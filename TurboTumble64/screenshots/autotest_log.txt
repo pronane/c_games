@@ -1,0 +1,35 @@
+Turbo Tumble 64 autotest  (raylib 6.0, GL renderer active)
+screenshot: screenshots/01_title.png
+screenshot: screenshots/02_character_select.png
+screenshot: screenshots/03_track_select.png
+screenshot: screenshots/04_options.png
+---- Race 1: Sunny Meadow Circuit  (player = Prof. Wobble, 712 samples, lap length 1425) ----
+screenshot: screenshots/race1_0_intro.png
+screenshot: screenshots/race1_1_countdown.png
+screenshot: screenshots/race1_item_roulette.png
+screenshot: screenshots/race1_2_racing.png
+screenshot: screenshots/race1_drift_blue.png
+AI: P1 approaching shortcut on lap 1 -> skip
+PERF: 600 frames at 1 sim step/frame took 2.32s => 259.1 fps average (uncapped, software GL under Xvfb)
+PERF: worst frame 135.7 ms
+screenshot: screenshots/race1_3_racing.png
+AI: P1 approaching shortcut on lap 2 -> take it
+screenshot: screenshots/race1_shortcut.png
+SHORTCUT: kart 0 (Prof. Wobble) completed the shortcut (lap 2)
+AI: P1 approaching shortcut on lap 3 -> skip
+player Prof. Wobble: laps=3 place=8 time=2'35"70 bestLap=0'49"24 items got=3 used=3 hits=0 wallBumps=1 boosts=13
+all racers: items got=34 used=42 hits=20 boosts=135, 8/8 crossed the line for real, sim race time 160.3s
+   1. Big Tony      2'27"39
+   2. Biscuit       2'30"30
+   3. Nana Nitro    2'30"44
+   4. Gloop         2'34"03
+   5. Captain Crumb 2'34"08
+   6. Frostina      2'34"15
+   7. Zippy         2'35"52
+   8. Prof. Wobble  2'35"70  <- P1
+render loop: 2939 frames in 10.4s real (283 fps with 4x sim steps/frame)
+terrain: shortcut taken by P1 1 time(s), by CPUs 0 time(s); landing boosts 25; mogul lift-offs 0 (P1 0)
+drift: P1 mini-turbos blue=9 orange=0; all racers blue=84 orange=3
+RESULT race 1: PASS
+screenshot: screenshots/race1_4_results.png
+==== SUMMARY: PASS (0 failures). Average loop fps during races: 283 ====

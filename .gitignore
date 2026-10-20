@@ -1,0 +1,6 @@
+*.jpeg
+*.mp4
+**/build/
+**/Build/
+*.vscode
+**/.vscode
