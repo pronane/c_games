@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hd-fighter-2
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3000

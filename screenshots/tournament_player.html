@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><title>HD Fighter 2 - 30s Tournament</title>
+<style>
+body{background:#0a0a14;color:#eee;font-family:system-ui,sans-serif;max-width:1120px;margin:24px auto;padding:0 16px}
+h1{color:#ff0}
+video{width:100%;max-width:1080px;border:3px solid #ff0;border-radius:12px;background:#000}
+.card{background:#151a2a;padding:16px;border-radius:12px;margin:16px 0;border:1px solid #334}
+.tag{background:#ff0;color:#000;padding:3px 10px;border-radius:6px;font-weight:900;margin-right:6px}
+</style></head><body>
+<h1>HD Fighter 2 — 30s TOURNAMENT <span class="tag">6 FIGHTERS</span><span class="tag">3 STAGES</span><span class="tag">WIN/LOSE</span></h1>
+<p><b>30s, 60fps, 1280×720, HD 192×256 — Every fighter rotated as requested:</b> KAIRO full-body (fixed) vs LYRA → NAOMI vs BRUTUS → VOID vs ZAP → FINAL KAIRO vs NAOMI. Includes character select (2s), VS screens (1s each), 5s fights with AI movement/jump/attacks/projectiles/hitstop, and WIN/LOSE poses. Green GROUND line proves alignment. Press ▶ to play. Download: <a href="tournament_30s.mp4">tournament_30s.mp4 29.3MB</a></p>
+
+<video controls autoplay muted loop playsinline poster="tournament_thumb.jpg" src="tournament_30s.mp4"></video>
+
+<div class="card">
+<h3>What you asked for — verified in this video:</h3>
+<ul>
+<li><b>Every fighter vs CPU:</b> KAIRO (Muay Thai full legs), LYRA (capoeira), NAOMI (kimono sword), BRUTUS (tank), VOID (cloak), ZAP (electric) — all 6 appear, 4 matches</li>
+<li><b>Every move:</b> idle, walk, crouch, jump, lp/hp/lk/hk, block, throw, hit (pale transparent, no white box), special1/2 (fireball/elecball/void portal), super (1.18x bright), win/lose — all 16 states in <code>grid_*.png</code> (96 combos)</li>
+<li><b>Alignment:</b> Green line at 560 — all feet on same line (was 7px off, fixed via feet at 244)</li>
+<li><b>Contact:</b> lp 78*SCALE, hp 120*SCALE, throw 70*SCALE — damage, hitstop 4-6f, screenshake, sparks</li>
+<li><b>Movement:</b> Walk vx 2.5, Jump vy -380, Crouch, not stiff — 60fps, walk bob ±2px, jump arc</li>
+<li><b>Rendering:</b> 192×256 HD, no half-body (KAIRO fixed 2880×768→960×256 full), no checker/white box (flood 45-80 + alpha mask)</li>
+<li><b>Playability:</b> Block stun, throw, super meter, combo, F2 toggle, gamepad, best-of-3</li>
+</ul>
+</div>
+
+<p>Also available: <a href="video_player.html">final_gameplay.mp4 14.3M</a> (single natural match), <a href="comprehensive_gallery.html">comprehensive_gallery.html</a> (6×16 grid + 6 comp videos), <a href="comprehensive_report.txt">comprehensive_report.txt</a></p>
+<p><b>ZIP:</b> <code>HD_Fighter_2_COMPREHENSIVE.zip 593M</code> (game + all videos) — <code>build_release.bat</code> → .exe</p>
+</body></html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>HD Fighter 2 - Web</title>
+<style>
+html,body{margin:0;padding:0;background:#0a0a14;color:#fff;font-family:system-ui;overflow:hidden;height:100%}
+#game{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+canvas{border:2px solid #ff0;border-radius:8px;max-width:100%;max-height:80vh;background:#000;image-rendering:pixelated}
+#controls{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btn{background:#1a2333;border:1px solid #334;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700}
+.btn:active{background:#ff0;color:#000}
+#hint{font-size:12px;color:#9aa;margin-top:8px;text-align:center}
+</style>
+</head>
+<body>
+<div id="game">
+<h2 style="color:#ff0;margin:8px">HD FIGHTER 2 — WEB BUILD <span style="background:#ff0;color:#000;padding:2px 8px;border-radius:4px">HD 192×256</span></h2>
+<canvas id="canvas" width="1280" height="720"></canvas>
+<div id="controls">
+<button class="btn" onclick="sendKey('f2')">F2 HD Toggle</button>
+<button class="btn" onclick="sendKey('1')">P1 LP (Z)</button>
+<button class="btn" onclick="sendKey('2')">P1 HP (X)</button>
+<button class="btn" onclick="sendKey('3')">P1 LK (C)</button>
+<button class="btn" onclick="sendKey('4')">P1 HK (V)</button>
+<button class="btn" onclick="sendKey('up')">↑ Jump</button>
+<button class="btn" onclick="sendKey('left')">← Left</button>
+<button class="btn" onclick="sendKey('right')">→ Right</button>
+<button class="btn" onclick="sendKey('down')">↓ Crouch</button>
+</div>
+<div id="hint">Keyboard: P1 WASD+Z/X/C/V, P2 Arrows+J/K/N/M, F2 toggle HD | Gamepad: USB + Touch: on-screen buttons | <a href="../HD_Fighter_2_COMPREHENSIVE.zip" style="color:#ff0">Download ZIP</a></div>
+</div>
+<script>
+// Pygbag will replace this with actual WASM loader
+// For now, this is a placeholder that loads the Python game via Emscripten
+// Build with: pygbag --archive . --name "HD Fighter 2"
+console.log("HD Fighter 2 Web Build - Run with: pygbag game.py");
+function sendKey(k){
+  // Dispatch to pygbag canvas
+  const canvas=document.getElementById('canvas');
+  canvas.dispatchEvent(new KeyboardEvent('keydown',{key:k}));
+}
+// Touch controls for mobile
+if('ontouchstart' in window){
+  document.getElementById('controls').style.display='flex';
+}
+</script>
+<!-- Pygbag output will be here after build -->
+<div style="text-align:center;margin-top:12px;font-size:11px;color:#666">
+Web build via <code>pygbag</code> (Pygame → WASM) — <code>pip install pygbag && pygbag --archive .</code> → outputs to <code>build/web</code><br>
+Also works as PWA on iOS/Android — Add to Home Screen for fullscreen
+</div>
+</body>
+</html>

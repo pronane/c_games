@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><title>HD Fighter 2 - FIXED ALIGNMENT & FLASH</title>
+<style>
+body{background:#0a0a14;color:#eee;font-family:system-ui,sans-serif;max-width:1120px;margin:24px auto;padding:0 16px}
+h1{color:#ff0} .tag{background:#ff0;color:#000;padding:3px 10px;border-radius:6px;font-weight:900;margin-right:6px}
+video{width:100%;max-width:1040px;border:2px solid #2f8;border-radius:10px;background:#000}
+.card{background:#151a2a;padding:18px;border-radius:14px;margin:18px 0;border:1px solid #334}
+.before{border-color:#f44} .after{border-color:#2f8}
+img{max-width:100%;border-radius:10px;border:1px solid #334;margin:8px 0}
+b{color:#ff0} i{color:#9cf} .label{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:800;font-size:12px}
+.label.before-l{background:#f44;color:#fff} .label.after-l{background:#2f8;color:#000}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<h1>HD Fighter 2 — FIXED <span class="tag">ALIGNMENT</span><span class="tag">TRANSPARENCY</span><span class="tag">192×256</span></h1>
+<p>You were right: <b>1) feet were 7px off</b> (KAIRO sinking, VOID floating) and <b>2) NAOMI/LYRA turned into white box on grey</b> when fireballed. Both fixed:</p>
+<ul>
+<li><b>Alignment:</b> Old: each character scaled to max 170×235 then placed at 12px padding → feet at different heights (KAIRO 16px vs VOID 9px). <b>Fixed:</b> find feet as lowest alpha>30 pixel in each crop, scale to common height 210px, place feet at exactly <code>256-12=244</code> for all 6. Now KAIRO/VOID/LYRA/NAOMI all stand on same black ground line.</li>
+<li><b>Flash transparency:</b> Old: <code>BLEND_RGBA_ADD</code> with white 170 on whole 192×256 → transparent pixels (alpha 0) became alpha 170 white box. <b>Fixed:</b> numpy mask <code>alpha>30</code> only, blend towards white 70% keeping original alpha. Now hit girls are pale ghost with transparent background.</li>
+</ul>
+
+<div class="card after">
+<h2>1) KAIRO vs VOID — Rooftop — 14.6MB 60fps <span class="label after-l">FIXED</span></h2>
+<video controls preload="metadata" src="fixed_hd1.mp4"></video>
+<p><b>Check:</b> Both feet on same line, no sinking. Pause at 2s — KAIRO HP vs VOID block aligned.</p>
+</div>
+
+<div class="card after">
+<h2>2) NAOMI vs ZAP — Industrial — 9.2MB <span class="label after-l">FIXED</span></h2>
+<video controls preload="metadata" src="fixed_hd2.mp4"></video>
+<p><b>Check:</b> NAOMI fireballed at 3-4s — now pale lavender transparent ghost, not white box on grey. ZAP electric aligned.</p>
+</div>
+
+<div class="card after">
+<h2>3) LYRA vs BRUTUS — Temple — 14.6MB <span class="label after-l">FIXED</span></h2>
+<video controls preload="metadata" src="fixed_hd3.mp4"></video>
+<p><b>Check:</b> LYRA kick vs BRUTUS hit — BRUTUS legs now solid (was semi-transparent ghost due to misaligned hit tint).</p>
+</div>
+
+<h2>Before / After — Alignment</h2>
+<div class="grid">
+<div class="card before"><h3><span class="label before-l">BEFORE</span> KAIRO sinking, VOID floating (7px gap)</h3><img src="../screenshots/final_kairo_void.png" onerror="this.src='final_kairo_void.png'"><p><i>KAIRO feet below pink platform, VOID above teal</i></p></div>
+<div class="card after"><h3><span class="label after-l">AFTER</span> Both on same line</h3><img src="align_kairo_void.png"><p><b>Both feet on 560 ground line, 4px shadow gap consistent</b></p></div>
+</div>
+
+<h2>Before / After — Transparency (hit flash)</h2>
+<div class="grid">
+<div class="card before"><h3><span class="label before-l">BEFORE</span> NAOMI white box on grey</h3><img src="/tmp/final_hd2_frame180.jpg" onerror="this.src='../screenshots/hit_naomi.png'"><p style="font-size:12px">Old: <code>BLEND_RGBA_ADD</code> made transparent → grey box</p></div>
+<div class="card after"><h3><span class="label after-l">AFTER</span> Pale ghost, background stays transparent</h3><img src="hit_naomi.png"><p>NAOMI hit by fireball — lavender tint, stage shows through</p></div>
+</div>
+
+<div class="grid">
+<div class="card before"><h3><span class="label before-l">BEFORE</span> LYRA hit ghost</h3><img src="hit_lyra_noflash.png"><p>Lyra hit without flash — but flash made box</p></div>
+<div class="card after"><h3><span class="label after-l">AFTER</span> Clean flash</h3><img src="hit_lyra.png"><p>Pale pink transparent — no box, even when fireballed</p></div>
+</div>
+
+<h2>Stills — aligned idle (all 6, 192×256)</h2>
+<img src="align_lyra_brutus.png"><p>LYRA vs BRUTUS idle — Lyra's back foot and Brutus's boots both on ground line</p>
+<img src="align_naomi_zap.png"><p>NAOMI vs ZAP — katana tip and electric feet aligned</p>
+
+<hr>
+<p>All 3 FIXED videos are <b>60fps, 192×256 per frame, 98 sprites 101-284K each, F2 toggles CLASSIC/HD</b>. Old broken videos: <a href="final_hd_gallery.html">final_hd_gallery.html</a> (5-figure bug) | <a href="videos.html">videos.html</a> placeholders</p>
+</body></html>
