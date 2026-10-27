@@ -1,0 +1,10 @@
+Asset: Fox, Khronos glTF Sample Asset
+Source: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/15cd02d304e54cb42a4db4eefe719f76190f4b68/Models/Fox
+Model: PixelMannen, CC0 1.0 Universal
+Rigging and animation: tomkranis, CC BY 4.0
+glTF conversion: AsoboStudio and scurest, CC BY 4.0
+CC BY 4.0 license: https://creativecommons.org/licenses/by/4.0/
+
+Downloaded by download_assets.py. The animation clips are ordered with Run
+first so the game's current first-clip animation playback uses the run cycle.
+Mesh, skin, and texture data are unchanged.

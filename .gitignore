@@ -10,3 +10,8 @@ bin/
 .DS_Store
 screenshots/*.mp4
 screenshots/*.jpg
+*.jpeg
+**/build/
+**/Build/
+*.vscode
+**/.vscode
