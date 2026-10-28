@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: hd-fighter-2
+    env: node
+    rootDir: multiplayer
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 10000
