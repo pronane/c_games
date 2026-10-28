@@ -7,6 +7,3 @@ services:
     startCommand: node server.js
     plan: free
     healthCheckPath: /api/health
-    envVars:
-      - key: PORT
-        value: 10000

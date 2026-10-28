@@ -27,6 +27,7 @@ function saveRoomState(room){ /* placeholder for Redis - in-memory is cache */ }
 
 setInterval(()=>{ wss.clients.forEach(ws=>{ if(ws.isAlive===false) return ws.terminate(); ws.isAlive=false; try{ws.ping()}catch{} }); }, 30000);
 wss.on('connection', ws => {
+  ws._msgCount=0; ws._msgWindow=Date.now();
   ws.id = Math.random().toString(36).slice(2,7);
   ws.userId = null;
   ws.room = null;
@@ -36,6 +37,7 @@ wss.on('connection', ws => {
   ws.isAlive=true;
   ws.on('pong', ()=>{ ws.isAlive=true; });
   ws.on('message', raw => {
+    const now=Date.now(); if(now - ws._msgWindow > 10000){ ws._msgWindow=now; ws._msgCount=0; } if(++ws._msgCount > 30){ try{ws.close(1008, 'rate limited');}catch{} return; }
     let m; try { m = JSON.parse(raw); } catch { return; }
 
     // PING
@@ -99,7 +101,7 @@ wss.on('connection', ws => {
       if (ws.room) { try{leave(ws)}catch{} }
       const room = rooms.get(m.room);
       if (!room) return ws.send(JSON.stringify({ t: 'error', msg: 'Room not found - try Create new room' }));
-      if (room.players.length >= 2 && !room.userIds[0]===uid && !room.userIds[1]===uid) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
+      if (room.players.filter(Boolean).length >= 2 && !Object.values(room.userIds||{}).includes(uid)) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
       if (room.players.length >= 2) { // maybe one slot empty due to disconnect, fill it
         let slot = room.players[0] ? 1 : 0;
         if (room.players.length===2) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
@@ -128,7 +130,7 @@ wss.on('connection', ws => {
       broadcast(r, { t: 'peer_pick', slot: ws.slot, char: m.char, picks:r.picks }, ws);
       if (r.picks[0] && r.picks[1]) {
         broadcast(r, { t: 'both_picked', picks: r.picks });
-        r.picks[0] && r.picks[1] && ws.send(JSON.stringify({ t:'both_picked', picks:r.picks }));
+
       }
       return;
     }
@@ -180,8 +182,8 @@ function leave(ws) {
     broadcast(r, { t: 'peer_left', slot: ws.slot, userId:ws.userId }, ws);
     // keep room+ picks for 60s to allow rejoin, just remove player ref
     r.players[ws.slot]=null; 
-    r.players = r.players.filter(Boolean); // compact but keep slot mapping via userIds
-    if (r.players.length === 0) {
+    /* keep sparse */
+    if (r.players.filter(Boolean).length === 0) {
       // don't delete immediately - keep picks for 2 min for invite link to still work
       setTimeout(()=>{ if(r.players.length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
     }
@@ -195,7 +197,6 @@ function leave(ws) {
 app.get('/api/rooms', (req,res) => {
   res.json([...rooms.values()].map(r => ({ id: r.id, players: r.players.length, picks: r.picks })));
 });
-app.get('/api/debug', (req,res) => res.json({rooms:[...rooms.keys()], count:rooms.size}));
 app.get('/api/health', (req,res) => res.json({ ok: true, rooms: rooms.size }));
 
 server.listen(PORT, '0.0.0.0', () => console.log(`HD Fighter 2 server on http://0.0.0.0:${PORT}`));
