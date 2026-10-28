@@ -53,8 +53,9 @@ wss.on('connection', ws => {
       return;
     }
 
-    // CREATE room
+    // CREATE room - leave old first
     if (m.t === 'create') {
+      if (ws.room) { try{leave(ws)}catch{} }
       const id = roomId();
       const room = { id, players: [ws], picks: {}, ready: {}, created: Date.now() };
       rooms.set(id, room);
@@ -63,11 +64,13 @@ wss.on('connection', ws => {
       return;
     }
 
-    // JOIN room
+    // JOIN room - leave old first
     if (m.t === 'join') {
+      if (ws.room && ws.room.id === m.room) return ws.send(JSON.stringify({ t: 'joined', room: ws.room.id, slot: ws.slot }));
+      if (ws.room) { try{leave(ws)}catch{} }
       const room = rooms.get(m.room);
-      if (!room) return ws.send(JSON.stringify({ t: 'error', msg: 'Room not found' }));
-      if (room.players.length >= 2) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full' }));
+      if (!room) return ws.send(JSON.stringify({ t: 'error', msg: 'Room not found - try Create new room' }));
+      if (room.players.length >= 2) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
       room.players.push(ws);
       ws.room = room; ws.slot = 1;
       ws.send(JSON.stringify({ t: 'joined', room: room.id, slot: 1 }));
@@ -88,12 +91,16 @@ wss.on('connection', ws => {
       return;
     }
 
-    // READY / START
+    // READY / START - ensure picks
     if (m.t === 'ready') {
       const r = ws.room; if (!r) return;
+      const F=['kairo','lyra','naomi','brutus','void','zap'];
+      if (!r.picks[ws.slot]) r.picks[ws.slot]=F[ws.slot%6];
       r.ready[ws.slot] = true;
       broadcast(r, { t: 'peer_ready', slot: ws.slot });
       if (r.ready[0] && r.ready[1]) {
+        if (!r.picks[0]) r.picks[0]='kairo';
+        if (!r.picks[1]) r.picks[1]='lyra';
         broadcast(r, { t: 'start', picks: r.picks, seed: Date.now() % 10000 });
       }
       return;
@@ -133,6 +140,7 @@ function leave(ws) {
 app.get('/api/rooms', (req,res) => {
   res.json([...rooms.values()].map(r => ({ id: r.id, players: r.players.length, picks: r.picks })));
 });
+app.get('/api/debug', (req,res) => res.json({rooms:[...rooms.keys()], count:rooms.size}));
 app.get('/api/health', (req,res) => res.json({ ok: true, rooms: rooms.size }));
 
 server.listen(PORT, '0.0.0.0', () => console.log(`HD Fighter 2 server on http://0.0.0.0:${PORT}`));
