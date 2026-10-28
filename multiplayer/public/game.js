@@ -62,7 +62,7 @@ joy.addEventListener('touchmove',e=>{e.preventDefault();updateJoy(joyPos(e));},{
 joy.addEventListener('touchend',e=>{e.preventDefault();touchInp.left=touchInp.right=touchInp.up=touchInp.down=touchInp.jump=false;knob.style.transform='translate(0,0)';},{passive:false});
 function updateJoy(p){let dx=p.x-joyCX,dy=p.y-joyCY;const r=46;const d=Math.hypot(dx,dy);if(d>r){dx=dx/d*r;dy=dy/d*r;}knob.style.transform=`translate(${dx}px,${dy}px)`;touchInp.left=dx<-14;touchInp.right=dx>14;touchInp.up=dy<-14;touchInp.down=dy>14;touchInp.jump=dy<-22;}
 document.querySelectorAll('.pad .b').forEach(b=>{const k=b.dataset.k;const set=v=>{if(k==='up')touchInp.jump=v,touchInp.up=v;else if(k==='down')touchInp.down=v;else if(k==='left')touchInp.left=v;else if(k==='right')touchInp.right=v;else touchInp[k]=v;};b.addEventListener('touchstart',e=>{e.preventDefault();set(true);b.style.background='#ffd000';b.style.color='#111';},{passive:false});b.addEventListener('touchend',e=>{e.preventDefault();set(false);b.style.background='';b.style.color='';},{passive:false});b.addEventListener('mousedown',()=>set(true));b.addEventListener('mouseup',()=>set(false));b.addEventListener('mouseleave',()=>set(false));});
-if('ontouchstart' in window)document.getElementById('stage').classList.add('show-touch');
+(function ensureTouchControls(){const stage=document.getElementById('stage');const isTouch='ontouchstart' in window||navigator.maxTouchPoints>0||/Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);if(isTouch)stage.classList.add('show-touch');})();
 // Keep session alive when app goes to background (WhatsApp share) - auto-rejoin on return
 let wasAway=false;
 window.addEventListener('pagehide', ()=>{ wasAway=true; });
@@ -77,4 +77,4 @@ window.addEventListener('online', ()=>{ if(room) { connect(); setTimeout(()=>sen
 // Restore last room on load
 try{ const savedRoom=localStorage.getItem('hd2_room'); const hashRoom=(location.hash||'').slice(1).toUpperCase(); const target=savedRoom||hashRoom; if(target && !room){ roomIn.value=target; /* auto-join after connect */ setTimeout(()=>{ if(!room) send({t:'join',room:target,userId}); }, 900); }}catch{}
 // Mobile: add bottom padding so controls don't cover fighters
-const style=document.createElement('style');style.textContent='@media(max-width:800px){#stage{margin-bottom:140px} .pad{bottom:-130px!important} .joy{bottom:-130px!important} #touch{position:static!important; height:140px; display:block!important; background:#0a0e20; border-top:1px solid #1e2440;}}';document.head.appendChild(style);
+const style=document.createElement('style');style.textContent='@media(max-width:800px){#stage{margin-bottom:150px}}';document.head.appendChild(style);

@@ -72,7 +72,7 @@ wss.on('connection', ws => {
       let existing = userRoom.get(uid);
       if (existing && rooms.has(existing)) {
         const er = rooms.get(existing);
-        if (er.players.length===1 && !er.started) { ws.room=er; ws.slot=0; ws.send(JSON.stringify({ t:'created', room:er.id, slot:0, picks:er.picks, rejoin:true })); return; }
+        if (er.players.filter(Boolean).length===1 && !er.started) { ws.room=er; ws.slot=0; ws.send(JSON.stringify({ t:'created', room:er.id, slot:0, picks:er.picks, rejoin:true })); return; }
       }
       const id = roomId();
       const room = { id, players: [ws], userIds:{0:uid}, picks: {}, ready: {}, created: Date.now(), started:false };
@@ -101,16 +101,12 @@ wss.on('connection', ws => {
       if (ws.room) { try{leave(ws)}catch{} }
       const room = rooms.get(m.room);
       if (!room) return ws.send(JSON.stringify({ t: 'error', msg: 'Room not found - try Create new room' }));
-      if (room.players.filter(Boolean).length >= 2 && !Object.values(room.userIds||{}).includes(uid)) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
-      if (room.players.length >= 2) { // maybe one slot empty due to disconnect, fill it
-        let slot = room.players[0] ? 1 : 0;
-        if (room.players.length===2) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
-      }
-      // find empty slot
-      let slot = 0; if(room.players[0] && !room.players[1]) slot=1; else if(!room.players[0] && room.players[1]) slot=0; else if(room.players.length===0) slot=0; else slot=1;
-      room.players[slot]=ws; if(!room.players[0]) room.players[0]=room.players[slot]; // ensure 0 exists
-      // handle sparse array case: normalize to [ws0,ws1]
-      if(room.players.length===1 && slot===1){ room.players[1]=ws; } else if(room.players[0]!==ws && room.players[1]!==ws){ room.players.push(ws); slot=room.players.length-1; }
+      const occupied = room.players.filter(Boolean).length;
+      if (occupied >= 2 && !Object.values(room.userIds||{}).includes(uid)) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
+      const has0 = !!room.players[0], has1 = !!room.players[1];
+      const slot = !has0 ? 0 : !has1 ? 1 : -1;
+      if (slot === -1) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
+      room.players[slot]=ws;
       ws.room = room; ws.slot = slot; room.userIds[slot]=uid; userRoom.set(uid, room.id);
       ws.send(JSON.stringify({ t: 'joined', room: room.id, slot: slot, picks:room.picks, ready:room.ready }));
       broadcast(room, { t: 'peer', id: ws.id, slot: slot, picks:room.picks }, ws);
@@ -181,11 +177,12 @@ function leave(ws) {
   if (r) {
     broadcast(r, { t: 'peer_left', slot: ws.slot, userId:ws.userId }, ws);
     // keep room+ picks for 60s to allow rejoin, just remove player ref
-    r.players[ws.slot]=null; 
-    /* keep sparse */
-    if (r.players.filter(Boolean).length === 0) {
+    r.players[ws.slot]=null;
+    r.ready[ws.slot]=false;
+    if (r.ready[0] && r.ready[1]) r.started=false;
+    if (r.players.filter(Boolean).length === 0 {
       // don't delete immediately - keep picks for 2 min for invite link to still work
-      setTimeout(()=>{ if(r.players.length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
+      setTimeout(()=>{ if(r.players.filter(Boolean).length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
     }
     ws.room = null;
   }
@@ -195,7 +192,7 @@ function leave(ws) {
 
 // Health + room list for lobby
 app.get('/api/rooms', (req,res) => {
-  res.json([...rooms.values()].map(r => ({ id: r.id, players: r.players.length, picks: r.picks })));
+  res.json([...rooms.values()].map(r => ({ id: r.id, players: r.players.filter(Boolean).length, picks: r.picks })));
 });
 app.get('/api/health', (req,res) => res.json({ ok: true, rooms: rooms.size }));
 
