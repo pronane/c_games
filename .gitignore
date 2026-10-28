@@ -1,5 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+build/
+bin/
+*.apk
+*.aab
+.DS_Store
+screenshots/*.mp4
+screenshots/*.jpg
 *.jpeg
-*.mp4
 **/build/
 **/Build/
 *.vscode

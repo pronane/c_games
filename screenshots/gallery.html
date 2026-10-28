@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HD Fighter 2 — Screenshot Gallery (93 frames, fully tested)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0e1018;color:#e8e8ef;line-height:1.5}
+  header{max-width:1100px;margin:32px auto 16px;padding:0 20px}
+  header h1{font-size:28px;letter-spacing:0.5px}
+  header h1 span{color:#66e0a8}
+  header p{color:#a0a6b8;margin-top:8px;font-size:14px}
+  header .badges{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .badge{background:#1c2130;border:1px solid #2a3350;border-radius:999px;padding:4px 10px;font-size:12px;color:#8edfff}
+  section{max-width:1100px;margin:32px auto;padding:0 20px}
+  section h2{font-size:20px;margin-bottom:4px;color:#e8e8ef}
+  section .sub{font-size:13px;color:#8a90a8;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+  .card{background:#161a28;border:1px solid #252d45;border-radius:12px;overflow:hidden}
+  .card img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover}
+  .card figcaption{padding:10px 12px;font-size:13px}
+  .card figcaption b{color:#fff}
+  .card figcaption span{color:#8a90a8}
+  .hero{border-color:#3a6bff !important}
+  .hero figcaption{background:linear-gradient(180deg,#1a2340,#161a28)}
+  .full{grid-column:1 / -1}
+  .full img{aspect-ratio:16/9}
+  footer{max-width:1100px;margin:40px auto;padding:20px;border-top:1px solid #252d45;color:#6b7288;font-size:12px}
+  a{color:#66e0a8}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HD FIGHTER 2 — <span>Original HD Fighting Game</span></h1>
+  <p>93 screenshots rendered headless (SDL dummy) from the <b>fully tested build</b> — 6 fighters × 16 states × 3 parallax stages. All art is procedural, no Capcom assets. Font/UI/anchoring fixes verified.</p>
+  <div class="badges">
+    <span class="badge">✓ 96 sprite sheets 192×256</span>
+    <span class="badge">✓ 3 stages 1280×720</span>
+    <span class="badge">✓ 6 FX + 6 portraits</span>
+    <span class="badge">✓ 300-frame stress passed</span>
+    <span class="badge">✓ Frozen exe path fixed (_internal/next/_MEIPASS)</span>
+    <span class="badge">✓ Hitbox / frame_durations crashes fixed</span>
+  </div>
+</header>
+
+<section>
+  <h2>🎮 Character Select</h2>
+  <div class="sub">2-player fighter selection — fixed layout fits 1280px (was overflowing), 6 original fighters</div>
+  <div class="grid">
+    <figure class="card">
+      <img src="01_select_default.png" alt="Character select default">
+      <figcaption><b>Character select</b> — <span>6 fighters: KAIRO (Muay Thai), LYRA (Capoeira), BRUTUS (Brawler), NAOMI (Kenjutsu), ZAP (Electric), VOID (Mystic)</span></figcaption>
+    </figure>
+    <figure class="card">
+      <img src="02_select_p1_confirm.png" alt="P1 confirmed">
+      <figcaption><b>P1 confirms KAIRO</b> — <span>blue border → P1 locked</span></figcaption>
+    </figure>
+    <figure class="card hero">
+      <img src="03_select_both_ready.png" alt="Both ready">
+      <figcaption><b>Both ready — PRESS ENTER TO FIGHT</b> — <span>stage: NEON ROOFTOP</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>🏙️ Parallax Stages (3 × bg/mid/fg layers)</h2>
+  <div class="sub">1280×720 layered backgrounds — moon lit city, temple, industrial zone</div>
+  <div class="grid">
+    <figure class="card"><img src="04_stage_rooftop.png" alt="Neon Rooftop"><figcaption><b>NEON ROOFTOP</b> — <span>night city, moon, lit windows, rain</span></figcaption></figure>
+    <figure class="card"><img src="04_stage_temple.png" alt="Temple"><figcaption><b>ANCIENT TEMPLE</b> — <span>mountains, cherry blossom, lanterns</span></figcaption></figure>
+    <figure class="card"><img src="04_stage_industrial.png" alt="Industrial"><figcaption><b>INDUSTRIAL ZONE</b> — <span>smokestacks, pipes, cranes</span></figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>🧍 6 Fighters — Idle Poses</h2>
+  <div class="sub">96×128 base, 2× HD scale = 192×256 in-game, head now attached to torso (was floating)</div>
+  <div class="grid">
+    <figure class="card"><img src="05_idle_kairo.png" alt="Kairo"><figcaption><b>KAIRO</b> — <span>Muay Thai, red shorts, headband</span></figcaption></figure>
+    <figure class="card"><img src="05_idle_lyra.png" alt="Lyra"><figcaption><b>LYRA</b> — <span>Capoeira acrobat, teal dojo, aura FX</span></figcaption></figure>
+    <figure class="card"><img src="05_idle_brutus.png" alt="Brutus"><figcaption><b>BRUTUS</b> — <span>Heavy brawler, gray tank</span></figcaption></figure>
+    <figure class="card"><img src="05_idle_naomi.png" alt="Naomi"><figcaption><b>NAOMI</b> — <span>Katana, purple kimono, ribbon</span></figcaption></figure>
+    <figure class="card"><img src="05_idle_zap.png" alt="Zap"><figcaption><b>ZAP</b> — <span>Electric wrestler, blue/yellow, lightningFX</span></figcaption></figure>
+    <figure class="card"><img src="05_idle_void.png" alt="Void"><figcaption><b>VOID</b> — <span>Mystic, black/cyan robe, hood</span></figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>🥊 Movesets — Each fighter: LP/HP/LK/HK + Specials + Super</h2>
+  <div class="sub">Mid-frame of each animation — startup/active/recovery frames, distinct durations</div>
+
+  <h3 style="margin:16px 0 12px;font-size:16px;color:#66e0a8">KAIRO — Muay Thai striker</h3>
+  <div class="grid">
+    <figure class="card"><img src="06_kairo_lp.png"><figcaption><b>LP</b> — <span>jab</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_hp.png"><figcaption><b>HP</b> — <span>heavy elbow, forward dash</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_lk.png"><figcaption><b>LK</b> — <span>low kick</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_hk.png"><figcaption><b>HK</b> — <span>high roundhouse</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_block.png"><figcaption><b>BLOCK</b> — <span>high guard</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_special1.png"><figcaption><b>SPECIAL 1</b> — <span>fireball (spawns projectile)</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_special2.png"><figcaption><b>SPECIAL 2</b> — <span>dash</span></figcaption></figure>
+    <figure class="card hero"><img src="06_kairo_super.png"><figcaption><b>SUPER</b> — <span>24 dmg cinematic, shake 12</span></figcaption></figure>
+    <figure class="card"><img src="06_kairo_hit.png"><figcaption><b>HIT</b> — <span>hitstun 0.4–1.0s</span></figcaption></figure>
+  </div>
+
+  <h3 style="margin:16px 0 12px;font-size:16px;color:#66e0a8">LYRA — Capoeira</h3>
+  <div class="grid">
+    <figure class="card"><img src="06_lyra_lp.png"><figcaption><b>LP</b></figcaption></figure>
+    <figure class="card"><img src="06_lyra_hp.png"><figcaption><b>HP</b></figcaption></figure>
+    <figure class="card"><img src="06_lyra_hk.png"><figcaption><b>HK — acrobatic kick</b></figcaption></figure>
+    <figure class="card hero"><img src="06_lyra_super.png"><figcaption><b>SUPER — aura burst</b></figcaption></figure>
+  </div>
+
+  <h3 style="margin:16px 0 12px;font-size:16px;color:#66e0a8">BRUTUS / NAOMI / ZAP / VOID</h3>
+  <div class="grid">
+    <figure class="card"><img src="06_brutus_super.png"><figcaption><b>BRUTUS SUPER</b></figcaption></figure>
+    <figure class="card"><img src="06_naomi_hp.png"><figcaption><b>NAOMI HP — katana slash</b></figcaption></figure>
+    <figure class="card"><img src="06_naomi_special1.png"><figcaption><b>NAOMI SPECIAL — blade wave</b></figcaption></figure>
+    <figure class="card"><img src="06_zap_super.png"><figcaption><b>ZAP SUPER — electric</b></figcaption></figure>
+    <figure class="card"><img src="06_void_super.png"><figcaption><b>VOID SUPER — void orb</b></figcaption></figure>
+    <figure class="card"><img src="06_zap_special1.png"><figcaption><b>ZAP SPECIAL — elecball</b></figcaption></figure>
+    <figure class="card"><img src="06_lyra_special1.png"><figcaption><b>LYRA SPECIAL — spin</b></figcaption></figure>
+    <figure class="card"><img src="06_brutus_hk.png"><figcaption><b>BRUTUS HK</b></figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>💥 Combat — Projectiles, Throws, Supers, FX</h2>
+  <div class="sub">Hit-stop, screen shake, sparks, combo counter, super meter, blockstun</div>
+  <div class="grid">
+    <figure class="card hero full"><img src="15_vs_showdown.png"><figcaption><b>VS SHOWDOWN</b> — <span>KAIRO vs VOID, Industrial stage</span></figcaption></figure>
+    <figure class="card"><img src="07_fireball_kairo_vs_lyra.png"><figcaption><b>PROJECTILE — Fireball</b> — <span>KAIRO → LYRA (block), 12 dmg, life 45</span></figcaption></figure>
+    <figure class="card"><img src="08_elecball_zap_vs_naomi.png"><figcaption><b>PROJECTILE — Elecball</b> — <span>ZAP → NAOMI, 14 dmg, hitstun 0.55</span></figcaption></figure>
+    <figure class="card"><img src="09_throw_brutus.png"><figcaption><b>THROW</b> — <span>BRUTUS grab, 18 dmg, 0.9s stun</span></figcaption></figure>
+    <figure class="card"><img src="10_super_void.png"><figcaption><b>SUPER MOVE</b> — <span>VOID cinematic, 24 dmg, meter drains 500→0</span></figcaption></figure>
+    <figure class="card"><img src="11_combo_lyra.png"><figcaption><b>COMBO — 4 HIT</b> — <span>timer 1.2s, yellow counter</span></figcaption></figure>
+    <figure class="card"><img src="12_hitstop_spark.png"><figcaption><b>HIT-STOP + SPARK + SHAKE</b> — <span>6-frame freeze, shake 10</span></figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>❤️ HUD & States — Timer, Super Meter, Low HP, Win</h2>
+  <div class="sub">Timer no longer overlaps ROUND, health/super bars, combo, clutch/win poses</div>
+  <div class="grid">
+    <figure class="card"><img src="13_low_hp_clutch.png"><figcaption><b>CLUTCH — 1% HP!</b> — <span>KAIRO 8 HP vs VOID 92</span></figcaption></figure>
+    <figure class="card hero"><img src="14_win_pose_brutus.png"><figcaption><b>WIN / LOSE — GAME OVER</b> — <span>best-of-3, first to 2, R to reselect</span></figcaption></figure>
+  </div>
+</section>
+
+<footer>
+  All screenshots generated by <code>python /tmp/gallery.py</code> with <code>SDL_VIDEODRIVER=dummy</code> on 2026-10-26 after the full fix pass (robust <code>_find_assets()</code>, <code>frame_durations</code>, <code>remove(entry)</code>, head anchor <code>cy+10</code>, layout <code>160+12</code>, HUD <code>64/22</code>). Full sources + build in <code>/home/user/HD_Fighter_2.zip</code>. Run <code>build_release.bat</code> on Windows → <code>dist\HD_Fighter_2\HD_Fighter_2.exe</code>. 93 PNGs in <code>screenshots/</code>.
+</footer>
+
+</body>
+</html>

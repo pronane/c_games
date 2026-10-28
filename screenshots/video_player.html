@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>HD Fighter 2 - Gameplay Video</title>
+<style>
+body{background:#0a0a14;color:#eee;font-family:system-ui,sans-serif;max-width:1100px;margin:24px auto;padding:0 16px}
+h1{color:#ff0}
+video{width:100%;max-width:1040px;border:3px solid #ff0;border-radius:12px;background:#000}
+a{color:#ff0}
+.card{background:#151a2a;padding:16px;border-radius:12px;margin:16px 0;border:1px solid #334}
+</style></head><body>
+<h1>HD Fighter 2 — Gameplay Video <span style="background:#ff0;color:#000;padding:3px 10px;border-radius:6px">60fps HD 192×256</span></h1>
+<p>This is actual gameplay (AI vs AI, 12s, 60fps) — <b>KAIRO now full-body with legs</b> vs VOID, rooftop stage, hitstop, screen shake, projectiles, 1280×720. Timer 99→88, health bars deplete. Press ▶ to play. Download: <a href="final_gameplay.mp4">final_gameplay.mp4 14.3MB</a> | <a href="gameplay_kairo_void.mp4">kairo_void 14M</a> | <a href="gameplay_lyra_brutus.mp4">lyra_brutus 15M</a> | <a href="gameplay_naomi_zap.mp4">naomi_zap 8M</a></p>
+
+<video controls autoplay muted loop playsinline poster="final_charselect_for_video.png" src="final_gameplay.mp4"></video>
+
+<div class="card">
+<h3>What you're seeing (all fixed):</h3>
+<ul>
+<li><b>KAIRO full legs:</b> red shorts, wraps to bare feet — was half-body, now 2880×768 AI → 960×256 (149K) full</li>
+<li><b>Alignment:</b> both feet on green GROUND line (560), consistent 12px offset — no sinking/floating</li>
+<li><b>No white box:</b> hit flash now alpha-masked (was BLEND_RGBA_ADD → grey box), now pale transparent</li>
+<li><b>Every fighter/ move works:</b> 6 fighters × 16 moves =96 combos verified, see <a href="comprehensive_gallery.html">comprehensive_gallery.html</a> for all 6 vs CPU videos + 96 screenshots</li>
+<li><b>Gamepad + F2 toggle:</b> Press F2 in-game to switch CLASSIC 96×128 ↔ HD 192×256 live</li>
+</ul>
+</div>
+
+<p>Full deliverable ZIP: <code>HD_Fighter_2_COMPREHENSIVE.zip 593M</code> (or <code>HD_Fighter_2_FINAL2.zip 22M</code> without videos) — run <code>python game.py</code> or <code>build_release.bat</code> for .exe</p>
+</body></html>

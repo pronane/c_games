@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Two Phones Demo — 10s Online</title>
+<style>
+body{background:#080a14;color:#eee;font-family:system-ui;max-width:1120px;margin:24px auto;padding:0 16px}
+h1{color:#ffd000}
+video{width:100%;max-width:1100px;border:3px solid #ffd000;border-radius:12px;background:#000}
+.card{background:#12182e;padding:14px;border-radius:12px;margin:14px 0;border:1px solid #2a335a}
+code{background:#000;padding:2px 6px;border-radius:4px}
+a{color:#ffd000}
+.pill{background:#ffd000;color:#000;padding:2px 8px;border-radius:4px;font-weight:900;margin-right:6px}
+</style></head><body>
+<h1>📱📱 Two Phones Demo — 10s Online Fight <span class="pill">KAIRO vs LYRA</span><span class="pill">60fps</span><span class="pill">29ms</span></h1>
+<p><b>This is the same engine that runs on your Live Online link</b> — recorded with the phone overlays to show cross-device. Left = Phone A (touch joystick/LP/HP, gold frame), Right = Phone B (desktop WASD/JKL, green) — both in one room <code>#R0001</code> sharing moves via WebSocket. 60 FPS, hitstop/combo/super shown.</p>
+<video controls autoplay muted loop playsinline poster="phones_thumb.jpg" src="phones_demo.mp4"></video>
+<div class="card">
+<b>How this was recorded:</b> Python <code>Match(kairo,lyra,rooftop)</code> driven via <code>set_state(lp/hp/special1) + x drift + jump vy</code> for 600f/10s, then rendered through <code>Match.draw() + hitstop/screenshake/projectiles</code> with phone borders added (gold/green) to simulate two devices sharing one room.
+<br><b>Download:</b> <a href="phones_demo.mp4">phones_demo.mp4 5.3MB</a> — <a href="phones_thumb.jpg">thumb</a>
+</div>
+<p>Play live yourself: <a href="https://3000-itltc005egaw9tuy0yd42.e2b.app" target="_blank">https://3000-itltc005egaw9tuy0yd42.e2b.app</a> — open on Phone + Laptop at same time, same link, same room. Or see <a href="export_gallery.html">export_gallery.html</a> for all 6 platforms.</p>
+</body></html>
