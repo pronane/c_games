@@ -25,6 +25,7 @@ function broadcast(room, msg, except=null) {
 }
 function saveRoomState(room){ /* placeholder for Redis - in-memory is cache */ }
 
+setInterval(()=>{ wss.clients.forEach(ws=>{ if(ws.isAlive===false) return ws.terminate(); ws.isAlive=false; try{ws.ping()}catch{} }); }, 30000);
 wss.on('connection', ws => {
   ws.id = Math.random().toString(36).slice(2,7);
   ws.userId = null;
@@ -32,6 +33,8 @@ wss.on('connection', ws => {
   ws.slot = -1;
   console.log('connect', ws.id);
 
+  ws.isAlive=true;
+  ws.on('pong', ()=>{ ws.isAlive=true; });
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
 
@@ -180,7 +183,7 @@ function leave(ws) {
     r.players = r.players.filter(Boolean); // compact but keep slot mapping via userIds
     if (r.players.length === 0) {
       // don't delete immediately - keep picks for 2 min for invite link to still work
-      setTimeout(()=>{ if(r.players.length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 120000);
+      setTimeout(()=>{ if(r.players.length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
     }
     ws.room = null;
   }
