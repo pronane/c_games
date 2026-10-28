@@ -180,7 +180,7 @@ function leave(ws) {
     r.players[ws.slot]=null;
     r.ready[ws.slot]=false;
     if (r.ready[0] && r.ready[1]) r.started=false;
-    if (r.players.filter(Boolean).length === 0 {
+    if (r.players.filter(Boolean).length === 0) {
       // don't delete immediately - keep picks for 2 min for invite link to still work
       setTimeout(()=>{ if(r.players.filter(Boolean).length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
     }
