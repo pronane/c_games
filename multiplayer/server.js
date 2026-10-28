@@ -8,7 +8,8 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: false }));
+app.use((req,res,next)=>{res.set('Cache-Control','no-store'); next();});
 app.use('/assets', express.static(path.join(__dirname, '..', 'assets_hd')));
 
 // Rooms: { id: { players: [ws1, ws2], picks: {}, ready: {}, state: {} } }
