@@ -1,0 +1,18 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <NoWarn>CS0649;CS0169;CS0414</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Tests/**/*.cs" />
+    <Compile Remove="Web/**/*.cs" />
+    <Compile Remove="Server/**/*.cs" />
+    <Compile Remove="Tools/**/*.cs" />
+    <None Include="Shaders/**/*" />
+    <None Include="Data/**/*" />
+  </ItemGroup>
+</Project>

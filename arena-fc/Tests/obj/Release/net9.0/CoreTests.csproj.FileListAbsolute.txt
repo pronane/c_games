@@ -1,0 +1,14 @@
+/home/user/arena-fc/Tests/bin/Release/net9.0/CoreTests
+/home/user/arena-fc/Tests/bin/Release/net9.0/CoreTests.deps.json
+/home/user/arena-fc/Tests/bin/Release/net9.0/CoreTests.runtimeconfig.json
+/home/user/arena-fc/Tests/bin/Release/net9.0/CoreTests.dll
+/home/user/arena-fc/Tests/bin/Release/net9.0/CoreTests.pdb
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.GeneratedMSBuildEditorConfig.editorconfig
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.AssemblyInfoInputs.cache
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.AssemblyInfo.cs
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.csproj.CoreCompileInputs.cache
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.dll
+/home/user/arena-fc/Tests/obj/Release/net9.0/refint/CoreTests.dll
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.pdb
+/home/user/arena-fc/Tests/obj/Release/net9.0/CoreTests.genruntimeconfig.cache
+/home/user/arena-fc/Tests/obj/Release/net9.0/ref/CoreTests.dll

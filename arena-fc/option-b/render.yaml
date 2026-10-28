@@ -1,0 +1,24 @@
+# Arena FC — Option B: Node static edge + .NET authoritative server behind /ws proxy
+# Single Render Docker service (paid plan required for Docker on Render).
+#
+# Topology:
+#   https://arena-fc.onrender.com/          -> Express static (Godot WASM) + COOP/COEP
+#   https://arena-fc.onrender.com/health    -> health check
+#   wss://arena-fc.onrender.com/ws          -> http-proxy-middleware -> ws://127.0.0.1:7777 (.NET)
+#
+# Render injects PORT automatically. The Node edge binds to $PORT (public).
+# The .NET server binds to 127.0.0.1:7777 (internal only, not exposed publicly).
+
+services:
+  - type: web
+    name: arena-fc
+    env: docker
+    repo: https://github.com/YOUR_OWNER/arena-fc   # <-- replace with your repo
+    dockerfilePath: ./Dockerfile
+    plan: starter                                  # Docker requires paid Render plan
+    healthCheckPath: /health
+    envVars:
+      - key: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
+        value: 1
+      - key: ASPNETCORE_URLS
+        value: http://127.0.0.1:7777               # .NET listens internally only

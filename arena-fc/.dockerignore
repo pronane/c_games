@@ -1,0 +1,19 @@
+# Keep the Docker build context small - the server only needs C# sources.
+build/
+.godot/
+media/
+screenshots/
+bin/
+obj/
+**/bin/
+**/obj/
+.git/
+.cache/
+__pycache__/
+*.zip
+*.mp4
+*.png
+*.tpz
+Tests/
+Tools/
+Web/
