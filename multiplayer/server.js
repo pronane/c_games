@@ -14,10 +14,15 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: false 
 app.use((req,res,next)=>{res.set('Cache-Control','no-store'); next();});
 app.use('/assets', express.static(path.join(__dirname, '..', 'assets_hd')));
 
-// Rooms sophisticated: { id, players:[ws0,ws1], userIds:{0:uid,1:uid}, picks:{0:char,1:char}, ready:{0:bool,1:bool}, created, started }
+// Rooms: { id, players:[ws|null,ws|null], userIds:{0:uid,1:uid}, picks:{0:char,1:char}, ready:{0:bool,1:bool}, created, started }
+// players[] is kept sparse (null holes) so slot→player mapping never shifts after a disconnect.
 const rooms = new Map();
 let nextRoom = 1;
 let waiting = null;
+
+// Per-connection message rate limit (30 msgs / 10 s)
+const MSG_LIMIT = 30;
+const MSG_WINDOW = 10000;
 
 function roomId() { return 'R' + String(nextRoom++).padStart(4,'0'); }
 function broadcast(room, msg, except=null) {
@@ -43,7 +48,7 @@ wss.on('connection', ws => {
     // PING
     if (m.t === 'ping') { ws.send(JSON.stringify({ t: 'pong', ts: m.ts })); return; }
 
-    // QUICK PLAY - auto matchmake with userId
+    // QUICK PLAY
     if (m.t === 'quick') {
       const uid=getUserId(ws,m); ws.userId=uid;
       if (waiting && waiting !== ws && !waiting.room) {
@@ -64,15 +69,14 @@ wss.on('connection', ws => {
       return;
     }
 
-    // CREATE room - userId-backed, cached
+    // CREATE room
     if (m.t === 'create') {
       const uid = getUserId(ws,m); ws.userId = uid;
       if (ws.room) { try{leave(ws)}catch{} }
-      // reuse existing room if same user already has one with 1 player and not started
       let existing = userRoom.get(uid);
       if (existing && rooms.has(existing)) {
         const er = rooms.get(existing);
-        if (er.players.filter(Boolean).length===1 && !er.started) { ws.room=er; ws.slot=0; ws.send(JSON.stringify({ t:'created', room:er.id, slot:0, picks:er.picks, rejoin:true })); return; }
+        if (er.players.length===1 && !er.started) { ws.room=er; ws.slot=0; ws.send(JSON.stringify({ t:'created', room:er.id, slot:0, picks:er.picks, rejoin:true })); return; }
       }
       const id = roomId();
       const room = { id, players: [ws], userIds:{0:uid}, picks: {}, ready: {}, created: Date.now(), started:false };
@@ -85,14 +89,13 @@ wss.on('connection', ws => {
       return;
     }
 
-    // JOIN room - leave old, sync cached state, allow rejoin
+    // JOIN room
     if (m.t === 'join') {
       const uid = getUserId(ws,m); ws.userId = uid;
       if (ws.room && ws.room.id === m.room) return ws.send(JSON.stringify({ t: 'joined', room: ws.room.id, slot: ws.slot, picks:ws.room.picks, ready:ws.room.ready }));
-      // check if this user already in this room (refresh/rejoin)
       const existingRoom = rooms.get(m.room);
       if (existingRoom) {
-        for(let s=0;s<2;s++){ if(existingRoom.userIds[s]===uid){ ws.room=existingRoom; ws.slot=s; // reattach ws
+        for(let s=0;s<2;s++){ if(existingRoom.userIds[s]===uid){ ws.room=existingRoom; ws.slot=s;
             existingRoom.players[s]=ws;
             ws.send(JSON.stringify({ t:'joined', room:existingRoom.id, slot:s, picks:existingRoom.picks, ready:existingRoom.ready, rejoin:true }));
             broadcast(existingRoom,{t:'peer_rejoin', slot:s, userId:uid},ws);
@@ -101,22 +104,20 @@ wss.on('connection', ws => {
       if (ws.room) { try{leave(ws)}catch{} }
       const room = rooms.get(m.room);
       if (!room) return ws.send(JSON.stringify({ t: 'error', msg: 'Room not found - try Create new room' }));
-      const occupied = room.players.filter(Boolean).length;
-      if (occupied >= 2 && !Object.values(room.userIds||{}).includes(uid)) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
-      const has0 = !!room.players[0], has1 = !!room.players[1];
-      const slot = !has0 ? 0 : !has1 ? 1 : -1;
+      const hasSlot0 = !!room.players[0], hasSlot1 = !!room.players[1];
+      if (hasSlot0 && hasSlot1 && room.userIds[0] !== uid && room.userIds[1] !== uid) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
+      let slot = !hasSlot0 ? 0 : !hasSlot1 ? 1 : -1;
       if (slot === -1) return ws.send(JSON.stringify({ t: 'error', msg: 'Room full (2/2) - Create new room' }));
-      room.players[slot]=ws;
-      ws.room = room; ws.slot = slot; room.userIds[slot]=uid; userRoom.set(uid, room.id);
+      room.players[slot] = ws;
+      ws.room = room; ws.slot = slot; room.userIds[slot] = uid; userRoom.set(uid, room.id);
       ws.send(JSON.stringify({ t: 'joined', room: room.id, slot: slot, picks:room.picks, ready:room.ready }));
       broadcast(room, { t: 'peer', id: ws.id, slot: slot, picks:room.picks }, ws);
-      // send existing picks to joiner so they see opponent's choice
       if(Object.keys(room.picks).length) ws.send(JSON.stringify({ t:'room_state', picks:room.picks, ready:room.ready }));
       saveRoomState(room);
       return;
     }
 
-    // CHARACTER PICK - cached per room per slot
+    // CHARACTER PICK
     if (m.t === 'pick') {
       const r = ws.room; if (!r) return ws.send(JSON.stringify({t:'error',msg:'No room - Create first'}));
       const uid=getUserId(ws,m); ws.userId=uid; if(uid) r.userIds[ws.slot]=uid;
@@ -126,12 +127,11 @@ wss.on('connection', ws => {
       broadcast(r, { t: 'peer_pick', slot: ws.slot, char: m.char, picks:r.picks }, ws);
       if (r.picks[0] && r.picks[1]) {
         broadcast(r, { t: 'both_picked', picks: r.picks });
-
       }
       return;
     }
 
-    // READY / START - ensure picks cached, prompt if missing
+    // READY / START
     if (m.t === 'ready') {
       const r = ws.room; if (!r) return ws.send(JSON.stringify({t:'error',msg:'No room'}));
       if (!r.picks[ws.slot]) return ws.send(JSON.stringify({t:'error',msg:'Pick a fighter first - tap a portrait'}));
@@ -148,13 +148,12 @@ wss.on('connection', ws => {
         r.started=true; saveRoomState(r);
         broadcast(r, { t: 'start', picks: r.picks, seed: Date.now() % 10000 });
       } else {
-        // send current state to both so UI shows 1/2 ready
         broadcast(r,{t:'room_state', picks:r.picks, ready:r.ready});
       }
       return;
     }
 
-    // INPUT: relay to peer(s) with server tick
+    // INPUT / STATE / HIT / CHAT relay
     if (m.t === 'input' || m.t === 'state' || m.t === 'hit' || m.t === 'chat') {
       const r = ws.room; if (!r) return;
       m.from = ws.slot;
@@ -169,20 +168,19 @@ wss.on('connection', ws => {
     }
   });
 
-  ws.on('close', () => leave(ws));
+  ws.on('close', () => { leave(ws); });
 });
 
 function leave(ws) {
   const r = ws.room;
   if (r) {
     broadcast(r, { t: 'peer_left', slot: ws.slot, userId:ws.userId }, ws);
-    // keep room+ picks for 60s to allow rejoin, just remove player ref
-    r.players[ws.slot]=null;
-    r.ready[ws.slot]=false;
-    if (r.ready[0] && r.ready[1]) r.started=false;
+    // null the slot, keep sparse; clear ready so a departed player can't count as ready
+    r.players[ws.slot] = null;
+    r.ready[ws.slot] = false;
+    if (r.ready[0] && r.ready[1]) r.started = false; // a readied player left, match not started
     if (r.players.filter(Boolean).length === 0) {
-      // don't delete immediately - keep picks for 2 min for invite link to still work
-      setTimeout(()=>{ if(r.players.filter(Boolean).length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
+      setTimeout(()=>{ const r2 = rooms.get(r.id); if (r2 && r2.players.filter(Boolean).length===0) { rooms.delete(r.id); console.log('room expired',r.id); } }, 300000);
     }
     ws.room = null;
   }
@@ -190,7 +188,6 @@ function leave(ws) {
   console.log('leave', ws.id, 'slot',ws.slot, 'user',ws.userId);
 }
 
-// Health + room list for lobby
 app.get('/api/rooms', (req,res) => {
   res.json([...rooms.values()].map(r => ({ id: r.id, players: r.players.filter(Boolean).length, picks: r.picks })));
 });
