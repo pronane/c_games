@@ -235,6 +235,35 @@ async function testPairs(port) {
   return { pairs: 100, uniqueCodes: new Set(codes).size };
 }
 
+async function testLeaveBeforeGo(port) {
+  const a = await bot(port, 'leave-a');
+  const b = await bot(port, 'leave-b');
+  a.send({ t: 'create' });
+  const created = await a.wait((m) => m.t === 'created');
+  b.send({ t: 'join', room: created.room });
+  await b.wait((m) => m.t === 'joined');
+  a.send({ t: 'pick', char: 'kairo' });
+  b.send({ t: 'pick', char: 'lyra' });
+  await a.wait((m) => m.t === 'room_state' && field(m.picks, 0) && field(m.picks, 1));
+  a.send({ t: 'ready', ready: true, readySeq: 1 });
+  b.send({ t: 'ready', ready: true, readySeq: 1 });
+  await a.wait((m) => m.t === 'countdown');
+  await b.wait((m) => m.t === 'countdown');
+  await b.close();
+  const notice = await a.wait((m) => m.t === 'peer_left' || (m.t === 'room_state' && m.notice));
+  check(/opponent left/i.test(notice.notice || ''), 'missing Opponent left notice: ' + JSON.stringify(notice));
+  const state = await a.wait((m) => m.t === 'room_state' && m.phase === 'lobby' && m.notice);
+  check(field(state.ready, 0) === false && field(state.ready, 1) === false, 'ready flags were not both cleared');
+  check(state.started === false, 'started stayed true');
+  check(!a.msgs.some((m) => m.t === 'go'), 'go arrived after the opponent left');
+  a.send({ t: 'ready', ready: true, readySeq: 2 });
+  const again = await a.wait((m) => m.t === 'room_state' && m.seq > state.seq && field(m.ready, 0) === true);
+  check(field(again.ready, 1) === false, 'missing opponent counted as ready');
+  check(!a.closed, 'survivor socket closed');
+  await a.close();
+  return { room: created.room, notice: state.notice, readyCleared: true };
+}
+
 async function testInputSoak(port) {
   const total = SOAK_SECONDS * 60;
   const a = await bot(port, 'soak-a');
@@ -298,6 +327,9 @@ async function main() {
     const rejoin = await testRejoin(port);
     console.log('PASS rejoin', rejoin.createRoom, 'guest slot', rejoin.guestSlot);
     summary.push({ name: 'rejoin mid-way and create-rejoin slot', ok: true, detail: rejoin });
+    const leftEarly = await testLeaveBeforeGo(port);
+    console.log('PASS leave before go', leftEarly);
+    summary.push({ name: 'opponent leaves during countdown', ok: true, detail: leftEarly });
     const pairs = await testPairs(port);
     console.log('PASS pairs', pairs.uniqueCodes);
     summary.push({ name: '100 sequential pair joins', ok: true, detail: pairs });

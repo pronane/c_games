@@ -15,6 +15,7 @@ const LOAD_TIMEOUT_MS = 20000;
 const ROOM_TTL_MS = 300000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const FIGHTERS = new Set(['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap']);
+const INPUT_DELAY_FRAMES = 3;
 
 function createServer() {
   const app = express();
@@ -127,6 +128,7 @@ function createServer() {
       occupied: { 0: !!room.players[0], 1: !!room.players[1] },
       phase: room.phase,
       epoch: room.epoch,
+      delay: INPUT_DELAY_FRAMES,
       seq: ++room.seq,
     };
   }
@@ -244,6 +246,7 @@ function createServer() {
       picks: { 0: room.picks[0] || null, 1: room.picks[1] || null },
       phase: 'playing',
       started: true,
+      delay: INPUT_DELAY_FRAMES,
       epoch: room.epoch,
       seq: ++room.seq,
     });
@@ -332,8 +335,11 @@ function createServer() {
     clearLoadTimer(room);
     const userId = ws.userId;
     room.players[slot] = null;
-    room.ready[slot] = false;
-    room.loaded[slot] = false;
+    // Clear both ready flags. Leaving only the leaver's flag set left the
+    // other player stuck on a disabled Ready button through the countdown.
+    room.ready = { 0: false, 1: false };
+    room.readySeq = { 0: -1, 1: -1 };
+    room.loaded = { 0: false, 1: false };
     // Unconditional: the old check ran after this slot was already cleared, so it never fired.
     room.started = false;
     room.phase = 'lobby';
@@ -348,10 +354,14 @@ function createServer() {
       room: room.id,
       slot,
       userId,
+      notice: 'Opponent left',
+      ready: { 0: false, 1: false },
+      phase: 'lobby',
+      started: false,
       epoch: room.epoch,
       seq: ++room.seq,
     });
-    broadcastState(room);
+    broadcast(room, Object.assign(snapshot(room), { notice: 'Opponent left' }));
     if (room.players.filter(Boolean).length === 0) armExpiry(room);
     console.log('leave', ws.id, 'slot', slot, 'user', userId);
   }
@@ -366,7 +376,7 @@ function createServer() {
     try { m = JSON.parse(text); } catch { return; }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
 
-    if (m.t === 'input') {
+    if (m.t === 'input' || m.t === 'hash') {
       const gate = takeInput(ws);
       if (gate === 'close') {
         try { ws.close(1008, 'rate limited'); } catch {}
@@ -376,10 +386,31 @@ function createServer() {
       const room = ws.room;
       if (!room || room.players[ws.slot] !== ws) return;
       if (m.epoch != null && Number(m.epoch) !== room.epoch) return;
+      if (m.t === 'hash') {
+        broadcast(room, {
+          t: 'hash',
+          frame: m.frame,
+          hash: m.hash,
+          from: ws.slot,
+          epoch: room.epoch,
+        }, ws);
+        return;
+      }
+      let batch = null;
+      if (Array.isArray(m.batch)) {
+        batch = [];
+        for (const item of m.batch) {
+          if (!item || typeof item.frame !== 'number' || item.frame < 0 || item.frame > 1000000) continue;
+          batch.push({ frame: item.frame | 0, inp: item.inp || null });
+          if (batch.length >= 30) break;
+        }
+      }
       broadcast(room, {
         t: 'input',
         inp: m.inp,
         n: m.n,
+        frame: typeof m.frame === 'number' ? m.frame : null,
+        batch,
         seq: typeof m.seq === 'number' ? m.seq : null,
         from: ws.slot,
         fromGen: room.slotGen[ws.slot],

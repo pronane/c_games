@@ -1,3 +1,5 @@
+import { createMatch, cloneInput, neutralInput, HASH_EVERY, DEFAULT_DELAY } from './sim.mjs';
+
 const FIGHTERS = ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap'];
 const FNAME = { kairo: 'KAIRO', lyra: 'LYRA', naomi: 'NAOMI', brutus: 'BRUTUS', void: 'VOID', zap: 'ZAP' };
 const STAGES = ['rooftop', 'temple', 'industrial'];
@@ -42,11 +44,16 @@ let slot = -1;
 let picks = {};
 let pingMs = 0;
 const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-let userId = localStorage.getItem('hd2_userId');
+// Per-tab id. sessionStorage survives a reload of this tab and is not shared
+// with a second tab, so the second tab cannot take this tab's slot.
+let userId = sessionStorage.getItem('hd2_tabId');
 let lastRoom = localStorage.getItem('hd2_room');
 if (!userId) {
-  userId = 'u' + Math.random().toString(36).slice(2, 9);
-  localStorage.setItem('hd2_userId', userId);
+  const bytes = new Uint8Array(6);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = (Date.now() + i * 17) & 255;
+  userId = 't' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  sessionStorage.setItem('hd2_tabId', userId);
 }
 
 let myPick = null;
@@ -54,8 +61,15 @@ let peerPick = null;
 let serverReady = { 0: false, 1: false };
 let occupied = { 0: false, 1: false };
 let fighters = [null, null];
-let match = null;
+let sim = null;
+let inputQueue = [];
+let sentFrames = new Set();
+let localHashes = new Map();
+let remoteHashes = new Map();
+let lastHash = 0;
+let raf = null;
 let keys = {};
+let touchInp = {};
 let remoteKeys = {};
 let fighterImgs = {};
 let bgImg = new Image();
@@ -74,7 +88,6 @@ let intentionalLeave = false;
 let loadedFor = null;
 let beganId = null;
 let matchGen = 0;
-let raf = null;
 const queue = [];
 
 function wsURL() { return `${proto}://${location.host}`; }
@@ -298,8 +311,13 @@ function acceptMeta(m) {
 }
 
 function syncReadyButton() {
-  if (match && !match.over) return;
-  if ((slot === 0 || slot === 1) && serverReady[slot]) {
+  if (sim && !sim.closed) return;
+  if (!room || (slot !== 0 && slot !== 1)) {
+    readyBtn.disabled = true;
+    pickInfo.textContent = myPick ? `You: ${FNAME[myPick]} — join a room, then Ready` : 'Pick a fighter';
+    return;
+  }
+  if (serverReady[slot]) {
     readyBtn.disabled = true;
     pickInfo.textContent = 'Ready! Waiting…';
     return;
@@ -392,8 +410,10 @@ function fightersThumbs() {
       for (const c of chargrid.children) c.classList.remove('sel');
       d.classList.add('sel');
       myPick = f;
-      readyBtn.disabled = false;
-      pickInfo.textContent = `You: ${FNAME[f]} — hit Ready`;
+      syncReadyButton();
+      if (room && (slot === 0 || slot === 1) && !serverReady[slot]) {
+        pickInfo.textContent = `You: ${FNAME[f]} — hit Ready`;
+      }
       send({ t: 'pick', char: f, userId });
     });
     chargrid.appendChild(d);
@@ -424,7 +444,9 @@ function loadFighterSheets(char) {
     const file = entry ? entry[0] : `sprites/${char}_${s}.png`;
     const count = entry ? entry[1] : 5;
     const img = new Image();
-    fighterImgs[char][s] = { img, count, w: 0, h: 0, fw: 192, frames: count };
+    // These three idle sheets are not one fighter per frame (see PR notes).
+    const broken = (char === 'brutus' || char === 'void' || char === 'zap') && s === 'idle';
+    fighterImgs[char][s] = { img, count, w: 0, h: 0, fw: 192, frames: count, broken };
     img.onload = () => {
       fighterImgs[char][s].w = img.width;
       fighterImgs[char][s].h = img.height;
@@ -437,7 +459,7 @@ function loadFighterSheets(char) {
 }
 
 function loadStage(name) {
-  const base = `./assets_hd/stages/${name}`;
+  const base = `./assets_hd/stages/stage_${name}`;
   bgImg = new Image(); bgImg.src = `${base}_bg.png`;
   midImg = new Image(); midImg.src = `${base}_mid.png`;
   fgImg = new Image(); fgImg.src = `${base}_fg.png`;
@@ -519,7 +541,9 @@ function onMsg(e) {
     if (!applySnapshot(m)) return;
     const p0 = val(picks, 0);
     const p1 = val(picks, 1);
-    statusEl.textContent = `Room ${room || ''} — P1:${p0 || '—'}${serverReady[0] ? ' ✅' : ''} P2:${p1 || '—'}${serverReady[1] ? ' ✅' : ''}`;
+    statusEl.textContent = m.notice
+      ? m.notice
+      : `Room ${room || ''} — P1:${p0 || '—'}${serverReady[0] ? ' ✅' : ''} P2:${p1 || '—'}${serverReady[1] ? ' ✅' : ''}`;
     if (m.phase === 'lobby') loadedFor = null;
     maybeFlushReady();
     return;
@@ -540,7 +564,7 @@ function onMsg(e) {
     if (!m.startId || beganId === m.startId) return;
     beganId = m.startId;
     pendingReady = false;
-    startMatch(m.picks || picks, m.seed, m.startAt);
+    startMatch(m.picks || picks, m.seed, m.delay);
     return;
   }
   if (m.t === 'ready_ack') {
@@ -563,18 +587,17 @@ function onMsg(e) {
   }
   if (m.t === 'peer_left') {
     if (!acceptMeta(m)) return;
-    if (typeof m.slot === 'number') {
-      serverReady[m.slot] = false;
-      occupied[m.slot] = false;
-    }
-    const who = picks[m.slot];
-    statusEl.textContent = `P${(m.slot ?? 0) + 1} left${who ? ` (was ${FNAME[who] || who})` : ''}`;
+    serverReady = { 0: false, 1: false };
+    if (typeof m.slot === 'number') occupied[m.slot] = false;
+    loadedFor = null;
+    statusEl.textContent = m.notice || 'Opponent left';
     updateRoomInfo();
-    endMatch('Opponent left');
-    syncReadyButton();
+    if (sim && !sim.closed) endMatch('Opponent left');
+    else syncReadyButton();
     return;
   }
   if (m.t === 'input') onRemoteInput(m);
+  if (m.t === 'hash') onRemoteHash(m);
 }
 
 quickBtn.onclick = () => {
@@ -642,155 +665,56 @@ if (bootCode) {
   setTimeout(() => { if (!room) startJoin(bootCode); }, 200);
 }
 
-class Fighter {
-  constructor(idx, char, x, facing) {
-    this.idx = idx;
-    this.char = char;
-    this.x = x;
-    this.y = GROUND_Y;
-    this.vx = 0;
-    this.vy = 0;
-    this.facing = facing;
-    this.state = 'idle';
-    this.frame = 0;
-    this.tick = 0;
-    this.lock = 0;
-    this.hp = 100;
-    this.super = 0;
-    this.blocking = false;
-    this.hitStun = 0;
-    this.combo = 0;
+function drawFighter(f, context) {
+  const sheet = fighterImgs[f.char]?.[f.state] || fighterImgs[f.char]?.idle;
+  const broken = sheet && sheet.broken;
+  if (!sheet || !sheet.img.complete || !sheet.img.naturalWidth || broken) {
+    drawSilhouette(f, context);
+    return;
   }
-  inputToState(inp, other) {
-    if (this.hitStun > 0 || this.lock > 0) return;
-    if (inp.throw && Math.abs(this.x - other.x) < 70) { this.setState('throw', 18); return; }
-    if (inp.lp) { this.setState('lp', 12); return; }
-    if (inp.hp) { this.setState('hp', 16); return; }
-    if (inp.lk) { this.setState('lk', 12); return; }
-    if (inp.hk) { this.setState('hk', 16); return; }
-    if (inp.special1) { this.setState('special1', 18); return; }
-    if (inp.special2) { this.setState('special2', 18); return; }
-    if (inp.super && this.super >= 100) { this.setState('super', 24); this.super = 0; return; }
-    if (inp.block) { this.setState('block', 8); this.blocking = true; return; }
-    this.blocking = false;
-    let mv = 0;
-    if (inp.left) mv -= 1;
-    if (inp.right) mv += 1;
-    if (mv !== 0) {
-      this.vx = mv * SPEED;
-      if (this.state !== 'walk' && this.y >= GROUND_Y) this.setState('walk');
-      this.facing = mv > 0 ? 1 : -1;
-    } else {
-      this.vx = 0;
-      if (this.state === 'walk') this.setState('idle');
-    }
-    if (inp.jump && this.y >= GROUND_Y) { this.vy = JUMP; this.setState('jump'); }
-    if (inp.down && this.y >= GROUND_Y) this.setState('crouch');
+  const scale = window.innerWidth < 900 ? 1.6 : 1.05;
+  const fw = sheet.fw || 192;
+  const fh = sheet.h || 256;
+  const sw = fw * scale;
+  const sh = fh * scale;
+  const frames = sheet.frames || 5;
+  const sx = (f.frame % frames) * fw;
+  const flip = f.facing < 0;
+  context.save();
+  context.shadowColor = 'rgba(0,0,0,0.7)';
+  context.shadowBlur = 8;
+  if (flip) {
+    context.scale(-1, 1);
+    context.drawImage(sheet.img, sx, 0, fw, fh, -f.x - sw / 2, f.y - sh + 12, sw, sh);
+  } else {
+    context.drawImage(sheet.img, sx, 0, fw, fh, f.x - sw / 2, f.y - sh + 12, sw, sh);
   }
-  setState(s, lockTicks = 0) {
-    if (this.state === s && lockTicks === 0) return;
-    this.state = s;
-    this.frame = 0;
-    this.tick = 0;
-    this.lock = lockTicks;
-  }
-  update(other) {
-    if (this.hitStun > 0) this.hitStun -= 1;
-    if (this.lock > 0) {
-      this.lock -= 1;
-      if (this.lock <= 0 && this.state !== 'jump' && this.state !== 'hit') this.setState('idle');
-    }
-    this.x += this.vx * SIM_DT;
-    if (this.y < GROUND_Y || this.vy !== 0) {
-      this.y += this.vy * SIM_DT;
-      this.vy += GRAV * SIM_DT;
-      if (this.y >= GROUND_Y) {
-        this.y = GROUND_Y;
-        this.vy = 0;
-        if (this.state === 'jump') this.setState('idle');
-      }
-    }
-    this.x = Math.max(70, Math.min(SCREEN_W - 70, this.x));
-    if (Math.abs(this.x - other.x) > 10) this.facing = other.x > this.x ? 1 : -1;
-    this.tick += 1;
-    const need = DUR[this.state] || 4;
-    if (this.tick >= need) {
-      this.tick = 0;
-      this.frame += 1;
-      const sheet = fighterImgs[this.char]?.[this.state];
-      const maxF = sheet ? sheet.frames : 5;
-      if (this.frame >= maxF) {
-        if (['lp', 'hp', 'lk', 'hk', 'throw', 'special1', 'special2', 'super', 'hit'].includes(this.state)) this.setState('idle');
-        else this.frame = 0;
-      }
-    }
-    if (this.state === 'idle' || this.state === 'walk') this.super = Math.min(100, this.super + 0.06);
-  }
-  hurtbox() { return { x: this.x - 36, y: this.y - 110, w: 72, h: 110 }; }
-  hitbox() {
-    const s = this.state;
-    if (!['lp', 'hp', 'lk', 'hk', 'throw', 'special1', 'special2', 'super'].includes(s)) return null;
-    const active = this.frame >= 1 && this.frame <= 2;
-    if (!active) return null;
-    const dir = this.facing;
-    const range = s === 'hp' || s === 'hk' || s === 'super' ? 110 : 78;
-    const xoff = dir > 0 ? 20 : -20 - range;
-    return { x: this.x + xoff, y: this.y - 95, w: range, h: 34, dmg: DMG[s] || 8 };
-  }
-  takeHit(dmg, from) {
-    if (this.blocking) {
-      dmg = Math.floor(dmg * 0.25);
-      this.hitStun = 4;
-      this.vx = (this.x > from.x ? 1 : -1) * 60;
-      return dmg;
-    }
-    this.hp = Math.max(0, this.hp - dmg);
-    this.hitStun = 10;
-    this.setState('hit', 10);
-    this.vx = (this.x > from.x ? 1 : -1) * 90;
-    if (this.hp <= 0) this.setState('lose');
-    return dmg;
-  }
-  draw(context) {
-    const sheet = fighterImgs[this.char]?.[this.state] || fighterImgs[this.char]?.idle;
-    if (!sheet || !sheet.img.complete) return;
-    const scale = window.innerWidth < 900 ? 1.6 : 1.05;
-    const fw = sheet.fw || 192;
-    const fh = sheet.h || 256;
-    const sw = fw * scale;
-    const sh = fh * scale;
-    const sx = (this.frame % sheet.frames) * fw;
-    const flip = this.facing < 0;
-    context.save();
-    context.shadowColor = 'rgba(0,0,0,0.7)';
-    context.shadowBlur = 8;
-    if (flip) {
-      context.scale(-1, 1);
-      context.drawImage(sheet.img, sx, 0, fw, fh, -this.x - sw / 2, this.y - sh + 12, sw, sh);
-    } else {
-      context.drawImage(sheet.img, sx, 0, fw, fh, this.x - sw / 2, this.y - sh + 12, sw, sh);
-    }
-    context.restore();
-    if (this.super > 0) {
-      context.fillStyle = '#222';
-      context.fillRect(this.x - 32, this.y - 126, 64, 4);
-      context.fillStyle = '#ffd000';
-      context.fillRect(this.x - 32, this.y - 126, 64 * this.super / 100, 4);
-    }
+  context.restore();
+  if (f.super > 0) {
+    context.fillStyle = '#222';
+    context.fillRect(f.x - 32, f.y - 126, 64, 4);
+    context.fillStyle = '#ffd000';
+    context.fillRect(f.x - 32, f.y - 126, 64 * f.super / 100, 4);
   }
 }
 
-let hitstop = 0;
-let shake = 0;
-let hits = [];
-let touchInp = {};
-
-function currentInputFor(slotIdx) {
-  if (slotIdx === slot) return readLocalInput();
-  return remoteKeys;
+function drawSilhouette(f, context) {
+  const color = f.char === 'void' ? '#6ec8ff' : f.char === 'zap' ? '#ffe14a' : '#d7d7e0';
+  context.save();
+  context.fillStyle = color;
+  context.fillRect(f.x - 28, f.y - 132, 56, 120);
+  context.beginPath();
+  context.arc(f.x, f.y - 148, 18, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = '#fff';
+  context.font = '700 14px system-ui';
+  context.textAlign = 'center';
+  context.fillText(FNAME[f.char] || f.char, f.x, f.y - 176);
+  context.restore();
 }
+
 function readLocalInput() {
-  const inp = { left: false, right: false, up: false, down: false, jump: false, lp: false, hp: false, lk: false, hk: false, block: false, throw: false, special1: false, special2: false, super: false };
+  const inp = neutralInput();
   if (keys.a || keys.arrowleft) inp.left = true;
   if (keys.d || keys.arrowright) inp.right = true;
   if (keys.w || keys.arrowup) { inp.jump = true; inp.up = true; }
@@ -820,99 +744,104 @@ function readLocalInput() {
   }
   return inp;
 }
-function sendInput(inp) {
-  if (!match || match.over || !ws || ws.readyState !== 1 || !room) return;
-  transmit({ t: 'input', inp });
+
+function queueLocal(frame) {
+  if (!sim || sentFrames.has(frame) || frame < 0) return;
+  const inp = cloneInput(readLocalInput());
+  if (!sim.setInput(slot, frame, inp)) return;
+  sentFrames.add(frame);
+  inputQueue.push({ frame, inp });
 }
-function intersect(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-function tick(sendNet) {
-  if (!match || match.over || !fighters[0] || !fighters[1]) return;
-  const myInp = readLocalInput();
-  if (sendNet) sendInput(myInp);
-  if (hitstop > 0) { hitstop -= 1; return; }
-  const inp0 = currentInputFor(0);
-  const inp1 = currentInputFor(1);
-  fighters[0].inputToState(inp0, fighters[1]);
-  fighters[1].inputToState(inp1, fighters[0]);
-  fighters[0].update(fighters[1]);
-  fighters[1].update(fighters[0]);
-  const aHit = fighters[0].hitbox();
-  const bHit = fighters[1].hitbox();
-  const aHurt = fighters[0].hurtbox();
-  const bHurt = fighters[1].hurtbox();
-  let hit = false;
-  if (aHit && intersect(aHit, bHurt)) {
-    fighters[1].takeHit(aHit.dmg, fighters[0]);
-    hit = true;
-    if (!fighters[1].blocking) fighters[1].combo += 1;
-    shake = 6;
-    hitstop = 4;
-    hits.push({ x: aHit.x + aHit.w / 2, y: aHit.y + 8, t: 0.18 });
-  }
-  if (bHit && intersect(bHit, aHurt)) {
-    fighters[0].takeHit(bHit.dmg, fighters[1]);
-    hit = true;
-    shake = 6;
-    hitstop = 4;
-    hits.push({ x: bHit.x + bHit.w / 2, y: bHit.y + 8, t: 0.18 });
-  }
-  if (hit) {
-    hpA.style.width = fighters[0].hp + '%';
-    hpB.style.width = fighters[1].hp + '%';
-  }
-  if (fighters[0].hp <= 0 || fighters[1].hp <= 0) {
-    const win = fighters[0].hp > fighters[1].hp ? 0 : 1;
-    endMatch(`${FNAME[fighters[win].char]} WINS!`);
-    return;
-  }
-  for (const h of hits) h.t -= SIM_DT;
-  hits = hits.filter((h) => h.t > 0);
+
+function flushInputs() {
+  if (!inputQueue.length || !ws || ws.readyState !== 1 || !room) return;
+  const batch = inputQueue.splice(0, 30);
+  transmit({ t: 'input', batch });
 }
 
 function onRemoteInput(m) {
-  if (!m.inp) return;
+  if (!sim || sim.closed) return;
   if (typeof m.epoch === 'number' && m.epoch !== roomEpoch) return;
-  if (m.fromGen != null && m.fromGen !== remoteGen) {
-    remoteGen = m.fromGen;
-    remoteSeq = -1;
+  const from = m.from === 0 || m.from === 1 ? m.from : (slot ^ 1);
+  if (from === slot) return;
+  const items = Array.isArray(m.batch) && m.batch.length
+    ? m.batch
+    : (typeof m.frame === 'number' ? [{ frame: m.frame, inp: m.inp }] : []);
+  for (const item of items) {
+    if (!item || typeof item.frame !== 'number') continue;
+    sim.setInput(from, item.frame, item.inp);
   }
-  if (typeof m.seq === 'number') {
-    if (m.seq <= remoteSeq) return;
-    remoteSeq = m.seq;
-  }
-  remoteKeys = {
-    left: !!m.inp.left, right: !!m.inp.right, up: !!m.inp.up, down: !!m.inp.down,
-    jump: !!m.inp.jump, lp: !!m.inp.lp, hp: !!m.inp.hp, lk: !!m.inp.lk, hk: !!m.inp.hk,
-    block: !!m.inp.block, throw: !!m.inp.throw, special1: !!m.inp.special1,
-    special2: !!m.inp.special2, super: !!m.inp.super,
-  };
 }
 
-function onSecond() {
-  if (!match || match.over) return;
-  match.timer = Math.max(0, match.timer - 1);
-  timerEl.textContent = String(match.timer).padStart(2, '0');
-  if (match.timer <= 0) endMatch('Time up!');
+function onRemoteHash(m) {
+  if (!sim || typeof m.frame !== 'number') return;
+  if (typeof m.epoch === 'number' && m.epoch !== roomEpoch) return;
+  remoteHashes.set(m.frame, m.hash >>> 0);
+  const mine = localHashes.get(m.frame);
+  if (mine != null && mine !== (m.hash >>> 0)) flagDesync(m.frame, mine, m.hash >>> 0);
 }
 
-function startMatch(picksMap, seed, startAt) {
+function publishHash() {
+  if (!sim || sim.frame <= 0 || sim.frame % HASH_EVERY !== 0) return;
+  if (localHashes.has(sim.frame)) return;
+  const hash = sim.hash() >>> 0;
+  localHashes.set(sim.frame, hash);
+  lastHash = hash;
+  if (ws && ws.readyState === 1) transmit({ t: 'hash', frame: sim.frame, hash });
+  const theirs = remoteHashes.get(sim.frame);
+  if (theirs != null && theirs !== hash) flagDesync(sim.frame, hash, theirs);
+  const dbg = document.getElementById('simdebug');
+  if (dbg) {
+    dbg.dataset.frame = String(sim.frame);
+    dbg.dataset.hash = String(hash);
+    dbg.dataset['h' + sim.frame] = String(hash);
+    dbg.textContent = `frame=${sim.frame} hash=${hash} delay=${sim.delay}`;
+  }
+}
+
+function flagDesync(frame, local, remote) {
+  console.warn('desync', { frame, local, remote });
+  const el = document.getElementById('desync');
+  if (!el) return;
+  el.textContent = `Desync at frame ${frame}. The two games no longer match.`;
+  el.classList.add('show');
+}
+
+function resultText() {
+  if (!sim || !sim.result) return '';
+  if (sim.result === 'time') {
+    if (sim.fighters[0].hp === sim.fighters[1].hp) return 'Time up!';
+  }
+  const w = sim.fighters[sim.winner];
+  if (!w) return sim.result === 'time' ? 'Time up!' : 'Draw';
+  return `${FNAME[w.char] || w.char} WINS!`;
+}
+
+function startMatch(picksMap, seed, delay) {
   const a = val(picksMap, 0) || FIGHTERS[0];
   const b = val(picksMap, 1) || FIGHTERS[1];
   const stage = STAGES[(Number(seed) || 0) % STAGES.length];
   loadFighterSheets(a);
   loadFighterSheets(b);
   loadStage(stage);
-  fighters[0] = new Fighter(0, a, 360, 1);
-  fighters[1] = new Fighter(1, b, SCREEN_W - 360, -1);
-  const gen = ++matchGen;
-  const origin = typeof startAt === 'number' ? startAt : Date.now();
-  match = { stage, timer: 99, gen, origin, simFrame: 0, over: false };
-  hitstop = 0;
-  shake = 0;
-  hits = [];
-  remoteKeys = {};
+  const useDelay = delay > 0 ? delay : DEFAULT_DELAY;
+  sim = createMatch({
+    p0: a,
+    p1: b,
+    seed,
+    delay: useDelay,
+    frames: META && META.characters,
+  });
+  fighters = sim.fighters;
+  inputQueue = [];
+  sentFrames = new Set();
+  localHashes = new Map();
+  remoteHashes = new Map();
+  lastHash = 0;
+  const desyncEl = document.getElementById('desync');
+  if (desyncEl) { desyncEl.textContent = ''; desyncEl.classList.remove('show'); }
+  const ko = document.getElementById('koBanner');
+  if (ko) { ko.classList.remove('show'); ko.textContent = ''; }
   show('gameScr');
   nameA.textContent = `P1 ${FNAME[a] || a}`;
   nameB.textContent = `P2 ${FNAME[b] || b}`;
@@ -920,55 +849,80 @@ function startMatch(picksMap, seed, startAt) {
   hpB.style.width = '100%';
   timerEl.textContent = '99';
   inviteEl.textContent = location.origin + location.pathname + '#' + (room || '');
-  document.getElementById('stage').classList.add('show-touch');
   statusEl.textContent = `Fight! ${FNAME[a] || a} vs ${FNAME[b] || b} — ${stage.toUpperCase()}`;
+  // Both sides commit the same opening frames before either steps.
+  const opening = cloneInput(readLocalInput());
+  for (let f = 0; f < useDelay; f++) {
+    sim.setInput(slot, f, opening);
+    sentFrames.add(f);
+    inputQueue.push({ frame: f, inp: cloneInput(opening) });
+  }
+  flushInputs();
   if (raf) cancelAnimationFrame(raf);
+  const gen = ++matchGen;
   const loop = () => {
-    if (!match || match.gen !== gen || match.over) return;
-    const due = Math.floor((Date.now() - origin) / SIM_MS);
+    if (!sim || sim.closed || matchGen !== gen) return;
     let steps = 0;
-    const behind = due - match.simFrame;
-    const cap = behind > 30 ? 10 : Math.max(behind, 0);
-    while (match && !match.over && match.simFrame < due && steps < cap) {
+    while (sim.canStep() && steps < 8 && !sim.result) {
+      sim.step();
       steps += 1;
-      const sendNet = behind <= 2 || steps === cap;
-      tick(sendNet);
-      if (!match || match.over) return;
-      match.simFrame += 1;
-      if (match.simFrame % SIM_HZ === 0) onSecond();
+      queueLocal(sim.frame - 1 + sim.delay);
+      publishHash();
+      if (sim.result) break;
     }
+    flushInputs();
     render();
+    if (sim.result) {
+      endMatch(resultText());
+      return;
+    }
+    const stall = document.getElementById('stall');
+    if (stall) stall.textContent = sim.canStep() ? '' : 'Waiting for opponent…';
     raf = requestAnimationFrame(loop);
   };
   raf = requestAnimationFrame(loop);
 }
 
 function endMatch(msg) {
-  if (!match || match.over) return;
-  match.over = true;
-  matchGen += 1;
+  if (!sim || sim.closed) return;
+  sim.closed = true;
   if (raf) cancelAnimationFrame(raf);
   raf = null;
-  const frozen = match;
+  const banner = document.getElementById('koBanner');
+  if (banner && msg && msg !== 'Left room') {
+    banner.textContent = msg;
+    banner.classList.add('show');
+  }
+  const frozen = sim;
+  const wait = msg && msg !== 'Left room' ? 2200 : 400;
   setTimeout(() => {
-    if (match === frozen) match = null;
-    statusEl.textContent = msg;
+    if (sim !== frozen) return;
+    if (banner) banner.classList.remove('show');
+    sim = null;
+    fighters = [null, null];
+    statusEl.textContent = msg || '';
     show('lobby');
     if (msg && msg.includes('WINS')) {
       vsLine.style.display = 'block';
       vsLine.textContent = msg;
     }
     syncReadyButton();
-  }, 900);
+  }, wait);
 }
 
 function render() {
-  if (!match) return;
+  if (!sim) return;
+  const a = sim.fighters[0];
+  const b = sim.fighters[1];
+  hpA.style.width = a.hp + '%';
+  hpB.style.width = b.hp + '%';
+  timerEl.textContent = String(sim.timer).padStart(2, '0');
   ctx.clearRect(0, 0, SCREEN_W, SCREEN_H);
-  if (shake > 0) {
+  const shake = sim.hitstop > 0 ? 4 : 0;
+  if (shake) {
     ctx.save();
-    ctx.translate((Math.random() - 0.5) * shake * 2, (Math.random() - 0.5) * shake);
-    shake = Math.max(0, shake - 0.8);
+    const dir = (sim.frame % 2) ? 1 : -1;
+    ctx.translate(dir * shake, 0);
   }
   if (bgImg.complete && bgImg.naturalWidth) ctx.drawImage(bgImg, 0, 0, SCREEN_W, SCREEN_H);
   else { ctx.fillStyle = '#0e1a33'; ctx.fillRect(0, 0, SCREEN_W, SCREEN_H); }
@@ -978,27 +932,28 @@ function render() {
   ctx.fillStyle = '#111';
   ctx.fillRect(0, GROUND_Y, SCREEN_W, 4);
   if (fgImg.complete && fgImg.naturalWidth) ctx.drawImage(fgImg, 0, 0, SCREEN_W, SCREEN_H);
-  for (const f of fighters) {
-    if (!f) continue;
+  for (const f of sim.fighters) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
     ctx.ellipse(f.x, GROUND_Y + 6, 54, 10, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  const ordered = fighters.filter(Boolean).sort((a, b) => a.x - b.x);
-  for (const f of ordered) f.draw(ctx);
-  for (const h of hits) {
-    ctx.fillStyle = `rgba(255,${200 + Math.floor(Math.random() * 55)},0,${h.t / 0.18})`;
+  const ordered = [...sim.fighters].sort((p, q) => p.x - q.x);
+  for (const f of ordered) drawFighter(f, ctx);
+  for (const h of sim.hits) {
+    const flicker = 200 + ((sim.frame * 17 + Math.round(h.x)) % 55);
+    ctx.fillStyle = `rgba(255,${flicker},0,${Math.max(0, h.t) / 0.18})`;
     ctx.fillRect(h.x - 8, h.y - 8, 16, 16);
     ctx.fillStyle = '#fff';
     ctx.fillRect(h.x - 4, h.y - 4, 8, 8);
   }
-  if (shake > 0) ctx.restore();
+  if (shake) ctx.restore();
   ctx.fillStyle = '#fff';
   ctx.font = '900 14px system-ui';
-  if (fighters[0] && fighters[0].combo > 1) ctx.fillText(`P1 ${fighters[0].combo} HIT COMBO!`, 20, 40);
-  if (fighters[1] && fighters[1].combo > 1) ctx.fillText(`P2 ${fighters[1].combo} HIT COMBO!`, SCREEN_W - 180, 40);
+  if (a.combo > 1) ctx.fillText(`P1 ${a.combo} HIT COMBO!`, 20, 40);
+  if (b.combo > 1) ctx.fillText(`P2 ${b.combo} HIT COMBO!`, SCREEN_W - 180, 40);
 }
+
 
 window.addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
@@ -1057,9 +1012,9 @@ document.querySelectorAll('.pad .b').forEach((b) => {
 });
 
 (function ensureTouchControls() {
-  const stage = document.getElementById('stage');
-  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-  if (isTouch) stage.classList.add('show-touch');
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const isTouch = coarse || 'ontouchstart' in window;
+  if (isTouch) document.body.classList.add('touch-device');
 })();
 
 let wasAway = false;
@@ -1086,6 +1041,3 @@ window.addEventListener('online', () => {
   if (code) startJoin(String(code).toUpperCase());
 });
 
-const style = document.createElement('style');
-style.textContent = '@media(max-width:800px){#stage{margin-bottom:150px}}';
-document.head.appendChild(style);

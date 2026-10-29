@@ -10,11 +10,13 @@ Two browsers share a room on the Node server in `multiplayer/`. The server relay
 4. When both have picked and both are ready, the server sends a countdown with one seed and one start time. Each browser loads and replies. The fight starts only after both replies, at that start time.
 5. On a cold host (Render’s free tier sleeps), the page says **Waking the server...** and keeps trying for about 90 seconds. A wrong or expired code still fails as soon as the server answers.
 
-If you leave and open the same link, the game reclaims your slot. The previous socket is closed. A late disconnect from that old socket does not remove you from the room. The player id is stored in `localStorage`, so two tabs in the same browser are the same player: the second tab takes the slot and the first connection is closed. Use two devices, or two browser profiles, to fight.
+If you leave and reopen the same tab, the game reclaims your slot. The previous socket is closed. A late disconnect from that old socket does not remove you from the room. The player id is stored in `sessionStorage`, so a second tab is a different player and joins as the other slot instead of taking the first tab's place.
 
 ## Simulation
 
-The fight steps at a fixed 1/60 s, counted from the agreed start time, not from each display’s frame gap. Inputs are sent on those steps (about 60 per second). Lobby messages and inputs have separate rate limits: extra inputs are dropped, and the socket is closed only if someone floods far past that. The two screens can still disagree if a packet is late. There is no rollback.
+The fight steps at a fixed 1/60 s. Each input is numbered with the sim frame it belongs to and is applied 3 frames later, so both screens use the same input on the same frame. A screen waits when the other player's input for that frame has not arrived. The seed in the start message drives the only random number generator. Every 30 frames the clients exchange a state hash and show a warning if the fights diverge. Lobby messages and inputs have separate rate limits: extra inputs are dropped, and the socket is closed only for a flood.
+
+The player id lives in `sessionStorage` for this tab. A second tab is a different player and does not take the first tab's slot. Reloading the same tab keeps the id.
 
 ## Run locally
 
