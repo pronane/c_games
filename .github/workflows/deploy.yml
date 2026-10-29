@@ -8,5 +8,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: npm install --prefix multiplayer
-      - run: timeout 3 npm start --prefix multiplayer || true
+      - run: npm install --prefix HD_Fighter/multiplayer
+      - run: timeout 3 npm start --prefix HD_Fighter/multiplayer || true
