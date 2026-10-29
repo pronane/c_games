@@ -27,8 +27,13 @@ typedef struct Player {
     Rectangle hitbox;
     Rectangle hurtbox;
 
-    // Which character this player is using (0 or 1)
+    // Which character this player is using (index into Game.characters)
     int characterIndex;
+
+    // Specials that fire a projectile (sprites.cfg 'projectile ball|book'); 0 = melee specials
+    int projectileKind;
+    bool projectileFired;   // already launched during the current special
+    float opponentX;        // set by the game every frame: used to keep facing the opponent
 
     // Sprite sheets (indexed by PlayerState)
     SpriteSheet sheets[STATE_COUNT];
@@ -62,5 +67,7 @@ void Player_SetState(Player *p, PlayerState newState);
 bool Player_IsAttacking(const Player *p);
 bool Player_CanMove(const Player *p);
 Rectangle Player_GetHurtbox(const Player *p);
+float Player_FrameTime(const Player *p);        // seconds per frame of the current state
+float Player_Progress(const Player *p);         // 0..1 through the current one-shot state
 
 #endif // PLAYER_H
