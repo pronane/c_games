@@ -3,6 +3,6 @@
   "version": "2.0.0",
   "description": "HD Fighter 2 - Online Multiplayer Server",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
+  "scripts": { "start": "node server.js", "test": "node test_handshake.js && node test_lockstep.mjs && node test_pace.mjs && node test_stall.mjs && node test_reconnect.mjs" },
   "dependencies": { "ws": "^8.17.0", "express": "^4.18.2", "cors": "^2.8.5" }
 }
