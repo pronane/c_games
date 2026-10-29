@@ -80,6 +80,11 @@ class CharacterSpec:
     shoes: str = "boots"         # boots trainers barefoot
     shoes_colour: str = ""
     kit: str = "home"            # home away blue red black gk  (fallback colours)
+    accessories: str = ""        # v9: cap,glasses,backpack,... (sforge.mesh.ACCESSORIES)
+    accessory_colour: str = ""
+    accessory2_colour: str = ""
+    pattern: str = ""            # v9: hoops stripes sash chest_band halves check camo dots (on the top)
+    pattern_colour: str = ""
     extra: dict = field(default_factory=dict)
 
     # ---- derived numbers used by the mesh builder
@@ -117,6 +122,12 @@ class CharacterSpec:
             "ball": (0.95, 0.94, 0.9), "ball_seam": (0.78, 0.74, 0.68),
             "kart": parse_colour(self.extra.get("kart_colour", ""), COLOURS, k["shirt"]),
             "kart_dark": (0.09, 0.09, 0.1), "kart_trim": (0.82, 0.82, 0.86),
+            "accessory": parse_colour(self.accessory_colour, COLOURS, (0.15, 0.16, 0.2)),
+            "accessory2": parse_colour(self.accessory2_colour, COLOURS, (0.85, 0.7, 0.2)),
+            "pattern": parse_colour(self.pattern_colour, COLOURS, parse_colour(self.trim_colour, COLOURS, k["trim"])),
+            "teeth": (0.93, 0.92, 0.86), "eyelid": skin,
+            "brow": parse_colour(self.hair_colour, HAIR_COLOURS, HAIR_COLOURS["dark_brown"]),
+            "emissive": parse_colour(self.extra.get("emissive_colour", ""), COLOURS, (0.35, 0.95, 1.0)),
         }
 
     def to_dict(self):
@@ -144,6 +155,20 @@ def load_spec(path) -> CharacterSpec:
             else:
                 sp.extra[k] = v
     return sp
+
+
+def save_spec(sp, path):
+    """write a spec file load_spec() reads back (v9: variants)"""
+    lines = ["# Sprite Forge Studio character spec (FICTIONAL / procedural character)"]
+    for k, v in sp.to_dict().items():
+        if k == "extra":
+            continue
+        lines.append("%-14s= %s" % (k, v))
+    for k, v in (sp.extra or {}).items():
+        lines.append("%-14s= %s" % (k, v))
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
 
 
 EXAMPLE_SPEC = """# Sprite Forge Studio - character spec (FICTIONAL character only)

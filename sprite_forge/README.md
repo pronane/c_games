@@ -1,9 +1,96 @@
-# Sprite Forge Studio v8.0
+# Sprite Forge Studio v9.0
 
 A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib loader are the
 **SpriteForge** base pipeline (`spriteforge/`, vendored, same `sprites.cfg` v1 format). The Studio adds the
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
+
+## New in v9: faces, colours, variants (+ extras, NPC pack, Unity / Godot plugins)
+`python forge.py help v9` or the Help tab topic "New in v9" has the short version. Screenshots: `previews_v9/`
+(mannequin / fictional NPCs only). Tests: `previews_v9/tests/RESULTS_v9_tests.md`. Results: `RESULTS_v9.md`.
+Timings: `TIMINGS_v9.md`. Video: `videos/06_v9_faces_colours_variants.mp4`.
+
+The Start wizard has a new **step 4 STYLE** with three tabs. Each tab has a **Preview** button that runs a one-move
+draft build (about 1.5 s) so you see the real result. Every setting is also a `forge.py` flag.
+
+* **Faces: expressions and mouth shapes per move.**
+  * Seven faces: neutral, happy, angry, hurt, shout, taunt and blink. **Automatic** picks one per move
+    (punch / kick = angry, specials = shout, hit = hurt, taunt = taunt, victory = happy). You can change any move
+    (`--expr-map punch=shout,victory=happy`) or use one face for every move (`--expressions happy`). Looping
+    neutral moves blink once per loop (`--no-blink` to stop it).
+  * `faces.png` + `faces/` hold a HUD portrait of every expression and mouth shape.
+  * Talking: `--talk "Ready to fight"` writes `talk/talk_strip.png` + `talk.json`. The 8 mouth shapes (rest, M/B/P, A/I,
+    E, O, U, F/V, L) are picked from the **letters**. There is no speech recognition.
+  * 3D characters get a morphed face mesh. `model.glb` also gets morph targets and weight tracks.
+  * **Photo characters** get procedural warps and small overlays of **your own photo's face**. No new face is drawn.
+    The result is ESTIMATED and labelled that way.
+* **Colours: palette swaps, region masks, texture overlays, one-click sets.**
+  * There are 20 one-click sets (`forge.py sets`): team colours, county colours (kerry, dublin, mayo, cork, galway),
+    egypt_gold, ninja, villain, ghost, fire, ice and p2_alt. You can also save your own.
+  * Per region: skin, hair, top, trim, bottom, socks, shoes, accessory (`--recolor "team_blue;hair=black"`).
+  * Overlays on the top: hoops, stripes, sash, chest_band, halves, check, dots, camo, or your own tiled texture
+    (`--overlay top:hoops:#ffffff`, `--overlay top:texture:cloth.png`).
+  * 3D characters: the colours go into the 3D spec, so they are exact.
+  * Photos: the regions are ESTIMATED (pose points + skin model + colour clusters). The photo's own pixels are
+    re-tinted with their shading kept. Each build writes `regions.png`; paint over it and pass it back with
+    `--regions` to fix a mask.
+  * To recolour something already built: `forge.py recolor out/hero --set team_red` (palette swap of every PNG).
+* **Variants: procedural, seeded.**
+  * `--variants 8` writes `variants/` (`variants_sheet.png` + one spec per seed). `--variant SEED` builds that one
+    as the character. The same seed always gives the same variant.
+  * `--vary` limits what changes: body, outfit, colours, skin, accessories, face, or all.
+  * For a **photo**, a variant only re-tints the clothes and scales the body. The face, skin and hair are kept,
+    and no new image of the person is ever made.
+* **Extras** (step 5 > Extras, or the flags):
+  * `--framedata`: hit / hurt boxes plus startup / active / recovery, written to `framedata.json` / `.cfg` with a
+    preview.
+  * `--footlock`: 2-bone IK pins planted feet, so there is no sliding. Walk slide drops from 14.0 cm to 0.0 cm on
+    the mannequin.
+  * `--fx`: outline, cel, pixel-art, palette and lighting / rim passes.
+  * `--maps normal,emissive`: normal maps and emissive maps.
+  * `--blend idle>walk:3`: transition moves.
+  * `--lods 2`: `model_baked.glb` + `model_lodN.glb`.
+  * Hair, cape and scarf physics chains in the sprites and the GLB (`--no-physics` to turn them off).
+  * The **QA check** runs on every build and writes `qa_report.txt`. It looks for clipping, empty frames, feet drift,
+    pops, loop seams, specks and halos. `forge.py qa <folder>` checks any build or game folder.
+* **Tools menu / commands:**
+  * `forge.py atlas a b c --out pack` packs several characters on shared MaxRects pages (about 83% fill).
+  * `forge.py batch queue.txt --workers 3` runs a queue of forge.py jobs.
+  * `forge.py framedata` and `forge.py qa` run on an existing build.
+* **NPC / enemy preset pack.** `forge.py npc` lists 17 fictional characters (villager, guard, knight, goblin, orc_brute,
+  wizard, skeleton, zombie, ghost, robot, boss_king ...). There are 7 move presets, with new motions such as wave,
+  talk, patrol, cower, cast, roar, lunge, die and sit. Example: `forge.py build --npc goblin --variants 6`.
+* **Engine plugins.**
+  * `plugins/godot/addons/sprite_forge`: SpriteFrames + a character scene with hit / hurt Area2D boxes and
+    normal-mapped frames. It was tested headless on Godot 4.3.
+  * `plugins/unity/com.spriteforge.importer`: a UPM package that makes sliced sprites, the `_NormalMap` secondary
+    texture, clips + controller, and a prefab with frame-data colliders.
+* **Tests.** `tools/test_v9.py OUT` passes 46/46. It includes the Godot import and a Unity compile against stub APIs,
+  and its photo-path regressions use a drawn doll, not a real person. `tools/test_v8.py` passes 20/20 and
+  `tools/test_v7.py` passes 50/50. `build_release.bat` / `.sh` run all three (step 2h / 6c).
+* **Speed** (8 cores, 14 moves, 384x512 cells): base 2.3 s. Faces, colours, variants, foot lock, blend, frame data
+  and QA each add 0 to 0.5 s. FX adds about 1 s and normal + emissive maps add about 5 s. Everything together takes
+  11.6 s (`TIMINGS_v9.md`).
+* Evidence for older versions (`previews_v2` - `previews_v4`) is in the v8 release zip. It is left out here to
+  keep the zip under 25 MB.
+
+### v9 limits (honest)
+* **Photo expressions are estimated** procedural warps of the photo's own face. They are subtle on small in-game faces,
+  very subtle on side-on (turned) views, and absent on back views.
+* **Photo colour regions are estimated.** Small patches such as a bag strap can be missed. Fix them with
+  `regions.png` + `--regions`.
+* **Photo variants** change only the clothes colours and the body scale. The face, skin and hair are kept.
+* Frame data and normal maps are **estimated** from the 2D silhouettes, so tune them. Emissive maps only pick up
+  the glow colours set in the spec.
+* Foot locking fixes the sprites. The GLB clips are not re-solved. On photo builds, blending is a crossfade.
+* Mouth shapes come from letters, not from audio.
+* LODs are rebuilt with fewer segments, not decimated. The baked model uses a flat palette texture with no baked
+  lighting.
+* The Unity package has only been compiled against stub APIs. It has not been run in the Unity editor. The Godot
+  plugin was tested on 4.3 only.
+* The NPC `sit` motion sits on an invisible stool, so add your own chair.
+* QA flags real problems. The sample `rua_keeper` build has a FAIL for special1 (frame 4 touches the top edge of the cell), and that is
+  correct.
 
 ## New in v8: Start wizard, three goal tabs, side-on turn, faster builds
 `python forge.py help v8` or the Help tab topic "New in v8" has the short version. Screenshots: `previews_v8/`.

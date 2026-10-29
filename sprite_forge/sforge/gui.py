@@ -101,6 +101,8 @@ class Studio:
         self.b = {k: tk.BooleanVar(value=val) for k, val in dict(flip=False, outline=True, glb=True, fbx=True, strips=False,
                                                                 gifs=True, dither=True, side_left=False, srun=True,
                                                                 anim_export=False, cache=True).items()}
+        from .gui_style import install_vars
+        install_vars(self)        # v9 style / extras settings
         self.field_rows = []      # (widgets, modes)
         self._build_ui()
         from .gui_library import LibraryTab
@@ -142,6 +144,8 @@ class Studio:
         hm.add_separator(); hm.add_command(label="Example walkthrough (build the sample)", command=self.walkthrough)
         hm.add_command(label="Check setup (forge.py doctor)", command=self.show_doctor)
         hm.add_command(label="About", command=lambda: messagebox.showinfo("About", "Sprite Forge Studio %s" % __version__))
+        from .gui_style import install_menu
+        install_menu(self, mb)
         mb.add_cascade(label="Help", menu=hm)
         self.root.config(menu=mb)
         self.nb = ttk.Notebook(self.root); self.nb.pack(fill=tk.BOTH, expand=True)
@@ -839,7 +843,8 @@ class Studio:
         for item in v["pvars"].get().split(";"):
             if "=" in item:
                 k, _, val = item.partition("="); c.profile_vars[k.strip()] = val.strip()
-        return c
+        from .gui_style import apply_to_config
+        return apply_to_config(self, c)
 
     # ------------------------------------------------------------ profiles
     def _profile_names(self):
@@ -1429,6 +1434,38 @@ def run_script(app, steps, caplog=None, flag="/tmp/sfs_gui_done"):
                 L_.add_file(d_["add"], d_.get("name"), d_.get("licence_rec"))
             if "remove" in d_:
                 L_.tree.selection_set(d_["remove"]); L_.remove()
+        if "home" in st:             # v9: Start-tab wizard {"step": n, "style_tab": k, "goal": g, "target": label, "style_preview": true}
+            h = st["home"]; app.nb.select(app.hometab)
+            if h.get("target"):
+                app.home.target.set(h["target"]); app.home.apply_target()
+            if h.get("goal"):
+                app.home.goal = h["goal"]
+            if h.get("style_tab"):
+                app.home.style_tab = h["style_tab"]
+                if getattr(app.home, "style", None) is not None and app.home.step == h.get("step", app.home.step):
+                    try:
+                        app.home.style.nb.select(app.home.style.tabs[h["style_tab"]])
+                    except Exception:
+                        pass
+            if "step" in h and h["step"] != app.home.step:
+                app.home.go(int(h["step"]))
+            if h.get("style_preview"):
+                k = app.home.style_tab
+                app.home.style.preview(k)
+                btn = getattr(app.home.style, "pv_" + k)[0]
+                log_cap("@fast")
+                def wait_sp(n=0):
+                    if "disabled" in btn.state() and n < 900:
+                        return root.after(200, lambda: wait_sp(n + 1))
+                    log_cap("@normal"); nxt()
+                return root.after(400, wait_sp)
+            if h.get("face_row"):        # {"punch": "shout"} - change a per-move expression in the Faces grid
+                for mv, e in h["face_row"].items():
+                    app.v["expr_map"].set(",".join(x for x in app.v["expr_map"].get().split(",") if x and not x.startswith(mv + "=")) + ",%s=%s" % (mv, e))
+                try:
+                    app.home.style._face_rows()
+                except Exception:
+                    pass
         if "move_clip" in st:
             app.set_move_clip(*st["move_clip"])
         if "shot" in st:             # screenshot of the whole virtual screen (Xvfb + imagemagick)
@@ -1527,9 +1564,21 @@ def main():
                 if h.get("goal"):
                     app.home.goal = h["goal"]
                 app.home.step = 0
-                for i in range(int(h.get("step", 0))):
-                    app.home.go(i + 1)
                 ha = h.get("action")
+                from .gui_home import BUILD_STEP
+                if h.get("style_tab"):
+                    app.home.style_tab = h["style_tab"]
+                for i in range(BUILD_STEP if ha == "build" else int(h.get("step", 0))):
+                    app.home.go(i + 1)
+                if ha == "style_preview":        # v9: Style step preview (faces / colours / variants)
+                    k = h.get("style_tab", "faces")
+                    app.home.style.preview(k)
+                    btn = getattr(app.home.style, "pv_" + k)[0]
+                    def wait_s(n=0):
+                        if "disabled" in btn.state() and n < 900:
+                            return app.root.after(200, lambda: wait_s(n + 1))
+                        finished(app)
+                    app.root.after(500, wait_s); return
                 if h.get("raw") and hasattr(app.home, "raw"):
                     app.home.raw.set(h["raw"])
                 if ha == "cutout":

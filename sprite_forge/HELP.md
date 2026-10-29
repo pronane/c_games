@@ -21,6 +21,8 @@ The same text is in the app (Help tab / Help menu) and `forge.py help <topic>`.
 - [Licensing: what you may put in a pack](#licensing)
 - [New in v7: material slots, animation files, equip, MakeHuman, your own mesh](#v7)
 - [New in v8: Start wizard, three goal tabs, side-on turn, faster builds](#v8)
+- [New in v9: faces, colours, variants (+ extras)](#v9)
+- [Game engine plugins: Unity and Godot](#plugins)
 - [Is Python fast enough? (how the engine is built)](#python)
 
 <a id="quickstart"></a>
@@ -31,7 +33,8 @@ Sprite Forge Studio turns a character into game-ready sprite frames (and, for ma
 
 0. Once: setup.bat (Windows) or ./setup.sh (Linux) - installs everything into this folder (Help > Install).
 1. Open the Studio:  double-click run_studio.bat, or ./run_studio.sh on Linux  (or: python sprite_forge_studio.py)
-   v8: the START tab walks you through steps 1-5 below in plain language (Help > New in v8). The rest of this
+   v8/v9: the START tab walks you through 6 steps in plain language, including STYLE (faces, colours,
+   variants - Help > New in v9). The rest of this
    page describes the Build (advanced) tab, which has every setting.
 2. Pick an INPUT MODE at the top-left (Photo, Frames folder, Per-move sheets, Sprite sheet, Text spec,
    Mannequin). Only the fields that mode needs are shown. Hover or click a (?) for an explanation.
@@ -226,7 +229,18 @@ Copy-paste code for raylib, Unity, Godot, Unreal and SNES/GBA-style tile banks: 
     Rectangle src = { col * fw, row * fh, facingLeft ? -fw : fw, fh };
     DrawTexturePro(atlas, src, (Rectangle){ x - pivot_x, y - ground_y, fw, fh }, (Vector2){0,0}, 0, WHITE);
 
---- Unity (C#) ------------------------------------------------------------------------------------------
+--- Unity / Godot PLUGINS (v9, in plugins/) -------------------------------------------------------------
+  Unity: copy plugins/unity/com.spriteforge.importer into Packages/ (or Package Manager > Add from disk),
+         copy the build folder under Assets/, then Tools > Sprite Forge > Import Build Folder...  -> sliced
+         sprites (feet pivot), <name>_data.asset, .anim clips + .controller, <name>.prefab with hurt / hit
+         BoxCollider2D children driven by framedata.json; maps/atlas_normal.png -> _NormalMap for 2D lights.
+  Godot 4: copy plugins/godot/addons/sprite_forge into your project's addons/, enable it (Project Settings >
+         Plugins), then Project > Tools > Sprite Forge: Import Build Folder... -> <name>_frames.tres
+         (SpriteFrames) + <name>.tscn (SpriteForgeCharacter: AnimatedSprite2D with Hurtbox / Hitbox Area2D,
+         hit_active signal, normal maps as CanvasTexture). Reads atlas.json or a multi-character pack.json.
+  Help > Plugins has the details and the honest limits.
+
+--- Unity (C#) by hand -----------------------------------------------------------------------------------
   Import atlas.png: Texture Type = Sprite (2D and UI), Sprite Mode = Multiple, Filter = Point (pixel art),
   Sprite Editor > Slice > Grid By Cell Size = frame_w x frame_h, Pivot = Custom (pivot_x/frame_w,
   1 - ground_y/frame_h). Then drag a row's sprites into the scene to make an Animation clip (set its fps).
@@ -539,6 +553,18 @@ Run COLMAP               SCAN: also reconstruct here (pycolmap from setup, or CO
 Scan mesh                SCAN: skip reconstruction and make console LODs from a finished mesh (obj/ply/glb from Meshroom, RealityScan, Polycam...).
 Scan height              SCAN: real height in metres (photogrammetry has no scale of its own).
 Scan budgets             SCAN: triangle budgets, e.g. ps1=600,ps2gc=5000,pc_hd=100000. Blank = one LOD per console preset.
+Expressions              v9 FACES: auto = a face per move (punch angry, hit hurt, taunt taunt, victory happy ...); off = neutral; or one face for all. Photo: ESTIMATED warps of your own photo.
+Talk                     v9: a line of dialogue -> talk/ strip with mouth shapes + talk.json. Shapes come from the letters (not speech recognition). 'sheet' = every mouth shape.
+Regions                  v9 PHOTO: a painted region map (start from the regions.png a build writes) to fix the ESTIMATED skin / hair / clothes masks.
+Variant                  v9: build procedural variant SEED as the character (same seed = same result). Empty = the character itself.
+Frame data               v9: hit / hurt boxes + startup / active / recovery measured from the sprites (ESTIMATED) -> framedata.json + framedata.cfg.
+Foot lock                v9: 2-bone IK keeps planted feet still (no sliding) in 3D-character sprite moves.
+QA                       v9: sprite QA check after the build -> qa_report.txt (clipping, empty frames, feet drift, pops, loop seams, specks, halos).
+Physics                  v9: ponytail / long hair / cape / scarf swing as simple verlet chains (3D characters).
+FX                       v9 look passes: outline=2, cel=3 (bands), pixel=4 (pixel-art block size), colors=32, light=x:y:z, rim=0.4, outline_colour=#101018.
+Maps                     v9: normal and/or emissive maps -> maps/ (estimated from the 2D sprite; for 2D lights in Unity / Godot).
+Blend                    v9: transition moves a>b:frames, e.g. idle>walk:3 -> blend_idle_walk (3D: pose blend; photo: crossfade).
+LODs                     v9 3D: model_baked.glb (1 palette texture, 1 material) + N lower-detail model_lodN.glb + lods.json.
 Moves                    Tick the moves to build. frames = number of frames, fps = playback speed, loop = repeats (idle/walk) or plays once (punch).
 ```
 
@@ -798,6 +824,97 @@ cores, PNGs are saved in the background. Quick preview = half size, 4 frames a m
     --quality draft     quick preview from the command line
     --no-cache          force a full rebuild
     forge.bat cache stats | clear | prune
+```
+
+<a id="v9"></a>
+## New in v9: faces, colours, variants (+ extras)
+
+```
+The Start tab has a new step 4 STYLE with three tabs - the same settings as the forge.py flags shown below.
+
+FACES - expressions and mouth shapes
+  neutral, happy, angry, hurt, shout, taunt and blink, chosen PER MOVE: Automatic picks punch/kick = angry,
+  specials = shout, hit / ko = hurt, taunt = taunt, victory = happy; change any move in the list
+  (--expr-map punch=shout,victory=happy) or use one face everywhere (--expressions happy). Looping
+  neutral moves blink once per loop (--no-blink to stop). faces.png + faces/ = a HUD portrait of every
+  expression and mouth shape. Talking: --talk "Ready to fight" -> talk/talk_strip.png + talk.json (frame
+  timing). Mouth shapes (rest, M/B/P, A/I, E, O, U, F/V, L) come from the LETTERS, not speech recognition.
+  3D characters: a morphed face mesh (also morph targets in model.glb).  PHOTO characters: procedural warps
+  and small overlays of YOUR photo's own face - ESTIMATED, subtle on small faces, very subtle on side-on
+  (turned) views, none on back views.
+
+COLOURS - palette swaps, region masks, texture overlays, one-click sets
+  One click: team_red / team_blue / ... / kerry / dublin / mayo / cork / galway / egypt_gold / ninja /
+  villain / ghost / fire / ice / p2_alt (hue shift)   (forge.py sets lists them; save your own).
+  Per region: skin hair top trim bottom socks shoes accessory  (--recolor "team_blue;hair=black").
+  Overlay on the top: hoops stripes sash chest_band halves check dots camo, or your own tiled texture
+  (--overlay top:hoops:#ffffff, --overlay top:texture:cloth.png).
+  3D characters: the colours go into the 3D spec (exact).  PHOTO: regions are ESTIMATED (pose points + skin
+  model + colour clusters) and your photo's own pixels are re-tinted with their shading kept; every build writes
+  regions.png - paint over it and pass it back with --regions to fix a mask.
+  Already built?  forge.py recolor out/hero --set team_red   (palette swap of every PNG into out/hero_team_red;
+  photo / game folders: add --from top=#2a5bd7,bottom=#202020 to say which colours to replace).
+
+VARIANTS - a crowd from one character
+  --variants 8 writes variants/ (variants_sheet.png + variant_<seed>.txt specs); --variant SEED builds that
+  one as the character. Vary: body, outfit, colours, skin, accessories, face (--vary all). Same seed = same
+  variant, every time.  PHOTO: a variant only re-tints the clothes and scales the body (face, skin and hair
+  are kept) - never a new image of the person.  forge.py variants --npc goblin -n 12  (no build needed).
+
+ENEMY / NPC PRESET PACK
+  forge.py npc lists 17 fictional characters (villager, guard, knight, goblin, orc_brute, wizard, skeleton,
+  zombie, ghost, robot, boss_king ...) and 7 move presets (npc_civilian, npc_guard, enemy_grunt, enemy_caster,
+  enemy_creature, boss, zombie) with new motions (wave, talk, patrol, cower, cast, roar, lunge, die, sit ...).
+  forge.py build --npc goblin --variants 6
+
+EXTRAS (Start > What to make > Extras, or the flags)
+  --framedata     hit / hurt boxes + startup / active / recovery -> framedata.json, framedata.cfg, preview
+  --footlock      2-bone IK pins planted feet (no sliding) in 3D-character sprite moves
+  --fx            outline=2, cel=3, pixel=4, colors=32, light=-1:-1:1, rim=0.4 look passes on every frame
+  --maps          normal,emissive -> maps/ (normal maps light 2D sprites in Unity URP 2D / Godot)
+  --blend         idle>walk:3 -> blend_idle_walk transition move
+  --lods 2        model_baked.glb (one texture, one material) + model_lod1/2.glb + lods.json
+  QA check        on by default: qa_report.txt (clipping, empty frames, feet drift, pops, loop seams,
+                  specks, halos); --no-qa to skip; forge.py qa <folder> on any build or game folder
+  Physics         hair / cape / scarf swing on 3D characters (--no-physics to stop)
+
+TOOLS menu / commands
+  forge.py atlas out/a out/b out/c --out out/pack     several characters on shared pages + pack.json
+  forge.py batch queue.txt --workers 3                one forge.py command per line (or a .json queue);
+                                                      writes queue_report.txt + per-job logs
+  forge.py framedata <folder>    forge.py qa <folder>    forge.py recolor <folder> --set NAME
+
+Honest limits: frame data and normal maps are ESTIMATED from the 2D silhouettes (tune them); foot locking
+is for sprites (the GLB clips are not re-solved); LODs are rebuilt at fewer segments (not decimation) and the
+baked model uses a flat palette texture (no baked lighting); the Unity package was compiled against stub APIs,
+not run in Unity; the Godot plugin was tested on Godot 4.3.
+```
+
+<a id="plugins"></a>
+## Game engine plugins: Unity and Godot
+
+```
+Both read a Sprite Forge build folder (atlas.json + atlas pages, + framedata.json and maps/ if you made them)
+or a multi-character pack.json from forge.py atlas.
+
+GODOT 4 (plugins/godot/addons/sprite_forge) - tested on Godot 4.3 (headless + rendered)
+  1. Copy addons/sprite_forge into your project; Project Settings > Plugins > enable "Sprite Forge".
+  2. Copy the build folder into the project (e.g. res://chars/hero).
+  3. Project > Tools > Sprite Forge: Import Build Folder...  (or in code:
+        SpriteForgeImport.import_folder("res://chars/hero")   )
+  -> hero_frames.tres (SpriteFrames: every move with its fps / loop, feet pivot) and hero.tscn
+     (SpriteForgeCharacter = AnimatedSprite2D + Hurtbox / Hitbox Area2D children that follow framedata.json,
+     mirrored with flip_h; signal hit_active(move, frame, rect); show_boxes draws them).
+  Normal maps: frames become CanvasTexture(diffuse + normal) so PointLight2D lights the sprite.
+
+UNITY 2021.3+ (plugins/unity/com.spriteforge.importer)
+  1. Package Manager > + > Add package from disk > com.spriteforge.importer/package.json
+  2. Copy the build folder under Assets/.  3. Tools > Sprite Forge > Import Build Folder...
+  Batch: Unity -batchmode -quit -projectPath P -executeMethod SpriteForge.Editor.SpriteForgeImporter.ImportFromCommandLine -sfFolder Assets/chars/hero
+  -> sprites sliced with the feet pivot, <name>_data.asset (moves + boxes in units), Anim/*.anim + .controller,
+     <name>.prefab (SpriteRenderer + SpriteForgeCharacter driving BoxCollider2D hurt / hit boxes, HitActive event).
+     maps/atlas_normal.png is attached as the _NormalMap secondary texture (URP 2D lights).
+  HONEST: compiled against stub Unity APIs only (tools/unity_stub_check) - not yet run inside Unity.
 ```
 
 <a id="python"></a>

@@ -1,0 +1,37 @@
+{
+ "studio": "/workspace/sprite_forge_v9",
+ "cpus": 8,
+ "results": [
+  {
+   "scenario": "spec fighter14 + SNES console",
+   "first": 2.8427298069000244,
+   "rebuild": 0.22960782051086426,
+   "one_move_changed": 2.636461019515991
+  },
+  {
+   "scenario": "photo fighter14",
+   "first": 2.1413204669952393,
+   "rebuild": 0.16513943672180176
+  },
+  {
+   "scenario": "library rig fighter14 (3D render)",
+   "first": 1.3990113735198975,
+   "rebuild": 0.22598838806152344
+  },
+  {
+   "scenario": "mannequin gaelic36 + GLB + FBX",
+   "first": 4.728183746337891,
+   "rebuild": 0.3046085834503174,
+   "one_move_changed": 3.8614935874938965
+  },
+  {
+   "scenario": "video -> sprites (2 clips)",
+   "first": 4.438554286956787,
+   "rebuild": 0.9042248725891113
+  },
+  {
+   "scenario": "UI quick preview (fighter14 draft)",
+   "first": 1.531822919845581
+  }
+ ]
+}

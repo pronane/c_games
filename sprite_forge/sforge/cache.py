@@ -99,8 +99,10 @@ def hkey(*parts):
 # settings that only change WHICH output files are written, never the move frames
 OUTPUT_ONLY = {"glb", "fbx", "blender", "strips", "gifs", "console", "dither", "profile", "profile_vars", "kits",
                "anim_export", "max_atlas", "out_root", "display_name", "root_motion", "material_split", "material_slots",
-               "fbx_writer", "view_frame_pngs"}
-PATH_FIELDS = ("spec_path", "photo", "back", "frames_dir", "sheet", "rig", "library_dir")
+               "fbx_writer", "view_frame_pngs",
+               # v9: applied to finished frames / written next to them (sforge/v9out.py), never inside a cached move
+               "talk", "faces_sheet", "maps", "framedata", "qa", "lods", "fx", "blend", "variants", "variant_seed"}
+PATH_FIELDS = ("spec_path", "photo", "back", "frames_dir", "sheet", "rig", "library_dir", "regions")
 
 
 def input_sigs(cfg):

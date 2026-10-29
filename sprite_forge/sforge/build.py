@@ -120,6 +120,28 @@ class BuildConfig:
     side_frame: float = -1.0           # side_photo is a video: time in seconds to take (-1 = middle)
     turn_template: str = ""            # MakeHuman macro params "gender=1,age=0.55,muscle=0.5,weight=0.55"
     anim_export: bool = False          # v7: also write anim/character_base.glb + anim/anim_<move>.glb (+ .fbx) + anim/manifest.json
+    # ---- v9 STYLE: faces / colours / variants (sforge/expressions.py, recolor.py, variants.py)
+    expressions: str = "auto"          # auto (mapped per move) | off | <one expression for every move>
+    expr_map: str = ""                 # "hit=hurt,victory=happy,taunt=taunt" (overrides the default per-move map)
+    blink: bool = True                 # looping neutral moves blink once per loop
+    talk: str = ""                     # line of dialogue -> talk/ strip with mouth shapes (+ talk.json timing); "sheet" = all shapes
+    faces_sheet: bool = True           # faces.png: head close-up of every expression + mouth shape (HUD portraits)
+    recolor: str = ""                  # recolour set (team_red, kerry ...) | sets/*.json | "top=#c8102e,hair=black"
+    overlay: str = ""                  # texture overlay: "top:hoops:#ffffff" | "top:stripes" | "top:my_texture.png"
+    regions: str = ""                  # PHOTO: user-painted region map PNG (colours as in regions_preview.png)
+    physics: bool = True               # mannequin: ponytail / long hair / cape / scarf swing (+ GLB chain joints)
+    variant: int = -1                  # build procedural variant SEED of this character (-1 = the character itself)
+    vary: str = "body,outfit,colours,accessories"   # what a variant changes (variants.VARY_KEYS)
+    variants: int = 0                  # also write variants/ : sheet + spec files of N variants (seeds variant_seed..)
+    variant_seed: int = 1
+    # ---- v9 EXTRAS (sforge/fx.py, footlock.py, framedata.py, blend.py, qa.py, lod.py)
+    fx: str = ""                       # "outline=2,cel=3,pixel=4,light=-1:-1:1,rim=0.4" post passes on every frame
+    maps: str = ""                     # "normal,emissive" -> maps/ atlas_normal.png / atlas_emissive.png
+    footlock: bool = False             # pin planted feet (removes foot sliding in walk / idle)
+    framedata: bool = False            # hitboxes / hurtboxes / startup-active-recovery -> framedata.json + framedata.cfg
+    blend: str = ""                    # transitions "idle>walk:3,walk>idle:3" -> blend_<a>_<b> moves
+    qa: bool = True                    # sprite QA checker -> qa_report.txt / qa.json
+    lods: int = 0                      # GLB LODs: model_lod1.glb .. (fewer segments, same skeleton/morphs) + palette-baked model_baked.glb
 
     def resolved(self):
         if not self.figure_h:
@@ -153,6 +175,7 @@ class Report:
         self.warn.append(msg); self.log("  ! " + msg)
 
     def note(self, msg):
+        self.notes = getattr(self, "notes", []); self.notes.append(msg)
         self.log("  " + msg)
 
 
@@ -180,16 +203,62 @@ def _clipped(ims):
 
 
 def _render_mannequin_move(job):
-    """worker (top level so it pickles for Windows 'spawn'): (spec, prop, rs, move) -> list of RGBA frames"""
-    from . import mesh, render, anim
-    sp, prop, rs, m = job
-    k = (repr(sp.to_dict()), prop)
-    if k not in _MESH:
-        _MESH.clear(); _MESH[k] = mesh.build_mannequin(sp, prop=prop)
-    T, B, M = _MESH[k]
+    """worker (top level so it pickles for Windows 'spawn'): (spec, prop, rs, move[, faces, physics, footlock]) -> RGBA frames.
+    v9: faces = expression name per frame (morphed face mesh), physics = draw simulated hair / cloth chains."""
+    import numpy as np
+    from . import mesh, render, anim, physics
+    from . import expressions as X
+    sp, prop, rs, m = job[:4]
+    faces = job[4] if len(job) > 4 else None
+    phys = job[5] if len(job) > 5 else False
+    base = (repr(sp.to_dict()), prop)
+    if _MESH.get("_base") != base:
+        _MESH.clear(); _MESH["_base"] = base
+    def mesh_for(e):
+        if e not in _MESH:
+            _MESH[e] = mesh.build_mannequin(sp, prop=prop, face=X.params_for(e) if e != "neutral" else None)
+        return _MESH[e]
     cols = sp.colours()
     mo = motion_for(m)
-    return [render.render_state(T, B, M, cols, st, rs) for st in anim.states_for(mo, m.frames, m.loop)]
+    states = anim.states_for(mo, m.frames, m.loop)
+    if len(job) > 6 and job[6]:                     # v9 foot locking (two-bone leg IK on planted feet)
+        from . import footlock
+        states, _ = footlock.lock(states, m.loop, m.fps)
+    chains = physics.chains_for(sp) if phys else []
+    sim = physics.simulate(chains, states, 1.0 / max(1, m.fps), m.loop) if chains else None
+    out = []
+    for i, st in enumerate(states):
+        T, B, M = mesh_for(faces[i] if faces else "neutral")
+        if not chains:
+            out.append(render.render_state(T, B, M, cols, st, rs)); continue
+        P, keep = render.pose_triangles(T, B, st)
+        ct, cm = physics.posed_tris(chains, sim[i], st)
+        P2 = np.concatenate([P[keep], ct]) if len(ct) else P[keep]
+        M2 = np.concatenate([M[keep], np.array([mesh.MATS.index(x) for x in cm], M.dtype)]) if len(ct) else M[keep]
+        out.append(render.render_tris(P2, M2, cols, rs, (st.root_t[0], st.root_t[2])))
+    return out
+
+
+def glb_v9_extras(cfg, sp):
+    """v9: facial expression / mouth-shape morph targets + per-clip weight tracks + physics chains for model.glb"""
+    from . import mesh, physics
+    from . import expressions as X
+    out = {}
+    if cfg.expressions not in ("off", "none", ""):
+        umap = X.parse_map(cfg.expr_map)
+        morphs = {}
+        for e in X.all_names():
+            if e in ("neutral", "mouth_rest"):
+                continue
+            morphs[e] = mesh.build_mannequin(sp, prop=_prop(cfg), face=X.params_for(e))[0]
+        out["morphs"] = morphs
+        out["morph_tracks"] = {m.name: ([cfg.expressions] * m.frames if cfg.expressions != "auto" else
+                                        X.schedule(m.name, m.frames, m.loop, umap, cfg.blink)) for m in cfg.moves}
+    if cfg.physics:
+        ch = physics.chains_for(sp)
+        if ch:
+            out["chains"] = ch
+    return out
 
 
 def move_key(base, m, extra=None):
@@ -212,6 +281,17 @@ def _mannequin_frames(cfg, sp, report, only=None):
     use_cache = cfg.cache and C.enabled()
     base = C.hkey(C.frame_base_key(cfg), sp.to_dict(), prop, cfg.quality) if use_cache else ""
     out, todo = {}, []
+    from . import expressions as X
+    from . import physics as PH
+    umap = X.parse_map(cfg.expr_map)
+    faces_on = cfg.expressions not in ("off", "none", "")
+    phys = bool(cfg.physics and PH.chains_for(sp))
+    def sched(m):
+        if not faces_on:
+            return None
+        if cfg.expressions != "auto":
+            return [cfg.expressions] * m.frames
+        return X.schedule(m.name, m.frames, m.loop, umap, cfg.blink)
     for m in cfg.moves:
         if only is not None and m.name not in only:
             continue
@@ -220,20 +300,50 @@ def _mannequin_frames(cfg, sp, report, only=None):
             report.warning("no procedural motion for '%s' - set its 'motion' to an existing one" % m.name)
             continue
         tag = "mannequin" if mo.name == m.name else "mannequin:" + mo.name
-        hit = C.get_frames(move_key(base, m)) if use_cache else None
+        hit = C.get_frames(move_key(base, m, (sched(m), phys, cfg.footlock))) if use_cache else None
         if hit:
             out[m.name] = (hit[0], tag, hit[2]); report.cached.append(m.name)
         else:
             todo.append((m, tag))
     if todo:
         t = time.time()
-        res = C.pmap(_render_mannequin_move, [(sp, prop, rs, m) for m, _ in todo])
+        res = C.pmap(_render_mannequin_move, [(sp, prop, rs, m, sched(m), phys, cfg.footlock) for m, _ in todo])
         for (m, tag), ims in zip(todo, res):
             note = "clipped at cell edge" if _clipped(ims) else ""
             out[m.name] = (ims, tag, note)
             if use_cache:
-                C.put_frames(move_key(base, m), ims, tag, note)
+                C.put_frames(move_key(base, m, (sched(m), phys, cfg.footlock)), ims, tag, note)
         report.timing("render %d moves (%d workers)" % (len(todo), C.workers(len(todo))), time.time() - t)
+    if cfg.footlock:                                   # v9: report the foot-slide numbers the IK removed
+        from . import footlock as FLK, anim as AN
+        parts = []
+        for m in cfg.moves:
+            mo = motion_for(m)
+            if mo is None:
+                continue
+            _, inf = FLK.lock(AN.states_for(mo, m.frames, m.loop), m.loop, m.fps)
+            if inf["segments"]:
+                parts.append("%s %.1f->%.1f cm" % (m.name, inf["before_cm"], inf["after_cm"]))
+        report.note("footlock: planted-foot slide (mean) " + (", ".join(parts) if parts else "no planted feet found"))
+    if faces_on:
+        def _face_render(e, _sp=sp, _prop=prop, _rs=rs, _phys=phys):
+            from . import moves as MV
+            idle = next((m for m in cfg.moves if m.name in ("idle", "fight_idle")), cfg.moves[0])
+            m1 = MV.MoveSpec(**{**idle.__dict__, "frames": 1})
+            return _render_mannequin_move((_sp, _prop, _rs, m1, [e], _phys))[0]
+        def _face_close(e, size=160, _sp=sp, _prop=prop):
+            from . import render as RD, moves as MV
+            rs2 = RD.RenderSettings(size * 4, size * 7, size * 6, size * 7 - 4, size * 2, yaw=min(cfg.yaw, 30.0), pitch=4, ss=2, outline=cfg.outline)
+            idle = next((m for m in cfg.moves if m.name in ("idle", "fight_idle")), cfg.moves[0])
+            im = _render_mannequin_move((_sp, _prop, rs2, MV.MoveSpec(**{**idle.__dict__, "frames": 1}), [e], False))[0]
+            bb = X.head_box(im, 0.16)
+            return im.crop(bb).resize((size, size), Image.LANCZOS) if bb else im
+        cfg._face_render, cfg._face_close = _face_render, _face_close
+        cfg._face_estimated = False
+        report.note("faces: per-move expressions on the 3D face (%s)" % (cfg.expressions if cfg.expressions != "auto" else
+                    "auto map" + (" + " + cfg.expr_map if cfg.expr_map else "")))
+    if phys:
+        report.note("physics: %s swing as verlet chains" % ", ".join(c.name for c in PH.chains_for(sp)))
     # keep the move order of cfg.moves
     return {m.name: out[m.name] for m in cfg.moves if m.name in out}
 
@@ -428,6 +538,26 @@ def _puppet_photo(cfg, report):
             if others is not None:
                 others = others.resize(cut.size, Image.NEAREST)
             report.log("  draft: posing a %dx%d copy of the cut-out (x%.2f)" % (cut.width, cut.height, k))
+    rc_str = cfg.recolor
+    cfg._cut_lms = (cut, lms)
+    if cfg.variant >= 0:                               # v9: photo variant = recolour + body scale of the photo's own pixels
+        from . import variants as VA
+        vrec, (vsx, vsy), vn = VA.photo_variant(cfg.variant, cfg.vary)
+        rc_str = ";".join(x for x in (vrec, cfg.recolor) if x)
+        if (vsx, vsy) != (1.0, 1.0):
+            W0, H0 = cut.size
+            cut = cut.resize((max(1, int(W0 * vsx)), max(1, int(H0 * vsy))), Image.LANCZOS)
+            lms = [[x * vsx, y * vsy] + list(rest) for x, y, *rest in lms]
+        report.note("variant: photo seed %d (%s)" % (cfg.variant, "; ".join(vn)))
+    cut_ref = cut                                      # pre-recolour photo: the rig's skin / jeans tests use it
+    if rc_str or cfg.overlay or cfg.regions:           # v9: colour / texture swap on the photo itself (before posing)
+        from . import recolor as RC
+        t0 = time.time()
+        cut, rinfo = RC.recolor_cutout(cut, lms, rc_str, cfg.overlay, cfg.regions, log=report.log)
+        report.timing("recolour (photo regions)", time.time() - t0)
+        report.note("colours: %s on the photo's own pixels (regions found from the pose landmarks + colour clusters; "
+                    "shading kept). Region masks are ESTIMATED - check regions_preview.png" % rinfo.get("summary", "recolour"))
+        cfg._regions_preview = rinfo.get("preview"); cfg._regions_png = rinfo.get("regions_png")
     turned = bool(cfg.turn) and abs(((cfg.turn + 180) % 360) - 180) > 0.5
     TN = None
     if turned:
@@ -436,7 +566,7 @@ def _puppet_photo(cfg, report):
         side_img = _side_reference(cfg, report) if cfg.side_photo else None
         res = TN.build_turned(cut, lms, yaw=cfg.turn, depth=cfg.turn_depth, side=side_img,
                               side_faces=cfg.side_faces, template_params=TN.parse_params(cfg.turn_template),
-                              others_mask=others, log=report.log)
+                              others_mask=others, colour_ref=cut_ref, log=report.log)
         if TN.is_side(cfg.turn) and math.sin(math.radians(cfg.turn)) < 0:
             TN.mirror_turned(res)
             report.note("turn: %g deg shows the left side; mirrored so the sprite faces right like every fighter sprite" % cfg.turn)
@@ -452,7 +582,7 @@ def _puppet_photo(cfg, report):
         known = TN.known_moves(rig)
         keyfn = lambda name, n: TN.rig_move_keys(rig, name, n)
     else:
-        rig = PP.Rig(cut, lms)
+        rig = PP.Rig(cut, lms, colour_ref=cut_ref)
         known = PP.KNOWN_MOVES
         keyfn = lambda name, n: PP.move_keys(name, rig.rest, n)
     report.note("puppet: rig from %s (%d landmarks), stand height %d px, hidden hand: %s" % (
@@ -469,6 +599,24 @@ def _puppet_photo(cfg, report):
             report.warning("puppet: no key poses for '%s' - idle pose used" % m.name)
         all_poses[m.name] = PP._sample(keys, m.frames) if len(keys) != m.frames else keys
 
+    # v9 FACES: expression per frame = a procedurally warped copy of the head layer (the photo's own pixels)
+    from . import expressions as X
+    faces_on = cfg.expressions not in ("off", "none", "")
+    pf, exprs = None, {}
+    if faces_on:
+        try:
+            pf = X.PhotoFaces(rig, X.rig_face_points(rig, lms, cfg._turned if turned else None))
+            umap = X.parse_map(cfg.expr_map)
+            for m in cfg.moves:
+                exprs[m.name] = ([cfg.expressions] * m.frames if cfg.expressions != "auto" else
+                                 X.schedule(m.name, m.frames, m.loop, umap, cfg.blink))
+            report.note("faces: ESTIMATED expressions - procedural warps of the photo's own face pixels (mouth corners, jaw, "
+                        "brows, lids) + drawn eyelids / mouth inside; not real photos of these expressions")
+            cfg._photo_faces = pf
+        except Exception as e:
+            report.warning("faces: no expressions for this photo (%s)" % e)
+            pf = None
+
     def _draw(p):
         big = rig.render(p)
         bb = big.getchannel("A").getbbox()
@@ -476,14 +624,27 @@ def _puppet_photo(cfg, report):
         fw, fh = max(1, int(round(fig.width * scale))), max(1, int(round(fig.height * scale)))
         return bb, fig.resize((fw, fh), Image.LANCZOS)
     flat = [p for m in cfg.moves for p in all_poses[m.name]]
+    fexp = [e for m in cfg.moves for e in (exprs.get(m.name) or ["neutral"] * len(all_poses[m.name]))]
     nthr = int(os.environ.get("SFS_THREADS", "0") or 0) or min(8, os.cpu_count() or 1)
     t0 = time.time()
-    if nthr > 1 and len(flat) > 1:
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(nthr) as ex:
-            drawn = list(ex.map(_draw, flat))
-    else:
-        drawn = [_draw(p) for p in flat]
+    drawn = [None] * len(flat)
+    groups = {}
+    for i, e in enumerate(fexp if pf is not None else ["neutral"] * len(flat)):
+        groups.setdefault(e, []).append(i)
+    for e, idx in groups.items():          # one expression at a time (the rig's head layer is swapped)
+        if pf is not None:
+            pf.use(e)
+        ps = [flat[i] for i in idx]
+        if nthr > 1 and len(ps) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(nthr) as ex:
+                res_ = list(ex.map(_draw, ps))
+        else:
+            res_ = [_draw(p) for p in ps]
+        for i, r in zip(idx, res_):
+            drawn[i] = r
+    if pf is not None:
+        pf.use("neutral")
     report.timing("puppet poses (%d frames, %d thread%s)" % (len(flat), nthr, "s" if nthr > 1 else ""), time.time() - t0)
     di = iter(drawn)
     for m in cfg.moves:
@@ -507,14 +668,40 @@ def _puppet_photo(cfg, report):
             cells.append(cell)
         real = m.name in ("idle", "fight_idle") and not turned
         tag = "photo" if real else ("filled:turned-puppet" if turned else "filled:puppet")
-        note = ("front photo (+ subtle breathing)" if real else
+        ex_ = sorted(set(exprs.get(m.name) or [])) if pf is not None else []
+        note = ("front photo (+ subtle breathing)" + ("; face: ESTIMATED %s" % "/".join(ex_) if ex_ and ex_ != ["neutral"] else "") if real else
                 ("photo turned %g deg (estimated depth / far side) + procedural puppet pose - NOT a real photo" % cfg.turn) if turned else
                 "procedural cut-out puppet pose from the one photo - NOT a real photo of this move")
+        if ex_ and ex_ != ["neutral"] and not real:
+            note += "; face: ESTIMATED %s" % "/".join(ex_)
         if clip:
             note += "; CLIPPED at the cell edge - use a wider --frame"
             report.warning("puppet: %s is clipped by the %dx%d cell" % (m.name, cfg.frame_w, cfg.frame_h))
         out[m.name] = (cells, tag, note)
         report.log("  puppet %-14s %2d frames%s" % (m.name, len(cells), "  CLIPPED" if clip else ""))
+    if pf is not None:            # v9: faces.png / talk strip renderer (first idle pose, any expression / mouth shape)
+        p0 = (all_poses.get("idle") or all_poses.get("fight_idle") or next(iter(all_poses.values())))[0]
+        def _face_render(e, _p=p0):
+            pf.use(e)
+            try:
+                bb, small = _draw(_p)
+            finally:
+                pf.use("neutral")
+            x = int(round(cfg.pivot_x + (bb[0] - rig.cx) * scale))
+            y = int(round(cfg.ground_y - (rig.ground + 1 - bb[1]) * scale))
+            cell = Image.new("RGBA", (cfg.frame_w, cfg.frame_h), (0, 0, 0, 0))
+            PP.composite(cell, small, x, y)
+            return cell
+        def _face_close(e, size=160):
+            L = pf.layer(e)
+            f = pf.face
+            c, s_ = (f["Em"] + f["Cm"]) / 2, f["s"]
+            box = (int(c[0] - 2.2 * s_), int(c[1] - 2.5 * s_), int(c[0] + 2.2 * s_), int(c[1] + 1.9 * s_))
+            im = L.crop(box)
+            k = size / max(1, im.height)
+            return im.resize((max(1, int(im.width * k)), size), Image.LANCZOS)
+        cfg._face_render, cfg._face_close = _face_render, _face_close
+        cfg._face_estimated = True
     return out
 
 
@@ -649,6 +836,16 @@ def collect_frames(cfg, report):
         sp = load_spec(cfg.spec_path) if cfg.spec_path else (cfg.spec or CharacterSpec(name=cfg.name))
         if cfg.kit:
             sp.kit = cfg.kit
+        if cfg.variant >= 0:
+            from . import variants as VA
+            base_name = sp.name
+            sp, vn = VA.vary_spec(sp, cfg.variant, cfg.vary)
+            report.note("variant: seed %d of %s (%s)" % (cfg.variant, base_name, "; ".join(vn)))
+        if cfg.recolor or cfg.overlay:
+            from . import recolor as RC
+            RC.apply_to_spec(sp, cfg.recolor or {}, cfg.overlay)
+            report.note("colours: %s applied to the 3D spec (exact slot colours)" % (cfg.recolor or cfg.overlay))
+        cfg._base_spec = sp
         frames = _mannequin_frames(cfg, sp, report)
         if cfg.extra_back_view and not any(m.name == "idle_back" for m in cfg.moves):
             pass
@@ -1137,8 +1334,20 @@ def build(cfg: BuildConfig, log=print, progress=None):
     except OSError:
         pass
     log("Sprite Forge Studio %s - building '%s' (%s mode, %d moves) -> %s" % (__version__, cfg.name, cfg.mode, len(cfg.moves), out))
+    if cfg.blend:
+        from . import blend as BL
+        added = BL.add_moves(cfg, report)
+        if added:
+            report.note("blend: %s" % ", ".join(added))
     frames, sp = collect_frames(cfg, report)
     _ground_lock(cfg, frames, report)
+    if cfg.blend:
+        BL.fill_crossfades(cfg, frames, report)
+    if cfg.fx:
+        from . import fx as FX
+        t_fx = time.time()
+        FX.apply_frames(cfg, frames, report)
+        report.timing("fx passes (%s)" % cfg.fx, time.time() - t_fx)
     labels = {m.name: (m.label or m.name) for m in cfg.moves}
     ordered = [(m.name, frames[m.name][0]) for m in cfg.moves if m.name in frames]
     for m in cfg.moves:
@@ -1290,9 +1499,11 @@ def build(cfg: BuildConfig, log=print, progress=None):
             if mo is not None:
                 clips.append((m.name, mo, m.frames, m.fps, m.loop))
         glb = os.path.join(out, "model.glb")
+        v9x = glb_v9_extras(cfg, sp)
         gltf.write_glb(glb, T, B, M, sp.colours(), clips, scale=sp.scale, name=cfg.name, slots=_slots(cfg),
-                       extras={"spec": {k: str(v) for k, v in sp.to_dict().items()}})
-        log("  model.glb written (%d animation clips, %.0f KB)" % (len(clips), os.path.getsize(glb) / 1024))
+                       extras={"spec": {k: str(v) for k, v in sp.to_dict().items()}}, **v9x)
+        log("  model.glb written (%d animation clips, %d morph targets, %d physics joints, %.0f KB)" % (
+            len(clips), len(v9x.get("morphs") or {}), sum(c.n for c in v9x.get("chains") or []), os.path.getsize(glb) / 1024))
         model_note = "model.glb"
         if cfg.fbx:
             if export_fbx(glb, os.path.join(out, "model.fbx"), cfg.blender, log):
@@ -1302,7 +1513,7 @@ def build(cfg: BuildConfig, log=print, progress=None):
             sk = copy.deepcopy(sp); sk.kit = kit
             sk.top_colour = sk.bottom_colour = sk.socks_colour = sk.trim_colour = ""
             kg = os.path.join(out, "model_%s.glb" % kit)
-            gltf.write_glb(kg, T, B, M, sk.colours(), clips, scale=sp.scale, name=cfg.name + "_" + kit, slots=_slots(cfg))
+            gltf.write_glb(kg, T, B, M, sk.colours(), clips, scale=sp.scale, name=cfg.name + "_" + kit, slots=_slots(cfg), **v9x)
             model_note += " + model_%s.glb" % kit
             if cfg.fbx and export_fbx(kg, kg[:-4] + ".fbx", cfg.blender, log):
                 model_note += "/.fbx"
@@ -1359,6 +1570,10 @@ def build(cfg: BuildConfig, log=print, progress=None):
         ctx = profiles.context(cfg, out, ordered, placed, page_names, spec_by, frames, view_info, scale, px_per_m, stand_px, cols)
         written = profiles.emit(cfg.profile, ctx, out, log)
         profile_note = "%s -> %s" % (cfg.profile.get("name", "?"), ", ".join(written))
+    # v9 extra outputs (faces, talk, regions, maps, frame data, QA, LODs)
+    from . import v9out
+    v9_notes = v9out.post_outputs(cfg, out, {"ordered": ordered, "placed": placed, "page_names": page_names, "pages": pages,
+                                            "frames": frames, "sp": sp, "spec_by": spec_by, "scale": scale}, report)
     # report
     with open(os.path.join(out, "build_report.txt"), "w") as f:
         f.write("Sprite Forge Studio %s build report - %s\nmode: %s\n\n" % (__version__, cfg.name, cfg.mode))
@@ -1385,6 +1600,9 @@ def build(cfg: BuildConfig, log=print, progress=None):
         f.write("console: %s\n" % (console_note or "none"))
         f.write("views: %s\n" % (", ".join("%s=%s" % (v, i["source"]) for v, i in view_info.items()) or "none"))
         f.write("profile: %s\n" % (profile_note or "none"))
+        f.write("v9: %s\n" % ("; ".join(v9_notes) or "none"))
+        for n in getattr(report, "notes", []):
+            f.write("NOTE: %s\n" % n)
     filled = [r[0] for r in report.rows if r[1].startswith("filled")]
     if filled:
         pup = [r[0] for r in report.rows if r[1] in ("filled:puppet", "filled:turned-puppet")]
@@ -1406,4 +1624,4 @@ def build(cfg: BuildConfig, log=print, progress=None):
     if progress:
         progress(1.0)
     return {"out": out, "frames": frames, "ordered": ordered, "report": report, "pages": page_names, "filled": filled,
-            "views": view_info, "view_files": view_files}
+            "views": view_info, "view_files": view_files, "v9": v9_notes}

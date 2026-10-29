@@ -1,4 +1,4 @@
-"""v8 Start tab: a 5-step guided wizard over the same Studio settings (and the same build core as forge.py build).
+"""v8/v9 Start tab: a 6-step guided wizard over the same Studio settings (and the same build core as forge.py build).
 
 1 Start from  ->  2 Your source  ->  3 Look & view (turn)  ->  4 Game target  ->  5 Build.
 Every choice just fills in the Build tab (which stays as the 'advanced' view), and step 5 shows the exact
@@ -17,7 +17,8 @@ from .moves import MoveSpec, PRESETS
 from . import consoles
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STEPS = ["1  Start from", "2  Your source", "3  Look & view", "4  What to make", "5  Build"]
+STEPS = ["1  Start from", "2  Your source", "3  Look & view", "4  Style", "5  What to make", "6  Build"]
+BUILD_STEP = len(STEPS) - 1
 SOURCES = [  # mode, title, one-line description
     ("photo", "A photo of a person", "Your own photo. The person is cut out (your real pixels) and posed per move; can be turned side-on."),
     ("video", "Video clips of each move", "One clip per move (e.g. walk.mp4, punch.mp4); frames are cut out and laid out as sprites."),
@@ -124,6 +125,14 @@ def forge_command(app):
         a += ["--quality", "draft"]
     if not b["cache"].get():
         a += ["--no-cache"]
+    from .gui_style import style_argv
+    if "npc" in v and v["npc"].get().strip() and mode in ("mannequin", "spec"):
+        i = a.index("--mannequin") if "--mannequin" in a else (a.index("--spec") if "--spec" in a else -1)
+        if i >= 0:
+            a[i:i + (1 if a[i] == "--mannequin" else 2)] = ["--npc", v["npc"].get().strip()]
+        if "--kit" in a:
+            j = a.index("--kit"); del a[j:j + 2]
+    a += style_argv(app)
     a += ["--out", v["out"].get().strip() or "out"]
     return a
 
@@ -150,7 +159,7 @@ class HomeTab:
         top = ttk.Frame(frame); top.pack(fill=tk.X, padx=10, pady=(10, 4))
         self.step_lbls = []
         for i, s in enumerate(STEPS):
-            lab = ttk.Label(top, text=" " + s, image=_ic(["start", "photo", "turn", "hd", "build"][i], 18), compound=tk.LEFT,
+            lab = ttk.Label(top, text=" " + s, image=_ic(["start", "photo", "turn", "style", "hd", "build"][i], 18), compound=tk.LEFT,
                             style="Step.TLabel", cursor="hand2"); lab.pack(side=tk.LEFT, padx=2)
             lab.bind("<Button-1>", lambda e, i=i: self.go(i)); self.step_lbls.append(lab)
         ttk.Label(top, text="   Advanced: every setting is on the Build tab.", foreground="#555").pack(side=tk.LEFT, padx=10)
@@ -175,7 +184,7 @@ class HomeTab:
             lab.configure(style="StepOn.TLabel" if k == i else "Step.TLabel")
         for w in self.body.winfo_children():
             w.destroy()
-        [self.s_start, self.s_source, self.s_look, self.s_target, self.s_build][i]()
+        [self.s_start, self.s_source, self.s_look, self.s_style, self.s_target, self.s_build][i]()
         self.back_btn.state(["disabled"] if i == 0 else ["!disabled"])
         self.next_btn.state(["disabled"] if i == len(STEPS) - 1 else ["!disabled"])
 
@@ -321,14 +330,19 @@ class HomeTab:
         self.turn_info = ttk.Label(left, text="", foreground="#26a269", wraplength=520); self.turn_info.pack(anchor="w", pady=4)
         self.turn_img = ttk.Label(row); self.turn_img.pack(side=tk.LEFT, padx=20, anchor="n")
 
-    # ---- step 4: three goal tabs (HD sprite sheet / retro console sprites / 3D files) + move picker
-    GOALS = [("hd", "HD sprite sheet"), ("retro", "Retro console sprites"), ("3d", "3D files")]
+    # ---- step 4 (v9): Style - Faces / Colours / Variants
+    def s_style(self):
+        from .gui_style import StyleStep
+        self.style = StyleStep(self, self.body)
+
+    # ---- step 5: goal tabs (HD sprite sheet / retro console sprites / 3D files) + move picker
+    GOALS = [("hd", "HD sprite sheet"), ("retro", "Retro console sprites"), ("3d", "3D files"), ("extras", "Extras")]
 
     def s_target(self):
         from . import icons
         v = self.app.v
-        self._title("What to make", "Three goals, one tab each. They add up: one build can make the HD sheet, a console version "
-                    "and 3D files together. Everything here is also on the Build tab.")
+        self._title("What to make", "One tab per goal. They add up: one build can make the HD sheet, a console version, "
+                    "3D files and the extras together. Everything here is also on the Build tab.")
         self.goal_nb = nb = ttk.Notebook(self.body); nb.pack(fill=tk.BOTH, expand=True)
         self.goal_tabs = {}
         for key, label in self.GOALS:
@@ -336,6 +350,8 @@ class HomeTab:
             nb.add(fr, text="  %s  " % label, image=icons.tk_icon(key, 22), compound=tk.LEFT)
             self.goal_tabs[key] = fr
         self._goal_hd(self.goal_tabs["hd"]); self._goal_retro(self.goal_tabs["retro"]); self._goal_3d(self.goal_tabs["3d"])
+        from .gui_style import goal_extras
+        goal_extras(self, self.goal_tabs["extras"])
         nb.select(self.goal_tabs.get(self.goal, self.goal_tabs["hd"]))
         nb.bind("<<NotebookTabChanged>>", lambda e: setattr(self, "goal", [k for k, f in self.goal_tabs.items() if str(f) == nb.select()][0]))
         f = ttk.Frame(self.body); f.pack(anchor="w", pady=(8, 2), fill=tk.X)
@@ -504,7 +520,7 @@ class HomeTab:
         self.cmd = tk.Text(self.body, height=4, width=150, font="TkFixedFont", wrap=tk.WORD, background="#f4f4f4")
         self.cmd.pack(anchor="w", fill=tk.X)
         self._cmd()
-        v["quality"].trace_add("write", lambda *a: self._cmd() if self.step == 4 else None)
+        v["quality"].trace_add("write", lambda *a: self._cmd() if self.step == BUILD_STEP else None)
         bf = ttk.Frame(self.body); bf.pack(anchor="w", pady=8)
         self.go_btn = ttk.Button(bf, text=" BUILD", image=_ic("build", 24), compound=tk.LEFT, style="Go.TButton", command=self.build); self.go_btn.pack(side=tk.LEFT)
         self.open_btn = ttk.Button(bf, text=" Open output folder", image=_ic("folder"), compound=tk.LEFT, command=self.app.open_out); self.open_btn.pack(side=tk.LEFT, padx=6)
@@ -619,7 +635,7 @@ class HomeTab:
             self.bstat.configure(text=self.app.status.cget("text"), foreground="#c01c28")
 
     def _tick_pb(self):
-        if self.step == 4 and self.bpb.winfo_exists():
+        if self.step == BUILD_STEP and self.bpb.winfo_exists():
             if "disabled" in self.go_btn.state():
                 self.bpb["value"] = self.app.pb["value"]
             if self.t0 and "disabled" in self.go_btn.state():

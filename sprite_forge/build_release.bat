@@ -38,6 +38,12 @@ echo [2g/3] v8: Quick preview (draft) + cached rebuild + Egyptian Fighter export
 %PY% forge.py build --spec examples_char.txt --preset fighter14 --no-fbx --out out_v8 || goto :err
 %PY% forge.py export-ef out_v8\rua_keeper out_v8\game_assets\char_rua || goto :err
 %PY% tools\test_v8.py out_v8\tests || goto :err
+echo [2h/3] v9: faces + talk + colours + variants + extras build, NPC preset, multi-character atlas, QA + v9 tests -^> out_v9
+%PY% forge.py build --spec examples_char.txt --preset fighter14 --no-fbx --expressions auto --talk "Ready to fight" --recolor team_blue --overlay "top:hoops:#ffffff" --variants 6 --fx outline=2,cel=3 --maps normal,emissive --framedata --footlock --blend "idle>walk:3" --lods 2 --out out_v9 || goto :err
+%PY% forge.py build --npc goblin --variants 6 --no-fbx --out out_v9 || goto :err
+%PY% forge.py atlas out_v9\rua_keeper out_v9\goblin --out out_v9\pack || goto :err
+%PY% forge.py qa out_v9\rua_keeper || echo (QA flagged frames - see out_v9\rua_keeper\qa_report.txt)
+%PY% tools\test_v9.py out_v9\tests || goto :err
 echo [3/3] raylib C example (needs MSYS2 UCRT64 gcc + raylib: pacman -S mingw-w64-ucrt-x86_64-raylib)
 set "PATH=C:\msys64\ucrt64\bin;%PATH%"
 pushd spriteforge

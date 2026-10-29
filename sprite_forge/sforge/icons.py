@@ -82,6 +82,15 @@ def _draw(name, s):
         d.rounded_rectangle([s * .04, s * .26, s * .96, s * .78], radius=s * .2, fill=DARK)
         d.line([s * .2, s * .52, s * .4, s * .52], fill="white", width=w); d.line([s * .3, s * .42, s * .3, s * .62], fill="white", width=w)
         d.ellipse([s * .62, s * .38, s * .74, s * .5], fill=RED); d.ellipse([s * .74, s * .52, s * .86, s * .64], fill=GREEN)
+    elif name == "style":      # palette
+        d.ellipse([s * .08, s * .12, s * .92, s * .88], fill=(222, 196, 150))
+        for (x, y), c in zip(((.3, .32), (.52, .25), (.71, .38), (.68, .6)), (RED, BLUE, GREEN, ORANGE)):
+            d.ellipse([s * (x - .09), s * (y - .09), s * (x + .09), s * (y + .09)], fill=c)
+        d.ellipse([s * .3, s * .58, s * .46, s * .74], fill=(255, 255, 255, 0))
+    elif name == "extras":     # star
+        import math
+        pts = [(s * .5 + s * (.44 if i % 2 == 0 else .19) * math.sin(i * math.pi / 5), s * .53 - s * (.44 if i % 2 == 0 else .19) * math.cos(i * math.pi / 5)) for i in range(10)]
+        d.polygon(pts, fill=ORANGE)
     elif name == "move":
         _mini(d, s * .5, s * .1, s * .85, ORANGE)
         d.line([s * .1, s * .5, s * .3, s * .5], fill=GREY, width=w); d.line([s * .05, s * .65, s * .25, s * .65], fill=GREY, width=w)
@@ -109,7 +118,7 @@ def _font(px):
 
 
 NAMES = ["photo", "video", "frames", "mannequin", "library", "spec", "hd", "retro", "3d", "turn", "help", "build", "start",
-         "preview", "folder", "game", "move"]
+         "preview", "folder", "game", "move", "style", "extras"]
 
 
 def icon(name, size=20):

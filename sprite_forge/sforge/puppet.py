@@ -88,7 +88,9 @@ def _fill_from_nearest(rgba, todo, known, blur=6):
 
 
 class Rig:
-    def __init__(self, cut: Image.Image, landmarks, pad_frac=0.75):
+    def __init__(self, cut: Image.Image, landmarks, pad_frac=0.75, colour_ref=None):
+        """colour_ref (v9): the photo BEFORE a colour swap - skin / jeans colour tests that decide the rig pieces use
+        it, so a recoloured top (e.g. a light-blue variant) cannot change which pixels belong to the arm"""
         a0 = np.asarray(cut.convert("RGBA"))
         h0, w0 = a0.shape[:2]
         self.pad = pad = int(h0 * pad_frac)
@@ -165,7 +167,11 @@ class Rig:
         # and a MIRRORED COPY of the person's other (visible) hand is attached as the fist.  The pocket area
         # is filled like any other uncovered body area.  Flagged in the build notes.
         self.fist = {}
-        A3 = A[..., :3].astype(int)
+        if colour_ref is not None and colour_ref.size == cut.size:
+            Ac = np.zeros_like(A); Ac[padt:padt + h0, pad:pad + w0] = np.asarray(colour_ref.convert("RGBA"))
+            A3 = Ac[..., :3].astype(int)
+        else:
+            A3 = A[..., :3].astype(int)
         skin = (A3[..., 0] > 70) & (A3[..., 0] > A3[..., 1] + 10) & (A3[..., 0] > A3[..., 2] + 8) & alpha
         hand_px = {}
         for k in ("n", "f"):

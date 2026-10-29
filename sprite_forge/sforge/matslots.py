@@ -36,7 +36,9 @@ NAME_RULES = [("*jersey*|*shirt*|*top*|*torso_cloth*|*tshirt*|*vest*", "Jersey_M
               ("*mouth*|*teeth*|*tongue*|*lip*", "Mouth_Mat"),
               ("*skin*|*body*|*head*|*face*|*arm*|*hand*|*leg*", "Skin_Mat")]
 FOLD_CORE4 = {"Trim_Mat": "Jersey_Mat", "Hair_Mat": "Skin_Mat", "Shoes_Mat": "Skin_Mat", "Eye_Mat": "Skin_Mat",
-              "EyeWhite_Mat": "Skin_Mat", "Mouth_Mat": "Skin_Mat"}
+              "EyeWhite_Mat": "Skin_Mat", "Mouth_Mat": "Skin_Mat", "Teeth_Mat": "Skin_Mat",
+              "JerseyPattern_Mat": "Jersey_Mat", "Accessory_Mat": "Jersey_Mat", "Accessory2_Mat": "Jersey_Mat",
+              "Emissive_Mat": "Jersey_Mat"}
 # default colours for slots created by an auto split of an untextured single material
 DEFAULT_COL = {"Skin_Mat": [0.80, 0.62, 0.50], "Jersey_Mat": [0.10, 0.40, 0.18], "Shorts_Mat": [0.93, 0.93, 0.93],
                "Socks_Mat": [0.10, 0.40, 0.18], "Shoes_Mat": [0.12, 0.12, 0.12], "Trim_Mat": [0.95, 0.95, 0.95],
@@ -203,7 +205,9 @@ def apply(rig, rec=None, split="auto", slots="full", log=None):
 
 MANNEQUIN_SLOT = {"skin": "Skin_Mat", "shirt": "Jersey_Mat", "shorts": "Shorts_Mat", "socks": "Socks_Mat",
                   "trim": "Trim_Mat", "boots": "Shoes_Mat", "hair": "Hair_Mat", "eye": "Eye_Mat",
-                  "eye_white": "EyeWhite_Mat", "mouth": "Mouth_Mat"}
+                  "eye_white": "EyeWhite_Mat", "mouth": "Mouth_Mat", "teeth": "Teeth_Mat",
+                  "pattern": "JerseyPattern_Mat", "accessory": "Accessory_Mat", "accessory2": "Accessory2_Mat",
+                  "emissive": "Emissive_Mat", "eyelid": "Skin_Mat", "brow": "Hair_Mat"}
 
 
 def mannequin_name(mat, slots="full"):

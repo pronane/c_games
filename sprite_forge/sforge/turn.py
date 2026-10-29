@@ -300,10 +300,10 @@ def clean_hand_mask(m, J, L, k, others=None, pad=(0, 0)):
 
 
 def build_turned(cut, landmarks, yaw=90.0, depth="auto", side=None, side_faces="right", template_params=None,
-                 clean_hand=True, others_mask=None, far_shade=0.82, balance=0.9, log=print):
+                 clean_hand=True, others_mask=None, far_shade=0.82, balance=0.9, colour_ref=None, log=print):
     from .puppet import Rig
     cut = cut.convert("RGBA")
-    rig = Rig(cut, landmarks)
+    rig = Rig(cut, landmarks, colour_ref=colour_ref)
     A0 = np.asarray(cut)
     h0, w0 = A0.shape[:2]
     pad, padt = rig.pad, rig.padt
