@@ -493,3 +493,89 @@ M("kart_taunt", "Kart", "wave / taunt from the kart", keys=K(
     (0.5, P(SEAT, arm_R=(150, 25, 0), elbow_R=30, wrist_R=-30, neck=(0, -20, 0))),
     (0.7, P(SEAT, arm_R=(150, 40, 0), elbow_R=60, wrist_R=30, neck=(0, -20, 0))),
     (1, P(SEAT))))
+
+
+# ---------------------------------------------------------------- v9 NPC / enemy pack motions
+def _wave(t):
+    p = dict(STAND)
+    s = math.sin(2 * math.pi * 2 * t)
+    p.update(arm_R=(150, 25 + 18 * s, 0), elbow_R=35 + 20 * s, neck=(-4, 6, 0))
+    return p
+
+
+def _talk(t):
+    p = idle_func(STAND, 0.6)(t)
+    s = math.sin(2 * math.pi * t); c = math.cos(2 * math.pi * t)
+    p.update(arm_R=(35 + 18 * s, 20, 0), elbow_R=70 + 20 * c, arm_L=(25 - 10 * s, 18, 0), elbow_L=60 + 15 * s,
+             wrist_R=20 * c, neck=(-3, 8 * s, 0))
+    return p
+
+
+def _look(t):
+    p = idle_func(STAND, 0.5)(t)
+    y = 40 * math.sin(2 * math.pi * t)
+    p.update(neck=(-4, y, 0), chest=(1, y * 0.25, 0))
+    return p
+
+
+def _cower(t):
+    p = dict(CROUCH)
+    s = math.sin(2 * math.pi * 3 * t)
+    p.update(arm_L=(120, 40, 0), arm_R=(120, 40, 0), elbow_L=140, elbow_R=140, neck=(25, 0, 0),
+             chest=(14 + 2 * s, 2 * s, 0))
+    return p
+
+
+def _hover(t):
+    p = idle_func(STAND, 0.8)(t)
+    s = math.sin(2 * math.pi * t)
+    p.update(lift=0.18 + 0.05 * s, leg_L=(14, 4, 0), leg_R=(4, 4, 0), knee_L=35, knee_R=20, ankle_L=30, ankle_R=30,
+             arm_L=(20, 40 + 8 * s, 0), arm_R=(20, 40 + 8 * s, 0))
+    return p
+
+
+def _hop(t):
+    h = math.sin(math.pi * t)
+    p = dict(READY) if h < 0.15 else dict(STAND)
+    p.update(lift=0.35 * h, arm_L=(30, 25 + 40 * h, 0), arm_R=(30, 25 + 40 * h, 0), pos=(0.25 * t, 0))
+    return p
+
+
+M("wave", "NPC", "wave hello", func=_wave, loop=True)
+M("talk", "NPC", "talking with hand gestures (pair with --talk for mouth shapes)", func=_talk, loop=True)
+M("look_around", "NPC", "guard / patrol looks left and right", func=_look, loop=True)
+M("cower", "NPC", "scared civilian, shaking", func=_cower, loop=True)
+M("hover", "NPC", "floating idle (ghosts, spirits)", func=_hover, loop=True)
+M("hop", "NPC", "small creature hop", func=_hop, loop=True)
+M("patrol", "NPC", "slow patrol walk", func=loco(16, 30, 10, 20, 2), loop=True)
+M("limp", "NPC", "injured / zombie shuffle", func=loco(12, 18, 6, 50, 14), loop=True)
+M("alert", "NPC", "spots the player: jolt into a guard", keys=K(
+    (0, P(STAND)), (0.25, P(STAND, chest=(-8, 0, 0), neck=(-14, 0, 0), arm_L=(20, 30, 0), arm_R=(20, 30, 0), lift=0.03)),
+    (0.6, P(FIGHT)), (1, P(FIGHT))))
+M("swing_attack", "NPC", "overhead club / sword swing (two hands)", keys=K(
+    (0, P(FIGHT)),
+    (0.35, P(FIGHT, hips=(-6, -20, 0), chest=(-14, 10, 0), arm_L=(175, 10, 0), arm_R=(175, 10, 0), elbow_L=50, elbow_R=50, neck=(-12, 0, 0))),
+    (0.55, P(FIGHT, hips=(18, -10, 0), spine=(14, 0, 0), chest=(14, 0, 0), arm_L=(70, 5, 0), arm_R=(70, 5, 0), elbow_L=5, elbow_R=5,
+             leg_L=(38, 7, 0), knee_L=45, pos=(0.12, 0))),
+    (0.75, P(FIGHT, hips=(22, -10, 0), spine=(16, 0, 0), arm_L=(35, 5, 0), arm_R=(35, 5, 0), elbow_L=10, elbow_R=10, leg_L=(38, 7, 0), knee_L=45, pos=(0.12, 0))),
+    (1, P(FIGHT))))
+M("lunge", "NPC", "creature lunge / bite", keys=K(
+    (0, P(READY)), (0.3, P(CROUCH, neck=(-30, 0, 0), arm_L=(-20, 20, 0), arm_R=(-20, 20, 0))),
+    (0.55, P(READY, hips=(40, 0, 0), spine=(20, 0, 0), neck=(-45, 0, 0), arm_L=(110, 15, 0), arm_R=(110, 15, 0), elbow_L=20, elbow_R=20,
+             leg_R=(-40, 6, 0), knee_R=10, lift=0.12, pos=(0.35, 0))),
+    (0.8, P(READY, pos=(0.35, 0))), (1, P(READY, pos=(0.35, 0)))))
+M("cast", "NPC", "spell cast: gather then thrust both hands forward", keys=K(
+    (0, P(STAND)), (0.35, P(STAND, arm_L=(40, -10, 0), arm_R=(40, -10, 0), elbow_L=110, elbow_R=110, chest=(-6, 0, 0), neck=(-6, 0, 0))),
+    (0.6, P(STAND, hips=(8, 0, 0), arm_L=(88, 6, 0), arm_R=(88, 6, 0), elbow_L=5, elbow_R=5, leg_L=(25, 5, 0), knee_L=25)),
+    (0.8, P(STAND, hips=(8, 0, 0), arm_L=(92, 6, 0), arm_R=(92, 6, 0), elbow_L=5, elbow_R=5, leg_L=(25, 5, 0), knee_L=25)),
+    (1, P(STAND))))
+M("roar", "NPC", "boss roar: arms wide, head back", keys=K(
+    (0, P(FIGHT)), (0.3, P(READY, chest=(12, 0, 0), arm_L=(30, 20, 0), arm_R=(30, 20, 0))),
+    (0.6, P(STAND, chest=(-16, 0, 0), neck=(-30, 0, 0), arm_L=(60, 85, 0), arm_R=(60, 85, 0), elbow_L=40, elbow_R=40)),
+    (0.85, P(STAND, chest=(-16, 0, 0), neck=(-30, 0, 0), arm_L=(64, 88, 0), arm_R=(64, 88, 0), elbow_L=30, elbow_R=30)),
+    (1, P(FIGHT))))
+M("die", "NPC", "fall forward and stay down", keys=K(
+    (0, P(FIGHT)), (0.3, P(FIGHT, hips=(-20, 0, 0), neck=(30, 0, 0), arm_L=(40, 50, 0), arm_R=(40, 50, 0), pos=(0, -0.1))),
+    (0.55, P(CROUCH, neck=(10, 0, 0), arm_L=(10, 20, 0), arm_R=(10, 20, 0))),
+    (0.85, P(LIE_FRONT, pos=(0.3, 0))), (1, P(LIE_FRONT, pos=(0.3, 0)))))
+M("sit", "NPC", "sitting idle (shopkeepers, villagers)", func=idle_func(dict(SEAT), 0.5), loop=True)

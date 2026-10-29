@@ -10,7 +10,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from .rig import JOINT_NAMES, rest_world, HEIGHT
 from .mathutil import ry, rx, mat4
-from .mesh import MATS
+from .mesh import MATS, DECAL_BIAS
+_BIAS = np.array([DECAL_BIAS.get(m, 0.0) for m in MATS])
 
 _BIND_INV = None
 
@@ -75,7 +76,9 @@ def render_tris(P, mats, colors, rs: RenderSettings, root_xz=(0, 0), wire=False,
     if two_sided:
         N = N * np.where(N[:, 2:3] < 0, -1.0, 1.0)
     depth = Q[..., 2].mean(axis=1)
-    order = np.argsort(depth)
+    if rgb is None and mats is not None and len(depth):
+        depth = depth + _BIAS[np.asarray(mats)]
+    order = np.argsort(depth, kind="stable")
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     dr = ImageDraw.Draw(img)
     ndl = np.clip(N @ rs.light, 0, 1)

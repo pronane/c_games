@@ -42,6 +42,12 @@ $PY forge.py build --spec examples_char.txt --preset fighter14 --no-fbx --out ou
 $PY forge.py build --spec examples_char.txt --preset fighter14 --no-fbx --out out_v8 || fail 6b
 $PY forge.py export-ef out_v8/rua_keeper out_v8/game_assets/char_rua || fail 6b
 $PY tools/test_v8.py out_v8/tests || fail 6b
+step 6c "v9: faces + talk + colours + variants + extras build, NPC preset, multi-character atlas, QA + v9 tests -> out_v9"
+$PY forge.py build --spec examples_char.txt --preset fighter14 --no-fbx --expressions auto --talk "Ready to fight" --recolor team_blue --overlay "top:hoops:#ffffff" --variants 6 --fx outline=2,cel=3 --maps normal,emissive --framedata --footlock --blend "idle>walk:3" --lods 2 --out out_v9 || fail 6c
+$PY forge.py build --npc goblin --variants 6 --no-fbx --out out_v9 || fail 6c
+$PY forge.py atlas out_v9/rua_keeper out_v9/goblin --out out_v9/pack || fail 6c
+$PY forge.py qa out_v9/rua_keeper || echo "(QA flagged frames - see out_v9/rua_keeper/qa_report.txt)"
+$PY tools/test_v9.py out_v9/tests || fail 6c
 step 7 "raylib C example (optional)"
 if [ "$QUICK" = 0 ] && command -v make >/dev/null 2>&1 && command -v cc >/dev/null 2>&1; then
   make -C spriteforge || echo "(C example not built - needs raylib: see spriteforge/README_spriteforge.md or 'make -C spriteforge raylib')"

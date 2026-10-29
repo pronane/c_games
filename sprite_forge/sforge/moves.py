@@ -140,7 +140,23 @@ def preset(name):
 
 def motion_for(spec: MoveSpec):
     from .motions import find_motion, LIB
+    if spec.motion.startswith("blend:"):            # v9 animation blending (sforge/blend.py)
+        from .blend import blend_motion
+        return blend_motion(spec.motion)
     m = find_motion(spec.motion) if spec.motion else None
     if m is None:
         m = find_motion(spec.name)
+    if m is None:                                   # v9: a preset move typed by name (e.g. 'attack' from enemy_grunt)
+        for mvs in PRESETS.values():
+            for p in mvs:
+                if p.name == spec.name and p.motion and p.motion != spec.name:
+                    m = find_motion(p.motion)
+                    if m is not None:
+                        return m
     return m
+
+
+# v9: enemy / NPC preset pack (npc_civilian, npc_guard, enemy_grunt, enemy_caster, enemy_creature, boss, zombie)
+from . import npcpack as _npcpack   # noqa: E402
+if hasattr(_npcpack, "register"):    # (npcpack imported first: it registers itself at its end)
+    _npcpack.register()

@@ -231,6 +231,42 @@ def cmd_build(a):
         cfg.props = list(a.attach)
     if getattr(a, "slot_color", None):
         cfg.slot_colors = ",".join(a.slot_color)
+    # ---- v9
+    if getattr(a, "npc", None):
+        from sforge import npcpack
+        try:
+            sp_, mp_ = npcpack.character_spec(a.npc)
+        except ValueError as e:
+            print(e); return 2
+        cfg.mode = "mannequin"; cfg.spec = sp_
+        if not a.preset and not a.moves:
+            cfg.moves = preset(mp_)
+        if not a.name:
+            cfg.name = cfg.display_name = a.npc
+    for k_ in ("expressions", "expr_map", "talk", "recolor", "overlay", "regions", "vary", "fx", "maps", "blend"):
+        if getattr(a, k_, None) not in (None, ""):
+            setattr(cfg, k_, getattr(a, k_))
+    for k_ in ("variant", "variants", "variant_seed", "lods"):
+        if getattr(a, k_, None) is not None:
+            setattr(cfg, k_, int(getattr(a, k_)))
+    if a.no_blink:
+        cfg.blink = False
+    if a.no_faces_sheet:
+        cfg.faces_sheet = False
+    if a.no_physics:
+        cfg.physics = False
+    if a.no_qa:
+        cfg.qa = False
+    if a.footlock:
+        cfg.footlock = True
+    if a.framedata:
+        cfg.framedata = True
+    if cfg.vary:
+        from sforge import variants as _V
+        try:
+            _V.parse_vary(cfg.vary)
+        except ValueError as e:
+            print(e); return 2
     if a.kits:
         from sforge.mesh import KITS
         if cfg.mode == "library" and a.kits == "all":
@@ -464,6 +500,9 @@ def main(argv=None):
     if argv and argv[0] in ("fighter", "export-ef"):   # v7.1: photo puppet fighter moves / game export
         from sforge import fighter_cli
         return fighter_cli.main(argv)
+    from sforge import v9_cli
+    if argv and argv[0] in v9_cli.COMMANDS:     # v9: recolor variants atlas batch qa framedata npc sets expressions
+        return v9_cli.main(argv)
     if argv and argv[0] == "doctor":
         from sforge import doctor
         return doctor.run(argv[1:])
@@ -481,7 +520,9 @@ def main(argv=None):
   export-ef   built character -> Egyptian Fighter / Padel Wars char_<name>/ folder (sprites.cfg, HD + low-res)
   package     drop-in zip for a game's assets/ folder (<= 25 MB check)
   summary     one-page pipeline summary image
-  cache       build cache: cache stats | clear | prune""")
+  cache       build cache: cache stats | clear | prune
+v9:
+""" + "\n".join("  %-11s %s" % kv for kv in v9_cli.HELP.items()))
     sub = p.add_subparsers(dest="cmd")
     b = sub.add_parser("build", help="build a character")
     src = b.add_argument_group("source (pick one; default = mannequin)")
@@ -569,6 +610,29 @@ def main(argv=None):
                     help="attach library prop NAME to a socket: hand_r hand_l head back hip foot (default: the prop's own socket); repeatable")
     eq.add_argument("--slot-color", dest="slot_color", action="append", metavar="SLOT=#RRGGBB",
                     help="recolour a material slot, e.g. --slot-color Jersey=#c8102e --slot-color Armour=#777777")
+    v9 = b.add_argument_group("v9 STYLE: faces / colours / variants")
+    v9.add_argument("--expressions", help="auto (per move: hit=hurt, punch=angry, taunt=taunt ...) | off | one expression for all moves (forge.py expressions)")
+    v9.add_argument("--expr-map", dest="expr_map", help="per-move expressions, e.g. 'punch=shout,victory=happy,idle=neutral'")
+    v9.add_argument("--no-blink", dest="no_blink", action="store_true", help="no blink in looping neutral moves")
+    v9.add_argument("--talk", help="a line of dialogue -> talk/ strip with mouth shapes + talk.json timing ('sheet' = every mouth shape)")
+    v9.add_argument("--no-faces-sheet", dest="no_faces_sheet", action="store_true", help="skip faces.png (HUD portraits of every expression)")
+    v9.add_argument("--recolor", help="colour set and/or regions: team_red | kerry | 'team_blue;hair=black' | 'top=#c8102e,skin=..' (forge.py sets)")
+    v9.add_argument("--overlay", help="texture overlay on the top: 'top:hoops:#ffffff' | 'top:stripes:gold' | 'top:texture:cloth.png'")
+    v9.add_argument("--regions", help="PHOTO: your painted region map PNG (colours as in regions_preview.png) instead of the automatic one")
+    v9.add_argument("--no-physics", dest="no_physics", action="store_true", help="no hair / cape / scarf swing")
+    v9.add_argument("--variant", type=int, help="build procedural variant SEED of this character")
+    v9.add_argument("--vary", help="what a variant changes: body,outfit,colours,skin,accessories,face | all")
+    v9.add_argument("--variants", type=int, help="also write variants/ (sheet + spec files of N variants)")
+    v9.add_argument("--variant-seed", dest="variant_seed", type=int, help="first seed for --variants (default 1)")
+    v9.add_argument("--npc", help="build an enemy / NPC preset character (forge.py npc): goblin, guard, wizard, boss_king ...")
+    v9x = b.add_argument_group("v9 EXTRAS")
+    v9x.add_argument("--fx", help="post passes: 'outline=2,cel=3,pixel=4,colors=32,light=-1:-1:1,rim=0.4,outline_colour=#101018'")
+    v9x.add_argument("--maps", help="'normal,emissive' (emissive=#59f2ff to pick the glow colour) -> maps/")
+    v9x.add_argument("--footlock", action="store_true", help="pin planted feet with 2-bone IK (no foot sliding) - mannequin / library moves")
+    v9x.add_argument("--framedata", action="store_true", help="hit / hurt boxes + startup / active / recovery -> framedata.json + framedata.cfg")
+    v9x.add_argument("--blend", help="transition moves 'idle>walk:3,punch>idle:3' -> blend_<a>_<b>")
+    v9x.add_argument("--no-qa", dest="no_qa", action="store_true", help="skip the sprite QA checker")
+    v9x.add_argument("--lods", type=int, help="3D: model_baked.glb (1 texture, 1 material) + N lower-detail model_lodN.glb")
     b.add_argument("--config", help="load a project .json (saved from the GUI)")
     b.add_argument("--save-config", dest="save_config")
     sub.add_parser("video", help="video clips -> sprite moves -> build   (forge.py video -h)")

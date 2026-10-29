@@ -6,7 +6,10 @@ import math
 import numpy as np
 from .rig import JOINT_NAMES, rest_world, BALL_RADIUS
 
-MATS = ["skin", "shirt", "shorts", "socks", "trim", "boots", "hair", "ball", "ball_seam", "eye", "eye_white", "mouth", "kart", "kart_dark", "kart_trim"]
+MATS = ["skin", "shirt", "shorts", "socks", "trim", "boots", "hair", "ball", "ball_seam", "eye", "eye_white", "mouth", "kart", "kart_dark", "kart_trim",
+        "accessory", "accessory2", "pattern", "teeth", "emissive", "eyelid", "brow"]   # v9: accessories, top pattern, face, glow
+# v9: small face parts are drawn after the head surface they sit on (painter's algorithm depth bias, metres)
+DECAL_BIAS = {"eye_white": 0.010, "eye": 0.011, "mouth": 0.010, "teeth": 0.012, "eyelid": 0.014, "brow": 0.012}
 
 KITS = {
     "home":  dict(label="Home (Green)", shirt=(0.04, 0.42, 0.16), shorts=(0.93, 0.93, 0.93), socks=(0.04, 0.42, 0.16), trim=(0.95, 0.95, 0.95)),
@@ -98,20 +101,30 @@ class MeshBuilder:
         for f in F:
             self.quad(v[f[0]], v[f[1]], v[f[2]], v[f[3]], bone, mat)
 
+    def box8(self, bone, v, mat):
+        """box from 8 corners: bottom face 0..3 (lo y), top face 4..7, same order as box()"""
+        v = [np.asarray(p, float) for p in v]
+        F = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+        for f in F:
+            self.quad(v[f[0]], v[f[1]], v[f[2]], v[f[3]], bone, mat)
+
     def arrays(self):
         T = np.array(self.tris, dtype=np.float64)          # (M,3,3)
         return T, np.array(self.bones, np.int32), np.array(self.mats, np.int32)
 
 
-def build_mannequin(spec=None, include_ball=True, prop=None):
+def build_mannequin(spec=None, include_ball=True, prop=None, face=None):
     """Build the mannequin. `spec` (CharacterSpec) controls girth, face, hair,
-    clothing.  Height is applied as a uniform scale by the caller (spec.scale)."""
+    clothing.  Height is applied as a uniform scale by the caller (spec.scale).
+    v9: `face` = expression parameters (sforge.expressions.params_for); the face always has the SAME triangles
+    (only moved), so every expression is a morph target of the neutral mesh."""
     from .spec import CharacterSpec
     sp = spec or CharacterSpec()
     g = sp.girth; gx = g ** 0.6          # sideways growth limited (arms stay attached)
     J = rest_world()
     b = MeshBuilder()
     hs = sp.size("head")
+    fp = dict(face or {})
     top, bottom, shoes = sp.top.lower(), sp.bottom.lower(), sp.shoes.lower()
     # ---- head
     hc = J["head"] + np.array([0, 0.105, 0.0]) * hs
@@ -128,7 +141,7 @@ def build_mannequin(spec=None, include_ball=True, prop=None):
     if hair == "long":
         b.box("head", hc + np.array([-0.10, -0.20, -0.125]) * hs, hc + np.array([0.10, 0.06, -0.06]) * hs, "hair", taper=(1.0, 1.0))
     if hair == "ponytail":
-        b.cyl("head", hc + np.array([0, 0.03, -0.11]) * hs, hc + np.array([0, -0.18, -0.16]) * hs, 0.035, 0.02, "hair", seg=6)
+        b.cyl("head", hc + np.array([0, 0.03, -0.11]) * hs, hc + np.array([0, -0.03, -0.13]) * hs, 0.035, 0.03, "hair", seg=6)   # v9: the tail is a physics chain
     if hair == "bun":
         b.sphere("head", hc + np.array([0, 0.10, -0.09]) * hs, 0.045, "hair", seg=8, rings=5)
     if hair == "curly":
@@ -145,16 +158,15 @@ def build_mannequin(spec=None, include_ball=True, prop=None):
         ec = hc + np.array([sx * 0.04, 0.012, 0.094]) * hs
         b.sphere("head", ec, 0.017 * hs, "eye_white", seg=6, rings=4, scale=(1.2, 0.8, 0.6))
         b.sphere("head", ec + np.array([0, 0, 0.009]) * hs, 0.0095 * hs, "eye", seg=6, rings=4, scale=(1, 1, 0.6))
-        b.box("head", ec + np.array([-0.02, 0.022, -0.004]) * hs, ec + np.array([0.02, 0.03, 0.012]) * hs, "hair")  # brow
-    ms = sp.size("mouth")
-    mc = hc + np.array([0, -0.058, 0.093]) * hs
-    b.box("head", mc + np.array([-0.025 * ms, -0.006, -0.01]) * hs, mc + np.array([0.025 * ms, 0.006, 0.008]) * hs, "mouth")
+        _face_eye(b, ec, sx, hs, fp)
+    _face_mouth(b, hc, hs, sp.size("mouth"), fp)
     fh = sp.facial_hair.lower()
     if fh in ("beard", "stubble"):
         grow = 1.03 if fh == "stubble" else 1.09
         b.sphere("head", hc + np.array([0, -0.004, 0.004]) * hs, R * grow, "hair", seg=12, rings=3, scale=(0.92, 1.08, 1.0),
                  lat_min=math.pi * 0.66, lat_max=math.pi * 0.93)
     if fh in ("moustache", "beard"):
+        mc = hc + np.array([0, -0.058, 0.093]) * hs          # same mouth centre as _face_mouth
         b.box("head", mc + np.array([-0.03, 0.008, 0.0]) * hs, mc + np.array([0.03, 0.02, 0.018]) * hs, "hair")
     if "freckle" in sp.complexion.lower():
         for sx in (-1, 1):
@@ -202,12 +214,76 @@ def build_mannequin(spec=None, include_ball=True, prop=None):
         ft = J["foot_" + s]
         fl = 0.19 * foot_s
         b.box("foot_" + s, ft + [-0.048 * foot_s, -0.082, -0.065], ft + [0.048 * foot_s, 0.03 if shoes != "barefoot" else 0.0, fl], "boots", taper=(0.85, 0.55))
+    acc = [a.strip().lower() for a in str(getattr(sp, "accessories", "") or "").replace("+", ",").split(",") if a.strip()]
+    if acc:
+        add_accessories(b, J, sp, acc, hs, g, gx)
+    pat = str(getattr(sp, "pattern", "") or "").strip().lower()
     if include_ball:
         bc = J["ball"]
         b.sphere("ball", bc, BALL_RADIUS, "ball", seg=10, rings=6, mat2="ball_seam")
     if prop == "kart":
         add_kart(b, J)
-    return b.arrays()
+    T, B, M = b.arrays()
+    if pat and pat != "none":
+        T, B, M = apply_pattern(T, B, M, pat, J)
+    return T, B, M
+
+
+# ---------------------------------------------------------------- v9 face (fixed topology)
+def _rot2(p, c, ang):
+    ca, sa = math.cos(ang), math.sin(ang)
+    d = np.asarray(p, float) - c
+    return c + np.array([d[0] * ca - d[1] * sa, d[0] * sa + d[1] * ca, d[2]])
+
+
+def _face_eye(b, ec, sx, hs, fp):
+    """brow (tilted / raised) + upper eyelid (skin box that slides down over the eye)"""
+    up = fp.get("brow_up", 0.0) * 0.010 + (fp.get("brow_one", 0.0) * 0.012 if sx > 0 else 0.0)
+    bc = ec + np.array([0, 0.026 + up, 0.004]) * hs
+    ang = math.radians(sx * fp.get("brow_in", 0.0) * 22.0)
+    hx, hy, hz = 0.02 * hs, 0.004 * hs, 0.008 * hs
+    cs = [bc + np.array([dx, dy, dz]) for dy in (-hy, hy) for (dx, dz) in ((-hx, -hz), (hx, -hz), (hx, hz), (-hx, hz))]
+    b.box8("head", [_rot2(p, bc, ang) for p in cs], "brow")
+    close = min(1.0, fp.get("lid", 0.0) + 0.35 * fp.get("squint", 0.0))
+    top = ec[1] + 0.0145 * hs
+    h = (0.0004 + 0.029 * close) * hs
+    b.box("head", (ec[0] - 0.022 * hs, top - h, ec[2] - 0.002 * hs), (ec[0] + 0.022 * hs, top, ec[2] + 0.0168 * hs), "eyelid")
+    sq = 0.35 * fp.get("squint", 0.0)          # lower lid (squint / smile pushes it up)
+    bot = ec[1] - 0.0145 * hs
+    h2 = (0.0004 + 0.012 * sq) * hs
+    b.box("head", (ec[0] - 0.02 * hs, bot, ec[2] - 0.002 * hs), (ec[0] + 0.02 * hs, bot + h2, ec[2] + 0.0165 * hs), "eyelid")
+
+
+def _face_mouth(b, hc, hs, ms, fp):
+    """three-piece mouth (corners bend up / down, centre opens) + teeth; always 4 boxes"""
+    mc = hc + np.array([0, -0.058, 0.093]) * hs
+    w = 0.028 * ms * fp.get("mouth_w", 1.0)
+    hh = 0.0045 * (1.0 - 0.45 * fp.get("press", 0.0))
+    op = fp.get("mouth_open", 0.0)
+    drop = 0.04 * op
+    z0, z1 = -0.004, 0.007
+    def P(x, y, z):
+        return mc + np.array([x, y, z]) * hs
+    b.box8("head", [P(-w / 3, -hh - drop, z0), P(w / 3, -hh - drop, z0), P(w / 3, -hh - drop, z1), P(-w / 3, -hh - drop, z1),
+                    P(-w / 3, hh, z0), P(w / 3, hh, z0), P(w / 3, hh, z1), P(-w / 3, hh, z1)], "mouth")
+    for sx in (-1, 1):
+        lift = 0.016 * fp.get("corner", 0.0) + (0.018 * fp.get("smirk", 0.0) if sx > 0 else 0.0)
+        xi, xo = sx * w / 3, sx * w
+        lo_i, lo_o = -hh - drop * 0.8, -hh * 0.7 + lift - drop * 0.25
+        hi_i, hi_o = hh, hh * 0.7 + lift
+        v = [P(xi, lo_i, z0), P(xo, lo_o, z0), P(xo, lo_o, z1), P(xi, lo_i, z1),
+             P(xi, hi_i, z0), P(xo, hi_o, z0), P(xo, hi_o, z1), P(xi, hi_i, z1)]
+        if sx < 0:
+            v = [v[1], v[0], v[3], v[2], v[5], v[4], v[7], v[6]]
+        b.box8("head", v, "mouth")
+    show = fp.get("teeth", 0.0) * min(1.0, op * 1.6) if op > 0.05 else 0.0
+    if show > 0:
+        th = 0.0001 + 0.0085 * show
+        zt = z1 + 0.0006
+        b.box("head", P(-w * 0.55, hh - th - 0.0004, zt - 0.003), P(w * 0.55, hh - 0.0004, zt), "teeth")
+    else:                                                    # closed: collapsed inside the head (same topology for morphs)
+        e = 1e-5
+        b.box("head", P(-e, -e, -0.03), P(e, e, -0.03 + e), "teeth")
 
 
 def add_kart(b, J):
@@ -257,3 +333,134 @@ def build_mannequin_budget(spec=None, prop=None, max_tris=None):
         return best
     finally:
         DETAIL = 1.0
+
+
+# ---------------------------------------------------------------- v9 accessories (for variants / NPCs)
+ACCESSORIES = {
+    "cap": "baseball cap", "beanie": "woolly hat", "headband": "sweat band", "helmet": "round helmet",
+    "crown": "crown (gold)", "horns": "two horns", "glasses": "glasses", "sunglasses": "sunglasses", "mask": "face mask",
+    "backpack": "backpack", "belt": "belt", "wristbands": "wristbands", "gloves": "gloves", "kneepads": "knee pads",
+    "shoulder_pads": "shoulder pads", "armor": "chest plate", "scarf": "scarf (physics tails)",
+    "cape": "cape (physics cloth)", "satchel": "shoulder bag (strap + bag)", "visor": "glowing visor (emissive)",
+}
+PHYSICS_ACCESSORIES = ("scarf", "cape")
+
+
+def add_accessories(b, J, sp, acc, hs, g, gx):
+    hc = J["head"] + np.array([0, 0.105, 0.0]) * hs
+    R = 0.112 * hs
+    for a in acc:
+        if a == "cap":
+            b.sphere("head", hc + np.array([0, 0.03, -0.005]) * hs, R * 1.09, "accessory", seg=12, rings=6, scale=(0.96, 0.9, 1.04), lat_max=math.pi * 0.42)
+            b.box("head", hc + np.array([-0.075, 0.035, 0.07]) * hs, hc + np.array([0.075, 0.047, 0.21]) * hs, "accessory2")
+        elif a == "beanie":
+            b.sphere("head", hc + np.array([0, 0.035, -0.008]) * hs, R * 1.12, "accessory", seg=12, rings=6, scale=(0.95, 1.12, 1.02), lat_max=math.pi * 0.45)
+            b.sphere("head", hc + np.array([0, 0.17, -0.01]) * hs, 0.028 * hs, "accessory2", seg=6, rings=4)
+        elif a == "headband":
+            b.cyl("head", hc + np.array([0, 0.035, -0.008]) * hs, hc + np.array([0, 0.06, -0.008]) * hs, R * 1.07, R * 1.06, "accessory", seg=12)
+        elif a == "helmet":
+            b.sphere("head", hc + np.array([0, 0.02, -0.01]) * hs, R * 1.22, "accessory", seg=12, rings=7, scale=(0.98, 1.05, 1.05), lat_max=math.pi * 0.55)
+            b.box("head", hc + np.array([-0.12, -0.005, 0.02]) * hs, hc + np.array([0.12, 0.01, 0.13]) * hs, "accessory2")
+        elif a == "crown":
+            b.cyl("head", hc + np.array([0, 0.08, -0.01]) * hs, hc + np.array([0, 0.125, -0.01]) * hs, R * 0.95, R * 1.0, "accessory2", seg=10, cap0=False, cap1=False)
+            for i in range(5):
+                an = 2 * math.pi * i / 5
+                c = hc + np.array([math.sin(an) * R * 0.97, 0.125, math.cos(an) * R * 0.97 - 0.01]) * hs
+                b.cyl("head", c, c + np.array([0, 0.045, 0]) * hs, 0.012 * hs, 0.002 * hs, "accessory2", seg=4)
+        elif a == "horns":
+            for sx in (-1, 1):
+                c = hc + np.array([sx * 0.07, 0.08, 0.0]) * hs
+                b.cyl("head", c, c + np.array([sx * 0.06, 0.09, 0.03]) * hs, 0.022 * hs, 0.003 * hs, "accessory", seg=6)
+        elif a in ("glasses", "sunglasses", "visor"):
+            if a == "visor":
+                b.box("head", hc + np.array([-0.085, 0.0, 0.085]) * hs, hc + np.array([0.085, 0.03, 0.113]) * hs, "emissive")
+            else:
+                mat = "accessory2" if a == "sunglasses" else "eye_white"
+                for sx in (-1, 1):
+                    ec = hc + np.array([sx * 0.04, 0.012, 0.112]) * hs
+                    b.box("head", ec + np.array([-0.023, -0.015, 0]) * hs, ec + np.array([0.023, 0.015, 0.004]) * hs, "accessory")
+                    if a == "sunglasses":
+                        b.box("head", ec + np.array([-0.019, -0.011, 0.004]) * hs, ec + np.array([0.019, 0.011, 0.006]) * hs, "accessory")
+                b.box("head", hc + np.array([-0.02, 0.02, 0.112]) * hs, hc + np.array([0.02, 0.026, 0.117]) * hs, "accessory")
+        elif a == "mask":
+            b.sphere("head", hc + np.array([0, -0.004, 0.006]) * hs, R * 1.04, "accessory", seg=12, rings=4, scale=(0.94, 1.08, 1.02),
+                     lat_min=math.pi * 0.55, lat_max=math.pi * 0.9)
+        elif a == "backpack":
+            b.box("chest", J["chest"] + np.array([-0.13 * gx, -0.12, -0.13 * g - 0.11]), J["chest"] + np.array([0.13 * gx, 0.2, -0.1 * g]), "accessory", taper=(0.9, 1.0))
+        elif a == "satchel":
+            b.box("hips", J["hips"] + np.array([0.13 * gx, -0.12, -0.06]), J["hips"] + np.array([0.21 * gx, 0.08, 0.12]), "accessory")
+            b.cyl("chest", J["chest"] + np.array([-0.16 * gx, 0.2, 0.0]), J["hips"] + np.array([0.17 * gx, 0.05, 0.03]), 0.012, 0.012, "accessory2", seg=4)
+        elif a == "belt":
+            b.cyl("hips", J["hips"] + np.array([0, 0.02, 0]), J["hips"] + np.array([0, 0.065, 0]), (0.176 * gx, 0.116 * g), (0.172 * gx, 0.113 * g), "accessory", seg=10)
+            b.box("hips", J["hips"] + np.array([-0.025, 0.02, 0.112 * g]), J["hips"] + np.array([0.025, 0.065, 0.125 * g]), "accessory2")
+        elif a == "wristbands":
+            for s in ("L", "R"):
+                b.cyl("forearm_" + s, J["hand_" + s] + [0, 0.06, 0], J["hand_" + s] + [0, 0.0, 0], 0.041 * g ** 0.7, 0.037 * g ** 0.7, "accessory", seg=8)
+        elif a == "gloves":
+            for s in ("L", "R"):
+                hd = J["hand_" + s]
+                b.cyl("hand_" + s, hd + [0, 0.01, 0], hd + [0, -0.11, 0.0], (0.03, 0.052), (0.026, 0.046), "accessory", seg=6)
+        elif a == "kneepads":
+            for s in ("L", "R"):
+                b.sphere("shin_" + s, J["shin_" + s] + [0, 0.0, 0.035], 0.055 * g, "accessory", seg=8, rings=5, scale=(1, 1.2, 0.8))
+        elif a == "shoulder_pads":
+            for s in ("L", "R"):
+                b.sphere("upperarm_" + s, J["upperarm_" + s] + [0, 0.01, 0], 0.085 * g ** 0.8, "accessory", seg=8, rings=5, scale=(1.1, 0.7, 1.1), lat_max=math.pi * 0.55)
+        elif a == "armor":
+            b.cyl("chest", J["chest"] + [0, -0.06, 0], J["chest"] + [0, 0.2, 0], (0.178 * gx, 0.12 * g), (0.215 * gx, 0.128 * g), "accessory", seg=10)
+        elif a in PHYSICS_ACCESSORIES:
+            pass     # physics chains: sforge/physics.py adds them per frame (they swing)
+        else:
+            raise ValueError("unknown accessory '%s' (use %s)" % (a, ", ".join(ACCESSORIES)))
+
+
+# ---------------------------------------------------------------- v9 3D texture overlays on the top (follow the body)
+PATTERNS = {"hoops": "horizontal hoops", "stripes": "vertical stripes", "sash": "diagonal sash", "chest_band": "one chest band",
+            "halves": "left / right halves", "check": "checks", "camo": "camouflage blotches", "dots": "polka dots"}
+
+
+def _subdiv(T):
+    a, b_, c = T[:, 0], T[:, 1], T[:, 2]
+    ab, bc, ca = (a + b_) / 2, (b_ + c) / 2, (c + a) / 2
+    return np.concatenate([np.stack([a, ab, ca], 1), np.stack([ab, b_, bc], 1), np.stack([ca, bc, c], 1), np.stack([ab, bc, ca], 1)])
+
+
+def pattern_value(name, P, J):
+    """True = pattern colour at rest-pose points P (n,3)"""
+    y = P[:, 1] - J["chest"][1]
+    x, z = P[:, 0], P[:, 2]
+    if name == "hoops":
+        return (np.floor(y / 0.07) % 2 == 0)
+    if name == "stripes":
+        return (np.floor((x + 1.0) / 0.06) % 2 == 0)
+    if name == "sash":
+        return np.abs((x + y * 0.9)) < 0.05
+    if name == "chest_band":
+        return np.abs(y - 0.09) < 0.045
+    if name == "halves":
+        return x > 0
+    if name == "check":
+        return ((np.floor(y / 0.07) + np.floor((x + 1.0) / 0.07)) % 2 == 0)
+    if name == "dots":
+        gx_, gy_ = (x + 1.0) / 0.08, y / 0.08
+        return ((gx_ - np.round(gx_)) ** 2 + (gy_ - np.round(gy_)) ** 2) < 0.08
+    if name == "camo":
+        v = np.sin(x * 23 + 1.3) * np.sin(y * 19 + 0.7) + 0.6 * np.sin((x + y) * 37 + z * 11) + 0.4 * np.sin(z * 29 - y * 13)
+        return v > 0.35
+    raise ValueError("unknown pattern '%s' (use %s)" % (name, ", ".join(PATTERNS)))
+
+
+def apply_pattern(T, B, M, name, J, levels=2):
+    """split the shirt triangles (x4 per level) and paint the pattern on the pieces by their REST position, so
+    the pattern moves with the body in every frame and in the GLB"""
+    si = MATS.index("shirt")
+    sel = M == si
+    if not sel.any():
+        return T, B, M
+    St, Sb = T[sel], B[sel]
+    for _ in range(levels):
+        St = _subdiv(St)
+        Sb = np.tile(Sb, 4)
+    on = pattern_value(name, St.mean(1), J)
+    Sm = np.where(on, MATS.index("pattern"), si).astype(M.dtype)
+    return (np.concatenate([T[~sel], St]), np.concatenate([B[~sel], Sb]), np.concatenate([M[~sel], Sm]))
