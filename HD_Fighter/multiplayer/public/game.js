@@ -1,4 +1,5 @@
 import { createMatch, cloneInput, neutralInput, HASH_EVERY, DEFAULT_DELAY } from './sim.mjs';
+import { createPacer, stepBudget, redundantBatch } from './pace.mjs';
 
 const FIGHTERS = ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap'];
 const FNAME = { kairo: 'KAIRO', lyra: 'LYRA', naomi: 'NAOMI', brutus: 'BRUTUS', void: 'VOID', zap: 'ZAP' };
@@ -62,8 +63,16 @@ let serverReady = { 0: false, 1: false };
 let occupied = { 0: false, 1: false };
 let fighters = [null, null];
 let sim = null;
-let inputQueue = [];
+let inputLog = [];
 let sentFrames = new Set();
+let peerAck = -1;
+let remoteMax = -1;
+let lastInputSend = 0;
+let stallSince = 0;
+let rttSamples = [];
+let connectFailedFast = false;
+const STALL_SHOW_MS = 300;
+const STALL_GIVE_UP_MS = 8000;
 let localHashes = new Map();
 let remoteHashes = new Map();
 let lastHash = 0;
@@ -186,15 +195,23 @@ function setOnline(on) {
 
 function connect() {
   if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
+  const started = Date.now();
+  let opened = false;
   const sock = new WebSocket(wsURL());
   ws = sock;
   sock.addEventListener('open', () => {
     if (ws !== sock) return;
+    opened = true;
+    connectFailedFast = false;
     setOnline(true);
     flushQueue();
   });
   sock.addEventListener('close', () => {
     if (ws !== sock) return;
+    if (!opened && Date.now() - started < 1200) {
+      connectFailedFast = true;
+      if (!room && !intentionalLeave) statusEl.textContent = "Can't reach the server.";
+    }
     ws = null;
     setOnline(false);
     if (intentionalLeave) return;
@@ -226,6 +243,12 @@ function ensurePing() {
   }, 2000);
 }
 
+function linkStatus(waitingLong) {
+  if (connectFailedFast && !(ws && ws.readyState === 1)) return "Can't reach the server.";
+  if (waitingLong) return 'Waking the server...';
+  return 'Connecting…';
+}
+
 function stopJoin() {
   if (!joinAttempt) return;
   if (joinAttempt.timer) clearTimeout(joinAttempt.timer);
@@ -254,8 +277,9 @@ function startJoin(code) {
       }
       const open = ws && ws.readyState === 1;
       if (!open) {
-        joinAttempt.waking = true;
-        statusEl.textContent = 'Waking the server...';
+        const slow = Date.now() - joinAttempt.started > 1500;
+        joinAttempt.waking = slow && !connectFailedFast;
+        statusEl.textContent = linkStatus(joinAttempt.waking);
         connect();
       } else {
         statusEl.textContent = joinAttempt.waking ? `Waking the server... joining ${code}` : `Joining ${code}…`;
@@ -271,8 +295,7 @@ function startJoin(code) {
     transmit({ t: 'join', room: code, userId });
     run(2000);
   } else {
-    statusEl.textContent = 'Waking the server...';
-    joinAttempt.waking = true;
+    statusEl.textContent = linkStatus(false);
     run(2000);
   }
 }
@@ -347,17 +370,20 @@ function updateRoomInfo() {
 function updateVS() {
   const p0 = val(picks, 0);
   const p1 = val(picks, 1);
-  if (myPick && p0 && p1) {
+  const s0 = !!val(serverReady, 0);
+  const s1 = !!val(serverReady, 1);
+  if (s0 && s1 && p0 && p1) {
+    vsLine.style.display = 'block';
+    vsLine.textContent = 'Both ready — starting…';
+  } else if (myPick && p0 && p1) {
     const peer = slot === 1 ? p0 : p1;
     peerPick = peer;
     vsLine.style.display = 'block';
     vsLine.textContent = `VS  ${FNAME[myPick]} (You)  vs  ${FNAME[peer] || peer} — both picked, hit Ready`;
-  }
-  const s0 = !!val(serverReady, 0);
-  const s1 = !!val(serverReady, 1);
-  if (s0 && s1) {
-    vsLine.style.display = 'block';
-    vsLine.textContent = 'Both ready — starting…';
+  } else {
+    peerPick = null;
+    vsLine.style.display = 'none';
+    vsLine.textContent = '';
   }
   updateRoomInfo();
 }
@@ -491,9 +517,19 @@ function onCountdown(m) {
   preloadMatch(m.picks || picks, m.seed).then(() => {
     if (loadedFor !== startId) return;
     if (!ws || ws.readyState !== 1) return;
-    transmit({ t: 'loaded', startId });
+    const net = netSample();
+    transmit({ t: 'loaded', startId, rtt: net.rtt, jitter: net.jitter });
     statusEl.textContent = 'Loaded — waiting for the other player…';
   });
+}
+
+function netSample() {
+  if (!rttSamples.length) return { rtt: undefined, jitter: undefined };
+  const sorted = [...rttSamples].sort((a, b) => a - b);
+  return {
+    rtt: sorted[Math.floor(sorted.length / 2)],
+    jitter: Math.max(0, sorted[sorted.length - 1] - sorted[0]),
+  };
 }
 
 function onMsg(e) {
@@ -501,6 +537,10 @@ function onMsg(e) {
   try { m = JSON.parse(e.data); } catch { return; }
   if (m.t === 'pong') {
     pingMs = Date.now() - m.ts;
+    if (pingMs >= 0 && pingMs < 5000) {
+      rttSamples.push(pingMs);
+      if (rttSamples.length > 8) rttSamples.shift();
+    }
     const pingEl = document.getElementById('ping');
     if (pingEl) pingEl.textContent = pingMs + ' ms';
     return;
@@ -588,7 +628,13 @@ function onMsg(e) {
   if (m.t === 'peer_left') {
     if (!acceptMeta(m)) return;
     serverReady = { 0: false, 1: false };
-    if (typeof m.slot === 'number') occupied[m.slot] = false;
+    if (typeof m.slot === 'number') {
+      occupied[m.slot] = false;
+      delete picks[m.slot];
+    }
+    peerPick = null;
+    vsLine.style.display = 'none';
+    vsLine.textContent = '';
     loadedFor = null;
     statusEl.textContent = m.notice || 'Opponent left';
     updateRoomInfo();
@@ -603,14 +649,14 @@ function onMsg(e) {
 quickBtn.onclick = () => {
   stopJoin();
   intentionalLeave = false;
-  statusEl.textContent = (ws && ws.readyState === 1) ? 'Searching for an opponent…' : 'Waking the server...';
+  statusEl.textContent = (ws && ws.readyState === 1) ? 'Searching for an opponent…' : linkStatus(false);
   send({ t: 'quick', userId });
 };
 createBtn.onclick = () => {
   stopJoin();
   intentionalLeave = false;
   roompill.textContent = 'creating…';
-  statusEl.textContent = (ws && ws.readyState === 1) ? 'Creating a room…' : 'Waking the server...';
+  statusEl.textContent = (ws && ws.readyState === 1) ? 'Creating a room…' : linkStatus(false);
   send({ t: 'create', userId, char: myPick });
 };
 joinBtn.onclick = () => {
@@ -655,7 +701,7 @@ connect();
 ensurePing();
 setTimeout(() => {
   if (!ws || ws.readyState !== 1) {
-    if (!room) statusEl.textContent = 'Waking the server...';
+    if (!room) statusEl.textContent = linkStatus(!connectFailedFast);
   }
 }, 2000);
 
@@ -665,10 +711,15 @@ if (bootCode) {
   setTimeout(() => { if (!room) startJoin(bootCode); }, 200);
 }
 
+const BROKEN_CHARS = new Set(['brutus', 'void', 'zap']);
+
 function drawFighter(f, context) {
+  if (BROKEN_CHARS.has(f.char)) {
+    drawSilhouette(f, context);
+    return;
+  }
   const sheet = fighterImgs[f.char]?.[f.state] || fighterImgs[f.char]?.idle;
-  const broken = sheet && sheet.broken;
-  if (!sheet || !sheet.img.complete || !sheet.img.naturalWidth || broken) {
+  if (!sheet || !sheet.img.complete || !sheet.img.naturalWidth || sheet.broken) {
     drawSilhouette(f, context);
     return;
   }
@@ -699,17 +750,18 @@ function drawFighter(f, context) {
 }
 
 function drawSilhouette(f, context) {
-  const color = f.char === 'void' ? '#6ec8ff' : f.char === 'zap' ? '#ffe14a' : '#d7d7e0';
+  const color = f.char === 'void' ? '#6ec8ff' : f.char === 'zap' ? '#ffe14a' : '#c8c8d4';
   context.save();
+  context.translate(f.x, f.y);
   context.fillStyle = color;
-  context.fillRect(f.x - 28, f.y - 132, 56, 120);
   context.beginPath();
-  context.arc(f.x, f.y - 148, 18, 0, Math.PI * 2);
+  if (context.roundRect) context.roundRect(-24, -148, 48, 136, 16);
+  else context.rect(-24, -148, 48, 136);
   context.fill();
-  context.fillStyle = '#fff';
-  context.font = '700 14px system-ui';
+  context.fillStyle = '#111';
+  context.font = '700 13px system-ui';
   context.textAlign = 'center';
-  context.fillText(FNAME[f.char] || f.char, f.x, f.y - 176);
+  context.fillText(FNAME[f.char] || f.char, 0, -156);
   context.restore();
 }
 
@@ -750,18 +802,22 @@ function queueLocal(frame) {
   const inp = cloneInput(readLocalInput());
   if (!sim.setInput(slot, frame, inp)) return;
   sentFrames.add(frame);
-  inputQueue.push({ frame, inp });
+  inputLog.push({ frame, inp });
+  if (inputLog.length > 90) inputLog.splice(0, inputLog.length - 90);
 }
 
 function flushInputs() {
-  if (!inputQueue.length || !ws || ws.readyState !== 1 || !room) return;
-  const batch = inputQueue.splice(0, 30);
-  transmit({ t: 'input', batch });
+  if (!ws || ws.readyState !== 1 || !room) return;
+  const batch = redundantBatch(inputLog, peerAck);
+  if (!batch.length) return;
+  lastInputSend = performance.now();
+  transmit({ t: 'input', ack: remoteMax, batch });
 }
 
 function onRemoteInput(m) {
   if (!sim || sim.closed) return;
   if (typeof m.epoch === 'number' && m.epoch !== roomEpoch) return;
+  if (typeof m.ack === 'number') peerAck = Math.max(peerAck, m.ack);
   const from = m.from === 0 || m.from === 1 ? m.from : (slot ^ 1);
   if (from === slot) return;
   const items = Array.isArray(m.batch) && m.batch.length
@@ -770,6 +826,7 @@ function onRemoteInput(m) {
   for (const item of items) {
     if (!item || typeof item.frame !== 'number') continue;
     sim.setInput(from, item.frame, item.inp);
+    if (item.frame > remoteMax) remoteMax = item.frame;
   }
 }
 
@@ -799,12 +856,18 @@ function publishHash() {
   }
 }
 
+let desyncEnded = false;
 function flagDesync(frame, local, remote) {
   console.warn('desync', { frame, local, remote });
   const el = document.getElementById('desync');
-  if (!el) return;
-  el.textContent = `Desync at frame ${frame}. The two games no longer match.`;
-  el.classList.add('show');
+  if (el) {
+    el.textContent = `Desync at frame ${frame}. The two games no longer match.`;
+    el.classList.add('show');
+  }
+  if (!desyncEnded) {
+    desyncEnded = true;
+    setTimeout(() => endMatch('Desync — no contest'), 600);
+  }
 }
 
 function resultText() {
@@ -833,11 +896,16 @@ function startMatch(picksMap, seed, delay) {
     frames: META && META.characters,
   });
   fighters = sim.fighters;
-  inputQueue = [];
+  inputLog = [];
   sentFrames = new Set();
+  peerAck = -1;
+  remoteMax = -1;
+  lastInputSend = 0;
+  stallSince = 0;
   localHashes = new Map();
   remoteHashes = new Map();
   lastHash = 0;
+  const clock = createPacer(performance.now());
   const desyncEl = document.getElementById('desync');
   if (desyncEl) { desyncEl.textContent = ''; desyncEl.classList.remove('show'); }
   const ko = document.getElementById('koBanner');
@@ -855,29 +923,44 @@ function startMatch(picksMap, seed, delay) {
   for (let f = 0; f < useDelay; f++) {
     sim.setInput(slot, f, opening);
     sentFrames.add(f);
-    inputQueue.push({ frame: f, inp: cloneInput(opening) });
+    inputLog.push({ frame: f, inp: cloneInput(opening) });
   }
   flushInputs();
   if (raf) cancelAnimationFrame(raf);
   const gen = ++matchGen;
   const loop = () => {
     if (!sim || sim.closed || matchGen !== gen) return;
+    const now = performance.now();
+    const budget = stepBudget(clock, sim.frame, now);
     let steps = 0;
-    while (sim.canStep() && steps < 8 && !sim.result) {
+    while (steps < budget && sim.canStep() && !sim.result) {
       sim.step();
       steps += 1;
       queueLocal(sim.frame - 1 + sim.delay);
       publishHash();
       if (sim.result) break;
     }
-    flushInputs();
+    if (steps > 0 || now - lastInputSend > 120) flushInputs();
     render();
     if (sim.result) {
       endMatch(resultText());
       return;
     }
     const stall = document.getElementById('stall');
-    if (stall) stall.textContent = sim.canStep() ? '' : 'Waiting for opponent…';
+    const blocked = budget > steps;
+    if (blocked) {
+      if (!stallSince) stallSince = now;
+      const waited = now - stallSince;
+      if (waited > STALL_GIVE_UP_MS) {
+        if (stall) stall.textContent = '';
+        endMatch('Connection lost');
+        return;
+      }
+      if (stall) stall.textContent = waited > STALL_SHOW_MS ? 'Connection slow' : '';
+    } else {
+      stallSince = 0;
+      if (stall) stall.textContent = '';
+    }
     raf = requestAnimationFrame(loop);
   };
   raf = requestAnimationFrame(loop);

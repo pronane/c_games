@@ -14,7 +14,7 @@ If you leave and reopen the same tab, the game reclaims your slot. The previous 
 
 ## Simulation
 
-The fight steps at a fixed 1/60 s. Each input is numbered with the sim frame it belongs to and is applied 3 frames later, so both screens use the same input on the same frame. A screen waits when the other player's input for that frame has not arrived. The seed in the start message drives the only random number generator. Every 30 frames the clients exchange a state hash and show a warning if the fights diverge. Lobby messages and inputs have separate rate limits: extra inputs are dropped, and the socket is closed only for a flood.
+The fight steps at a fixed 1/60 s of wall time. A fast link does not fast-forward the round, and a burst of inputs does not skip ahead. Each input is numbered with the sim frame it belongs to. The server picks one input delay for both players (2–8 frames, about 30–130 ms) from the ping samples they send when they finish loading, so the input is usually already there when that frame is due. Every packet repeats the last few unacknowledged inputs. A screen shows "Connection slow" only after it has been waiting, and gives up the round if the wait lasts several seconds. The seed in the start message drives the only random number generator. Every 30 frames the clients exchange a state hash and stop the round if they differ.
 
 The player id lives in `sessionStorage` for this tab. A second tab is a different player and does not take the first tab's slot. Reloading the same tab keeps the id.
 

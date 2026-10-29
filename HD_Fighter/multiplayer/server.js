@@ -8,8 +8,8 @@ const WebSocket = require('ws');
 // 60 Hz, so a shared 30-per-10s cap used to close both sockets just after start.
 const CTRL_LIMIT = 80;
 const CTRL_WINDOW_MS = 10000;
-const INPUT_RATE = 120; // sustained tokens per second (60 Hz + slack)
-const INPUT_BURST = 600;
+const INPUT_RATE = 240; // one packet per sim frame is 60/s; this stays well above that
+const INPUT_BURST = 800;
 const INPUT_DROP_CLOSE = 5000; // close only after this many dropped inputs in 10s
 const LOAD_TIMEOUT_MS = 20000;
 const ROOM_TTL_MS = 300000;
@@ -77,7 +77,22 @@ function createServer() {
       startAt: null,
       startId: null,
       loadTimer: null,
+      net: { 0: null, 1: null },
     };
+  }
+
+  // Same formula as public/pace.mjs chooseDelay. Both clients are told this
+  // number in `go`, so they never pick different delays.
+  function chooseDelay(net0, net1) {
+    const nets = [net0, net1].filter((n) => n && typeof n.rtt === 'number');
+    if (!nets.length) return INPUT_DELAY_FRAMES;
+    const rtt = Math.max(...nets.map((n) => n.rtt));
+    const jitter = Math.max(...nets.map((n) => Number(n.jitter) || 0));
+    const needMs = rtt / 2 + jitter + 30;
+    let frames = Math.ceil(needMs / (1000 / 60));
+    if (frames < 2) frames = 2;
+    if (frames > 8) frames = 8;
+    return frames;
   }
 
   function send(ws, msg) {
@@ -237,6 +252,7 @@ function createServer() {
     room.startAt = Math.max(room.startAt || 0, Date.now() + 250);
     room.ready = { 0: false, 1: false };
     room.loaded = { 0: false, 1: false };
+    const delay = chooseDelay(room.net && room.net[0], room.net && room.net[1]);
     broadcast(room, {
       t: 'go',
       room: room.id,
@@ -246,12 +262,12 @@ function createServer() {
       picks: { 0: room.picks[0] || null, 1: room.picks[1] || null },
       phase: 'playing',
       started: true,
-      delay: INPUT_DELAY_FRAMES,
+      delay,
       epoch: room.epoch,
       seq: ++room.seq,
     });
     broadcastState(room);
-    console.log('go', room.id, room.startId);
+    console.log('go', room.id, room.startId, 'delay', delay);
   }
 
   function maybeStart(room) {
@@ -340,6 +356,7 @@ function createServer() {
     room.ready = { 0: false, 1: false };
     room.readySeq = { 0: -1, 1: -1 };
     room.loaded = { 0: false, 1: false };
+    room.picks[slot] = null;
     // Unconditional: the old check ran after this slot was already cleared, so it never fired.
     room.started = false;
     room.phase = 'lobby';
@@ -411,6 +428,7 @@ function createServer() {
         n: m.n,
         frame: typeof m.frame === 'number' ? m.frame : null,
         batch,
+        ack: typeof m.ack === 'number' ? m.ack : null,
         seq: typeof m.seq === 'number' ? m.seq : null,
         from: ws.slot,
         fromGen: room.slotGen[ws.slot],
@@ -590,6 +608,12 @@ function createServer() {
       if (room.phase !== 'countdown' || m.startId !== room.startId) return;
       if (m.epoch != null && Number(m.epoch) !== room.epoch) return;
       room.loaded[ws.slot] = true;
+      if (typeof m.rtt === 'number') {
+        room.net[ws.slot] = {
+          rtt: Math.max(0, Math.min(2000, Number(m.rtt))),
+          jitter: Math.max(0, Math.min(1000, Number(m.jitter) || 0)),
+        };
+      }
       broadcastState(room);
       if (room.loaded[0] && room.loaded[1]) beginGo(room);
       return;
