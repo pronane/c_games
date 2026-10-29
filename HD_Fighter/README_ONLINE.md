@@ -1,19 +1,50 @@
-# Deploy Online — HD Fighter 2 Multiplayer
-Your game is **already playable online right now** on this sandbox (port 3000).
-Share the preview URL — any device that opens it joins the same server (phone vs desktop).
+# HD Fighter 2 — online multiplayer
 
-## How to play
-1. Device A: Create room / Quick Play → pick fighter → Ready
-2. Copy Invite Link (`#R0001`) → send to Device B
-3. Device B: Join by Code → pick → both Ready → Fight!
+Two browsers share a room on the Node server in `multiplayer/`. The server relays inputs and keeps the room; each browser runs the fight.
 
-Controls: Desktop WASD+JKL etc, Phone joystick+buttons, Gamepad USB/BT on all.
-Network: 60fps input relay, ping shown.
+## Play
 
-## Deploy to your GitHub (when you share it)
+1. One player chooses **Create Private Room** or **Quick Play**. A private room gets a 5-character code such as `K7Q2M` (not a counter like `R0001`).
+2. The other player joins with that code or the invite link (`#` plus the code).
+3. Both pick a fighter and press **Ready**. Ready is a set value: pressing it again does not cancel it.
+4. When both have picked and both are ready, the server sends a countdown with one seed and one start time. Each browser loads and replies. The fight starts only after both replies, at that start time.
+5. On a cold host (Render’s free tier sleeps), the page says **Waking the server...** and keeps trying for about 90 seconds. A wrong or expired code still fails as soon as the server answers.
+
+If you leave and open the same link, the game reclaims your slot. The previous socket is closed. A late disconnect from that old socket does not remove you from the room. The player id is stored in `localStorage`, so two tabs in the same browser are the same player: the second tab takes the slot and the first connection is closed. Use two devices, or two browser profiles, to fight.
+
+## Simulation
+
+The fight steps at a fixed 1/60 s, counted from the agreed start time, not from each display’s frame gap. Inputs are sent on those steps (about 60 per second). Lobby messages and inputs have separate rate limits: extra inputs are dropped, and the socket is closed only if someone floods far past that. The two screens can still disagree if a packet is late. There is no rollback.
+
+## Run locally
+
 ```bash
-git remote add origin YOUR_URL
-git push -u origin main
-# Render: New Web Service → Build: npm install --prefix multiplayer → Start: npm start --prefix multiplayer
-# Fly: fly launch --cwd multiplayer && fly deploy --cwd multiplayer
+cd HD_Fighter/multiplayer
+npm install
+npm start
 ```
+
+Open `http://localhost:3000` in two browsers.
+
+## Test
+
+```bash
+cd HD_Fighter/multiplayer
+npm test
+```
+
+`test_handshake.js` starts the server and checks:
+
+- two clients join, ready, load, and both receive `go` with the same seed and start time
+- a client rejoins mid-way, the old socket closes, and the new socket still gets the start
+- creating again while you are alone stores the socket, so the next player is the other slot
+- 100 pairs in a row each reach `go` with distinct codes
+- 60 input messages per second for 60 seconds are all delivered, and the sockets stay open
+
+`SOAK_SECONDS=2 npm test` shortens the input check.
+
+## Deploy
+
+Render: root directory `HD_Fighter/multiplayer`, build `npm install`, start `node server.js`, health check `/api/health`.
+
+The free instance sleeps when idle. The client waits and retries while it wakes. Room codes are kept in memory, so a restart drops existing rooms. New codes are random, so a restart does not hand `R0001` to the next pair.

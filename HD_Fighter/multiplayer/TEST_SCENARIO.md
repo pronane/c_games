@@ -13,10 +13,10 @@
 |---|--------|-----------------|------|
 | 1 | Open URL on **Browser A** (desktop Chrome) | Site loads, `netpill` = **online** (green), `roompill` = **no room** | ☐ |
 | 2 | Open same URL on **Browser B** (iPhone Safari) | Same as above | ☐ |
-| 3 | Browser A: **Create Private Room** | Room code appears (e.g. `R0001`), `Leave Room` shows, `status` = `Room R0001 as P1` | ☐ |
+| 3 | Browser A: **Create Private Room** | A 5-character code appears (e.g. `K7Q2M`, not `R0001`), `Leave Room` shows, `status` = `Room K7Q2M as P1` | ☐ |
 | 4 | Browser A: **Copy Invite Link** | Link copied (or shown in status) | ☐ |
-| 5 | Browser B: Paste link or enter code → **Join by Code** | `status` = `Joining R0001…` → `Room R0001 as P2` | ☐ |
-| 6 | Browser A: Wait | Both show `Opponent joined! Pick fighters.` + `roomInfo: Room R0001 — 1/2 …` | ☐ |
+| 5 | Browser B: Paste link or enter code → **Join by Code** | `status` = `Joining K7Q2M…` → `Room K7Q2M as P2`. If the host is asleep, status says `Waking the server...` and keeps retrying for about 90s | ☐ |
+| 6 | Browser A: Wait | Both show the opponent joined + `roomInfo` with `2/2` once both slots are filled | ☐ |
 
 **Fail = STOP. Check Render `online`, hard-refresh `?v=` , DevTools Console for `WSS` errors.**
 
@@ -28,10 +28,10 @@
 |---|--------|----------|------|
 | 7 | Browser A: Tap **KAIRO** | Yellow border, `pickInfo` = `You: KAIRO — hit Ready`, `Ready` enables | ☐ |
 | 8 | Browser B: Tap **LYRA** | Same for P2, `vsLine` = `VS KAIRO (You) vs LYRA — both picked, hit Ready` | ☐ |
-| 9 | Both: `vsLine` visible | Shows both names, `roomInfo` = `Room R0001 — 2/2 | P1: KAIRO …pick | P2: LYRA …pick` | ☐ |
+| 9 | Both: `vsLine` visible | Shows both names, `roomInfo` shows both fighters and `2/2` | ☐ |
 | 10 | Browser A: **Ready** | `readyBtn` disabled, `pickInfo` = `Ready! Waiting… Server will confirm`, `roomInfo` → `P1: KAIRO ✅` | ☐ |
 | 11 | Browser B: **Ready** | Same, `roomInfo` → `P1: KAIRO ✅ P2: LYRA ✅ — both Ready → starting…` | ☐ |
-| 12 | Both | `status` shows `2/2`, `start` received, `gameScr` visible | ☐ |
+| 12 | Both | Countdown, then each client answers loaded, then `gameScr` appears together. The fight does not start on the first Ready alone | ☐ |
 
 **If both show `Ready` but no `start`, check: `api/health` rooms, `roomInfo` line (`1/2` vs `2/2`), `netpill` must be `online`, `DevTools → Console` for `Pick a fighter first` / `Waiting…` errors.**
 
@@ -55,8 +55,8 @@
 | # | Action | Expected | Pass |
 |---|--------|----------|------|
 | 19 | Browser A: Close tab / airplane ✈️ 3s | Browser B shows `P1 left` (yellow) | ☐ |
-| 20 | Browser A: Reopen same link `/#R0001` | Auto-rejoin via `hd2_userId`+`hd2_room`, **same slot/team**, `roomInfo` restores picks | ☐ |
-| 21 | If was fighting | Same tick, HP, positions resume | ☐ |
+| 20 | Browser A: Reopen same link `/#` + the code | Auto-rejoin via `hd2_userId`+`hd2_room`, **same slot**, `roomInfo` restores picks. The old socket closing must not drop this one | ☐ |
+| 21 | If was fighting | Slot is restored. Positions and HP are not resumed (the server does not store the sim). Press Ready again for a rematch | ☐ |
 | 22 | If was in lobby | Both `ready` reset → `roomInfo` shows `…pick` not `✅`, no false `2/2 ready` (verifies `leave() {r.ready[slot]=false}`) | ☐ |
 
 ---
