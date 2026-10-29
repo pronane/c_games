@@ -1,0 +1,24 @@
+# Build outputs (build.sh -> bin/, build_release.bat -> release/)
+bin/
+release/
+*.exe
+*.dll
+*.o
+*.obj
+build_log.txt
+# Runtime files written by the game
+settings.cfg
+demo_out/
+shots/
+# Archives / packaged drops (share via GitHub Releases instead)
+*.7z
+*.zip
+# Python / editor junk
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.DS_Store
+Thumbs.db
+# Photo sources for tools/build_sprites.py (large, real-person photos) - keep out of git
+sprite_sources/
