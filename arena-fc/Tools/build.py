@@ -184,7 +184,7 @@ def configure_android(sdk: str | None, java: str | None, keystore: str | None):
         nonlocal text
         pat = re.compile(rf'^{re.escape(key)} = .*$', re.M)
         line = f'{key} = "{value}"'
-        if pat.search(text): text = pat.sub(line, text)
+        if pat.search(text): text = pat.sub(lambda _: line, text)
         else: text += line + "\n"
     if sdk: setkey("export/android/android_sdk_path", sdk)
     if java: setkey("export/android/java_sdk_path", java)
