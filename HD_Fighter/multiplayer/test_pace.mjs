@@ -10,7 +10,7 @@ import { dirname, join } from 'path';
 import net from 'net';
 import WebSocket from 'ws';
 import { createMatch, neutralInput, cloneInput } from './public/sim.mjs';
-import { createPacer, stepBudget, redundantBatch, FRAME_MS } from './public/pace.mjs';
+import { createPacer, stepBudget, redundantBatch, chooseDelay, FRAME_MS, MAX_DELAY_FRAMES } from './public/pace.mjs';
 
 const require = createRequire(import.meta.url);
 const { createServer } = require('./server.js');
@@ -151,7 +151,9 @@ class Fighter {
   }
 }
 
-async function pair(port, rtt) {
+async function pair(port, net) {
+  const rtt = typeof net === 'number' ? net : net.rtt;
+  const jitter = typeof net === 'number' ? (rtt > 200 ? 60 : 8) : net.jitter;
   const a = new Fighter(port, 'pace-a-' + rtt + '-' + Math.random(), 0, 1);
   const b = new Fighter(port, 'pace-b-' + rtt + '-' + Math.random(), 1, 1);
   await a.ready;
@@ -166,11 +168,12 @@ async function pair(port, rtt) {
   b.send({ t: 'ready', ready: true, readySeq: 1 });
   const cdA = await a.wait((m) => m.t === 'countdown');
   const cdB = await b.wait((m) => m.t === 'countdown');
-  a.send({ t: 'loaded', startId: cdA.startId, epoch: cdA.epoch, rtt, jitter: rtt > 80 ? 40 : 8 });
-  b.send({ t: 'loaded', startId: cdB.startId, epoch: cdB.epoch, rtt, jitter: rtt > 80 ? 40 : 8 });
-  const go = await a.wait((m) => m.t === 'go');
-  await b.wait((m) => m.t === 'go' && m.startId === go.startId);
-  check(go.delay >= 2 && go.delay <= 8, 'delay out of range ' + go.delay);
+  a.send({ t: 'loaded', startId: cdA.startId, epoch: cdA.epoch, rtt, jitter });
+  b.send({ t: 'loaded', startId: cdB.startId, epoch: cdB.epoch, rtt, jitter });
+  const go = await a.wait((m) => m.t === 'go', 8000);
+  await b.wait((m) => m.t === 'go' && m.startId === go.startId, 8000);
+  check(go.delay >= 2 && go.delay <= MAX_DELAY_FRAMES, 'delay out of range ' + go.delay);
+  check(go.delay === chooseDelay({ rtt, jitter }, { rtt, jitter }), 'server delay ' + go.delay);
   a.arm(go.seed, go.delay);
   b.arm(go.seed, go.delay);
   a.msgs.length = 0;
@@ -182,8 +185,20 @@ async function runTicks(a, b, ms, hz) {
   const randA = mulberry(3);
   const randB = mulberry(4);
   const step = 1000 / hz;
+  // The first inputs are still in flight. That fill is a one-time wait, not
+  // the speed of the round, so the fps window starts after it.
+  const warmUntil = Date.now() + 1000;
+  while (Date.now() < warmUntil) {
+    const now = Date.now();
+    a.tick(now, randA);
+    b.tick(now, randB);
+    const left = step - (Date.now() - now);
+    if (left > 0) await sleep(left);
+  }
   const t0 = Date.now();
   const startFrame = a.sim.frame;
+  const startTimer = a.sim.timer;
+  const sentAtStart = a.sent;
   let now = t0;
   while (Date.now() - t0 < ms) {
     now = Date.now();
@@ -206,7 +221,8 @@ async function runTicks(a, b, ms, hz) {
     frames,
     elapsed,
     timer: a.sim.timer,
-    packetsPerSec: (a.sent / elapsed),
+    timerDrop: startTimer - a.sim.timer,
+    packetsPerSec: ((a.sent - sentAtStart) / elapsed),
     hashMatch: a.sim.hash() === b.sim.hash() && a.sim.frame === b.sim.frame,
     frameA: a.sim.frame,
     frameB: b.sim.frame,
@@ -244,36 +260,37 @@ async function main() {
       const { a, b } = await pair(port, 16);
       const row = await runTicks(a, b, SECONDS * 1000, 60);
       assertFps(row, 58, 62);
-      const timerDrop = 99 - row.timer;
-      check(Math.abs(timerDrop - row.elapsed) < 1.5, `timer dropped ${timerDrop}s in ${row.elapsed.toFixed(2)}s`);
-      summary.push({ name: 'no latency 60Hz', ...row, timerDrop });
+      check(Math.abs(row.timerDrop - row.elapsed) < 1.5, `timer dropped ${row.timerDrop}s in ${row.elapsed.toFixed(2)}s`);
+      summary.push({ name: 'no latency 60Hz', ...row });
       a.ws.close(); b.ws.close();
     }
     {
       const { a, b } = await pair(port, 16);
       const row = await runTicks(a, b, SECONDS * 1000, 144);
       assertFps(row, 58, 62);
-      check(row.packetsPerSec < 90, 'sent ' + row.packetsPerSec.toFixed(1) + '/s at 144Hz');
+      check(row.packetsPerSec < 80, 'sent ' + row.packetsPerSec.toFixed(1) + '/s at 144Hz');
       summary.push({ name: 'no latency 144Hz ticker', packetsPerSec: row.packetsPerSec, fps: row.fps });
       a.ws.close(); b.ws.close();
     }
     {
+      // 25 ms on each TCP leg (~50 ms one way, ~100 ms RTT) and 1% delayed chunks.
       const proxy = await startProxy(port, { delayMs: 25, loss: 0.01 });
-      const { a, b, delay } = await pair(proxy.port, 50);
+      const { a, b, delay } = await pair(proxy.port, { rtt: 100, jitter: 16 });
       const row = await runTicks(a, b, SECONDS * 1000, 60);
-      assertFps(row, 56, 62);
+      assertFps(row, 58, 62);
+      check(delay >= 2 && delay <= 8, '25ms delay ' + delay);
       summary.push({ name: '25ms+1%', ...row, delay });
       a.ws.close(); b.ws.close();
       proxy.server.close();
     }
     {
-      // 60 ms on each TCP leg is about 120 ms from one player to the other.
-      const proxy = await startProxy(port, { delayMs: 60, loss: 0.05 });
-      const { a, b, delay } = await pair(proxy.port, 160);
-      const row = await runTicks(a, b, SECONDS * 1000, 60);
-      check(row.hashMatch, `120ms hashes diverged ${row.frameA}/${row.frameB}`);
-      check(row.fps >= 45 && row.fps <= 70, '120ms fps ' + row.fps.toFixed(2));
-      check(delay >= 6 && delay <= 8, 'delay ' + delay);
+      // 120 ms on each TCP leg (~240 ms one way, ~480 ms RTT) and 5% delayed
+      // chunks. This is the profile that used to run at ~18% speed.
+      const proxy = await startProxy(port, { delayMs: 120, loss: 0.05 });
+      const { a, b, delay } = await pair(proxy.port, { rtt: 480, jitter: 60 });
+      const row = await runTicks(a, b, Math.max(SECONDS, 8) * 1000, 60);
+      assertFps(row, 58, 62);
+      check(delay >= 16 && delay <= MAX_DELAY_FRAMES, '120ms delay ' + delay);
       summary.push({ name: '120ms+5%', ...row, delay });
       a.ws.close(); b.ws.close();
       proxy.server.close();

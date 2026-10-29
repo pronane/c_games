@@ -3,7 +3,14 @@
 
 export const FRAME_MS = 1000 / 60;
 export const RESYNC_BEHIND = 6;
-export const REDUNDANT_FRAMES = 12;
+// A quiet link stays in the 2–8 frame range (~30–130 ms). A 120 ms-per-leg
+// path is ~240 ms one way, so the cap has to sit above that or lockstep
+// cannot tick at 60 Hz. 24 frames is 400 ms.
+export const MAX_DELAY_FRAMES = 24;
+// Must cover every input still waiting for an ack. At a 480 ms RTT that is
+// ~30 frames; 48 leaves room for a dropped packet to be repeated.
+export const REDUNDANT_FRAMES = 48;
+const DELAY_MARGIN_MS = 30;
 
 export function createPacer(now = 0) {
   return { origin: now };
@@ -30,10 +37,10 @@ export function chooseDelay(net0, net1) {
   if (!nets.length) return 3;
   const rtt = Math.max(...nets.map((n) => n.rtt));
   const jitter = Math.max(...nets.map((n) => n.jitter || 0));
-  const needMs = rtt / 2 + jitter + 30;
+  const needMs = rtt / 2 + jitter + DELAY_MARGIN_MS;
   let frames = Math.ceil(needMs / FRAME_MS);
   if (frames < 2) frames = 2;
-  if (frames > 8) frames = 8;
+  if (frames > MAX_DELAY_FRAMES) frames = MAX_DELAY_FRAMES;
   return frames;
 }
 

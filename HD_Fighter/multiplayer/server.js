@@ -88,10 +88,11 @@ function createServer() {
     if (!nets.length) return INPUT_DELAY_FRAMES;
     const rtt = Math.max(...nets.map((n) => n.rtt));
     const jitter = Math.max(...nets.map((n) => Number(n.jitter) || 0));
+    // Keep this in step with public/pace.mjs chooseDelay (cap 24, margin 30).
     const needMs = rtt / 2 + jitter + 30;
     let frames = Math.ceil(needMs / (1000 / 60));
     if (frames < 2) frames = 2;
-    if (frames > 8) frames = 8;
+    if (frames > 24) frames = 24;
     return frames;
   }
 
@@ -419,7 +420,7 @@ function createServer() {
         for (const item of m.batch) {
           if (!item || typeof item.frame !== 'number' || item.frame < 0 || item.frame > 1000000) continue;
           batch.push({ frame: item.frame | 0, inp: item.inp || null });
-          if (batch.length >= 30) break;
+          if (batch.length >= 48) break;
         }
       }
       broadcast(room, {
