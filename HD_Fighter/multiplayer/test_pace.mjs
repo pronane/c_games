@@ -32,7 +32,7 @@ function mulberry(seed) {
   };
 }
 
-function startProxy(targetPort, { delayMs = 0, loss = 0 }) {
+function startProxy(targetPort, { delayMs = 0, loss = 0, jitterMs = 0 }) {
   const rnd = mulberry(99);
   return new Promise((resolve) => {
     const server = net.createServer((socket) => {
@@ -42,8 +42,9 @@ function startProxy(targetPort, { delayMs = 0, loss = 0 }) {
         let nextAt = 0;
         from.on('data', (chunk) => {
           const extra = loss && Date.now() - born > 500 && rnd() < loss ? 40 : 0;
+          const swing = jitterMs ? Math.round((rnd() * 2 - 1) * jitterMs) : 0;
           const now = Date.now();
-          const at = Math.max(now + delayMs + extra, nextAt);
+          const at = Math.max(now + delayMs + swing + extra, nextAt);
           nextAt = at;
           setTimeout(() => { try { to.write(chunk); } catch {} }, Math.max(0, at - now));
         });
@@ -154,6 +155,7 @@ class Fighter {
 async function pair(port, net) {
   const rtt = typeof net === 'number' ? net : net.rtt;
   const jitter = typeof net === 'number' ? (rtt > 200 ? 60 : 8) : net.jitter;
+  const samples = typeof net === 'number' ? 8 : (net.samples == null ? 8 : net.samples);
   const a = new Fighter(port, 'pace-a-' + rtt + '-' + Math.random(), 0, 1);
   const b = new Fighter(port, 'pace-b-' + rtt + '-' + Math.random(), 1, 1);
   await a.ready;
@@ -168,12 +170,12 @@ async function pair(port, net) {
   b.send({ t: 'ready', ready: true, readySeq: 1 });
   const cdA = await a.wait((m) => m.t === 'countdown');
   const cdB = await b.wait((m) => m.t === 'countdown');
-  a.send({ t: 'loaded', startId: cdA.startId, epoch: cdA.epoch, rtt, jitter });
-  b.send({ t: 'loaded', startId: cdB.startId, epoch: cdB.epoch, rtt, jitter });
+  a.send({ t: 'loaded', startId: cdA.startId, epoch: cdA.epoch, rtt, jitter, samples });
+  b.send({ t: 'loaded', startId: cdB.startId, epoch: cdB.epoch, rtt, jitter, samples });
   const go = await a.wait((m) => m.t === 'go', 8000);
   await b.wait((m) => m.t === 'go' && m.startId === go.startId, 8000);
   check(go.delay >= 2 && go.delay <= MAX_DELAY_FRAMES, 'delay out of range ' + go.delay);
-  check(go.delay === chooseDelay({ rtt, jitter }, { rtt, jitter }), 'server delay ' + go.delay);
+  check(go.delay === chooseDelay({ rtt, jitter, samples }, { rtt, jitter, samples }), 'server delay ' + go.delay);
   a.arm(go.seed, go.delay);
   b.arm(go.seed, go.delay);
   a.msgs.length = 0;
@@ -273,9 +275,9 @@ async function main() {
       a.ws.close(); b.ws.close();
     }
     {
-      // 25 ms on each TCP leg (~50 ms one way, ~100 ms RTT) and 1% delayed chunks.
+      // 25 ms on each TCP leg. Ping RTT is ~50 ms; A→B is ~50 ms.
       const proxy = await startProxy(port, { delayMs: 25, loss: 0.01 });
-      const { a, b, delay } = await pair(proxy.port, { rtt: 100, jitter: 16 });
+      const { a, b, delay } = await pair(proxy.port, { rtt: 50, jitter: 16, samples: 8 });
       const row = await runTicks(a, b, SECONDS * 1000, 60);
       assertFps(row, 58, 62);
       check(delay >= 2 && delay <= 8, '25ms delay ' + delay);
@@ -284,14 +286,27 @@ async function main() {
       proxy.server.close();
     }
     {
-      // 120 ms on each TCP leg (~240 ms one way, ~480 ms RTT) and 5% delayed
-      // chunks. This is the profile that used to run at ~18% speed.
+      // 120 ms on each TCP leg. Ping RTT is ~240 ms and A→B is ~240 ms,
+      // so the delay has to cover a full RTT, not half of one. 5% of chunks
+      // are held an extra 40 ms.
       const proxy = await startProxy(port, { delayMs: 120, loss: 0.05 });
-      const { a, b, delay } = await pair(proxy.port, { rtt: 480, jitter: 60 });
+      const { a, b, delay } = await pair(proxy.port, { rtt: 240, jitter: 80, samples: 8 });
       const row = await runTicks(a, b, Math.max(SECONDS, 8) * 1000, 60);
       assertFps(row, 58, 62);
-      check(delay >= 16 && delay <= MAX_DELAY_FRAMES, '120ms delay ' + delay);
+      check(delay >= 18 && delay < MAX_DELAY_FRAMES, '120ms delay hit the cap ' + delay);
       summary.push({ name: '120ms+5%', ...row, delay });
+      a.ws.close(); b.ws.close();
+      proxy.server.close();
+    }
+    {
+      // Same hop, but each chunk also swings ±30 ms, which is the profile
+      // that previously landed around 45–50 fps.
+      const proxy = await startProxy(port, { delayMs: 120, loss: 0.05, jitterMs: 30 });
+      const { a, b, delay } = await pair(proxy.port, { rtt: 240, jitter: 120, samples: 8 });
+      const row = await runTicks(a, b, 8000, 60);
+      assertFps(row, 58, 62);
+      check(delay < MAX_DELAY_FRAMES, '120±30 delay cap ' + delay);
+      summary.push({ name: '120ms±30+5%', ...row, delay });
       a.ws.close(); b.ws.close();
       proxy.server.close();
     }

@@ -16,6 +16,12 @@ const ROOM_TTL_MS = 300000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const FIGHTERS = new Set(['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap']);
 const INPUT_DELAY_FRAMES = 3;
+const HOLD_MS = Number(process.env.HOLD_MS) || 30000;
+const INPUT_KEYS = [
+  'left', 'right', 'up', 'down', 'jump',
+  'lp', 'hp', 'lk', 'hk', 'block', 'throw',
+  'special1', 'special2', 'super',
+];
 
 function createServer() {
   const app = express();
@@ -78,6 +84,11 @@ function createServer() {
       startId: null,
       loadTimer: null,
       net: { 0: null, 1: null },
+      savedPicks: {},
+      hist: [[], []],
+      hold: null,
+      holdTimer: null,
+      delay: INPUT_DELAY_FRAMES,
     };
   }
 
@@ -87,13 +98,39 @@ function createServer() {
     const nets = [net0, net1].filter((n) => n && typeof n.rtt === 'number');
     if (!nets.length) return INPUT_DELAY_FRAMES;
     const rtt = Math.max(...nets.map((n) => n.rtt));
-    const jitter = Math.max(...nets.map((n) => Number(n.jitter) || 0));
-    // Keep this in step with public/pace.mjs chooseDelay (cap 24, margin 30).
-    const needMs = rtt / 2 + jitter + 30;
+    let jitter = Math.max(...nets.map((n) => Number(n.jitter) || 0));
+    const samples = Math.max(...nets.map((n) => Number(n.samples) || 0));
+    if (samples < 4) jitter = Math.max(jitter, rtt * 0.25);
+    const oneWay = nets.reduce((sum, n) => sum + n.rtt / 2, 0);
+    const needMs = oneWay + jitter + 34;
     let frames = Math.ceil(needMs / (1000 / 60));
     if (frames < 2) frames = 2;
-    if (frames > 24) frames = 24;
+    if (frames > 36) frames = 36;
     return frames;
+  }
+
+  function packLoose(inp) {
+    let bits = 0;
+    for (let i = 0; i < INPUT_KEYS.length; i++) {
+      if (inp && inp[INPUT_KEYS[i]]) bits |= 1 << i;
+    }
+    return bits;
+  }
+
+  function packHist(arr, end) {
+    const buf = Buffer.alloc(end * 2);
+    for (let i = 0; i < end; i++) buf.writeUInt16LE((arr[i] || 0) & 0xffff, i * 2);
+    return buf.toString('base64');
+  }
+
+  function rememberPick(room, slot) {
+    const uid = room.userIds[slot];
+    if (uid && room.picks[slot]) room.savedPicks[uid] = room.picks[slot];
+  }
+
+  function restorePick(room, slot, uid) {
+    if (!uid) return;
+    if (!room.picks[slot] && room.savedPicks[uid]) room.picks[slot] = room.savedPicks[uid];
   }
 
   function send(ws, msg) {
@@ -157,8 +194,18 @@ function createServer() {
     }
   }
 
+  function clearHold(room) {
+    if (room.holdTimer) {
+      clearTimeout(room.holdTimer);
+      timeouts.delete(room.holdTimer);
+      room.holdTimer = null;
+    }
+    room.hold = null;
+  }
+
   function destroyRoom(room) {
     clearLoadTimer(room);
+    clearHold(room);
     rooms.delete(room.id);
     for (const uid of Object.values(room.userIds)) {
       if (uid && userRoom.get(uid) === room.id) userRoom.delete(uid);
@@ -254,6 +301,8 @@ function createServer() {
     room.ready = { 0: false, 1: false };
     room.loaded = { 0: false, 1: false };
     const delay = chooseDelay(room.net && room.net[0], room.net && room.net[1]);
+    room.delay = delay;
+    room.hist = [[], []];
     broadcast(room, {
       t: 'go',
       room: room.id,
@@ -337,7 +386,135 @@ function createServer() {
     return 'drop';
   }
 
-  function leave(ws) {
+  function abortToLobby(room, notice) {
+    clearHold(room);
+    clearLoadTimer(room);
+    room.phase = 'lobby';
+    room.started = false;
+    room.ready = { 0: false, 1: false };
+    room.readySeq = { 0: -1, 1: -1 };
+    room.loaded = { 0: false, 1: false };
+    room.startId = null;
+    room.startAt = null;
+    room.hist = [[], []];
+    room.epoch += 1;
+    broadcast(room, {
+      t: 'match_end',
+      room: room.id,
+      notice,
+      phase: 'lobby',
+      started: false,
+      epoch: room.epoch,
+      seq: ++room.seq,
+    });
+    broadcastState(room);
+  }
+
+  function forfeit(room) {
+    if (!room.hold) return;
+    const loser = room.hold.slot;
+    const winner = loser ^ 1;
+    clearHold(room);
+    clearLoadTimer(room);
+    room.phase = 'lobby';
+    room.started = false;
+    room.ready = { 0: false, 1: false };
+    room.readySeq = { 0: -1, 1: -1 };
+    room.loaded = { 0: false, 1: false };
+    room.startId = null;
+    room.startAt = null;
+    room.hist = [[], []];
+    room.epoch += 1;
+    broadcast(room, {
+      t: 'forfeit',
+      room: room.id,
+      winner,
+      loser,
+      notice: 'You win — opponent left',
+      phase: 'lobby',
+      started: false,
+      epoch: room.epoch,
+      seq: ++room.seq,
+    });
+    broadcastState(room);
+    console.log('forfeit', room.id, 'winner', winner);
+  }
+
+  function histEnd(room, frame) {
+    let max = frame;
+    const delay = room.delay || INPUT_DELAY_FRAMES;
+    const cap = frame + delay + 12;
+    for (const hist of room.hist) {
+      for (let i = Math.min(hist.length, cap) - 1; i >= 0; i--) {
+        if (hist[i] != null && i + 1 > max) max = i + 1;
+        if (hist[i] != null) break;
+      }
+    }
+    return Math.min(Math.max(max, frame), cap);
+  }
+
+  function sendResume(room) {
+    const hold = room.hold;
+    if (!hold || hold.frame == null) return;
+    const slot = hold.slot;
+    const peer = room.players[slot];
+    const other = room.players[slot ^ 1];
+    const frame = hold.frame | 0;
+    const end = histEnd(room, frame);
+    send(peer, {
+      t: 'resume',
+      room: room.id,
+      frame,
+      end,
+      hash: hold.hash,
+      seed: room.seed,
+      delay: room.delay,
+      startId: room.startId,
+      picks: { 0: room.picks[0] || null, 1: room.picks[1] || null },
+      p0: packHist(room.hist[0], end),
+      p1: packHist(room.hist[1], end),
+      epoch: room.epoch,
+      phase: 'playing',
+    });
+    send(other, { t: 'peer_back', epoch: room.epoch, frame });
+    clearHold(room);
+    console.log('resume', room.id, 'frame', frame);
+  }
+
+  function beginHold(room, slot, userId) {
+    rememberPick(room, slot);
+    if (!room.players[0] && !room.players[1]) {
+      clearHold(room);
+      room.phase = 'lobby';
+      room.started = false;
+      armExpiry(room);
+      return;
+    }
+    clearHold(room);
+    room.hold = { slot, userId, until: Date.now() + HOLD_MS, frame: null, hash: null };
+    room.holdTimer = later(() => forfeit(room), HOLD_MS);
+    broadcast(room, {
+      t: 'peer_hold',
+      room: room.id,
+      slot,
+      until: room.hold.until,
+      timeoutMs: HOLD_MS,
+      epoch: room.epoch,
+      seq: ++room.seq,
+    });
+  }
+
+  function noteResume(room, slot, uid) {
+    restorePick(room, slot, uid);
+    if (!(room.phase === 'playing' && room.hold && room.hold.slot === slot)) return;
+    if (room.hold.frame == null) {
+      send(room.players[slot ^ 1], { t: 'need_frame', epoch: room.epoch });
+    } else {
+      sendResume(room);
+    }
+  }
+
+  function leave(ws, reason) {
     if (waiting === ws) waiting = null;
     const room = ws.room;
     if (!room) return;
@@ -352,6 +529,17 @@ function createServer() {
     clearLoadTimer(room);
     const userId = ws.userId;
     room.players[slot] = null;
+    ws.room = null;
+    ws.slot = -1;
+    // A dropped socket during a fight pauses the round so they can rejoin
+    // the same frame. An explicit Leave still ends it.
+    if (room.phase === 'playing' && reason !== 'intentional') {
+      beginHold(room, slot, userId);
+      console.log('hold', room.id, 'slot', slot, 'user', userId);
+      return;
+    }
+    if (room.hold && room.hold.slot !== slot) clearHold(room);
+    rememberPick(room, slot);
     // Clear both ready flags. Leaving only the leaver's flag set left the
     // other player stuck on a disabled Ready button through the countdown.
     room.ready = { 0: false, 1: false };
@@ -364,9 +552,8 @@ function createServer() {
     room.startId = null;
     room.startAt = null;
     room.seed = null;
+    room.hist = [[], []];
     room.epoch += 1;
-    ws.room = null;
-    ws.slot = -1;
     broadcast(room, {
       t: 'peer_left',
       room: room.id,
@@ -414,28 +601,80 @@ function createServer() {
         }, ws);
         return;
       }
-      let batch = null;
-      if (Array.isArray(m.batch)) {
-        batch = [];
-        for (const item of m.batch) {
-          if (!item || typeof item.frame !== 'number' || item.frame < 0 || item.frame > 1000000) continue;
-          batch.push({ frame: item.frame | 0, inp: item.inp || null });
-          if (batch.length >= 48) break;
+      const batch = [];
+      if (typeof m.base === 'number' && Array.isArray(m.bits)) {
+        const base = m.base | 0;
+        for (let i = 0; i < m.bits.length && i < 64; i++) {
+          const frame = base + i;
+          if (frame < 0 || frame > 1000000) continue;
+          batch.push({ frame, b: m.bits[i] & 0xffff });
         }
       }
-      broadcast(room, {
+      if (Array.isArray(m.batch)) {
+        for (const item of m.batch) {
+          if (!item || typeof item.frame !== 'number') continue;
+          const frame = item.frame | 0;
+          if (frame < 0 || frame > 1000000) continue;
+          if (typeof item.b === 'number') batch.push({ frame, b: item.b & 0xffff });
+          else batch.push({ frame, inp: item.inp || null });
+          if (batch.length >= 64) break;
+        }
+      }
+      if (!room.hist) room.hist = [[], []];
+      for (const item of batch) {
+        const bits = typeof item.b === 'number' ? item.b : packLoose(item.inp);
+        if (room.hist[ws.slot][item.frame] == null) room.hist[ws.slot][item.frame] = bits;
+      }
+      const relay = {
         t: 'input',
         inp: m.inp,
         n: m.n,
         frame: typeof m.frame === 'number' ? m.frame : null,
-        batch,
         ack: typeof m.ack === 'number' ? m.ack : null,
         seq: typeof m.seq === 'number' ? m.seq : null,
         from: ws.slot,
         fromGen: room.slotGen[ws.slot],
         epoch: room.epoch,
         ts: Date.now(),
-      }, ws);
+      };
+      if (typeof m.base === 'number' && Array.isArray(m.bits)) {
+        relay.base = m.base | 0;
+        relay.bits = m.bits.slice(0, 64);
+      }
+      if (Array.isArray(m.batch)) relay.batch = batch;
+      broadcast(room, relay, ws);
+      return;
+    }
+
+    if (m.t === 'hb' || m.t === 'nack' || m.t === 'hold_frame' || m.t === 'give_up') {
+      const room = ws.room;
+      if (!room || room.players[ws.slot] !== ws) return;
+      if (m.t === 'hb') {
+        broadcast(room, { t: 'hb', from: ws.slot, epoch: room.epoch }, ws);
+        return;
+      }
+      if (m.t === 'nack') {
+        const fromFrame = Math.max(0, m.fromFrame | 0);
+        const toFrame = Math.min(fromFrame + 90, m.toFrame | 0);
+        if (toFrame < fromFrame) return;
+        broadcast(room, { t: 'nack', fromFrame, toFrame, from: ws.slot, epoch: room.epoch }, ws);
+        return;
+      }
+      if (m.t === 'give_up') {
+        if (room.phase === 'playing') abortToLobby(room, 'Connection lost');
+        return;
+      }
+      if (!room.hold || ws.slot === room.hold.slot) return;
+      room.hold.frame = m.frame | 0;
+      room.hold.hash = (m.hash >>> 0);
+      if (typeof m.base === 'number' && Array.isArray(m.bits)) {
+        const base = m.base | 0;
+        for (let i = 0; i < m.bits.length && i < 120; i++) {
+          const frame = base + i;
+          if (frame >= 0 && room.hist[ws.slot][frame] == null) room.hist[ws.slot][frame] = m.bits[i] & 0xffff;
+        }
+      }
+      if (room.players[room.hold.slot]) sendResume(room);
       return;
     }
 
@@ -501,6 +740,7 @@ function createServer() {
           existing.userIds[owned] = uid;
           userRoom.set(uid, existing.id);
           if (m.char && FIGHTERS.has(m.char)) existing.picks[owned] = m.char;
+          noteResume(existing, owned, uid);
           welcome(ws, 'created', { rejoin: true });
           console.log('create rejoin', existing.id, 'slot', owned);
           return;
@@ -529,6 +769,7 @@ function createServer() {
       }
       if (ws.room && ws.room !== room) leave(ws);
       if (ws.room === room && room.players[ws.slot] === ws) {
+        noteResume(room, ws.slot, uid);
         welcome(ws, 'joined', { rejoin: true });
         return;
       }
@@ -537,6 +778,7 @@ function createServer() {
         placeSocket(room, owned, ws);
         room.userIds[owned] = uid;
         userRoom.set(uid, room.id);
+        noteResume(room, owned, uid);
         welcome(ws, 'joined', { rejoin: true });
         broadcast(room, { t: 'peer', id: ws.id, slot: owned, rejoin: true, epoch: room.epoch, seq: ++room.seq }, ws);
         console.log('rejoin', room.id, 'slot', owned);
@@ -565,6 +807,7 @@ function createServer() {
         return;
       }
       room.picks[ws.slot] = m.char;
+      if (ws.userId) room.savedPicks[ws.userId] = m.char;
       send(ws, { t: 'pick_ack', char: m.char, slot: ws.slot, epoch: room.epoch, seq: room.seq });
       broadcast(room, { t: 'peer_pick', slot: ws.slot, char: m.char, epoch: room.epoch, seq: ++room.seq }, ws);
       broadcastState(room);
@@ -613,6 +856,7 @@ function createServer() {
         room.net[ws.slot] = {
           rtt: Math.max(0, Math.min(2000, Number(m.rtt))),
           jitter: Math.max(0, Math.min(1000, Number(m.jitter) || 0)),
+          samples: Math.max(0, Math.min(50, Number(m.samples) || 0)),
         };
       }
       broadcastState(room);
@@ -629,7 +873,7 @@ function createServer() {
       return;
     }
 
-    if (m.t === 'leave') leave(ws);
+    if (m.t === 'leave') leave(ws, 'intentional');
   }
 
   wss.on('connection', (ws) => {
@@ -681,7 +925,10 @@ function createServer() {
     timeouts.clear();
     for (const i of intervals) clearInterval(i);
     intervals.length = 0;
-    for (const room of rooms.values()) clearLoadTimer(room);
+    for (const room of rooms.values()) {
+      clearLoadTimer(room);
+      clearHold(room);
+    }
     for (const client of wss.clients) {
       try { client.terminate(); } catch {}
     }

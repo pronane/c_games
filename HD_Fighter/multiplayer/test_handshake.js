@@ -123,9 +123,11 @@ async function testHandshake(port) {
   check(joined.slot === 1, 'guest got slot ' + joined.slot);
   const { goA } = await fightUntilGo(a, b);
   a.ws.close();
-  const left = await b.wait((m) => m.t === 'room_state' && m.phase === 'lobby' && m.started === false && m.seq > goA.seq);
-  check(left.started === false, 'started was not reset when a player left');
-  check(!field(left.occupied, 0), 'leaver still occupied');
+  // A drop during the fight pauses for a reconnect instead of dumping the
+  // other player straight back to the lobby.
+  const hold = await b.wait((m) => m.t === 'peer_hold');
+  check(hold.slot === 0, 'hold slot ' + hold.slot);
+  check(hold.timeoutMs >= 1000, 'hold timeout ' + hold.timeoutMs);
   await Promise.all([a.close(), b.close()]);
   return { room: created.room, startId: goA.startId, seed: goA.seed, startAt: goA.startAt };
 }

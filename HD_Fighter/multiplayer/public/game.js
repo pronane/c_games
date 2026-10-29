@@ -1,5 +1,7 @@
 import { createMatch, cloneInput, neutralInput, HASH_EVERY, DEFAULT_DELAY } from './sim.mjs';
-import { createPacer, stepBudget, redundantBatch } from './pace.mjs';
+import { createPacer, stepBudget } from './pace.mjs';
+import { evalStall, stallLabel, connectFailure } from './stall.mjs';
+import { encodeTail, encodeFrames, decodeInputs, absorbContig, gapBefore, unpackInput, unpackHist, packInput } from './wire.mjs';
 
 const FIGHTERS = ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap'];
 const FNAME = { kairo: 'KAIRO', lyra: 'LYRA', naomi: 'NAOMI', brutus: 'BRUTUS', void: 'VOID', zap: 'ZAP' };
@@ -68,11 +70,17 @@ let sentFrames = new Set();
 let peerAck = -1;
 let remoteMax = -1;
 let lastInputSend = 0;
-let stallSince = 0;
+let lastPeerRx = 0;
+let lastHb = 0;
+let lastNackAt = 0;
+let lastNackFrom = -1;
+let holdUntil = 0;
+let remoteContig = -1;
+let remoteHave = new Set();
+let localInputs = new Map();
 let rttSamples = [];
 let connectFailedFast = false;
-const STALL_SHOW_MS = 300;
-const STALL_GIVE_UP_MS = 8000;
+let driveMatch = null;
 let localHashes = new Map();
 let remoteHashes = new Map();
 let lastHash = 0;
@@ -208,10 +216,7 @@ function connect() {
   });
   sock.addEventListener('close', () => {
     if (ws !== sock) return;
-    if (!opened && Date.now() - started < 1200) {
-      connectFailedFast = true;
-      if (!room && !intentionalLeave) statusEl.textContent = "Can't reach the server.";
-    }
+    if (!opened && Date.now() - started < 1500) classifyConnectFailure();
     ws = null;
     setOnline(false);
     if (intentionalLeave) return;
@@ -233,14 +238,37 @@ function connect() {
 }
 
 let pingTimer = null;
+let lastPingAt = 0;
 function ensurePing() {
   if (pingTimer) return;
   pingTimer = setInterval(() => {
-    if (ws && ws.readyState === 1) {
-      const ts = Date.now();
-      ws.send(JSON.stringify({ t: 'ping', ts }));
-    }
-  }, 2000);
+    if (!ws || ws.readyState !== 1) return;
+    const now = Date.now();
+    const gap = sim && !sim.closed ? 1000 : 250;
+    if (now - lastPingAt < gap) return;
+    lastPingAt = now;
+    ws.send(JSON.stringify({ t: 'ping', ts: now }));
+  }, 250);
+}
+
+function applyConnectFailure(kind) {
+  const status = connectFailure(kind);
+  connectFailedFast = !status.waking;
+  if (!room && !intentionalLeave) {
+    statusEl.textContent = status.text;
+    if (status.clearPill) roompill.textContent = 'no room';
+  }
+}
+
+function classifyConnectFailure() {
+  fetch('/api/health', { cache: 'no-store' }).then((res) => {
+    if (ws && ws.readyState === 1) return;
+    // Any HTTP answer, including 503, means a host is there and waking.
+    applyConnectFailure({ networkError: false, httpStatus: res.status });
+  }).catch(() => {
+    if (ws && ws.readyState === 1) return;
+    applyConnectFailure({ networkError: true });
+  });
 }
 
 function linkStatus(waitingLong) {
@@ -518,17 +546,18 @@ function onCountdown(m) {
     if (loadedFor !== startId) return;
     if (!ws || ws.readyState !== 1) return;
     const net = netSample();
-    transmit({ t: 'loaded', startId, rtt: net.rtt, jitter: net.jitter });
+    transmit({ t: 'loaded', startId, rtt: net.rtt, jitter: net.jitter, samples: net.samples });
     statusEl.textContent = 'Loaded — waiting for the other player…';
   });
 }
 
 function netSample() {
-  if (!rttSamples.length) return { rtt: undefined, jitter: undefined };
+  if (!rttSamples.length) return { rtt: undefined, jitter: undefined, samples: 0 };
   const sorted = [...rttSamples].sort((a, b) => a - b);
   return {
     rtt: sorted[Math.floor(sorted.length / 2)],
     jitter: Math.max(0, sorted[sorted.length - 1] - sorted[0]),
+    samples: sorted.length,
   };
 }
 
@@ -555,9 +584,10 @@ function onMsg(e) {
       : m.t === 'created' ? `Room ${room} as P${slot + 1}. Share the code.`
       : `Room ${room} as P${slot + 1}.`;
     statusEl.textContent = m.rejoin ? `Rejoined ${room} as P${slot + 1}.` : label;
-    if (m.phase === 'playing') {
-      statusEl.textContent = 'Rejoined. This match is already underway — press Ready when it ends for a rematch.';
+    if (m.phase === 'playing' && !(sim && !sim.closed)) {
+      statusEl.textContent = 'Rejoined. Waiting to resume the fight…';
     }
+    if (m.rejoin && myPick && m.phase !== 'playing') pendingPick = myPick;
     maybeFlushReady();
     return;
   }
@@ -638,12 +668,54 @@ function onMsg(e) {
     loadedFor = null;
     statusEl.textContent = m.notice || 'Opponent left';
     updateRoomInfo();
-    if (sim && !sim.closed) endMatch('Opponent left');
+    if (sim && !sim.closed) endMatch(m.notice || 'Opponent left');
     else syncReadyButton();
     return;
   }
+  if (m.t === 'peer_hold') {
+    if (!sim || sim.closed) return;
+    holdUntil = typeof m.until === 'number' ? m.until : Date.now() + 30000;
+    const stall = document.getElementById('stall');
+    if (stall) stall.textContent = 'Opponent reconnecting... (30 s)';
+    sendHoldFrame();
+    return;
+  }
+  if (m.t === 'need_frame') {
+    sendHoldFrame();
+    return;
+  }
+  if (m.t === 'peer_back') {
+    holdUntil = 0;
+    notePeer();
+    const stall = document.getElementById('stall');
+    if (stall) stall.textContent = '';
+    return;
+  }
+  if (m.t === 'forfeit') {
+    holdUntil = 0;
+    const mine = m.winner === slot;
+    endMatch(mine ? 'You win — opponent left' : 'Opponent left');
+    return;
+  }
+  if (m.t === 'match_end') {
+    holdUntil = 0;
+    endMatch(m.notice || 'Connection lost');
+    return;
+  }
+  if (m.t === 'resume') {
+    resumeMatch(m);
+    return;
+  }
+  if (m.t === 'hb') {
+    if (typeof m.from === 'number' && m.from !== slot) notePeer();
+    return;
+  }
+  if (m.t === 'nack') onNack(m);
   if (m.t === 'input') onRemoteInput(m);
-  if (m.t === 'hash') onRemoteHash(m);
+  if (m.t === 'hash') {
+    notePeer();
+    onRemoteHash(m);
+  }
 }
 
 quickBtn.onclick = () => {
@@ -797,37 +869,85 @@ function readLocalInput() {
   return inp;
 }
 
+function notePeer() { lastPeerRx = Date.now(); }
+
 function queueLocal(frame) {
   if (!sim || sentFrames.has(frame) || frame < 0) return;
   const inp = cloneInput(readLocalInput());
   if (!sim.setInput(slot, frame, inp)) return;
   sentFrames.add(frame);
+  localInputs.set(frame, inp);
   inputLog.push({ frame, inp });
   if (inputLog.length > 90) inputLog.splice(0, inputLog.length - 90);
 }
 
 function flushInputs() {
   if (!ws || ws.readyState !== 1 || !room) return;
-  const batch = redundantBatch(inputLog, peerAck);
-  if (!batch.length) return;
+  const encoded = encodeTail(inputLog, peerAck);
+  if (!encoded) return;
   lastInputSend = performance.now();
-  transmit({ t: 'input', ack: remoteMax, batch });
+  transmit(Object.assign({ t: 'input', ack: remoteMax }, encoded));
+}
+
+function onNack(m) {
+  if (!sim || sim.closed) return;
+  if (typeof m.from === 'number' && m.from === slot) return;
+  const fromFrame = m.fromFrame | 0;
+  const toFrame = m.toFrame | 0;
+  if (toFrame < fromFrame) return;
+  const rows = [];
+  for (let f = fromFrame; f <= toFrame && rows.length < 90; f++) {
+    const inp = localInputs.get(f);
+    if (inp) rows.push({ frame: f, inp });
+  }
+  const encoded = encodeFrames(rows);
+  if (!encoded || !ws || ws.readyState !== 1) return;
+  transmit(Object.assign({ t: 'input', ack: remoteMax }, encoded));
 }
 
 function onRemoteInput(m) {
   if (!sim || sim.closed) return;
   if (typeof m.epoch === 'number' && m.epoch !== roomEpoch) return;
+  notePeer();
   if (typeof m.ack === 'number') peerAck = Math.max(peerAck, m.ack);
   const from = m.from === 0 || m.from === 1 ? m.from : (slot ^ 1);
   if (from === slot) return;
-  const items = Array.isArray(m.batch) && m.batch.length
-    ? m.batch
-    : (typeof m.frame === 'number' ? [{ frame: m.frame, inp: m.inp }] : []);
+  let items = decodeInputs(m);
+  if (!items.length && m.inp && typeof m.frame === 'number') {
+    items = [{ frame: m.frame, inp: m.inp, bits: packInput(m.inp) }];
+  }
+  const frames = [];
   for (const item of items) {
     if (!item || typeof item.frame !== 'number') continue;
-    sim.setInput(from, item.frame, item.inp);
+    const inp = item.inp || unpackInput(item.bits || 0);
+    sim.setInput(from, item.frame, inp);
+    remoteHave.add(item.frame);
+    frames.push(item.frame);
     if (item.frame > remoteMax) remoteMax = item.frame;
   }
+  const gap = gapBefore(remoteContig, frames);
+  remoteContig = absorbContig(remoteContig, remoteHave);
+  const now = Date.now();
+  if (gap && (gap.from !== lastNackFrom || now - lastNackAt > 80)) {
+    lastNackFrom = gap.from;
+    lastNackAt = now;
+    const toFrame = Math.min(gap.to, gap.from + 40);
+    transmit({ t: 'nack', fromFrame: gap.from, toFrame });
+  }
+}
+
+function sendHoldFrame() {
+  if (!sim || sim.closed) return;
+  let base = sim.frame;
+  const bits = [];
+  for (let f = Math.max(0, sim.frame - 90); f < sim.frame + sim.delay + 4; f++) {
+    const inp = localInputs.get(f);
+    if (!inp) continue;
+    if (!bits.length) base = f;
+    while (base + bits.length < f) bits.push(0);
+    bits.push(packInput(inp));
+  }
+  transmit({ t: 'hold_frame', frame: sim.frame, hash: sim.hash() >>> 0, base, bits });
 }
 
 function onRemoteHash(m) {
@@ -898,10 +1018,15 @@ function startMatch(picksMap, seed, delay) {
   fighters = sim.fighters;
   inputLog = [];
   sentFrames = new Set();
+  localInputs = new Map();
+  remoteHave = new Set();
+  remoteContig = -1;
   peerAck = -1;
   remoteMax = -1;
   lastInputSend = 0;
-  stallSince = 0;
+  lastPeerRx = Date.now();
+  lastNackFrom = -1;
+  holdUntil = 0;
   localHashes = new Map();
   remoteHashes = new Map();
   lastHash = 0;
@@ -921,16 +1046,27 @@ function startMatch(picksMap, seed, delay) {
   // Both sides commit the same opening frames before either steps.
   const opening = cloneInput(readLocalInput());
   for (let f = 0; f < useDelay; f++) {
-    sim.setInput(slot, f, opening);
+    const inp = cloneInput(opening);
+    sim.setInput(slot, f, inp);
     sentFrames.add(f);
-    inputLog.push({ frame: f, inp: cloneInput(opening) });
+    localInputs.set(f, inp);
+    inputLog.push({ frame: f, inp });
   }
   flushInputs();
+  armLoop(clock, ++matchGen);
+}
+
+function armLoop(clock, gen) {
   if (raf) cancelAnimationFrame(raf);
-  const gen = ++matchGen;
-  const loop = () => {
+  const loop = (now) => {
     if (!sim || sim.closed || matchGen !== gen) return;
-    const now = performance.now();
+    const stall = document.getElementById('stall');
+    if (holdUntil) {
+      const left = Math.max(0, Math.ceil((holdUntil - Date.now()) / 1000));
+      if (stall) stall.textContent = `Opponent reconnecting... (${left} s)`;
+      render();
+      return;
+    }
     const budget = stepBudget(clock, sim.frame, now);
     let steps = 0;
     while (steps < budget && sim.canStep() && !sim.result) {
@@ -946,29 +1082,82 @@ function startMatch(picksMap, seed, delay) {
       endMatch(resultText());
       return;
     }
-    const stall = document.getElementById('stall');
-    const blocked = budget > steps;
-    if (blocked) {
-      if (!stallSince) stallSince = now;
-      const waited = now - stallSince;
-      if (waited > STALL_GIVE_UP_MS) {
-        if (stall) stall.textContent = '';
-        endMatch('Connection lost');
-        return;
-      }
-      if (stall) stall.textContent = waited > STALL_SHOW_MS ? 'Connection slow' : '';
-    } else {
-      stallSince = 0;
-      if (stall) stall.textContent = '';
+    const level = evalStall(lastPeerRx, Date.now());
+    if (level === 'lost') {
+      if (stall) stall.textContent = 'Connection lost';
+      transmit({ t: 'give_up' });
+      endMatch('Connection lost');
+      return;
     }
-    raf = requestAnimationFrame(loop);
+    if (stall) stall.textContent = level === 'slow' ? stallLabel(level) : '';
   };
-  raf = requestAnimationFrame(loop);
+  driveMatch = loop;
+  const rafLoop = () => {
+    if (!driveMatch || matchGen !== gen) return;
+    if (document.visibilityState !== 'hidden') driveMatch(performance.now());
+    raf = requestAnimationFrame(rafLoop);
+  };
+  raf = requestAnimationFrame(rafLoop);
+}
+
+function resumeMatch(m) {
+  if (!m || typeof m.frame !== 'number') return;
+  holdUntil = 0;
+  notePeer();
+  const picksMap = m.picks || picks;
+  const a = val(picksMap, 0) || FIGHTERS[0];
+  const b = val(picksMap, 1) || FIGHTERS[1];
+  const useDelay = m.delay > 0 ? m.delay : DEFAULT_DELAY;
+  const fresh = createMatch({
+    p0: a, p1: b, seed: m.seed, delay: useDelay, frames: META && META.characters,
+  });
+  const p0 = unpackHist(m.p0);
+  const p1 = unpackHist(m.p1);
+  const end = Math.max(m.end | 0, m.frame | 0, p0.length, p1.length);
+  for (let f = 0; f < end; f++) {
+    fresh.setInput(0, f, unpackInput(p0[f] || 0));
+    fresh.setInput(1, f, unpackInput(p1[f] || 0));
+  }
+  while (fresh.frame < m.frame && fresh.canStep() && !fresh.result) fresh.step();
+  if (typeof m.hash === 'number' && (fresh.hash() >>> 0) !== (m.hash >>> 0)) {
+    flagDesync(fresh.frame, fresh.hash() >>> 0, m.hash >>> 0);
+  }
+  sim = fresh;
+  fighters = sim.fighters;
+  inputLog = [];
+  sentFrames = new Set();
+  localInputs = new Map();
+  remoteHave = new Set();
+  remoteContig = -1;
+  peerAck = -1;
+  remoteMax = -1;
+  for (let f = 0; f < end; f++) {
+    const mine = slot === 0 ? p0[f] : p1[f];
+    if (mine == null) continue;
+    const inp = unpackInput(mine);
+    sentFrames.add(f);
+    localInputs.set(f, inp);
+    inputLog.push({ frame: f, inp });
+  }
+  if (inputLog.length > 90) inputLog.splice(0, inputLog.length - 90);
+  for (let f = 0; f < end; f++) remoteHave.add(f);
+  remoteContig = end - 1;
+  lastPeerRx = Date.now();
+  show('gameScr');
+  const stall = document.getElementById('stall');
+  if (stall) stall.textContent = '';
+  statusEl.textContent = 'Opponent reconnected.';
+  const clock = createPacer(performance.now());
+  const gen = ++matchGen;
+  armLoop(clock, gen);
+  flushInputs();
 }
 
 function endMatch(msg) {
   if (!sim || sim.closed) return;
   sim.closed = true;
+  driveMatch = null;
+  holdUntil = 0;
   if (raf) cancelAnimationFrame(raf);
   raf = null;
   const banner = document.getElementById('koBanner');
@@ -1108,6 +1297,30 @@ window.addEventListener('pageshow', () => {
   const code = (lastRoom || localStorage.getItem('hd2_room') || '').toUpperCase();
   if (code && (!ws || ws.readyState !== 1)) startJoin(code);
 });
+try {
+  const clockWorker = new Worker(new URL('./tick-worker.js', import.meta.url));
+  clockWorker.onmessage = () => {
+    const now = performance.now();
+    if (sim && !sim.closed && ws && ws.readyState === 1 && now - lastHb > 400) {
+      lastHb = now;
+      transmit({ t: 'hb' });
+    }
+    if (driveMatch) driveMatch(now);
+  };
+} catch {}
+
+const demoVid = document.querySelector('#lobby video');
+const demoNote = demoVid && demoVid.nextElementSibling;
+if (demoVid) {
+  const supported = demoVid.canPlayType('video/mp4; codecs="avc1.42E01E"') !== '';
+  const showDemoFallback = () => {
+    demoVid.style.display = 'none';
+    if (demoNote) demoNote.textContent = 'Demo clip cannot play in this browser. Create → Share → Pick → Ready → Fight (10s).';
+  };
+  if (!supported) showDemoFallback();
+  demoVid.addEventListener('error', showDemoFallback);
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     if (room) {
