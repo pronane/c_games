@@ -1,0 +1,129 @@
+{
+ "fbx": "/tmp/v5test/sprite_forge_studio/out_mocap/mocap_demo/model.fbx",
+ "size_kb": 231.5,
+ "own_reader": {
+  "version": 7400,
+  "limb_nodes": 19,
+  "meshes": 1,
+  "control_points": 902,
+  "polygons": 1622,
+  "clusters": 18,
+  "skin_weights": 902,
+  "materials": 12,
+  "anim_stacks": [
+   "walk",
+   "jump"
+  ],
+  "anim_curves": 234,
+  "connections": 483,
+  "unit_scale_factor": 100.0,
+  "up_axis": 1,
+  "bones": [
+   "root",
+   "hips",
+   "spine",
+   "chest",
+   "neck",
+   "head",
+   "upperarm_L",
+   "forearm_L",
+   "hand_L",
+   "upperarm_R",
+   "forearm_R",
+   "hand_R",
+   "thigh_L",
+   "shin_L",
+   "foot_L",
+   "thigh_R",
+   "shin_R",
+   "foot_R",
+   "ball"
+  ]
+ },
+ "assimp": {
+  "ran": true,
+  "ok": true,
+  "meshes": 12,
+  "animations": 2,
+  "bones": 216,
+  "faces": 1622,
+  "vertices": 3201,
+  "nodes": 22,
+  "materials": 11,
+  "bounds_min": [
+   -0.267419,
+   -0.002,
+   -0.128737
+  ],
+  "bounds_max": [
+   0.267419,
+   1.78825,
+   0.404616
+  ]
+ },
+ "fbx2gltf_fbxsdk": {
+  "ran": true,
+  "fbx_sdk_takes": [
+   "jump",
+   "walk"
+  ],
+  "glb_takes": [
+   "jump",
+   "walk"
+  ],
+  "bones_compared": 19,
+  "takes": {
+   "walk": {
+    "max_joint_err_mm": 0.009,
+    "mean_joint_err_mm": 0.001
+   },
+   "jump": {
+    "max_joint_err_mm": 0.004,
+    "mean_joint_err_mm": 0.0
+   }
+  },
+  "bind_pose_vertices": {
+   "glb": 4866,
+   "fbx_sdk": 4866,
+   "max_err_mm": 0.0
+  },
+  "skinned_mid_take": {
+   "take": "walk",
+   "t": 0.567,
+   "max_err_mm": 0.006,
+   "mean_err_mm": 0.0
+  },
+  "note": "FBX2glTF re-samples every take at 30 fps with the Autodesk FBX SDK; errors are measured at those sample times",
+  "worst_err_mm": 0.009,
+  "ok": true
+ },
+ "blender": {
+  "blender": "4.2.0",
+  "armatures": 1,
+  "meshes": 1,
+  "bones": 19,
+  "fps": 30.0,
+  "actions": [
+   "jump",
+   "walk"
+  ],
+  "vertex_groups": 18,
+  "weighted_verts": 902,
+  "modifiers": [
+   "ARMATURE"
+  ],
+  "ran": true,
+  "skinned_max_err_mm_at_key": {
+   "jump": 0.01,
+   "walk": 0.01
+  },
+  "skinned_max_err_mm_between_keys": {
+   "jump": 0.01,
+   "walk": 0.01
+  },
+  "worst_skinned_err_mm": 0.01,
+  "worst_between_keys_mm": 0.01,
+  "ok": true
+ },
+ "RESULT": "PASS"
+}

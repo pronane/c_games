@@ -1,0 +1,8 @@
+{
+  "name": "com.spriteforge.importer",
+  "version": "9.0.0",
+  "displayName": "Sprite Forge Importer",
+  "description": "Imports Sprite Forge Studio builds (atlas.json / pack.json + framedata.json + maps/) as sliced sprites with pivots at the feet, AnimationClips + AnimatorController per character, frame data (hit / hurt boxes) and a ready prefab.",
+  "unity": "2021.3",
+  "author": { "name": "Sprite Forge Studio" }
+}

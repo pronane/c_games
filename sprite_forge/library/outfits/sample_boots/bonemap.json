@@ -1,0 +1,34 @@
+{
+ "convention": "mixamo",
+ "map": {
+  "hips": "mixamorig:Hips",
+  "spine": "mixamorig:Spine",
+  "chest": "mixamorig:Spine1",
+  "upperchest": "mixamorig:Spine2",
+  "neck": "mixamorig:Neck",
+  "head": "mixamorig:Head",
+  "shoulder_L": "mixamorig:LeftShoulder",
+  "upperarm_L": "mixamorig:LeftArm",
+  "forearm_L": "mixamorig:LeftForeArm",
+  "hand_L": "mixamorig:LeftHand",
+  "thigh_L": "mixamorig:LeftUpLeg",
+  "shin_L": "mixamorig:LeftLeg",
+  "foot_L": "mixamorig:LeftFoot",
+  "toe_L": "mixamorig:LeftToeBase",
+  "shoulder_R": "mixamorig:RightShoulder",
+  "upperarm_R": "mixamorig:RightArm",
+  "forearm_R": "mixamorig:RightForeArm",
+  "hand_R": "mixamorig:RightHand",
+  "thigh_R": "mixamorig:RightUpLeg",
+  "shin_R": "mixamorig:RightLeg",
+  "foot_R": "mixamorig:RightFoot",
+  "toe_R": "mixamorig:RightToeBase"
+ },
+ "unmapped": [
+  "mixamorig:LeftToe_End",
+  "mixamorig:RightToe_End",
+  "mixamorig:HeadTop_End"
+ ],
+ "missing": [],
+ "edited": false
+}

@@ -1,0 +1,26 @@
+{
+ "convention": "sforge",
+ "map": {
+  "root": "root",
+  "hips": "hips",
+  "spine": "spine",
+  "chest": "chest",
+  "neck": "neck",
+  "head": "head",
+  "upperarm_L": "upperarm_L",
+  "forearm_L": "forearm_L",
+  "hand_L": "hand_L",
+  "thigh_L": "thigh_L",
+  "shin_L": "shin_L",
+  "foot_L": "foot_L",
+  "upperarm_R": "upperarm_R",
+  "forearm_R": "forearm_R",
+  "hand_R": "hand_R",
+  "thigh_R": "thigh_R",
+  "shin_R": "shin_R",
+  "foot_R": "foot_R"
+ },
+ "unmapped": [],
+ "missing": [],
+ "edited": false
+}

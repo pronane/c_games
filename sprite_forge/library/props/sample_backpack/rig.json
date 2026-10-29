@@ -1,0 +1,61 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_backpack",
+ "bones": [
+  "prop"
+ ],
+ "materials": [
+  {
+   "name": "Bag",
+   "color": [
+    0.2,
+    0.35,
+    0.22
+   ]
+  },
+  {
+   "name": "Pocket",
+   "color": [
+    0.16,
+    0.28,
+    0.18
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sample_backpack_mesh",
+    "f0": 0,
+    "f1": 24
+   }
+  ],
+  "source_file": "sample_backpack.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "prop": {
+   "socket": "back",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": 1.0,
+   "fit": "height"
+  }
+ },
+ "height_m": 0.42,
+ "verts": 16,
+ "tris": 24
+}

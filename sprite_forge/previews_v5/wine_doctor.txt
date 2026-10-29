@@ -1,0 +1,38 @@
+wine: Call from 00006FFFFF3FCF77 to unimplemented function ucrtbase.dll.crealf, aborting
+wine: Unimplemented function ucrtbase.dll.crealf called at address 00006FFFFF3FCF77 (thread 01c0), starting debugger...
+Sprite Forge Studio doctor  -  Windows-10-10.0.19043-SP0  -  Python 3.12.7
+component                   status  details
+----------------------------------------------------------------------------------------------------
+Python                      OK      3.12.7 (Z:\workspace\wintest\sprite_forge_studio\.venv\Scripts\python.exe) venv
+numpy                       OK      1.26.4
+Pillow                      OK      13.0.0
+scipy                       OK      1.13.1
+opencv-python-headless      OK      4.10.0
+scikit-image                OK      0.24.0
+imageio-ffmpeg              OK      0.6.0
+pycolmap                    OK      4.2.1
+trimesh                     OK      5.2.0
+fast-simplification         OK      0.2.0
+open3d                      --      not installed
+                                      -> disables: second quadric decimation backend (not needed if fast-simplification is installed)
+rembg                       --      not installed
+                                      -> disables: AI background removal for photos (built-in cut-out still works)
+PyAV                        --      not installed
+                                      -> disables: second video decoder fallback (not needed when imageio-ffmpeg is installed)
+tkinter (GUI)               MISSING missing - re-run the python.org installer and tick 'tcl/tk and IDLE'
+                                      -> disables: the visual Studio (run_studio); the CLI forge.py still works
+video decode/encode         OK      ffmpeg [imageio-ffmpeg (pip)] - ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (
+slow-motion interpolation   OK      ffmpeg minterpolate
+FBX export                  OK      built-in pure-Python FBX 7.4 writer (sforge/fbx.py) - no Blender needed
+SfM for scan --run          OK      pycolmap 4.2.1 (pip, CPU)
+MediaPipe pose (mocap)      --      no Python with mediapipe - run: python tools/setup_pose.py
+                                      -> disables: forge.py mocap (video -> 3D animation)
+pose model                  OK      Z:\workspace\wintest\sprite_forge_studio\models\pose_landmarker_full.task
+Blender (optional)          --      not found (not needed)
+                                      -> disables: only the optional --fbx-writer blender and Blender-based LOD decimation
+C compiler (optional)       --      not found
+                                      -> disables: only the raylib C example in spriteforge/
+raylib (optional)           --      not found (make -C spriteforge raylib fetches + builds it)
+                                      -> disables: only the C example
+----------------------------------------------------------------------------------------------------
+READY: sprites, photo/spec builds, consoles, GLB + FBX export. Missing core pieces: tkinter (GUI) (see above).

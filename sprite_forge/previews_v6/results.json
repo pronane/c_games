@@ -1,0 +1,230 @@
+[
+ {
+  "section": "pack",
+  "name": "starter pack verifies",
+  "ok": true,
+  "detail": "8 assets"
+ },
+ {
+  "section": "pack",
+  "name": "install refused without acknowledgement",
+  "ok": true,
+  "detail": "error: not installed: the licences were not acknowledged (use --accept-licences after read"
+ },
+ {
+  "section": "pack",
+  "name": "install with --accept-licences",
+  "ok": true,
+  "detail": "8 assets"
+ },
+ {
+  "section": "pack",
+  "name": "install records provenance + acknowledgement",
+  "ok": true,
+  "detail": "Sprite Forge Studio starter pack (CC0)"
+ },
+ {
+  "section": "pack",
+  "name": "re-install identical content is skipped",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "section": "pack",
+  "name": "tampered file is detected (sha256)",
+  "ok": true,
+  "detail": "rigs/sample_lanky: checksum mismatch rigs/sample_lanky/rig.json"
+ },
+ {
+  "section": "pack",
+  "name": "path traversal entry is refused",
+  "ok": true,
+  "detail": "rigs/sample_chibi: unsafe path ../../evil.txt"
+ },
+ {
+  "section": "pack",
+  "name": "pack with a non-redistributable asset is refused",
+  "ok": true,
+  "detail": "rigs/sample_chibi: not redistributable (redistribution = unknown)"
+ },
+ {
+  "section": "licence",
+  "name": "add without licence warns",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "section": "licence",
+  "name": "pack refuses licence=unknown",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "section": "licence",
+  "name": "'I own the rights' needs --by",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "section": "licence",
+  "name": "override recorded in the pack",
+  "ok": true,
+  "detail": "I own the rights to this asset (or have permission) and may "
+ },
+ {
+  "section": "licence",
+  "name": "clips retargeted from a 'no' source block packing",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "section": "licence",
+  "name": "clips-drop clears the block",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "section": "pack",
+  "name": "pack --all -> install elsewhere: identical rigs",
+  "ok": true,
+  "detail": "9 assets"
+ },
+ {
+  "section": "import",
+  "name": "sforge_mannequin .glb",
+  "ok": true,
+  "detail": "18/18 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, sforge names, grounding shift 2.0 mm"
+ },
+ {
+  "section": "import",
+  "name": "sforge_mannequin .fbx",
+  "ok": true,
+  "detail": "18/18 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, sforge names, grounding shift 2.0 mm"
+ },
+ {
+  "section": "import",
+  "name": "sample_chibi .glb",
+  "ok": true,
+  "detail": "22/22 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, unity names"
+ },
+ {
+  "section": "import",
+  "name": "sample_chibi .fbx",
+  "ok": true,
+  "detail": "22/22 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, unity names"
+ },
+ {
+  "section": "import",
+  "name": "sample_lanky .glb",
+  "ok": true,
+  "detail": "25/25 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, mixamo names"
+ },
+ {
+  "section": "import",
+  "name": "sample_lanky .fbx",
+  "ok": true,
+  "detail": "25/25 bones, 7 takes, bind err 0.000 mm, clip err 0.01 mm, mixamo names"
+ },
+ {
+  "section": "import",
+  "name": "sample_stocky .glb",
+  "ok": true,
+  "detail": "27/27 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, rigify names"
+ },
+ {
+  "section": "import",
+  "name": "sample_stocky .fbx",
+  "ok": true,
+  "detail": "27/27 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, rigify names"
+ },
+ {
+  "section": "import",
+  "name": "sample_moves .glb",
+  "ok": true,
+  "detail": "25/25 bones, 5 takes, bind err 0.000 mm, clip err 0.00 mm, mixamo names, grounding shift 29.6 mm"
+ },
+ {
+  "section": "import",
+  "name": "sample_moves .fbx",
+  "ok": true,
+  "detail": "25/25 bones, 5 takes, bind err 0.000 mm, clip err 0.00 mm, mixamo names, grounding shift 29.6 mm"
+ },
+ {
+  "section": "blender",
+  "name": "sample_chibi (Blender 4 FBX, leaf bones)",
+  "ok": true,
+  "detail": "unity names, 22/22 bones common, bind 0.000 mm, clips 0.00 mm, 1 textured mats"
+ },
+ {
+  "section": "blender",
+  "name": "sample_lanky (Blender 4 FBX, leaf bones)",
+  "ok": true,
+  "detail": "mixamo names, 25/25 bones common, bind 0.000 mm, clips 0.00 mm, 1 textured mats"
+ },
+ {
+  "section": "blender",
+  "name": "sample_stocky (Blender 4 FBX, leaf bones)",
+  "ok": true,
+  "detail": "rigify names, 27/27 bones common, bind 0.001 mm, clips 0.00 mm, 1 textured mats"
+ },
+ {
+  "section": "retarget",
+  "name": "sample_moves -> sample_chibi",
+  "ok": true,
+  "detail": "leg ratio 0.41, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.023"
+ },
+ {
+  "section": "retarget",
+  "name": "sample_moves -> sample_stocky",
+  "ok": true,
+  "detail": "leg ratio 0.78, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.008"
+ },
+ {
+  "section": "retarget",
+  "name": "sample_lanky -> sample_chibi",
+  "ok": true,
+  "detail": "leg ratio 0.34, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.017"
+ },
+ {
+  "section": "retarget",
+  "name": "sample_chibi -> sample_lanky",
+  "ok": true,
+  "detail": "leg ratio 2.91, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.020"
+ },
+ {
+  "section": "retarget",
+  "name": "sforge_mannequin -> sample_stocky",
+  "ok": true,
+  "detail": "leg ratio 0.76, dir err 0.00 deg, ground contact 0.6 mm off the scaled source, hip-height/leg diff 0.013"
+ },
+ {
+  "section": "retarget",
+  "name": "sample_stocky -> sforge_mannequin",
+  "ok": true,
+  "detail": "leg ratio 1.31, dir err 0.00 deg, ground contact 0.8 mm off the scaled source, hip-height/leg diff 0.013"
+ },
+ {
+  "section": "build",
+  "name": "sample_lanky_fighter14",
+  "ok": true,
+  "detail": "96 sprite frames, model.fbx 14 takes"
+ },
+ {
+  "section": "build",
+  "name": "sample_chibi_platformer",
+  "ok": true,
+  "detail": "71 sprite frames, model.fbx 10 takes"
+ },
+ {
+  "section": "build",
+  "name": "sample_stocky_gba",
+  "ok": true,
+  "detail": "56 sprite frames, model.fbx 7 takes, console gba"
+ },
+ {
+  "section": "build",
+  "name": "sample_lanky_ps1",
+  "ok": true,
+  "detail": "56 sprite frames, model.fbx 7 takes, console ps1, console model 596 tris"
+ }
+]

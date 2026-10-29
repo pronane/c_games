@@ -1,0 +1,2 @@
+meshes=1 armatures=1 bones=19 actions=14 height=1.80 m
+actions: block, crouch, hit, idle, jump, jumpattack, kick, punch, special1, special2, taunt, throw, victory, walk

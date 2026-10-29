@@ -1,0 +1,167 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sforge_mannequin",
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "chest",
+  "neck",
+  "head",
+  "upperarm_L",
+  "forearm_L",
+  "hand_L",
+  "upperarm_R",
+  "forearm_R",
+  "hand_R",
+  "thigh_L",
+  "shin_L",
+  "foot_L",
+  "thigh_R",
+  "shin_R",
+  "foot_R"
+ ],
+ "materials": [
+  {
+   "name": "skin",
+   "color": [
+    0.8,
+    0.6,
+    0.45
+   ]
+  },
+  {
+   "name": "shirt",
+   "color": [
+    0.04,
+    0.42,
+    0.16
+   ]
+  },
+  {
+   "name": "shorts",
+   "color": [
+    0.93,
+    0.93,
+    0.93
+   ]
+  },
+  {
+   "name": "socks",
+   "color": [
+    0.04,
+    0.42,
+    0.16
+   ]
+  },
+  {
+   "name": "trim",
+   "color": [
+    0.95,
+    0.95,
+    0.95
+   ]
+  },
+  {
+   "name": "boots",
+   "color": [
+    0.06,
+    0.06,
+    0.07
+   ]
+  },
+  {
+   "name": "hair",
+   "color": [
+    0.16,
+    0.1,
+    0.06
+   ]
+  },
+  {
+   "name": "eye",
+   "color": [
+    0.3,
+    0.18,
+    0.08
+   ]
+  },
+  {
+   "name": "eye_white",
+   "color": [
+    0.96,
+    0.96,
+    0.94
+   ]
+  },
+  {
+   "name": "mouth",
+   "color": [
+    0.496,
+    0.22799999999999998,
+    0.171
+   ]
+  }
+ ],
+ "clips": [
+  {
+   "name": "idle",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'idle'"
+  },
+  {
+   "name": "walk",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'walk'"
+  },
+  {
+   "name": "run",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'run'"
+  },
+  {
+   "name": "jump",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'jump'"
+  },
+  {
+   "name": "kick",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'kick'"
+  },
+  {
+   "name": "punch",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'punch'"
+  },
+  {
+   "name": "celebrate",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'celebrate'"
+  }
+ ],
+ "meta": {
+  "source": "built-in mannequin (procedural, no likeness)",
+  "hips_index": 1,
+  "convention": "sforge",
+  "description": "the built-in no-likeness mannequin (18 bones, rigid parts) with 7 procedural clips"
+ },
+ "height_m": 1.7902,
+ "verts": 850,
+ "tris": 1522
+}

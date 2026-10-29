@@ -1,0 +1,36 @@
+{
+  "name": "topdown8dir",
+  "description": "Top-down / isometric RPG: idle + walk + run in all 8 directions (views/atlas_<view>.png), billboard8.png, Godot animations idle_<view> etc.",
+  "moves": [
+    "idle",
+    "walk",
+    "run"
+  ],
+  "frame": [
+    128,
+    128
+  ],
+  "views": "billboard8",
+  "view_moves": [
+    "idle",
+    "walk",
+    "run"
+  ],
+  "manifests": [
+    {
+      "type": "godot_spriteframes",
+      "res_path": "res://actors/{name}/",
+      "include_views": true
+    },
+    {
+      "type": "unity_json",
+      "include_views": true
+    },
+    {
+      "type": "template",
+      "file": "directions.txt",
+      "header": "# {display_name}: one atlas per direction, same rows as atlas.png ({moves_csv})\n",
+      "per_view": "{angle}\t{view}\t{image}\t{source}\n"
+    }
+  ]
+}

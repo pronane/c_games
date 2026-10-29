@@ -1,0 +1,27 @@
+{
+ "description": "synthetic sample kit: gold shirt, black shorts and socks",
+ "materials": {
+  "*shirt*|*jersey*|*top*": {
+   "color": "#e8b923",
+   "mode": "tint"
+  },
+  "*short*|*pant*": {
+   "color": "#161616",
+   "mode": "replace"
+  },
+  "*sock*": {
+   "color": "#161616",
+   "mode": "replace"
+  }
+ },
+ "name": "sample_gold_black",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio (procedurally generated)",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Synthetic sample made by samplerigs.py; no third-party content."
+ }
+}

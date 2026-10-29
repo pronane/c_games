@@ -1,0 +1,98 @@
+[
+ {
+  "scenario": "base: mannequin fighter14 (faces off, QA off)",
+  "secs": 2.3
+ },
+ {
+  "scenario": "+ expressions per move + faces.png",
+  "secs": 2.33
+ },
+ {
+  "scenario": "+ faces.png only",
+  "secs": 2.31
+ },
+ {
+  "scenario": "+ talk line (mouth shapes)",
+  "secs": 2.28
+ },
+ {
+  "scenario": "+ colour set + hoops overlay",
+  "secs": 2.62
+ },
+ {
+  "scenario": "+ variant seed 5 (as the character)",
+  "secs": 2.48
+ },
+ {
+  "scenario": "+ 8 variants sheet",
+  "secs": 2.47
+ },
+ {
+  "scenario": "+ FX passes (outline, cel, light)",
+  "secs": 3.41
+ },
+ {
+  "scenario": "+ FX pixel pass",
+  "secs": 2.16
+ },
+ {
+  "scenario": "+ normal + emissive maps",
+  "secs": 7.46
+ },
+ {
+  "scenario": "+ frame data (hit/hurt boxes)",
+  "secs": 2.78
+ },
+ {
+  "scenario": "+ foot locking (IK)",
+  "secs": 2.54
+ },
+ {
+  "scenario": "+ blend idle>walk:3",
+  "secs": 2.45
+ },
+ {
+  "scenario": "+ QA check",
+  "secs": 2.52
+ },
+ {
+  "scenario": "3D: + GLB (base for LODs / physics)",
+  "secs": 2.43
+ },
+ {
+  "scenario": "3D: + GLB + 2 LODs + baked model",
+  "secs": 2.66
+ },
+ {
+  "scenario": "3D: + GLB, cloth/hair physics off",
+  "secs": 2.39
+ },
+ {
+  "scenario": "ALL v9 options together (+ GLB, LODs, QA)",
+  "secs": 11.6
+ },
+ {
+  "scenario": "NPC preset goblin (npc_creature moves)",
+  "secs": 2.39
+ },
+ {
+  "scenario": "forge.py recolor (palette swap of a build)",
+  "secs": 8.29
+ },
+ {
+  "scenario": "forge.py variants --npc goblin -n 12",
+  "secs": 0.37
+ },
+ {
+  "scenario": "forge.py atlas (3 characters)",
+  "secs": 5.33
+ },
+ {
+  "scenario": "forge.py qa (fighter14 build)",
+  "secs": 0.45
+ },
+ {
+  "scenario": "forge.py framedata (fighter14 build)",
+  "secs": 0.69
+ }
+]

@@ -1,0 +1,278 @@
+[
+ {
+  "test": "expressions: 7 faces, auto per-move map, user map, blink",
+  "ok": true,
+  "detail": "{'idle': 'neutral', 'punch': 'angry', 'hit': 'hurt', 'taunt': 'taunt', 'victory': 'happy', 'special1': 'shout'}",
+  "secs": 0.0
+ },
+ {
+  "test": "talk: letters -> mouth shapes (M=mbp, A=ai, O=o, F=fv)",
+  "ok": true,
+  "detail": "[[\"mbp\", 1], [\"ai\", 2], [\"mbp\", 1], [\"rest\", 1], [\"o\", 2], [\"fv\", 1], [\"rest\", 1], [\"e\", 2], [\"o\", 2",
+  "secs": 0.0
+ },
+ {
+  "test": "photo expressions: procedural warp of the drawn face only (estimated)",
+  "ok": true,
+  "detail": "{'happy': 501, 'angry': 418, 'hurt': 697, 'shout': 1004, 'taunt': 266, 'blink': 277}",
+  "secs": 0.29
+ },
+ {
+  "test": "recolour: sets, region + overlay parsing",
+  "ok": true,
+  "detail": "20 sets",
+  "secs": 0.0
+ },
+ {
+  "test": "recolour: applied to the 3D spec (exact slot colours)",
+  "ok": true,
+  "detail": "top_colour=#1c3fb0",
+  "secs": 0.0
+ },
+ {
+  "test": "recolour: palette swap keeps shading, leaves other colours",
+  "ok": true,
+  "detail": "red share 1.00",
+  "secs": 0.1
+ },
+ {
+  "test": "variants: same seed = same variant, vary limits what changes",
+  "ok": true,
+  "detail": "seeded + vary=colours keeps body/outfit",
+  "secs": 0.0
+ },
+ {
+  "test": "foot lock: 2-bone IK removes planted-foot slide",
+  "ok": true,
+  "detail": "walk slide 7.26 -> 0.28 cm",
+  "secs": 0.01
+ },
+ {
+  "test": "fx: outline / cel / pixel-art / lighting passes",
+  "ok": true,
+  "detail": "outline grows, cel 2 colours, pixel blocks, light changes",
+  "secs": 0.0
+ },
+ {
+  "test": "maps: normal map faces out of the silhouette, emissive picks glow colours",
+  "ok": true,
+  "detail": "n centre [128 128 255] left [ 26 128 204] right [229 128 204]",
+  "secs": 0.0
+ },
+ {
+  "test": "blend: parse + crossfade",
+  "ok": true,
+  "detail": "[('idle', 'walk', 3), ('punch', 'idle', 3)]",
+  "secs": 0.0
+ },
+ {
+  "test": "physics: ponytail / cape / scarf chains swing",
+  "ok": true,
+  "detail": "4 chains (hair_tail,cape,scarf_R,scarf_L), tip moves 0.040",
+  "secs": 0.06
+ },
+ {
+  "test": "npc pack: 17 fictional characters",
+  "ok": true,
+  "detail": "17 characters",
+  "secs": 0.0
+ },
+ {
+  "test": "build: mannequin with every v9 option",
+  "ok": true,
+  "detail": "Done in 3.2s -> /tmp/sfs_v9test_88vzs8q0/b/hero",
+  "secs": 3.32
+ },
+ {
+  "test": "build: faces.png + per-move expressions noted",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "build: talk strip + 8 mouth shapes + timing",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "build: colours noted as exact for 3D",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "build: variants sheet + 4 variant specs",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "build: blend_idle_walk move made",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "build: footlock slide numbers reported",
+  "ok": true,
+  "detail": "['NOTE: footlock: planted-foot slide (mean) idle 0.6->0.0 cm, walk 14.0->0.0 cm, punch 6.1->0.0 cm, hit 0.1->0.0 cm, taunt 4.4->0.2 cm, victory 3.0->0.5 cm, ble",
+  "secs": 0.0
+ },
+ {
+  "test": "frame data: punch has hit boxes in its active frames, blend is not an attack",
+  "ok": true,
+  "detail": "punch startup 3 active 2 recovery 1",
+  "secs": 0.0
+ },
+ {
+  "test": "maps: maps/atlas_normal.png + atlas_emissive.png",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "LODs: fewer triangles per level, baked model has 1 material",
+  "ok": true,
+  "detail": "[6236, 3124, 1837]",
+  "secs": 0.0
+ },
+ {
+  "test": "QA: report written for the build",
+  "ok": true,
+  "detail": "",
+  "secs": 0.0
+ },
+ {
+  "test": "expressions with a beard and a moustache (facial hair follows the face)",
+  "ok": true,
+  "detail": "uin     2 frames \n  taunt                    mannequin     2 frames \n  [1.23s] faces\n  [0.02s] qa\nDone in 1.3s -> /tmp/sfs_v9test_88vzs8q0/beard/tash\n",
+  "secs": 2.89
+ },
+ {
+  "test": "regression: --footlock is part of the render cache key",
+  "ok": true,
+  "detail": "footlock changes the cached render",
+  "secs": 2.9
+ },
+ {
+  "test": "build --npc wizard",
+  "ok": true,
+  "detail": "",
+  "secs": 1.57
+ },
+ {
+  "test": "forge.py recolor <folder> --set team_red",
+  "ok": true,
+  "detail": "recoloured 68 images -> /tmp/sfs_v9test_88vzs8q0/hero_red",
+  "secs": 1.13
+ },
+ {
+  "test": "forge.py variants --npc goblin -n 6",
+  "ok": true,
+  "detail": "",
+  "secs": 0.28
+ },
+ {
+  "test": "forge.py atlas: 2 characters, one pack",
+  "ok": true,
+  "detail": "atlas pack: 2 characters, 52 frames (47 unique) -> 1 page(s) 796x790, fill 84%, 38% of the untrimmed pixels",
+  "secs": 0.49
+ },
+ {
+  "test": "atlas: rects inside pages, no overlaps, fill > 60%",
+  "ok": true,
+  "detail": "fill 0.84, 1 pages",
+  "secs": 0.0
+ },
+ {
+  "test": "forge.py qa <build folder> runs",
+  "ok": true,
+  "detail": "blend_idle_walk        PASS",
+  "secs": 0.23
+ },
+ {
+  "test": "QA: an emptied frame is flagged FAIL (exit 1)",
+  "ok": true,
+  "detail": "hit                    PASS",
+  "secs": 0.17
+ },
+ {
+  "test": "forge.py framedata <folder> (cast counts as an attack)",
+  "ok": true,
+  "detail": "",
+  "secs": 0.19
+ },
+ {
+  "test": "forge.py npc lists",
+  "ok": true,
+  "detail": "",
+  "secs": 0.09
+ },
+ {
+  "test": "forge.py sets lists",
+  "ok": true,
+  "detail": "",
+  "secs": 0.1
+ },
+ {
+  "test": "forge.py expressions lists",
+  "ok": true,
+  "detail": "",
+  "secs": 0.1
+ },
+ {
+  "test": "forge.py batch: 3-job queue, 2 workers, dependent qa job",
+  "ok": true,
+  "detail": "Sprite Forge batch queue.txt: 3 ok, 0 failed, 0 skipped in 1.8s (2 workers)",
+  "secs": 1.87
+ },
+ {
+  "test": "photo regions: shading / faded denim keep their region (not trim / socks)",
+  "ok": true,
+  "detail": "shaded top: top 0.97 trim 0.00; faded jeans: bottom 0.85 socks 0.00",
+  "secs": 0.05
+ },
+ {
+  "test": "recoloured photo: rig pieces come from the pre-recolour colours (forearm kept)",
+  "ok": true,
+  "detail": "hidden forearm px: original 2053, light-blue top with colour_ref 2053 (without: 0)",
+  "secs": 1.6
+ },
+ {
+  "test": "forge.py variants --cutout (landmarks.json dict) + photo variants keep the hair",
+  "ok": true,
+  "detail": "rc 0, photo variants never recolour hair: True",
+  "secs": 0.81
+ },
+ {
+  "test": "Studio: Style + Extras settings -> forge.py flags",
+  "ok": true,
+  "detail": "--expr-map punch=shout --no-blink --talk Hi --recolor kerry;hair=#111111 --overlay top:hoops:#ffffff --variants 6 --vari",
+  "secs": 0.0
+ },
+ {
+  "test": "Studio: defaults add no v9 flags (v8 commands unchanged)",
+  "ok": true,
+  "detail": "defaults add no flags",
+  "secs": 0.0
+ },
+ {
+  "test": "Studio: settings -> BuildConfig (in-process build)",
+  "ok": true,
+  "detail": "recolor/variant/footlock/npc",
+  "secs": 0.0
+ },
+ {
+  "test": "Godot plugin: import build -> SpriteFrames (all moves) + scene",
+  "ok": true,
+  "detail": "SFANIMS 7",
+  "secs": 5.85
+ },
+ {
+  "test": "Unity package: compiles against stub UnityEngine/UnityEditor APIs",
+  "ok": true,
+  "detail": "['    0 Warning(s)', '    0 Error(s)']",
+  "secs": 2.27
+ }
+]

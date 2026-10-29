@@ -1,0 +1,15 @@
+{
+  "name": "gaelic36",
+  "description": "Sports game: the 36 Gaelic-football moves, 3/4 view, plus team kits for the 3D model.",
+  "moves": "gaelic36",
+  "frame": [
+    256,
+    256
+  ],
+  "yaw": 65,
+  "manifests": [
+    {
+      "type": "tiled_tsx"
+    }
+  ]
+}

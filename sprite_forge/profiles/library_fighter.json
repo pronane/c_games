@@ -1,0 +1,14 @@
+{
+  "name": "library_fighter",
+  "description": "fighter14 built from a library rig (sample_lanky, Mixamo bone names) instead of the mannequin. victory and taunt come from the sample_moves animation asset, retargeted. Swap 'rig' for your own library rig.",
+  "moves": "fighter14",
+  "frame": [256, 256],
+  "rig": "sample_lanky",
+  "kit": "sample_gold_black",
+  "root_motion": "keep",
+  "clip_map": {
+    "victory": "sample_moves:spin@speed=1.2",
+    "taunt": "sample_moves:bow"
+  },
+  "manifests": []
+}

@@ -1,0 +1,7 @@
+# Optional extras (setup installs them unless --core-only; each one failing is not fatal).
+pycolmap>=0.6                   # scan --run: COLMAP SfM as a pip wheel (CPU) -> no COLMAP install
+fast-simplification>=0.1   # scan LODs: quadric decimation (small wheel). Fallback: vertex clustering
+trimesh>=4.0                    # scan --mesh: extra mesh formats (.stl/.dae/.gltf variants)
+# open3d                        # alternative quadric decimation; wheels for Python <= 3.12 only (not needed)
+# rembg[cpu]                    # AI background removal for photos (~170 MB model download). Fallback: built-in cut-out
+# av                            # PyAV: extra video decoder fallback (not needed with imageio-ffmpeg)

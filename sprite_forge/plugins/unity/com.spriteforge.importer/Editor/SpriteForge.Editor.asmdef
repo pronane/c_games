@@ -1,0 +1,1 @@
+{ "name": "SpriteForge.Editor", "rootNamespace": "SpriteForge.Editor", "references": ["SpriteForge.Runtime"], "includePlatforms": ["Editor"], "autoReferenced": true }

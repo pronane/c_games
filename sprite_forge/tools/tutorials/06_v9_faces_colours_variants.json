@@ -1,0 +1,33 @@
+{"out": "videos/06_v9_faces_colours_variants.mp4", "display": ":89", "speedup": 4,
+ "segments": [
+  {"type": "card", "secs": 5, "title": "6. v9 Style: faces, colours, variants",
+   "lines": ["Start tab > step 4 STYLE has three tabs: Faces, Colours, Variants.",
+             "Each Preview runs a real 1-move build through forge.py (a few seconds).",
+             "Shown on the fictional mannequin. On a photo character, faces and colours",
+             "are procedural edits of YOUR photo's own pixels and are labelled ESTIMATED."]},
+  {"type": "gui", "timeout": 400, "script": [
+   {"wait": 1.0, "mode": "mannequin", "set": {"name": "hero", "out": "/tmp/v9vid/out"}, "cap": "Start tab: a mannequin character (fictional, procedural)"},
+   {"wait": 1.5, "home": {"target": "Fighter, generic (14 moves, 256x256)", "step": 3, "style_tab": "faces"}, "cap": "Step 4 STYLE > Faces: Automatic gives every move a face"},
+   {"wait": 2.5, "home": {"step": 3, "style_preview": true}, "cap": "Preview: neutral, happy, angry, hurt, shout, taunt, blink + 8 mouth shapes"},
+   {"wait": 4.0, "set": {"expressions": "map"}, "home": {"step": 3, "face_row": {"punch": "shout", "victory": "taunt"}}, "cap": "Change any move: punch = shout, victory = taunt"},
+   {"wait": 3.0, "type": ["talk", "Ready to fight"], "cap": "A line of dialogue -> talk/ strip with mouth shapes from the letters"},
+   {"wait": 2.0, "home": {"step": 3, "style_tab": "colours"}, "cap": "Colours: one-click sets, per-region colours, texture overlays"},
+   {"wait": 1.5, "set": {"recolor_set": "team_red"}, "cap": "One click: Team Red"},
+   {"wait": 1.0, "home": {"step": 3, "style_preview": true}},
+   {"wait": 3.5, "set": {"recolor_set": "kerry"}, "cap": "Kerry green & gold (with its chest band)"},
+   {"wait": 1.0, "home": {"step": 3, "style_preview": true}},
+   {"wait": 3.5, "set": {"recolor_set": "team_blue", "rc_hair": "#e8d27a", "overlay_kind": "hoops", "overlay_colour": "#ffffff"}, "cap": "Team Blue + blond hair + white hoops overlay"},
+   {"wait": 1.0, "home": {"step": 3, "style_preview": true}},
+   {"wait": 3.5, "home": {"step": 3, "style_tab": "variants"}, "cap": "Variants: a crowd from one character, every one reproducible from its seed"},
+   {"wait": 1.5, "set": {"variants": "8", "variant_seed": "1"}, "home": {"step": 3, "style_preview": true}, "cap": "8 variants: body, outfit, colours, accessories"},
+   {"wait": 4.0, "set": {"variant_seed": "41"}, "cap": "Shuffle = a new first seed"},
+   {"wait": 1.0, "home": {"step": 3, "style_preview": true}},
+   {"wait": 4.0, "home": {"step": 4, "goal": "extras"}, "cap": "What to make > Extras: frame data, foot lock, QA, physics, fx, maps, blend, LODs"},
+   {"wait": 3.0, "home": {"step": 5}, "cap": "Build: the same settings as a forge.py command you can copy"},
+   {"wait": 3.5, "quit": true}
+  ]},
+  {"type": "card", "secs": 4, "title": "Same thing from the command line",
+   "lines": ["forge.py build --mannequin --expr-map punch=shout --talk \"Ready to fight\"",
+             "   --recolor \"team_blue;hair=#e8d27a\" --overlay top:hoops:#ffffff --variants 8",
+             "forge.py recolor out/hero --set kerry        forge.py variants --npc goblin -n 12"]}
+ ]}

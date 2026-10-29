@@ -1,0 +1,122 @@
+[
+ {
+  "test": "turn_args parses 0/90/180/270",
+  "ok": true,
+  "detail": "",
+  "secs": null
+ },
+ {
+  "test": "GUI turn dropdown -> degrees (+ fine angle override)",
+  "ok": true,
+  "detail": "",
+  "secs": null
+ },
+ {
+  "test": "icons: 17 drawn, all non-empty RGBA",
+  "ok": true,
+  "detail": "",
+  "secs": null
+ },
+ {
+  "test": "wizard command: 3D tab -> --no-fbx --anim-export, retro tab -> --console snes",
+  "ok": true,
+  "detail": "",
+  "secs": null
+ },
+ {
+  "test": "wizard command: photo source -> no 3D / console flags",
+  "ok": true,
+  "detail": "",
+  "secs": null
+ },
+ {
+  "test": "forge.py cutout: transparent RGBA cut-out, clear border, sprite + HD sprite + landmarks",
+  "ok": true,
+  "detail": "QA verdict FAIL (see cutout_report.txt)",
+  "secs": 1.69
+ },
+ {
+  "test": "forge.py export-ef: sprites.cfg + one strip per move for all 14 fighter moves",
+  "ok": true,
+  "detail": "missing: none",
+  "secs": 0.55
+ },
+ {
+  "test": "forge.py turn --yaw 0",
+  "ok": true,
+  "detail": "turn: 0 deg (template) in 1.3s -> /tmp/sfs_v8test_4t48p_14/turn",
+  "secs": 1.68
+ },
+ {
+  "test": "forge.py turn --yaw 90",
+  "ok": true,
+  "detail": "turn: 90 deg (template) in 1.3s -> /tmp/sfs_v8test_4t48p_14/turn",
+  "secs": 1.67
+ },
+ {
+  "test": "forge.py turn --yaw 180",
+  "ok": true,
+  "detail": "turn: 180 deg (template) in 1.3s -> /tmp/sfs_v8test_4t48p_14/turn",
+  "secs": 1.71
+ },
+ {
+  "test": "forge.py turn --yaw 270",
+  "ok": true,
+  "detail": "turn: 270 deg (template) in 1.3s -> /tmp/sfs_v8test_4t48p_14/turn",
+  "secs": 1.73
+ },
+ {
+  "test": "forge.py turn --yaw 60",
+  "ok": true,
+  "detail": "turn: 60 deg (template) in 1.3s -> /tmp/sfs_v8test_4t48p_14/turn",
+  "secs": 1.71
+ },
+ {
+  "test": "build --turn 90 final (thread pool)",
+  "ok": true,
+  "detail": "",
+  "secs": 5.75
+ },
+ {
+  "test": "build --turn 90 final, SFS_THREADS=1 (serial)",
+  "ok": true,
+  "detail": "",
+  "secs": 10.49
+ },
+ {
+  "test": "thread pool output == serial output (atlas.png)",
+  "ok": true,
+  "detail": "speed-up x1.8",
+  "secs": null
+ },
+ {
+  "test": "rebuild unchanged (cache)",
+  "ok": true,
+  "detail": "",
+  "secs": 0.79
+ },
+ {
+  "test": "build --turn 90 --quality draft (Quick preview)",
+  "ok": true,
+  "detail": "x2.7 faster than final",
+  "secs": 2.17
+ },
+ {
+  "test": "build report labels turned moves honestly",
+  "ok": true,
+  "detail": "",
+  "secs": null
+ },
+ {
+  "test": "Start-tab wizard: photo -> turn 90 -> EF target -> Quick preview build",
+  "ok": true,
+  "detail": "",
+  "secs": 3.93
+ },
+ {
+  "test": "wizard's 'Same as typing' command == wizard build",
+  "ok": true,
+  "detail": "",
+  "secs": 2.1
+ }
+]
