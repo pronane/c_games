@@ -1,0 +1,36 @@
+{"out": "videos/04_video_to_game.mp4", "display": ":88", "speedup": 6,
+ "segments": [
+  {"type": "card", "secs": 6, "title": "4. Video -> sprites, mocap and 3D",
+   "lines": ["Use YOUR OWN clips (one per move): walk, run, jump, punch ...",
+             "Video -> sprites cuts the person out of the footage and loops / times each move.",
+             "Video -> mocap drives the 3D mannequin with the tracked motion (GLB/FBX).",
+             "Orbit video -> 3D mesh is a guided photogrammetry route with console LODs.",
+             "",
+             "The clips in this video are rendered test clips of the mannequin (no real people)."]},
+  {"type": "images", "items": [
+     ["/tmp/vid4/walk_static.png", "Clip 1: walking, camera on a tripod", 4],
+     ["/tmp/vid4/run_tracking.png", "Clip 2: running 'in frame' - the camera follows the runner, the background slides past", 5]]},
+  {"type": "gui", "timeout": 400, "script": [
+   {"wait": 1.0, "mode": "video", "cap": "Choose 'Video -> sprites': only the video fields are shown"},
+   {"wait": 2.5, "type": ["clips", "walk:8=/workspace/v4_clips/walk_static.mp4; run:8=/workspace/v4_clips/run_tracking.mp4"],
+    "cap": "One clip per move:  move:frames=file  ('Add clip...' picks the file for you)"},
+   {"wait": 2.0, "set": {"name": "vidhero", "out": "/tmp/vid4_out"}, "cap": "Camera and background on 'auto': static / handheld / tracking and median / plate / green screen are detected"},
+   {"wait": 3.0, "set": {"console": "SNES / Super Famicom"}, "cap": "Optional console target: here SNES as well as the HD sprites"},
+   {"wait": 2.5, "point": "build_btn", "cap": "BUILD"},
+   {"wait": 0.8, "build": true, "cap": "Cut-out, loop detection (one exact walk / run cycle), scaling to one ground line, SNES export"},
+   {"wait": 5.0, "cap": "Done: the contact sheet shows the walk and run cycles cut out of the footage"},
+   {"wait": 2.0, "help": "video", "cap": "Help > Video to sprites explains every step, filming tips and limits"},
+   {"wait": 5.0, "cap": ""}
+  ]},
+  {"type": "images", "items": [
+     ["previews_v4/video_debug_run.png", "Debug sheet for the tracking shot: frames, background panorama and the cut-out", 7],
+     ["previews_v4/video_contact_sheet.png", "All four test moves: walk, run, jump (handheld + empty plate), punch (green screen)", 6],
+     ["previews_v4/mocap_check_walk.png", "Video -> mocap: tracked body points (top) and the fitted mannequin (bottom)", 7],
+     ["previews_v4/mocap_fbx_reimport.png", "The mocap moves in model.fbx, re-imported in Blender", 6],
+     ["previews_v4/scan_orbit_mesh_lods.png", "Orbit video -> 3D mesh: CPU reconstruction and console LODs (PS2 5000 / PS1 600 tris)", 7]]},
+  {"type": "card", "secs": 8, "title": "Limits (honest)",
+   "lines": ["Sprites are cut-outs of the real footage: hair, loose clothes, busy floors give rough edges.",
+             "Mocap: body only (no fingers / face); fast runs come out ~15-25 degrees less bent.",
+             "3D scan: the object must stay still; shiny / plain surfaces fail; not one-click.",
+             "For hero-quality textured models use Meshroom / RealityScan, then import the mesh here."]}
+ ]}

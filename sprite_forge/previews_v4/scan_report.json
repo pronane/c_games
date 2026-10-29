@@ -1,0 +1,243 @@
+{
+ "name": "orbittest",
+ "tool": "forge.py scan",
+ "not_one_click": true,
+ "extract": {
+  "decoded": 72,
+  "fps": 24.0,
+  "picked": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49,
+   50,
+   51,
+   52,
+   53,
+   54,
+   55,
+   56,
+   57,
+   58,
+   59,
+   60,
+   61,
+   62,
+   63,
+   64,
+   65,
+   66,
+   67,
+   68,
+   69,
+   70,
+   71
+  ],
+  "size": [
+   640,
+   480
+  ],
+  "blurry_picks": 0,
+  "sharpness_median": 44.41340255737305,
+  "s": 0.8
+ },
+ "colmap": {
+  "s": {
+   "features": 2.6,
+   "matching": 11.5,
+   "mapper": 10.7
+  },
+  "registered": 72,
+  "images": 72,
+  "points": 8665,
+  "mean_reproj_px": 0.47650984350956965
+ },
+ "dense": {
+  "views": 72,
+  "neighbour_step": 2,
+  "voxel": 0.016360788272138434,
+  "grid": [
+   82,
+   145,
+   77
+  ],
+  "fuse_s": 10.3,
+  "depth_coverage_mean": 0.065,
+  "tris_raw": 35512,
+  "height_sfm_units": 2.077319812542599,
+  "orbit_radius_sfm": 3.7531431370400465,
+  "floor_inliers": 5115,
+  "object_sparse_points": 1838,
+  "s": 11.4
+ },
+ "lods": {
+  "ps5": {
+   "budget": 100000,
+   "tris": 35512,
+   "verts": 17730,
+   "method": "none",
+   "s": 0.1,
+   "files": [
+    "orbittest_ps5.glb",
+    "orbittest_ps5.obj"
+   ]
+  },
+  "pc_hd": {
+   "budget": 100000,
+   "tris": 35512,
+   "verts": 17730,
+   "method": "none",
+   "s": 0.1,
+   "files": [
+    "orbittest_pc_hd.glb",
+    "orbittest_pc_hd.obj"
+   ]
+  },
+  "switch_ps4": {
+   "budget": 40000,
+   "tris": 35512,
+   "verts": 17730,
+   "method": "none",
+   "s": 0.1,
+   "files": [
+    "orbittest_switch_ps4.glb",
+    "orbittest_switch_ps4.obj"
+   ]
+  },
+  "wii360ps3": {
+   "budget": 15000,
+   "tris": 15000,
+   "verts": 7474,
+   "method": "blender-collapse",
+   "s": 0.49,
+   "files": [
+    "orbittest_wii360ps3.glb",
+    "orbittest_wii360ps3.obj"
+   ]
+  },
+  "ps2gc": {
+   "budget": 5000,
+   "tris": 5000,
+   "verts": 2474,
+   "method": "blender-collapse",
+   "s": 0.46,
+   "files": [
+    "orbittest_ps2gc.glb",
+    "orbittest_ps2gc.obj"
+   ]
+  },
+  "dreamcast": {
+   "budget": 3000,
+   "tris": 2998,
+   "verts": 1473,
+   "method": "blender-collapse",
+   "s": 0.46,
+   "files": [
+    "orbittest_dreamcast.glb",
+    "orbittest_dreamcast.obj"
+   ]
+  },
+  "psp": {
+   "budget": 3000,
+   "tris": 2998,
+   "verts": 1473,
+   "method": "blender-collapse",
+   "s": 0.46,
+   "files": [
+    "orbittest_psp.glb",
+    "orbittest_psp.obj"
+   ]
+  },
+  "saturn": {
+   "budget": 1000,
+   "tris": 1000,
+   "verts": 474,
+   "method": "blender-collapse",
+   "s": 0.46,
+   "files": [
+    "orbittest_saturn.glb",
+    "orbittest_saturn.obj"
+   ]
+  },
+  "n64": {
+   "budget": 900,
+   "tris": 900,
+   "verts": 424,
+   "method": "blender-collapse",
+   "s": 0.44,
+   "files": [
+    "orbittest_n64.glb",
+    "orbittest_n64.obj"
+   ]
+  },
+  "ds": {
+   "budget": 600,
+   "tris": 600,
+   "verts": 274,
+   "method": "blender-collapse",
+   "s": 0.47,
+   "files": [
+    "orbittest_ds.glb",
+    "orbittest_ds.obj"
+   ]
+  },
+  "ps1": {
+   "budget": 600,
+   "tris": 600,
+   "verts": 274,
+   "method": "blender-collapse",
+   "s": 0.48,
+   "files": [
+    "orbittest_ps1.glb",
+    "orbittest_ps1.obj"
+   ]
+  }
+ },
+ "total_s": 42.2
+}

@@ -1,0 +1,148 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_chibi",
+ "bones": [
+  "Hips",
+  "Spine",
+  "Chest",
+  "UpperChest",
+  "Neck",
+  "Head",
+  "LeftShoulder",
+  "LeftUpperArm",
+  "LeftLowerArm",
+  "LeftHand",
+  "LeftUpperLeg",
+  "LeftLowerLeg",
+  "LeftFoot",
+  "LeftToes",
+  "RightShoulder",
+  "RightUpperArm",
+  "RightLowerArm",
+  "RightHand",
+  "RightUpperLeg",
+  "RightLowerLeg",
+  "RightFoot",
+  "RightToes"
+ ],
+ "materials": [
+  {
+   "name": "skin",
+   "color": [
+    0.62,
+    0.78,
+    0.92
+   ]
+  },
+  {
+   "name": "shirt",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "texture": "textures/shirt.png"
+  },
+  {
+   "name": "shorts",
+   "color": [
+    0.2,
+    0.25,
+    0.6
+   ]
+  },
+  {
+   "name": "socks",
+   "color": [
+    0.95,
+    0.95,
+    0.95
+   ]
+  },
+  {
+   "name": "boots",
+   "color": [
+    0.08,
+    0.08,
+    0.09
+   ]
+  },
+  {
+   "name": "hair",
+   "color": [
+    0.85,
+    0.2,
+    0.45
+   ]
+  },
+  {
+   "name": "eye",
+   "color": [
+    0.05,
+    0.05,
+    0.07
+   ]
+  }
+ ],
+ "clips": [
+  {
+   "name": "idle",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'idle' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "walk",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'walk' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "run",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'run' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "jump",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'jump' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "kick",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'kick' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "punch",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'punch' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "celebrate",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'celebrate' (built-in, retargeted from the mannequin)"
+  }
+ ],
+ "meta": {
+  "source": "procedurally generated sample (sforge.samplerigs) - synthetic, CC0",
+  "description": "1.10 m chibi: big head, short legs, T-pose, Unity humanoid bone names",
+  "hips_index": 0,
+  "generator": "samplerigs sample_chibi"
+ },
+ "height_m": 1.1184,
+ "verts": 776,
+ "tris": 1440
+}

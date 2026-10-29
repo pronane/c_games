@@ -1,0 +1,17 @@
+{
+  "name": "retro_gba",
+  "description": "Game Boy Advance-style sprites: platformer moves at 64x64 with the Game Boy Advance console export (palette, tiles, C header) in console/.",
+  "moves": "platformer10",
+  "frame": [
+    64,
+    64
+  ],
+  "yaw": 90,
+  "console": "gba",
+  "outline": true,
+  "manifests": [
+    {
+      "type": "tiled_tsx"
+    }
+  ]
+}

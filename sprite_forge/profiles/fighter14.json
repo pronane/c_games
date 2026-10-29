@@ -1,0 +1,10 @@
+{
+  "name": "fighter14",
+  "description": "2D fighting game: 14 moves, side-on (facing right), game mirrors for player 2. Writes the standard Sprite Forge files that the Egyptian Fighter loader reads.",
+  "moves": "fighter14",
+  "frame": [
+    256,
+    256
+  ],
+  "manifests": []
+}

@@ -1,0 +1,79 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_moves",
+ "bones": [
+  "mixamorig:Hips",
+  "mixamorig:Spine",
+  "mixamorig:Spine1",
+  "mixamorig:Spine2",
+  "mixamorig:Neck",
+  "mixamorig:Head",
+  "mixamorig:LeftShoulder",
+  "mixamorig:LeftArm",
+  "mixamorig:LeftForeArm",
+  "mixamorig:LeftHand",
+  "mixamorig:LeftUpLeg",
+  "mixamorig:LeftLeg",
+  "mixamorig:LeftFoot",
+  "mixamorig:LeftToeBase",
+  "mixamorig:RightShoulder",
+  "mixamorig:RightArm",
+  "mixamorig:RightForeArm",
+  "mixamorig:RightHand",
+  "mixamorig:RightUpLeg",
+  "mixamorig:RightLeg",
+  "mixamorig:RightFoot",
+  "mixamorig:RightToeBase",
+  "mixamorig:HeadTop_End",
+  "mixamorig:LeftToe_End",
+  "mixamorig:RightToe_End"
+ ],
+ "materials": [],
+ "clips": [
+  {
+   "name": "wave",
+   "fps": 30.0,
+   "frames": 49,
+   "loop": true,
+   "source": "new procedural clip 'wave' (samplerigs.new_motions)"
+  },
+  {
+   "name": "squat",
+   "fps": 30.0,
+   "frames": 37,
+   "loop": false,
+   "source": "new procedural clip 'squat' (samplerigs.new_motions)"
+  },
+  {
+   "name": "hop",
+   "fps": 30.0,
+   "frames": 37,
+   "loop": false,
+   "source": "new procedural clip 'hop' (samplerigs.new_motions)"
+  },
+  {
+   "name": "bow",
+   "fps": 30.0,
+   "frames": 37,
+   "loop": false,
+   "source": "new procedural clip 'bow' (samplerigs.new_motions)"
+  },
+  {
+   "name": "spin",
+   "fps": 30.0,
+   "frames": 49,
+   "loop": true,
+   "source": "new procedural clip 'spin' (samplerigs.new_motions)"
+  }
+ ],
+ "meta": {
+  "source": "procedurally generated sample (sforge.samplerigs) - synthetic, CC0",
+  "description": "animation-only: 1.75 m Mixamo-named skeleton with wave / squat / hop / bow / spin",
+  "hips_index": 0,
+  "generator": "samplerigs sample_moves"
+ },
+ "height_m": 1.8617,
+ "verts": 0,
+ "tris": 0
+}

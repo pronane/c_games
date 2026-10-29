@@ -1,0 +1,30 @@
+{
+ "convention": "unity",
+ "map": {
+  "hips": "Hips",
+  "spine": "Spine",
+  "chest": "Chest",
+  "upperchest": "UpperChest",
+  "neck": "Neck",
+  "head": "Head",
+  "shoulder_L": "LeftShoulder",
+  "upperarm_L": "LeftUpperArm",
+  "forearm_L": "LeftLowerArm",
+  "hand_L": "LeftHand",
+  "thigh_L": "LeftUpperLeg",
+  "shin_L": "LeftLowerLeg",
+  "foot_L": "LeftFoot",
+  "toe_L": "LeftToes",
+  "shoulder_R": "RightShoulder",
+  "upperarm_R": "RightUpperArm",
+  "forearm_R": "RightLowerArm",
+  "hand_R": "RightHand",
+  "thigh_R": "RightUpperLeg",
+  "shin_R": "RightLowerLeg",
+  "foot_R": "RightFoot",
+  "toe_R": "RightToes"
+ },
+ "unmapped": [],
+ "missing": [],
+ "edited": false
+}

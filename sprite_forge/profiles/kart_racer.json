@@ -1,0 +1,96 @@
+{
+  "name": "kart_racer",
+  "description": "Kart racer that draws its own kart (e.g. TurboTumble64): 8 camera angles of the seated driver, head to lap, as sprite.png (4x2 grid of 512x640, order 0,45,...,315), win.png, portrait.png and a key=value character.ini. Drop the output folder into the game's characters folder.",
+  "game_hint": "TurboTumble64: copy out/<name>/ to assets/characters/<name>/",
+  "moves": "kart12",
+  "frame": [
+    512,
+    640
+  ],
+  "figure_h": 0.97,
+  "ground_y": 636,
+  "prop": "none",
+  "views": "billboard8",
+  "view_cut": 0.55,
+  "view_moves": [
+    "idle"
+  ],
+  "gifs": false,
+  "glb": true,
+  "vars": {
+    "tagline": "A brand-new racer.",
+    "weight": "medium",
+    "speed": "3.0",
+    "accel": "3.5",
+    "handling": "3.5",
+    "mass": "2.5",
+    "kart": "60,130,220",
+    "trim": "250,250,250",
+    "voice": "1.00",
+    "size": "1.40",
+    "seat": "0.00",
+    "quip": "Here I go!",
+    "quipstyle": "happy"
+  },
+  "images": [
+    {
+      "type": "grid",
+      "file": "sprite.png",
+      "views": "billboard8",
+      "cols": 4,
+      "move": "idle",
+      "frame": 0
+    },
+    {
+      "type": "frame",
+      "file": "win.png",
+      "view": "front",
+      "move": [
+        "victory",
+        "idle"
+      ],
+      "frame": "key"
+    },
+    {
+      "type": "portrait",
+      "file": "portrait.png",
+      "view": "front",
+      "size": 256
+    }
+  ],
+  "manifests": [
+    {
+      "type": "ini",
+      "file": "character.ini",
+      "header": "; {display_name} - made by Sprite Forge Studio {version} (profile kart_racer) {date}\n; views: {views_csv}",
+      "keys": {
+        "name": "{display_name}",
+        "tagline": "{tagline}",
+        "weight": "{weight}",
+        "speed": "{speed}",
+        "accel": "{accel}",
+        "handling": "{handling}",
+        "mass": "{mass}",
+        "kart": "{kart}",
+        "trim": "{trim}",
+        "voice": "{voice}",
+        "sprite": "sprite.png",
+        "angles": "8",
+        "rows": "2",
+        "size": "{size}",
+        "seat": "{seat}",
+        "portrait": "portrait.png",
+        "winsprite": "win.png",
+        "face": "{face_x},{face_y}",
+        "quip": "{quip}",
+        "quipstyle": "{quipstyle}",
+        "frame_w": "{frame_w}",
+        "frame_h": "{frame_h}",
+        "ground_y": "{ground_y}",
+        "scale": "{scale}"
+      },
+      "per_view_section": "views",
+      "per_view_value": "{angle},{image},{source}"
+    }
+  ]
+}

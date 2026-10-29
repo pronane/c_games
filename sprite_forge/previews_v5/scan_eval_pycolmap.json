@@ -1,0 +1,33 @@
+{
+ "orbit_demo_raw.ply": {
+  "tris": 35406,
+  "scan_to_truth_mean_cm": 1.3099427655931017,
+  "scan_to_truth_p90_cm": 3.137175795015258,
+  "truth_to_scan_mean_cm": 1.1631355633026874,
+  "truth_to_scan_p90_cm": 2.3082283970753332,
+  "scale_fix": 1.000644807932014,
+  "within_2cm_pct": 83.45
+ },
+ "orbit_demo_ps2gc.obj": {
+  "tris": 4998,
+  "scan_to_truth_mean_cm": 1.2803456819275287,
+  "scan_to_truth_p90_cm": 2.998611965155927,
+  "truth_to_scan_mean_cm": 1.1638008110208515,
+  "truth_to_scan_p90_cm": 2.334473801773288,
+  "scale_fix": 0.998674632278762,
+  "within_2cm_pct": 84.24666666666667
+ },
+ "orbit_demo_ps1.obj": {
+  "tris": 600,
+  "scan_to_truth_mean_cm": 1.2971855440669553,
+  "scan_to_truth_p90_cm": 2.900958315237087,
+  "truth_to_scan_mean_cm": 1.261574509952855,
+  "truth_to_scan_p90_cm": 2.4806617408264935,
+  "scale_fix": 1.0033730236873404,
+  "within_2cm_pct": 84.17666666666666
+ },
+ "cameras": {
+  "mean_mm": 5.464819726938757,
+  "max_mm": 9.953355538322887
+ }
+}

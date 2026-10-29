@@ -1,0 +1,8 @@
+# Sprite Forge Studio - core (installed by setup.bat / setup.sh into .venv).  All are pip wheels for
+# Windows 10/11 x64, Linux x86_64/aarch64 and macOS; nothing needs a compiler or a system install.
+Pillow>=9.0
+numpy>=1.21
+scipy>=1.7                      # mocap skeleton fit, cut-out clean-up, scan mesh clean-up
+opencv-python-headless>=4.8     # video cut-out speed, slow motion, scan stereo (bundles its own FFmpeg for decoding)
+scikit-image>=0.20              # scan: marching cubes
+imageio-ffmpeg>=0.4.9           # ships a static ffmpeg executable inside the wheel -> no ffmpeg install

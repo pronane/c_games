@@ -1,0 +1,70 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_vest",
+ "bones": [
+  "DEF-spine",
+  "DEF-spine.001",
+  "DEF-thigh.L",
+  "DEF-thigh.R",
+  "DEF-spine.002",
+  "DEF-thigh.L.001",
+  "DEF-thigh.R.001",
+  "DEF-spine.003",
+  "DEF-shin.L",
+  "DEF-shin.R",
+  "DEF-spine.004",
+  "DEF-shoulder.L",
+  "DEF-foot.L",
+  "DEF-shoulder.R",
+  "DEF-foot.R",
+  "DEF-spine.005",
+  "DEF-upper_arm.L",
+  "DEF-toe.L",
+  "DEF-upper_arm.R",
+  "DEF-toe.R",
+  "DEF-spine.006",
+  "DEF-upper_arm.L.001",
+  "DEF-upper_arm.R.001",
+  "DEF-forearm.L",
+  "DEF-forearm.R",
+  "DEF-hand.L",
+  "DEF-hand.R"
+ ],
+ "materials": [
+  {
+   "name": "sample_vest",
+   "color": [
+    0.45,
+    0.47,
+    0.52
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sample_vest_mesh",
+    "f0": 0,
+    "f1": 360
+   }
+  ],
+  "source_file": "sample_vest.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "outfit": {
+   "hide": [
+    "torso"
+   ],
+   "slot": "Armour"
+  }
+ },
+ "height_m": 0.4995,
+ "verts": 190,
+ "tris": 360
+}

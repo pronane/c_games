@@ -1,0 +1,2 @@
+meshes=1 armatures=1 bones=19 actions=2 height=1.79 m
+actions: jump, walk

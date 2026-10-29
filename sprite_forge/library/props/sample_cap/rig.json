@@ -1,0 +1,61 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_cap",
+ "bones": [
+  "prop"
+ ],
+ "materials": [
+  {
+   "name": "Crown",
+   "color": [
+    0.12,
+    0.2,
+    0.55
+   ]
+  },
+  {
+   "name": "Brim",
+   "color": [
+    0.12,
+    0.2,
+    0.55
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sample_cap_mesh",
+    "f0": 0,
+    "f1": 60
+   }
+  ],
+  "source_file": "sample_cap.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "prop": {
+   "socket": "head",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": 1.0,
+   "fit": "head"
+  }
+ },
+ "height_m": 0.08,
+ "verts": 32,
+ "tris": 60
+}

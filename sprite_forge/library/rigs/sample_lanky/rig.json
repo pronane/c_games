@@ -1,0 +1,151 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_lanky",
+ "bones": [
+  "mixamorig:Hips",
+  "mixamorig:Spine",
+  "mixamorig:Spine1",
+  "mixamorig:Spine2",
+  "mixamorig:Neck",
+  "mixamorig:Head",
+  "mixamorig:LeftShoulder",
+  "mixamorig:LeftArm",
+  "mixamorig:LeftForeArm",
+  "mixamorig:LeftHand",
+  "mixamorig:LeftUpLeg",
+  "mixamorig:LeftLeg",
+  "mixamorig:LeftFoot",
+  "mixamorig:LeftToeBase",
+  "mixamorig:RightShoulder",
+  "mixamorig:RightArm",
+  "mixamorig:RightForeArm",
+  "mixamorig:RightHand",
+  "mixamorig:RightUpLeg",
+  "mixamorig:RightLeg",
+  "mixamorig:RightFoot",
+  "mixamorig:RightToeBase",
+  "mixamorig:HeadTop_End",
+  "mixamorig:LeftToe_End",
+  "mixamorig:RightToe_End"
+ ],
+ "materials": [
+  {
+   "name": "skin",
+   "color": [
+    0.72,
+    0.72,
+    0.76
+   ]
+  },
+  {
+   "name": "shirt",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "texture": "textures/shirt.png"
+  },
+  {
+   "name": "shorts",
+   "color": [
+    0.12,
+    0.12,
+    0.14
+   ]
+  },
+  {
+   "name": "socks",
+   "color": [
+    0.15,
+    0.55,
+    0.55
+   ]
+  },
+  {
+   "name": "boots",
+   "color": [
+    0.08,
+    0.08,
+    0.09
+   ]
+  },
+  {
+   "name": "hair",
+   "color": [
+    0.1,
+    0.1,
+    0.1
+   ]
+  },
+  {
+   "name": "eye",
+   "color": [
+    0.05,
+    0.05,
+    0.07
+   ]
+  }
+ ],
+ "clips": [
+  {
+   "name": "idle",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'idle' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "walk",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'walk' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "run",
+   "fps": 30.0,
+   "frames": 31,
+   "loop": true,
+   "source": "procedural motion 'run' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "jump",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'jump' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "kick",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'kick' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "punch",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'punch' (built-in, retargeted from the mannequin)"
+  },
+  {
+   "name": "celebrate",
+   "fps": 30.0,
+   "frames": 25,
+   "loop": false,
+   "source": "procedural motion 'celebrate' (built-in, retargeted from the mannequin)"
+  }
+ ],
+ "meta": {
+  "source": "procedurally generated sample (sforge.samplerigs) - synthetic, CC0",
+  "description": "2.00 m lanky: long limbs, A-pose, Mixamo bone names, bones oriented along Y",
+  "hips_index": 0,
+  "generator": "samplerigs sample_lanky"
+ },
+ "height_m": 2.0053,
+ "verts": 776,
+ "tris": 1440
+}

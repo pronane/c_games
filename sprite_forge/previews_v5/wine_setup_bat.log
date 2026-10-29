@@ -1,0 +1,132 @@
+== Python in .venv:
+3.12.7 (tags/v3.12.7:0b05ead, Oct  1 2024, 03:06:41) [MSC v.1941 64 bit (AMD64)]
+== installing core packages - requirements-core.txt
+Requirement already satisfied: Pillow>=9.0 in .\.venv\Lib\site-packages (from -r requirements-core.txt (line 3)) (13.0.0)
+Requirement already satisfied: numpy>=1.21 in .\.venv\Lib\site-packages (from -r requirements-core.txt (line 4)) (2.5.4)
+Requirement already satisfied: scipy>=1.7 in .\.venv\Lib\site-packages (from -r requirements-core.txt (line 5)) (1.18.1)
+Requirement already satisfied: opencv-python-headless>=4.8 in .\.venv\Lib\site-packages (from -r requirements-core.txt (line 6)) (5.0.0.93)
+Requirement already satisfied: scikit-image>=0.20 in .\.venv\Lib\site-packages (from -r requirements-core.txt (line 7)) (0.26.0)
+Requirement already satisfied: imageio-ffmpeg>=0.4.9 in .\.venv\Lib\site-packages (from -r requirements-core.txt (line 8)) (0.6.0)
+Requirement already satisfied: networkx>=3.0 in .\.venv\Lib\site-packages (from scikit-image>=0.20->-r requirements-core.txt (line 7)) (3.7)
+Requirement already satisfied: imageio!=2.35.0,>=2.33 in .\.venv\Lib\site-packages (from scikit-image>=0.20->-r requirements-core.txt (line 7)) (2.38.1)
+Requirement already satisfied: tifffile>=2022.8.12 in .\.venv\Lib\site-packages (from scikit-image>=0.20->-r requirements-core.txt (line 7)) (2026.10.15)
+Requirement already satisfied: packaging>=21 in .\.venv\Lib\site-packages (from scikit-image>=0.20->-r requirements-core.txt (line 7)) (26.3)
+Requirement already satisfied: lazy-loader>=0.4 in .\.venv\Lib\site-packages (from scikit-image>=0.20->-r requirements-core.txt (line 7)) (0.6)
+== installing extras - requirements-extras.txt - optional, failures are not fatal
+Collecting pycolmap>=0.6 (from -r requirements-extras.txt (line 2))
+  Downloading pycolmap-4.2.1-cp312-cp312-win_amd64.whl.metadata (11 kB)
+Collecting fast-simplification>=0.1 (from -r requirements-extras.txt (line 3))
+  Downloading fast_simplification-0.2.0-cp312-cp312-win_amd64.whl.metadata (9.8 kB)
+Collecting trimesh>=4.0 (from -r requirements-extras.txt (line 4))
+  Downloading trimesh-5.2.0-py3-none-any.whl.metadata (13 kB)
+Requirement already satisfied: numpy in .\.venv\Lib\site-packages (from pycolmap>=0.6->-r requirements-extras.txt (line 2)) (2.5.4)
+Downloading pycolmap-4.2.1-cp312-cp312-win_amd64.whl (24.0 MB)
+   ---------------------------------------- 24.0/24.0 MB 114.5 MB/s  0:00:00
+
+Downloading fast_simplification-0.2.0-cp312-cp312-win_amd64.whl (343 kB)
+Downloading trimesh-5.2.0-py3-none-any.whl (751 kB)
+   ---------------------------------------- 751.5/751.5 kB 54.4 MB/s  0:00:00
+
+Installing collected packages: trimesh, pycolmap, fast-simplification
+
+
+Successfully installed fast-simplification-0.2.0 pycolmap-4.2.1 trimesh-5.2.0
+== mocap: venv_pose with Python 3.12 + mediapipe + pose model - tools\setup_pose.py
+[setup_pose] base Python for mocap: Z:\workspace\wintest\sprite_forge_studio\.venv\Scripts\python.exe (3.12)
+Collecting mediapipe>=0.10.9 (from -r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading mediapipe-1.1.1-py3-none-win_amd64.whl.metadata (10 kB)
+Collecting numpy (from -r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 4))
+  Using cached numpy-2.5.4-cp312-cp312-win_amd64.whl.metadata (6.6 kB)
+Collecting opencv-python-headless (from -r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 5))
+  Using cached opencv_python_headless-5.0.0.93-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting imageio-ffmpeg (from -r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 6))
+  Using cached imageio_ffmpeg-0.6.0-py3-none-win_amd64.whl.metadata (1.5 kB)
+Collecting absl-py~=2.3 (from mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading absl_py-2.5.1-py3-none-any.whl.metadata (3.3 kB)
+Collecting certifi (from mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting sounddevice~=0.5 (from mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading sounddevice-0.5.6-py3-none-win_amd64.whl.metadata (1.4 kB)
+Collecting flatbuffers~=25.9 (from mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading flatbuffers-25.12.19-py2.py3-none-any.whl.metadata (1.0 kB)
+Collecting opencv-contrib-python (from mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading opencv_contrib_python-5.0.0.93-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting matplotlib (from mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading matplotlib-3.11.2-cp312-cp312-win_amd64.whl.metadata (80 kB)
+Collecting cffi (from sounddevice~=0.5->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading cffi-2.1.1-cp312-cp312-win_amd64.whl.metadata (2.6 kB)
+Collecting contourpy>=1.0.1 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading contourpy-1.4.0-cp312-cp312-win_amd64.whl.metadata (3.8 kB)
+Collecting cycler>=0.10 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.28.2 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading fonttools-4.67.0-cp312-cp312-win_amd64.whl.metadata (139 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading kiwisolver-1.5.1-cp312-cp312-win_amd64.whl.metadata (5.2 kB)
+Collecting packaging>=20.0 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Using cached packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pillow>=9 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Using cached pillow-13.0.0-cp312-cp312-win_amd64.whl.metadata (9.3 kB)
+Collecting pyparsing>=3 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading pyparsing-3.3.3-py3-none-any.whl.metadata (5.9 kB)
+Collecting python-dateutil>=2.7 (from matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading python_dateutil-3.0.0-py2.py3-none-any.whl.metadata (8.2 kB)
+Collecting six>=1.6 (from python-dateutil>=2.7->matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting tzdata (from python-dateutil>=2.7->matplotlib->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading tzdata-2026.5-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting pycparser (from cffi->sounddevice~=0.5->mediapipe>=0.10.9->-r Z:\workspace\wintest\sprite_forge_studio\requirements-pose.txt (line 3))
+  Downloading pycparser-3.12-py3-none-any.whl.metadata (9.7 kB)
+Downloading mediapipe-1.1.1-py3-none-win_amd64.whl (22.8 MB)
+   ---------------------------------------- 22.8/22.8 MB 143.3 MB/s eta 0:00:00
+
+Using cached numpy-2.5.4-cp312-cp312-win_amd64.whl (12.6 MB)
+Using cached opencv_python_headless-5.0.0.93-cp37-abi3-win_amd64.whl (43.8 MB)
+Using cached imageio_ffmpeg-0.6.0-py3-none-win_amd64.whl (31.2 MB)
+Downloading absl_py-2.5.1-py3-none-any.whl (137 kB)
+Downloading flatbuffers-25.12.19-py2.py3-none-any.whl (26 kB)
+Downloading sounddevice-0.5.6-py3-none-win_amd64.whl (1.0 MB)
+   ---------------------------------------- 1.0/1.0 MB 93.4 MB/s eta 0:00:00
+
+Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+Downloading matplotlib-3.11.2-cp312-cp312-win_amd64.whl (9.3 MB)
+   ---------------------------------------- 9.3/9.3 MB 181.7 MB/s eta 0:00:00
+
+Downloading opencv_contrib_python-5.0.0.93-cp37-abi3-win_amd64.whl (53.8 MB)
+   ---------------------------------------- 53.8/53.8 MB 195.5 MB/s eta 0:00:00
+
+Downloading contourpy-1.4.0-cp312-cp312-win_amd64.whl (234 kB)
+Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Downloading fonttools-4.67.0-cp312-cp312-win_amd64.whl (2.5 MB)
+   ---------------------------------------- 2.5/2.5 MB 131.5 MB/s eta 0:00:00
+
+Downloading kiwisolver-1.5.1-cp312-cp312-win_amd64.whl (70 kB)
+Using cached packaging-26.3-py3-none-any.whl (129 kB)
+Using cached pillow-13.0.0-cp312-cp312-win_amd64.whl (7.3 MB)
+Downloading pyparsing-3.3.3-py3-none-any.whl (126 kB)
+Downloading python_dateutil-3.0.0-py2.py3-none-any.whl (94 kB)
+Downloading cffi-2.1.1-cp312-cp312-win_amd64.whl (185 kB)
+Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Downloading pycparser-3.12-py3-none-any.whl (62 kB)
+Downloading tzdata-2026.5-py2.py3-none-any.whl (347 kB)
+Installing collected packages: flatbuffers, tzdata, six, pyparsing, pycparser, pillow, packaging, numpy, kiwisolver, imageio-ffmpeg, fonttools, cycler, certifi, absl-py, python-dateutil, opencv-python-headless, opencv-contrib-python, contourpy, cffi, sounddevice, matplotlib, mediapipe
+Successfully installed absl-py-2.5.1 certifi-2026.10.23 cffi-2.1.1 contourpy-1.4.0 cycler-0.12.1 flatbuffers-25.12.19 fonttools-4.67.0 imageio-ffmpeg-0.6.0 kiwisolver-1.5.1 matplotlib-3.11.2 mediapipe-1.1.1 numpy-2.5.4 opencv-contrib-python-5.0.0.93 opencv-python-headless-5.0.0.93 packaging-26.3 pillow-13.0.0 pycparser-3.12 pyparsing-3.3.3 python-dateutil-3.0.0 six-1.17.0 sounddevice-0.5.6 tzdata-2026.5
+[setup_pose] downloading https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task
+[setup_pose] saved Z:\workspace\wintest\sprite_forge_studio\models\pose_landmarker_full.task (9.4 MB)
+wine: Call from 00006FFFFF3FCF77 to unimplemented function ucrtbase.dll.crealf, aborting
+wine: Unimplemented function ucrtbase.dll.crealf called at address 00006FFFFF3FCF77 (thread 022c), starting debugger...
+[setup_pose] WineDbg attached to pid 0228
+mocap setup failed - everything else works. Re-run: .venv\Scripts\python.exe tools\setup_pose.py
+== forge.py doctor
+wine: Call from 00006FFFFF3FCF77 to unimplemented function ucrtbase.dll.crealf, aborting
+wine: Unimplemented function ucrtbase.dll.crealf called at address 00006FFFFF3FCF77 (thread 0264), starting debugger...
+WineDbg attached to pid 0260
+
+Next steps
+  run_studio.bat                                     visual Studio (Help tab explains every field)
+  forge.bat build --spec examples_char.txt --preset fighter14     demo character -> out\rua_keeper
+  forge.bat video --clip walk:8=examples_video\walk_static.mp4 --name vid --consoles snes
+  forge.bat scan --video examples_video\orbit_mannequin.mp4 --frames 72 --run --name orbit
+  forge.bat help quickstart        beginner guide;    forge.bat doctor    re-check
+  build_release.bat                build + verify every demo
+EXIT 0

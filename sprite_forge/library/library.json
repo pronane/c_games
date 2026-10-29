@@ -1,0 +1,389 @@
+{
+ "format": "sforge-library",
+ "version": 1,
+ "updated": "2026-10-29T01:14:05",
+ "dir": "/workspace/sprite_forge_v8/library",
+ "assets": [
+  {
+   "kind": "rigs",
+   "name": "sample_chibi",
+   "path": "rigs/sample_chibi",
+   "bones": 22,
+   "tris": 1440,
+   "height_m": 1.1184,
+   "clips": [
+    "idle",
+    "walk",
+    "run",
+    "jump",
+    "kick",
+    "punch",
+    "celebrate"
+   ],
+   "convention": "unity",
+   "unmapped": 0,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "1.10 m chibi: big head, short legs, T-pose, Unity humanoid bone names",
+   "thumb": "rigs/sample_chibi/thumb.png"
+  },
+  {
+   "kind": "rigs",
+   "name": "sample_lanky",
+   "path": "rigs/sample_lanky",
+   "bones": 25,
+   "tris": 1440,
+   "height_m": 2.0053,
+   "clips": [
+    "idle",
+    "walk",
+    "run",
+    "jump",
+    "kick",
+    "punch",
+    "celebrate"
+   ],
+   "convention": "mixamo",
+   "unmapped": 3,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "2.00 m lanky: long limbs, A-pose, Mixamo bone names, bones oriented along Y",
+   "thumb": "rigs/sample_lanky/thumb.png"
+  },
+  {
+   "kind": "rigs",
+   "name": "sample_stocky",
+   "path": "rigs/sample_stocky",
+   "bones": 27,
+   "tris": 1440,
+   "height_m": 1.6309,
+   "clips": [
+    "idle",
+    "walk",
+    "run",
+    "jump",
+    "kick",
+    "punch",
+    "celebrate"
+   ],
+   "convention": "rigify",
+   "unmapped": 5,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "1.60 m stocky: wide body, arms down, Rigify DEF- names with twist bones",
+   "thumb": "rigs/sample_stocky/thumb.png"
+  },
+  {
+   "kind": "rigs",
+   "name": "sforge_mannequin",
+   "path": "rigs/sforge_mannequin",
+   "bones": 18,
+   "tris": 1522,
+   "height_m": 1.7902,
+   "clips": [
+    "idle",
+    "walk",
+    "run",
+    "jump",
+    "kick",
+    "punch",
+    "celebrate"
+   ],
+   "convention": "sforge",
+   "unmapped": 0,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "the built-in no-likeness mannequin (18 bones, rigid parts) with 7 procedural clips",
+   "thumb": "rigs/sforge_mannequin/thumb.png"
+  },
+  {
+   "kind": "animations",
+   "name": "sample_moves",
+   "path": "animations/sample_moves",
+   "bones": 25,
+   "tris": 0,
+   "height_m": 1.8617,
+   "clips": [
+    "wave",
+    "squat",
+    "hop",
+    "bow",
+    "spin"
+   ],
+   "convention": "mixamo",
+   "unmapped": 3,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "animation-only: 1.75 m Mixamo-named skeleton with wave / squat / hop / bow / spin",
+   "thumb": "animations/sample_moves/thumb.png"
+  },
+  {
+   "kind": "kits",
+   "name": "sample_gold_black",
+   "path": "kits/sample_gold_black.json",
+   "description": "synthetic sample kit: gold shirt, black shorts and socks",
+   "materials": [
+    "*shirt*|*jersey*|*top*",
+    "*short*|*pant*",
+    "*sock*"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes"
+   },
+   "licence_ok": true
+  },
+  {
+   "kind": "kits",
+   "name": "sample_red_white",
+   "path": "kits/sample_red_white.json",
+   "description": "synthetic sample kit: red shirt, white shorts, red socks",
+   "materials": [
+    "*shirt*|*jersey*|*top*",
+    "*short*|*pant*",
+    "*sock*"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes"
+   },
+   "licence_ok": true
+  },
+  {
+   "kind": "kits",
+   "name": "sample_sky_navy",
+   "path": "kits/sample_sky_navy.json",
+   "description": "synthetic sample kit: sky-blue shirt, navy shorts, white socks",
+   "materials": [
+    "*shirt*|*jersey*|*top*",
+    "*short*|*pant*",
+    "*sock*"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes"
+   },
+   "licence_ok": true
+  },
+  {
+   "kind": "outfits",
+   "name": "sample_boots",
+   "path": "outfits/sample_boots",
+   "bones": 25,
+   "tris": 144,
+   "height_m": 0.3631,
+   "clips": [],
+   "convention": "mixamo",
+   "unmapped": 3,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "outfits/sample_boots/thumb.png"
+  },
+  {
+   "kind": "outfits",
+   "name": "sample_vest",
+   "path": "outfits/sample_vest",
+   "bones": 27,
+   "tris": 360,
+   "height_m": 0.4995,
+   "clips": [],
+   "convention": "rigify",
+   "unmapped": 5,
+   "missing": [],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "outfits/sample_vest/thumb.png"
+  },
+  {
+   "kind": "props",
+   "name": "sample_backpack",
+   "path": "props/sample_backpack",
+   "bones": 1,
+   "tris": 24,
+   "height_m": 0.42,
+   "clips": [],
+   "convention": "generic",
+   "unmapped": 1,
+   "missing": [
+    "hips",
+    "spine",
+    "head",
+    "upperarm_L",
+    "forearm_L",
+    "hand_L",
+    "upperarm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "props/sample_backpack/thumb.png"
+  },
+  {
+   "kind": "props",
+   "name": "sample_cap",
+   "path": "props/sample_cap",
+   "bones": 1,
+   "tris": 60,
+   "height_m": 0.08,
+   "clips": [],
+   "convention": "generic",
+   "unmapped": 1,
+   "missing": [
+    "hips",
+    "spine",
+    "head",
+    "upperarm_L",
+    "forearm_L",
+    "hand_L",
+    "upperarm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "props/sample_cap/thumb.png"
+  },
+  {
+   "kind": "props",
+   "name": "sample_shield",
+   "path": "props/sample_shield",
+   "bones": 1,
+   "tris": 80,
+   "height_m": 0.52,
+   "clips": [],
+   "convention": "generic",
+   "unmapped": 1,
+   "missing": [
+    "hips",
+    "spine",
+    "head",
+    "upperarm_L",
+    "forearm_L",
+    "hand_L",
+    "upperarm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "props/sample_shield/thumb.png"
+  },
+  {
+   "kind": "props",
+   "name": "sample_sword",
+   "path": "props/sample_sword",
+   "bones": 1,
+   "tris": 52,
+   "height_m": 0.93,
+   "clips": [],
+   "convention": "generic",
+   "unmapped": 1,
+   "missing": [
+    "hips",
+    "spine",
+    "head",
+    "upperarm_L",
+    "forearm_L",
+    "hand_L",
+    "upperarm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "props/sample_sword/thumb.png"
+  }
+ ]
+}

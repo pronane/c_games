@@ -1,0 +1,30 @@
+# Sprite Forge Studio - character spec (FICTIONAL character only)
+# key = value ; lines starting with # are comments. Colours: names (green, navy...),
+# #rrggbb hex, or r,g,b.  Unknown keys are kept as metadata in character.ini.
+name          = rua_keeper
+height_cm     = 184
+weight_kg     = 82
+build         = athletic        # slim lean average athletic muscular stocky heavy
+skin_tone     = light_medium    # very_light fair light light_medium medium olive tan brown dark_brown dark deep  or #hex
+ethnicity     =                 # metadata only - it does NOT change the model; set skin_tone
+complexion    = freckles        # 'freckles' adds a few freckle dots, anything else = metadata
+hair_colour   = ginger          # black dark_brown brown light_brown auburn red ginger blonde platinum grey white or #hex
+hair_style    = short           # bald buzz short long ponytail curly afro bun
+facial_hair   = stubble         # none stubble beard moustache
+eye_colour    = green           # brown dark_brown blue green hazel grey amber black or #hex
+nose          = medium          # small medium large
+ears          = medium
+mouth         = medium
+hands         = medium
+feet          = large
+head          = medium
+top           = jersey          # jersey tshirt longsleeve tank hoodie
+top_colour    = #f2c512
+trim_colour   = black
+bottom        = shorts          # shorts trousers
+bottom_colour = black
+socks_colour  = #f2c512
+shoes         = boots           # boots trainers barefoot
+shoes_colour  = black
+kit           = gk              # fallback colours: home away blue red black gk
+role          = goalkeeper      # (example of free metadata)

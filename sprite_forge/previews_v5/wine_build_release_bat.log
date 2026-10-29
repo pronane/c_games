@@ -1,0 +1,248 @@
+[1/3] doctor
+wine: Call from 00006FFFFF3FCF77 to unimplemented function ucrtbase.dll.crealf, aborting
+wine: Unimplemented function ucrtbase.dll.crealf called at address 00006FFFFF3FCF77 (thread 01c0), starting debugger...
+Sprite Forge Studio doctor  -  Windows-10-10.0.19043-SP0  -  Python 3.12.7
+component                   status  details
+----------------------------------------------------------------------------------------------------
+Python                      OK      3.12.7 (Z:\workspace\wintest\sprite_forge_studio\.venv\Scripts\python.exe) venv
+numpy                       OK      1.26.4
+Pillow                      OK      13.0.0
+scipy                       OK      1.13.1
+opencv-python-headless      OK      4.10.0
+scikit-image                OK      0.24.0
+imageio-ffmpeg              OK      0.6.0
+pycolmap                    OK      4.2.1
+trimesh                     OK      5.2.0
+fast-simplification         OK      0.2.0
+open3d                      --      not installed
+                                      -> disables: second quadric decimation backend (not needed if fast-simplification is installed)
+rembg                       --      not installed
+                                      -> disables: AI background removal for photos (built-in cut-out still works)
+PyAV                        --      not installed
+                                      -> disables: second video decoder fallback (not needed when imageio-ffmpeg is installed)
+tkinter (GUI)               MISSING missing - re-run the python.org installer and tick 'tcl/tk and IDLE'
+                                      -> disables: the visual Studio (run_studio); the CLI forge.py still works
+video decode/encode         OK      ffmpeg [imageio-ffmpeg (pip)] - ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (
+slow-motion interpolation   OK      ffmpeg minterpolate
+FBX export                  OK      built-in pure-Python FBX 7.4 writer (sforge/fbx.py) - no Blender needed
+SfM for scan --run          OK      pycolmap 4.2.1 (pip, CPU)
+MediaPipe pose (mocap)      --      no Python with mediapipe - run: python tools/setup_pose.py
+                                      -> disables: forge.py mocap (video -> 3D animation)
+pose model                  OK      Z:\workspace\wintest\sprite_forge_studio\models\pose_landmarker_full.task
+Blender (optional)          --      not found (not needed)
+                                      -> disables: only the optional --fbx-writer blender and Blender-based LOD decimation
+C compiler (optional)       --      not found
+                                      -> disables: only the raylib C example in spriteforge/
+raylib (optional)           --      not found (make -C spriteforge raylib fetches + builds it)
+                                      -> disables: only the C example
+----------------------------------------------------------------------------------------------------
+READY: sprites, photo/spec builds, consoles, GLB + FBX export. Missing core pieces: tkinter (GUI) (see above).
+[2/3] Demo build (SPEC example, fighter14 set) -> out\rua_keeper  (model.fbx by the built-in writer)
+Sprite Forge Studio 5.0.0 - building 'rua_keeper' (spec mode, 14 moves) -> out\rua_keeper
+  ground lock: set shifted -3 px, 27 frame(s) lifted onto ground_y=241
+  idle                     mannequin:fight_idle  6 frames 
+  walk                     mannequin:fight_walk  8 frames 
+  crouch                   mannequin     4 frames 
+  jump                     mannequin     8 frames 
+  punch                    mannequin     6 frames 
+  kick                     mannequin     7 frames 
+  special1                 mannequin:special_1  8 frames 
+  special2                 mannequin:special_2 10 frames 
+  block                    mannequin:guard  3 frames 
+  hit                      mannequin     4 frames 
+  throw                    mannequin     8 frames 
+  jumpattack               mannequin:jump_attack  6 frames 
+  taunt                    mannequin     8 frames 
+  victory                  mannequin    10 frames 
+  model.glb written (14 animation clips, 364 KB)
+  FBX written by the built-in writer: 19 bones, 18 skin clusters, 14 takes, 1103 KB
+  3D: model.glb + model.fbx
+Done in 3.9s -> Z:\workspace\wintest\sprite_forge_studio\out\rua_keeper
+== out\rua_keeper
+  move             cfg  json   ini files
+  idle               6     6     6     6  OK
+  walk               8     8     8     8  OK
+  crouch             4     4     4     4  OK
+  jump               8     8     8     8  OK
+  punch              6     6     6     6  OK
+  kick               7     7     7     7  OK
+  special1           8     8     8     8  OK
+  special2          10    10    10    10  OK
+  block              3     3     3     3  OK
+  hit                4     4     4     4  OK
+  throw              8     8     8     8  OK
+  jumpattack         6     6     6     6  OK
+  taunt              8     8     8     8  OK
+  victory           10    10    10    10  OK
+  RESULT: PASS
+[2a/3] FBX check with independent readers (assimp / FBX2glTF / Blender when installed)
+[2b/3] Same character for the SNES preset -> out_snes\rua_keeper\console
+Sprite Forge Studio 5.0.0 - building 'rua_keeper' (spec mode, 14 moves) -> out_snes\rua_keeper
+  ground lock: set shifted -3 px, 27 frame(s) lifted onto ground_y=241
+  idle                     mannequin:fight_idle  6 frames 
+  walk                     mannequin:fight_walk  8 frames 
+  crouch                   mannequin     4 frames 
+  jump                     mannequin     8 frames 
+  punch                    mannequin     6 frames 
+  kick                     mannequin     7 frames 
+  special1                 mannequin:special_1  8 frames 
+  special2                 mannequin:special_2 10 frames 
+  block                    mannequin:guard  3 frames 
+  hit                      mannequin     4 frames 
+  throw                    mannequin     8 frames 
+  jumpattack               mannequin:jump_attack  6 frames 
+  taunt                    mannequin     8 frames 
+  victory                  mannequin    10 frames 
+  model.glb written (14 animation clips, 364 KB)
+  3D: model.glb
+  console snes: character scaled x0.322 into 64x64 frames
+  ! console: 1323 tiles do not fit one 512-tile bank -> 3 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)
+  console/ (SNES / Super Famicom): 64x64 frames, 15 colours, 1323 tiles in 3 bank(s)
+Done in 4.0s -> Z:\workspace\wintest\sprite_forge_studio\out_snes\rua_keeper
+out_snes\rua_keeper  [snes]  64x64  warnings: 1
+   PASS  frame 64x64 <= max 64x64
+   PASS  frame is a multiple of the 8x8 tile
+   PASS  96 frame files == 96 frames in anims
+   PASS  palette 15 colours <= 15 (+ transparent)
+   PASS  every palette colour is representable in the bgr555 colour space
+   PASS  all frames / sheets / tiles / pages are indexed (P) PNGs (100 files)
+   PASS  highest palette index used 15 <= 15
+   PASS  tiles per bank [512, 495, 316] <= 512
+   PASS  tiles_bank0.4bpp = 512 tiles x 32 bytes (snes4)
+   PASS  tiles_bank1.4bpp = 495 tiles x 32 bytes (snes4)
+   PASS  tiles_bank2.4bpp = 316 tiles x 32 bytes (snes4)
+   NOTE  1323 tiles do not fit one 512-tile bank -> 3 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)
+RESULT: PASS (0 checks failed)
+[2c/3] Output profiles: validate all, then a kart racer (TurboTumble64-style) from the text spec, 8 views
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\fighter14.json
+   warning: no images/manifests: only the standard outputs (sprites.cfg, atlas.json, character.ini) are written
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\gaelic36.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\generic_2d.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\kart_racer.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\platformer.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\retro_gba.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\retro_nes.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\retro_snes.json
+OK   Z:\workspace\wintest\sprite_forge_studio\profiles\topdown8dir.json
+Sprite Forge Studio 5.0.0 - building 'rua_keeper' (spec mode, 12 moves) -> out_profiles\rua_keeper
+  ground lock: set shifted -4 px, 0 frame(s) lifted onto ground_y=636
+  idle                     mannequin:kart_idle  6 frames clipped at cell edge
+  drive                    mannequin:kart_drive  8 frames clipped at cell edge
+  steer_left               mannequin     4 frames clipped at cell edge
+  steer_right              mannequin     4 frames clipped at cell edge
+  boost                    mannequin     6 frames clipped at cell edge
+  drift                    mannequin     6 frames clipped at cell edge
+  hit                      mannequin:kart_hit  6 frames clipped at cell edge
+  spin_out                 mannequin     8 frames clipped at cell edge
+  item_throw               mannequin     6 frames clipped at cell edge
+  victory                  mannequin:kart_victory  8 frames clipped at cell edge
+  defeat                   mannequin     6 frames clipped at cell edge
+  taunt                    mannequin:kart_taunt  8 frames clipped at cell edge
+  views: the widest view (front_left, pose of 'idle') does not fit 512px wide, so every view is drawn at 48% of the figure height to stay inside the frame and on the same scale (wider frame or a pose with the arms in = bigger figure)
+  views: 8 rendered for real (front, front_right, right, back_right, back, back_left, left, front_left), bust cut 0.55
+  views: front, front_right, right, back_right, back, back_left, left, front_left -> views/, turnaround.png, turnaround_preview.png, billboard8.png
+  model.glb written (12 animation clips, 347 KB)
+  3D: model.glb
+  profile 'kart_racer': sprite.png, win.png, portrait.png, character.ini
+Done in 47.2s -> Z:\workspace\wintest\sprite_forge_studio\out_profiles\rua_keeper
+Sprite Forge Studio 5.0.0 - building 'rua_keeper' (spec mode, 3 moves) -> out_profiles_topdown\rua_keeper
+  ground lock: set shifted -2 px, 2 frame(s) lifted onto ground_y=120
+  idle                     mannequin     8 frames 
+  walk                     mannequin     8 frames 
+  run                      mannequin     8 frames 
+  views: 8 rendered for real (front, front_right, right, back_right, back, back_left, left, front_left)
+  views: front, front_right, right, back_right, back, back_left, left, front_left -> views/, turnaround.png, turnaround_preview.png, billboard8.png
+  model.glb written (3 animation clips, 275 KB)
+  3D: model.glb
+  profile 'topdown8dir': rua_keeper.tres, rua_keeper.unity.json, directions.txt
+Done in 3.1s -> Z:\workspace\wintest\sprite_forge_studio\out_profiles_topdown\rua_keeper
+[2d/3] VIDEO: the bundled test clips (rendered mannequin) -> sprites + SNES  -> out_video\vidhero
+clip walk_static.mp4 -> walk (8 frames, loop)
+  decode walk_static.mp4: 110 frames 640x360 @ 30.0 fps in 0.95s (116 frames/s)
+  camera: static 
+  background: median
+  loop: period 33.0 frames (1.10 s) [step 16.5], start frame 68, seam error 0.008
+  -> 8 frames, 6.92s total (decode 0.95s, camera 3.11s, background 0.47s, matte 1.24s = 89 frames/s)
+clip run_tracking.mp4 -> run (8 frames, loop)
+  decode run_tracking.mp4: 90 frames 640x360 @ 30.0 fps in 0.82s (110 frames/s)
+  camera: tracking (pan 4.0 px/frame)
+  background: median
+  parallax layers: own band pan + -11.0, -4.3 px/frame (subject masked out of the background)
+  loop: period 19.9 frames (0.66 s) [step 10.0], start frame 55, seam error 0.028
+  -> 8 frames, 23.81s total (decode 0.82s, camera 9.84s, background 1.62s, matte 10.77s = 8 frames/s)
+clip jump_handheld.mp4 -> jump (12 frames, one-shot)
+  decode jump_handheld.mp4: 73 frames 640x360 @ 30.0 fps in 0.76s (96 frames/s)
+  camera: handheld 
+  background: median
+  action: frames 32-51 of 73 (0.63 s) -> 12 sprite frames
+  -> 12 frames, 4.85s total (decode 0.76s, camera 2.05s, background 0.55s, matte 0.81s = 37 frames/s)
+clip punch_green.mp4 -> punch (10 frames, one-shot)
+  decode punch_green.mp4: 28 frames 640x360 @ 24.0 fps in 0.55s (51 frames/s)
+  chroma screen detected (100% of the border is green)
+  camera: static 
+  background: chroma
+  action: frames 8-20 of 28 (0.50 s) -> 10 sprite frames
+  -> 10 frames, 1.59s total (decode 0.55s, camera 0.00s, background 0.00s, matte 0.38s = 75 frames/s)
+frames: out_video\vidhero_video   debug sheets: out_video\vidhero_video\_debug
+Sprite Forge Studio 5.0.0 - building 'vidhero' (frames mode, 4 moves) -> out_video\vidhero
+video frames: standing height 400 px -> scale 0.395
+  ground lock: set shifted +1 px, 6 frame(s) lifted onto ground_y=241
+  walk                     imported      8 frames 
+  run                      imported      8 frames 
+  jump                     imported     12 frames clipped
+  punch                    imported     10 frames 
+  3D model: not generated in frames mode (a 3D model is only built from a SPEC; photos are never turned into 3D)
+Done in 0.8s -> Z:\workspace\wintest\sprite_forge_studio\out_video\vidhero
+Sprite Forge Studio 5.0.0 - building 'vidhero_snes' (frames mode, 4 moves) -> out_video\vidhero_snes
+video frames: standing height 400 px -> scale 0.395
+  ground lock: set shifted +1 px, 6 frame(s) lifted onto ground_y=241
+  walk                     imported      8 frames 
+  run                      imported      8 frames 
+  jump                     imported     12 frames clipped
+  punch                    imported     10 frames 
+  console snes: character scaled x0.317 into 48x64 frames
+  ! console: 537 tiles do not fit one 512-tile bank -> 2 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)
+  console/ (SNES / Super Famicom): 48x64 frames, 15 colours, 537 tiles in 2 bank(s)
+Done in 0.9s -> Z:\workspace\wintest\sprite_forge_studio\out_video\vidhero_snes
+[2e/3] SCAN: orbit clip -> pycolmap SfM -> mesh -> console LODs (project only if pycolmap is missing)
+scan: extract: 72 frames decoded, 72 picked (0 blurry) in 3.7s -> out_scan\orbit_demo_scan\images
+scan: pycolmap features: 3.8s
+scan: pycolmap matching: 7.5s
+scan: pycolmap mapper: 13.1s
+scan: colmap: 72/72 images registered, 8280 points, reprojection 0.45 px
+scan: dense: 72 views, neighbour step 2 (~9.2 deg), object box [1.19, 2.34, 1.22] (orbit radius 3.72 SfM units)
+scan: dense: fused 10/72 views (1.9s)
+scan: dense: fused 20/72 views (4.1s)
+scan: dense: fused 30/72 views (6.2s)
+scan: dense: fused 40/72 views (8.1s)
+scan: dense: fused 50/72 views (10.2s)
+scan: dense: fused 60/72 views (12.3s)
+scan: dense: fused 70/72 views (14.3s)
+scan: dense: 35456 tris raw in 16.3s (depth coverage 6%)
+scan: LOD ps5         35456 tris (budget 100000, none)
+scan: LOD pc_hd       35456 tris (budget 100000, none)
+scan: LOD switch_ps4  35456 tris (budget 40000, none)
+scan: LOD wii360ps3   15000 tris (budget 15000, fast-simplification-quadric)
+scan: LOD ps2gc        5000 tris (budget 5000, fast-simplification-quadric)
+scan: LOD dreamcast    2998 tris (budget 3000, fast-simplification-quadric)
+scan: LOD psp          2998 tris (budget 3000, fast-simplification-quadric)
+scan: LOD saturn        998 tris (budget 1000, fast-simplification-quadric)
+scan: LOD n64           900 tris (budget 900, fast-simplification-quadric)
+scan: LOD ds            600 tris (budget 600, fast-simplification-quadric)
+scan: LOD ps1           600 tris (budget 600, fast-simplification-quadric)
+scan: done in 47.0s -> out_scan\orbit_demo_scan (scan_preview.png, lods/, scan_report.json)
+[2f/3] MOCAP (only if tools\setup_pose.py / setup.bat made venv_pose)
+wine: Call from 00006FFFFF3FCF77 to unimplemented function ucrtbase.dll.crealf, aborting
+wine: Unimplemented function ucrtbase.dll.crealf called at address 00006FFFFF3FCF77 (thread 03f4), starting debugger...
+mocap walk_static.mp4 -> walk (loop)
+mocap: mediapipe is not installed for any Python found (it needs Python 3.9-3.12).
+  Run:  python tools/setup_pose.py   (or setup.bat / setup.sh) - it makes venv_pose with Python 3.12,
+  fetching that Python with uv if needed, and downloads the pose model.  Or set SFS_POSE_PYTHON.
+[3/3] raylib C example (needs MSYS2 UCRT64 gcc + raylib: pacman -S mingw-w64-ucrt-x86_64-raylib)
+gcc not found - install MSYS2 UCRT64 gcc, see README.md 
+C example not built - optional, needs MSYS2 UCRT64 gcc + raylib
+
+Done.  Try:  spriteforge\bin\example.exe out\rua_keeper
+       or:   run_studio.bat     (Help tab / Help menu explains everything)
+       or:   forge.bat help quickstart
+EXIT 0 166s
