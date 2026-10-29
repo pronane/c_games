@@ -1,4 +1,4 @@
-import { evalStall, stallLabel, connectFailure, SLOW_MS, LOST_MS } from './public/stall.mjs';
+import { evalStall, stallLabel, connectFailure, nextBackoff, isGameData, poorLink, SLOW_MS, LOST_MS, BACKOFF_MIN_MS, BACKOFF_MAX_MS } from './public/stall.mjs';
 import { packInput, unpackInput, encodeTail, absorbContig, gapBefore } from './public/wire.mjs';
 import { chooseDelay, MAX_DELAY_FRAMES, FRAME_MS } from './public/pace.mjs';
 
@@ -91,6 +91,41 @@ function check(cond, msg) { if (!cond) throw new Error(msg); }
   check(refused.text === "Can't reach the server." && refused.clearPill && !refused.waking, 'refused');
   const waking = connectFailure({ networkError: false, httpStatus: 503 });
   check(waking.text === 'Waking the server...' && waking.waking && !waking.clearPill, '503');
+}
+
+{
+  const calm = [];
+  for (let i = 0; i < 12; i++) calm.push(nextBackoff(i, () => 0.5));
+  check(calm[0] === BACKOFF_MIN_MS, 'backoff start ' + calm[0]);
+  check(calm[1] > calm[0] && calm[5] > calm[4], 'backoff grows ' + calm.join(','));
+  check(calm[11] === BACKOFF_MAX_MS, 'backoff cap ' + calm[11]);
+  const jittered = nextBackoff(4, () => 0);
+  const mid = nextBackoff(4, () => 0.5);
+  check(jittered >= BACKOFF_MIN_MS && jittered <= mid, 'jitter low ' + jittered);
+}
+
+{
+  check(isGameData({ t: 'hb' }) === false, 'heartbeat is not game data');
+  check(isGameData({ t: 'hash', frame: 30, hash: 1 }) === true, 'hash');
+  check(isGameData({ t: 'input', ack: 10 }) === true, 'ack');
+  check(isGameData({ t: 'input', base: 4, bits: [1] }) === true, 'bits');
+  let last = 0;
+  for (let i = 0; i < 220; i++) {
+    const t = i * 100;
+    check(isGameData({ t: 'hb' }) === false, 'hb');
+    check(evalStall(last, t) !== 'ok' || t < SLOW_MS, 'hb hid stall at ' + t);
+  }
+  check(evalStall(last, 220 * 100) === 'lost', 'heartbeats alone should be lost');
+}
+
+{
+  const steps = [];
+  for (let t = 0; t <= 4000; t += 120) steps.push(t); // ~8.3 fps
+  check(poorLink(steps, 4000) === true, 'crawling match');
+  const fast = [];
+  for (let t = 0; t <= 4000; t += 16) fast.push(t);
+  check(poorLink(fast, 4000) === false, '60 fps is not poor');
+  check(poorLink(fast, 500) === false, 'window not open yet');
 }
 
 console.log(JSON.stringify({ ok: true, slowMs: SLOW_MS, lostMs: LOST_MS }));

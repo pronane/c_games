@@ -18,6 +18,10 @@ The fight steps at a fixed 1/60 s of wall time. A fast link does not fast-forwar
 
 The player id lives in `sessionStorage` for this tab. A second tab is a different player and does not take the first tab's slot. Reloading the same tab keeps the id.
 
+At about 120 ms on each hop the input delay is roughly 21–24 frames, so a button press reaches the sim about 365–390 ms later. Both screens stay in sync, and the round still lasts about 99 seconds, but the fight feels sluggish. Lockstep has to wait for the other player's input before that frame can run. A later version can hide that wait with rollback: play the local input immediately, keep the last second of state, and if the remote input disagrees, rewind and simulate forward again. That is not in this version — rewinding the hit checks and the seeded RNG is easy to get wrong, and this change only keeps the delay honest.
+
+Reconnects wait 0.3 s and then back off up to 3 s, and a socket that is still connecting after 4 s is closed so the next try can start. A dropped fight stays on the fight screen for 30 s (`Reconnecting...`) instead of giving up at 9 s. **Connection slow** / **Connection lost** mean game inputs or hashes have stopped, not merely that heartbeats are still arriving. A match that is still running but under about 45 sim frames per second for 2 seconds shows **Poor connection**.
+
 ## Run locally
 
 ```bash

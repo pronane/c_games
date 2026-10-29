@@ -17,6 +17,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const FIGHTERS = new Set(['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap']);
 const INPUT_DELAY_FRAMES = 3;
 const HOLD_MS = Number(process.env.HOLD_MS) || 30000;
+const HIST_MAX = 6400; // a little over a 99 s round at 60 Hz
 const INPUT_KEYS = [
   'left', 'right', 'up', 'down', 'jump',
   'lp', 'hp', 'lk', 'hk', 'block', 'throw',
@@ -49,10 +50,29 @@ function createServer() {
   }));
 
   function later(fn, ms) {
-    const t = setTimeout(fn, ms);
+    let t;
+    t = setTimeout(() => {
+      timeouts.delete(t);
+      fn();
+    }, ms);
     if (t.unref) t.unref();
     timeouts.add(t);
     return t;
+  }
+
+  function blankHist() {
+    return [new Uint16Array(HIST_MAX), new Uint16Array(HIST_MAX)];
+  }
+
+  function noteHist(room, slot, frame, bits) {
+    const buf = room.hist && room.hist[slot];
+    if (!buf || frame < 0 || frame >= buf.length) return;
+    if (buf[frame] !== 0) return;
+    buf[frame] = ((bits & 0xffff) + 1) & 0xffff;
+  }
+
+  function releaseHist(room) {
+    room.hist = null;
   }
 
   function roomId() {
@@ -85,7 +105,7 @@ function createServer() {
       loadTimer: null,
       net: { 0: null, 1: null },
       savedPicks: {},
-      hist: [[], []],
+      hist: null,
       hold: null,
       holdTimer: null,
       delay: INPUT_DELAY_FRAMES,
@@ -117,10 +137,15 @@ function createServer() {
     return bits;
   }
 
-  function packHist(arr, end) {
-    const buf = Buffer.alloc(end * 2);
-    for (let i = 0; i < end; i++) buf.writeUInt16LE((arr[i] || 0) & 0xffff, i * 2);
-    return buf.toString('base64');
+  function packHist(buf, end) {
+    const n = Math.max(0, Math.min(end | 0, buf ? buf.length : 0));
+    const out = Buffer.alloc(n * 2);
+    for (let i = 0; i < n; i++) {
+      const stored = buf && buf[i] ? buf[i] : 0;
+      const bits = stored ? (stored - 1) & 0xffff : 0;
+      out.writeUInt16LE(bits, i * 2);
+    }
+    return out.toString('base64');
   }
 
   function rememberPick(room, slot) {
@@ -302,7 +327,7 @@ function createServer() {
     room.loaded = { 0: false, 1: false };
     const delay = chooseDelay(room.net && room.net[0], room.net && room.net[1]);
     room.delay = delay;
-    room.hist = [[], []];
+    room.hist = blankHist();
     broadcast(room, {
       t: 'go',
       room: room.id,
@@ -335,7 +360,7 @@ function createServer() {
   function welcome(ws, type, extra) {
     const room = ws.room;
     const snap = snapshot(room);
-    send(ws, Object.assign({ t: type, slot: ws.slot }, extra || {}, snap, { t: type, slot: ws.slot }));
+    send(ws, Object.assign({ t: type, slot: ws.slot }, snap, extra || {}, { t: type, slot: ws.slot }));
     broadcast(room, Object.assign({}, snap, { t: 'room_state' }), ws);
     if (room.phase === 'countdown' && room.startId) send(ws, countdownMessage(room));
   }
@@ -396,7 +421,7 @@ function createServer() {
     room.loaded = { 0: false, 1: false };
     room.startId = null;
     room.startAt = null;
-    room.hist = [[], []];
+    releaseHist(room);
     room.epoch += 1;
     broadcast(room, {
       t: 'match_end',
@@ -423,7 +448,7 @@ function createServer() {
     room.loaded = { 0: false, 1: false };
     room.startId = null;
     room.startAt = null;
-    room.hist = [[], []];
+    releaseHist(room);
     room.epoch += 1;
     broadcast(room, {
       t: 'forfeit',
@@ -443,11 +468,11 @@ function createServer() {
   function histEnd(room, frame) {
     let max = frame;
     const delay = room.delay || INPUT_DELAY_FRAMES;
-    const cap = frame + delay + 12;
-    for (const hist of room.hist) {
+    const cap = Math.min(HIST_MAX, frame + delay + 12);
+    for (const hist of room.hist || []) {
+      if (!hist) continue;
       for (let i = Math.min(hist.length, cap) - 1; i >= 0; i--) {
-        if (hist[i] != null && i + 1 > max) max = i + 1;
-        if (hist[i] != null) break;
+        if (hist[i]) { if (i + 1 > max) max = i + 1; break; }
       }
     }
     return Math.min(Math.max(max, frame), cap);
@@ -471,8 +496,8 @@ function createServer() {
       delay: room.delay,
       startId: room.startId,
       picks: { 0: room.picks[0] || null, 1: room.picks[1] || null },
-      p0: packHist(room.hist[0], end),
-      p1: packHist(room.hist[1], end),
+      p0: packHist(room.hist && room.hist[0], end),
+      p1: packHist(room.hist && room.hist[1], end),
       epoch: room.epoch,
       phase: 'playing',
     });
@@ -552,7 +577,7 @@ function createServer() {
     room.startId = null;
     room.startAt = null;
     room.seed = null;
-    room.hist = [[], []];
+    releaseHist(room);
     room.epoch += 1;
     broadcast(room, {
       t: 'peer_left',
@@ -620,10 +645,9 @@ function createServer() {
           if (batch.length >= 64) break;
         }
       }
-      if (!room.hist) room.hist = [[], []];
       for (const item of batch) {
         const bits = typeof item.b === 'number' ? item.b : packLoose(item.inp);
-        if (room.hist[ws.slot][item.frame] == null) room.hist[ws.slot][item.frame] = bits;
+        noteHist(room, ws.slot, item.frame, bits);
       }
       const relay = {
         t: 'input',
@@ -671,7 +695,7 @@ function createServer() {
         const base = m.base | 0;
         for (let i = 0; i < m.bits.length && i < 120; i++) {
           const frame = base + i;
-          if (frame >= 0 && room.hist[ws.slot][frame] == null) room.hist[ws.slot][frame] = m.bits[i] & 0xffff;
+          noteHist(room, ws.slot, frame, m.bits[i] & 0xffff);
         }
       }
       if (room.players[room.hold.slot]) sendResume(room);

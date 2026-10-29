@@ -1,6 +1,6 @@
 import { createMatch, cloneInput, neutralInput, HASH_EVERY, DEFAULT_DELAY } from './sim.mjs';
 import { createPacer, stepBudget } from './pace.mjs';
-import { evalStall, stallLabel, connectFailure } from './stall.mjs';
+import { evalStall, stallLabel, connectFailure, nextBackoff, isGameData, poorLink, CONNECT_TIMEOUT_MS, RECONNECT_HOLD_MS } from './stall.mjs';
 import { encodeTail, encodeFrames, decodeInputs, absorbContig, gapBefore, unpackInput, unpackHist, packInput } from './wire.mjs';
 
 const FIGHTERS = ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap'];
@@ -75,6 +75,10 @@ let lastHb = 0;
 let lastNackAt = 0;
 let lastNackFrom = -1;
 let holdUntil = 0;
+let selfHoldUntil = 0;
+let connectTimer = null;
+let socketJoined = false;
+let stepTimes = [];
 let remoteContig = -1;
 let remoteHave = new Set();
 let localInputs = new Map();
@@ -202,34 +206,37 @@ function setOnline(on) {
 }
 
 function connect() {
-  if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
+  if (ws && ws.readyState === 1) return;
+  if (ws && ws.readyState === 0) return;
   const started = Date.now();
   let opened = false;
   const sock = new WebSocket(wsURL());
   ws = sock;
+  if (connectTimer) clearTimeout(connectTimer);
+  connectTimer = setTimeout(() => {
+    if (ws !== sock || sock.readyState !== 0) return;
+    // Chromium can leave a socket in CONNECTING forever after many refusals.
+    ws = null;
+    try { sock.close(); } catch {}
+  }, CONNECT_TIMEOUT_MS);
   sock.addEventListener('open', () => {
     if (ws !== sock) return;
     opened = true;
     connectFailedFast = false;
+    if (connectTimer) clearTimeout(connectTimer);
     setOnline(true);
     flushQueue();
   });
   sock.addEventListener('close', () => {
-    if (ws !== sock) return;
-    if (!opened && Date.now() - started < 1500) classifyConnectFailure();
-    ws = null;
+    if (connectTimer) clearTimeout(connectTimer);
+    if (ws === sock) ws = null;
+    socketJoined = false;
     setOnline(false);
+    if (!opened && Date.now() - started < 1500 && !(sim && !sim.closed)) classifyConnectFailure();
     if (intentionalLeave) return;
-    if (joinAttempt) {
-      connect();
-      return;
-    }
-    const code = room || lastRoom;
-    if (code) {
-      setTimeout(() => {
-        if (!ws || ws.readyState !== 1) startJoin(String(code).toUpperCase());
-      }, 400);
-    }
+    if (sim && !sim.closed && !selfHoldUntil) selfHoldUntil = Date.now() + RECONNECT_HOLD_MS;
+    const code = (joinAttempt && joinAttempt.code) || room || lastRoom;
+    if (code && !joinAttempt) startJoin(String(code).toUpperCase());
   });
   sock.addEventListener('message', (e) => {
     if (ws !== sock) return;
@@ -286,46 +293,41 @@ function stopJoin() {
 function startJoin(code) {
   code = String(code || '').trim().toUpperCase();
   if (!code) return;
+  if (joinAttempt && joinAttempt.code === code) return;
   stopJoin();
   const token = {};
-  joinAttempt = { code, token, started: Date.now(), delay: 2000, timer: null, waking: false };
+  joinAttempt = { code, token, started: Date.now(), tries: 0, timer: null, waking: false };
   roomIn.value = code;
-  connect();
-  const run = (delay) => {
+  const tick = () => {
     if (!joinAttempt || joinAttempt.token !== token) return;
-    joinAttempt.timer = setTimeout(() => {
-      if (!joinAttempt || joinAttempt.token !== token) return;
-      if (room === code) { stopJoin(); return; }
-      const elapsed = Date.now() - joinAttempt.started;
-      if (elapsed > JOIN_GIVE_UP_MS) {
-        statusEl.textContent = 'Could not reach the server. It can take about a minute to wake — try again.';
-        stopJoin();
-        syncReadyButton();
-        return;
-      }
-      const open = ws && ws.readyState === 1;
-      if (!open) {
-        const slow = Date.now() - joinAttempt.started > 1500;
-        joinAttempt.waking = slow && !connectFailedFast;
-        statusEl.textContent = linkStatus(joinAttempt.waking);
-        connect();
-      } else {
+    if (socketJoined && ws && ws.readyState === 1) {
+      stopJoin();
+      return;
+    }
+    if (Date.now() - joinAttempt.started > JOIN_GIVE_UP_MS) {
+      statusEl.textContent = 'Could not reach the server. It can take about a minute to wake — try again.';
+      stopJoin();
+      syncReadyButton();
+      return;
+    }
+    const open = ws && ws.readyState === 1;
+    if (open) {
+      if (!(sim && !sim.closed)) {
         statusEl.textContent = joinAttempt.waking ? `Waking the server... joining ${code}` : `Joining ${code}…`;
-        transmit({ t: 'join', room: code, userId });
       }
-      const next = joinAttempt.delay;
-      joinAttempt.delay = Math.min(10000, Math.round(joinAttempt.delay * 1.5));
-      run(next);
-    }, delay);
+      transmit({ t: 'join', room: code, userId });
+    } else if (!ws || ws.readyState > 1) {
+      const slow = Date.now() - joinAttempt.started > 1500;
+      joinAttempt.waking = slow && !connectFailedFast;
+      if (!(sim && !sim.closed)) statusEl.textContent = linkStatus(joinAttempt.waking);
+      connect();
+    }
+    const wait = nextBackoff(joinAttempt.tries);
+    joinAttempt.tries += 1;
+    joinAttempt.timer = setTimeout(tick, wait);
   };
-  if (ws && ws.readyState === 1) {
-    statusEl.textContent = `Joining ${code}…`;
-    transmit({ t: 'join', room: code, userId });
-    run(2000);
-  } else {
-    statusEl.textContent = linkStatus(false);
-    run(2000);
-  }
+  if (!(sim && !sim.closed) && !(ws && ws.readyState === 1)) statusEl.textContent = linkStatus(false);
+  tick();
 }
 
 function noteRoom(code, mySlot) {
@@ -337,6 +339,7 @@ function noteRoom(code, mySlot) {
     inviteEl.textContent = location.origin + location.pathname + '#' + code;
     try { history.replaceState(null, '', '#' + code); } catch {}
     leaveBtn.style.display = '';
+    socketJoined = true;
     if (joinAttempt && joinAttempt.code === code) stopJoin();
   }
   if (typeof mySlot === 'number' && mySlot >= 0) {
@@ -583,10 +586,27 @@ function onMsg(e) {
     const label = m.t === 'matched' ? `Matched in ${room} as P${slot + 1}. Pick a fighter.`
       : m.t === 'created' ? `Room ${room} as P${slot + 1}. Share the code.`
       : `Room ${room} as P${slot + 1}.`;
-    statusEl.textContent = m.rejoin ? `Rejoined ${room} as P${slot + 1}.` : label;
-    if (m.phase === 'playing' && !(sim && !sim.closed)) {
-      statusEl.textContent = 'Rejoined. Waiting to resume the fight…';
+    if (sim && !sim.closed && m.phase === 'playing') {
+      selfHoldUntil = 0;
+      statusEl.textContent = 'Opponent reconnected.';
+      maybeFlushReady();
+      return;
     }
+    if (m.phase !== 'playing' && beganId) {
+      selfHoldUntil = 0;
+      if (sim && !sim.closed) {
+        endMatch('Back in the lobby — press Ready to rematch.');
+        return;
+      }
+      statusEl.textContent = 'Back in the lobby — press Ready to rematch.';
+      show('lobby');
+      if (sim) { sim = null; driveMatch = null; }
+      if (myPick) pendingPick = myPick;
+      syncReadyButton();
+      maybeFlushReady();
+      return;
+    }
+    statusEl.textContent = label;
     if (m.rejoin && myPick && m.phase !== 'playing') pendingPick = myPick;
     maybeFlushReady();
     return;
@@ -596,6 +616,11 @@ function onMsg(e) {
       if (!acceptMeta(m)) return;
     }
     if (typeof m.slot === 'number') occupied[m.slot] = true;
+    if (sim && !sim.closed) {
+      if (m.rejoin) statusEl.textContent = 'Opponent reconnected.';
+      updateRoomInfo();
+      return;
+    }
     statusEl.textContent = 'Opponent joined. Pick a fighter.';
     updateRoomInfo();
     return;
@@ -609,6 +634,27 @@ function onMsg(e) {
   }
   if (m.t === 'room_state') {
     if (!applySnapshot(m)) return;
+    if (sim && !sim.closed && m.phase === 'playing') {
+      maybeFlushReady();
+      return;
+    }
+    if (sim && sim.closed) {
+      maybeFlushReady();
+      return;
+    }
+    if (m.phase === 'lobby' && beganId) {
+      selfHoldUntil = 0;
+      statusEl.textContent = 'Back in the lobby — press Ready to rematch.';
+      show('lobby');
+      syncReadyButton();
+      maybeFlushReady();
+      return;
+    }
+    if (sim && !sim.closed && m.phase === 'lobby') {
+      selfHoldUntil = 0;
+      endMatch(m.notice || 'Back in the lobby — press Ready to rematch.');
+      return;
+    }
     const p0 = val(picks, 0);
     const p1 = val(picks, 1);
     statusEl.textContent = m.notice
@@ -649,7 +695,20 @@ function onMsg(e) {
   if (m.t === 'error') {
     if (typeof m.epoch === 'number' && m.epoch > roomEpoch) roomEpoch = m.epoch;
     pendingReady = false;
-    if (/not found|full/i.test(m.msg || '')) stopJoin();
+    if (/not found|full|no room/i.test(m.msg || '')) stopJoin();
+    if (/not found|no room/i.test(m.msg || '')) {
+      selfHoldUntil = 0;
+      room = null;
+      slot = -1;
+      roompill.textContent = 'no room';
+      statusEl.textContent = 'Not in a room. Create or join to play again.';
+      if (sim && !sim.closed) endMatch('Not in a room. Create or join to play again.');
+      else {
+        show('lobby');
+        syncReadyButton();
+      }
+      return;
+    }
     if (slot === 0 || slot === 1) serverReady[slot] = false;
     statusEl.textContent = m.msg || 'Error';
     syncReadyButton();
@@ -693,12 +752,14 @@ function onMsg(e) {
   }
   if (m.t === 'forfeit') {
     holdUntil = 0;
+    selfHoldUntil = 0;
     const mine = m.winner === slot;
     endMatch(mine ? 'You win — opponent left' : 'Opponent left');
     return;
   }
   if (m.t === 'match_end') {
     holdUntil = 0;
+    selfHoldUntil = 0;
     endMatch(m.notice || 'Connection lost');
     return;
   }
@@ -706,14 +767,11 @@ function onMsg(e) {
     resumeMatch(m);
     return;
   }
-  if (m.t === 'hb') {
-    if (typeof m.from === 'number' && m.from !== slot) notePeer();
-    return;
-  }
+  if (m.t === 'hb') return;
   if (m.t === 'nack') onNack(m);
   if (m.t === 'input') onRemoteInput(m);
   if (m.t === 'hash') {
-    notePeer();
+    if (isGameData(m)) notePeer();
     onRemoteHash(m);
   }
 }
@@ -869,7 +927,10 @@ function readLocalInput() {
   return inp;
 }
 
-function notePeer() { lastPeerRx = Date.now(); }
+function notePeer(msg) {
+  if (msg && !isGameData(msg)) return;
+  lastPeerRx = Date.now();
+}
 
 function queueLocal(frame) {
   if (!sim || sentFrames.has(frame) || frame < 0) return;
@@ -908,7 +969,7 @@ function onNack(m) {
 function onRemoteInput(m) {
   if (!sim || sim.closed) return;
   if (typeof m.epoch === 'number' && m.epoch !== roomEpoch) return;
-  notePeer();
+  if (isGameData(m)) notePeer();
   if (typeof m.ack === 'number') peerAck = Math.max(peerAck, m.ack);
   const from = m.from === 0 || m.from === 1 ? m.from : (slot ^ 1);
   if (from === slot) return;
@@ -1027,6 +1088,8 @@ function startMatch(picksMap, seed, delay) {
   lastPeerRx = Date.now();
   lastNackFrom = -1;
   holdUntil = 0;
+  selfHoldUntil = 0;
+  stepTimes = [];
   localHashes = new Map();
   remoteHashes = new Map();
   lastHash = 0;
@@ -1061,10 +1124,24 @@ function armLoop(clock, gen) {
   const loop = (now) => {
     if (!sim || sim.closed || matchGen !== gen) return;
     const stall = document.getElementById('stall');
-    if (holdUntil) {
-      const left = Math.max(0, Math.ceil((holdUntil - Date.now()) / 1000));
+    const wall = Date.now();
+    // Keep the fight screen for the whole 30 s, including after the socket
+    // opens, until the server resumes the match or says it is over.
+    if (selfHoldUntil && wall < selfHoldUntil) {
+      const left = Math.max(0, Math.ceil((selfHoldUntil - wall) / 1000));
+      if (stall) stall.textContent = `Reconnecting... (${left} s)`;
+      render();
+      return;
+    }
+    if (holdUntil && wall < holdUntil) {
+      const left = Math.max(0, Math.ceil((holdUntil - wall) / 1000));
       if (stall) stall.textContent = `Opponent reconnecting... (${left} s)`;
       render();
+      return;
+    }
+    if (selfHoldUntil && wall > selfHoldUntil + 2000 && (!ws || ws.readyState !== 1)) {
+      selfHoldUntil = 0;
+      endMatch('Connection lost');
       return;
     }
     const budget = stepBudget(clock, sim.frame, now);
@@ -1072,6 +1149,8 @@ function armLoop(clock, gen) {
     while (steps < budget && sim.canStep() && !sim.result) {
       sim.step();
       steps += 1;
+      stepTimes.push(wall);
+      if (stepTimes.length > 180) stepTimes.shift();
       queueLocal(sim.frame - 1 + sim.delay);
       publishHash();
       if (sim.result) break;
@@ -1082,14 +1161,21 @@ function armLoop(clock, gen) {
       endMatch(resultText());
       return;
     }
-    const level = evalStall(lastPeerRx, Date.now());
+    // Own socket is down: keep the fight screen for the 30 s hold. Do not
+    // bail to the lobby at 9 s while the server is still waiting.
+    if (!ws || ws.readyState !== 1) return;
+    const level = evalStall(lastPeerRx, wall);
     if (level === 'lost') {
       if (stall) stall.textContent = 'Connection lost';
       transmit({ t: 'give_up' });
       endMatch('Connection lost');
       return;
     }
-    if (stall) stall.textContent = level === 'slow' ? stallLabel(level) : '';
+    if (level === 'slow') {
+      if (stall) stall.textContent = stallLabel(level);
+      return;
+    }
+    if (stall) stall.textContent = poorLink(stepTimes, wall) ? 'Poor connection' : '';
   };
   driveMatch = loop;
   const rafLoop = () => {
@@ -1103,6 +1189,7 @@ function armLoop(clock, gen) {
 function resumeMatch(m) {
   if (!m || typeof m.frame !== 'number') return;
   holdUntil = 0;
+  selfHoldUntil = 0;
   notePeer();
   const picksMap = m.picks || picks;
   const a = val(picksMap, 0) || FIGHTERS[0];
@@ -1147,6 +1234,7 @@ function resumeMatch(m) {
   const stall = document.getElementById('stall');
   if (stall) stall.textContent = '';
   statusEl.textContent = 'Opponent reconnected.';
+  stepTimes = [];
   const clock = createPacer(performance.now());
   const gen = ++matchGen;
   armLoop(clock, gen);
@@ -1158,6 +1246,7 @@ function endMatch(msg) {
   sim.closed = true;
   driveMatch = null;
   holdUntil = 0;
+  selfHoldUntil = 0;
   if (raf) cancelAnimationFrame(raf);
   raf = null;
   const banner = document.getElementById('koBanner');
