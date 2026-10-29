@@ -2,7 +2,7 @@ services:
   - type: web
     name: hd-fighter-2
     env: node
-    rootDir: multiplayer
+    rootDir: HD_Fighter/multiplayer
     buildCommand: npm install
     startCommand: node server.js
     plan: free
