@@ -1,0 +1,3 @@
+# Server for ONLINE VS. Copy to netplay.cfg (next to the exe) and point it at your hub.
+# ws:// for a local server, wss:// for a hosted one (Render, Fly.io...).
+server = ws://localhost:3000/turbo

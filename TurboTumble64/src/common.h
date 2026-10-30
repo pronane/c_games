@@ -5,6 +5,7 @@
  */
 #ifndef TT64_COMMON_H
 #define TT64_COMMON_H
+#include <stdint.h>
 
 #include "raylib.h"
 #include "raymath.h"
@@ -291,13 +292,16 @@ typedef struct Race {
     bool finalLapMusic;
     float shake[MAX_HUMANS];
     long simFrames;
+    /* online (online.c): both humans' buttons for this sim step, and the step before */
+    bool netInputs;
+    uint16_t netBits[MAX_HUMANS], netPrev[MAX_HUMANS];
 } Race;
 
 /* ------------------------------------------------------------------ */
 /* Game / menus                                                        */
 /* ------------------------------------------------------------------ */
-typedef enum { MODE_GP = 0, MODE_TT, MODE_VS } GameMode;
-typedef enum { SCR_TITLE = 0, SCR_MODE, SCR_OPTIONS, SCR_CHAR, SCR_TRACK, SCR_RACE, SCR_RESULTS, SCR_STANDINGS, SCR_CONTROLS, SCR_TROPHY } Screen;
+typedef enum { MODE_GP = 0, MODE_TT, MODE_VS, MODE_ONLINE } GameMode;
+typedef enum { SCR_TITLE = 0, SCR_MODE, SCR_OPTIONS, SCR_CHAR, SCR_TRACK, SCR_RACE, SCR_RESULTS, SCR_STANDINGS, SCR_CONTROLS, SCR_TROPHY, SCR_ONLINE } Screen;
 
 /* gamepad actions + bindings (input.c) */
 typedef enum { PA_ACCEL = 0, PA_BRAKE, PA_HOP, PA_ITEM, PA_PAUSE, NUM_PAD_ACTIONS } PadAction;
@@ -361,6 +365,9 @@ typedef struct Game {
     int autoVisual;
     bool previewOnly;
     int autoOnly;
+    /* online: which human this window plays (-1 offline) and the match seed */
+    int netView;
+    uint32_t netSeed;
 } Game;
 
 extern Game G;
@@ -371,7 +378,10 @@ extern Track T;
 float Approach(float v, float target, float step);
 float WrapAngle(float a);
 float LerpAngle(float a, float b, float t);
-float RandF(float lo, float hi);
+float RandF(float lo, float hi);   /* race sim: seeded, the same on both online machines */
+void SimSeed(uint32_t seed);
+uint32_t SimRand(void);
+float VisRandF(float lo, float hi);  /* visual-only randomness (never inside the sim) */
 Color ColorScale(Color c, float s);
 Color ColorMix(Color a, Color b, float t);
 Color HueColor(float h, float s, float v);

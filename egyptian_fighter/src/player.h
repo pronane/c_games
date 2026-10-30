@@ -35,6 +35,8 @@ typedef struct Player {
     bool projectileFired;   // already launched during the current special
     float opponentX;        // set by the game every frame: used to keep facing the opponent
 
+    bool noGpu;             // headless: sheets carry sizes only (see Player_LoadSprites)
+
     // Sprite sheets (indexed by PlayerState)
     SpriteSheet sheets[STATE_COUNT];
 

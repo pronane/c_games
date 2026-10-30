@@ -36,7 +36,7 @@ ItemType ItemRoll(int place, int numKarts)
     row = row < 0 ? 0 : (row > 7 ? 7 : row);
     int total = 0;
     for (int i = 0; i < 7; i++) total += ODDS[row][i];
-    int r = rand() % total;
+    int r = (int)(SimRand() % (uint32_t)total);
     for (int i = 0; i < 7; i++) { if (r < ODDS[row][i]) return (ItemType)(ITEM_PEEL + i); r -= ODDS[row][i]; }
     return ITEM_PEEL;
 }

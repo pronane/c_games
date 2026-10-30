@@ -1,0 +1,88 @@
+name: Determinism + netplay tests
+on:
+  push:
+  pull_request:
+
+jobs:
+  # Egyptian Fighter --sim-test on Linux and Windows. Each job also checks the expected hashes
+  # compiled into sim.c, and the last job compares the two platforms' outputs line by line.
+  sim-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: X11 / GL headers for raylib
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+      - name: Build raylib 5.5 (bundled with TurboTumble64)
+        run: make -C TurboTumble64/deps/raylib-5.5/src PLATFORM=PLATFORM_DESKTOP -j4
+      - name: Build Egyptian Fighter
+        working-directory: egyptian_fighter
+        run: |
+          R=../TurboTumble64/deps/raylib-5.5/src
+          gcc -std=c99 -D_DEFAULT_SOURCE -O2 -Wall -ffp-contract=off src/*.c \
+              ../shared/netplay/c/netplay.c ../shared/netplay/c/netplay_ws.c \
+              -I$R -L$R -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 -o egyptian_fighter
+      - name: --sim-test
+        working-directory: egyptian_fighter
+        run: ./egyptian_fighter --sim-test | tee ../sim-linux.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: sim-linux, path: sim-linux.txt }
+
+  sim-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-raylib
+      - name: Build Egyptian Fighter (same flags as build_release.bat)
+        working-directory: egyptian_fighter
+        run: |
+          gcc -std=c99 -O2 -Wall -ffp-contract=off src/*.c \
+              ../shared/netplay/c/netplay.c ../shared/netplay/c/netplay_ws.c \
+              -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lwinhttp -o egyptian_fighter.exe ||
+          gcc -std=c99 -O2 -Wall -ffp-contract=off src/*.c \
+              ../shared/netplay/c/netplay.c ../shared/netplay/c/netplay_ws.c \
+              -lraylib -lopengl32 -lgdi32 -lwinmm -lwinhttp -o egyptian_fighter.exe
+      - name: --sim-test
+        working-directory: egyptian_fighter
+        run: ./egyptian_fighter.exe --sim-test | tee ../sim-windows.txt
+      - name: Build TurboTumble64 and the netplay C test (compile check)
+        run: |
+          cd TurboTumble64 && gcc -std=c99 -O2 -Wall -Wno-missing-braces src/*.c \
+              ../shared/netplay/c/netplay.c ../shared/netplay/c/netplay_ws.c \
+              -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lwinhttp -o tt.exe ||
+            gcc -std=c99 -O2 -Wall -Wno-missing-braces src/*.c \
+              ../shared/netplay/c/netplay.c ../shared/netplay/c/netplay_ws.c \
+              -lraylib -lopengl32 -lgdi32 -lwinmm -lwinhttp -o tt.exe
+          cd ../shared/netplay/c && gcc -std=c99 -O2 -Wall netplay.c netplay_ws.c test_netplay.c -lwinhttp -o test_netplay.exe
+      - uses: actions/upload-artifact@v4
+        with: { name: sim-windows, path: sim-windows.txt }
+
+  sim-compare:
+    needs: [sim-linux, sim-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Linux and Windows must produce the same hashes (cross-play)
+        run: |
+          grep -E "final hash|config hash" sim-linux/sim-linux.txt > linux.txt
+          grep -E "final hash|config hash" sim-windows/sim-windows.txt | tr -d '\r' > windows.txt
+          diff -u linux.txt windows.txt && echo "Linux and Windows agree"
+
+  netplay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Shared server (hub routing)
+        run: npm install --prefix shared/netplay/server && npm test --prefix shared/netplay/server
+      - name: HD Fighter on the shared server
+        working-directory: HD_Fighter/multiplayer
+        run: npm install && SOAK_SECONDS=2 npm test
+      - name: C client against the hub (600 frames, drop + rejoin)
+        run: shared/netplay/c/test_netplay.sh

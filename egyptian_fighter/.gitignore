@@ -22,3 +22,7 @@ __pycache__/
 Thumbs.db
 # Photo sources for tools/build_sprites.py (large, real-person photos) - keep out of git
 sprite_sources/
+
+# replays / --sim-test output
+*.efrec
+*.efrec.*

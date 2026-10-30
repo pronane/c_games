@@ -11,6 +11,49 @@ static float attractTimer = 0;
 /* ------------------------------------------------------------------ */
 static const char *GhostFile(int track) { return TextFormat("ghost_track%d.dat", track + 1); }
 
+/* Ghost file v2: "TTGH", version, track, track-geometry hash, character, sample count, lap time,
+   then x y z yaw per sample - every field written on its own, little-endian, so struct padding,
+   the compiler or a changed track layout can't produce a garbled ghost.  v1 files (a raw struct
+   dump) are still read once and rewritten as v2 on the next best lap. */
+#define GHOST_MAGIC   0x48475454u   /* "TTGH" */
+#define GHOST_VERSION 2u
+
+static uint32_t TrackHash(void)
+{
+    uint32_t h = 2166136261u;
+    const unsigned char *p = (const unsigned char *)&T.n;
+    for (size_t i = 0; i < sizeof(T.n); i++) { h ^= p[i]; h *= 16777619u; }
+    for (int i = 0; i < T.n; i += 8) {
+        p = (const unsigned char *)&T.s[i].pos;
+        for (size_t j = 0; j < sizeof(Vector3); j++) { h ^= p[j]; h *= 16777619u; }
+    }
+    return h;
+}
+
+static void PutU32(unsigned char **w, uint32_t v) { for (int i = 0; i < 4; i++) *(*w)++ = (unsigned char)(v >> (8*i)); }
+static void PutF32(unsigned char **w, float f) { uint32_t v; memcpy(&v, &f, 4); PutU32(w, v); }
+static uint32_t GetU32(const unsigned char **r) { uint32_t v = 0; for (int i = 0; i < 4; i++) v |= (uint32_t)*(*r)++ << (8*i); return v; }
+static float GetF32(const unsigned char **r) { uint32_t v = GetU32(r); float f; memcpy(&f, &v, 4); return f; }
+
+static void GhostSave(void)
+{
+    int n = G.ghost.n;
+    int size = 4*7 + n*16;
+    unsigned char *buf = (unsigned char *)malloc((size_t)size), *w = buf;
+    if (!buf) return;
+    PutU32(&w, GHOST_MAGIC); PutU32(&w, GHOST_VERSION); PutU32(&w, (uint32_t)G.ghost.track);
+    PutU32(&w, TrackHash()); PutU32(&w, (uint32_t)G.ghost.charId); PutU32(&w, (uint32_t)n); PutF32(&w, G.ghost.lapTime);
+    for (int i = 0; i < n; i++) { PutF32(&w, G.ghost.x[i]); PutF32(&w, G.ghost.y[i]); PutF32(&w, G.ghost.z[i]); PutF32(&w, G.ghost.yaw[i]); }
+    SaveFileData(GhostFile(G.ghost.track), buf, size);
+    free(buf);
+}
+
+static bool GhostSane(int track)
+{
+    return G.ghost.track == track && G.ghost.n > 10 && G.ghost.n <= GHOST_MAX &&
+           G.ghost.charId >= 0 && G.ghost.charId < NUM_CHARACTERS && G.ghost.lapTime > 0;
+}
+
 void GhostLoad(int track)
 {
     if (G.ghostValid && G.ghost.track == track) return;
@@ -19,9 +62,26 @@ void GhostLoad(int track)
     int size = 0;
     unsigned char *d = LoadFileData(GhostFile(track), &size);
     if (!d) return;
-    if (size == (int)sizeof(G.ghost) && ((int *)d)[0] == track) {
-        memcpy(&G.ghost, d, sizeof(G.ghost));
-        if (G.ghost.n > 10 && G.ghost.n <= GHOST_MAX && G.ghost.charId >= 0 && G.ghost.charId < NUM_CHARACTERS) G.ghostValid = true;
+    const unsigned char *r = d;
+    if (size >= 28 && GetU32(&r) == GHOST_MAGIC) {
+        uint32_t ver = GetU32(&r), tr = GetU32(&r), th = GetU32(&r);
+        int ch = (int)GetU32(&r), n = (int)GetU32(&r);
+        float lap = GetF32(&r);
+        if (ver != GHOST_VERSION) TraceLog(LOG_WARNING, "GHOST: %s is version %u, expected %u - ignored", GhostFile(track), ver, GHOST_VERSION);
+        else if ((int)tr != track || th != TrackHash()) TraceLog(LOG_WARNING, "GHOST: %s was recorded on a different track layout - ignored", GhostFile(track));
+        else if (n <= 0 || n > GHOST_MAX || size != 28 + n*16) TraceLog(LOG_WARNING, "GHOST: %s is truncated - ignored", GhostFile(track));
+        else {
+            G.ghost.track = track; G.ghost.charId = ch; G.ghost.n = n; G.ghost.lapTime = lap;
+            for (int i = 0; i < n; i++) { G.ghost.x[i] = GetF32(&r); G.ghost.y[i] = GetF32(&r); G.ghost.z[i] = GetF32(&r); G.ghost.yaw[i] = GetF32(&r); }
+            G.ghostValid = GhostSane(track);
+        }
+    } else if (size == (int)sizeof(G.ghost)) {    /* v1: raw struct from the same build */
+        int t1;
+        memcpy(&t1, d, sizeof t1);
+        if (t1 == track) {
+            memcpy(&G.ghost, d, sizeof(G.ghost));
+            G.ghostValid = GhostSane(track);
+        }
     }
     UnloadFileData(d);
 }
@@ -45,7 +105,7 @@ static void GhostLapDone(float lapTime)
         G.ghostRec.track = T.index; G.ghostRec.charId = k->charId; G.ghostRec.lapTime = lapTime;
         memcpy(&G.ghost, &G.ghostRec, sizeof(G.ghost));
         G.ghostValid = true;
-        if (!G.autotest) SaveFileData(GhostFile(T.index), &G.ghost, (int)sizeof(G.ghost));
+        if (!G.autotest) GhostSave();
         if (G.autotest) ALog("GHOST: new best lap %s recorded (%d samples) on %s", FormatTime(lapTime), G.ghost.n, T.def->name);
         if (k->human >= 0) { strcpy(R.banner[k->human], "NEW BEST LAP!"); R.bannerTimer[k->human] = 2.2f; }
     }
@@ -72,9 +132,11 @@ void RaceStart(int trackIndex, bool attract)
 {
     TrackBuild(&T, trackIndex);
     memset(&R, 0, sizeof(R));
+    SimSeed(G.mode == MODE_ONLINE && !attract ? G.netSeed : (uint32_t)rand()*2654435761u + 1u);
     R.attract = attract;
     R.timeTrial = (!attract && G.mode == MODE_TT);
-    R.numHumans = attract ? 0 : (G.mode == MODE_VS ? 2 : 1);
+    R.numHumans = attract ? 0 : ((G.mode == MODE_VS || G.mode == MODE_ONLINE) ? 2 : 1);
+    R.netInputs = !attract && G.mode == MODE_ONLINE;
     if (G.autotest && !attract && G.mode != MODE_VS) R.numHumans = 1;
 
     int chars[MAX_RACERS], humanOf[MAX_RACERS];
@@ -89,9 +151,9 @@ void RaceStart(int trackIndex, bool attract)
         for (int h = 0; h < R.numHumans; h++) { chars[n] = G.humanChar[h]; humanOf[n] = h; used[G.humanChar[h]] = true; n++; }
         int pool[MAX_CHARACTERS], pn = 0;
         for (int c = 0; c < NUM_CHARACTERS; c++) if (!used[c]) pool[pn++] = c;
-        for (int i = pn - 1; i > 0; i--) { int j = rand() % (i + 1); int t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+        for (int i = pn - 1; i > 0; i--) { int j = (int)(SimRand() % (uint32_t)(i + 1)); int t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
         for (int i = 0; n < MAX_RACERS && i < pn; i++) { chars[n] = pool[i]; humanOf[n] = -1; n++; }
-        while (n < MAX_RACERS) { chars[n] = rand() % NUM_CHARACTERS; humanOf[n] = -1; n++; }
+        while (n < MAX_RACERS) { chars[n] = (int)(SimRand() % NUM_CHARACTERS); humanOf[n] = -1; n++; }
     }
     R.numKarts = n;
 
@@ -263,6 +325,23 @@ static void UpdateAttractCamera(float dt)
     c->projection = CAMERA_PERSPECTIVE;
 }
 
+/* Online buttons -> KartInput. Bits 0-4: steer -15..15 (+16), 5 accel, 6 brake, 7 hop, 8 item.
+   Presses come from the previous step's bits, which are part of the sim state. */
+static void NetKartInput(int h, KartInput *in)
+{
+    uint16_t b = R.netBits[h], p = R.netPrev[h];
+    memset(in, 0, sizeof(*in));
+    in->steer = Clamp(((int)(b & 31) - 16)/15.0f, -1, 1);
+    bool accel = b & (1 << 5), brake = b & (1 << 6), hop = b & (1 << 7), item = b & (1 << 8);
+    in->accel = accel;
+    in->brake = brake && !accel;
+    in->back = brake;
+    in->hop = hop;
+    in->hopPressed = hop && !(p & (1 << 7));
+    in->item = item;
+    in->itemPressed = item && !(p & (1 << 8));
+}
+
 void RaceUpdate(float dt)
 {
     R.simFrames++;
@@ -284,7 +363,7 @@ void RaceUpdate(float dt)
                     /* rocket start: hit the gas just as "1" shows (0.3s - 1.0s before GO) */
                     if (k->startBoostWindow > 0.3f && k->startBoostWindow < 1.0f) { k->boostTimer = 1.0f; k->boostPower = 0.35f; k->statBoosts++; if (!Quiet()) PlaySfx(SFX_BOOST, 0.8f, 1.0f); }
                     else if (k->startBoostWindow >= 1.6f) { k->spinTimer = 0.8f; }
-                } else if (k->human < 0 && rand() % 3 == 0) {
+                } else if (k->human < 0 && SimRand() % 3 == 0) {
                     k->boostTimer = 0.8f; k->boostPower = 0.3f;
                 }
             }
@@ -296,12 +375,16 @@ void RaceUpdate(float dt)
     for (int i = 0; i < R.numKarts; i++) {
         Kart *k = &R.karts[i];
         KartInput in;
-        if (k->human >= 0 && !k->autopilot) InputRead(k->human, &in);
+        if (k->human >= 0 && !k->autopilot) {
+            if (R.netInputs) NetKartInput(k->human, &in);
+            else InputRead(k->human, &in);
+        }
         else KartAIInput(i, &in, dt);
         if (R.phase == RACE_COUNTDOWN && in.accel && k->startBoostWindow < 0) k->startBoostWindow = R.countdown;
         if (in.itemPressed && (R.phase == RACE_RUNNING || R.phase == RACE_DONE || R.attract)) ItemUse(i);
         KartUpdate(i, &in, dt);
     }
+    if (R.netInputs) for (int h = 0; h < MAX_HUMANS; h++) R.netPrev[h] = R.netBits[h];
     if (R.timeTrial && R.phase == RACE_RUNNING && !R.karts[0].finished) GhostRecord();
     KartsCollide();
     ItemsUpdate(dt);
@@ -314,7 +397,7 @@ void RaceUpdate(float dt)
         UpdateChaseCam(h, dt);
         if (R.bannerTimer[h] > 0) R.bannerTimer[h] -= dt;
         Kart *k = &R.karts[R.humanKart[h]];
-        if (!Quiet()) {
+        if (!Quiet() && (G.netView < 0 || h == G.netView)) {
             EngineSet(h, k->speed/KartTopSpeed(k) + (k->boostTimer > 0 ? 0.25f : 0), G.screen == SCR_RACE ? 0.16f : 0.05f);
             DriftLoop(h, k->driftState == 2 && k->grounded, k->sparkLevel);
         }
@@ -356,15 +439,16 @@ void RaceEnd(void)
 void RaceDraw(void)
 {
     int W = GetScreenWidth(), H = GetScreenHeight();
-    int views = R.attract ? 1 : (R.numHumans == 2 ? 2 : 1);
+    int views = R.attract ? 1 : (R.numHumans == 2 && G.netView < 0 ? 2 : 1);
     int vh = H/views;
+    int hv0 = G.netView >= 0 ? G.netView : 0;     /* online: the one human this window plays */
     if (RenderDirect()) {
         ClearBackground(BLACK);
         for (int v = 0; v < views; v++)
-            RenderWorldView(v, R.cam[v], R.attract ? attractFocus : R.humanKart[v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
+            RenderWorldView(v, R.cam[hv0 + v], R.attract ? attractFocus : R.humanKart[hv0 + v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
     } else {
     for (int v = 0; v < views; v++) {
-        RenderWorldView(v, R.cam[v], R.attract ? attractFocus : R.humanKart[v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
+        RenderWorldView(v, R.cam[hv0 + v], R.attract ? attractFocus : R.humanKart[hv0 + v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
     }
     ClearBackground(BLACK);
     }
@@ -386,7 +470,7 @@ void RaceDraw(void)
     }
     if (views == 2) DrawRectangle(0, vh - 2, W, 4, BLACK);
     if (R.attract) return;
-    for (int v = 0; v < views; v++) DrawHUD(v, (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
+    for (int v = 0; v < views; v++) DrawHUD(hv0 + v, (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
     float ms = fminf(W, H)*(views == 2 ? 0.26f : 0.24f);
     Rectangle mr = views == 2 ? (Rectangle){ W - ms - 16, H*0.5f - ms*0.5f, ms, ms } : (Rectangle){ W - ms - 20, H - ms - 50, ms, ms };
     DrawMinimap(mr);

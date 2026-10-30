@@ -1,4 +1,8 @@
 #include "game.h"
+#include "input.h"
+#include <time.h>
+#include "sim.h"
+#include "online.h"
 
 // ------------------------------------------------------------------------------------
 // Face-off captions.  Defaults here; assets/captions.cfg (one "folder = caption" per line)
@@ -54,7 +58,8 @@ static void LoadCaptions(Game *g) {
     TraceLog(LOG_INFO, "Loaded %s", CAPTIONS_FILE);
 }
 
-void Game_Init(Game *g) {
+// Roster + defaults only (no window needed): used by Game_Init and the headless tools.
+void Game_InitCore(Game *g) {
     memset(g, 0, sizeof(Game));
 
     g->characters[0] = (CharacterDef){ "RA",           "char_egypt",  "assets/stages/egypt.png",  "assets/portraits/ra.png" };
@@ -75,7 +80,10 @@ void Game_Init(Game *g) {
     g->winner = 0;
     g->roundTimer = 99.0f;
     g->paused = false;
+}
 
+void Game_Init(Game *g) {
+    Game_InitCore(g);
     for (int i = 0; i < MAX_CHARACTERS; i++) {
         if (FileExists(g->characters[i].stageFile)) {
             g->stages[i] = Gfx_LoadTexture(g->characters[i].stageFile);   // mipmapped, trilinear
@@ -170,13 +178,12 @@ static void MakeFace(Game *g, const Player *p, int slot) {
 
 #define PREFIGHT_TIME 3.6f
 
-static void StartFight(Game *g) {
-    // Unload any previous sprites
-    Player_UnloadSprites(&g->player1);
-    Player_UnloadSprites(&g->player2);
-
+// Everything the simulation needs to start a fight (no faces / stage textures).  gpu=false:
+// headless (sprite sizes only) for --sim-test / --replay; the values come out the same.
+void Game_BeginFightSim(Game *g, uint32_t seed, bool gpu) {
     Player_Init(&g->player1, 300.0f, GROUND_Y, 1, g->selectP1);
     Player_Init(&g->player2, 980.0f, GROUND_Y, -1, g->selectP2);
+    g->player1.noGpu = g->player2.noGpu = !gpu;
 
     // Load sprites for the chosen characters
     // Works even if many PNGs are missing – placeholders will be used + warnings printed
@@ -192,15 +199,40 @@ static void StartFight(Game *g) {
     g->pauseNote[0] = 0;
     g->padWaitRelease = true;
 
+    // seeded PRNG for the CPU (the only randomness in the fight)
+    g->fightSeed = seed;
+    Rng_Seed(&g->rng, seed);
+    g->simTick = 0;
+
     // test aid: EF_TEST_HP2=<n> starts player 2 with n health (quick KO / victory tests)
     if (getenv("EF_TEST_HP2")) g->player2.health = atoi(getenv("EF_TEST_HP2"));
+
+    g->prefightTimer = 0.0f;
+    g->screen = SCREEN_PREFIGHT;
+}
+
+void Game_StartFightSeeded(Game *g, uint32_t seed) {
+    // Unload any previous sprites
+    Player_UnloadSprites(&g->player1);
+    Player_UnloadSprites(&g->player2);
+
+    Game_BeginFightSim(g, seed, true);
+    TraceLog(LOG_INFO, "SIM: fight seed %u, config hash %016llx", (unsigned)seed,
+             (unsigned long long)Sim_ConfigHash(g));
 
     // face-off screen first (also in the CPU modes)
     FreeFaces(g);
     MakeFace(g, &g->player1, 0);
     MakeFace(g, &g->player2, 1);
-    g->prefightTimer = 0.0f;
-    g->screen = SCREEN_PREFIGHT;
+}
+
+static void StartFight(Game *g) {
+    // EF_SEED=<n> fixes the CPU's dice (tests / replays); otherwise a fresh seed per fight.
+    // Online play: the server sends the seed (online.c calls Game_StartFightSeeded).
+    const char *seedEnv = getenv("EF_SEED");
+    uint32_t seed = seedEnv ? (uint32_t)strtoul(seedEnv, NULL, 10)
+                            : (uint32_t)time(NULL) ^ (uint32_t)(GetTime() * 1000003.0);
+    Game_StartFightSeeded(g, seed);
 }
 
 void Game_Unload(Game *g) {
@@ -212,73 +244,6 @@ void Game_Unload(Game *g) {
         if (g->portraitLoaded[i]) UnloadTexture(g->portraits[i]);
     }
 }
-
-static void ReadInputP1(Player *p) {
-    p->inputLeft = p->inputRight = p->inputDown = p->inputUp = false;
-    p->inputPunch = p->inputKick = p->inputSpecial1 = p->inputSpecial2 = false;
-    p->inputBlock = p->inputThrow = p->inputTaunt = p->inputJumpAttack = false;
-
-    p->inputLeft        = IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT);
-    p->inputRight       = IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT);
-    p->inputDown        = IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN);
-    p->inputUp          = IsKeyDown(KEY_W) || IsKeyDown(KEY_UP);
-
-    p->inputPunch       = IsKeyPressed(KEY_J);
-    p->inputKick        = IsKeyPressed(KEY_K);
-    p->inputSpecial1    = IsKeyPressed(KEY_U);
-    p->inputSpecial2    = IsKeyPressed(KEY_I);
-    p->inputBlock       = IsKeyDown(KEY_L);
-    p->inputThrow       = IsKeyPressed(KEY_O);
-    p->inputTaunt       = IsKeyPressed(KEY_P);
-    p->inputJumpAttack  = IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K);
-}
-
-static void ReadInputP2(Player *p) {
-    // Second player on the right side of the keyboard
-    p->inputLeft = p->inputRight = p->inputDown = p->inputUp = false;
-    p->inputPunch = p->inputKick = p->inputSpecial1 = p->inputSpecial2 = false;
-    p->inputBlock = p->inputThrow = p->inputTaunt = p->inputJumpAttack = false;
-
-    p->inputLeft        = IsKeyDown(KEY_LEFT);
-    p->inputRight       = IsKeyDown(KEY_RIGHT);
-    p->inputDown        = IsKeyDown(KEY_DOWN);
-    p->inputUp          = IsKeyDown(KEY_UP);
-
-    // Numpad style or alternative keys
-    p->inputPunch       = IsKeyPressed(KEY_KP_1) || IsKeyPressed(KEY_Z);
-    p->inputKick        = IsKeyPressed(KEY_KP_2) || IsKeyPressed(KEY_X);
-    p->inputSpecial1    = IsKeyPressed(KEY_KP_4) || IsKeyPressed(KEY_C);
-    p->inputSpecial2    = IsKeyPressed(KEY_KP_5) || IsKeyPressed(KEY_V);
-    p->inputBlock       = IsKeyDown(KEY_KP_3) || IsKeyDown(KEY_B);
-    p->inputThrow       = IsKeyPressed(KEY_KP_6) || IsKeyPressed(KEY_N);
-    p->inputTaunt       = IsKeyPressed(KEY_KP_7) || IsKeyPressed(KEY_M);
-    p->inputJumpAttack  = IsKeyPressed(KEY_KP_1) || IsKeyPressed(KEY_KP_2) ||
-                          IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X);
-}
-
-// Gamepad -> player inputs, OR-ed on top of the keyboard.  sel = pad index or PAD_ANY.
-//   D-pad / left stick = move, up = jump, down = crouch   A = jump
-//   X = punch  Y = kick  B or LT = special 1  RT = special 2
-//   RB = block (hold)  LB = throw  Back/Select = taunt  (Start = pause, handled in main.c)
-static void ApplyPad(Game *g, Player *p, int sel) {
-    if (sel == PAD_NONE) return;
-    bool aHeld = Pad_Down(sel, PB_A);
-    if (g->padWaitRelease) aHeld = false;
-    p->inputLeft       |= Pad_Down(sel, PB_LEFT);
-    p->inputRight      |= Pad_Down(sel, PB_RIGHT);
-    p->inputDown       |= Pad_Down(sel, PB_DOWN);
-    p->inputUp         |= Pad_Down(sel, PB_UP) || aHeld;
-    p->inputPunch      |= Pad_Pressed(sel, PB_X);
-    p->inputKick       |= Pad_Pressed(sel, PB_Y);
-    p->inputSpecial1   |= Pad_Pressed(sel, PB_B) || Pad_Pressed(sel, PB_LT);
-    p->inputSpecial2   |= Pad_Pressed(sel, PB_RT);
-    p->inputBlock      |= Pad_Down(sel, PB_RB);
-    p->inputThrow      |= Pad_Pressed(sel, PB_LB);
-    p->inputTaunt      |= Pad_Pressed(sel, PB_BACK);
-    p->inputJumpAttack |= Pad_Pressed(sel, PB_X) || Pad_Pressed(sel, PB_Y);
-}
-
-
 
 // CPU opponent.  Walks in, keeps facing the human (Player_Update does the facing),
 // attacks with every move it has, blocks some incoming attacks and, for characters with
@@ -292,7 +257,7 @@ static void SimpleCPU(Game *g, Player *cpu, const Player *human) {
     float dist = fabsf(dx);
 
     // react to an attack in progress: block ~45% of the time when it can reach us
-    if (Player_IsAttacking(human) && dist < 170.0f && GetRandomValue(0, 99) < 35) {
+    if (Player_IsAttacking(human) && dist < 170.0f && Rng_Range(&g->rng, 0, 99) < 35) {
         cpu->inputBlock = true;
         return;
     }
@@ -306,20 +271,20 @@ static void SimpleCPU(Game *g, Player *cpu, const Player *human) {
     if (dist > 125.0f) {
         // approach (sometimes fire the projectile from range instead)
         if (cpu->projectileKind != PROJ_NONE && dist > 300.0f && g->cpuAttackCooldown == 0 &&
-            GetRandomValue(0, 99) < 4) {
-            if (GetRandomValue(0, 1)) cpu->inputSpecial1 = true; else cpu->inputSpecial2 = true;
+            Rng_Range(&g->rng, 0, 99) < 4) {
+            if (Rng_Range(&g->rng, 0, 1)) cpu->inputSpecial1 = true; else cpu->inputSpecial2 = true;
             g->cpuAttackCooldown = 70;
             return;
         }
         if (dx > 0) cpu->inputRight = true; else cpu->inputLeft = true;
-        if (dist < 260.0f && g->cpuAttackCooldown == 0 && GetRandomValue(0, 99) < 2) {
+        if (dist < 260.0f && g->cpuAttackCooldown == 0 && Rng_Range(&g->rng, 0, 99) < 2) {
             cpu->inputUp = true;               // jump in ...
             g->cpuAttackCooldown = 20;
         }
-    } else if (dist < 95.0f && GetRandomValue(0, 99) < 3) {
+    } else if (dist < 95.0f && Rng_Range(&g->rng, 0, 99) < 3) {
         if (dx > 0) cpu->inputLeft = true; else cpu->inputRight = true;   // make some room
     } else if (g->cpuAttackCooldown == 0) {
-        int r = GetRandomValue(0, 99);
+        int r = Rng_Range(&g->rng, 0, 99);
         if      (r < 30) cpu->inputPunch = true;
         else if (r < 55) cpu->inputKick = true;
         else if (r < 67) cpu->inputThrow = true;
@@ -328,12 +293,12 @@ static void SimpleCPU(Game *g, Player *cpu, const Player *human) {
         else if (r < 92) cpu->inputDown = true;
         else if (r < 95) { if (dx > 0) cpu->inputLeft = true; else cpu->inputRight = true; }
         else             cpu->inputUp = true;
-        g->cpuAttackCooldown = GetRandomValue(35, 80);
+        g->cpuAttackCooldown = Rng_Range(&g->rng, 35, 80);
     }
     // ... and attack in the air
-    if (!cpu->onGround && cpu->state == STATE_JUMP && dist < 200.0f && GetRandomValue(0, 99) < 8)
+    if (!cpu->onGround && cpu->state == STATE_JUMP && dist < 200.0f && Rng_Range(&g->rng, 0, 99) < 8)
         cpu->inputJumpAttack = true;
-    if (GetRandomValue(0, 1500) < 1) cpu->inputTaunt = true;
+    if (Rng_Range(&g->rng, 0, 1500) < 1) cpu->inputTaunt = true;
 }
 
 static void HitPlayer(Player *def, int dir, int dmg) {
@@ -377,6 +342,13 @@ static void SpawnProjectiles(Game *g, Player *p, int owner) {
     }
 }
 
+// A block only stops what comes from the front, while standing in the block state on the ground
+// (holding the button while walking, jumping or attacking does nothing).  attackDir = the
+// direction the attack travels (+1 right, -1 left); the defender must face against it.
+static bool Blocks(const Player *def, int attackDir) {
+    return def->state == STATE_BLOCK && def->onGround && def->facing == -attackDir;
+}
+
 static void UpdateProjectiles(Game *g, float dt) {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *pr = &g->projectiles[i];
@@ -392,7 +364,7 @@ static void UpdateProjectiles(Game *g, float dt) {
         Rectangle box = { pr->pos.x - PROJ_BOX * 0.5f, pr->pos.y - PROJ_BOX * 0.5f, PROJ_BOX, PROJ_BOX };
         if (!def->invincible && CheckCollisionRecs(box, def->hurtbox)) {
             pr->active = false;
-            if (def->inputBlock && def->onGround) {
+            if (Blocks(def, pr->vx > 0 ? 1 : -1)) {
                 def->health -= PROJ_CHIP;                // chip damage through a block
                 if (def->health < 0) def->health = 0;
             } else {
@@ -532,18 +504,28 @@ static void DrawProjectile(const Projectile *pr) {
     }
 }
 
+static bool MeleeLands(const Player *att, const Player *def) {
+    if (!att->attackActive || def->invincible) return false;
+    if (!CheckCollisionRecs(att->hitbox, def->hurtbox)) return false;
+    return att->state == STATE_THROW || !Blocks(def, att->facing);      // throws beat a block
+}
+
 static void CheckHits(Game *g) {
     Player *p1 = &g->player1;
     Player *p2 = &g->player2;
 
-    if (p1->attackActive && !p2->invincible && !p2->inputBlock) {
-        if (CheckCollisionRecs(p1->hitbox, p2->hurtbox)) HitPlayer(p2, p1->facing, MELEE_DAMAGE);
-    }
+    // Decide both hits from the same moment, then apply them: a simultaneous exchange is a
+    // trade (P1's hit no longer cancels P2's attack just because P1 is checked first).
+    bool hit2 = MeleeLands(p1, p2), hit1 = MeleeLands(p2, p1);
+    int dir1 = p1->facing, dir2 = p2->facing;
+    if (hit2) HitPlayer(p2, dir1, MELEE_DAMAGE);
+    if (hit1) HitPlayer(p1, dir2, MELEE_DAMAGE);
 
-    if (p2->attackActive && !p1->invincible && !p1->inputBlock) {
-        if (CheckCollisionRecs(p2->hitbox, p1->hurtbox)) HitPlayer(p1, p2->facing, MELEE_DAMAGE);
+    if (p1->health <= 0 && p2->health <= 0 && !g->gameOver) {   // double KO: a draw
+        g->gameOver = true;
+        g->winner = 0;
+        g->screen = SCREEN_RESULT;
     }
-
     if (p1->health <= 0 && !g->gameOver) {
         g->gameOver = true;
         g->winner = 2;
@@ -610,15 +592,92 @@ static int GridMove(int sel, int dx, int dy) {
     return i;
 }
 
-// two independent cursors only in 1P vs 2P with two controllers plugged in
+// two independent cursors only in 1P vs 2P with two controllers plugged in (and online: one each)
 static bool SelectDual(const Game *g) {
+    if (g->mode == MODE_ONLINE) return true;
     return g->mode == MODE_1P_VS_2P && Pad_ForPlayer(1) != PAD_NONE && Pad_ForPlayer(2) != PAD_NONE;
 }
 
+// One fixed 1/60 s step of the fight simulation: pre-fight countdown, the fight itself and the
+// result poses.  Inputs come only from in[] - no raylib input, no clock, no rand().
+void Game_SimTick(Game *g, const InputBits in[2]) {
+    const float dt = SIM_DT;
+    if (g->paused) return;
+    if (g->screen != SCREEN_PREFIGHT && g->screen != SCREEN_FIGHT && g->screen != SCREEN_RESULT) return;
+    g->simTick++;
+
+    // ---------- PRE-FIGHT FACE-OFF ----------
+    if (g->screen == SCREEN_PREFIGHT) {
+        g->prefightTimer += dt;
+        bool skip = g->prefightTimer > 0.35f && ((in[0] | in[1]) & IN_CONFIRM);
+        if (skip || g->prefightTimer >= PREFIGHT_TIME) {
+            g->screen = SCREEN_FIGHT;
+            g->padWaitRelease = true;        // the A / Start that skipped must not jump / pause
+        }
+        return;
+    }
+
+    // ---------- FIGHT ----------
+    if (g->screen == SCREEN_FIGHT) {
+        // one 16-bit mask per fighter (sampled by input.c, or from the network / a replay)
+        Input_ToPlayer(&g->player1, in[0]);
+        Input_ToPlayer(&g->player2, in[1]);
+        if (g->mode == MODE_1P_VS_CPU)      SimpleCPU(g, &g->player2, &g->player1);
+        else if (g->mode == MODE_CPU_VS_1P) SimpleCPU(g, &g->player1, &g->player2);
+
+        g->player1.opponentX = g->player2.position.x;
+        g->player2.opponentX = g->player1.position.x;
+        Player_Update(&g->player1, dt);
+        Player_Update(&g->player2, dt);
+
+        KeepPlayersApart(&g->player1, &g->player2);
+        SpawnProjectiles(g, &g->player1, 1);
+        SpawnProjectiles(g, &g->player2, 2);
+        UpdateProjectiles(g, dt);
+        CheckHits(g);
+
+        g->roundTimer -= dt;
+        if (g->roundTimer <= 0.0f) {
+            g->roundTimer = 0.0f;
+            g->gameOver = true;
+            if (g->player1.health > g->player2.health) g->winner = 1;
+            else if (g->player2.health > g->player1.health) g->winner = 2;
+            else g->winner = 0;
+            if (g->winner) Player_SetState(g->winner == 1 ? &g->player1 : &g->player2, STATE_VICTORY);
+            g->screen = SCREEN_RESULT;
+        }
+        return;
+    }
+
+    // ---------- RESULT: keep animating the winner's pose / the loser landing ----------
+    if (g->screen == SCREEN_RESULT) {
+        // keep animating: the winner's victory pose (Mike keeps flexing), the loser lands
+        Player *pl[2] = { &g->player1, &g->player2 };
+        for (int k = 0; k < 2; k++) {
+            Player *q = pl[k];
+            q->inputLeft = q->inputRight = q->inputDown = q->inputUp = false;
+            q->inputPunch = q->inputKick = q->inputSpecial1 = q->inputSpecial2 = false;
+            q->inputBlock = q->inputThrow = q->inputTaunt = q->inputJumpAttack = false;
+            q->opponentX = 0.0f;
+            if (q->onGround) q->velocity.x = 0.0f;
+            Player_Update(q, dt);
+            q->attackActive = false;
+        }
+        return;
+    }
+}
+
+// Per-frame (render-rate) menus: select screen, controller test, leaving the result screen.
+// Not part of the deterministic simulation.
 void Game_Update(Game *g) {
     if (g->paused) return;
 
     float dt = GetFrameTime();
+
+    if (g->screen == SCREEN_ONLINE) {
+        Online_MenuUpdate(g);
+        return;
+    }
 
     // ---------- CHARACTER SELECT ----------
     // One shared cursor (keyboard only / one controller / any CPU mode): it picks the LEFT slot
@@ -630,15 +689,20 @@ void Game_Update(Game *g) {
             if (++g->startPending > 2) { g->startPending = 0; StartFight(g); }
             return;
         }
+        if (g->mode == MODE_ONLINE) {          // our cursor only; the other side comes from the server
+            Online_SelectUpdate(g);
+            return;
+        }
         if (IsKeyPressed(KEY_F1) || Pad_Pressed(PAD_ANY, PB_BACK)) {   // controller test / controls
             g->screen = SCREEN_PADTEST;
             return;
         }
         int modeStep = 0;
         if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_E) || Pad_Pressed(PAD_ANY, PB_RB)) modeStep = 1;
-        else if (IsKeyPressed(KEY_Q) || Pad_Pressed(PAD_ANY, PB_LB)) modeStep = 2;
+        else if (IsKeyPressed(KEY_Q) || Pad_Pressed(PAD_ANY, PB_LB)) modeStep = MODE_COUNT - 1;
         if (modeStep) {
-            g->mode = (g->mode + modeStep) % 3;
+            g->mode = (g->mode + modeStep) % MODE_COUNT;
+            if (g->mode == MODE_ONLINE) { Online_Enter(g); return; }
             g->p1Ready = false;
             g->p2Ready = false;
             return;
@@ -702,72 +766,6 @@ void Game_Update(Game *g) {
         return;
     }
 
-    // ---------- PRE-FIGHT FACE-OFF ----------
-    if (g->screen == SCREEN_PREFIGHT) {
-        g->prefightTimer += dt;
-        bool skip = g->prefightTimer > 0.35f &&
-                    (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
-                     Pad_Pressed(PAD_ANY, PB_A) || Pad_Pressed(PAD_ANY, PB_START));
-        if (skip || g->prefightTimer >= PREFIGHT_TIME) {
-            g->screen = SCREEN_FIGHT;
-            g->padWaitRelease = true;        // the A / Start that skipped must not jump / pause
-        }
-        return;
-    }
-
-    // ---------- FIGHT ----------
-    if (g->screen == SCREEN_FIGHT) {
-        if (g->padWaitRelease && !Pad_Down(PAD_ANY, PB_A) && !Pad_Down(PAD_ANY, PB_START))
-            g->padWaitRelease = false;
-        if (g->mode == MODE_1P_VS_CPU) {
-            ReadInputP1(&g->player1);
-            ApplyPad(g, &g->player1, PAD_ANY);
-            SimpleCPU(g, &g->player2, &g->player1);
-        } else if (g->mode == MODE_CPU_VS_1P) {
-            // the human is on the right: accept the P1 keys (WASD...) and the P2 keys
-            Player tmp = g->player2;
-            ReadInputP1(&g->player2);
-            ReadInputP2(&tmp);
-            Player *h = &g->player2;
-            h->inputLeft |= tmp.inputLeft;   h->inputRight |= tmp.inputRight;
-            h->inputDown |= tmp.inputDown;   h->inputUp |= tmp.inputUp;
-            h->inputPunch |= tmp.inputPunch; h->inputKick |= tmp.inputKick;
-            h->inputSpecial1 |= tmp.inputSpecial1; h->inputSpecial2 |= tmp.inputSpecial2;
-            h->inputBlock |= tmp.inputBlock; h->inputThrow |= tmp.inputThrow;
-            h->inputTaunt |= tmp.inputTaunt; h->inputJumpAttack |= tmp.inputJumpAttack;
-            ApplyPad(g, h, PAD_ANY);
-            SimpleCPU(g, &g->player1, &g->player2);
-        } else {
-            ReadInputP1(&g->player1);
-            ReadInputP2(&g->player2);
-            ApplyPad(g, &g->player1, Pad_ForPlayer(1));
-            ApplyPad(g, &g->player2, Pad_ForPlayer(2));
-        }
-
-        g->player1.opponentX = g->player2.position.x;
-        g->player2.opponentX = g->player1.position.x;
-        Player_Update(&g->player1, dt);
-        Player_Update(&g->player2, dt);
-
-        KeepPlayersApart(&g->player1, &g->player2);
-        SpawnProjectiles(g, &g->player1, 1);
-        SpawnProjectiles(g, &g->player2, 2);
-        UpdateProjectiles(g, dt);
-        CheckHits(g);
-
-        g->roundTimer -= dt;
-        if (g->roundTimer <= 0.0f) {
-            g->roundTimer = 0.0f;
-            g->gameOver = true;
-            if (g->player1.health > g->player2.health) g->winner = 1;
-            else if (g->player2.health > g->player1.health) g->winner = 2;
-            else g->winner = 0;
-            if (g->winner) Player_SetState(g->winner == 1 ? &g->player1 : &g->player2, STATE_VICTORY);
-            g->screen = SCREEN_RESULT;
-        }
-        return;
-    }
-
     // ---------- CONTROLLER TEST ----------
     if (g->screen == SCREEN_PADTEST) {
         bool startHeld = false;
@@ -782,20 +780,8 @@ void Game_Update(Game *g) {
         return;
     }
 
-    // ---------- RESULT ----------
+    // ---------- RESULT ----------  (the poses keep animating in Game_SimTick)
     if (g->screen == SCREEN_RESULT) {
-        // keep animating: the winner's victory pose (Mike keeps flexing), the loser lands
-        Player *pl[2] = { &g->player1, &g->player2 };
-        for (int k = 0; k < 2; k++) {
-            Player *q = pl[k];
-            q->inputLeft = q->inputRight = q->inputDown = q->inputUp = false;
-            q->inputPunch = q->inputKick = q->inputSpecial1 = q->inputSpecial2 = false;
-            q->inputBlock = q->inputThrow = q->inputTaunt = q->inputJumpAttack = false;
-            q->opponentX = 0.0f;
-            if (q->onGround) q->velocity.x = 0.0f;
-            Player_Update(q, dt);
-            q->attackActive = false;
-        }
         if (IsKeyPressed(KEY_R) || IsKeyPressed(KEY_ENTER) ||
             Pad_Pressed(PAD_ANY, PB_A) || Pad_Pressed(PAD_ANY, PB_START)) {
             // Back to select (fighter sprites only: stage / portrait textures stay loaded)
@@ -926,6 +912,7 @@ static bool SlotIsCpu(const Game *g, int slot) {
     return slot == 0 ? g->mode == MODE_CPU_VS_1P : g->mode == MODE_1P_VS_CPU;
 }
 static const char *SlotLabel(const Game *g, int slot) {
+    if (g->mode == MODE_ONLINE) return slot == Online_MySlot() ? "YOU" : "RIVAL";
     if (SlotIsCpu(g, slot)) return "CPU";
     if (slot == 0) return "P1";
     return g->mode == MODE_CPU_VS_1P ? "P1" : "P2";
@@ -961,14 +948,14 @@ static void DrawSelect(const Game *g) {
     DrawCentered("EGYPTIAN FIGHTER", 22, 44, GOLD);
 
     // mode row
-    static const char *modes[3] = { "1P vs CPU", "CPU vs 1P", "1P vs 2P" };
+    static const char *modes[MODE_COUNT] = { "1P vs CPU", "CPU vs 1P", "1P vs 2P", "ONLINE" };
     int mw = 0;
-    for (int m = 0; m < 3; m++) mw += MeasureText(modes[m], 20) + 12 + 14;
+    for (int m = 0; m < MODE_COUNT; m++) mw += MeasureText(modes[m], 20) + 12 + 14;
     const char *mlab = "MODE:";
     int mx = SCREEN_WIDTH / 2 - (mw + MeasureText(mlab, 20) + 10) / 2;
     DrawText(mlab, mx, 78, 20, LIGHTGRAY);
     mx += MeasureText(mlab, 20) + 10;
-    for (int m = 0; m < 3; m++) {
+    for (int m = 0; m < MODE_COUNT; m++) {
         bool on = (int)g->mode == m;
         DrawChip(modes[m], mx, 75, 20, on ? GOLD : (Color){ 60, 60, 70, 220 }, on ? BLACK : GRAY);
         mx += MeasureText(modes[m], 20) + 12 + 14;
@@ -1023,11 +1010,12 @@ static void DrawSelect(const Game *g) {
         }
         // which inputs drive this slot
         const char *by;
-        if (SlotIsCpu(g, k)) by = "Picked with the same controller";
+        if (g->mode == MODE_ONLINE) by = k == Online_MySlot() ? "Keyboard or any controller" : "Online opponent";
+        else if (SlotIsCpu(g, k)) by = "Picked with the same controller";
         else if (dual) by = TextFormat("%s", Pad_Describe(Pad_ForPlayer(k + 1)));
         else by = "Keyboard or any controller";
         DrawText(by, px + 20, py + 352, 16, LIGHTGRAY);
-        if (dual) DrawText(k == 0 ? "keys: WASD + J ready, Backspace back" : "keys: arrows + Z ready, X back",
+        if (dual && g->mode != MODE_ONLINE) DrawText(k == 0 ? "keys: WASD + J ready, Backspace back" : "keys: arrows + Z ready, X back",
                            px + 20, py + 374, 16, GRAY);
     }
 
@@ -1088,6 +1076,7 @@ static void DrawSelect(const Game *g) {
         DrawRectangle(0, 300, SCREEN_WIDTH, 90, (Color){ 0, 0, 0, 200 });
         DrawCentered("LOADING FIGHTERS...", 326, 40, GOLD);
     }
+    if (g->mode == MODE_ONLINE) Online_DrawStatus(g);
 }
 
 void Game_Draw(const Game *g) {
@@ -1102,6 +1091,11 @@ void Game_Draw(const Game *g) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){30, 30, 50, 255});
     }
 
+    if (g->screen == SCREEN_ONLINE) {
+        Online_DrawMenu(g);
+        return;
+    }
+
     // ---------- SELECT SCREEN ----------
     if (g->screen == SCREEN_SELECT) {
         DrawSelect(g);
@@ -1111,6 +1105,7 @@ void Game_Draw(const Game *g) {
     // ---------- PRE-FIGHT FACE-OFF ----------
     if (g->screen == SCREEN_PREFIGHT) {
         DrawPrefight(g);
+        if (g->mode == MODE_ONLINE) Online_DrawStatus(g);
         return;
     }
 
@@ -1207,8 +1202,10 @@ void Game_Draw(const Game *g) {
     int tw = MeasureText(timerText, 40);
     DrawText(timerText, SCREEN_WIDTH/2 - tw/2, 25, 40, YELLOW);
 
+    if (g->mode == MODE_ONLINE) Online_DrawStatus(g);
+
     // Controls reminder
-    DrawText("P1: WASD+J/K/U/I/L/O/P   P2: Arrows+Z/X/C/V/B/N/M   ESC=Pause   "
+    if (g->mode != MODE_ONLINE) DrawText("P1: WASD+J/K/U/I/L/O/P   P2: Arrows+Z/X/C/V/B/N/M   ESC=Pause   "
              "Pad: X punch  Y kick  A jump  B/LT sp1  RT sp2  RB block  LB throw  Back taunt  Start pause",
              12, SCREEN_HEIGHT - 26, 14, LIGHTGRAY);
 
@@ -1220,6 +1217,7 @@ void Game_Draw(const Game *g) {
         if (g->winner == 1) msg = "PLAYER 1 WINS!";
         if (g->winner == 1) msg = (g->mode == MODE_CPU_VS_1P) ? "CPU WINS!" : "PLAYER 1 WINS!";
         if (g->winner == 2) msg = (g->mode == MODE_1P_VS_CPU) ? "CPU WINS!" : "PLAYER 2 WINS!";
+        if (g->mode == MODE_ONLINE && g->winner) msg = g->winner - 1 == Online_MySlot() ? "YOU WIN!" : "YOU LOSE";
         Gfx_DrawTitle(gTitleFont, msg, (Vector2){ SCREEN_WIDTH / 2.0f, 155 }, 64, GOLD, (Color){ 90, 20, 10, 255 }, 4);
         const char *back = "Press R / Enter or pad A / Start to return to Character Select";
         DrawText(back, SCREEN_WIDTH/2 - MeasureText(back, 22)/2, 198, 22, RAYWHITE);

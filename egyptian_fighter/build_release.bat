@@ -31,9 +31,9 @@ if not exist "%UCRT%\include\raylib.h" (
 )
 
 if not exist release mkdir release
-set "SRC=src\main.c src\player.c src\game.c src\demo.c src\pad.c src\gfx.c"
-set "CFLAGS=-std=c99 -O2 -Wall -I"%UCRT%\include""
-set "LIBS=-L"%UCRT%\lib" -lraylib -lopengl32 -lgdi32 -lwinmm"
+set "SRC=src\main.c src\player.c src\game.c src\demo.c src\pad.c src\gfx.c src\input.c src\sim.c src\online.c ..\shared\netplay\c\netplay.c ..\shared\netplay\c\netplay_ws.c"
+set "CFLAGS=-std=c99 -O2 -Wall -ffp-contract=off -I"%UCRT%\include""
+set "LIBS=-L"%UCRT%\lib" -lraylib -lopengl32 -lgdi32 -lwinmm -lwinhttp"
 
 echo Compiling (static, no console window)...
 :: MSYS2's raylib uses the separate glfw package, so -lglfw3 is tried first.
@@ -41,7 +41,7 @@ echo Compiling (static, no console window)...
 set "BUILT="
 set "LINKMODE=-static"
 set "GLFWLIB=-lglfw3"
-gcc %CFLAGS% %SRC% -o release\egyptian_fighter.exe -L"%UCRT%\lib" -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -mwindows -static >nul 2>&1 && set "BUILT=static" && set "LINKMODE=-static"
+gcc %CFLAGS% %SRC% -o release\egyptian_fighter.exe -L"%UCRT%\lib" -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lwinhttp -mwindows -static >nul 2>&1 && set "BUILT=static" && set "LINKMODE=-static"
 if not defined BUILT (
     set "GLFWLIB="
     gcc %CFLAGS% %SRC% -o release\egyptian_fighter.exe %LIBS% -mwindows -static >nul 2>&1 && set "BUILT=static" && set "LINKMODE=-static"

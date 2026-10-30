@@ -5,6 +5,29 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v9.1: bendier photo puppets (opt-in)
+
+Two `forge.py build` options for the front-photo puppet (`--fill puppet`). The defaults are unchanged.
+
+| Option | What it does |
+|---|---|
+| `--puppet-engine skin` | Elbows and knees bend smoothly (linear blend skinning, `sforge/skinwarp.py`) instead of rigid pieces with cap discs. On the mannequin test the detached forearm/shin islands in kick, punch and jump frames went away (about 3 islands per frame down to 2). If a hidden hand had to be copied from the visible one, the classic renderer is used for that build and the report says so. |
+| `--motion-style polish` | Smooth in-betweens (monotone cubic instead of straight lines), a slight lag on forearms and shins, small sway on idle/taunt/victory and a landing squash on jumps (`sforge/motionpolish.py`). Only moves with more frames than key poses change (kick, throw, hit, taunt and both specials in fighter14). The trade-off is that peak joint speed rises (kick about 105 to 152 deg/frame), so judge fast moves by eye. |
+
+```
+python tools/setup_pose.py                                   # once: the pose model forge.py cutout needs
+python forge.py cutout photo.jpg --person largest --out cut
+python forge.py build --photo cut/cutout.png --landmarks cut/landmarks.json --fill puppet \
+    --preset fighter14 --puppet-engine skin --motion-style polish --name me --out out
+```
+
+Tested on the project's own mannequin render with hand-placed landmarks: `tools/test_v9.py` 44/44 and
+`tools/test_v8.py` 6/6 still pass with the patch. **Not yet tested on a real photo or on cartoon art**,
+because the pose model wasn't available where this was made. Compare `--puppet-engine skin` with the
+classic build on your own photos before making it the default.
+A front photo has no depth, so punches and kicks still extend sideways. For a side-on fighter, try
+`--turn 90` (an estimate from a front photo plus a body template).
+
 ## New in v9: faces, colours, variants (+ extras, NPC pack, Unity / Godot plugins)
 `python forge.py help v9` or the Help tab topic "New in v9" has the short version. Screenshots: `previews_v9/`
 (mannequin / fictional NPCs only). Tests: `previews_v9/tests/RESULTS_v9_tests.md`. Results: `RESULTS_v9.md`.
@@ -465,6 +488,7 @@ COLMAP-CUDA, OpenMVS or Meshroom do. The Studio exports a project for those tool
 ## Install (Windows 10 or Linux)
 ```
 setup.bat / ./setup.sh                 once: .venv + pip packages + venv_pose (mocap) + pose model
+python tools/setup_pose.py             just the pose model (needed by forge.py cutout / photo builds)
 forge.bat doctor / ./forge.sh doctor   what is installed and what a missing piece disables
 run_studio.bat / ./run_studio.sh       the visual UI
 forge.bat build ... / ./forge.sh build ...   the CLI; same core as the UI

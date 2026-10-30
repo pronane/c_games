@@ -5,6 +5,7 @@
  *  main.c : window, main loop, and the --autotest harness
  */
 #include "common.h"
+#include "online.h"
 #include <time.h>
 #include <stdarg.h>
 
@@ -363,6 +364,7 @@ static void Gallery(void)
 int main(int argc, char **argv)
 {
     memset(&G, 0, sizeof(G));
+    G.netView = -1;
     G.autoSpeed = 4;
     strcpy(G.shotDir, "screenshots");
     for (int i = 1; i < argc; i++) {
@@ -392,6 +394,7 @@ int main(int argc, char **argv)
     LoadSettings();
     if (G.autotest) { G.settings.visualMode = G.autoVisual; G.settings.padMode = 0; }
     InputInit2();
+    OnlineConfigure(argc, argv);   /* ONLINE VS server: --server / TT_SERVER / netplay.cfg */
 
     if (G.autotest) {
         MakeDirectory(G.shotDir);
@@ -405,11 +408,12 @@ int main(int argc, char **argv)
     if (gallery) { MakeDirectory(G.shotDir); Gallery(); CloseWindow(); return 0; }
     RaceStart(0, true);
     GoToScreen(SCR_TITLE);
+    OnlineAutoStart();
 
     while (!WindowShouldClose() && !G.quit) {
         if (IsWindowResized()) RenderResize();
         if (IsKeyPressed(KEY_F11) || ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER))) { ToggleBorderlessWindowed(); RenderResize(); }
-        if (IsKeyPressed(KEY_F2)) { G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) { T.loaded = true; TrackBuild(&T, T.index); } SaveSettings(); }
+        if (IsKeyPressed(KEY_F2)) { G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) TrackBuild(&T, T.index); SaveSettings(); }
 
         float frameDt = GetFrameTime();
         if (frameDt > AT.worstFrame && G.autotest && AT.perfFrames > 0 && !AT.perfDone) AT.worstFrame = frameDt;
@@ -424,6 +428,7 @@ int main(int argc, char **argv)
             sub = dt/steps;
         }
         InputUpdate(frameDt);
+        OnlinePoll(frameDt);
         if (!G.autotest) MenusUpdate(frameDt);
         else {
             G.screenTime += steps*sub;
@@ -433,7 +438,8 @@ int main(int argc, char **argv)
         }
         if (G.quit) break;
         bool simulate = !(G.screen == SCR_RACE && G.paused);
-        if (simulate) for (int s = 0; s < steps; s++) { RaceUpdate(sub); G.time += sub; }
+        if (G.mode == MODE_ONLINE && G.screen == SCR_RACE) OnlineRaceSteps();   /* lockstep at SIM_DT */
+        else if (simulate) for (int s = 0; s < steps; s++) { RaceUpdate(sub); G.time += sub; }
         AudioUpdate();
 
         BeginDrawing();
@@ -453,6 +459,7 @@ int main(int argc, char **argv)
 
     int code = (G.autotest && AT.failures) ? 1 : 0;
     if (AT.log) fclose(AT.log);
+    OnlineShutdown();
     TrackUnload(&T);
     AudioShutdown();
     CloseWindow();

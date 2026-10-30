@@ -137,6 +137,8 @@ class BuildConfig:
     # ---- v9 EXTRAS (sforge/fx.py, footlock.py, framedata.py, blend.py, qa.py, lod.py)
     fx: str = ""                       # "outline=2,cel=3,pixel=4,light=-1:-1:1,rim=0.4" post passes on every frame
     maps: str = ""                     # "normal,emissive" -> maps/ atlas_normal.png / atlas_emissive.png
+    puppet_engine: str = "classic"     # v9.1: classic | skin (smooth bending limbs, sforge/skinwarp.py)
+    motion_style: str = "classic"      # v9.1: classic | polish (smooth in-betweens, sforge/motionpolish.py)
     footlock: bool = False             # pin planted feet (removes foot sliding in walk / idle)
     framedata: bool = False            # hitboxes / hurtboxes / startup-active-recovery -> framedata.json + framedata.cfg
     blend: str = ""                    # transitions "idle>walk:3,walk>idle:3" -> blend_<a>_<b> moves
@@ -582,7 +584,13 @@ def _puppet_photo(cfg, report):
         known = TN.known_moves(rig)
         keyfn = lambda name, n: TN.rig_move_keys(rig, name, n)
     else:
-        rig = PP.Rig(cut, lms, colour_ref=cut_ref)
+        if cfg.puppet_engine == "skin":
+            from . import skinwarp as SKW
+            rig = SKW.SkinRig(cut, lms, colour_ref=cut_ref)
+            if not rig._skin_ok:
+                report.note("puppet-engine skin: hidden hand copied from the visible one - classic renderer used for this build")
+        else:
+            rig = PP.Rig(cut, lms, colour_ref=cut_ref)
         known = PP.KNOWN_MOVES
         keyfn = lambda name, n: PP.move_keys(name, rig.rest, n)
     report.note("puppet: rig from %s (%d landmarks), stand height %d px, hidden hand: %s" % (
@@ -597,7 +605,13 @@ def _puppet_photo(cfg, report):
         keys, cyc = keyfn(m.name, m.frames)
         if m.name not in known:
             report.warning("puppet: no key poses for '%s' - idle pose used" % m.name)
-        all_poses[m.name] = PP._sample(keys, m.frames) if len(keys) != m.frames else keys
+        if len(keys) == m.frames:
+            all_poses[m.name] = keys
+        elif cfg.motion_style == "polish":
+            from . import motionpolish as MPL
+            all_poses[m.name] = MPL.polished(keys, m.frames, rig.rest, m.name, cyc)
+        else:
+            all_poses[m.name] = PP._sample(keys, m.frames)
 
     # v9 FACES: expression per frame = a procedurally warped copy of the head layer (the photo's own pixels)
     from . import expressions as X

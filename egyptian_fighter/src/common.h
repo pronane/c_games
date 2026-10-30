@@ -17,6 +17,19 @@
 #define SCREEN_HEIGHT 720
 #define TARGET_FPS    60
 
+// The fight simulation always advances in fixed 1/60 s ticks (main.c accumulator), never by
+// the measured frame time, so the same inputs give the same fight on every machine.
+// Bump SIM_VERSION whenever a gameplay rule changes the simulation. It is part of the config hash
+// and the replay header, so old .efrec recordings and mismatched online peers are rejected cleanly.
+//   1  Stage 1 (behaviour identical to Padel Wars v4)
+//   2  block needs the block state, grounded, facing the attacker; throws are unblockable;
+//      simultaneous melee hits trade; a double KO is a draw
+#define SIM_VERSION   2
+#define SIM_HZ        60
+#define SIM_DT        (1.0f / 60.0f)          // what the sim adds to its float timers
+#define SIM_DT_WALL   (1.0 / 60.0)            // wall-clock length of a tick (accumulator)
+#define SIM_MAX_STEPS_PER_FRAME 4     // catch-up limit after a stall (offline play)
+
 #define GROUND_Y      640.0f
 #define PLAYER_WIDTH  80.0f
 #define PLAYER_HEIGHT 160.0f

@@ -3,19 +3,23 @@
 
 #include "player.h"
 #include "pad.h"
+#include "rng.h"
 
 typedef enum {
     SCREEN_SELECT = 0,
     SCREEN_FIGHT,
     SCREEN_RESULT,
     SCREEN_PADTEST,      // controller test + controls help
-    SCREEN_PREFIGHT      // "PADEL WARS" face-off between select and fight
+    SCREEN_PREFIGHT,     // "PADEL WARS" face-off between select and fight
+    SCREEN_ONLINE        // online menu: quick match / create / join (online.c)
 } GameScreen;
 
 typedef enum {
     MODE_1P_VS_CPU = 0,
     MODE_CPU_VS_1P,
-    MODE_1P_VS_2P
+    MODE_1P_VS_2P,
+    MODE_ONLINE,         // two players over the internet (online.c)
+    MODE_COUNT
 } SelectMode;
 
 typedef struct {
@@ -30,7 +34,7 @@ typedef struct {
     float age;
 } Projectile;
 
-typedef struct {
+typedef struct Game {
     Player player1;
     Player player2;
 
@@ -58,6 +62,9 @@ typedef struct {
 
     Projectile projectiles[MAX_PROJECTILES];
     int cpuAttackCooldown;
+    SimRng rng;            // fight PRNG (CPU decisions) - part of the hashed sim state
+    uint32_t fightSeed;    // seed it started from (recorded in replays)
+    uint32_t simTick;      // ticks since the fight was set up (pre-fight included)
 
     // pre-fight screen
     float prefightTimer;
@@ -71,8 +78,13 @@ typedef struct {
     char pauseNote[128];   // e.g. "P1 controller disconnected"
 } Game;
 
+void Game_InitCore(Game *g);                              // roster + defaults, no window
 void Game_Init(Game *g);
-void Game_Update(Game *g);
+void Game_BeginFightSim(Game *g, uint32_t seed, bool gpu); // sim side of starting a fight
+void Game_StartFightSeeded(Game *g, uint32_t seed);       // sprites + face-off, given seed (online)
+#include "input.h"
+void Game_Update(Game *g);                               // menus, once per rendered frame
+void Game_SimTick(Game *g, const InputBits in[2]);       // one fixed SIM_DT step of the fight
 void Game_Draw(const Game *g);
 void Game_Unload(Game *g);
 
