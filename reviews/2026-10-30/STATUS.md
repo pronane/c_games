@@ -51,9 +51,18 @@ These are the reviews in this folder (from the review conversation's handover), 
 
 ## Arena FC (`ArenaFC_review.md`)
 
-Nothing changed. Arena FC is C#/Godot, which isn't in this container, and it wasn't part of your request. Its findings
-#1–#5 (hand-written WebSocket server: negative length, unbounded fragments, timeouts, masking, Origin) are
-the ones worth doing next. The shared `netplay` server uses the `ws` library, so it isn't affected by these.
+No code changed yet. I installed .NET 9 SDK 9.0.320 (Microsoft's `dotnet-install.sh`) and Godot 4.7.2 .NET (the official release
+zip) in the session container and actually built and ran the project, in a scratch copy:
+
+| What | Result |
+|---|---|
+| Godot game project (`ArenaFC.csproj`), `dotnet build` | **Builds**, 0 warnings |
+| In-engine self-test (`godot --headless --rendering-driver dummy -- --selftest`) | **39 passed, 0 failed**. Godot prints RID leak messages at exit with the dummy renderer; they aren't test failures. |
+| Server (`Server/ArenaFC.Server.csproj`) | **Does not compile.** (1) `Program.cs:507` uses `$$"..."` (raw-string syntax) on a normal string: error CS9004. A one-character fix. (2) The `ArenaFC.Core.Net` namespace (`NetProtocol`, referenced 147 times) **isn't in the repo**: `Scripts/Core/Net/` holds only two `.gd` files. The C# networking sources were never committed. |
+| Core tests (`Tests/CoreTests.csproj`) | **Do not compile** for the same missing `ArenaFC.Core.Net` reason, so the 66 core tests can't run from the repo. |
+
+So review findings #1–#5 (the WebSocket server) can't be fixed or tested until the missing `Scripts/Core/Net/*.cs` files are added.
+`Tests/obj` is committed and gets rewritten by every build (review #11).
 
 ## Online play (from the first request)
 
