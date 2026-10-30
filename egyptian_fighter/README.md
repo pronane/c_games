@@ -143,7 +143,7 @@ In the room, pick your fighter and lock it in (Enter / A). Backspace / B un-read
 
 Both players need the same server. Run the shared server (`shared/netplay/server`, `npm start`) or deploy it to Render, then either copy `netplay.cfg.example` to `netplay.cfg` and set `server = wss://<your-app>.onrender.com/egyptian`, or start the game with `--server ws://host:3000/egyptian` (or set `EF_SERVER`). The default is `ws://localhost:3000/egyptian`.
 
-How it works (lockstep, the same protocol as HD Fighter) and its limits are in [`shared/netplay/README.md`](../shared/netplay/README.md). Both players should run the same build.
+It is built on the Stage 1 deterministic sim: every tick is `Game_SimTick` with both players' input bits, and checkpoints compare `Sim_Hash` (with `Sim_ConfigHash` mixed in, so different game data shows up straight away as a desync). How it works (lockstep, the same protocol as HD Fighter) and its limits are in [`shared/netplay/README.md`](../shared/netplay/README.md). Both players should run the same build.
 
 ## Asset Folders
 
@@ -227,6 +227,9 @@ egyptian_fighter/
 │   ├── player.h / player.c
 │   ├── pad.h / pad.c      ← USB / XInput / EasySMX gamepad support
 │   ├── gfx.h / gfx.c      ← fullscreen, TV scaling, fonts, texture filtering
+│   ├── input.h / input.c  ← keyboard + pads -> 16-bit input mask per fighter
+│   ├── rng.h              ← seeded PRNG for the CPU (deterministic)
+│   ├── sim.h / sim.c      ← sim hash, config hash, fixed step, record/replay, --sim-test
 │   └── game.h / game.c    ← screens (select, PADEL WARS face-off, fight, result)
 ├── assets/
 │   ├── gamecontrollerdb.txt   ← controller mappings (SDL_GameControllerDB)
@@ -441,3 +444,46 @@ turns to face the camera again and repeats (`loop victory 1`).
 * **There is no photo of Mike's back.** The back view is reconstructed: his own front image is mirrored, the shirt print and face are
   painted out and replaced with his own hair, and the image is slightly darkened. The turn is a flat "card flip" squeeze, not a real 3D turn.
 * Fixed: the black patch on his shorts where the racket used to be.
+
+---
+
+## Determinism (Stage 1 of the online plan - see ONLINE_PLAN.md)
+
+The fight is now a deterministic simulation: the same inputs and seed give exactly the same
+fight on every run, whatever the frame rate. Nothing about how it plays or looks has changed
+(checked frame by frame against the previous version, see the Stage 1 report).
+
+* **Input**: each fighter's buttons are one 16-bit number per 1/60 s tick (`src/input.h`).
+  Keyboard and pads are read only by `input.c`; the fight code (`Game_SimTick`) sees just the bits.
+* **Fixed step**: the sim always advances 1/60 s per tick. `main.c` runs as many ticks as
+  real time needs (one per frame on a 60 Hz screen, max 4 to catch up after a stall).
+  Pause, a lost controller and F11 / Alt+Enter just stop the ticks; they can't change a fight.
+* **Random**: the CPU uses a seeded PRNG kept in the game state (`src/rng.h`).
+  `EF_SEED=1234` fixes the seed (for tests); otherwise every fight gets a new one.
+* **Hashes**: `Sim_Hash` (whole fight state) and `Sim_ConfigHash` (gameplay values from
+  `sprites.cfg` + sheet sizes + rules). The config hash is logged at each fight start
+  (`SIM: fight seed ..., config hash ...`); two machines must match it to play online.
+
+Test tools (no window needed, run from the `egyptian_fighter` folder):
+
+```
+bin/egyptian_fighter --sim-test              # plays 4 scripted fights in many ways, prints PASS/FAIL
+bin/egyptian_fighter --record fight.efrec    # play normally; each fight saved (fight.efrec, .2, ...)
+bin/egyptian_fighter --replay fight.efrec    # re-simulates it and checks every hash
+```
+
+**Floats - where fixed-point is needed.** Positions, velocities and timers are still `float`.
+Only `+ - * /`, `fabsf`, `fminf`/`fmaxf` and comparisons are used in the sim, which IEEE-754
+makes bit-exact on x86-64 (SSE2) and in WebAssembly, *provided the compiler doesn't fuse a
+multiply and an add* - so the builds pass `-ffp-contract=off` and must never use `-ffast-math`.
+That is enough for Windows-vs-Windows (and Linux) online play with the same exe. For
+**Windows-vs-browser cross-play** it is not a guarantee (different compilers / libm / possible
+FMA on ARM phones), so before stage 5 convert these to fixed-point integers (e.g. 1/256 px):
+`Player.position`, `velocity`, `opponentX`, `hitbox`/`hurtbox` (player.c `UpdatePhysics`,
+`GetHurtbox`, attack boxes), `Projectile.pos`/`vx`/`origin`/`spin`/`age` (game.c
+`SpawnProjectiles`, `UpdateProjectiles`, `KeepPlayersApart`, `CheckHits`), and the timers
+`frameTimer`, `stateTimer`, `invincibleTimer`, `roundTimer`, `prefightTimer` (as tick counts,
+with `sprites.cfg` frame times converted to ticks at load). Also: 32-bit x87 builds are not
+deterministic - ship 64-bit only.
+
+`.efrec` files and `sim_test_replay.efrec` (written by `--sim-test`) can be deleted at any time.

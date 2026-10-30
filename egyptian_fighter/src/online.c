@@ -1,5 +1,7 @@
 // Online versus: menu, lobby and the lockstep fight loop (see online.h).
 #include "online.h"
+#include "input.h"
+#include "sim.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -16,7 +18,9 @@ static struct {
     char code[8];
     char note[128];
     double noteAt;
-    uint16_t latch;        // buttons tapped since the last sampled sim frame
+    InputBits latch;       // "pressed" bits not yet given to a sim tick
+    uint32_t config;       // Sim_ConfigHash folded to 32 bits: mixed into every checkpoint
+    double accum;          // after the match: local-only ticks for the result poses
     // test hooks (EF_ONLINE=quick|create|join:CODE, EF_ONLINE_PICK, EF_ONLINE_BOT, EF_ONLINE_QUIT_AT)
     bool autoPick;
     int autoQuitAt;
@@ -118,32 +122,36 @@ void Online_Poll(Game *g)
                 Np_Ready(O.np, true);
             }
             break;
-        case NP_EV_COUNTDOWN: {
-            int a = PickIndex(ev.picks[0]), b = PickIndex(ev.picks[1]);
-            if (a >= 0) g->selectP1 = a;
-            if (b >= 0) g->selectP2 = b;
-            Game_LoadFight(g);                  // sprites + face-off screen
-            Np_Loaded(O.np);
-            Note("Get ready!");
-            break;
-        }
+        case NP_EV_COUNTDOWN:
         case NP_EV_START: {
+            // The countdown already carries the seed: load the fighters and set the sim up at
+            // tick 0 (the face-off is part of the sim). START only redoes that after a rejoin.
             int a = PickIndex(ev.picks[0]), b = PickIndex(ev.picks[1]);
-            bool loaded = g->player1.sheets[0].texture.id && g->player1.characterIndex == a &&
-                          g->player2.characterIndex == b;
-            if (!loaded) {                      // a rejoin after a restart: load first
+            bool ready = ev.type == NP_EV_START && ev.resumeFrame == 0 && g->simTick == 0 &&
+                         g->screen == SCREEN_PREFIGHT && g->fightSeed == ev.seed &&
+                         g->player1.characterIndex == a && g->player2.characterIndex == b;
+            if (!ready) {
                 if (a >= 0) g->selectP1 = a;
                 if (b >= 0) g->selectP2 = b;
-                Game_LoadFight(g);
+                Game_StartFightSeeded(g, ev.seed);
+                uint64_t c = Sim_ConfigHash(g);
+                O.config = (uint32_t)(c ^ (c >> 32));
             }
-            Game_ResetFight(g);
-            g->screen = ev.resumeFrame > 0 ? SCREEN_FIGHT : SCREEN_PREFIGHT;
+            g->padWaitRelease = false;           // online input is sampled in online.c
             O.latch = 0;
+            O.accum = 0;
+            if (ev.type == NP_EV_COUNTDOWN) {
+                Np_Loaded(O.np);
+                Note("Get ready!");
+                break;
+            }
             if (ev.resumeFrame > 0) Note("Rejoined - catching up");
             TraceLog(LOG_INFO, "ONLINE: start seed %u delay %d slot %d resume %d", ev.seed, ev.delay, ev.slot, ev.resumeFrame);
             break;
         }
         case NP_EV_CANCEL:
+            Player_UnloadSprites(&g->player1);
+            Player_UnloadSprites(&g->player2);
             g->screen = SCREEN_SELECT;
             g->p1Ready = g->p2Ready = false;
             Note(TextFormat("Start cancelled (%s)", ev.text));
@@ -271,84 +279,72 @@ void Online_SelectUpdate(Game *g)
 // ---------------------------------------------------------------------------
 //  Fight: sample local buttons, step in lockstep
 // ---------------------------------------------------------------------------
-enum { B_LEFT, B_RIGHT, B_UP, B_DOWN, B_PUNCH, B_KICK, B_SP1, B_SP2, B_BLOCK, B_THROW, B_TAUNT };
-
-static uint16_t HeldBits(void)
+// This window's buttons as Stage 1 input bits: P1 keys (whichever side we are) + any pad.
+static InputBits LocalBits(void)
 {
-    uint16_t b = 0;
-    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || Pad_Down(PAD_ANY, PB_LEFT)) b |= 1 << B_LEFT;
-    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT) || Pad_Down(PAD_ANY, PB_RIGHT)) b |= 1 << B_RIGHT;
-    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP) || Pad_Down(PAD_ANY, PB_UP) || Pad_Down(PAD_ANY, PB_A)) b |= 1 << B_UP;
-    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN) || Pad_Down(PAD_ANY, PB_DOWN)) b |= 1 << B_DOWN;
-    if (IsKeyDown(KEY_J) || Pad_Down(PAD_ANY, PB_X)) b |= 1 << B_PUNCH;
-    if (IsKeyDown(KEY_K) || Pad_Down(PAD_ANY, PB_Y)) b |= 1 << B_KICK;
-    if (IsKeyDown(KEY_U) || Pad_Down(PAD_ANY, PB_B) || Pad_Down(PAD_ANY, PB_LT)) b |= 1 << B_SP1;
-    if (IsKeyDown(KEY_I) || Pad_Down(PAD_ANY, PB_RT)) b |= 1 << B_SP2;
-    if (IsKeyDown(KEY_L) || Pad_Down(PAD_ANY, PB_RB)) b |= 1 << B_BLOCK;
-    if (IsKeyDown(KEY_O) || Pad_Down(PAD_ANY, PB_LB)) b |= 1 << B_THROW;
-    if (IsKeyDown(KEY_P) || Pad_Down(PAD_ANY, PB_BACK)) b |= 1 << B_TAUNT;
+    InputBits b = Input_KeysP1() | Input_Pad(PAD_ANY, false);
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
+        Pad_Pressed(PAD_ANY, PB_START)) b |= IN_CONFIRM;          // skip the face-off (either side)
     return b;
 }
 
-// A tap shorter than one render frame still reaches the sim as one frame "down".
-static uint16_t TappedBits(void)
+static InputBits BotBits(void)
 {
-    uint16_t b = 0;
-    if (IsKeyPressed(KEY_J) || Pad_Pressed(PAD_ANY, PB_X)) b |= 1 << B_PUNCH;
-    if (IsKeyPressed(KEY_K) || Pad_Pressed(PAD_ANY, PB_Y)) b |= 1 << B_KICK;
-    if (IsKeyPressed(KEY_U) || Pad_Pressed(PAD_ANY, PB_B) || Pad_Pressed(PAD_ANY, PB_LT)) b |= 1 << B_SP1;
-    if (IsKeyPressed(KEY_I) || Pad_Pressed(PAD_ANY, PB_RT)) b |= 1 << B_SP2;
-    if (IsKeyPressed(KEY_O) || Pad_Pressed(PAD_ANY, PB_LB)) b |= 1 << B_THROW;
-    if (IsKeyPressed(KEY_P) || Pad_Pressed(PAD_ANY, PB_BACK)) b |= 1 << B_TAUNT;
-    if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || Pad_Pressed(PAD_ANY, PB_A)) b |= 1 << B_UP;
-    return b;
-}
-
-static uint16_t BotBits(void)
-{
-    // test bot: walk toward the middle, jab, block, jump now and then
+    // test bot: walk about, jab, block, jump now and then
     uint32_t r = Np_Rand(&O.botRng);
-    uint16_t b = (uint16_t)((r >> 3) & ((1 << B_LEFT) | (1 << B_RIGHT)));
-    if ((r & 15) == 0) b |= 1 << B_PUNCH;
-    if ((r & 31) == 1) b |= 1 << B_KICK;
-    if ((r & 63) == 2) b |= 1 << B_SP1;
-    if ((r & 127) == 3) b |= 1 << B_UP;
-    if ((r >> 8 & 7) == 0) b |= 1 << B_BLOCK;
+    InputBits b = (InputBits)((r >> 3) & (IN_LEFT | IN_RIGHT));
+    if ((r & 15) == 0) b |= IN_PUNCH | IN_JATK;
+    if ((r & 31) == 1) b |= IN_KICK | IN_JATK;
+    if ((r & 63) == 2) b |= IN_SP1;
+    if ((r & 127) == 3) b |= IN_UP;
+    if ((r >> 8 & 7) == 0) b |= IN_BLOCK;
     return b;
 }
 
+static uint32_t TickHash(const Game *g)
+{
+    uint64_t h = Sim_Hash(g);
+    return (uint32_t)(h ^ (h >> 32)) ^ O.config;   // different game data shows up as a desync
+}
+
+static void TestResult(const Game *g, int f)
+{
+    printf("ONLINE_RESULT frame %d hash %u hp %d %d\n", f, TickHash(g), g->player1.health, g->player2.health);
+    fflush(stdout);
+    exit(0);
+}
+
+// Runs from main.c instead of the local accumulator while an online fight is on screen.
 void Online_FightUpdate(Game *g)
 {
-    if (!O.np || !Np_InMatch(O.np)) return;
-    O.latch |= TappedBits();
+    if (!O.np) return;
+    if (!Np_InMatch(O.np)) {
+        // match over (KO / time / forfeit): keep the result poses animating, locally only
+        if (g->screen == SCREEN_RESULT) {
+            InputBits none[2] = { 0, 0 };
+            int steps = Sim_StepsForFrame(&O.accum, GetFrameTime());
+            for (int i = 0; i < steps; i++) Game_SimTick(g, none);
+        }
+        return;
+    }
+    InputBits sampled = O.botRng ? BotBits() : LocalBits();
+    O.latch |= sampled & IN_PRESS_MASK;                  // a tap waits for the next tick it can join
     int n = Np_StepsDue(O.np);
     for (int i = 0; i < n; i++) {
-        uint16_t local = O.botRng ? BotBits() : (uint16_t)(HeldBits() | O.latch);
+        InputBits local = (InputBits)((sampled & IN_HELD_MASK) | O.latch);
         if (Np_SetLocalInput(O.np, local)) O.latch = 0;
         uint16_t in[2];
         if (!Np_FrameInputs(O.np, in)) break;
-        if (g->screen == SCREEN_PREFIGHT) g->screen = SCREEN_FIGHT;   // the clock reached frame 0
-        Game_ApplyBits(&g->player1, in[0], g->netPrev[0]);
-        Game_ApplyBits(&g->player2, in[1], g->netPrev[1]);
-        g->netPrev[0] = in[0];
-        g->netPrev[1] = in[1];
-        Game_FightStep(g, 1.0f / 60.0f);
-        uint32_t h = Game_Hash(g);
+        InputBits tick[2] = { in[0], in[1] };
+        Game_SimTick(g, tick);
+        uint32_t h = TickHash(g);
         Np_FrameDone(O.np, h);
         int f = Np_State(O.np)->frame;
         if (f % 300 == 0) TraceLog(LOG_INFO, "ONLINE: frame %d hash %u", f, h);
-        if (O.autoQuitAt && f >= O.autoQuitAt) {
-            printf("ONLINE_RESULT frame %d hash %u hp %d %d\n", f, h, g->player1.health, g->player2.health);
-            fflush(stdout);
-            exit(0);
-        }
-        if (g->screen != SCREEN_FIGHT) {        // KO or time: both machines reach it on the same frame
+        if (O.autoQuitAt && f >= O.autoQuitAt) TestResult(g, f);
+        if (g->screen == SCREEN_RESULT) {        // KO or time: both machines reach it on the same tick
             Np_MatchOver(O.np);
-            if (O.autoQuitAt) {
-                printf("ONLINE_RESULT frame %d hash %u hp %d %d\n", f, h, g->player1.health, g->player2.health);
-                fflush(stdout);
-                exit(0);
-            }
+            if (O.autoQuitAt) TestResult(g, f);
             break;
         }
     }

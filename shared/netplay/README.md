@@ -39,11 +39,11 @@ Because only inputs cross the network, the bandwidth is tiny (about 60 small pac
 
 ## Does it work for the other games?
 
-**Egyptian Fighter — yes, and now does.** It's the same shape as HD Fighter: two players, one sim. The changes were:
-- the fight step (`Game_FightStep`) runs at a fixed 1/60 s instead of `GetFrameTime()`, and the invincibility timer used the frame time directly, so it now uses the step's `dt`;
-- inputs travel as held-button bits (11 bits); "pressed" is derived inside the sim from the previous frame's bits, so it lands on the same frame on both machines;
-- the CPU AI (the only `GetRandomValue` user) isn't used online;
-- `Game_Hash` hashes both fighters, projectiles and the round clock.
+**Egyptian Fighter: yes, and it now has an online mode.** It's built on the Padel Wars Stage 1 deterministic sim (`input.c`, `sim.c`, `rng.h`):
+- each lockstep tick is one `Game_SimTick` with both players' 16-bit `InputBits`; the "pressed" bits travel explicitly;
+- the face-off, the fight and the KO/time-out are all in the sim, so both machines reach the result on the same tick;
+- checkpoint hashes are `Sim_Hash` folded to 32 bits, XOR `Sim_ConfigHash`, so mismatched sprite data is caught at the first checkpoint;
+- `--sim-test` still passes with the online layer in, and its final hashes are unchanged from the Stage 1 report.
 
 **TurboTumble64 — yes for two humans plus the CPU karts.** It already had a fixed `SIM_DT`, a 2-human VS mode and per-player `KartInput`. The changes were:
 - a seeded race-sim RNG (`SimRand` / `RandF`) instead of `rand()`, so CPU driving, item rolls and the grid are identical on both machines. Visual-only randomness (ENHANCED extra particles) uses `VisRandF` so different graphics settings can't change the race;

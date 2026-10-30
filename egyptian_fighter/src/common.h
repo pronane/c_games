@@ -17,6 +17,13 @@
 #define SCREEN_HEIGHT 720
 #define TARGET_FPS    60
 
+// The fight simulation always advances in fixed 1/60 s ticks (main.c accumulator), never by
+// the measured frame time, so the same inputs give the same fight on every machine.
+#define SIM_HZ        60
+#define SIM_DT        (1.0f / 60.0f)          // what the sim adds to its float timers
+#define SIM_DT_WALL   (1.0 / 60.0)            // wall-clock length of a tick (accumulator)
+#define SIM_MAX_STEPS_PER_FRAME 4     // catch-up limit after a stall (offline play)
+
 #define GROUND_Y      640.0f
 #define PLAYER_WIDTH  80.0f
 #define PLAYER_HEIGHT 160.0f

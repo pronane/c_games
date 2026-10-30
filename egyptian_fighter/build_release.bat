@@ -31,8 +31,8 @@ if not exist "%UCRT%\include\raylib.h" (
 )
 
 if not exist release mkdir release
-set "SRC=src\main.c src\player.c src\game.c src\demo.c src\pad.c src\gfx.c src\online.c ..\shared\netplay\c\netplay.c ..\shared\netplay\c\netplay_ws.c"
-set "CFLAGS=-std=c99 -O2 -Wall -I"%UCRT%\include""
+set "SRC=src\main.c src\player.c src\game.c src\demo.c src\pad.c src\gfx.c src\input.c src\sim.c src\online.c ..\shared\netplay\c\netplay.c ..\shared\netplay\c\netplay_ws.c"
+set "CFLAGS=-std=c99 -O2 -Wall -ffp-contract=off -I"%UCRT%\include""
 set "LIBS=-L"%UCRT%\lib" -lraylib -lopengl32 -lgdi32 -lwinmm -lwinhttp"
 
 echo Compiling (static, no console window)...

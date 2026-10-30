@@ -1,9 +1,9 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include <stdint.h>
 #include "player.h"
 #include "pad.h"
+#include "rng.h"
 
 typedef enum {
     SCREEN_SELECT = 0,
@@ -34,7 +34,7 @@ typedef struct {
     float age;
 } Projectile;
 
-typedef struct {
+typedef struct Game {
     Player player1;
     Player player2;
 
@@ -62,6 +62,9 @@ typedef struct {
 
     Projectile projectiles[MAX_PROJECTILES];
     int cpuAttackCooldown;
+    SimRng rng;            // fight PRNG (CPU decisions) - part of the hashed sim state
+    uint32_t fightSeed;    // seed it started from (recorded in replays)
+    uint32_t simTick;      // ticks since the fight was set up (pre-fight included)
 
     // pre-fight screen
     float prefightTimer;
@@ -73,20 +76,16 @@ typedef struct {
 
     bool padWaitRelease;   // ignore a pad A/Start still held from the select screen
     char pauseNote[128];   // e.g. "P1 controller disconnected"
-
-    uint16_t netPrev[2];   // online: last frame's input bits (press = down now, up before)
 } Game;
 
+void Game_InitCore(Game *g);                              // roster + defaults, no window
 void Game_Init(Game *g);
-void Game_Update(Game *g);
+void Game_BeginFightSim(Game *g, uint32_t seed, bool gpu); // sim side of starting a fight
+void Game_StartFightSeeded(Game *g, uint32_t seed);       // sprites + face-off, given seed (online)
+#include "input.h"
+void Game_Update(Game *g);                               // menus, once per rendered frame
+void Game_SimTick(Game *g, const InputBits in[2]);       // one fixed SIM_DT step of the fight
 void Game_Draw(const Game *g);
 void Game_Unload(Game *g);
-
-// online lockstep (online.c): the fight step is deterministic with a fixed dt and these inputs
-void Game_LoadFight(Game *g);                  // load selectP1/P2 sprites, face-off screen
-void Game_ResetFight(Game *g);                 // round start state, sprites kept
-void Game_FightStep(Game *g, float dt);        // one sim step from the players' input flags
-void Game_ApplyBits(Player *p, uint16_t bits, uint16_t prev);
-uint32_t Game_Hash(const Game *g);
 
 #endif

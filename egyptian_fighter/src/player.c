@@ -98,6 +98,27 @@ void Player_Init(Player *p, float startX, float startY, int facing, int characte
     p->attackActive = false;
 }
 
+// ---- headless (no window / no GPU) loading for --sim-test / --replay / a future server ----
+// With p->noGpu the loaders run exactly the same code but only read the image sizes: the
+// "texture" gets a dummy id and the right width/height, so frame counts, fallbacks and every
+// other value the simulation uses come out identical to a real load.
+static Texture2D SheetFromImage(const Player *p, Image img) {
+    if (!p->noGpu) return Gfx_TextureFromImage(img);
+    return (Texture2D){ .id = 1, .width = img.width, .height = img.height, .mipmaps = 1,
+                        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+}
+static Texture2D SheetLoad(const Player *p, const char *path) {
+    if (!p->noGpu) return Gfx_LoadTexture(path);
+    Image img = LoadImage(path);
+    if (img.data == NULL) return (Texture2D){ 0 };
+    Texture2D t = SheetFromImage(p, img);
+    UnloadImage(img);
+    return t;
+}
+static void SheetFree(const Player *p, Texture2D t) {
+    if (!p->noGpu && t.id) UnloadTexture(t);
+}
+
 static void LoadSpritesLegacy(Player *p, const char *assetsRoot, const CharacterDef *chars) {
     char path[512];
     const char *folder = chars[p->characterIndex].folder;
@@ -118,7 +139,7 @@ static void LoadSpritesLegacy(Player *p, const char *assetsRoot, const Character
                 idleAnchorX = (firstFrameBounds.x + firstFrameBounds.width * 0.5f) / frameWidth;
                 idleVisibleHeight = visibleBounds.height;
             }
-            p->sheets[i].texture = Gfx_TextureFromImage(img);   // premultiplied + mipmapped
+            p->sheets[i].texture = SheetFromImage(p, img);   // premultiplied + mipmapped
             UnloadImage(img);
             p->sheets[i].loaded = true;
             TraceLog(LOG_INFO, "Loaded: %s", path);
@@ -136,7 +157,7 @@ static void LoadSpritesLegacy(Player *p, const char *assetsRoot, const Character
             ImageDrawText(&placeholder, TextFormat("%d", i), 90, 200, 80, BLACK);
             visibleBounds = (Rectangle){ 0.0f, 0.0f, 256.0f, 512.0f };
             if (i == STATE_IDLE) idleVisibleHeight = visibleBounds.height;
-            p->sheets[i].texture = Gfx_TextureFromImage(placeholder);
+            p->sheets[i].texture = SheetFromImage(p, placeholder);
             UnloadImage(placeholder);
             p->sheets[i].loaded = false;
         }
@@ -219,7 +240,7 @@ static bool LoadSpritesGrid(Player *p, const char *dir, const char *cfgPath) {
             char path[768];
             snprintf(path, sizeof(path), "%s/%s", dir, file);
             // full-resolution sheet, premultiplied alpha + mipmaps + trilinear filtering (gfx.c)
-            Texture2D tex = Gfx_LoadTexture(path);
+            Texture2D tex = SheetLoad(p, path);
             if (tex.id == 0) { TraceLog(LOG_WARNING, "MISSING ASSET: %s", path); continue; }
             int frames = tex.width / cellW;
             if (frames != a) {
@@ -249,7 +270,7 @@ static bool LoadSpritesGrid(Player *p, const char *dir, const char *cfgPath) {
     if (!p->sheets[STATE_IDLE].loaded) {
         TraceLog(LOG_WARNING, "%s has no idle animation - ignoring it", cfgPath);
         for (int i = 0; i < STATE_COUNT; i++)
-            if (p->sheets[i].texture.id) UnloadTexture(p->sheets[i].texture);
+            SheetFree(p, p->sheets[i].texture);
         memset(p->sheets, 0, sizeof(p->sheets));
         return false;
     }
@@ -313,7 +334,7 @@ void Player_LoadSprites(Player *p, const char *assetsRoot, const CharacterDef *c
 void Player_UnloadSprites(Player *p) {
     for (int i = 0; i < STATE_COUNT; i++) {
         if (p->sheets[i].texture.id != 0 && !p->sheets[i].shared) {
-            UnloadTexture(p->sheets[i].texture);
+            SheetFree(p, p->sheets[i].texture);
         }
         p->sheets[i].texture.id = 0;
     }
@@ -462,7 +483,7 @@ static void UpdatePhysics(Player *p, float dt) {
 
 static void HandleInputAndState(Player *p, float dt) {
     if (p->invincible) {
-        p->invincibleTimer -= dt;
+        p->invincibleTimer -= dt;          // sim step, never the wall clock
         if (p->invincibleTimer <= 0.0f) {
             p->invincible = false;
         }

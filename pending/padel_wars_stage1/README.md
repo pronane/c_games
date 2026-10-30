@@ -1,6 +1,8 @@
 # Parked: Padel Wars Stage 1 (deterministic sim) for egyptian_fighter
 
-**Not applied.** On hold until you say to go ahead. Nothing in `egyptian_fighter/` was changed for this.
+**Applied** (31 Oct 2026) to `egyptian_fighter/` on branch `claude/sprite-forge-recommendations-pt2ip4`, as the base for the online mode.
+The earlier online changes were removed first, Stage 1 was applied to main's files, and online.c was rebuilt on `Game_SimTick` / `Sim_Hash`.
+`--sim-test` passes with the same four final hashes as the report. This folder is kept as the record of the original upload.
 
 - `padel_wars_stage1.zip`: the original upload (changed and new files plus the patch)
 - `padel_wars_stage1.patch`: `git diff` against `main`, 16 files, +1089 / -179

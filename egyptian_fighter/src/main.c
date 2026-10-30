@@ -1,11 +1,26 @@
 #include "game.h"
-#include "online.h"
 #include "pad.h"
+#include "sim.h"
+#include "online.h"
 
 int RunDemo(int charIndex, const char *outDir);   // demo.c
 
 int main(int argc, char **argv)
 {
+    // Headless determinism tools (no window):  --sim-test   |   --replay <file.efrec>
+    if (argc >= 2 && strcmp(argv[1], "--sim-test") == 0) {
+        SetTraceLogLevel(LOG_WARNING);
+        return Sim_RunTests(argc, argv);
+    }
+    if (argc >= 3 && strcmp(argv[1], "--replay") == 0) {
+        SetTraceLogLevel(LOG_WARNING);
+        return Sim_Replay(argv[2], true);
+    }
+    // --record <file>: write every fight's per-tick inputs + checkpoint hashes (file, file.2, ...)
+    SimRecorder recorder;
+    Rec_Init(&recorder, "");
+    for (int i = 1; i + 1 < argc; i++) if (strcmp(argv[i], "--record") == 0) Rec_Init(&recorder, argv[i + 1]);
+
     // Test mode: egyptian_fighter --demo <charIndex 0-6> [outDir]
     if (argc >= 3 && strcmp(argv[1], "--demo") == 0) {
         InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Egyptian Fighter - animation demo");
@@ -41,10 +56,13 @@ int main(int argc, char **argv)
     TraceLog(LOG_INFO, " The game will still run perfectly without them.");
     TraceLog(LOG_INFO, "=================================================");
 
+    double simAccum = 0.0;                 // unsimulated time (seconds), < 1 tick normally
+    InputBits pendingPress[2] = { 0, 0 };  // "pressed" bits waiting for the next tick
+
     while (!WindowShouldClose())
     {
         Pad_Update();          // hot-plug safe: re-checks every pad each frame
-        Online_Poll(&game);    // online mode: server messages (the fight never pauses online)
+        Online_Poll(&game);    // online mode: server messages (an online fight never pauses)
         bool online = game.mode == MODE_ONLINE;
 
         // a controller that belonged to a player was unplugged mid-fight -> pause
@@ -64,8 +82,44 @@ int main(int argc, char **argv)
         // F11 or Alt+Enter = borderless fullscreen at the display's native resolution
         bool toggled = Gfx_HandleFullscreenKeys();
 
-        if (!game.paused && !toggled) {      // (the Enter of Alt+Enter is not a menu press)
+        bool onlineFight = online && (game.screen == SCREEN_PREFIGHT || game.screen == SCREEN_FIGHT ||
+                                      game.screen == SCREEN_RESULT);
+        if (onlineFight) {
+            // lockstep: ticks run when both players' inputs are in (online.c), never paused
+            Online_FightUpdate(&game);
+            if (!toggled) Game_Update(&game);
+            simAccum = 0.0;
+            pendingPress[0] = pendingPress[1] = 0;
+        } else if (!game.paused && !toggled) {      // (the Enter of Alt+Enter is not a menu press)
+            // 1) sample keyboard + pads into one 16-bit mask per fighter (input.c)
+            InputBits in[2];
+            Input_SampleFight(&game, in);
+            pendingPress[0] |= in[0] & IN_PRESS_MASK;   // a tap is never lost on a 0-tick frame
+            pendingPress[1] |= in[1] & IN_PRESS_MASK;
+
+            // 2) fixed 1/60 s simulation steps (accumulator, sim.c)
+            int steps = Sim_StepsForFrame(&simAccum, GetFrameTime());
+            for (int i = 0; i < steps; i++) {
+                InputBits tick[2] = { (InputBits)((in[0] & IN_HELD_MASK) | pendingPress[0]),
+                                      (InputBits)((in[1] & IN_HELD_MASK) | pendingPress[1]) };
+                pendingPress[0] = pendingPress[1] = 0;      // presses go to the first tick only
+                Game_SimTick(&game, tick);
+                Rec_Tick(&recorder, &game, tick);
+            }
+
+            // 3) menus (select screen, leaving the result screen) - once per rendered frame
             Game_Update(&game);
+            if (recorder.path[0]) {
+                if (!recorder.active && game.screen == SCREEN_PREFIGHT && game.simTick == 0)
+                    Rec_FightStart(&recorder, &game);
+                else if (recorder.active && game.screen == SCREEN_SELECT)
+                    Rec_FightEnd(&recorder, &game);
+            }
+        } else {
+            // paused or fullscreen toggled: the simulation simply does not step; no time
+            // is banked and no tap carries over, so pausing can never change a fight
+            simAccum = 0.0;
+            pendingPress[0] = pendingPress[1] = 0;
         }
 
         BeginDrawing();
@@ -87,6 +141,7 @@ int main(int argc, char **argv)
         EndDrawing();
     }
 
+    Rec_FightEnd(&recorder, &game);
     Online_Shutdown();
     Game_Unload(&game);
     Gfx_UnloadFonts();
