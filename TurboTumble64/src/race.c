@@ -11,6 +11,49 @@ static float attractTimer = 0;
 /* ------------------------------------------------------------------ */
 static const char *GhostFile(int track) { return TextFormat("ghost_track%d.dat", track + 1); }
 
+/* Ghost file v2: "TTGH", version, track, track-geometry hash, character, sample count, lap time,
+   then x y z yaw per sample - every field written on its own, little-endian, so struct padding,
+   the compiler or a changed track layout can't produce a garbled ghost.  v1 files (a raw struct
+   dump) are still read once and rewritten as v2 on the next best lap. */
+#define GHOST_MAGIC   0x48475454u   /* "TTGH" */
+#define GHOST_VERSION 2u
+
+static uint32_t TrackHash(void)
+{
+    uint32_t h = 2166136261u;
+    const unsigned char *p = (const unsigned char *)&T.n;
+    for (size_t i = 0; i < sizeof(T.n); i++) { h ^= p[i]; h *= 16777619u; }
+    for (int i = 0; i < T.n; i += 8) {
+        p = (const unsigned char *)&T.s[i].pos;
+        for (size_t j = 0; j < sizeof(Vector3); j++) { h ^= p[j]; h *= 16777619u; }
+    }
+    return h;
+}
+
+static void PutU32(unsigned char **w, uint32_t v) { for (int i = 0; i < 4; i++) *(*w)++ = (unsigned char)(v >> (8*i)); }
+static void PutF32(unsigned char **w, float f) { uint32_t v; memcpy(&v, &f, 4); PutU32(w, v); }
+static uint32_t GetU32(const unsigned char **r) { uint32_t v = 0; for (int i = 0; i < 4; i++) v |= (uint32_t)*(*r)++ << (8*i); return v; }
+static float GetF32(const unsigned char **r) { uint32_t v = GetU32(r); float f; memcpy(&f, &v, 4); return f; }
+
+static void GhostSave(void)
+{
+    int n = G.ghost.n;
+    int size = 4*7 + n*16;
+    unsigned char *buf = (unsigned char *)malloc((size_t)size), *w = buf;
+    if (!buf) return;
+    PutU32(&w, GHOST_MAGIC); PutU32(&w, GHOST_VERSION); PutU32(&w, (uint32_t)G.ghost.track);
+    PutU32(&w, TrackHash()); PutU32(&w, (uint32_t)G.ghost.charId); PutU32(&w, (uint32_t)n); PutF32(&w, G.ghost.lapTime);
+    for (int i = 0; i < n; i++) { PutF32(&w, G.ghost.x[i]); PutF32(&w, G.ghost.y[i]); PutF32(&w, G.ghost.z[i]); PutF32(&w, G.ghost.yaw[i]); }
+    SaveFileData(GhostFile(G.ghost.track), buf, size);
+    free(buf);
+}
+
+static bool GhostSane(int track)
+{
+    return G.ghost.track == track && G.ghost.n > 10 && G.ghost.n <= GHOST_MAX &&
+           G.ghost.charId >= 0 && G.ghost.charId < NUM_CHARACTERS && G.ghost.lapTime > 0;
+}
+
 void GhostLoad(int track)
 {
     if (G.ghostValid && G.ghost.track == track) return;
@@ -19,9 +62,26 @@ void GhostLoad(int track)
     int size = 0;
     unsigned char *d = LoadFileData(GhostFile(track), &size);
     if (!d) return;
-    if (size == (int)sizeof(G.ghost) && ((int *)d)[0] == track) {
-        memcpy(&G.ghost, d, sizeof(G.ghost));
-        if (G.ghost.n > 10 && G.ghost.n <= GHOST_MAX && G.ghost.charId >= 0 && G.ghost.charId < NUM_CHARACTERS) G.ghostValid = true;
+    const unsigned char *r = d;
+    if (size >= 28 && GetU32(&r) == GHOST_MAGIC) {
+        uint32_t ver = GetU32(&r), tr = GetU32(&r), th = GetU32(&r);
+        int ch = (int)GetU32(&r), n = (int)GetU32(&r);
+        float lap = GetF32(&r);
+        if (ver != GHOST_VERSION) TraceLog(LOG_WARNING, "GHOST: %s is version %u, expected %u - ignored", GhostFile(track), ver, GHOST_VERSION);
+        else if ((int)tr != track || th != TrackHash()) TraceLog(LOG_WARNING, "GHOST: %s was recorded on a different track layout - ignored", GhostFile(track));
+        else if (n <= 0 || n > GHOST_MAX || size != 28 + n*16) TraceLog(LOG_WARNING, "GHOST: %s is truncated - ignored", GhostFile(track));
+        else {
+            G.ghost.track = track; G.ghost.charId = ch; G.ghost.n = n; G.ghost.lapTime = lap;
+            for (int i = 0; i < n; i++) { G.ghost.x[i] = GetF32(&r); G.ghost.y[i] = GetF32(&r); G.ghost.z[i] = GetF32(&r); G.ghost.yaw[i] = GetF32(&r); }
+            G.ghostValid = GhostSane(track);
+        }
+    } else if (size == (int)sizeof(G.ghost)) {    /* v1: raw struct from the same build */
+        int t1;
+        memcpy(&t1, d, sizeof t1);
+        if (t1 == track) {
+            memcpy(&G.ghost, d, sizeof(G.ghost));
+            G.ghostValid = GhostSane(track);
+        }
     }
     UnloadFileData(d);
 }
@@ -45,7 +105,7 @@ static void GhostLapDone(float lapTime)
         G.ghostRec.track = T.index; G.ghostRec.charId = k->charId; G.ghostRec.lapTime = lapTime;
         memcpy(&G.ghost, &G.ghostRec, sizeof(G.ghost));
         G.ghostValid = true;
-        if (!G.autotest) SaveFileData(GhostFile(T.index), &G.ghost, (int)sizeof(G.ghost));
+        if (!G.autotest) GhostSave();
         if (G.autotest) ALog("GHOST: new best lap %s recorded (%d samples) on %s", FormatTime(lapTime), G.ghost.n, T.def->name);
         if (k->human >= 0) { strcpy(R.banner[k->human], "NEW BEST LAP!"); R.bannerTimer[k->human] = 2.2f; }
     }

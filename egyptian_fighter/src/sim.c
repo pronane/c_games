@@ -69,7 +69,7 @@ static uint64_t RulesHash(void) {
         ACTIVE_TO, PROJ_LAUNCH_AT, PROJ_SPEED_HIGH, PROJ_SPEED_LOW, PROJ_BOX };
     for (size_t i = 0; i < sizeof(fl) / sizeof(fl[0]); i++) HF(&f, fl[i]);
     const int in[] = { SCREEN_WIDTH, SCREEN_HEIGHT, MAX_HEALTH, MELEE_DAMAGE, PROJ_DAMAGE, PROJ_CHIP,
-        MAX_PROJECTILES, STATE_COUNT, MAX_CHARACTERS };
+        MAX_PROJECTILES, STATE_COUNT, MAX_CHARACTERS, SIM_VERSION };
     for (size_t i = 0; i < sizeof(in) / sizeof(in[0]); i++) HI(&f, in[i]);
     return f.h;
 }
@@ -111,7 +111,7 @@ void Rec_FightStart(SimRecorder *r, const Game *g) {
     r->f = fopen(name, "w");
     if (!r->f) { TraceLog(LOG_WARNING, "REPLAY: cannot write %s", name); return; }
     r->active = true;
-    fprintf(r->f, "EFREC 1\n");
+    fprintf(r->f, "EFREC 2 sim %d\n", SIM_VERSION);
     fprintf(r->f, "seed %u mode %d p1 %d p2 %d hp1 %d hp2 %d config %016" PRIx64 "\n",
             (unsigned)g->fightSeed, (int)g->mode, g->player1.characterIndex, g->player2.characterIndex,
             g->player1.health, g->player2.health, Sim_ConfigHash(g));
@@ -148,11 +148,21 @@ int Sim_Replay(const char *path, bool verbose) {
     char line[256];
     unsigned seed = 0; int mode = 0, c1 = 0, c2 = 0, hp1 = MAX_HEALTH, hp2 = MAX_HEALTH;
     uint64_t cfg = 0;
-    if (!fgets(line, sizeof(line), f) || strncmp(line, "EFREC 1", 7) != 0 ||
-        !fgets(line, sizeof(line), f) ||
+    int ver = 0;
+    if (!fgets(line, sizeof(line), f) || sscanf(line, "EFREC 2 sim %d", &ver) != 1) {
+        printf("replay: %s was recorded before sim versions existed (EFREC 1) or is not a recording - "
+               "it cannot be replayed by this build\n", path);
+        fclose(f); return 2;
+    }
+    if (ver != SIM_VERSION) {
+        printf("replay: %s was recorded with sim version %d, this build is version %d - not replayable\n",
+               path, ver, SIM_VERSION);
+        fclose(f); return 2;
+    }
+    if (!fgets(line, sizeof(line), f) ||
         sscanf(line, "seed %u mode %d p1 %d p2 %d hp1 %d hp2 %d config %" SCNx64,
                &seed, &mode, &c1, &c2, &hp1, &hp2, &cfg) != 7) {
-        printf("replay: %s is not an EFREC 1 file\n", path); fclose(f); return 2;
+        printf("replay: %s has a bad header\n", path); fclose(f); return 2;
     }
     static Game g;
     SetupHeadless(&g, mode, c1, c2, seed);
@@ -216,7 +226,9 @@ static InputBits ScriptStep(Script *s) {
     return out;
 }
 
-typedef struct { const char *name; int mode, c1, c2; uint32_t seed; bool attacks; int skipAt; } Scenario;
+// expect: final hash on x86-64 gcc -ffp-contract=off for SIM_VERSION 2.  Another platform or compiler
+// that gets a different value is not lockstep-compatible with it (see README "Determinism").
+typedef struct { const char *name; int mode, c1, c2; uint32_t seed; bool attacks; int skipAt; uint64_t expect; } Scenario;
 
 #define MAX_TICKS (99 * 60 + 400)
 #define MAX_CHECKS (MAX_TICKS / SIM_HASH_EVERY + 4)
@@ -297,13 +309,57 @@ static int TestAccumulator(void) {
     return fails;
 }
 
+// SIM_VERSION 2 rules, each from a standing start face to face (P1 left, P2 right, in reach).
+typedef struct { int hp1, hp2, winner; GameScreen screen; } RuleOut;
+static RuleOut RuleFight(InputBits p1Hold, InputBits p1Press, InputBits p2Hold, InputBits p2Press,
+                         int hp1, int hp2) {
+    static Game g;
+    SetupHeadless(&g, MODE_1P_VS_2P, 5, 5, 1u);        // mirror match: same timings on both sides
+    g.screen = SCREEN_FIGHT;
+    g.player1.position.x = 600.0f;
+    g.player2.position.x = 690.0f;
+    g.player1.health = hp1;
+    g.player2.health = hp2;
+    for (int t = 0; t < 90 && g.screen == SCREEN_FIGHT; t++) {
+        InputBits in[2] = { p1Hold, p2Hold };
+        if (t == 10) { in[0] |= p1Press; in[1] |= p2Press; }
+        Game_SimTick(&g, in);
+    }
+    RuleOut o = { g.player1.health, g.player2.health, g.winner, g.screen };
+    Player_UnloadSprites(&g.player1); Player_UnloadSprites(&g.player2);
+    return o;
+}
+
+static int TestRules(void) {
+    int fails = 0;
+    RuleOut open_  = RuleFight(0, IN_PUNCH, 0, 0, 100, 100);
+    RuleOut block  = RuleFight(0, IN_PUNCH, IN_BLOCK, 0, 100, 100);
+    RuleOut thrown = RuleFight(0, IN_THROW, IN_BLOCK, 0, 100, 100);
+    RuleOut busy   = RuleFight(0, IN_PUNCH, IN_BLOCK, IN_KICK, 100, 100);   // block held while attacking
+    RuleOut dko    = RuleFight(0, IN_PUNCH, 0, IN_PUNCH, MELEE_DAMAGE, MELEE_DAMAGE);
+    struct { const char *what; bool ok; } r[] = {
+        { "punch hits an open fighter            ", open_.hp2 < 100 },
+        { "standing block from the front stops it ", block.hp2 == 100 },
+        { "a throw beats a block                  ", thrown.hp2 < 100 },
+        { "holding block while attacking: no block", busy.hp2 < 100 },
+        { "double KO is a draw                    ", dko.screen == SCREEN_RESULT && dko.winner == 0 &&
+                                                     dko.hp1 == 0 && dko.hp2 == 0 },
+    };
+    printf("\ncombat rules (sim version %d):\n", SIM_VERSION);
+    for (size_t i = 0; i < sizeof(r) / sizeof(r[0]); i++) {
+        printf("  %s: %s\n", r[i].what, r[i].ok ? "ok" : "FAIL");
+        if (!r[i].ok) fails++;
+    }
+    return fails;
+}
+
 int Sim_RunTests(int argc, char **argv) {
     (void)argc; (void)argv;
     static const Scenario SC[] = {
-        { "1P vs CPU   MIKE vs DARAGH ", MODE_1P_VS_CPU, 5, 6, 1234u, true,  0 },
-        { "CPU vs 1P   DEC vs DRAGON  ", MODE_CPU_VS_1P, 4, 2, 99u,   true,  40 },
-        { "1P vs 2P    RA vs FLAME    ", MODE_1P_VS_2P,  0, 3, 7u,    true,  30 },
-        { "1P vs 2P    PAUL vs MIKE (no attacks: time-out)", MODE_1P_VS_2P, 1, 5, 5u, false, 0 },
+        { "1P vs CPU   MIKE vs DARAGH ", MODE_1P_VS_CPU, 5, 6, 1234u, true,  0,  0xb5ff8d849a868bcbull },
+        { "CPU vs 1P   DEC vs DRAGON  ", MODE_CPU_VS_1P, 4, 2, 99u,   true,  40, 0xeb5ca790adb40ba9ull },
+        { "1P vs 2P    RA vs FLAME    ", MODE_1P_VS_2P,  0, 3, 7u,    true,  30, 0xc5342812f2a56f7cull },
+        { "1P vs 2P    PAUL vs MIKE (no attacks: time-out)", MODE_1P_VS_2P, 1, 5, 5u, false, 0, 0x0ce736c967cd17acull },
     };
     static InputBits in[MAX_TICKS][2];
     static Game start;
@@ -312,6 +368,7 @@ int Sim_RunTests(int argc, char **argv) {
     printf("=== Padel Wars deterministic sim test (headless, no window) ===\n");
     printf("tick %.9f s, hash checkpoint every %d ticks\n", SIM_DT, SIM_HASH_EVERY);
     fails += TestAccumulator();
+    fails += TestRules();
 
     for (size_t s = 0; s < sizeof(SC) / sizeof(SC[0]); s++) {
         const Scenario *sc = &SC[s];
@@ -334,7 +391,8 @@ int Sim_RunTests(int argc, char **argv) {
             int df; seedOk = !SameRun(&A, &F, &df);
             Player_UnloadSprites(&other.player1); Player_UnloadSprites(&other.player2);
         }
-        bool pass = ab && ac && ad && !ae && seedOk;
+        bool known = A.final == sc->expect;
+        bool pass = ab && ac && ad && !ae && seedOk && known;
         printf("\n[%s] %s\n", pass ? "PASS" : "FAIL", sc->name);
         printf("  config hash %016" PRIx64 "  seed %u  %u ticks (%.1f s)  P1 hp %d  P2 hp %d  winner %d\n",
                Sim_ConfigHash(&start), (unsigned)sc->seed, (unsigned)A.ticks, A.ticks * SIM_DT_WALL, A.hp1, A.hp2, A.winner);
@@ -344,7 +402,8 @@ int Sim_RunTests(int argc, char **argv) {
         printf("  human L/R flipped for ticks 500-559  : %s (first differing checkpoint: tick %d)\n",
                ae ? "NOT DETECTED" : "detected", (de + 1) * SIM_HASH_EVERY);
         if (cpu) printf("  CPU seed+1                           : %s\n", seedOk ? "plays differently" : "SAME (RNG unused?)");
-        printf("  final hash %016" PRIx64 "\n", A.final);
+        printf("  final hash %016" PRIx64 "  expected %016" PRIx64 " %s\n", A.final, sc->expect,
+               known ? "(match)" : "(MISMATCH: different sim version, compiler or platform)");
         if (!pass) fails++;
 
         if (s == 0) {                            // record the same fight through the recorder, replay it

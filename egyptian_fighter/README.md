@@ -31,7 +31,7 @@ P1 = WASD + J (Backspace back), P2 = arrows + Z (X back).
 **Player 1**
 | Key | Action |
 |-----|--------|
-| WASD / Arrows | Move / Crouch / Jump |
+| WASD (also the arrows when P2 is the CPU) | Move / Crouch / Jump |
 | J | Punch |
 | K | Kick |
 | U | Special 1 – Pyramid Blast |
@@ -487,3 +487,25 @@ with `sprites.cfg` frame times converted to ticks at load). Also: 32-bit x87 bui
 deterministic - ship 64-bit only.
 
 `.efrec` files and `sim_test_replay.efrec` (written by `--sim-test`) can be deleted at any time.
+
+### Sim version 2: combat fixes (31 Oct 2026)
+
+These fixes change gameplay on purpose, so `SIM_VERSION` (common.h) went from 1 to 2. It is part of the
+config hash and of the `.efrec` header (`EFREC 2 sim 2`). **Recordings made before this change
+(`EFREC 1`) can't be replayed**, and they're rejected with a clear message rather than failing on a hash.
+
+* **Blocking** only works when you're standing in the block state on the ground, facing the attack.
+  Holding the block button while walking, jumping or attacking no longer cancels melee hits.
+  The same rule applies to projectiles: a proper block takes chip damage, anything else is a full hit.
+* **Throws** can't be blocked.
+* **Trades**: if both fighters' attacks connect on the same tick, both hits land. Before, P1 was
+  checked first and that cancelled P2's attack.
+* **Double KO** is a draw. Before, it went to P2.
+* **Keyboard 1P vs 2P**: the arrow keys only move P2. Before, they moved both fighters.
+
+`--sim-test` now also checks these rules ("combat rules") and compares each scripted fight's
+final hash with the value expected for this sim version (x86-64 gcc, `-ffp-contract=off`):
+`b5ff8d849a868bcb`, `eb5ca790adb40ba9`, `c5342812f2a56f7c`, `0ce736c967cd17ac`. The first two
+changed from Stage 1 because the CPU's blocks now follow the new rule; the 2P fights are unchanged.
+CI (`.github/workflows/sim-test.yml`) runs `--sim-test` on Linux and on Windows (MSYS2 UCRT64) and
+fails if the two platforms print different hashes.

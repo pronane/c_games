@@ -39,7 +39,8 @@ struct Game;
 // still held from the select screen (Game.padWaitRelease, a local-input filter - not sim state).
 void Input_SampleFight(struct Game *g, InputBits out[2]);
 
-InputBits Input_KeysP1(void);                 // WASD/arrows + J K U I L O P
+InputBits Input_KeysP1(void);                 // WASD/arrows + J K U I L O P (one human on the keyboard)
+InputBits Input_KeysP1Only(void);             // WASD + J K U I L O P (P2 has the arrows)
 InputBits Input_KeysP2(void);                 // arrows + numpad / Z X C V B N M
 InputBits Input_Pad(int sel, bool ignoreA);   // one pad or PAD_ANY
 

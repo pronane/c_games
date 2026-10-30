@@ -147,6 +147,16 @@ Built-in characters live in `src/characters.c` (`CHARACTERS[]`) if you prefer co
 
 Both players need the same server. Run `shared/netplay/server` (`npm start`) or deploy it to Render, then either copy `netplay.cfg.example` to `netplay.cfg` next to the exe and set `server = wss://<your-app>.onrender.com/turbo`, or start the game with `--server ws://host:3000/turbo` (or set `TT_SERVER`). Both players should run the same build. See [`shared/netplay/README.md`](../shared/netplay/README.md) for how it works.
 
+## Saved files
+
+* **Ghosts** (`ghost_trackN.dat`) use a versioned format: a "TTGH" header with the version, track, a
+  track-layout hash, the racer and the lap time, then the samples, each field written separately.
+  A ghost recorded on a different track layout or by a newer version is ignored with a log message
+  instead of being drawn wrong. Old ghost files (raw struct dumps) still load, and they're rewritten in
+  the new format on your next best lap.
+* Settings, ghosts and logs are still written next to the exe, so install the game in a folder you
+  can write to (not Program Files).
+
 ## Building by hand (MSYS2 UCRT64 shell)
 ```
 pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-raylib

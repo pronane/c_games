@@ -116,7 +116,7 @@ void MenusUpdate(float dt)
             PlaySfx(SFX_MENU_MOVE, 0.5f, 1.2f);
             switch (G.menuSel) {
             case 0: G.settings.cc = (G.settings.cc + d + 3) % 3; break;
-            case 1: G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) { T.loaded = true; TrackBuild(&T, T.index); } break;
+            case 1: G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) TrackBuild(&T, T.index); break;
             case 2: G.settings.musicVol = Clamp(G.settings.musicVol + d*0.1f, 0, 1); break;
             case 3: G.settings.sfxVol = Clamp(G.settings.sfxVol + d*0.1f, 0, 1); break;
             case 4: G.settings.showFps = !G.settings.showFps; break;

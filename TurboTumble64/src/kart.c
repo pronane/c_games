@@ -68,9 +68,10 @@ void KartInit(Kart *k, int charId, int human, int gridSlot)
 
 static void Boost(Kart *k, float time, float power)
 {
+    bool fresh = k->boostTimer <= 0;            /* topping up a running boost is not a new one */
     if (k->boostTimer < time) k->boostTimer = time;
     if (k->boostPower < power || k->boostTimer <= 0) k->boostPower = power;
-    k->statBoosts++;
+    if (fresh) k->statBoosts++;
     KartSfx(k, SFX_BOOST, 0.8f, 1.0f);
 }
 
@@ -195,7 +196,6 @@ void KartUpdate(int idx, const KartInput *in, float dt)
             k->visYaw = Approach(k->visYaw, 0, 3.0f*dt);
         }
         if (!k->grounded) yawRate *= 0.6f;
-        if (k->human >= 0) yawRate *= 1.0f;
         k->heading = WrapAngle(k->heading - yawRate*dt);
 
         /* hop / drift state machine */

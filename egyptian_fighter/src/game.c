@@ -342,6 +342,13 @@ static void SpawnProjectiles(Game *g, Player *p, int owner) {
     }
 }
 
+// A block only stops what comes from the front, while standing in the block state on the ground
+// (holding the button while walking, jumping or attacking does nothing).  attackDir = the
+// direction the attack travels (+1 right, -1 left); the defender must face against it.
+static bool Blocks(const Player *def, int attackDir) {
+    return def->state == STATE_BLOCK && def->onGround && def->facing == -attackDir;
+}
+
 static void UpdateProjectiles(Game *g, float dt) {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *pr = &g->projectiles[i];
@@ -357,7 +364,7 @@ static void UpdateProjectiles(Game *g, float dt) {
         Rectangle box = { pr->pos.x - PROJ_BOX * 0.5f, pr->pos.y - PROJ_BOX * 0.5f, PROJ_BOX, PROJ_BOX };
         if (!def->invincible && CheckCollisionRecs(box, def->hurtbox)) {
             pr->active = false;
-            if (def->inputBlock && def->onGround) {
+            if (Blocks(def, pr->vx > 0 ? 1 : -1)) {
                 def->health -= PROJ_CHIP;                // chip damage through a block
                 if (def->health < 0) def->health = 0;
             } else {
@@ -497,18 +504,28 @@ static void DrawProjectile(const Projectile *pr) {
     }
 }
 
+static bool MeleeLands(const Player *att, const Player *def) {
+    if (!att->attackActive || def->invincible) return false;
+    if (!CheckCollisionRecs(att->hitbox, def->hurtbox)) return false;
+    return att->state == STATE_THROW || !Blocks(def, att->facing);      // throws beat a block
+}
+
 static void CheckHits(Game *g) {
     Player *p1 = &g->player1;
     Player *p2 = &g->player2;
 
-    if (p1->attackActive && !p2->invincible && !p2->inputBlock) {
-        if (CheckCollisionRecs(p1->hitbox, p2->hurtbox)) HitPlayer(p2, p1->facing, MELEE_DAMAGE);
-    }
+    // Decide both hits from the same moment, then apply them: a simultaneous exchange is a
+    // trade (P1's hit no longer cancels P2's attack just because P1 is checked first).
+    bool hit2 = MeleeLands(p1, p2), hit1 = MeleeLands(p2, p1);
+    int dir1 = p1->facing, dir2 = p2->facing;
+    if (hit2) HitPlayer(p2, dir1, MELEE_DAMAGE);
+    if (hit1) HitPlayer(p1, dir2, MELEE_DAMAGE);
 
-    if (p2->attackActive && !p1->invincible && !p1->inputBlock) {
-        if (CheckCollisionRecs(p2->hitbox, p1->hurtbox)) HitPlayer(p1, p2->facing, MELEE_DAMAGE);
+    if (p1->health <= 0 && p2->health <= 0 && !g->gameOver) {   // double KO: a draw
+        g->gameOver = true;
+        g->winner = 0;
+        g->screen = SCREEN_RESULT;
     }
-
     if (p1->health <= 0 && !g->gameOver) {
         g->gameOver = true;
         g->winner = 2;

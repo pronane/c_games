@@ -15,14 +15,14 @@
 
 CharacterDef CHARACTERS[MAX_CHARACTERS] = {
     /* name           tagline                                                    class          spd  acc  hnd  mass  body                 accent               kart                 trim                 head        hat              voice  model */
-    { "Biscuit",      "A very good boy. Thinks the finish line is a squirrel.",  WEIGHT_MEDIUM, 3.5f, 3.5f, 3.5f, 3.0f, {230,150, 60,255}, {250,245,235,255}, {215, 40, 40,255}, {255,210, 40,255}, HEAD_BEAR,  HAT_FLOPPY_EARS, 1.15f, NULL },
-    { "Prof. Wobble", "Brilliant, jiggly, and 92% gelatin.",                     WEIGHT_LIGHT,  2.5f, 5.0f, 4.5f, 1.5f, { 90,220,110,255}, {240,240,255,255}, {245,245,245,255}, { 60,170, 80,255}, HEAD_CUBE,  HAT_GOGGLES,     1.35f, NULL },
-    { "Nana Nitro",   "Knits at 200 km/h. Has never once used the brakes.",      WEIGHT_MEDIUM, 3.5f, 3.5f, 3.0f, 3.0f, {150, 90,200,255}, {255,215,180,255}, {120, 50,170,255}, {255,160,220,255}, HEAD_ROUND, HAT_BUN,         1.25f, NULL },
-    { "Captain Crumb","Toasted on one side, terrifying on the other.",           WEIGHT_HEAVY,  4.5f, 2.0f, 2.5f, 4.5f, { 70, 50,120,255}, {225,180,110,255}, {130, 80, 40,255}, {230,190, 50,255}, HEAD_TOAST, HAT_PIRATE,      0.80f, NULL },
-    { "Zippy",        "Tiny bee-bot. Runs on honey and pure caffeine.",          WEIGHT_LIGHT,  2.5f, 5.0f, 5.0f, 1.0f, { 40, 40, 40,255}, {255,215, 30,255}, {255,200, 20,255}, { 30, 30, 30,255}, HEAD_ROBOT, HAT_ANTENNA,     1.60f, NULL },
-    { "Gloop",        "A royal slime. Leaves a trail. Doesn't apologise.",       WEIGHT_LIGHT,  3.0f, 4.5f, 4.0f, 1.5f, {170, 70,220,255}, {255,230, 60,255}, { 30,190,190,255}, {255,255,255,255}, HEAD_BLOB,  HAT_CROWN,       1.45f, NULL },
-    { "Big Tony",     "A pasta-loving bear. Will race for meatballs.",           WEIGHT_HEAVY,  5.0f, 1.5f, 2.0f, 5.0f, {140, 90, 50,255}, {255,255,255,255}, { 30,150, 60,255}, {220, 40, 40,255}, HEAD_BEAR,  HAT_CHEF,        0.70f, NULL },
-    { "Frostina",     "Yeti princess of the peaks. Melts hearts, never melts.",  WEIGHT_MEDIUM, 3.5f, 3.0f, 4.0f, 3.0f, {235,245,255,255}, {120,190,255,255}, { 80,170,240,255}, {255,255,255,255}, HEAD_YETI,  HAT_HORNS,       1.05f, NULL },
+    { "Biscuit",      "A very good boy. Thinks the finish line is a squirrel.",  WEIGHT_MEDIUM, 3.5f, 3.5f, 3.5f, 3.0f, {230,150, 60,255}, {250,245,235,255}, {215, 40, 40,255}, {255,210, 40,255}, HEAD_BEAR,  HAT_FLOPPY_EARS, 1.15f, NULL, 0, 0 },
+    { "Prof. Wobble", "Brilliant, jiggly, and 92% gelatin.",                     WEIGHT_LIGHT,  2.5f, 5.0f, 4.5f, 1.5f, { 90,220,110,255}, {240,240,255,255}, {245,245,245,255}, { 60,170, 80,255}, HEAD_CUBE,  HAT_GOGGLES,     1.35f, NULL, 0, 0 },
+    { "Nana Nitro",   "Knits at 200 km/h. Has never once used the brakes.",      WEIGHT_MEDIUM, 3.5f, 3.5f, 3.0f, 3.0f, {150, 90,200,255}, {255,215,180,255}, {120, 50,170,255}, {255,160,220,255}, HEAD_ROUND, HAT_BUN,         1.25f, NULL, 0, 0 },
+    { "Captain Crumb","Toasted on one side, terrifying on the other.",           WEIGHT_HEAVY,  4.5f, 2.0f, 2.5f, 4.5f, { 70, 50,120,255}, {225,180,110,255}, {130, 80, 40,255}, {230,190, 50,255}, HEAD_TOAST, HAT_PIRATE,      0.80f, NULL, 0, 0 },
+    { "Zippy",        "Tiny bee-bot. Runs on honey and pure caffeine.",          WEIGHT_LIGHT,  2.5f, 5.0f, 5.0f, 1.0f, { 40, 40, 40,255}, {255,215, 30,255}, {255,200, 20,255}, { 30, 30, 30,255}, HEAD_ROBOT, HAT_ANTENNA,     1.60f, NULL, 0, 0 },
+    { "Gloop",        "A royal slime. Leaves a trail. Doesn't apologise.",       WEIGHT_LIGHT,  3.0f, 4.5f, 4.0f, 1.5f, {170, 70,220,255}, {255,230, 60,255}, { 30,190,190,255}, {255,255,255,255}, HEAD_BLOB,  HAT_CROWN,       1.45f, NULL, 0, 0 },
+    { "Big Tony",     "A pasta-loving bear. Will race for meatballs.",           WEIGHT_HEAVY,  5.0f, 1.5f, 2.0f, 5.0f, {140, 90, 50,255}, {255,255,255,255}, { 30,150, 60,255}, {220, 40, 40,255}, HEAD_BEAR,  HAT_CHEF,        0.70f, NULL, 0, 0 },
+    { "Frostina",     "Yeti princess of the peaks. Melts hearts, never melts.",  WEIGHT_MEDIUM, 3.5f, 3.0f, 4.0f, 3.0f, {235,245,255,255}, {120,190,255,255}, { 80,170,240,255}, {255,255,255,255}, HEAD_YETI,  HAT_HORNS,       1.05f, NULL, 0, 0 },
 };
 int NUM_CHARACTERS = 8;   /* built-in racers; more are appended from assets/characters/ */
 
@@ -41,7 +41,7 @@ static Color ParseColor(const char *v, Color def)
 
 static void LoadCharacterFolder(const char *dir)
 {
-    if (NUM_CHARACTERS >= MAX_CHARACTERS) return;
+    if (NUM_CHARACTERS >= MAX_CHARACTERS) { TraceLog(LOG_WARNING, "CHAR: %s skipped - the limit is %d racers", dir, MAX_CHARACTERS); return; }
     const char *ini = TextFormat("%s/character.ini", dir);
     if (!FileExists(ini)) return;
     char *txt = LoadFileText(ini);
@@ -53,6 +53,7 @@ static void LoadCharacterFolder(const char *dir)
     cd.head = HEAD_ROUND; cd.hat = HAT_NONE;
     cd.spriteAngles = 1; cd.spriteSize = 1.35f;
     char sprite[256] = "sprite.png";
+    bool ownTag = false;
     for (char *line = txt, *next; line && *line; line = next) {
         next = strchr(line, '\n');
         if (next) *next++ = 0;
@@ -62,8 +63,8 @@ static void LoadCharacterFolder(const char *dir)
         if (!eq) continue;
         *eq = 0;
         char *k = Trim(l), *v = Trim(eq + 1);
-        if (!strcmp(k, "name")) cd.name = Dup(v);
-        else if (!strcmp(k, "tagline")) cd.tagline = Dup(v);
+        if (!strcmp(k, "name")) { free((char *)cd.name); cd.name = Dup(v); }        /* name is always Dup'd */
+        else if (!strcmp(k, "tagline")) { if (ownTag) free((char *)cd.tagline); cd.tagline = Dup(v); ownTag = true; }
         else if (!strcmp(k, "weight")) cd.weight = !strcmp(v, "light") ? WEIGHT_LIGHT : !strcmp(v, "heavy") ? WEIGHT_HEAVY : WEIGHT_MEDIUM;
         else if (!strcmp(k, "speed")) cd.topSpeed = Clamp((float)atof(v), 1, 5);
         else if (!strcmp(k, "accel")) cd.accel = Clamp((float)atof(v), 1, 5);
@@ -77,7 +78,7 @@ static void LoadCharacterFolder(const char *dir)
         else if (!strcmp(k, "sprite")) snprintf(sprite, sizeof sprite, "%s", v);
         else if (!strcmp(k, "angles")) cd.spriteAngles = atoi(v) >= 16 ? 16 : atoi(v) >= 8 ? 8 : 1;
         else if (!strcmp(k, "size")) cd.spriteSize = Clamp((float)atof(v), 0.5f, 3.0f);
-        else if (!strcmp(k, "model")) cd.modelFile = Dup(TextFormat("%s/%s", GetFileName(dir), v));
+        else if (!strcmp(k, "model")) { free((char *)cd.modelFile); cd.modelFile = Dup(TextFormat("%s/%s", GetFileName(dir), v)); }
     }
     UnloadFileText(txt);
     int id = NUM_CHARACTERS;
@@ -91,7 +92,12 @@ static void LoadCharacterFolder(const char *dir)
             SetTextureWrap(G.charSprite[id], TEXTURE_WRAP_CLAMP);
         }
     }
-    if (!G.charSprite[id].id && !cd.modelFile) { TraceLog(LOG_WARNING, "CHAR: %s has no sprite or model, skipped", dir); return; }
+    if (!G.charSprite[id].id && !cd.modelFile) {
+        TraceLog(LOG_WARNING, "CHAR: %s has no sprite or model, skipped", dir);
+        free((char *)cd.name);
+        if (ownTag) free((char *)cd.tagline);
+        return;
+    }
     if (!G.charSprite[id].id) cd.spriteAngles = 0;
     /* menu colours from the kart if not given */
     CHARACTERS[id] = cd;

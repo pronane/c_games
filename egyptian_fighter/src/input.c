@@ -3,12 +3,12 @@
 #include "game.h"
 #include "pad.h"
 
-InputBits Input_KeysP1(void) {
+static InputBits KeysP1(bool arrows) {
     InputBits b = 0;
-    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))  b |= IN_LEFT;
-    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) b |= IN_RIGHT;
-    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))  b |= IN_DOWN;
-    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))    b |= IN_UP;
+    if (IsKeyDown(KEY_A) || (arrows && IsKeyDown(KEY_LEFT)))  b |= IN_LEFT;
+    if (IsKeyDown(KEY_D) || (arrows && IsKeyDown(KEY_RIGHT))) b |= IN_RIGHT;
+    if (IsKeyDown(KEY_S) || (arrows && IsKeyDown(KEY_DOWN)))  b |= IN_DOWN;
+    if (IsKeyDown(KEY_W) || (arrows && IsKeyDown(KEY_UP)))    b |= IN_UP;
     if (IsKeyDown(KEY_L))     b |= IN_BLOCK;
     if (IsKeyPressed(KEY_J))  b |= IN_PUNCH;
     if (IsKeyPressed(KEY_K))  b |= IN_KICK;
@@ -19,6 +19,9 @@ InputBits Input_KeysP1(void) {
     if (IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K)) b |= IN_JATK;
     return b;
 }
+
+InputBits Input_KeysP1(void)     { return KeysP1(true); }
+InputBits Input_KeysP1Only(void) { return KeysP1(false); }
 
 InputBits Input_KeysP2(void) {
     InputBits b = 0;
@@ -78,7 +81,7 @@ void Input_SampleFight(Game *g, InputBits out[2]) {
         // the human is on the right: accept the P1 keys (WASD...) and the P2 keys
         out[1] = Input_KeysP1() | Input_KeysP2() | Input_Pad(PAD_ANY, w);
     } else {
-        out[0] = Input_KeysP1() | Input_Pad(Pad_ForPlayer(1), w);
+        out[0] = Input_KeysP1Only() | Input_Pad(Pad_ForPlayer(1), w);   // the arrows belong to P2
         out[1] = Input_KeysP2() | Input_Pad(Pad_ForPlayer(2), w);
     }
     out[0] |= Confirm();     // either side may skip the face-off; the sim ORs both

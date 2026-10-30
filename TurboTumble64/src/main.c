@@ -413,7 +413,7 @@ int main(int argc, char **argv)
     while (!WindowShouldClose() && !G.quit) {
         if (IsWindowResized()) RenderResize();
         if (IsKeyPressed(KEY_F11) || ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER))) { ToggleBorderlessWindowed(); RenderResize(); }
-        if (IsKeyPressed(KEY_F2)) { G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) { T.loaded = true; TrackBuild(&T, T.index); } SaveSettings(); }
+        if (IsKeyPressed(KEY_F2)) { G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) TrackBuild(&T, T.index); SaveSettings(); }
 
         float frameDt = GetFrameTime();
         if (frameDt > AT.worstFrame && G.autotest && AT.perfFrames > 0 && !AT.perfDone) AT.worstFrame = frameDt;

@@ -725,7 +725,7 @@ static void BuildSky(Track *tr, MeshBuilder *mb)
 {
     const TrackDef *d = tr->def;
     trng = 777u + (unsigned)tr->index*31u;
-    float R = 600.0f;
+    float skyR = 600.0f;
     bool enh = G.settings.visualMode == 1;
     int slices = enh ? 48 : 24, rings = enh ? 20 : 8;
     Vector3 far = { 0, -5000, 0 };
@@ -743,10 +743,10 @@ static void BuildSky(Track *tr, MeshBuilder *mb)
         }
         for (int j = 0; j < slices; j++) {
             float b0 = 2*PI*j/slices, b1 = 2*PI*(j + 1)/slices;
-            Vector3 p00 = { R*cosf(a0)*cosf(b0), R*sinf(a0), R*cosf(a0)*sinf(b0) };
-            Vector3 p01 = { R*cosf(a0)*cosf(b1), R*sinf(a0), R*cosf(a0)*sinf(b1) };
-            Vector3 p10 = { R*cosf(a1)*cosf(b0), R*sinf(a1), R*cosf(a1)*sinf(b0) };
-            Vector3 p11 = { R*cosf(a1)*cosf(b1), R*sinf(a1), R*cosf(a1)*sinf(b1) };
+            Vector3 p00 = { skyR*cosf(a0)*cosf(b0), skyR*sinf(a0), skyR*cosf(a0)*sinf(b0) };
+            Vector3 p01 = { skyR*cosf(a0)*cosf(b1), skyR*sinf(a0), skyR*cosf(a0)*sinf(b1) };
+            Vector3 p10 = { skyR*cosf(a1)*cosf(b0), skyR*sinf(a1), skyR*cosf(a1)*sinf(b0) };
+            Vector3 p11 = { skyR*cosf(a1)*cosf(b1), skyR*sinf(a1), skyR*cosf(a1)*sinf(b1) };
             MB_TriUV(mb, p00, p01, p11, uv, uv, uv, c0, c0, c1, far, false);
             MB_TriUV(mb, p00, p11, p10, uv, uv, uv, c0, c1, c1, far, false);
         }
@@ -754,8 +754,8 @@ static void BuildSky(Track *tr, MeshBuilder *mb)
     /* below-horizon band in fog colour so the horizon is seamless */
     for (int j = 0; j < slices; j++) {
         float b0 = 2*PI*j/slices, b1 = 2*PI*(j + 1)/slices;
-        Vector3 a = { R*cosf(b0), 0, R*sinf(b0) }, b = { R*cosf(b1), 0, R*sinf(b1) };
-        Vector3 a2 = { a.x, -R*0.5f, a.z }, b2 = { b.x, -R*0.5f, b.z };
+        Vector3 a = { skyR*cosf(b0), 0, skyR*sinf(b0) }, b = { skyR*cosf(b1), 0, skyR*sinf(b1) };
+        Vector3 a2 = { a.x, -skyR*0.5f, a.z }, b2 = { b.x, -skyR*0.5f, b.z };
         Color bc = d->noGround ? ColorScale(d->fog, 0.5f) : d->fog;
         MB_TriUV(mb, a, b, b2, uv, uv, uv, d->fog, d->fog, bc, far, false);
         MB_TriUV(mb, a, b2, a2, uv, uv, uv, d->fog, bc, bc, far, false);
@@ -763,7 +763,7 @@ static void BuildSky(Track *tr, MeshBuilder *mb)
     if (d->night) {
         for (int i = 0; i < 400; i++) {
             float th = TR(0, 2*PI), ph = TR(0.08f, 1.5f);
-            Vector3 c = { R*0.95f*cosf(ph)*cosf(th), R*0.95f*sinf(ph), R*0.95f*cosf(ph)*sinf(th) };
+            Vector3 c = { skyR*0.95f*cosf(ph)*cosf(th), skyR*0.95f*sinf(ph), skyR*0.95f*cosf(ph)*sinf(th) };
             float s = TR(0.8f, 2.4f);
             Color sc = ColorFromHSV(TR(180, 300), TR(0, 0.4f), 1.0f);
             Vector3 up = { 0, s, 0 }, rt = { -sinf(th)*s, 0, cosf(th)*s };
@@ -789,8 +789,8 @@ static void BuildSky(Track *tr, MeshBuilder *mb)
         for (int j = 0; j < peaks; j++) {
             float b0 = 2*PI*j/peaks, b1 = 2*PI*(j + 1)/peaks, bm = (b0 + b1)*0.5f;
             float h = TR(25, 75);
-            Vector3 a = { R*0.9f*cosf(b0), -2, R*0.9f*sinf(b0) }, b = { R*0.9f*cosf(b1), -2, R*0.9f*sinf(b1) };
-            Vector3 top = { R*0.9f*cosf(bm), h, R*0.9f*sinf(bm) };
+            Vector3 a = { skyR*0.9f*cosf(b0), -2, skyR*0.9f*sinf(b0) }, b = { skyR*0.9f*cosf(b1), -2, skyR*0.9f*sinf(b1) };
+            Vector3 top = { skyR*0.9f*cosf(bm), h, skyR*0.9f*sinf(bm) };
             Color tc = d->scenery == SCENERY_SNOW ? ColorMix(mcol, WHITE, 0.6f) : ColorScale(mcol, 1.05f);
             MB_TriUV(mb, a, b, top, uv, uv, uv, mcol, mcol, tc, (Vector3){ 0, 0, 0 }, false);
         }
@@ -910,16 +910,16 @@ void TrackBuild(Track *tr, int index)
             raw[i][0] = raw[i][1] = def;
             float c = tr->s[i].curv;
             if (fabsf(c) > 1e-4f) {
-                float R = 1.0f/fabsf(c);
-                float lim = fmaxf(R*0.8f - 0.5f, tr->s[i].width*0.5f + 2.0f);
+                float radius = 1.0f/fabsf(c);
+                float lim = fmaxf(radius*0.8f - 0.5f, tr->s[i].width*0.5f + 2.0f);
                 int inner = c > 0 ? 0 : 1;      /* left turn -> inside is the left */
                 if (lim < raw[i][inner]) raw[i][inner] = lim;
             }
         }
         for (int i = 0; i < n; i++) for (int sd = 0; sd < 2; sd++) {
-            float m = raw[i][sd];
-            for (int k = -5; k <= 5; k++) m = fminf(m, raw[(i + k + n) % n][sd] + fabsf((float)k)*0.6f);
-            tr->s[i].edge[sd] = m;
+            float edge = raw[i][sd];
+            for (int k = -5; k <= 5; k++) edge = fminf(edge, raw[(i + k + n) % n][sd] + fabsf((float)k)*0.6f);
+            tr->s[i].edge[sd] = edge;
         }
     }
     BuildShortcut(tr);
