@@ -1,5 +1,6 @@
 /* items.c : item boxes, the roulette, and the seven original items */
 #include "common.h"
+static void DrawItemCube(float h, float t, int b);
 
 const char *ITEM_NAMES[ITEM_COUNT] = {
     "", "Slippy Peel", "Bouncy Melon", "Homing Tomato", "Hot Pepper", "Triple Pepper", "Disco Ball", "Thunder Kazoo"
@@ -364,18 +365,39 @@ void DrawItemsWorld(Camera3D cam)
         if (grow <= 0.01f) continue;
         Vector3 p = box->pos;
         p.y += 0.25f*sinf(t*2.0f + b);
-        DrawBillboard(cam, G.texQuestion, p, 1.1f*grow, WHITE);
+        DrawBillboard(cam, G.texQuestion, p, 0.8f*grow, WHITE);
         rlPushMatrix();
         rlTranslatef(p.x, p.y, p.z);
         rlRotatef(t*90.0f + b*20.0f, 0, 1, 0);
         rlRotatef(35, 1, 0, 1);
-        Color c = HueColor(t*120.0f + b*40.0f, 0.55f, 1.0f);
-        c.a = 120;
-        DrawLitBox((Vector3){ 0, 0, 0 }, (Vector3){ 1.6f*grow, 1.6f*grow, 1.6f*grow }, c);
+        DrawItemCube(0.8f*grow, t, b);
         rlPopMatrix();
     }
     rlDrawRenderBatchActive();
     rlEnableDepthMask();
+}
+
+/* rainbow-shimmering translucent cube, every face textured with a bright "?" panel */
+static void DrawItemCube(float h, float t, int b)
+{
+    static const signed char C[8][3] = { {-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1} };
+    static const unsigned char F[6][4] = { {4,5,6,7},{1,0,3,2},{5,1,2,6},{0,4,7,3},{7,6,2,3},{0,1,5,4} };
+    static const float UV[4][2] = { {0,1},{1,1},{1,0},{0,0} };
+    Color vc[8];
+    for (int i = 0; i < 8; i++) {
+        vc[i] = HueColor(t*150.0f + b*40.0f + i*47.0f, 0.6f, 1.0f);
+        vc[i].a = 175;
+    }
+    rlSetTexture(G.tx[TX_ITEMBOX].id);
+    rlBegin(RL_QUADS);
+    for (int f = 0; f < 6; f++) for (int k = 0; k < 4; k++) {
+        int i = F[f][k];
+        rlColor4ub(vc[i].r, vc[i].g, vc[i].b, vc[i].a);
+        rlTexCoord2f(UV[k][0], UV[k][1]);
+        rlVertex3f(C[i][0]*h, C[i][1]*h, C[i][2]*h);
+    }
+    rlEnd();
+    rlSetTexture(0);
 }
 
 /* 2D HUD icons */

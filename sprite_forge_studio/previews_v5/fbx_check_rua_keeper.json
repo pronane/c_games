@@ -1,0 +1,249 @@
+{
+ "fbx": "/tmp/v5test/sprite_forge_studio/out/rua_keeper/model.fbx",
+ "size_kb": 1102.6,
+ "own_reader": {
+  "version": 7400,
+  "limb_nodes": 19,
+  "meshes": 1,
+  "control_points": 1010,
+  "polygons": 1790,
+  "clusters": 18,
+  "skin_weights": 1010,
+  "materials": 12,
+  "anim_stacks": [
+   "idle",
+   "walk",
+   "crouch",
+   "jump",
+   "punch",
+   "kick",
+   "special1",
+   "special2",
+   "block",
+   "hit",
+   "throw",
+   "jumpattack",
+   "taunt",
+   "victory"
+  ],
+  "anim_curves": 1638,
+  "connections": 2835,
+  "unit_scale_factor": 100.0,
+  "up_axis": 1,
+  "bones": [
+   "root",
+   "hips",
+   "spine",
+   "chest",
+   "neck",
+   "head",
+   "upperarm_L",
+   "forearm_L",
+   "hand_L",
+   "upperarm_R",
+   "forearm_R",
+   "hand_R",
+   "thigh_L",
+   "shin_L",
+   "foot_L",
+   "thigh_R",
+   "shin_R",
+   "foot_R",
+   "ball"
+  ]
+ },
+ "assimp": {
+  "ran": true,
+  "ok": true,
+  "meshes": 12,
+  "animations": 14,
+  "bones": 216,
+  "faces": 1790,
+  "vertices": 3585,
+  "nodes": 22,
+  "materials": 9,
+  "bounds_min": [
+   -0.274621,
+   -0.002044,
+   -0.131598
+  ],
+  "bounds_max": [
+   0.274621,
+   1.827989,
+   0.411283
+  ]
+ },
+ "fbx2gltf_fbxsdk": {
+  "ran": true,
+  "fbx_sdk_takes": [
+   "block",
+   "crouch",
+   "hit",
+   "idle",
+   "jump",
+   "jumpattack",
+   "kick",
+   "punch",
+   "special1",
+   "special2",
+   "taunt",
+   "throw",
+   "victory",
+   "walk"
+  ],
+  "glb_takes": [
+   "block",
+   "crouch",
+   "hit",
+   "idle",
+   "jump",
+   "jumpattack",
+   "kick",
+   "punch",
+   "special1",
+   "special2",
+   "taunt",
+   "throw",
+   "victory",
+   "walk"
+  ],
+  "bones_compared": 19,
+  "takes": {
+   "idle": {
+    "max_joint_err_mm": 0.0,
+    "mean_joint_err_mm": 0.0
+   },
+   "walk": {
+    "max_joint_err_mm": 0.0,
+    "mean_joint_err_mm": 0.0
+   },
+   "crouch": {
+    "max_joint_err_mm": 0.001,
+    "mean_joint_err_mm": 0.0
+   },
+   "jump": {
+    "max_joint_err_mm": 0.005,
+    "mean_joint_err_mm": 0.001
+   },
+   "punch": {
+    "max_joint_err_mm": 2.746,
+    "mean_joint_err_mm": 0.026
+   },
+   "kick": {
+    "max_joint_err_mm": 1.29,
+    "mean_joint_err_mm": 0.022
+   },
+   "special1": {
+    "max_joint_err_mm": 2.07,
+    "mean_joint_err_mm": 0.033
+   },
+   "special2": {
+    "max_joint_err_mm": 0.455,
+    "mean_joint_err_mm": 0.037
+   },
+   "block": {
+    "max_joint_err_mm": 0.001,
+    "mean_joint_err_mm": 0.0
+   },
+   "hit": {
+    "max_joint_err_mm": 0.75,
+    "mean_joint_err_mm": 0.014
+   },
+   "throw": {
+    "max_joint_err_mm": 1.483,
+    "mean_joint_err_mm": 0.098
+   },
+   "jumpattack": {
+    "max_joint_err_mm": 2.701,
+    "mean_joint_err_mm": 0.047
+   },
+   "taunt": {
+    "max_joint_err_mm": 0.008,
+    "mean_joint_err_mm": 0.0
+   },
+   "victory": {
+    "max_joint_err_mm": 0.009,
+    "mean_joint_err_mm": 0.0
+   }
+  },
+  "bind_pose_vertices": {
+   "glb": 5370,
+   "fbx_sdk": 5370,
+   "max_err_mm": 0.0
+  },
+  "skinned_mid_take": {
+   "take": "punch",
+   "t": 0.167,
+   "max_err_mm": 0.033,
+   "mean_err_mm": 0.001
+  },
+  "note": "FBX2glTF re-samples every take at 30 fps with the Autodesk FBX SDK; errors are measured at those sample times",
+  "worst_err_mm": 2.746,
+  "ok": true
+ },
+ "blender": {
+  "blender": "4.2.0",
+  "armatures": 1,
+  "meshes": 1,
+  "bones": 19,
+  "fps": 30.0,
+  "actions": [
+   "block",
+   "crouch",
+   "hit",
+   "idle",
+   "jump",
+   "jumpattack",
+   "kick",
+   "punch",
+   "special1",
+   "special2",
+   "taunt",
+   "throw",
+   "victory",
+   "walk"
+  ],
+  "vertex_groups": 18,
+  "weighted_verts": 1010,
+  "modifiers": [
+   "ARMATURE"
+  ],
+  "ran": true,
+  "skinned_max_err_mm_at_key": {
+   "block": 0.01,
+   "crouch": 0.01,
+   "hit": 0.09,
+   "idle": 0.01,
+   "jump": 0.01,
+   "jumpattack": 0.01,
+   "kick": 0.01,
+   "punch": 0.01,
+   "special1": 0.02,
+   "special2": 0.01,
+   "taunt": 0.01,
+   "throw": 0.1,
+   "victory": 0.01,
+   "walk": 0.01
+  },
+  "skinned_max_err_mm_between_keys": {
+   "block": 0.01,
+   "crouch": 0.01,
+   "hit": 0.06,
+   "idle": 0.01,
+   "jump": 0.01,
+   "jumpattack": 2.97,
+   "kick": 0.01,
+   "punch": 0.01,
+   "special1": 0.01,
+   "special2": 0.01,
+   "taunt": 0.01,
+   "throw": 0.07,
+   "victory": 0.01,
+   "walk": 0.01
+  },
+  "worst_skinned_err_mm": 0.1,
+  "worst_between_keys_mm": 2.97,
+  "ok": true
+ },
+ "RESULT": "PASS"
+}

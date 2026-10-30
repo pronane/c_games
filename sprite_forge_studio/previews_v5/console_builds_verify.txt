@@ -1,0 +1,10 @@
+Console builds, Linux, restricted PATH (no ffmpeg/blender/colmap/gcc), spec examples_char.txt preset fighter14, --no-fbx; 7 builds + verify in 30.8 s total
+nes      RESULT: PASS (0 checks failed)
+gb       RESULT: PASS (0 checks failed)
+genesis  RESULT: PASS (0 checks failed)
+ps1      RESULT: PASS (0 checks failed)
+n64      RESULT: PASS (0 checks failed)
+saturn   RESULT: PASS (0 checks failed)
+ps2gc    RESULT: PASS (0 checks failed)
+snes     (build_release.sh step 2) RESULT: PASS
+gba      (photo builds) RESULT: PASS

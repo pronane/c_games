@@ -15,6 +15,7 @@ static const char *ACTION_NAMES[NUM_PAD_ACTIONS] = { "Accelerate (A)", "Brake / 
 const char *PadActionName(int a) { return ACTION_NAMES[a]; }
 
 PadBind gBinds[2][NUM_PAD_ACTIONS][2];
+static int gPadDbLoaded[2];
 
 void InputDefaultBinds(int set)
 {
@@ -85,18 +86,56 @@ static int StdPadFor(int p) { return IsGamepadAvailable(p) ? p : -1; }
 /* call after LoadSettings (bindings come from the config file) */
 void InputInit2(void)
 {
-    /* up-to-date SDL_GameControllerDB (incl. EasySMX + generic USB pads) */
-    const char *paths[] = { "assets/gamecontrollerdb.txt", "gamecontrollerdb.txt" };
-    for (int i = 0; i < 2; i++) {
-        if (!FileExists(paths[i])) continue;
-        char *db = LoadFileText(paths[i]);
-        if (db) {
-            int r = SetGamepadMappings(db);
-            TraceLog(LOG_INFO, "INPUT: loaded %s (result %d)", paths[i], r);
-            UnloadFileText(db);
+    /* up-to-date SDL_GameControllerDB, then our extra EasySMX file (a GUID there replaces the main one) */
+    const char *paths[][2] = { { "assets/gamecontrollerdb.txt", "gamecontrollerdb.txt" },
+                               { "assets/gamecontrollerdb_easysmx.txt", "gamecontrollerdb_easysmx.txt" } };
+    for (int f = 0; f < 2; f++)
+        for (int i = 0; i < 2; i++) {
+            if (!FileExists(paths[f][i])) continue;
+            char *db = LoadFileText(paths[f][i]);
+            if (db) {
+                int r = SetGamepadMappings(db);
+                gPadDbLoaded[f] = r;
+                TraceLog(LOG_INFO, "INPUT: loaded %s (result %d)", paths[f][i], r);
+                UnloadFileText(db);
+            }
+            break;
         }
-        break;
+}
+
+/* --padcheck: mapping files load, the remap rules hold, and the raw fallback reads binds */
+int InputSelfTest(void)
+{
+    int fail = 0;
+    #define CHECK(c, msg) do { if (c) printf("PADCHECK ok   %s\n", msg); else { printf("PADCHECK FAIL %s\n", msg); fail++; } } while (0)
+    CHECK(gPadDbLoaded[0] == 1, "main gamecontrollerdb.txt accepted");
+    CHECK(gPadDbLoaded[1] == 1, "gamecontrollerdb_easysmx.txt accepted");
+    PadBind saved[2][NUM_PAD_ACTIONS][2]; memcpy(saved, gBinds, sizeof saved);
+    for (int set = 0; set < 2; set++) {
+        InputDefaultBinds(set);
+        PadBind accel = gBinds[set][PA_ACCEL][0];
+        CHECK(accel.kind != BIND_NONE, set ? "raw default: accelerate bound" : "std default: accelerate bound");
+        InputSetBind(set, PA_ITEM, accel);           /* move accel's button onto item */
+        bool moved = gBinds[set][PA_ITEM][0].kind == accel.kind && gBinds[set][PA_ITEM][0].code == accel.code;
+        bool cleared = !(gBinds[set][PA_ACCEL][0].kind == accel.kind && gBinds[set][PA_ACCEL][0].code == accel.code);
+        CHECK(moved && cleared, set ? "raw remap: button moves, old action loses it" : "std remap: button moves, old action loses it");
+        /* config round trip uses kind*100+code */
+        for (int a = 0; a < NUM_PAD_ACTIONS; a++) for (int k = 0; k < 2; k++) {
+            PadBind b = gBinds[set][a][k]; int iv = b.kind*100 + b.code;
+            PadBind r = { (signed char)(iv/100), (signed char)(iv % 100) };
+            if (r.kind != b.kind || r.code != b.code) { fail++; printf("PADCHECK FAIL cfg round trip set %d action %d\n", set, a); }
+        }
     }
+    /* raw fallback: a fake DirectInput pad pressing button 2 (A/cross) accelerates with the default layout */
+    InputDefaultBinds(1);
+    RawPadState rs; memset(&rs, 0, sizeof rs); rs.buttons = 1u << 2; rs.nAxes = 4;
+    CHECK(BindDownRaw(&rs, gBinds[1][PA_ACCEL][0]), "raw fallback: button 3 (A/cross) = accelerate");
+    rs.buttons = 0; rs.axes[3] = 0.9f;
+    CHECK(BindDownRaw(&rs, (PadBind){ BIND_RAW_AXIS_POS, 3 }) && !BindDownRaw(&rs, (PadBind){ BIND_RAW_AXIS_NEG, 3 }), "raw fallback: analogue trigger axis bind");
+    memcpy(gBinds, saved, sizeof saved);
+    printf("PADCHECK %s (%d failures)\n", fail ? "FAILED" : "PASSED", fail);
+    #undef CHECK
+    return fail;
 }
 
 static void Toast(const char *s) { snprintf(toast, sizeof toast, "%s", s); toastT = 3.5f; }

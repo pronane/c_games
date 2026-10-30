@@ -1,0 +1,3 @@
+# pip install -r requirements.txt   == core + extras.  setup.bat / setup.sh do this (plus mocap) for you.
+-r requirements-core.txt
+-r requirements-extras.txt

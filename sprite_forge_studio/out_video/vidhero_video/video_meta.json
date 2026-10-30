@@ -1,0 +1,454 @@
+{
+ "standing_h": 400.0,
+ "clips": [
+  {
+   "file": "examples_video\\walk_static.mp4",
+   "move": "walk",
+   "frames_out": 8,
+   "fps": 30.0,
+   "decoded": 110,
+   "camera": "static",
+   "camera_info": {
+    "global_step_px": 0.001687818206846714,
+    "global_span_px": 9.135783195495605,
+    "max_offset_vs_first_px": 0.007023219484835863
+   },
+   "background": "median",
+   "threshold": 0.07,
+   "selection": {
+    "pmin": 6,
+    "step_period": 16.50499215722084,
+    "score": 0.4448244869709015,
+    "stride_from": "detected minimum at 2 x step",
+    "period": 33.00039767409908,
+    "start": 68,
+    "seam_error": 0.007617331109941006,
+    "period_s": 1.1000132558033024
+   },
+   "interpolated": 0,
+   "root": "inplace",
+   "travel_px_per_cycle": 152.19797021541677,
+   "ref_h_px": 224.0,
+   "height_ratio": 0.9806826460888152,
+   "standing_h_px": 228.41232165508669,
+   "scale": 1.7512190108728842,
+   "times": {
+    "decode_s": 0.3466770648956299,
+    "camera_s": 4.003895282745361,
+    "background_s": 0.5930428504943848,
+    "matte_s": 1.5302658081054688,
+    "matte_fps": 71.88293655739749,
+    "analyse_s": 0.30799365043640137,
+    "total_s": 7.267916917800903
+   },
+   "warnings": [],
+   "picks": [
+    [
+     "frame",
+     68,
+     0.0
+    ],
+    [
+     "frame",
+     72,
+     0.0
+    ],
+    [
+     "frame",
+     76,
+     0.0
+    ],
+    [
+     "frame",
+     80,
+     0.0
+    ],
+    [
+     "frame",
+     84,
+     0.0
+    ],
+    [
+     "frame",
+     88,
+     0.0
+    ],
+    [
+     "frame",
+     92,
+     0.0
+    ],
+    [
+     "frame",
+     97,
+     0.0
+    ]
+   ],
+   "options": {
+    "camera": "auto",
+    "bg": "auto",
+    "plate": null,
+    "plate_start": 0.0,
+    "key": null,
+    "thr": null,
+    "shadows": true,
+    "max_h": 720,
+    "slowmo": 1.0,
+    "interp": "auto",
+    "spacing": "mix",
+    "root": "auto",
+    "period": null,
+    "flip": false,
+    "debug_dir": "",
+    "layers": true
+   },
+   "debug_sheet": "out_video\\vidhero_video\\_debug\\walk.png",
+   "sprite_fps": 7
+  },
+  {
+   "file": "examples_video\\run_tracking.mp4",
+   "move": "run",
+   "frames_out": 8,
+   "fps": 30.0,
+   "decoded": 90,
+   "camera": "tracking",
+   "camera_info": {
+    "global_step_px": 4.016934394836426,
+    "global_span_px": 391.7431640625,
+    "max_offset_vs_first_px": 312.0042419433594,
+    "flat_bands": 9,
+    "layer2_bands": [
+     11
+    ],
+    "layer2_speed_px": [
+     -0.5
+    ]
+   },
+   "background": "median",
+   "threshold": 0.07,
+   "selection": {
+    "pmin": 6,
+    "step_period": 9.95837714523077,
+    "score": 0.6075014472007751,
+    "stride_from": "detected minimum at 2 x step",
+    "period": 19.91298956423998,
+    "start": 55,
+    "seam_error": 0.02814354933798313,
+    "period_s": 0.6637663188079993
+   },
+   "interpolated": 0,
+   "root": "inplace",
+   "travel_px_per_cycle": 191.11167710091476,
+   "ref_h_px": 207.5,
+   "height_ratio": 0.9620255191762277,
+   "standing_h_px": 215.69074402275737,
+   "scale": 1.8545070249180293,
+   "times": {
+    "decode_s": 0.302997350692749,
+    "camera_s": 15.288781642913818,
+    "background_s": 1.4999430179595947,
+    "matte_s": 12.50979232788086,
+    "matte_fps": 7.194364034278567,
+    "analyse_s": 0.2859938144683838,
+    "total_s": 30.41254234313965
+   },
+   "warnings": [],
+   "picks": [
+    [
+     "frame",
+     55,
+     0.0
+    ],
+    [
+     "frame",
+     57,
+     0.0
+    ],
+    [
+     "frame",
+     60,
+     0.0
+    ],
+    [
+     "frame",
+     62,
+     0.0
+    ],
+    [
+     "frame",
+     65,
+     0.0
+    ],
+    [
+     "frame",
+     67,
+     0.0
+    ],
+    [
+     "frame",
+     70,
+     0.0
+    ],
+    [
+     "frame",
+     72,
+     0.0
+    ]
+   ],
+   "options": {
+    "camera": "auto",
+    "bg": "auto",
+    "plate": null,
+    "plate_start": 0.0,
+    "key": null,
+    "thr": null,
+    "shadows": true,
+    "max_h": 720,
+    "slowmo": 1.0,
+    "interp": "auto",
+    "spacing": "mix",
+    "root": "auto",
+    "period": null,
+    "flip": false,
+    "debug_dir": "",
+    "layers": true
+   },
+   "debug_sheet": "out_video\\vidhero_video\\_debug\\run.png",
+   "sprite_fps": 12
+  },
+  {
+   "file": "examples_video\\jump_handheld.mp4",
+   "move": "jump",
+   "frames_out": 12,
+   "fps": 30.0,
+   "decoded": 73,
+   "camera": "handheld",
+   "camera_info": {
+    "global_step_px": 0.5806914567947388,
+    "global_span_px": 8.558938980102539,
+    "max_offset_vs_first_px": 10.392622947692871
+   },
+   "background": "median",
+   "threshold": 0.07,
+   "selection": {
+    "span": [
+     32,
+     51
+    ],
+    "thr": 0.10599198440710703,
+    "base": 0.07281189225614071,
+    "top": 0.23871235301097232
+   },
+   "interpolated": 0,
+   "root": "keep",
+   "travel_px_per_cycle": 27.685373829510695,
+   "ref_h_px": 187.0,
+   "height_ratio": 1.0003098184390795,
+   "standing_h_px": 186.9420818959887,
+   "scale": 2.139700146393753,
+   "times": {
+    "decode_s": 0.2771177291870117,
+    "camera_s": 3.2039899826049805,
+    "background_s": 0.797982931137085,
+    "matte_s": 1.1669409275054932,
+    "matte_fps": 25.70824220222474,
+    "analyse_s": 0.03603982925415039,
+    "total_s": 6.245999097824097
+   },
+   "warnings": [],
+   "picks": [
+    [
+     "frame",
+     32,
+     0.0
+    ],
+    [
+     "frame",
+     34,
+     0.0
+    ],
+    [
+     "frame",
+     36,
+     0.0
+    ],
+    [
+     "frame",
+     37,
+     0.0
+    ],
+    [
+     "frame",
+     39,
+     0.0
+    ],
+    [
+     "frame",
+     41,
+     0.0
+    ],
+    [
+     "frame",
+     42,
+     0.0
+    ],
+    [
+     "frame",
+     44,
+     0.0
+    ],
+    [
+     "frame",
+     46,
+     0.0
+    ],
+    [
+     "frame",
+     48,
+     0.0
+    ],
+    [
+     "frame",
+     49,
+     0.0
+    ],
+    [
+     "frame",
+     51,
+     0.0
+    ]
+   ],
+   "options": {
+    "camera": "auto",
+    "bg": "auto",
+    "plate": null,
+    "plate_start": 0.0,
+    "key": null,
+    "thr": null,
+    "shadows": true,
+    "max_h": 720,
+    "slowmo": 1.0,
+    "interp": "auto",
+    "spacing": "mix",
+    "root": "auto",
+    "period": null,
+    "flip": false,
+    "debug_dir": "",
+    "layers": true
+   },
+   "debug_sheet": "out_video\\vidhero_video\\_debug\\jump.png",
+   "sprite_fps": 17
+  },
+  {
+   "file": "examples_video\\punch_green.mp4",
+   "move": "punch",
+   "frames_out": 10,
+   "fps": 24.0,
+   "decoded": 28,
+   "camera": "static",
+   "camera_info": {
+    "note": "chroma key: camera motion irrelevant"
+   },
+   "background": "chroma",
+   "threshold": null,
+   "selection": {
+    "span": [
+     8,
+     20
+    ],
+    "thr": 0.01325788945731195,
+    "base": 3.142562727968349e-05,
+    "top": 0.06616374477744102
+   },
+   "interpolated": 0,
+   "root": "keep",
+   "travel_px_per_cycle": 0.0531134386337726,
+   "ref_h_px": 226.0,
+   "height_ratio": 0.9839124244044261,
+   "standing_h_px": 229.6952395298804,
+   "scale": 1.7414379192998692,
+   "times": {
+    "decode_s": 0.13818645477294922,
+    "camera_s": 0.0,
+    "background_s": 0.0019881725311279297,
+    "matte_s": 0.5450410842895508,
+    "matte_fps": 51.37227414057674,
+    "analyse_s": 0.032952308654785156,
+    "total_s": 1.2739615440368652
+   },
+   "warnings": [],
+   "picks": [
+    [
+     "frame",
+     8,
+     0.0
+    ],
+    [
+     "frame",
+     10,
+     0.0
+    ],
+    [
+     "frame",
+     11,
+     0.0
+    ],
+    [
+     "frame",
+     12,
+     0.0
+    ],
+    [
+     "frame",
+     13,
+     0.0
+    ],
+    [
+     "frame",
+     14,
+     0.0
+    ],
+    [
+     "frame",
+     16,
+     0.0
+    ],
+    [
+     "frame",
+     17,
+     0.0
+    ],
+    [
+     "frame",
+     18,
+     0.0
+    ],
+    [
+     "frame",
+     20,
+     0.0
+    ]
+   ],
+   "options": {
+    "camera": "auto",
+    "bg": "auto",
+    "plate": null,
+    "plate_start": 0.0,
+    "key": null,
+    "thr": null,
+    "shadows": true,
+    "max_h": 720,
+    "slowmo": 1.0,
+    "interp": "auto",
+    "spacing": "mix",
+    "root": "auto",
+    "period": null,
+    "flip": false,
+    "debug_dir": "",
+    "layers": true
+   },
+   "debug_sheet": "out_video\\vidhero_video\\_debug\\punch.png",
+   "sprite_fps": 18
+  }
+ ]
+}

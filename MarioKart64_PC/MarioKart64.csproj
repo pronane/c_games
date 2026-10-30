@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>MarioKart64</AssemblyName>
+    <RootNamespace>MarioKart64</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>assets\mk64.ico</ApplicationIcon>
+    <Optimize>true</Optimize>
+    <LangVersion>5</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+</Project>

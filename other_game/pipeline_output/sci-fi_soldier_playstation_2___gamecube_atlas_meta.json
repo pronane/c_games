@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "asset_name": "sci-fi_soldier",
+    "target_console": "PlayStation 2 / GameCube",
+    "mode": "Multi-Angle 3D Workaround Sheet",
+    "frame_width": 128,
+    "frame_height": 128,
+    "total_width": 512,
+    "total_height": 384,
+    "angles": [
+      "angle_0",
+      "angle_45",
+      "angle_90",
+      "angle_135",
+      "angle_180",
+      "angle_225",
+      "angle_270",
+      "angle_315",
+      "top_down"
+    ],
+    "notes": "512\u00d7512 textures, clean mid-poly / Phong aesthetic"
+  },
+  "frames": {
+    "angle_0": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 0
+      }
+    ],
+    "angle_45": [
+      {
+        "frame_index": 0,
+        "x": 128,
+        "y": 0,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 45
+      }
+    ],
+    "angle_90": [
+      {
+        "frame_index": 0,
+        "x": 256,
+        "y": 0,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 90
+      }
+    ],
+    "angle_135": [
+      {
+        "frame_index": 0,
+        "x": 384,
+        "y": 0,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 135
+      }
+    ],
+    "angle_180": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 128,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 180
+      }
+    ],
+    "angle_225": [
+      {
+        "frame_index": 0,
+        "x": 128,
+        "y": 128,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 225
+      }
+    ],
+    "angle_270": [
+      {
+        "frame_index": 0,
+        "x": 256,
+        "y": 128,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 270
+      }
+    ],
+    "angle_315": [
+      {
+        "frame_index": 0,
+        "x": 384,
+        "y": 128,
+        "w": 128,
+        "h": 128,
+        "angle_deg": 315
+      }
+    ],
+    "top_down": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 256,
+        "w": 128,
+        "h": 128,
+        "angle_deg": -1
+      }
+    ]
+  }
+}

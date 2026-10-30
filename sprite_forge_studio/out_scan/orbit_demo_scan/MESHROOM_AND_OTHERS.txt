@@ -1,0 +1,5 @@
+Other tools that take the images/ folder directly (better dense quality than our CPU step):
+  Meshroom (AliceVision, free, NVIDIA GPU for depth maps): drag images/ in, press Start, export Texturing/texturedMesh.obj
+  RealityScan / RealityCapture, Polycam, Kiri Engine (phone apps / cloud), COLMAP + OpenMVS (CPU, slow)
+  Gaussian splatting (Postshot, nerfstudio) gives great looking captures but NOT a game mesh without extra work.
+Then:  python forge.py scan --mesh texturedMesh.obj --name myobject   -> console LODs

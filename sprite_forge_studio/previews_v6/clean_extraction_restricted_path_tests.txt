@@ -1,0 +1,38 @@
+PASS  pack       starter pack verifies                        8 assets
+PASS  pack       install refused without acknowledgement      error: not installed: the licences were not acknowledged (use --accept-licences after read
+PASS  pack       install with --accept-licences               8 assets
+PASS  pack       install records provenance + acknowledgement Sprite Forge Studio starter pack (CC0)
+PASS  pack       re-install identical content is skipped      
+PASS  pack       tampered file is detected (sha256)           rigs/sample_lanky: checksum mismatch rigs/sample_lanky/rig.json
+PASS  pack       path traversal entry is refused              rigs/sample_chibi: unsafe path ../../evil.txt
+PASS  pack       pack with a non-redistributable asset is refused rigs/sample_chibi: not redistributable (redistribution = unknown)
+PASS  licence    add without licence warns                    
+PASS  licence    pack refuses licence=unknown                 
+PASS  licence    'I own the rights' needs --by                
+PASS  licence    override recorded in the pack                I own the rights to this asset (or have permission) and may 
+PASS  licence    clips retargeted from a 'no' source block packing 
+PASS  licence    clips-drop clears the block                  
+PASS  pack       pack --all -> install elsewhere: identical rigs 9 assets
+PASS  import     sforge_mannequin .glb                        18/18 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, sforge names, grounding shift 2.0 mm
+PASS  import     sforge_mannequin .fbx                        18/18 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, sforge names, grounding shift 2.0 mm
+PASS  import     sample_chibi .glb                            22/22 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, unity names
+PASS  import     sample_chibi .fbx                            22/22 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, unity names
+PASS  import     sample_lanky .glb                            25/25 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, mixamo names
+PASS  import     sample_lanky .fbx                            25/25 bones, 7 takes, bind err 0.000 mm, clip err 0.01 mm, mixamo names
+PASS  import     sample_stocky .glb                           27/27 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, rigify names
+PASS  import     sample_stocky .fbx                           27/27 bones, 7 takes, bind err 0.000 mm, clip err 0.00 mm, rigify names
+PASS  import     sample_moves .glb                            25/25 bones, 5 takes, bind err 0.000 mm, clip err 0.00 mm, mixamo names, grounding shift 29.6 mm
+PASS  import     sample_moves .fbx                            25/25 bones, 5 takes, bind err 0.000 mm, clip err 0.00 mm, mixamo names, grounding shift 29.6 mm
+PASS  blender    oracle skipped (set SFS_BPY_PYTHON)          not run
+PASS  retarget   sample_moves -> sample_chibi                 leg ratio 0.41, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.023
+PASS  retarget   sample_moves -> sample_stocky                leg ratio 0.78, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.008
+PASS  retarget   sample_lanky -> sample_chibi                 leg ratio 0.34, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.017
+PASS  retarget   sample_chibi -> sample_lanky                 leg ratio 2.91, dir err 0.00 deg, ground contact 0.0 mm off the scaled source, hip-height/leg diff 0.020
+PASS  retarget   sforge_mannequin -> sample_stocky            leg ratio 0.76, dir err 0.00 deg, ground contact 0.6 mm off the scaled source, hip-height/leg diff 0.013
+PASS  retarget   sample_stocky -> sforge_mannequin            leg ratio 1.31, dir err 0.00 deg, ground contact 0.8 mm off the scaled source, hip-height/leg diff 0.013
+PASS  build      sample_lanky_fighter14                       96 sprite frames, model.fbx 14 takes
+PASS  build      sample_chibi_platformer                      71 sprite frames, model.fbx 10 takes
+PASS  build      sample_stocky_gba                            56 sprite frames, model.fbx 7 takes, console gba
+PASS  build      sample_lanky_ps1                             56 sprite frames, model.fbx 7 takes, console ps1, console model 596 tris
+
+36 / 36 passed -> /tmp/rel6_tests

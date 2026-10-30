@@ -28,7 +28,9 @@
 #define MAX_PARTICLES       4096
 #define GHOST_MAX           4800   /* 20 Hz samples: 4 minutes of lap */
 #define GHOST_HZ            20.0f
-#define NUM_TRACKS          6
+#define NUM_TRACKS          11
+#define NUM_CUPS            4
+#define STADIUM_TRACK       6
 #define MUSIC_TITLE         NUM_TRACKS
 #define MUSIC_RESULTS       (NUM_TRACKS + 1)
 #define MAX_CHARACTERS      32
@@ -73,7 +75,17 @@ typedef struct CharacterDef {
     /* data-driven characters (assets/characters/<name>/character.ini) */
     int spriteAngles;         /* 0 = not a sprite character, 1 = single billboard, 8/16 = sheet */
     float spriteSize;         /* driver height in world units */
+    float spriteSeat;         /* extra seat height for the billboard driver (keeps e.g. a bib above the cowl) */
+    int spriteRows;           /* sheet rows (frames laid out row by row), 0/1 = one row */
+    int kartStyle;            /* KART_STYLE_* decoration */
+    const char *quip;         /* victory speech bubble (NULL = none) */
+    int quipStyle;            /* QUIP_* : how the winner acts out the quip */
+    float faceX, faceY;       /* face centre in the (win) sprite, 0..1, for quip effects */
+    int decalFrames;          /* frames stacked in decal.png (blinks between them) */
+    int model3d;              /* 0 = none, else a built-in-code low-poly 3D driver (MODEL3D_*, characters.c) */
 } CharacterDef;
+enum { KART_STYLE_NONE = 0, KART_STYLE_RATTLE, KART_STYLE_SPA };
+enum { QUIP_NONE = 0, QUIP_SLEEPY, QUIP_HAPPY };
 
 extern CharacterDef CHARACTERS[MAX_CHARACTERS];
 extern int NUM_CHARACTERS;
@@ -81,9 +93,20 @@ extern int NUM_CHARACTERS;
 /* ------------------------------------------------------------------ */
 /* Tracks                                                              */
 /* ------------------------------------------------------------------ */
-typedef enum { SCENERY_MEADOW = 0, SCENERY_DESERT, SCENERY_SNOW, SCENERY_STARLIGHT, SCENERY_BEACH, SCENERY_SPOOKY } SceneryType;
+typedef enum { SCENERY_MEADOW = 0, SCENERY_DESERT, SCENERY_SNOW, SCENERY_STARLIGHT, SCENERY_BEACH, SCENERY_SPOOKY, SCENERY_STADIUM,
+               SCENERY_RACEWAY, SCENERY_JUNGLE, SCENERY_ISLAND, SCENERY_FARM } SceneryType;
 
-#define MAX_CTRL_PTS 40
+/* per-section flags on the newer courses (TrackDef.zones -> TrackSample.zone) */
+enum { ZN_TUNNEL = 1, ZN_BOOSTFLOOR = 2, ZN_OPEN_L = 4, ZN_OPEN_R = 8, ZN_PLANKS = 16, ZN_GAP = 32, ZN_CAVE = 64,
+       ZN_CHECKER = 128, ZN_TIDE = 256, ZN_HAZARD = 512, ZN_NOWALL_L = 1024, ZN_NOWALL_R = 2048, ZN_RAMP = 4096, ZN_LOWWALL_L = 8192 };
+typedef enum { HZ_NONE = 0, HZ_MONKEYS, HZ_CRABS, HZ_MOLES } HazardType;
+typedef enum { WS_BARRIER = 0, WS_RACEWAY, WS_LOG, WS_NONE, WS_FENCE } WallStyle;
+typedef enum { MUS_ROCK = 0, MUS_COUNTRY, MUS_JUNGLE, MUS_CALYPSO, MUS_FANFARE } MusicStyle;
+#define MAX_ZONES 12
+#define MAX_RIVER 24
+
+
+#define MAX_CTRL_PTS 200
 typedef struct TrackDef {
     const char *name;
     const char *subtitle;
@@ -113,10 +136,22 @@ typedef struct TrackDef {
     const char *scHint;
     /* bumpy road sections (moguls): fraction ranges */
     int numBumps;
-    float bumps[3][2];
+    float bumps[6][2];
     float bumpAmp, bumpPeriod;
     Color groundFar;                   /* ground colour far from the road (gradient), alpha 0 = none */
     float farStart, farEnd;
+    /* v7 courses */
+    int numZones;
+    float zones[MAX_ZONES][3];         /* from fraction, to fraction, ZN_* flags */
+    HazardType hazard;
+    float tideAmp, tidePeriod;         /* rising / falling sea on the beach course */
+    int numRiver;
+    float river[MAX_RIVER][3];         /* water channel polyline: x, z, half width */
+    WallStyle wallStyle;
+    MusicStyle musicStyle;
+    float shoulderW;                   /* off-road strip width (0 = default) */
+    bool followTerrain;                /* ground follows the road height (cuttings, embankments, tunnels) */
+    float waterLevel;                  /* absolute water height for river / lake / sea (followTerrain courses) */
 } TrackDef;
 
 extern const TrackDef TRACK_DEFS[NUM_TRACKS];
@@ -131,7 +166,23 @@ typedef struct TrackSample {
     float edge[2];    /* outer edge of the off-road strip (wall line), [0]=left [1]=right */
     bool ramp;
     bool bump;
+    bool bridge;      /* a lower part of the course runs underneath (overpass) */
+    unsigned short zone;   /* ZN_* flags */
 } TrackSample;
+
+/* procedural texture ids (textures.c) */
+typedef enum { TX_GRAIN = 0, TX_ROAD, TX_CURB, TX_BARRIER, TX_WOOD, TX_STONE, TX_ROCK, TX_BARK, TX_LEAVES, TX_ROOF,
+               TX_CROWD, TX_SIGNS, TX_WATER, TX_RAINBOW, TX_ITEMBOX, TX_CLOUD, TX_DIRT, TX_ARENA, TX_TRAIL, TX_CHEVRON, TX_PLANK, NUM_TX } TexId;
+
+/* scenery is split into spatial chunks (one static mesh per texture per chunk) for frustum culling */
+#define MAX_SCENE_CHUNKS 82
+#define SCENE_MATS 14
+typedef struct SceneChunk {
+    Vector3 center; float radius;
+    bool far;                     /* big backdrop pieces: never distance-culled */
+    int nm;
+    Model m[SCENE_MATS];
+} SceneChunk;
 
 typedef struct Track {
     const TrackDef *def;
@@ -143,6 +194,12 @@ typedef struct Track {
     float shoulder;   /* off-road width beyond the rumble strip */
     float groundY;
     Model mRoad, mGround, mWalls, mScenery, mSky;
+    Model mCurb, mWater, mClouds, mPano;
+    bool hasWater;
+    float waterY;
+    int numChunks;
+    SceneChunk chunks[MAX_SCENE_CHUNKS];
+    int sceneVerts;
     bool loaded;
     int builtVisual;   /* visual mode the meshes were built for */
     /* shortcut corridor */
@@ -151,6 +208,31 @@ typedef struct Track {
     int scA, scB;      /* main-track samples where it leaves / rejoins */
     float scHalf;
     Vector2 mapMin, mapMax;
+    /* indoor stadium extras (SCENERY_STADIUM) */
+    int numJumbo;
+    Vector3 jumboC[2], jumboRight[2], jumboUp[2];   /* screen centres + half extents */
+    Vector3 jumboCamPos, jumboCamTarget;
+    int numFlashSpots;
+    Vector3 flashA[8], flashB[8], flashC[8];   /* crowd stand quads (a + u*(b-a) + v*(c-a)) for camera flashes */
+    int numLights;
+    Vector3 lights[48];                    /* flood-light lamp positions (glow sprites) */
+    Vector3 neonC, neonRight, neonUp;       /* neon arrow sign (animated chase lights) */
+    bool hasNeon;
+    /* v7 courses: water channels, tide, moving extras, animal spots */
+    float waterBase;                        /* sea level before the tide offset */
+    float tideOffset;                       /* current tide offset (updated per frame) */
+    int numCows;
+    Vector3 cows[16];
+    bool hasLandmark;                       /* screenshot-tour target: castle / lighthouse / barn */
+    Vector3 landmark;
+    float landmarkH;
+    int numHazSpots;
+    Vector3 hazSpot[24];                    /* mole holes / monkey hides / crab beats (x,z) + seg in y */
+    float hazLat[24];
+    int boatN;
+    Vector3 boatPath[32];                   /* steamboat route along the river */
+    Model mDeco[5];                         /* chevron floors, planks, brick, rock, concrete structures */
+    bool hasDeco;
 } Track;
 
 /* ------------------------------------------------------------------ */
@@ -231,6 +313,13 @@ typedef struct Kart {
     int shortcutsTaken;
     int statJumps;
     int statBumpAirs;
+    /* v7: fall-in rescue + course hazards */
+    float rescueT;
+    int rescueSeg;
+    float rescueLat;
+    int statRescues, statHazardHits;
+    float hazCooldown;
+    float tideCooldown;
 } Kart;
 
 /* ------------------------------------------------------------------ */
@@ -306,7 +395,7 @@ typedef struct PadBind { signed char kind, code; } PadBind;
 extern PadBind gBinds[2][NUM_PAD_ACTIONS][2];   /* [0] standard gamepads, [1] raw/DirectInput pads */
 
 typedef struct Settings {
-    int pixelMode;      /* 0 = chunky N64 (1/3 res), 1 = crisp (1/2 res), 2 = full resolution */
+    int pixelMode;      /* ORIGINAL only: 0 = N64 hi-res 640x480 (bilinear), 1 = retro 320x240 (point) */
     int cc;             /* 0 = 50cc, 1 = 100cc, 2 = 150cc */
     float musicVol, sfxVol;
     bool showFps;
@@ -322,6 +411,7 @@ typedef struct Game {
     int humanChar[MAX_HUMANS];
     int trackIndex;
     int gpRace;
+    int gpCup;                   /* -1 = every track in index order (test harness) */
     int gpChars[MAX_RACERS];     /* character per kart slot during a cup */
     int gpPoints[MAX_RACERS];
     int gpLastPoints[MAX_RACERS];   /* points scored in the last race (standings "+N") */
@@ -338,14 +428,23 @@ typedef struct Game {
     Shader fogShader;
     int locFogColor, locFogDensity, locFogStart;
     Texture2D texRoad, texGround[NUM_TRACKS], texWhite, texQuestion, texDot;
+    Texture2D tx[NUM_TX], texPano[NUM_TRACKS];
+    int locUvOffset, locHueShift;
+    Camera3D curCam;        /* camera of the view being rendered */
+    bool kartSprites;       /* ORIGINAL race views: draw racers as pre-rendered sprites */
     RenderTexture2D view[MAX_HUMANS];
     int viewW, viewH, viewScale;
     RenderTexture2D preview;
+    RenderTexture2D jumboRT;                  /* stadium jumbotron: live chase-cam render-to-texture */
+    int jumboFrame;
     Vector3 sunDir;
     float ambient;
     Model charModels[MAX_CHARACTERS];
     bool charModelLoaded[MAX_CHARACTERS];
     Texture2D charSprite[MAX_CHARACTERS];
+    Texture2D charPortrait[MAX_CHARACTERS];   /* square head shot for the select grid */
+    Texture2D charWin[MAX_CHARACTERS];        /* victory-mood front sprite (win.png), optional */
+    Texture2D charDecal[MAX_CHARACTERS];      /* kart decal (decal.png, frames stacked vertically), optional */
     /* time trial records */
     float bestTimes[NUM_TRACKS];
     /* time trial ghost (best lap) */
@@ -354,6 +453,9 @@ typedef struct Game {
     float ghostRecTimer;
     /* automated test */
     bool autotest;
+    bool autoCamOn;         /* autotest: scripted camera for track tour shots */
+    Camera3D autoCam;
+    int autoFrontCam;       /* autotest: >0 = show the player's kart from the front (close-up shot) */
     int autoSpeed;
     char shotDir[256];
     char shotPrefix[32];
@@ -376,6 +478,9 @@ Color ColorScale(Color c, float s);
 Color ColorMix(Color a, Color b, float t);
 Color HueColor(float h, float s, float v);
 void DrawTextOutlined(const char *text, int x, int y, int size, Color col);
+void DrawQuip(int charId, Vector2 head, float scale, float t);   /* victory speech bubble + mood effects (2D) */
+extern int gMoodChar;                       /* racer drawn with its win.png face (podium), -1 = none */
+void PlayQuipVoice(int charId);
 void DrawTextCentered(const char *text, int cx, int y, int size, Color col);
 const char *OrdinalSuffix(int place);
 const char *FormatTime(float t);
@@ -395,6 +500,16 @@ void MB_Box(MeshBuilder *mb, Vector3 center, Vector3 size, float yaw, Color c);
 void MB_Cylinder(MeshBuilder *mb, Vector3 base, float rBottom, float rTop, float h, int sides, Color c);
 void MB_Sphere(MeshBuilder *mb, Vector3 c, Vector3 radius, int rings, int slices, Color col);
 Model MB_BuildModel(MeshBuilder *mb, Texture2D tex, bool fog);
+/* textures.c / scenery.c */
+void TexturesInit(void);
+Texture2D TexturePanorama(int track);
+float WorldNoise(float x, float z, unsigned int seed);
+float TerrainY(const Track *tr, float x, float z);
+void BuildSceneryChunks(Track *tr);
+void DrawSceneryChunks(Camera3D cam, float aspect);
+int SceneryDrawnChunks(void);
+void SceneryUnload(Track *tr);
+void CharactersEnsureSprites(void);
 void MB_VertexLit(MeshBuilder *mb, Vector3 p, Vector2 uv, Vector3 n, Color c);
 void MB_SmoothSphere(MeshBuilder *mb, Vector3 c, Vector3 r, int rings, int slices, Color bottom, Color top, float minLat);
 
@@ -431,6 +546,25 @@ void TrackUnload(Track *tr);
 void TrackLocate(const Track *tr, Vector3 p, int hint, int *seg, float *lat, float *along, float *groundY);
 float TrackHalfWidth(const Track *tr, int seg);
 float TrackWallLimit(const Track *tr, int seg, float lat);
+float TrackSurfaceY(const Track *tr, int seg, float lat, Vector3 p, float roadY);   /* road height, or the bank / gorge beside open sections */
+float TerrainY(const Track *tr, float x, float z);
+
+/* cups */
+typedef struct CupDef { const char *name; const char *tag; int n; int tracks[NUM_TRACKS]; Color col; } CupDef;
+extern const CupDef CUPS[NUM_CUPS];
+int GpTrackCount(void);
+int GpTrack(int race);
+
+/* hazards.c: v7 course hazards, fall-in rescue, moving extras */
+void HazardsReset(void);
+void HazardsUpdate(float dt);
+void HazardsDraw(void);
+float HazardKartSpeedMul(int idx);
+bool HazardRescueUpdate(int idx, float dt);      /* true while the kart is being fished out */
+void HazardStartRescue(int idx, int seg, float lat);
+float HazardAvoidLane(int idx, float laneGoal);
+void HazardsUnloadModels(void);
+bool HazardFocus(int which, Vector3 *p, int *seg);
 Vector3 TrackPoint(const Track *tr, int seg, float lat);
 int TrackWrap(const Track *tr, int i);
 void TrackOutline(int index, Vector2 *out, int maxPts, int *count);
@@ -466,6 +600,8 @@ typedef enum {
     SFX_BEEP_LOW = 0, SFX_BEEP_HIGH, SFX_DRIFT, SFX_BOOST, SFX_ROULETTE, SFX_ITEMGET, SFX_THROW,
     SFX_HIT, SFX_BUMP, SFX_SPIN, SFX_LAP, SFX_FINALLAP, SFX_FINISH, SFX_MENU_MOVE, SFX_MENU_OK,
     SFX_MENU_BACK, SFX_PEEL, SFX_DISCO, SFX_KAZOO, SFX_HOP, SFX_SPARK, SFX_BOXBREAK, SFX_SQUISH,
+    SFX_QUIP_GRUMBLE, SFX_QUIP_CAR,
+    SFX_MOO, SFX_WHISTLE, SFX_SPLASH, SFX_MONKEY, SFX_POP, SFX_RESCUE,
     SFX_COUNT
 } SfxId;
 void AudioInit(void);
@@ -499,6 +635,16 @@ void DrawMinimap(Rectangle area);
 void BeginWorld(Camera3D cam, float fov);
 void EndWorld(void);
 void DrawSkyAndTrack(Camera3D cam);
+void DrawWater(void);
+void StadiumDrawExtras(Camera3D cam);   /* jumbotron screen, flood-light glow, camera flashes (stadium) */
+/* stadium layout + TX_ARENA atlas regions */
+#define STADIUM_BANK_W 7.0f
+#define STADIUM_RISE 5.8f
+#define STADIUM_MARGIN 32.0f
+enum { ARENA_WALL, ARENA_STRIPES, ARENA_CONCRETE, ARENA_BANNER, ARENA_NEON, ARENA_TITLE, ARENA_CHEQUER, ARENA_WHITE,
+       ARENA_LAMPS, ARENA_TRUSS, ARENA_AD, ARENA_COUNT };
+Rectangle ArenaUV(int region);
+void JumbotronUpdate(void);                     /* refresh the live jumbotron feed (call outside any view) */
 
 /* ---------------- menus ---------------- */
 void MenusUpdate(float dt);
@@ -506,6 +652,7 @@ void MenusDraw(void);
 void GoToScreen(Screen s);
 void InputRead(int player, KartInput *in);
 void InputInit2(void);
+int InputSelfTest(void);
 void InputUpdate(float dt);
 void InputDrawToast(void);
 void InputDefaultBinds(int set);

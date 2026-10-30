@@ -1,0 +1,22 @@
+Sprite Forge Studio 7.0.0 build report - rua_keeper
+mode: spec
+
+move                     source                 frames  note
+idle                     mannequin:kart_idle         6  clipped at cell edge
+drive                    mannequin:kart_drive        8  clipped at cell edge
+steer_left               mannequin                   4  clipped at cell edge
+steer_right              mannequin                   4  clipped at cell edge
+boost                    mannequin                   6  clipped at cell edge
+drift                    mannequin                   6  clipped at cell edge
+hit                      mannequin:kart_hit          6  clipped at cell edge
+spin_out                 mannequin                   8  clipped at cell edge
+item_throw               mannequin                   6  clipped at cell edge
+victory                  mannequin:kart_victory      8  clipped at cell edge
+defeat                   mannequin                   6  clipped at cell edge
+taunt                    mannequin:kart_taunt        8  clipped at cell edge
+
+FILLED moves (no source frames were given - placeholders): none
+3D: model.glb
+console: none
+views: front=real (rendered at yaw 0), front_right=real (rendered at yaw 45), right=real (rendered at yaw 90), back_right=real (rendered at yaw 135), back=real (rendered at yaw 180), back_left=real (rendered at yaw 225), left=real (rendered at yaw 270), front_left=real (rendered at yaw 315)
+profile: kart_racer -> sprite.png, win.png, portrait.png, character.ini

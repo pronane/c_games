@@ -1,0 +1,34 @@
+Sprite Forge Studio doctor  -  Linux-6.12.94+-x86_64-with-glibc2.41  -  Python 3.13.5
+component                   status  details
+----------------------------------------------------------------------------------------------------
+Python                      OK      3.13.5 (/tmp/v5test/sprite_forge_studio/.venv/bin/python) venv
+numpy                       OK      2.5.4
+Pillow                      OK      13.0.0
+scipy                       OK      1.18.1
+opencv-python-headless      OK      5.0.0
+scikit-image                OK      0.26.0
+imageio-ffmpeg              OK      0.6.0
+pycolmap                    OK      4.2.1
+trimesh                     OK      5.2.0
+fast-simplification         OK      0.2.0
+open3d                      --      not installed
+                                      -> disables: second quadric decimation backend (not needed if fast-simplification is installed)
+rembg                       --      not installed
+                                      -> disables: AI background removal for photos (built-in cut-out still works)
+PyAV                        --      not installed
+                                      -> disables: second video decoder fallback (not needed when imageio-ffmpeg is installed)
+tkinter (GUI)               OK      Tk 8.6.16
+video decode/encode         OK      ffmpeg [imageio-ffmpeg (pip)] - ffmpeg version 7.0.2-static https://johnvansickle.com/ffmpeg
+slow-motion interpolation   OK      ffmpeg minterpolate
+FBX export                  OK      built-in pure-Python FBX 7.4 writer (sforge/fbx.py) - no Blender needed
+SfM for scan --run          OK      pycolmap 4.2.1 (pip, CPU)
+MediaPipe pose (mocap)      OK      /tmp/v5test/sprite_forge_studio/venv_pose/bin/python
+pose model                  OK      /tmp/v5test/sprite_forge_studio/models/pose_landmarker_full.task
+Blender (optional)          --      not found (not needed)
+                                      -> disables: only the optional --fbx-writer blender and Blender-based LOD decimation
+C compiler (optional)       --      not found
+                                      -> disables: only the raylib C example in spriteforge/
+raylib (optional)           --      not found (make -C spriteforge raylib fetches + builds it)
+                                      -> disables: only the C example
+----------------------------------------------------------------------------------------------------
+READY: sprites, photo/spec builds, consoles, GLB + FBX export. All core pieces present.

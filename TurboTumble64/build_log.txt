@@ -1,9 +1,201 @@
 Turbo Tumble 64 build log 
 ==== static link against MSYS2 raylib ==== 
 src\main.c: In function 'AutotestReportRace':
-src\main.c:82:38: warning: variable 'bumps' set but not used [-Wunused-but-set-variable=]
-   82 |     int got = 0, used = 0, hits = 0, bumps = 0, boosts = 0, realFinish = 0;
+src\main.c:102:38: warning: variable 'bumps' set but not used [-Wunused-but-set-variable=]
+  102 |     int got = 0, used = 0, hits = 0, bumps = 0, boosts = 0, realFinish = 0;
       |                                      ^~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 95 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  352 |             if (++hold == 4) { snprintf(nm, sizeof nm, "track%d_%d_%s.png", AT.race + 1, step + 1, what[step]); Shot(nm); }
+      |                                                                                                                      ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:352:113:
+src\main.c:48:5: note: 'snprintf' output between 2 and 383 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  198 |         if (G.screen == SCR_RACE && R.phase == RACE_RUNNING && R.time > 9.0f && !AT.shotB) { snprintf(nm, sizeof nm, "pv_track%d_race.png", AT.race + 1); Shot(nm); AT.shotB = true; AT.frames = 1000; }
+      |                                                                                                                                                                ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:198:155:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  205 |         if (AT.frames == 1040) { snprintf(nm, sizeof nm, "pv_track%d_shortcut.png", AT.race + 1); Shot(nm); }
+      |                                                                                                        ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:205:99:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  538 |             if (AT.resultsFrames == 150) { snprintf(nm, sizeof nm, "win_%s_ceremony.png", slug); Shot(nm); }
+      |                                                                                                       ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:538:98:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  525 |             if (AT.resultsFrames == 30) { snprintf(nm, sizeof nm, "win_%s_results_pop.png", slug); Shot(nm); }
+      |                                                                                                         ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:525:100:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  526 |             if (AT.resultsFrames == 80) { snprintf(nm, sizeof nm, "win_%s_results.png", slug); Shot(nm); }
+      |                                                                                                     ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:526:96:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  422 |             if (AT.resultsFrames == 40) { snprintf(nm, sizeof nm, "race%d_%d_results.png", AT.race + 1, 4); Shot(nm); }
+      |                                                                                                                  ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:422:109:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  389 |             if (R.phase == RACE_INTRO && R.phaseTime > 1.0f && !AT.shotCountdown) { snprintf(nm, sizeof nm, "race%d_%d_intro.png", AT.race + 1, 0); Shot(nm); AT.shotCountdown = true; }
+      |                                                                                                                                                          ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:389:149:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  390 |             if (R.phase == RACE_COUNTDOWN && R.countdown < 1.5f && !AT.shotA) { snprintf(nm, sizeof nm, "race%d_%d_countdown.png", AT.race + 1, 1); Shot(nm); AT.shotA = true; }
+      |                                                                                                                                                          ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:390:149:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  391 |             if (R.phase == RACE_RUNNING && R.time > 12.0f && !AT.shotB) { snprintf(nm, sizeof nm, "race%d_%d_racing.png", AT.race + 1, 2); Shot(nm); AT.shotB = true; }
+      |                                                                                                                                                 ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:391:140:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  395 |             else if (AT.frontStage == 3 && ++AT.frontFrames == 3) { snprintf(nm, sizeof nm, "race%d_closeup_rear.png", AT.race + 1); Shot(nm); AT.frontStage = 4; AT.frontFrames = 0; }
+      |                                                                                                                                           ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:395:134:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  393 |             else if (AT.frontStage == 1 && ++AT.frontFrames == 3) { snprintf(nm, sizeof nm, "race%d_closeup.png", AT.race + 1); Shot(nm); AT.frontStage = 2; AT.frontFrames = 0; }
+      |                                                                                                                                      ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:393:129:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  397 |             if (R.phase == RACE_RUNNING && R.time > 50.0f && !AT.shotC) { snprintf(nm, sizeof nm, "race%d_%d_racing.png", AT.race + 1, 3); Shot(nm); AT.shotC = true; }
+      |                                                                                                                                                 ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:397:140:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  400 |                 if (pk->onShortcut && pk->scIdx > T.scN/3 && !AT.shotSc) { snprintf(nm, sizeof nm, "race%d_shortcut.png", AT.race + 1); Shot(nm); AT.shotSc = true; }
+      |                                                                                                                                              ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:400:137:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  401 |                 if (!pk->grounded && pk->airTime > 0.12f && T.s[pk->seg].bump && !AT.shotBump) { snprintf(nm, sizeof nm, "race%d_bumps_airborne.png", AT.race + 1); Shot(nm); AT.shotBump = true; }
+      |                                                                                                                                                                          ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:401:165:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  404 |                 if (pk->roulette > 0 && pk->rouletteDur > 0 && pk->roulette < pk->rouletteDur*0.6f && pk->roulette > pk->rouletteDur*0.3f && !AT.shotRoul) { snprintf(nm, sizeof nm, "race%d_item_roulette.png", AT.race + 1); Shot(nm); AT.shotRoul = true; }
+      |                                                                                                                                                                                                                                     ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:404:224:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../lib\libraylib.a(rcore.c.obj):(.text+0x601a): undefined reference to `__imp_glfwSetWindowShouldClose'
 C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../lib\libraylib.a(rcore.c.obj):(.text+0x614c): undefined reference to `__imp_glfwGetJoystickName'
 C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../lib\libraylib.a(rcore.c.obj):(.text+0xa8a3): undefined reference to `__imp_glfwGetTime'
@@ -191,6 +383,198 @@ C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/16.2.0/../../../../x86_64-w64
 collect2.exe: error: ld returned 1 exit status
 ==== dynamic link against MSYS2 raylib ==== 
 src\main.c: In function 'AutotestReportRace':
-src\main.c:82:38: warning: variable 'bumps' set but not used [-Wunused-but-set-variable=]
-   82 |     int got = 0, used = 0, hits = 0, bumps = 0, boosts = 0, realFinish = 0;
+src\main.c:102:38: warning: variable 'bumps' set but not used [-Wunused-but-set-variable=]
+  102 |     int got = 0, used = 0, hits = 0, bumps = 0, boosts = 0, realFinish = 0;
       |                                      ^~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 95 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  352 |             if (++hold == 4) { snprintf(nm, sizeof nm, "track%d_%d_%s.png", AT.race + 1, step + 1, what[step]); Shot(nm); }
+      |                                                                                                                      ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:352:113:
+src\main.c:48:5: note: 'snprintf' output between 2 and 383 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  198 |         if (G.screen == SCR_RACE && R.phase == RACE_RUNNING && R.time > 9.0f && !AT.shotB) { snprintf(nm, sizeof nm, "pv_track%d_race.png", AT.race + 1); Shot(nm); AT.shotB = true; AT.frames = 1000; }
+      |                                                                                                                                                                ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:198:155:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  205 |         if (AT.frames == 1040) { snprintf(nm, sizeof nm, "pv_track%d_shortcut.png", AT.race + 1); Shot(nm); }
+      |                                                                                                        ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:205:99:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  538 |             if (AT.resultsFrames == 150) { snprintf(nm, sizeof nm, "win_%s_ceremony.png", slug); Shot(nm); }
+      |                                                                                                       ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:538:98:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  525 |             if (AT.resultsFrames == 30) { snprintf(nm, sizeof nm, "win_%s_results_pop.png", slug); Shot(nm); }
+      |                                                                                                         ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:525:100:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  526 |             if (AT.resultsFrames == 80) { snprintf(nm, sizeof nm, "win_%s_results.png", slug); Shot(nm); }
+      |                                                                                                     ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:526:96:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  422 |             if (AT.resultsFrames == 40) { snprintf(nm, sizeof nm, "race%d_%d_results.png", AT.race + 1, 4); Shot(nm); }
+      |                                                                                                                  ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:422:109:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  389 |             if (R.phase == RACE_INTRO && R.phaseTime > 1.0f && !AT.shotCountdown) { snprintf(nm, sizeof nm, "race%d_%d_intro.png", AT.race + 1, 0); Shot(nm); AT.shotCountdown = true; }
+      |                                                                                                                                                          ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:389:149:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  390 |             if (R.phase == RACE_COUNTDOWN && R.countdown < 1.5f && !AT.shotA) { snprintf(nm, sizeof nm, "race%d_%d_countdown.png", AT.race + 1, 1); Shot(nm); AT.shotA = true; }
+      |                                                                                                                                                          ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:390:149:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  391 |             if (R.phase == RACE_RUNNING && R.time > 12.0f && !AT.shotB) { snprintf(nm, sizeof nm, "race%d_%d_racing.png", AT.race + 1, 2); Shot(nm); AT.shotB = true; }
+      |                                                                                                                                                 ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:391:140:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  395 |             else if (AT.frontStage == 3 && ++AT.frontFrames == 3) { snprintf(nm, sizeof nm, "race%d_closeup_rear.png", AT.race + 1); Shot(nm); AT.frontStage = 4; AT.frontFrames = 0; }
+      |                                                                                                                                           ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:395:134:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  393 |             else if (AT.frontStage == 1 && ++AT.frontFrames == 3) { snprintf(nm, sizeof nm, "race%d_closeup.png", AT.race + 1); Shot(nm); AT.frontStage = 2; AT.frontFrames = 0; }
+      |                                                                                                                                      ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:393:129:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  397 |             if (R.phase == RACE_RUNNING && R.time > 50.0f && !AT.shotC) { snprintf(nm, sizeof nm, "race%d_%d_racing.png", AT.race + 1, 3); Shot(nm); AT.shotC = true; }
+      |                                                                                                                                                 ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:397:140:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  400 |                 if (pk->onShortcut && pk->scIdx > T.scN/3 && !AT.shotSc) { snprintf(nm, sizeof nm, "race%d_shortcut.png", AT.race + 1); Shot(nm); AT.shotSc = true; }
+      |                                                                                                                                              ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:400:137:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  401 |                 if (!pk->grounded && pk->airTime > 0.12f && T.s[pk->seg].bump && !AT.shotBump) { snprintf(nm, sizeof nm, "race%d_bumps_airborne.png", AT.race + 1); Shot(nm); AT.shotBump = true; }
+      |                                                                                                                                                                          ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:401:165:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src\main.c: In function 'AutotestFrame':
+src\main.c:48:61: warning: '%s' directive output may be truncated writing up to 63 bytes into a region of size between 33 and 319 [-Wformat-truncation=]
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |                                                             ^~
+......
+  404 |                 if (pk->roulette > 0 && pk->rouletteDur > 0 && pk->roulette < pk->rouletteDur*0.6f && pk->roulette > pk->rouletteDur*0.3f && !AT.shotRoul) { snprintf(nm, sizeof nm, "race%d_item_roulette.png", AT.race + 1); Shot(nm); AT.shotRoul = true; }
+      |                                                                                                                                                                                                                                     ~~
+In function 'Shot',
+    inlined from 'AutotestFrame' at src\main.c:404:224:
+src\main.c:48:5: note: 'snprintf' output between 2 and 351 bytes into a destination of size 320
+   48 |     snprintf(pendingShotName, sizeof pendingShotName, "%s/%s%s", G.shotDir, G.shotPrefix, name);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

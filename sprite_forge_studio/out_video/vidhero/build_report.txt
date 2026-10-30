@@ -1,0 +1,14 @@
+Sprite Forge Studio 7.0.0 build report - vidhero
+mode: frames
+
+move                     source                 frames  note
+walk                     imported                    8  
+run                      imported                    8  
+jump                     imported                   12  clipped
+punch                    imported                   10  
+
+FILLED moves (no source frames were given - placeholders): none
+3D: none
+console: none
+views: none
+profile: none

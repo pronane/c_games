@@ -1,0 +1,261 @@
+{
+ "console": "snes",
+ "label": "SNES / Super Famicom",
+ "approx": "64x64 character size; 512 sprite tiles in VRAM at once (16 KB name tables)",
+ "notes": "4bpp planar (SNES format) tiles, 15 colours + transparent per palette (8 OBJ palettes), BGR555. 32 sprites / 34 tiles per line.",
+ "limits": {
+  "frame_max": [
+   64,
+   64
+  ],
+  "tile": [
+   8,
+   8
+  ],
+  "colours": 15,
+  "space": "bgr555",
+  "bank_tiles": 512,
+  "pow2": false,
+  "max_tex": null,
+  "tris": null,
+  "model_tex": 0
+ },
+ "dither": true,
+ "warnings": [
+  "1323 tiles do not fit one 512-tile bank -> 3 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)"
+ ],
+ "rise": {
+  "jump_02": 4,
+  "jump_03": 9,
+  "jump_04": 12,
+  "jump_05": 5,
+  "punch_03": 1,
+  "special1_03": 13,
+  "special1_04": 15,
+  "special1_05": 12,
+  "special1_06": 7,
+  "special2_04": 3,
+  "special2_05": 4,
+  "special2_06": 4,
+  "special2_07": 3,
+  "throw_03": 1,
+  "throw_04": 1,
+  "jumpattack_02": 15,
+  "jumpattack_03": 16,
+  "jumpattack_04": 5
+ },
+ "frame_w": 64,
+ "frame_h": 64,
+ "ground_y": 63,
+ "pivot_x": 32,
+ "scale": 0.3216,
+ "scale_y": 0.3216,
+ "palette_display": [
+  [
+   206,
+   173,
+   33
+  ],
+  [
+   181,
+   148,
+   57
+  ],
+  [
+   173,
+   132,
+   82
+  ],
+  [
+   156,
+   123,
+   49
+  ],
+  [
+   156,
+   115,
+   74
+  ],
+  [
+   132,
+   107,
+   57
+  ],
+  [
+   123,
+   99,
+   41
+  ],
+  [
+   115,
+   90,
+   41
+  ],
+  [
+   115,
+   82,
+   41
+  ],
+  [
+   90,
+   74,
+   41
+  ],
+  [
+   66,
+   57,
+   33
+  ],
+  [
+   49,
+   41,
+   33
+  ],
+  [
+   24,
+   24,
+   24
+  ],
+  [
+   16,
+   16,
+   16
+  ],
+  [
+   8,
+   8,
+   8
+  ]
+ ],
+ "palette_native": [
+  4793,
+  7766,
+  10773,
+  6643,
+  9683,
+  7600,
+  5519,
+  5486,
+  5454,
+  5419,
+  4328,
+  4262,
+  3171,
+  2114,
+  1057
+ ],
+ "anims": [
+  {
+   "name": "idle",
+   "first": 0,
+   "count": 6,
+   "fps": 8,
+   "loop": 1
+  },
+  {
+   "name": "walk",
+   "first": 6,
+   "count": 8,
+   "fps": 10,
+   "loop": 1
+  },
+  {
+   "name": "crouch",
+   "first": 14,
+   "count": 4,
+   "fps": 10,
+   "loop": 0
+  },
+  {
+   "name": "jump",
+   "first": 18,
+   "count": 8,
+   "fps": 10,
+   "loop": 0
+  },
+  {
+   "name": "punch",
+   "first": 26,
+   "count": 6,
+   "fps": 14,
+   "loop": 0
+  },
+  {
+   "name": "kick",
+   "first": 32,
+   "count": 7,
+   "fps": 14,
+   "loop": 0
+  },
+  {
+   "name": "special1",
+   "first": 39,
+   "count": 8,
+   "fps": 12,
+   "loop": 0
+  },
+  {
+   "name": "special2",
+   "first": 47,
+   "count": 10,
+   "fps": 14,
+   "loop": 0
+  },
+  {
+   "name": "block",
+   "first": 57,
+   "count": 3,
+   "fps": 10,
+   "loop": 0
+  },
+  {
+   "name": "hit",
+   "first": 60,
+   "count": 4,
+   "fps": 12,
+   "loop": 0
+  },
+  {
+   "name": "throw",
+   "first": 64,
+   "count": 8,
+   "fps": 12,
+   "loop": 0
+  },
+  {
+   "name": "jumpattack",
+   "first": 72,
+   "count": 6,
+   "fps": 12,
+   "loop": 0
+  },
+  {
+   "name": "taunt",
+   "first": 78,
+   "count": 8,
+   "fps": 8,
+   "loop": 0
+  },
+  {
+   "name": "victory",
+   "first": 86,
+   "count": 10,
+   "fps": 8,
+   "loop": 0
+  }
+ ],
+ "banks": [
+  512,
+  495,
+  316
+ ],
+ "unique_tiles": 1323,
+ "max_tiles_per_row": 6,
+ "tiles": {
+  "format": "snes4",
+  "tile_w": 8,
+  "tile_h": 8,
+  "map_entries": 6144
+ },
+ "header": "rua_keeper_snes.h"
+}

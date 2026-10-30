@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PEIL 26</title>
+  <link rel="stylesheet" href="./css/game.css" />
+  <script type="importmap">
+  {
+    "imports": { "three": "./vendor/three.module.js" }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="hud">
+    <div id="bug">
+      <div class="crest" id="crestA">DUB</div>
+      <div class="score" id="scoreA">0-00</div>
+      <div class="mid">
+        <div id="clock">0:00</div>
+        <div id="period">FIRST HALF · PEIL PARK</div>
+      </div>
+      <div class="score" id="scoreB">0-00</div>
+      <div class="crest" id="crestB">KER</div>
+    </div>
+    <div id="banner"></div>
+    <div id="lower">
+      <div id="who">11  Player</div>
+      <div id="stamina"><span></span></div>
+      <div id="hint">WASD move · mouse aim · Space kick</div>
+    </div>
+    <div id="pad"></div>
+    <div id="fps">60</div>
+    <div id="power"><span></span></div>
+  </div>
+  <div id="menu">
+    <div class="panel">
+      <div class="brand">PEIL 26</div>
+      <div class="tag" id="menuTag">GAELIC FOOTBALL · 2026 RULES</div>
+      <div id="menuBody"></div>
+      <div class="foot" id="menuFoot">USB and EasySMX pads · Windows</div>
+    </div>
+  </div>
+  <div id="toast"></div>
+  <div id="loading">Loading Peil Park…</div>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

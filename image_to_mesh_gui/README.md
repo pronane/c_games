@@ -1,49 +1,31 @@
 # Image → 3D Model / Classic Sprite Generator
 
-Convert a photo into either:
+## New features in this version
 
-1. **3D Extruded Model** with live preview and Run Bob / Lean animation
-2. **Classic Console Sprite** (NES, SNES, Mega Drive, N64, PS1, Dreamcast, GameCube, PS2)
+- **JPEG + GIF support** (in addition to PNG/BMP)
+- **Remove Background** button (lower-left under the image preview)
+- **Cartoonify** button (next to it)
+- **Multi-action sprite generation** with checkboxes:
+  Walk, Idle, Hunch, Punch, Kick, Throw, Run, Roll,
+  KickLeft, KickRight, PunchLeft, PunchRight, Kneel, BendOver
+- **Frames per action** selector: 6 / 8 / 10 / 12
 
-## New in this version
+## Important note about action sprites
 
-- Live 3D preview of the extruded model
-- **Run Bob / Lean** procedural animation (preview only)
-  - Adjustable speed, bob amount, and lean angle
-- Right-mouse drag to orbit the camera
-- Mouse wheel to zoom
+The action checkboxes generate **styled versions of the current image** named by action (e.g. `player_SNES_Walk.png`).
 
-## Features
+True different poses (walking cycle frames, actual kick, etc.) **cannot** be created from a single static photo with classical image processing. That requires AI pose/image generation tools (Meshy, video models, etc.).
 
-- Drag & drop image loading
-- 3D mode: Depth + Step controls, OBJ export, live animated preview
-- Sprite mode: Platform presets with resolution + colour reduction
-- Side-by-side previews
+The frame count is stored and shown so the UI is ready for future multi-frame support.
 
-## Requirements
+## How to use
 
-- Raylib (https://www.raylib.com)
-- C compiler (MinGW / w64devkit / MSYS2 recommended)
+1. Drag a PNG, JPG, JPEG, GIF or BMP onto the window.
+2. (Optional) Click **Remove BG** or **Cartoonify** under the preview.
+3. Choose **Sprite** mode → pick platform + which actions + frame count.
+4. Click **Generate Selected Sprites**.
+5. Or switch to **3D Model** mode for extruded mesh + live Bob/Lean preview.
 
-## Build & Run (Windows)
+## Build
 
-1. Make sure `gcc` and raylib are available
-2. Double-click **build.bat**
-3. Program compiles and launches
-
-## Controls (3D Preview)
-
-| Input              | Action                  |
-|--------------------|-------------------------|
-| Right-mouse drag   | Orbit camera            |
-| Mouse wheel        | Zoom                    |
-| Bob / Lean checkbox| Toggle run animation    |
-| Sliders            | Speed / Amount / Lean   |
-
-Note: The Run Bob / Lean animation is **preview only**. The exported OBJ file is static.
-
-## Limitations
-
-- Bob/Lean is a simple procedural effect, not real limb animation
-- Sprite mode uses resolution + colour reduction (not AI style transfer)
-- Video input is not supported in this version
+Double-click `build.bat` (requires Raylib + gcc/MinGW).

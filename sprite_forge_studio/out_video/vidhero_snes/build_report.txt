@@ -1,0 +1,15 @@
+Sprite Forge Studio 7.0.0 build report - vidhero_snes
+mode: frames
+
+move                     source                 frames  note
+walk                     imported                    8  
+run                      imported                    8  
+jump                     imported                   12  clipped
+punch                    imported                   10  
+
+FILLED moves (no source frames were given - placeholders): none
+WARNING: console: 538 tiles do not fit one 512-tile bank -> 2 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)
+3D: none
+console: snes -> console/ (48x64)
+views: none
+profile: none

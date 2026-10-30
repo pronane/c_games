@@ -117,6 +117,7 @@ void RaceStart(int trackIndex, bool attract)
     if (R.timeTrial) { R.karts[0].item = ITEM_PEPPER3; R.karts[0].itemCount = 3; GhostLoad(trackIndex); G.ghostRec.n = 0; }
 
     ItemsReset();
+    HazardsReset();
     RaceComputePlaces();
     R.phase = attract ? RACE_RUNNING : RACE_INTRO;
     R.phaseTime = 0;
@@ -240,6 +241,13 @@ static void UpdateChaseCam(int h, float dt)
     float fovT = 62.0f + (k->boostTimer > 0 ? 10.0f : 0.0f) + Clamp(k->speed/KartTopSpeed(k), 0, 1.3f)*4.0f + (k->turboFlash > 0 ? 8.0f : 0.0f);
     R.camFov[h] = Approach(R.camFov[h], fovT, (k->turboFlash > 0 ? 90.0f : 40.0f)*dt);
     c->fovy = R.camFov[h];
+    if (G.autoFrontCam > 0 && h == 0) {   /* autotest close-up: 3/4 front view (1) or 3/4 rear view (2) of the driver */
+        Vector3 fwd = { sinf(k->heading), 0, cosf(k->heading) }, rt = { fwd.z, 0, -fwd.x };
+        float fd = G.autoFrontCam == 2 ? -3.4f : 3.6f, sd = G.autoFrontCam == 2 ? 2.0f : 1.6f;
+        c->position = (Vector3){ k->pos.x + fwd.x*fd + rt.x*sd, k->pos.y + (G.autoFrontCam == 2 ? 2.2f : 1.9f), k->pos.z + fwd.z*fd + rt.z*sd };
+        c->target = (Vector3){ k->pos.x, k->pos.y + 1.2f, k->pos.z };
+        c->fovy = 48;
+    }
 }
 
 static void UpdateAttractCamera(float dt)
@@ -305,6 +313,7 @@ void RaceUpdate(float dt)
     if (R.timeTrial && R.phase == RACE_RUNNING && !R.karts[0].finished) GhostRecord();
     KartsCollide();
     ItemsUpdate(dt);
+    HazardsUpdate(dt);
     ItemBoxesUpdate(dt);
     ParticlesUpdate(dt);
     RaceComputePlaces();
@@ -358,6 +367,8 @@ void RaceDraw(void)
     int W = GetScreenWidth(), H = GetScreenHeight();
     int views = R.attract ? 1 : (R.numHumans == 2 ? 2 : 1);
     int vh = H/views;
+    if (G.autoCamOn) R.cam[0] = G.autoCam;
+    JumbotronUpdate();
     if (RenderDirect()) {
         ClearBackground(BLACK);
         for (int v = 0; v < views; v++)
@@ -371,6 +382,7 @@ void RaceDraw(void)
     for (int v = 0; v < views && !RenderDirect(); v++) {
         int dw = G.viewW*G.viewScale, dh = G.viewH*G.viewScale;
         float ox = (float)((W - dw)/2), oy = (float)(v*vh + (vh - dh)/2);
+        if (G.viewScale == 0) { dw = W; dh = vh; ox = 0; oy = (float)(v*vh); }   /* hi-res: soft bilinear stretch */
         /* opaque blit: translucent things (ghost, smoke) must not punch alpha holes into the view */
         rlDrawRenderBatchActive(); rlDisableColorBlend();
         DrawTexturePro(G.view[v].texture, (Rectangle){ 0, 0, (float)G.viewW, -(float)G.viewH },
@@ -380,7 +392,7 @@ void RaceDraw(void)
     if (RenderDirect()) {
         /* ENHANCED "bloom-ish" lift: a faint additive sky glow over the upper part of each view */
         BeginBlendMode(BLEND_ADDITIVE);
-        Color top = T.def->night ? (Color){ 40, 30, 60, 255 } : (Color){ 46, 42, 34, 255 };
+        Color top = T.def->scenery == SCENERY_STADIUM ? (Color){ 16, 13, 22, 255 } : T.def->night ? (Color){ 40, 30, 60, 255 } : (Color){ 46, 42, 34, 255 };
         for (int v = 0; v < views; v++) DrawRectangleGradientV(0, v*vh, W, (int)(vh*0.55f), top, (Color){ 0, 0, 0, 255 });
         EndBlendMode();
     }

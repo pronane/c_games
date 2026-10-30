@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "asset_name": "gaelic_footballer",
+    "target_console": "NES",
+    "mode": "OPTION_A_Chronological_Action_Sheet",
+    "frame_width": 16,
+    "frame_height": 16,
+    "frames_per_action": 3,
+    "total_width": 48,
+    "total_height": 80,
+    "notes": "8\u00d78 / 16\u00d716 tiles, 4-colour palette per sprite",
+    "transparent": true
+  },
+  "frames": {
+    "idle": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 1,
+        "x": 16,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 2,
+        "x": 32,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    ],
+    "walk": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 1,
+        "x": 16,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 2,
+        "x": 32,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      }
+    ],
+    "run": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 1,
+        "x": 16,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 2,
+        "x": 32,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      }
+    ],
+    "kick": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 1,
+        "x": 16,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 2,
+        "x": 32,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      }
+    ],
+    "solo": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 1,
+        "x": 16,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      {
+        "frame_index": 2,
+        "x": 32,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      }
+    ]
+  }
+}

@@ -1,0 +1,559 @@
+{
+  "characters": {
+    "kairo": {
+      "idle": [
+        "sprites/kairo_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/kairo_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/kairo_crouch.png",
+        2,
+        8
+      ],
+      "jump": [
+        "sprites/kairo_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/kairo_lp.png",
+        4,
+        3
+      ],
+      "hp": [
+        "sprites/kairo_hp.png",
+        5,
+        4
+      ],
+      "lk": [
+        "sprites/kairo_lk.png",
+        4,
+        3
+      ],
+      "hk": [
+        "sprites/kairo_hk.png",
+        5,
+        4
+      ],
+      "block": [
+        "sprites/kairo_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/kairo_throw.png",
+        5,
+        4
+      ],
+      "special1": [
+        "sprites/kairo_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/kairo_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/kairo_super.png",
+        7,
+        4
+      ],
+      "hit": [
+        "sprites/kairo_hit.png",
+        3,
+        5
+      ],
+      "win": [
+        "sprites/kairo_win.png",
+        5,
+        6
+      ],
+      "lose": [
+        "sprites/kairo_lose.png",
+        3,
+        8
+      ]
+    },
+    "lyra": {
+      "idle": [
+        "sprites/lyra_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/lyra_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/lyra_crouch.png",
+        2,
+        8
+      ],
+      "jump": [
+        "sprites/lyra_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/lyra_lp.png",
+        4,
+        3
+      ],
+      "hp": [
+        "sprites/lyra_hp.png",
+        5,
+        4
+      ],
+      "lk": [
+        "sprites/lyra_lk.png",
+        4,
+        3
+      ],
+      "hk": [
+        "sprites/lyra_hk.png",
+        5,
+        4
+      ],
+      "block": [
+        "sprites/lyra_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/lyra_throw.png",
+        5,
+        4
+      ],
+      "special1": [
+        "sprites/lyra_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/lyra_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/lyra_super.png",
+        7,
+        4
+      ],
+      "hit": [
+        "sprites/lyra_hit.png",
+        3,
+        5
+      ],
+      "win": [
+        "sprites/lyra_win.png",
+        5,
+        6
+      ],
+      "lose": [
+        "sprites/lyra_lose.png",
+        3,
+        8
+      ]
+    },
+    "brutus": {
+      "idle": [
+        "sprites/brutus_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/brutus_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/brutus_crouch.png",
+        2,
+        8
+      ],
+      "jump": [
+        "sprites/brutus_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/brutus_lp.png",
+        4,
+        3
+      ],
+      "hp": [
+        "sprites/brutus_hp.png",
+        5,
+        4
+      ],
+      "lk": [
+        "sprites/brutus_lk.png",
+        4,
+        3
+      ],
+      "hk": [
+        "sprites/brutus_hk.png",
+        5,
+        4
+      ],
+      "block": [
+        "sprites/brutus_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/brutus_throw.png",
+        5,
+        4
+      ],
+      "special1": [
+        "sprites/brutus_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/brutus_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/brutus_super.png",
+        7,
+        4
+      ],
+      "hit": [
+        "sprites/brutus_hit.png",
+        3,
+        5
+      ],
+      "win": [
+        "sprites/brutus_win.png",
+        5,
+        6
+      ],
+      "lose": [
+        "sprites/brutus_lose.png",
+        3,
+        8
+      ]
+    },
+    "naomi": {
+      "idle": [
+        "sprites/naomi_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/naomi_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/naomi_crouch.png",
+        2,
+        8
+      ],
+      "jump": [
+        "sprites/naomi_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/naomi_lp.png",
+        4,
+        3
+      ],
+      "hp": [
+        "sprites/naomi_hp.png",
+        5,
+        4
+      ],
+      "lk": [
+        "sprites/naomi_lk.png",
+        4,
+        3
+      ],
+      "hk": [
+        "sprites/naomi_hk.png",
+        5,
+        4
+      ],
+      "block": [
+        "sprites/naomi_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/naomi_throw.png",
+        5,
+        4
+      ],
+      "special1": [
+        "sprites/naomi_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/naomi_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/naomi_super.png",
+        7,
+        4
+      ],
+      "hit": [
+        "sprites/naomi_hit.png",
+        3,
+        5
+      ],
+      "win": [
+        "sprites/naomi_win.png",
+        5,
+        6
+      ],
+      "lose": [
+        "sprites/naomi_lose.png",
+        3,
+        8
+      ]
+    },
+    "zap": {
+      "idle": [
+        "sprites/zap_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/zap_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/zap_crouch.png",
+        2,
+        8
+      ],
+      "jump": [
+        "sprites/zap_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/zap_lp.png",
+        4,
+        3
+      ],
+      "hp": [
+        "sprites/zap_hp.png",
+        5,
+        4
+      ],
+      "lk": [
+        "sprites/zap_lk.png",
+        4,
+        3
+      ],
+      "hk": [
+        "sprites/zap_hk.png",
+        5,
+        4
+      ],
+      "block": [
+        "sprites/zap_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/zap_throw.png",
+        5,
+        4
+      ],
+      "special1": [
+        "sprites/zap_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/zap_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/zap_super.png",
+        7,
+        4
+      ],
+      "hit": [
+        "sprites/zap_hit.png",
+        3,
+        5
+      ],
+      "win": [
+        "sprites/zap_win.png",
+        5,
+        6
+      ],
+      "lose": [
+        "sprites/zap_lose.png",
+        3,
+        8
+      ]
+    },
+    "void": {
+      "idle": [
+        "sprites/void_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/void_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/void_crouch.png",
+        2,
+        8
+      ],
+      "jump": [
+        "sprites/void_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/void_lp.png",
+        4,
+        3
+      ],
+      "hp": [
+        "sprites/void_hp.png",
+        5,
+        4
+      ],
+      "lk": [
+        "sprites/void_lk.png",
+        4,
+        3
+      ],
+      "hk": [
+        "sprites/void_hk.png",
+        5,
+        4
+      ],
+      "block": [
+        "sprites/void_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/void_throw.png",
+        5,
+        4
+      ],
+      "special1": [
+        "sprites/void_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/void_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/void_super.png",
+        7,
+        4
+      ],
+      "hit": [
+        "sprites/void_hit.png",
+        3,
+        5
+      ],
+      "win": [
+        "sprites/void_win.png",
+        5,
+        6
+      ],
+      "lose": [
+        "sprites/void_lose.png",
+        3,
+        8
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "rooftop",
+      "name": "NEON ROOFTOP",
+      "bg": "stages/stage_rooftop_bg.png",
+      "mid": "stages/stage_rooftop_mid.png",
+      "fg": "stages/stage_rooftop_fg.png"
+    },
+    {
+      "id": "temple",
+      "name": "ANCIENT TEMPLE",
+      "bg": "stages/stage_temple_bg.png",
+      "mid": "stages/stage_temple_mid.png",
+      "fg": "stages/stage_temple_fg.png"
+    },
+    {
+      "id": "industrial",
+      "name": "INDUSTRIAL ZONE",
+      "bg": "stages/stage_industrial_bg.png",
+      "mid": "stages/stage_industrial_mid.png",
+      "fg": "stages/stage_industrial_fg.png"
+    }
+  ],
+  "effects": {
+    "fireball": [
+      "fx/fireball.png",
+      6,
+      3
+    ],
+    "elecball": [
+      "fx/elecball.png",
+      6,
+      3
+    ],
+    "spark": [
+      "fx/spark.png",
+      4,
+      2
+    ],
+    "block_spark": [
+      "fx/block_spark.png",
+      4,
+      2
+    ],
+    "hit_flash": [
+      "fx/hit_flash.png",
+      1,
+      3
+    ],
+    "super_flash": [
+      "fx/super_flash.png",
+      1,
+      3
+    ]
+  },
+  "select": {
+    "kairo": "select/portrait_kairo.png",
+    "lyra": "select/portrait_lyra.png",
+    "brutus": "select/portrait_brutus.png",
+    "naomi": "select/portrait_naomi.png",
+    "zap": "select/portrait_zap.png",
+    "void": "select/portrait_void.png"
+  }
+}

@@ -1,0 +1,56 @@
+{
+ "image": "sprite.png",
+ "frame_w": 512,
+ "frame_h": 640,
+ "pivot": "bottom-centre",
+ "frames": [
+  {
+   "angle": 0,
+   "x": 0,
+   "y": 0,
+   "source": "photo"
+  },
+  {
+   "angle": 45,
+   "x": 512,
+   "y": 0,
+   "source": "approximated (squashed front view)"
+  },
+  {
+   "angle": 90,
+   "x": 1024,
+   "y": 0,
+   "source": "approximated (squashed front view)"
+  },
+  {
+   "angle": 135,
+   "x": 1536,
+   "y": 0,
+   "source": "approximated (squashed back view)"
+  },
+  {
+   "angle": 180,
+   "x": 0,
+   "y": 640,
+   "source": "INVENTED from the front photo's own colours"
+  },
+  {
+   "angle": 225,
+   "x": 512,
+   "y": 640,
+   "source": "approximated (squashed back view)"
+  },
+  {
+   "angle": 270,
+   "x": 1024,
+   "y": 640,
+   "source": "approximated (squashed front view)"
+  },
+  {
+   "angle": 315,
+   "x": 1536,
+   "y": 640,
+   "source": "approximated (squashed front view)"
+  }
+ ]
+}

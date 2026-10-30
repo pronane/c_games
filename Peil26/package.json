@@ -1,0 +1,28 @@
+{
+  "name": "peil26",
+  "version": "2.0.0",
+  "description": "PEIL 26, a 3D Gaelic football game",
+  "main": "electron/main.js",
+  "author": "PEIL 26",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "31.7.7",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "app.peil26.game",
+    "productName": "PEIL 26",
+    "directories": { "output": "dist" },
+    "files": ["electron/**/*", "public/**/*", "package.json"],
+    "asar": true,
+    "win": {
+      "target": ["portable"],
+      "signAndEditExecutable": false
+    },
+    "portable": { "artifactName": "Peil26.exe" }
+  }
+}

@@ -1,0 +1,60 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_shield",
+ "bones": [
+  "prop"
+ ],
+ "materials": [
+  {
+   "name": "Face",
+   "color": [
+    0.7,
+    0.1,
+    0.12
+   ]
+  },
+  {
+   "name": "Boss",
+   "color": [
+    0.78,
+    0.8,
+    0.84
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sample_shield_mesh",
+    "f0": 0,
+    "f1": 80
+   }
+  ],
+  "source_file": "sample_shield.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "prop": {
+   "socket": "hand_l",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    -90,
+    0,
+    0
+   ],
+   "scale": 1.0
+  }
+ },
+ "height_m": 0.52,
+ "verts": 43,
+ "tris": 80
+}

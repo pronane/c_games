@@ -1,0 +1,36 @@
+{
+ "convention": "rigify",
+ "map": {
+  "hips": "DEF-spine",
+  "spine": "DEF-spine.001",
+  "chest": "DEF-spine.002",
+  "upperchest": "DEF-spine.003",
+  "neck": "DEF-spine.004",
+  "head": "DEF-spine.006",
+  "shoulder_L": "DEF-shoulder.L",
+  "upperarm_L": "DEF-upper_arm.L",
+  "forearm_L": "DEF-forearm.L",
+  "hand_L": "DEF-hand.L",
+  "thigh_L": "DEF-thigh.L",
+  "shin_L": "DEF-shin.L",
+  "foot_L": "DEF-foot.L",
+  "toe_L": "DEF-toe.L",
+  "shoulder_R": "DEF-shoulder.R",
+  "upperarm_R": "DEF-upper_arm.R",
+  "forearm_R": "DEF-forearm.R",
+  "hand_R": "DEF-hand.R",
+  "thigh_R": "DEF-thigh.R",
+  "shin_R": "DEF-shin.R",
+  "foot_R": "DEF-foot.R",
+  "toe_R": "DEF-toe.R"
+ },
+ "unmapped": [
+  "DEF-spine.005",
+  "DEF-upper_arm.L.001",
+  "DEF-thigh.L.001",
+  "DEF-upper_arm.R.001",
+  "DEF-thigh.R.001"
+ ],
+ "missing": [],
+ "edited": false
+}

@@ -1,0 +1,46 @@
+[
+ {
+  "file": "walk_static.mp4",
+  "move": "walk",
+  "fps": 30,
+  "period_frames": 33.0,
+  "camera": "static",
+  "note": "walks across, cast shadow"
+ },
+ {
+  "file": "run_tracking.mp4",
+  "move": "run",
+  "fps": 30,
+  "period_frames": 19.8,
+  "camera": "pan-tracking",
+  "note": "camera follows the runner; 3 parallax layers scroll at 1 / 4.5 / 11 px per frame; motion blur"
+ },
+ {
+  "file": "jump_handheld.mp4",
+  "move": "jump",
+  "fps": 30,
+  "camera": "hand-held shake (+-3 px)",
+  "plate_frames": 15,
+  "action_frames": [
+   27,
+   61
+  ]
+ },
+ {
+  "file": "punch_green.mp4",
+  "move": "punch",
+  "fps": 24,
+  "camera": "static, green screen",
+  "action_frames": [
+   8,
+   20
+  ],
+  "note": "only 12 action frames at 24 fps -> needs slow-motion interpolation for 16+ sprite frames"
+ },
+ {
+  "file": "orbit_turntable.mp4",
+  "move": "orbit",
+  "fps": 12,
+  "camera": "turntable 360 deg, 72 views"
+ }
+]

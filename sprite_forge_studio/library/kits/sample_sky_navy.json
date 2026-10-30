@@ -1,0 +1,27 @@
+{
+ "description": "synthetic sample kit: sky-blue shirt, navy shorts, white socks",
+ "materials": {
+  "*shirt*|*jersey*|*top*": {
+   "color": "#6cabdd",
+   "mode": "tint"
+  },
+  "*short*|*pant*": {
+   "color": "#1c2c5b",
+   "mode": "replace"
+  },
+  "*sock*": {
+   "color": "#ffffff",
+   "mode": "replace"
+  }
+ },
+ "name": "sample_sky_navy",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio (procedurally generated)",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Synthetic sample made by samplerigs.py; no third-party content."
+ }
+}

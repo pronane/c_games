@@ -1,0 +1,25 @@
+Sprite Forge Studio 7.0.0 build report - rua_keeper
+mode: spec
+
+move                     source                 frames  note
+idle                     mannequin:fight_idle        6  
+walk                     mannequin:fight_walk        8  
+crouch                   mannequin                   4  
+jump                     mannequin                   8  
+punch                    mannequin                   6  
+kick                     mannequin                   7  
+special1                 mannequin:special_1         8  
+special2                 mannequin:special_2        10  
+block                    mannequin:guard             3  
+hit                      mannequin                   4  
+throw                    mannequin                   8  
+jumpattack               mannequin:jump_attack       6  
+taunt                    mannequin                   8  
+victory                  mannequin                  10  
+
+FILLED moves (no source frames were given - placeholders): none
+WARNING: console: 1323 tiles do not fit one 512-tile bank -> 3 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)
+3D: model.glb
+console: snes -> console/ (64x64)
+views: none
+profile: none

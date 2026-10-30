@@ -1,0 +1,13 @@
+Sprite Forge Studio 7.0.0 build report - rua_keeper
+mode: spec
+
+move                     source                 frames  note
+idle                     mannequin                   8  
+walk                     mannequin                   8  
+run                      mannequin                   8  
+
+FILLED moves (no source frames were given - placeholders): none
+3D: model.glb
+console: none
+views: front=real (rendered at yaw 0), front_right=real (rendered at yaw 45), right=real (rendered at yaw 90), back_right=real (rendered at yaw 135), back=real (rendered at yaw 180), back_left=real (rendered at yaw 225), left=real (rendered at yaw 270), front_left=real (rendered at yaw 315)
+profile: topdown8dir -> rua_keeper.tres, rua_keeper.unity.json, directions.txt

@@ -6,11 +6,33 @@
 /* settings                                                             */
 /* ------------------------------------------------------------------ */
 #define CFG_FILE "turbotumble64.cfg"
+
+/* pad a UTF-8 name to n characters (printf's %-13s counts bytes, which breaks on accents like \xc3\x89) */
+/* character grid: 4 columns for a small roster, wider when many racers have been added
+   (add_racer.py) so the grid stays at 3 rows under the preview */
+static int CharCols(void)
+{
+    int c = (NUM_CHARACTERS + 2)/3;
+    return c < 4 ? 4 : c > 6 ? 6 : c;
+}
+
+static const char *PadName(const char *s, int n)
+{
+    static char buf[4][96];
+    static int slot = 0;
+    char *b = buf[slot = (slot + 1) & 3];
+    int len = 0, cps = 0;
+    for (const char *p = s; *p && len < 80; p++) { b[len++] = *p; if (((unsigned char)*p & 0xC0) != 0x80) cps++; }
+    while (cps < n && len < 94) { b[len++] = ' '; cps++; }
+    b[len] = 0;
+    return b;
+}
 #define TRACK_CUP_NAME "~ TURBO TUMBLE CUP ~"
 void SaveSettings(void)
 {
     FILE *f = fopen(CFG_FILE, "w");
     if (!f) return;
+    fprintf(f, "retro %d\n", G.settings.pixelMode);
     fprintf(f, "visual %d\ncc %d\nmusic %.2f\nsfx %.2f\nfps %d\npadmode %d\n", G.settings.visualMode, G.settings.cc, G.settings.musicVol, G.settings.sfxVol, G.settings.showFps ? 1 : 0, G.settings.padMode);
     for (int s = 0; s < 2; s++) for (int a = 0; a < NUM_PAD_ACTIONS; a++) for (int k = 0; k < 2; k++)
         fprintf(f, "bind%d_%d_%d %d\n", s, a, k, gBinds[s][a][k].kind*100 + gBinds[s][a][k].code);
@@ -20,12 +42,14 @@ void SaveSettings(void)
 
 void LoadSettings(void)
 {
-    G.settings.pixelMode = 0; G.settings.visualMode = 0; G.settings.padMode = 0; G.settings.cc = 1; G.settings.musicVol = 0.55f; G.settings.sfxVol = 0.8f; G.settings.showFps = false;
+    /* first launch defaults: ENHANCED look; the choice is remembered in turbotumble64.cfg next to the exe */
+    G.settings.pixelMode = 0; G.settings.visualMode = 1; G.settings.padMode = 0; G.settings.cc = 1; G.settings.musicVol = 0.55f; G.settings.sfxVol = 0.8f; G.settings.showFps = false;
     FILE *f = fopen(CFG_FILE, "r");
-    if (!f) return;
+    if (!f) { if (!G.autotest) SaveSettings(); return; }
     char key[32]; float v;
     while (fscanf(f, "%31s %f", key, &v) == 2) {
         if (!strcmp(key, "visual")) G.settings.visualMode = (int)Clamp(v, 0, 1);
+        else if (!strcmp(key, "retro")) G.settings.pixelMode = (int)Clamp(v, 0, 1);
         else if (!strcmp(key, "padmode")) G.settings.padMode = (int)Clamp(v, 0, 2);
         else if (!strncmp(key, "bind", 4)) {
             int s, a, k;
@@ -76,8 +100,23 @@ static void StartCup(void)
     while (n < MAX_RACERS) G.gpChars[n++] = rand() % NUM_CHARACTERS;
     memset(G.gpPoints, 0, sizeof(G.gpPoints));
     G.gpRace = 0;
-    RaceStart(0, false);
+    RaceStart(GpTrack(0), false);
     GoToScreen(SCR_RACE);
+}
+
+/* the track grid is laid out by cup: one row per cup (Grand Tour is just all of them) */
+static void TrackRC(int t, int *row, int *col)
+{
+    for (int r = 0; r < NUM_CUPS - 1; r++)
+        for (int c = 0; c < CUPS[r].n; c++) if (CUPS[r].tracks[c] == t) { *row = r; *col = c; return; }
+    *row = 0; *col = 0;
+}
+static int TrackAt(int row, int col)
+{
+    row = (row + NUM_CUPS - 1) % (NUM_CUPS - 1);
+    if (col >= CUPS[row].n) col = CUPS[row].n - 1;
+    if (col < 0) col = 0;
+    return CUPS[row].tracks[col];
 }
 
 static void Move(int *sel, int n, int d) { *sel = (*sel + d + n) % n; PlaySfx(SFX_MENU_MOVE, 0.5f, 1.0f); }
@@ -114,7 +153,16 @@ void MenusUpdate(float dt)
             PlaySfx(SFX_MENU_MOVE, 0.5f, 1.2f);
             switch (G.menuSel) {
             case 0: G.settings.cc = (G.settings.cc + d + 3) % 3; break;
-            case 1: G.settings.visualMode = 1 - G.settings.visualMode; RenderApplyTextureFilters(); RenderResize(); if (T.loaded) { T.loaded = true; TrackBuild(&T, T.index); } break;
+            case 1: {
+                int st = G.settings.visualMode == 1 ? 2 : G.settings.pixelMode;
+                st = (st + d + 3) % 3;
+                int oldVis = G.settings.visualMode;
+                G.settings.visualMode = st == 2 ? 1 : 0;
+                if (st < 2) G.settings.pixelMode = st;
+                RenderApplyTextureFilters(); RenderResize();
+                if (G.settings.visualMode == 0) CharactersEnsureSprites();
+                if (oldVis != G.settings.visualMode && T.loaded) TrackBuild(&T, T.index);
+            } break;
             case 2: G.settings.musicVol = Clamp(G.settings.musicVol + d*0.1f, 0, 1); break;
             case 3: G.settings.sfxVol = Clamp(G.settings.sfxVol + d*0.1f, 0, 1); break;
             case 4: G.settings.showFps = !G.settings.showFps; break;
@@ -146,7 +194,7 @@ void MenusUpdate(float dt)
         } else if (MenuBack() && G.screenTime > 0.25f) { SaveSettings(); PlaySfx(SFX_MENU_BACK, 0.7f, 1); GoToScreen(SCR_OPTIONS); G.menuSel = 6; }
     } break;
     case SCR_CHAR: {
-        int cols = 4;
+        int cols = CharCols();
         for (int p = 0; p < G.numHumans; p++) {
             if (!G.charLocked[p]) {
                 int c = G.charCursor[p];
@@ -170,14 +218,27 @@ void MenusUpdate(float dt)
         bool all = true;
         for (int p = 0; p < G.numHumans; p++) if (!G.charLocked[p]) all = false;
         if (all) {
-            if (G.mode == MODE_GP) StartCup();
-            else { GoToScreen(SCR_TRACK); G.menuSel = G.trackIndex; }
+            GoToScreen(SCR_TRACK);
+            G.menuSel = G.mode == MODE_GP ? (G.gpCup >= 0 && G.gpCup < NUM_CUPS ? G.gpCup : 0) : G.trackIndex;
         }
     } break;
     case SCR_TRACK:
-        if (MenuLeft()) Move(&G.menuSel, NUM_TRACKS, -1);
-        if (MenuRight()) Move(&G.menuSel, NUM_TRACKS, 1);
-        if (MenuUp() || MenuDown()) Move(&G.menuSel, NUM_TRACKS, 3);
+        if (G.mode == MODE_GP) {   /* cup chooser */
+            if (MenuLeft() || MenuUp()) Move(&G.menuSel, NUM_CUPS, -1);
+            if (MenuRight() || MenuDown()) Move(&G.menuSel, NUM_CUPS, 1);
+            if (MenuBack()) { G.charLocked[0] = G.charLocked[1] = false; PlaySfx(SFX_MENU_BACK, 0.7f, 1); GoToScreen(SCR_CHAR); break; }
+            if (MenuOk() && G.screenTime > 0.2f) { PlaySfx(SFX_MENU_OK, 0.7f, 1); G.gpCup = G.menuSel; StartCup(); }
+            break;
+        }
+        {                          /* track grid: one row per cup */
+            int row, col; TrackRC(G.menuSel, &row, &col);
+            int t = G.menuSel;
+            if (MenuLeft()) t = col > 0 ? TrackAt(row, col - 1) : TrackAt(row - 1, 99);
+            else if (MenuRight()) t = col + 1 < CUPS[row].n ? TrackAt(row, col + 1) : TrackAt(row + 1, 0);
+            else if (MenuDown()) t = TrackAt(row + 1, col);
+            else if (MenuUp()) t = TrackAt(row - 1, col);
+            if (t != G.menuSel) { G.menuSel = t; PlaySfx(SFX_MENU_MOVE, 0.5f, 1.0f); }
+        }
         if (MenuBack()) { G.charLocked[0] = G.charLocked[1] = false; PlaySfx(SFX_MENU_BACK, 0.7f, 1); GoToScreen(SCR_CHAR); break; }
         if (MenuOk() && G.screenTime > 0.2f) {
             PlaySfx(SFX_MENU_OK, 0.7f, 1);
@@ -192,7 +253,7 @@ void MenusUpdate(float dt)
             if (MenuDown()) Move(&G.pauseSel, 3, 1);
             if (IsKeyPressed(KEY_P) || (MenuOk() && G.pauseSel == 0)) { G.paused = false; break; }
             if (MenuOk() && G.pauseSel == 1) {
-                if (G.mode == MODE_GP) RaceStart(G.gpRace, false);
+                if (G.mode == MODE_GP) RaceStart(GpTrack(G.gpRace), false);
                 else RaceStart(G.trackIndex, false);
                 G.paused = false;
                 break;
@@ -225,7 +286,7 @@ void MenusUpdate(float dt)
     case SCR_STANDINGS:
         if (MenuOk() && G.screenTime > 0.6f) {
             PlaySfx(SFX_MENU_OK, 0.7f, 1);
-            if (G.gpRace < NUM_TRACKS - 1) { G.gpRace++; RaceStart(G.gpRace, false); GoToScreen(SCR_RACE); }
+            if (G.gpRace < GpTrackCount() - 1) { G.gpRace++; RaceStart(GpTrack(G.gpRace), false); GoToScreen(SCR_RACE); }
             else { PlaySfx(SFX_FINISH, 0.9f, 1.0f); GoToScreen(SCR_TROPHY); }
         }
         break;
@@ -302,29 +363,41 @@ static void DrawCharSelect(void)
     int W = GetScreenWidth(), H = GetScreenHeight();
     float u = U();
     DrawTextCentered(G.numHumans == 2 ? "CHOOSE YOUR RACERS" : "CHOOSE YOUR RACER", W/2, (int)(18*u), (int)(46*u), (Color){ 255, 230, 80, 255 });
-    int cols = 4, rows = (NUM_CHARACTERS + cols - 1)/cols;
-    float cw = 190*u, ch = 70*u;
+    int cols = CharCols(), rows = (NUM_CHARACTERS + cols - 1)/cols;
+    float cw = fminf(190*u, (W - 30*u)/cols), ch = 70*u;
     float gx = W*0.5f - cols*cw*0.5f, gy = H - rows*(ch + 10*u) - 70*u;
     for (int i = 0; i < NUM_CHARACTERS; i++) {
         const CharacterDef *cd = &CHARACTERS[i];
         Rectangle r = { gx + (i % cols)*cw + 5*u, gy + (i/cols)*(ch + 10*u), cw - 10*u, ch };
         DrawRectangleRounded(r, 0.2f, 6, ColorScale(cd->kart, 0.55f));
-        DrawRectangleRounded((Rectangle){ r.x + 6*u, r.y + 6*u, 16*u, r.height - 12*u }, 0.4f, 4, cd->body);
-        DrawTextOutlined(cd->name, (int)(r.x + 30*u), (int)(r.y + 10*u), (int)(22*u), WHITE);
-        DrawTextOutlined(WeightName(cd->weight), (int)(r.x + 30*u), (int)(r.y + 40*u), (int)(16*u), (Color){ 220, 220, 220, 255 });
+        /* portrait */
+        float ps = r.height - 8*u;
+        Rectangle pr = { r.x + 4*u, r.y + 4*u, ps, ps };
+        DrawRectangleRounded(pr, 0.25f, 6, ColorMix(ColorScale(cd->kart, 0.9f), WHITE, 0.45f));
+        if (G.charPortrait[i].id)
+            DrawTexturePro(G.charPortrait[i], (Rectangle){ 0, 0, (float)G.charPortrait[i].width, (float)G.charPortrait[i].height }, pr, (Vector2){ 0, 0 }, 0, WHITE);
+        else
+            DrawRectangleRounded((Rectangle){ pr.x + 4*u, pr.y + 4*u, 16*u, pr.height - 8*u }, 0.4f, 4, cd->body);
+        /* name, shrunk to fit the card (UTF-8 aware, e.g. "Baby \xc3\x89abha") */
+        float tx = pr.x + ps + 6*u, avail = r.x + r.width - tx - 4*u;
+        int fs = (int)(22*u);
+        while (fs > 10 && MeasureText(cd->name, fs) > avail) fs--;
+        DrawTextOutlined(cd->name, (int)tx, (int)(r.y + 10*u + (22*u - fs)*0.5f), fs, WHITE);
+        DrawTextOutlined(WeightName(cd->weight), (int)tx, (int)(r.y + 40*u), (int)(16*u), (Color){ 220, 220, 220, 255 });
         for (int p = 0; p < G.numHumans; p++) {
             if (G.charCursor[p] != i) continue;
             Color pc = p == 0 ? (Color){ 255, 60, 60, 255 } : (Color){ 60, 140, 255, 255 };
             float pulse = 2 + 2*sinf(G.time*8);
             DrawRectangleRoundedLinesEx((Rectangle){ r.x - pulse - p*4, r.y - pulse - p*4, r.width + 2*pulse + p*8, r.height + 2*pulse + p*8 }, 0.2f, 6, 4*u, pc);
-            DrawTextOutlined(TextFormat("P%d%s", p + 1, G.charLocked[p] ? " OK!" : ""), (int)(r.x + r.width - 62*u), (int)(r.y + 40*u), (int)(16*u), pc);
+            DrawTextOutlined(TextFormat("P%d%s", p + 1, G.charLocked[p] ? " OK!" : ""), (int)(r.x + 8*u), (int)(r.y + r.height - 22*u), (int)(16*u), pc);
         }
     }
     /* preview panels */
     for (int p = 0; p < G.numHumans; p++) {
         int c = G.charCursor[p];
         const CharacterDef *cd = &CHARACTERS[c];
-        float pw = 300*u, ph = 300*u;
+        float gyTop = H - ((NUM_CHARACTERS + CharCols() - 1)/CharCols())*(80*u) - 70*u;
+        float pw = fminf(300*u, fmaxf(180*u, gyTop - 90*u)), ph = pw;
         float px = G.numHumans == 2 ? (p == 0 ? W*0.25f - pw*0.5f - 60*u : W*0.75f - pw*0.5f - 60*u) : W*0.5f - pw - 60*u;
         float py = 80*u;
         RenderPreview(c);
@@ -369,7 +442,8 @@ static void DrawTrackCard(int i, Rectangle r, bool sel)
             DrawLineEx(A, B, pass ? 4*u : 9*u, c);
         }
     }
-    DrawTextOutlined(d->name, (int)(r.x + 12*u), (int)(r.y + r.height - 56*u), (int)(22*u), WHITE);
+    { int fs = (int)(22*u); while (fs > 10 && MeasureText(d->name, fs) > r.width - 24*u) fs--;
+      DrawTextOutlined(d->name, (int)(r.x + 12*u), (int)(r.y + r.height - 50*u), fs, WHITE); }
     if (d->numBumps > 0) DrawTextOutlined("BUMPY!", (int)(r.x + r.width - 80*u), (int)(r.y + 10*u), (int)(14*u), (Color){ 255, 160, 80, 255 });
     DrawTextOutlined("+ shortcut", (int)(r.x + 12*u), (int)(r.y + 10*u), (int)(14*u), (Color){ 160, 255, 200, 255 });
     if (G.mode == MODE_TT && G.bestTimes[i] > 0)
@@ -398,7 +472,12 @@ static void DrawResults(void)
         DrawTextOutlined(TextFormat("%d%s", r + 1, OrdinalSuffix(r + 1)), (int)x, (int)y, (int)(30*u), rc);
         DrawRectangle((int)(x + 80*u), (int)(y + 2*u), (int)(26*u), (int)(26*u), cd->kart);
         DrawRectangle((int)(x + 86*u), (int)(y + 8*u), (int)(14*u), (int)(14*u), cd->body);
-        DrawTextOutlined(TextFormat("%s%s", cd->name, k->human >= 0 ? TextFormat(" (P%d)", k->human + 1) : ""), (int)(x + 120*u), (int)y, (int)(26*u), rc);
+        {
+            const char *nm = TextFormat("%s%s", cd->name, k->human >= 0 ? TextFormat(" (P%d)", k->human + 1) : "");
+            int nfs = (int)(26*u);
+            while (nfs > 12 && MeasureText(nm, nfs) > 210*u) nfs--;      /* long names shrink to fit */
+            DrawTextOutlined(nm, (int)(x + 120*u), (int)(y + (26*u - nfs)*0.5f), nfs, rc);
+        }
         DrawTextOutlined(FormatTime(k->finishTime), (int)(x + 400*u), (int)y, (int)(26*u), rc);
         if (G.mode == MODE_GP) DrawTextOutlined(TextFormat("+%d", pts[r]), (int)(x + 560*u), (int)y, (int)(26*u), (Color){ 120, 255, 140, 255 });
     }
@@ -433,10 +512,10 @@ static void DrawStandings(void)
 {
     int W = GetScreenWidth();
     float u = U();
-    bool final = G.gpRace >= NUM_TRACKS - 1;
+    bool final = G.gpRace >= GpTrackCount() - 1;
     Rectangle p = { W*0.5f - 330*u, 60*u, 660*u, 560*u };
     Panel(p, (Color){ 10, 10, 40, 210 });
-    DrawTextCentered(final ? "FINAL CUP STANDINGS" : TextFormat("CUP STANDINGS  (RACE %d/%d)", G.gpRace + 1, NUM_TRACKS), W/2, (int)(78*u), (int)(34*u), (Color){ 255, 230, 60, 255 });
+    DrawTextCentered(final ? "FINAL CUP STANDINGS" : TextFormat("%s  (RACE %d/%d)", (G.gpCup >= 0 && G.gpCup < NUM_CUPS) ? CUPS[G.gpCup].name : "CUP STANDINGS", G.gpRace + 1, GpTrackCount()), W/2, (int)(78*u), (int)(34*u), (Color){ 255, 230, 60, 255 });
     DrawTextOutlined("LAST RACE", (int)(p.x + 262*u), (int)(118*u), (int)(12*u), (Color){ 190, 190, 220, 255 });
     int order[MAX_RACERS] = { 0 };
     for (int i = 0; i < R.numKarts; i++) order[i] = i;
@@ -450,7 +529,9 @@ static void DrawStandings(void)
         float y = 140*u + r*50*u;
         Color rc = k->human >= 0 ? (Color){ 255, 255, 140, 255 } : WHITE;
         DrawTextOutlined(TextFormat("%d", r + 1), (int)(p.x + 26*u), (int)y, (int)(28*u), rc);
-        DrawTextOutlined(cd->name, (int)(p.x + 66*u), (int)y, (int)(24*u), rc);
+        int nfs = (int)(24*u);
+        while (nfs > 12 && MeasureText(cd->name, nfs) > 196*u) nfs--;      /* long names shrink to fit */
+        DrawTextOutlined(cd->name, (int)(p.x + 66*u), (int)(y + (24*u - nfs)*0.5f), nfs, rc);
         float bw = 210*u*G.gpPoints[i]/maxPts*Clamp(G.screenTime*1.5f, 0, 1);
         DrawRectangle((int)(p.x + 330*u), (int)(y + 2*u), (int)bw, (int)(24*u), cd->kart);
         DrawTextOutlined(TextFormat("%d", G.gpPoints[i]), (int)(p.x + 338*u + bw), (int)y, (int)(24*u), rc);
@@ -471,7 +552,7 @@ static void DrawStandings(void)
         DrawTextCentered(TextFormat("CHAMPION: %s!", cd->name), W/2, (int)(p.y + p.height - 50*u), (int)(32*u), HueColor(G.time*200, 0.6f, 1));
         DrawTextCentered("PRESS ENTER FOR THE TROPHY CEREMONY", W/2, (int)(p.y + p.height + 14*u), (int)(24*u), ((int)(G.time*2) & 1) ? WHITE : tc);
     } else {
-        DrawTextCentered(TextFormat("NEXT: %s  -  PRESS ENTER", TRACK_DEFS[G.gpRace + 1].name), W/2, (int)(p.y + p.height + 14*u), (int)(24*u), ((int)(G.time*2) & 1) ? WHITE : (Color){ 255, 230, 60, 255 });
+        DrawTextCentered(TextFormat("NEXT: %s  -  PRESS ENTER", TRACK_DEFS[GpTrack(G.gpRace + 1)].name), W/2, (int)(p.y + p.height + 14*u), (int)(24*u), ((int)(G.time*2) & 1) ? WHITE : (Color){ 255, 230, 60, 255 });
     }
 }
 
@@ -487,6 +568,56 @@ static void CupOrder(int *order)
     for (int i = 0; i < R.numKarts; i++) order[i] = i;
     for (int i = 0; i < R.numKarts; i++) for (int j = i + 1; j < R.numKarts; j++)
         if (G.gpPoints[order[j]] > G.gpPoints[order[i]]) { int t = order[i]; order[i] = order[j]; order[j] = t; }
+}
+
+/* ---------------- victory quips ---------------- */
+static Vector2 gQuipAnchorN = { -1, -1 };   /* podium winner's face, normalised to the 3D view */
+static float gQuipScaleN = 0;
+static int QuipWinner(void)
+{
+    if (R.numKarts <= 1 || R.timeTrial) return -1;
+    int w = -1;
+    if (G.screen == SCR_RESULTS) { for (int i = 0; i < R.numKarts; i++) if (R.karts[i].place == 1) w = R.karts[i].charId; }
+    else if (G.screen == SCR_TROPHY) { int order[MAX_RACERS]; CupOrder(order); w = R.karts[order[0]].charId; }
+    if (w < 0 || w >= NUM_CHARACTERS || !CHARACTERS[w].quip) return -1;
+    return w;
+}
+/* winner's mood face + one voice clip per screen visit */
+static void QuipUpdate(void)
+{
+    static int lastScreen = -1, lastChar = -1;
+    int w = QuipWinner();
+    gMoodChar = w;
+    if (w < 0) { lastScreen = -1; lastChar = -1; return; }
+    if ((lastScreen != (int)G.screen || lastChar != w) && G.screenTime > 0.25f) {
+        const CharacterDef *cd = &CHARACTERS[w];
+        PlaySfx(cd->quipStyle == QUIP_SLEEPY ? SFX_QUIP_GRUMBLE : SFX_QUIP_CAR, 1.0f, 1.0f);
+        lastScreen = (int)G.screen; lastChar = w;
+    }
+}
+/* results screen: the winner's (mood) cut-out on a card, with the bubble */
+static void DrawQuipCard(int charId)
+{
+    int W = GetScreenWidth(), H = GetScreenHeight();
+    float u = U();
+    const CharacterDef *cd = &CHARACTERS[charId];
+    Texture2D tex = G.charWin[charId].id ? G.charWin[charId] : G.charPortrait[charId];
+    if (!tex.id) return;
+    float t = G.screenTime;
+    float room = W - (W*0.5f + 330*u);
+    float ch = room >= 250*u ? fminf(330*u, (room - 28*u)*tex.height/(float)tex.width) : 250*u;
+    float cw = ch*tex.width/(float)tex.height;
+    float cx = room >= 250*u ? W*0.5f + 330*u + room*0.5f : W - cw*0.5f - 12*u;
+    float by = room >= 250*u ? 620*u : H - 12*u;
+    if (cd->quipStyle != QUIP_SLEEPY) by -= fabsf(sinf(t*4.2f))*12*u;      /* bouncy baby */
+    else by += 3*u*sinf(t*1.4f);                                             /* slumped */
+    float in = fminf(1.0f, t*4.0f);
+    Rectangle dst = { cx - cw*0.5f, by - ch*in, cw, ch*in };
+    DrawRectangleRounded((Rectangle){ dst.x - 8*u, dst.y - 8*u, dst.width + 16*u, dst.height + 16*u }, 0.12f, 8, ColorMix(cd->kart, WHITE, 0.35f));
+    DrawRectangleRoundedLinesEx((Rectangle){ dst.x - 8*u, dst.y - 8*u, dst.width + 16*u, dst.height + 16*u }, 0.12f, 8, 4*u, ColorScale(cd->kart, 0.6f));
+    DrawTexturePro(tex, (Rectangle){ 0, 0, (float)tex.width, (float)tex.height }, dst, (Vector2){ 0, 0 }, 0, WHITE);
+    DrawTextCentered("WINNER!", (int)cx, (int)(dst.y + dst.height - 4*u), (int)(26*u), (Color){ 255, 230, 60, 255 });
+    if (t > 0.2f) DrawQuip(charId, (Vector2){ dst.x + cd->faceX*cw, dst.y + cd->faceY*ch*in }, ch*0.3f, t - 0.2f);
 }
 
 static void DrawTrophyScene(void)
@@ -518,6 +649,15 @@ static void DrawTrophyScene(void)
         k.squash = r == 0 ? 0.12f*fmaxf(0, sinf(t*6.0f)) : 0;
         k.pos.y += r == 0 ? 0.25f*fmaxf(0, sinf(t*3.0f)) : 0;      /* the winner hops for joy */
         DrawCharacterKart(k.charId, &k, G.time + r);
+        if (r == 0) {
+            const CharacterDef *wd = &CHARACTERS[k.charId];
+            float fy = wd->spriteAngles > 0 ? 0.47f + wd->spriteSeat + wd->spriteSize*(1.0f - wd->faceY) : 1.6f;
+            Vector3 fp = { k.pos.x, k.pos.y + fy, k.pos.z }, fq = { k.pos.x, k.pos.y + fy + (wd->spriteAngles > 0 ? wd->spriteSize*0.3f : 0.6f), k.pos.z };
+            float vw = (float)rlGetFramebufferWidth(), vh = (float)rlGetFramebufferHeight();
+            Vector2 a = GetWorldToScreenEx(fp, cam, (int)vw, (int)vh), b = GetWorldToScreenEx(fq, cam, (int)vw, (int)vh);
+            gQuipAnchorN = (Vector2){ a.x/vw, a.y/vh };
+            gQuipScaleN = Vector2Distance(a, b)/vh;
+        }
     }
     /* the trophy */
     int tier = myRank >= 1 && myRank <= 3 ? myRank - 1 : 0;
@@ -565,6 +705,7 @@ static void DrawTrophyScreen(void)
         EndTextureMode();
         ClearBackground(BLACK);
         int dw = G.viewW*G.viewScale, dh = G.viewH*G.viewScale;
+        if (G.viewScale == 0) { dw = W; dh = H; }
         rlDrawRenderBatchActive(); rlDisableColorBlend();
         DrawTexturePro(G.view[0].texture, (Rectangle){ 0, 0, (float)G.viewW, -(float)G.viewH }, (Rectangle){ (float)(W - dw)/2, (float)(H - dh)/2, (float)dw, (float)dh }, (Vector2){ 0, 0 }, 0, WHITE);
         rlDrawRenderBatchActive(); rlEnableColorBlend();
@@ -582,18 +723,30 @@ static void DrawTrophyScreen(void)
     Color tc = myRank == 1 ? (Color){ 255, 215, 50, 255 } : myRank == 2 ? (Color){ 220, 225, 240, 255 } : myRank == 3 ? (Color){ 230, 150, 80, 255 } : WHITE;
     float sc = 1.0f + 0.06f*sinf(G.time*4.0f);
     DrawTextCentered(title, W/2, (int)(28*u), (int)(72*u*sc), tc);
-    DrawTextCentered(TRACK_CUP_NAME, W/2, (int)(110*u), (int)(24*u), WHITE);
+    DrawTextCentered((G.gpCup >= 0 && G.gpCup < NUM_CUPS) ? TextFormat("~ %s ~", CUPS[G.gpCup].name) : TRACK_CUP_NAME, W/2, (int)(110*u), (int)(24*u), WHITE);
     for (int r = 0; r < 3 && r < R.numKarts; r++) {
         const CharacterDef *cd = &CHARACTERS[R.karts[order[r]].charId];
         Color c = R.karts[order[r]].human >= 0 ? (Color){ 255, 255, 140, 255 } : WHITE;
-        DrawTextOutlined(TextFormat("%d%s  %-13s %3d pts", r + 1, OrdinalSuffix(r + 1), cd->name, G.gpPoints[order[r]]), (int)(40*u), (int)(H - 150*u + r*34*u), (int)(26*u), c);
+        DrawTextOutlined(TextFormat("%d%s  %s %3d pts", r + 1, OrdinalSuffix(r + 1), PadName(cd->name, 16), G.gpPoints[order[r]]), (int)(40*u), (int)(H - 150*u + r*34*u), (int)(26*u), c);
     }
     if (myRank > 3) DrawTextOutlined(TextFormat("You finished %d%s overall - so close!", myRank, OrdinalSuffix(myRank)), (int)(40*u), (int)(H - 190*u), (int)(22*u), WHITE);
     if (G.screenTime > 1.5f) DrawTextCentered("PRESS ENTER", (int)(W*0.78f), (int)(H - 60*u), (int)(26*u), ((int)(G.time*2) & 1) ? WHITE : tc);
+    /* the champion's victory quip over the podium */
+    int qw = QuipWinner();
+    if (qw >= 0 && gQuipAnchorN.x >= 0 && G.screenTime > 0.6f) {
+        float x0 = 0, y0 = 0, dw = (float)W, dh = (float)H;
+        if (!direct) {
+            dw = (float)(G.viewW*G.viewScale); dh = (float)(G.viewH*G.viewScale);
+            if (G.viewScale == 0) { dw = (float)W; dh = (float)H; }
+            x0 = (W - dw)/2; y0 = (H - dh)/2;
+        }
+        DrawQuip(qw, (Vector2){ x0 + gQuipAnchorN.x*dw, y0 + gQuipAnchorN.y*dh }, fmaxf(gQuipScaleN*dh*1.6f, 85*u), G.screenTime - 0.6f);
+    }
 }
 
 void MenusDraw(void)
 {
+    QuipUpdate();
     int W = GetScreenWidth(), H = GetScreenHeight();
     float u = U();
     if (G.screen == SCR_TROPHY) { DrawTrophyScreen(); return; }
@@ -608,7 +761,7 @@ void MenusDraw(void)
         }
         return;
     }
-    if (G.screen == SCR_RESULTS) { DrawRectangle(0, 0, W, H, (Color){ 0, 0, 0, 90 }); DrawResults(); return; }
+    if (G.screen == SCR_RESULTS) { DrawRectangle(0, 0, W, H, (Color){ 0, 0, 0, 90 }); DrawResults(); int qw = QuipWinner(); if (qw >= 0) DrawQuipCard(qw); return; }
     if (G.screen == SCR_STANDINGS) { DrawRectangle(0, 0, W, H, (Color){ 0, 0, 0, 90 }); DrawStandings(); return; }
 
     DrawRectangle(0, 0, W, H, (Color){ 0, 0, 20, G.screen == SCR_TITLE ? 60 : 150 });
@@ -628,7 +781,7 @@ void MenusDraw(void)
             "Use item ........... E / CTRL / V        (pad LB / LT / Y)",
             "Pause .............. ESC / P             (pad START)",
             "Hold drift + steer for BLUE then ORANGE sparks, release to boost!",
-            "F2: toggle N64 pixel look     F11: fullscreen",
+            "F2: ENHANCED / ORIGINAL N64 look     F11: fullscreen",
         };
         for (int i = 0; i < 8; i++)
             DrawTextOutlined(lines[i], (int)(cp.x + 30*u), (int)(cp.y + 52*u + i*33*u), (int)(18*u), i >= 6 ? (Color){ 160, 230, 255, 255 } : WHITE);
@@ -637,7 +790,7 @@ void MenusDraw(void)
     case SCR_MODE: {
         DrawLogo(W/2, (int)(50*u), (int)(60*u));
         const char *opts[5] = { "GRAND PRIX", "TIME TRIAL", "VS  (2 PLAYERS)", "OPTIONS", "QUIT" };
-        const char *desc[5] = { "Race all 4 tracks for the Tumble Cup. Points: 9-6-3-1.",
+        const char *desc[5] = { "Pick a cup: Sprout, Blossom, Thunder or the Grand Tour. Points: 9-6-3-1.",
                                 "Just you, the clock and three hot peppers.",
                                 "Split-screen showdown with 6 CPU rivals.",
                                 "Engine class, display style, volume.", "See you next time!" };
@@ -653,12 +806,12 @@ void MenusDraw(void)
     } break;
     case SCR_OPTIONS: {
         DrawTextCentered("OPTIONS", W/2, (int)(50*u), (int)(56*u), (Color){ 255, 230, 60, 255 });
-        const char *disp[2] = { "ORIGINAL (N64 320x240)", "ENHANCED (HD + 4x MSAA)" };
+        const char *disp[3] = { "ORIGINAL (N64 hi-res 640x480)", "ORIGINAL RETRO (320x240)", "ENHANCED (HD + 4x MSAA)" };
         const char *padm[3] = { "AUTO", "STANDARD (XInput / SDL db)", "RAW (DirectInput)" };
         const char *labels[8] = { "Engine class", "Visual mode", "Music volume", "SFX volume", "Show FPS", "Pad mode", "Controller setup...", "Back" };
         static char vb[8][64];
         snprintf(vb[0], 64, "< %dcc >", G.settings.cc == 0 ? 50 : G.settings.cc == 1 ? 100 : 150);
-        snprintf(vb[1], 64, "< %s >", disp[G.settings.visualMode]);
+        snprintf(vb[1], 64, "< %s >", disp[G.settings.visualMode == 1 ? 2 : G.settings.pixelMode]);
         snprintf(vb[2], 64, "< %d%% >", (int)(G.settings.musicVol*100 + 0.5f));
         snprintf(vb[3], 64, "< %d%% >", (int)(G.settings.sfxVol*100 + 0.5f));
         snprintf(vb[4], 64, "< %s >", G.settings.showFps ? "ON" : "OFF");
@@ -703,20 +856,47 @@ void MenusDraw(void)
     } break;
     case SCR_CHAR: DrawCharSelect(); break;
     case SCR_TRACK: {
-        DrawTextCentered("CHOOSE A TRACK", W/2, (int)(24*u), (int)(46*u), (Color){ 255, 230, 60, 255 });
-        float cw = 330*u, chh = 225*u;
-        float x0 = W*0.5f - 1.5f*cw - 15*u;
-        for (int i = 0; i < NUM_TRACKS; i++) {
-            int col = i % 3, row = i/3;
-            Rectangle r = { x0 + col*(cw + 15*u), 85*u + row*(chh + 18*u) + (i == G.menuSel ? -6*u : 0), cw, chh };
-            DrawTrackCard(i, r, i == G.menuSel);
+        if (G.mode == MODE_GP) {   /* cup chooser */
+            DrawTextCentered("CHOOSE A CUP", W/2, (int)(24*u), (int)(46*u), (Color){ 255, 230, 60, 255 });
+            float cw = 280*u, chh = 470*u, gap = 18*u;
+            float x0 = W*0.5f - 0.5f*(NUM_CUPS*cw + (NUM_CUPS - 1)*gap);
+            for (int c = 0; c < NUM_CUPS; c++) {
+                const CupDef *cd = &CUPS[c];
+                bool sel = c == G.menuSel;
+                Rectangle r = { x0 + c*(cw + gap), 90*u + (sel ? -8*u : 0), cw, chh };
+                DrawRectangleRounded(r, 0.06f, 6, ColorMix(cd->col, BLACK, sel ? 0.45f : 0.7f));
+                DrawRectangleRoundedLinesEx(r, 0.06f, 6, sel ? 5*u : 2*u, sel ? (Color){ 255, 230, 60, 255 } : (Color){ 255, 255, 255, 150 });
+                DrawTrophy((int)(r.x + cw*0.5f), (int)(r.y + 100*u), 110*u, cd->col);
+                DrawTextCentered(cd->name, (int)(r.x + cw*0.5f), (int)(r.y + 170*u), (int)(30*u), sel ? (Color){ 255, 230, 60, 255 } : WHITE);
+                int fs = cd->n > 6 ? (int)(15*u) : (int)(20*u), lh = cd->n > 6 ? (int)(21*u) : (int)(34*u);
+                for (int k = 0; k < cd->n; k++)
+                    DrawTextCentered(TRACK_DEFS[cd->tracks[k]].name, (int)(r.x + cw*0.5f), (int)(r.y + 222*u + k*lh), fs, (Color){ 230, 235, 255, 255 });
+            }
+            DrawTextCentered(CUPS[G.menuSel].tag, W/2, (int)(H - 100*u), (int)(24*u), WHITE);
+            DrawTextCentered("ARROWS / D-PAD to choose   ENTER to start the cup   ESC back", W/2, (int)(H - 50*u), (int)(20*u), WHITE);
+            break;
+        }
+        DrawTextCentered("CHOOSE A TRACK", W/2, (int)(14*u), (int)(40*u), (Color){ 255, 230, 60, 255 });
+        float cw = 232*u, chh = 150*u, gap = 12*u, lab = 150*u;
+        for (int row = 0; row < NUM_CUPS - 1; row++) {
+            const CupDef *cd = &CUPS[row];
+            float x0 = W*0.5f - 0.5f*(lab + 4*cw + 3*gap);
+            float y = 64*u + row*(chh + 16*u);
+            DrawRectangleRounded((Rectangle){ x0, y + 10*u, lab - 14*u, chh - 20*u }, 0.15f, 6, ColorMix(cd->col, BLACK, 0.45f));
+            DrawTrophy((int)(x0 + (lab - 14*u)*0.5f), (int)(y + 58*u), 54*u, cd->col);
+            DrawTextCentered(cd->name, (int)(x0 + (lab - 14*u)*0.5f), (int)(y + chh - 46*u), (int)(18*u), WHITE);
+            for (int k = 0; k < cd->n; k++) {
+                int i = cd->tracks[k];
+                Rectangle r = { x0 + lab + k*(cw + gap), y + (i == G.menuSel ? -5*u : 0), cw, chh };
+                DrawTrackCard(i, r, i == G.menuSel);
+            }
         }
         {
             const TrackDef *sd = &TRACK_DEFS[G.menuSel];
             DrawTextCentered(TextFormat("%s  -  %s", sd->name, sd->subtitle), W/2, (int)(H - 112*u), (int)(22*u), WHITE);
             DrawTextCentered(TextFormat("SECRET: %s", sd->scHint), W/2, (int)(H - 82*u), (int)(19*u), (Color){ 255, 215, 120, 255 });
         }
-        DrawTextCentered("LEFT / RIGHT to choose   ENTER to race   ESC back", W/2, (int)(H - 50*u), (int)(20*u), WHITE);
+        DrawTextCentered("ARROWS / D-PAD to choose   ENTER to race   ESC back", W/2, (int)(H - 50*u), (int)(20*u), WHITE);
     } break;
     default: break;
     }

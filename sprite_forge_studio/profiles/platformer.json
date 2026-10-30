@@ -1,0 +1,22 @@
+{
+  "name": "platformer",
+  "description": "Side-scrolling platformer: 10 basic moves, facing right, Godot SpriteFrames + Unity JSON + Tiled tileset.",
+  "moves": "platformer10",
+  "frame": [
+    128,
+    128
+  ],
+  "yaw": 90,
+  "manifests": [
+    {
+      "type": "godot_spriteframes",
+      "res_path": "res://player/"
+    },
+    {
+      "type": "unity_json"
+    },
+    {
+      "type": "tiled_tsx"
+    }
+  ]
+}

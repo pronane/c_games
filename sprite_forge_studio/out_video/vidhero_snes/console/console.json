@@ -1,0 +1,191 @@
+{
+ "console": "snes",
+ "label": "SNES / Super Famicom",
+ "approx": "64x64 character size; 512 sprite tiles in VRAM at once (16 KB name tables)",
+ "notes": "4bpp planar (SNES format) tiles, 15 colours + transparent per palette (8 OBJ palettes), BGR555. 32 sprites / 34 tiles per line.",
+ "limits": {
+  "frame_max": [
+   64,
+   64
+  ],
+  "tile": [
+   8,
+   8
+  ],
+  "colours": 15,
+  "space": "bgr555",
+  "bank_tiles": 512,
+  "pow2": false,
+  "max_tex": null,
+  "tris": null,
+  "model_tex": 0
+ },
+ "dither": true,
+ "warnings": [
+  "538 tiles do not fit one 512-tile bank -> 2 banks (swap/stream banks per move: CHR bank switching / VRAM DMA)"
+ ],
+ "rise": {
+  "walk_01": 1,
+  "walk_02": 1,
+  "walk_03": 1,
+  "walk_04": 1,
+  "run_00": 1,
+  "run_03": 1,
+  "run_04": 1,
+  "run_05": 1,
+  "run_06": 1,
+  "jump_02": 4,
+  "jump_03": 32,
+  "jump_04": 56,
+  "jump_05": 57,
+  "jump_06": 57,
+  "jump_07": 31,
+  "jump_08": 12,
+  "jump_09": 57,
+  "jump_10": 10,
+  "jump_11": 5
+ },
+ "frame_w": 48,
+ "frame_h": 64,
+ "ground_y": 63,
+ "pivot_x": 24,
+ "scale": 0.3168,
+ "scale_y": 0.3168,
+ "palette_display": [
+  [
+   181,
+   181,
+   181
+  ],
+  [
+   156,
+   148,
+   140
+  ],
+  [
+   165,
+   123,
+   99
+  ],
+  [
+   123,
+   123,
+   107
+  ],
+  [
+   140,
+   107,
+   82
+  ],
+  [
+   123,
+   99,
+   74
+  ],
+  [
+   66,
+   90,
+   66
+  ],
+  [
+   107,
+   74,
+   57
+  ],
+  [
+   82,
+   66,
+   49
+  ],
+  [
+   148,
+   16,
+   24
+  ],
+  [
+   82,
+   24,
+   16
+  ],
+  [
+   16,
+   74,
+   33
+  ],
+  [
+   16,
+   57,
+   24
+  ],
+  [
+   24,
+   33,
+   16
+  ],
+  [
+   16,
+   8,
+   8
+  ]
+ ],
+ "palette_native": [
+  23254,
+  18003,
+  12788,
+  13807,
+  10673,
+  9615,
+  8552,
+  7469,
+  6410,
+  3154,
+  2154,
+  4386,
+  3298,
+  2179,
+  1058
+ ],
+ "anims": [
+  {
+   "name": "walk",
+   "first": 0,
+   "count": 8,
+   "fps": 7,
+   "loop": 1
+  },
+  {
+   "name": "run",
+   "first": 8,
+   "count": 8,
+   "fps": 12,
+   "loop": 1
+  },
+  {
+   "name": "jump",
+   "first": 16,
+   "count": 12,
+   "fps": 17,
+   "loop": 0
+  },
+  {
+   "name": "punch",
+   "first": 28,
+   "count": 10,
+   "fps": 18,
+   "loop": 0
+  }
+ ],
+ "banks": [
+  504,
+  34
+ ],
+ "unique_tiles": 538,
+ "max_tiles_per_row": 5,
+ "tiles": {
+  "format": "snes4",
+  "tile_w": 8,
+  "tile_h": 8,
+  "map_entries": 1824
+ },
+ "header": "vidhero_snes_snes.h"
+}

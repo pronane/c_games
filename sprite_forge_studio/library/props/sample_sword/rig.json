@@ -1,0 +1,68 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_sword",
+ "bones": [
+  "prop"
+ ],
+ "materials": [
+  {
+   "name": "Grip",
+   "color": [
+    0.3,
+    0.2,
+    0.12
+   ]
+  },
+  {
+   "name": "Guard",
+   "color": [
+    0.78,
+    0.8,
+    0.84
+   ]
+  },
+  {
+   "name": "Blade",
+   "color": [
+    0.78,
+    0.8,
+    0.84
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sample_sword_mesh",
+    "f0": 0,
+    "f1": 52
+   }
+  ],
+  "source_file": "sample_sword.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "prop": {
+   "socket": "hand_r",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": 1.0
+  }
+ },
+ "height_m": 0.93,
+ "verts": 34,
+ "tris": 52
+}

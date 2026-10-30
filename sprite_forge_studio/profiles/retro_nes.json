@@ -1,0 +1,17 @@
+{
+  "name": "retro_nes",
+  "description": "NES-style sprites: platformer moves at 32x32 with the NES console export (palette, tiles, C header) in console/.",
+  "moves": "platformer10",
+  "frame": [
+    32,
+    32
+  ],
+  "yaw": 90,
+  "console": "nes",
+  "outline": true,
+  "manifests": [
+    {
+      "type": "tiled_tsx"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "generic_2d",
+  "description": "Any 2D engine: atlas.png + atlas.json + sprites.cfg + character.ini, plus Godot SpriteFrames, a Tiled tileset, Unity-style sprite JSON and Phaser-style animation JSON. Front + back view.",
+  "moves": "fighter14",
+  "frame": [
+    256,
+    256
+  ],
+  "views": [
+    "front",
+    "back"
+  ],
+  "manifests": [
+    {
+      "type": "godot_spriteframes",
+      "res_path": "res://characters/{name}/"
+    },
+    {
+      "type": "tiled_tsx"
+    },
+    {
+      "type": "unity_json"
+    },
+    {
+      "type": "json",
+      "file": "{name}.phaser.json",
+      "data": {
+        "texture": "{name}",
+        "url": "{atlas}",
+        "frameConfig": {
+          "frameWidth": "{frame_w}",
+          "frameHeight": "{frame_h}"
+        },
+        "anims": {
+          "$per_move": {
+            "key": "{name}_{move}",
+            "frameRate": "{fps}",
+            "repeat": "{repeat}",
+            "start": "{first_tile}",
+            "end": "{last_tile}"
+          }
+        }
+      }
+    }
+  ]
+}

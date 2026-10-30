@@ -149,7 +149,18 @@ static int ScaleNote(int scale, int key, int degree)
 static unsigned int mseed = 1;
 static int MRand(int n) { mseed = mseed*1103515245u + 12345u; return (int)((mseed >> 16) % (unsigned)n); }
 
-static void GenSong(SongBuf *out, int seed, float bpm, int key, int scale, int energy)
+/* steel-pan / marimba style mallet note: sine + a decaying overtone */
+static void Mallet(float *mix, int len, float t, float hz, float vol, float ratio, float decay)
+{
+    AddNote(mix, len, t, 0.02f, hz, OSC_SINE, vol, 0.002f, decay, 0.0f, decay, 0, 0);
+    AddNote(mix, len, t, 0.02f, hz*ratio, OSC_SINE, vol*0.35f, 0.001f, decay*0.5f, 0.0f, decay*0.5f, 0, 0);
+}
+static void AddTom(float *buf, int len, float start, float hz, float vol)
+{
+    AddNote(buf, len, start, 0.05f, hz, OSC_SINE, vol, 0.001f, 0.18f, 0.0f, 0.12f, 0, -1.6f);
+}
+
+static void GenSong(SongBuf *out, int seed, float bpm, int key, int scale, int energy, int style)
 {
     mseed = (unsigned)seed*2654435761u + 1u;
     const int progs[6][4] = { {0,4,5,3}, {0,5,3,4}, {0,3,4,4}, {5,3,0,4}, {0,6,5,4}, {3,4,0,0} };
@@ -189,6 +200,18 @@ static void GenSong(SongBuf *out, int seed, float bpm, int key, int scale, int e
         int fifth = ScaleNote(scale, key - 24, chord + 4);
         /* bass */
         const int bp[8] = { 0, 0, 12, 0, 7, 0, 12, 7 };
+        if (style == MUS_COUNTRY) {          /* boom-chick: root / fifth on 1 and 3, walk-up every other bar */
+            for (int q = 0; q < 4; q += 2) AddNote(mix, len, t0 + q*beat, beat*0.7f, MidiHz((float)(q ? fifth : root)), OSC_TRI, 0.34f, 0.004f, 0.08f, 0.6f, 0.03f, 0, 0);
+            if (b & 1) for (int w = 0; w < 2; w++) AddNote(mix, len, t0 + 3*beat + w*e8, e8*0.8f, MidiHz((float)ScaleNote(scale, key - 24, chord + 5 + w)), OSC_TRI, 0.26f, 0.004f, 0.05f, 0.7f, 0.02f, 0, 0);
+        } else if (style == MUS_CALYPSO) {   /* tresillo 3+3+2 */
+            const int pos3[3] = { 0, 3, 6 };
+            for (int h = 0; h < 2; h++) for (int i = 0; i < 3; i++)
+                AddNote(mix, len, t0 + h*beat*2 + pos3[i]*e16, e8*0.9f, MidiHz((float)(i == 2 ? fifth : root)), OSC_TRI, 0.32f, 0.004f, 0.06f, 0.7f, 0.03f, 0, 0);
+        } else if (style == MUS_JUNGLE) {    /* rolling low octaves */
+            const int pj[8] = { 0, -1, -1, 12, 0, -1, 7, 12 };
+            for (int i = 0; i < 8; i++) if (pj[i] >= 0)
+                AddNote(mix, len, t0 + i*e8, e8*0.85f, MidiHz((float)(pj[i] == 7 ? fifth : root + pj[i])), OSC_TRI, 0.32f, 0.004f, 0.05f, 0.75f, 0.02f, 0, 0);
+        } else
         for (int i = 0; i < 8; i++) {
             int note = (bp[i] == 7) ? fifth : root + bp[i];
             AddNote(mix, len, t0 + i*e8, e8*0.8f, MidiHz((float)note), OSC_TRI, 0.30f, 0.004f, 0.05f, 0.8f, 0.02f, 0, 0);
@@ -197,6 +220,15 @@ static void GenSong(SongBuf *out, int seed, float bpm, int key, int scale, int e
         for (int i = 0; i < 16; i++) {
             int tone = (i % 4 == 3) ? 2 : (i % 4);
             int note = ScaleNote(scale, key, chord + tone*2);
+            if (style == MUS_COUNTRY) {      /* banjo roll: plucky, forward-roll pattern */
+                const int roll[8] = { 0, 2, 4, 7, 0, 4, 2, 7 };
+                note = ScaleNote(scale, key, chord + roll[i % 8]);
+                AddNote(mix, len, t0 + i*e16, e16*0.3f, MidiHz((float)note), OSC_SQUARE25, 0.075f, 0.001f, 0.07f, 0.0f, 0.05f, 0, 0);
+            } else if (style == MUS_CALYPSO) {   /* steel pan off-beats */
+                if (i % 16 == 0 || i % 16 == 3 || i % 16 == 6 || i % 16 == 10 || i % 16 == 12) Mallet(mix, len, t0 + i*e16, MidiHz((float)note), 0.13f, 2.76f, 0.22f);
+            } else if (style == MUS_JUNGLE) {    /* marimba eighths */
+                if (!(i & 1)) Mallet(mix, len, t0 + i*e16, MidiHz((float)ScaleNote(scale, key, chord + ((i/2) % 3)*2 + ((i/2) == 6 ? 7 : 0))), 0.12f, 3.9f, 0.16f);
+            } else
             AddNote(mix, len, t0 + i*e16, e16*0.6f, MidiHz((float)note), OSC_SQUARE12, 0.05f + 0.02f*energy, 0.002f, 0.04f, 0.4f, 0.02f, 0, 0);
         }
         /* pad: long chord tones */
@@ -209,12 +241,27 @@ static void GenSong(SongBuf *out, int seed, float bpm, int key, int scale, int e
         /* drums */
         for (int q = 0; q < 4; q++) {
             float bt = t0 + q*beat;
+            if (style == MUS_JUNGLE) {           /* tribal toms + shaker */
+                AddTom(mix, len, bt, q == 0 ? 90 : 130, 0.42f);
+                if (q == 1 || q == 3) AddTom(mix, len, bt + e8, 170, 0.3f);
+                if (q == 2) AddKick(mix, len, bt, 0.45f);
+                for (int h = 0; h < 4; h++) AddHat(mix, len, bt + h*e16, h == 2 ? 0.07f : 0.035f);
+                continue;
+            }
+            if (style == MUS_CALYPSO) {          /* soca-ish kick, clave 3-2, shaker */
+                AddKick(mix, len, bt, 0.5f);
+                if (q == 1 || q == 3) AddSnare(mix, len, bt + e8, 0.16f);
+                for (int h = 0; h < 4; h++) AddHat(mix, len, bt + h*e16, h == 2 ? 0.06f : 0.03f);
+                continue;
+            }
             if (q == 0 || q == 2) AddKick(mix, len, bt, 0.55f);
-            if (q == 1 || q == 3) AddSnare(mix, len, bt, 0.28f);
+            if (q == 1 || q == 3) AddSnare(mix, len, bt, style == MUS_COUNTRY ? 0.2f : 0.28f);
             AddHat(mix, len, bt, 0.12f);
             AddHat(mix, len, bt + e8, 0.08f);
             if (energy >= 2) { AddHat(mix, len, bt + e16, 0.04f); AddHat(mix, len, bt + 3*e16, 0.04f); }
         }
+        if (style == MUS_CALYPSO) { const float cl[5] = { 0, 3, 6, 10, 12 }; for (int c = 0; c < 5; c++) AddNote(mix, len, t0 + cl[c]*e16, 0.02f, 2500, OSC_SQUARE12, 0.07f, 0.001f, 0.02f, 0.0f, 0.02f, 0, 0); }
+        if (style == MUS_FANFARE && (b & 1)) for (int r = 0; r < 4; r++) AddSnare(mix, len, t0 + 3*beat + r*e16, 0.12f + 0.03f*r);
         if (energy >= 1 && (b % 4 == 2)) AddKick(mix, len, t0 + 2.5f*beat, 0.4f);
         if (b % 8 == 7) { /* fill */
             for (int i = 0; i < 4; i++) AddSnare(mix, len, t0 + 3*beat + i*e16, 0.18f + 0.04f*i);
@@ -248,6 +295,13 @@ static void GenSong(SongBuf *out, int seed, float bpm, int key, int scale, int e
             if (last && (ph == 3 || ph == 7)) deg = chord + 7 > 9 ? chord : chord + 7;
             if (!(MRand(9) == 0 && !strong)) {
                 int note = ScaleNote(scale, key + 12, deg);
+                if (style == MUS_COUNTRY) AddNote(mix, len, t + pos, dur*0.9f, MidiHz((float)note), OSC_SAW, 0.085f, 0.03f, 0.1f, 0.75f, 0.06f, 0.014f, 0);          /* fiddle */
+                else if (style == MUS_JUNGLE) AddNote(mix, len, t + pos, dur*0.85f, MidiHz((float)note), OSC_TRI, 0.2f, 0.03f, 0.1f, 0.7f, 0.06f, 0.012f, 0);     /* wooden flute */
+                else if (style == MUS_CALYPSO) Mallet(mix, len, t + pos, MidiHz((float)note), 0.2f, 2.76f, 0.3f + dur*0.4f);                                        /* lead pan */
+                else if (style == MUS_FANFARE) {                                                                                                                    /* brass */
+                    AddNote(mix, len, t + pos, dur*0.85f, MidiHz((float)note), OSC_SAW, 0.09f, 0.025f, 0.08f, 0.7f, 0.05f, 0.006f, 0);
+                    AddNote(mix, len, t + pos, dur*0.85f, MidiHz((float)ScaleNote(scale, key + 12, deg - 2)), OSC_SQUARE50, 0.045f, 0.025f, 0.08f, 0.6f, 0.05f, 0.004f, 0);
+                } else
                 AddNote(mix, len, t + pos, dur*0.85f, MidiHz((float)note), OSC_SQUARE25, 0.16f, 0.01f, 0.08f, 0.65f, 0.05f, 0.008f, 0);
                 /* harmony a third below in the B section */
                 if (m == 1) AddNote(mix, len, t + pos, dur*0.85f, MidiHz((float)ScaleNote(scale, key + 12, deg - 2)), OSC_SQUARE50, 0.05f, 0.01f, 0.08f, 0.6f, 0.05f, 0.006f, 0);
@@ -466,6 +520,44 @@ static void BuildSfx(void)
     { int n[] = { 84, 88, 91 }; Arp(b, len, n, 3, 0.04f, 0.05f, OSC_SQUARE12, 0.3f); } base[SFX_BOXBREAK] = MakeSound(b, len, 0.6f);
     b = NewBuf(0.5f, &len); AddNote(b, len, 0, 0.35f, 220, OSC_SQUARE50, 0.5f, 0.005f, 0.1f, 0.6f, 0.1f, 0.1f, -1.4f); base[SFX_SQUISH] = MakeSound(b, len, 0.6f);
 
+    /* Towelhead Qanna's victory grumble: low, sagging "hnnnh... mmmph" with a sigh of breath */
+    b = NewBuf(1.6f, &len);
+    VoiceSyllable(b, len, 0.0f, 0.42f, 132, 112, 420, 900, 380, 820, 1.0f);   /* "hnnh" */
+    VoiceSyllable(b, len, 0.48f, 1.05f, 120, 84, 520, 980, 330, 700, 1.0f);   /* "mmmph" falling */
+    { float lp = 0; for (int i = 0; i < len; i++) { float t = (float)i/SR; if (t < 1.05f) continue; lp += (Noise() - lp)*0.06f; float e = (t - 1.05f)/0.5f; b[i] += lp*1.4f*(e < 0.15f ? e/0.15f : expf(-(e - 0.15f)*3.0f)); } }   /* tired sigh */
+    base[SFX_QUIP_GRUMBLE] = MakeSound(b, len, 0.9f);
+    /* Baby Eabha's "Car!": squeaky rising chirp + a toy squeak */
+    b = NewBuf(0.7f, &len);
+    VoiceSyllable(b, len, 0.0f, 0.36f, 560, 820, 850, 1500, 780, 1300, 1.0f);   /* "caaar!" */
+    AddNote(b, len, 0.38f, 0.07f, 1700, OSC_SQUARE12, 0.22f, 0.001f, 0.05f, 0.5f, 0.05f, 0, 2.0f);   /* squeak */
+    AddNote(b, len, 0.47f, 0.07f, 2100, OSC_SQUARE12, 0.18f, 0.001f, 0.05f, 0.5f, 0.05f, 0, 2.0f);
+    base[SFX_QUIP_CAR] = MakeSound(b, len, 0.9f);
+    /* v7 course sounds */
+    b = NewBuf(1.2f, &len);
+    VoiceSyllable(b, len, 0.0f, 1.1f, 150, 112, 330, 720, 420, 820, 1.4f);       /* "mooooo" */
+    base[SFX_MOO] = MakeSound(b, len, 0.9f);
+    b = NewBuf(1.5f, &len);
+    { const float ch[3] = { 440, 554, 659 }; for (int c = 0; c < 3; c++) AddNote(b, len, 0, 1.1f, ch[c], OSC_SINE, 0.25f, 0.08f, 0.1f, 0.9f, 0.3f, 0.004f, 0); }
+    for (int i = 0; i < len; i++) { float t = (float)i/SR; b[i] += Noise()*0.06f*(t < 1.2f ? 1.0f : 0.0f); }
+    base[SFX_WHISTLE] = MakeSound(b, len, 0.75f);
+    b = NewBuf(0.7f, &len);
+    { float lp = 0; for (int i = 0; i < len; i++) { float t = (float)i/SR; lp += (Noise() - lp)*0.25f; b[i] = lp*expf(-t*5)*0.9f; } }
+    AddNote(b, len, 0, 0.12f, 300, OSC_SINE, 0.5f, 0.002f, 0.1f, 0.3f, 0.05f, 0, -3.0f);
+    base[SFX_SPLASH] = MakeSound(b, len, 0.8f);
+    b = NewBuf(1.0f, &len);
+    VoiceSyllable(b, len, 0.00f, 0.16f, 520, 640, 350, 700, 380, 800, 1.2f);    /* ooh */
+    VoiceSyllable(b, len, 0.18f, 0.16f, 560, 700, 350, 700, 380, 800, 1.2f);    /* ooh */
+    VoiceSyllable(b, len, 0.38f, 0.25f, 700, 820, 850, 1300, 800, 1250, 1.3f);  /* aah */
+    VoiceSyllable(b, len, 0.66f, 0.28f, 760, 880, 850, 1300, 800, 1250, 1.3f);  /* aah! */
+    base[SFX_MONKEY] = MakeSound(b, len, 0.9f);
+    b = NewBuf(0.2f, &len);
+    AddNote(b, len, 0, 0.08f, 220, OSC_SINE, 0.7f, 0.001f, 0.05f, 0.5f, 0.04f, 0, 6.0f);
+    for (int i = 0; i < 200 && i < len; i++) b[i] += Noise()*0.4f*(1.0f - i/200.0f);
+    base[SFX_POP] = MakeSound(b, len, 0.7f);
+    { int n[] = { 72, 76, 79, 84 }; b = NewBuf(1.0f, &len); Arp(b, len, n, 4, 0.1f, 0.09f, OSC_SQUARE12, 0.3f);
+      for (int i = 0; i < len; i++) { float t = (float)i/SR; b[i] += Osc(OSC_SQUARE25, t*95.0f)*0.08f*(0.6f + 0.4f*sinf(t*2*PI*30)); } }
+    base[SFX_RESCUE] = MakeSound(b, len, 0.6f);
+
     for (int i = 0; i < SFX_COUNT; i++) {
         sfx[i][0] = base[i];
         for (int a = 1; a < SFX_ALIASES; a++) sfx[i][a] = LoadSoundAlias(base[i]);
@@ -522,11 +614,18 @@ void AudioInit(void)
     /* songs: 4 tracks, title, results */
     for (int i = 0; i < NUM_TRACKS; i++) {
         const TrackDef *d = &TRACK_DEFS[i];
-        GenSong(&songs[i], d->musicSeed, d->bpm, d->musicKey, d->musicScale, 2);
+        GenSong(&songs[i], d->musicSeed, d->bpm, d->musicKey, d->musicScale, 2, (int)d->musicStyle);
     }
-    GenSong(&songs[MUSIC_TITLE], 101, 124, 60, 0, 1);
-    GenSong(&songs[MUSIC_RESULTS], 7, 112, 65, 0, 0);
+    GenSong(&songs[MUSIC_TITLE], 101, 124, 60, 0, 1, 0);
+    GenSong(&songs[MUSIC_RESULTS], 7, 112, 65, 0, 0, 0);
     BuildSfx();
+    {   /* developer aid: TT64_DUMP_AUDIO=dir writes every synthesised song as a WAV for checking */
+        const char *dd = getenv("TT64_DUMP_AUDIO");
+        if (dd) for (int i = 0; i < NUM_SONGS; i++) {
+            Wave w = { (unsigned int)songs[i].len, SR, 16, 1, songs[i].data };
+            ExportWave(w, TextFormat("%s/song%02d.wav", dd, i));
+        }
+    }
     TraceLog(LOG_INFO, "AUDIO: synthesised music + sfx in %.2fs", GetTime() - t0);
 
     musicStream = LoadAudioStream(SR, 16, 1);

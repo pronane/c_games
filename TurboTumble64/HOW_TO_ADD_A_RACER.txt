@@ -1,0 +1,175 @@
+TURBO TUMBLE 64 - HOW TO ADD A RACER
+====================================
+
+Every folder in assets\characters\ that has a character.ini is a racer. The
+game looks for them at startup, so you never need to recompile. The
+add_racer tool makes these folders for you, in one of two ways:
+
+  PHOTO MODE  Your own photo is cut out and used as an HD sprite. The face,
+              clothes and colours are the real photo pixels. Nothing is
+              redrawn, and no AI image generator is used.
+  SPEC MODE   A brand-new cartoon racer is drawn from a short text
+              description (ethnicity, hair, eyes, height, weight, nose,
+              ears and so on). This works offline and is drawn by simple
+              geometry, not AI.
+
+
+1. QUICK START (Windows)
+------------------------
+  * Install MSYS2 once from https://www.msys2.org. This is the same one
+    build_release.bat uses.
+  * Drag a photo onto add_racer.bat and type a name. That's it.
+    The first run installs python, pillow, numpy and scipy with pacman.
+  * Or drag a .txt description onto add_racer.bat (copy
+    tools\example\racer_spec_example.txt and edit it).
+  * Start the game. The new racer is on the character select screen.
+
+  From a command prompt (Linux/macOS: python3 tools/add_racer.py ...):
+     add_racer.bat --photo me.jpg --name "Speedy Me"
+     add_racer.bat --photo front.jpg --back back.jpg --name "Speedy Me" --kart-text "Zoom!"
+     add_racer.bat --spec tools\example\racer_spec_example.txt
+     add_racer.bat --help          (every option)
+
+  To remove a racer, delete its folder in assets\characters\.
+
+
+2. WHAT MAKES A GOOD PHOTO
+-------------------------
+  * Use one person, facing the camera, from the head down to the lap or
+    knees. A seated photo looks best in a kart.
+  * A plain, uncluttered background helps a lot. Clothes that are the same
+    colour as the wall are the hardest case.
+  * Higher resolution gives a sharper result. About 1000 px tall or more
+    is plenty.
+  * OPTIONAL extra photos make the turning views more real:
+      --back back.jpg            taken from behind
+      --side side.jpg            side-on, person facing image-RIGHT
+                                 (add --side-faces-left if they face left)
+      --view 45=threequarter.jpg any angle: 0 front, 45, 90 side, 135,
+                                 180 back ...
+    Without them, the back is INVENTED from the front photo's own colours
+    (silhouette, hair colour and clothing colour). The in-between angles
+    are the front or back photo, squashed and turned a little.
+
+
+3. IF THE CUT-OUT IS NOT CLEAN
+------------------------------
+Open preview.png in the racer's folder. If bits of sofa or wall are left, or
+parts of the person are missing, re-run with hints. All coordinates are
+pixels in the ORIGINAL photo; any paint program shows them.
+
+  --box x0,y0,x1,y1       A rectangle around the person. This is the single
+                          most useful hint in a busy room.
+  --bg-box x0,y0,x1,y1    "This rectangle is NOT the person", e.g. a bag
+                          next to her head. You can give it several times,
+                          or list boxes separated by ; inside one value.
+  --fg-box x0,y0,x1,y1    "This rectangle IS the person", e.g. a dark shirt
+                          that looks like the background.
+  --bg x,y  --fg x,y      The same as points (a magic-wand fill from each
+                          point).
+  --mask mask.png         The manual override: paint the photo white where
+                          the person is, black where they're not, and grey
+                          where the tool should decide.
+  --cut 0.7               How much of the person to keep, from the top
+                          (0.6 is head to lap).
+  --face x0,y0,x1,y1      Use this if the face is not found. The face is
+                          used for the portrait, the win-card blush or anger
+                          vein, and the invented back.
+  --keep-cutouts DIR      Saves the raw cut-outs so you can check them.
+                          Keep these OUT of assets.
+
+  Example (from the tool's own test, a public-domain NASA portrait with a
+  flag and a model shuttle next to the person):
+     add_racer.bat --photo baker.jpg --name "Test Pilot Mike" --box 120,60,1280,1600 ^
+        --bg-box "0,450,295,1600;120,60,560,620;930,60,1280,620" ^
+        --fg-box "720,600,840,760" --cut 0.93
+
+  ADVANCED: --hints file.ini can hold one [view ANGLE] section per photo or
+  video frame:
+     [view 0]
+     photo = front.jpg
+     box = 360,740,1120,1700
+     bgbox = 980,930,1260,1010 966,985,1070,1095
+     fg = 800,1300
+     cut = 0.76
+     face = 715,800,960,1150
+     [view 270]
+     video = clip.mp4       (needs ffmpeg on the PATH)
+     time = 4.4
+     box = ...
+  Photo paths are relative to the .ini file.
+
+
+4. RACER SETTINGS (all optional)
+--------------------------------
+  --tagline "..."            --weight light|medium|heavy
+  --speed --accel --handling (0-5)   --mass
+  --kart R,G,B --trim R,G,B  kart colours
+  --kart-text "Zoom!" --kart-text-style bubbly|comic   text on the rear wing
+  --decal my_decal.png --decal-frames N               or your own decal
+  --quip "Car!" --quipstyle happy|sleepy              the winner's line
+                             happy = bounce + sparkles + blush
+                             sleepy = droopy tilt + anger vein + Zzz
+  --kartstyle rattle|spa     toy fruit on a spring / a towel streaming
+                             behind
+  --size 1.4 --seat 0.0      how big the driver is, and how high they sit
+                             (tune in the game)
+  --voice 1.0                pitch of the voice (higher = squeakier)
+  --extra-ini file           extra raw character.ini lines
+
+
+5. SPEC MODE KEYS (tools\example\racer_spec_example.txt shows them all)
+----------------------------------------------------------------------
+  name, tagline, age (baby/child/teen/adult/senior)
+  ethnicity  (sets defaults for skin, hair and eyes, e.g. irish, nigerian,
+             japanese, indian, hispanic...)
+  complexion / skin, freckles, blush
+  hair_color, hair_style (short, long, bob, ponytail, pigtails, bun, curly,
+             afro, spiky, mohawk, buzz, bald, towel, wisps), hair_texture
+  eye_color, eye_size, eye_shape, eyebrows
+  face_shape, nose, ears, mouth, lips, lip_color, beard, glasses
+  height (cm, m or feet), weight (kg), build, hands, feet
+  top (hoodie/jumper/t-shirt/shirt/dress/jacket/onesie/vest), top_color,
+  pattern, trousers_color, shoes_color, hat, hat_color, bib, expression
+  The racing keys are the same as section 4 (weight_class, speed, kart,
+  kart_text, quip ...).
+
+
+6. WHAT THE TOOL WRITES
+-----------------------
+  assets\characters\<id>\
+     character.ini   the game settings, plus Sprite Forge compatible
+                     frame_w/frame_h/ground_y/scale
+     sprite.png      8 angles, 4 x 2 grid of 512x640 RGBA cells, in the
+                     order 0,45,90,135 / 180,225,270,315 (0 = front, 90 =
+                     camera on the driver's right). Pivot = bottom centre.
+     win.png         the victory-card version (simple tint, tilt and
+                     overlay edits)
+     portrait.png    the select-screen picture
+     decal.png       the rear-wing text, if asked for
+     atlas.json      frame rectangles + where each angle came from
+                     (photo / mirrored / approximated / INVENTED)
+     preview.png     all angles side by side, for checking (not used by
+                     the game)
+  The same sprite format is used by Sprite Forge (forge.py build --photo
+  ... / --spec ...), so its output folders can be dropped in as well.
+
+
+7. HONEST LIMITS
+----------------
+  * Photo racers are flat "billboard" sprites like the N64 Mario Kart
+    drivers, not 3D models. Turning views that weren't photographed are
+    the front or back photo squashed and turned a little. They read fine
+    at racing distance, but up close the face is still looking at the
+    camera.
+  * A mirrored view mirrors writing on clothes too.
+  * An invented back is a plain shape in the right colours, with no real
+    detail.
+  * The cut-out is a classic colour-model segmentation (GrabCut style),
+    not AI. Fine hair, and clothes that match the background, may need
+    hints.
+  * The automatic face finder uses skin colour. Beige or pink clothes can
+    confuse it; use --face if so.
+  * Spec racers are stylised cartoons ("toy figure" look). They will not
+    look like a specific real person, and fine details (hands, feet) are
+    small at racing size.

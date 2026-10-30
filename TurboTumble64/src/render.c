@@ -8,11 +8,12 @@ static const char *FOG_VS =
     "in vec2 vertexTexCoord;\n"
     "in vec4 vertexColor;\n"
     "uniform mat4 mvp;\n"
+    "uniform vec2 uvOffset;\n"
     "out vec2 fragTexCoord;\n"
     "out vec4 fragColor;\n"
     "out float fogDepth;\n"
     "void main() {\n"
-    "    fragTexCoord = vertexTexCoord;\n"
+    "    fragTexCoord = vertexTexCoord + uvOffset;\n"
     "    fragColor = vertexColor;\n"
     "    gl_Position = mvp*vec4(vertexPosition, 1.0);\n"
     "    fogDepth = gl_Position.w;\n"
@@ -28,10 +29,19 @@ static const char *FOG_FS =
     "uniform vec3 fogColor;\n"
     "uniform float fogDensity;\n"
     "uniform float fogStart;\n"
+    "uniform float hueShift;\n"
     "out vec4 finalColor;\n"
     "void main() {\n"
-    "    vec4 c = texture(texture0, fragTexCoord)*colDiffuse*fragColor;\n"
+    "    vec4 vc = fragColor;\n"
+    "    if (hueShift != 0.0) {\n"
+    "        const vec3 k = vec3(0.57735);\n"
+    "        float ca = cos(hueShift);\n"
+    "        vc.rgb = clamp(vc.rgb*ca + cross(k, vc.rgb)*sin(hueShift) + k*dot(k, vc.rgb)*(1.0 - ca), 0.0, 1.0);\n"
+    "    }\n"
+    "    vec4 c = texture(texture0, fragTexCoord)*colDiffuse*vc;\n"
     "    if (c.a < 0.02) discard;\n"
+    "    float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n"
+    "    c.rgb = clamp(mix(vec3(lum), c.rgb, 1.16)*1.03, 0.0, 1.0);\n"
     "    float d = max(fogDepth - fogStart, 0.0)*fogDensity;\n"
     "    float f = clamp(1.0 - exp(-d*d), 0.0, 1.0);\n"
     "    finalColor = vec4(mix(c.rgb, fogColor, f), c.a);\n"
@@ -57,14 +67,14 @@ bool RenderDirect(void) { return G.settings.visualMode == 1; }
    ENHANCED: trilinear + 8x anisotropic for crisp roads at grazing angles */
 void RenderApplyTextureFilters(void)
 {
-    Texture2D *ts[2 + NUM_TRACKS];
+    Texture2D *ts[2 + NUM_TRACKS + NUM_TX];
     int n = 0;
-    ts[n++] = &G.texRoad;
+    for (int i = 0; i < NUM_TX; i++) if (i != TX_ITEMBOX && i != TX_CLOUD) ts[n++] = &G.tx[i];
     for (int i = 0; i < NUM_TRACKS; i++) ts[n++] = &G.texGround[i];
     for (int i = 0; i < n; i++) {
         if (!ts[i]->id) continue;
         SetTextureFilter(*ts[i], TEXTURE_FILTER_TRILINEAR);
-        rlTextureParameters(ts[i]->id, RL_TEXTURE_FILTER_ANISOTROPIC, G.settings.visualMode == 1 ? 8 : 1);
+        rlTextureParameters(ts[i]->id, RL_TEXTURE_FILTER_ANISOTROPIC, G.settings.visualMode == 1 ? 8 : 4);
     }
 }
 
@@ -101,12 +111,8 @@ static void MakeTextures(void)
 {
     G.texWhite = MakeTex(GenImageColor(4, 4, WHITE), false);
 
-    /* road: neutral asphalt (tinted per track via vertex colour) with a dashed centre line */
-    Image road = NoiseImage(64, 64, (Color){ 205, 205, 205, 255 }, 34, 7);
-    for (int y = 0; y < 32; y++) for (int x = 30; x < 34; x++) ImageDrawPixel(&road, x, y, (Color){ 250, 250, 250, 255 });
-    G.texRoad = MakeTex(road, true);
-
-    for (int i = 0; i < NUM_TRACKS; i++) {
+    TexturesInit();
+    for (int i = 0; i < 0; i++) {
         const TrackDef *d = &TRACK_DEFS[i];
         Image g = NoiseImage(64, 64, d->ground, d->scenery == SCENERY_SNOW ? 16 : 40, 100 + i);
         rs = 555u + (unsigned)i;
@@ -162,6 +168,8 @@ void RenderInit(void)
     G.locFogColor = GetShaderLocation(G.fogShader, "fogColor");
     G.locFogDensity = GetShaderLocation(G.fogShader, "fogDensity");
     G.locFogStart = GetShaderLocation(G.fogShader, "fogStart");
+    G.locUvOffset = GetShaderLocation(G.fogShader, "uvOffset");
+    G.locHueShift = GetShaderLocation(G.fogShader, "hueShift");
     G.sunDir = Vector3Normalize((Vector3){ -0.45f, 0.8f, -0.35f });
     G.ambient = 0.62f;
     MakeTextures();
@@ -178,18 +186,28 @@ void RenderResize(void)
     H = H < 64 ? 64 : H;
     int views = (R.numHumans == 2) ? 2 : 1;
     int vh = H/views;
-    /* ORIGINAL: ~240 visible lines (N64 320x240 feel), integer point upscale.
+    /* ORIGINAL: N64 hi-res 640x480 internal render with a soft bilinear upscale (default),
+       or RETRO ~320x240 with an integer point upscale for purists.
        ENHANCED: rendered straight to the (4x MSAA) back buffer at native res. */
-    int target = views == 2 ? 180 : 240;
-    int scale = vh/target;
-    if (G.settings.visualMode == 1) scale = 1;
-    if (scale < 1) scale = 1;
-    int w = W/scale, h = vh/scale;
+    bool retro = G.settings.pixelMode == 1;
+    int w, h, scale;
+    if (retro || G.settings.visualMode == 1) {
+        int target = views == 2 ? 180 : 240;
+        scale = vh/target;
+        if (G.settings.visualMode == 1) scale = 1;
+        if (scale < 1) scale = 1;
+        w = W/scale; h = vh/scale;
+    } else {
+        int target = views == 2 ? 360 : 480;
+        h = vh < target ? vh : target;
+        w = (int)((float)W*h/vh + 0.5f);
+        scale = 0;      /* 0 = stretch to the view with bilinear filtering */
+    }
     if (w == G.viewW && h == G.viewH && scale == G.viewScale && G.view[0].id) return;
     for (int i = 0; i < MAX_HUMANS; i++) if (G.view[i].id) UnloadRenderTexture(G.view[i]);
     for (int i = 0; i < MAX_HUMANS; i++) {
         G.view[i] = LoadRenderTexture(w, h);
-        SetTextureFilter(G.view[i].texture, TEXTURE_FILTER_POINT);
+        SetTextureFilter(G.view[i].texture, scale == 0 ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT);
     }
     G.viewW = w; G.viewH = h; G.viewScale = scale;
 }
@@ -212,20 +230,22 @@ static void SetFog(void)
 {
     const TrackDef *d = T.def;
     float fc[3] = { d->fog.r/255.0f, d->fog.g/255.0f, d->fog.b/255.0f };
-    float dens = d->fogDensity, start = 25.0f;
-    if (G.settings.visualMode == 1) { dens *= 0.5f; start = 60.0f; }
+    /* clear, MK64-like air: light distance haze only */
+    float dens = d->fogDensity*0.55f, start = 70.0f;
+    if (G.settings.visualMode == 1) { dens = d->fogDensity*0.4f; start = 90.0f; }
     SetShaderValue(G.fogShader, G.locFogColor, fc, SHADER_UNIFORM_VEC3);
     SetShaderValue(G.fogShader, G.locFogDensity, &dens, SHADER_UNIFORM_FLOAT);
     SetShaderValue(G.fogShader, G.locFogStart, &start, SHADER_UNIFORM_FLOAT);
 }
 
+static float gViewAspect = 0;
 void DrawSkyAndTrack(Camera3D cam)
 {
     rlDisableDepthMask();
     rlDisableDepthTest();
     DrawModel(T.mSky, cam.position, 1.0f, WHITE);
     rlDrawRenderBatchActive();
-    if (G.settings.visualMode == 1) {
+    if (G.settings.visualMode == 1 && T.def->scenery != SCENERY_STADIUM) {
         /* ENHANCED: soft additive glow around the sun (day) or the moon (night) */
         const TrackDef *d = T.def;
         Vector3 dir = d->night ? Vector3Normalize((Vector3){ -300, 330, -330 }) : Vector3Normalize((Vector3){ -0.55f, 0.32f, -0.77f });
@@ -255,12 +275,51 @@ void DrawSkyAndTrack(Camera3D cam)
         rlDrawRenderBatchActive();
         EndBlendMode();
     }
+    /* soft clouds + painted panorama (mountains, sea, castles, nebula) */
+    DrawModel(T.mClouds, cam.position, 1.0f, WHITE);
+    DrawModel(T.mPano, (Vector3){ cam.position.x, cam.position.y, cam.position.z }, 1.0f, WHITE);
+    rlDrawRenderBatchActive();
     rlEnableDepthTest();
     rlEnableDepthMask();
-    DrawModel(T.mGround, (Vector3){ 0, 0, 0 }, 1.0f, WHITE);
-    DrawModel(T.mRoad, (Vector3){ 0, 0, 0 }, 1.0f, WHITE);
-    DrawModel(T.mWalls, (Vector3){ 0, 0, 0 }, 1.0f, WHITE);
-    DrawModel(T.mScenery, (Vector3){ 0, 0, 0 }, 1.0f, WHITE);
+    Vector3 o = { 0, 0, 0 };
+    DrawModel(T.mGround, o, 1.0f, WHITE);
+    if (T.def->rainbowRoad) {   /* colour-cycling rainbow tiles */
+        float hs = fmodf(G.time*1.4f, 2*PI) + 0.001f;
+        SetShaderValue(G.fogShader, G.locHueShift, &hs, SHADER_UNIFORM_FLOAT);
+        DrawModel(T.mRoad, o, 1.0f, WHITE);
+        DrawModel(T.mCurb, o, 1.0f, WHITE);
+        DrawModel(T.mWalls, o, 1.0f, WHITE);
+        rlDrawRenderBatchActive();
+        hs = 0;
+        SetShaderValue(G.fogShader, G.locHueShift, &hs, SHADER_UNIFORM_FLOAT);
+    } else {
+        DrawModel(T.mRoad, o, 1.0f, WHITE);
+        DrawModel(T.mCurb, o, 1.0f, WHITE);
+        DrawModel(T.mWalls, o, 1.0f, WHITE);
+    }
+    if (T.hasDeco) for (int k = 0; k < 5; k++) DrawModel(T.mDeco[k], o, 1.0f, WHITE);
+    float aspect = gViewAspect > 0 ? gViewAspect : 4.0f/3.0f;
+    DrawSceneryChunks(cam, aspect);
+}
+
+/* water last among the opaque world so it blends over the sea / lake beds */
+void DrawWater(void)
+{
+    if (!T.hasWater) return;
+    rlDrawRenderBatchActive();
+    float off[2] = { fmodf(G.time*0.035f, 1.0f), fmodf(G.time*0.021f, 1.0f) };
+    SetShaderValue(G.fogShader, G.locUvOffset, off, SHADER_UNIFORM_VEC2);
+    rlDisableDepthMask();
+    DrawModel(T.mWater, (Vector3){ 0, T.tideOffset, 0 }, 1.0f, WHITE);
+    /* second, slower layer at a different scale for shimmering waves */
+    float off2[2] = { -fmodf(G.time*0.02f, 1.0f) + 0.37f, fmodf(G.time*0.03f, 1.0f) + 0.11f };
+    rlDrawRenderBatchActive();
+    SetShaderValue(G.fogShader, G.locUvOffset, off2, SHADER_UNIFORM_VEC2);
+    DrawModel(T.mWater, (Vector3){ 0, 0.02f + T.tideOffset, 0 }, 1.0f, (Color){ 255, 255, 255, 110 });
+    rlDrawRenderBatchActive();
+    rlEnableDepthMask();
+    off[0] = off[1] = 0;
+    SetShaderValue(G.fogShader, G.locUvOffset, off, SHADER_UNIFORM_VEC2);
 }
 
 /* ------------------------------------------------------------------ */
@@ -426,6 +485,9 @@ void RenderWorldView(int view, Camera3D cam, int focusKart, Rectangle dst)
 {
     (void)focusKart;
     bool direct = RenderDirect();
+    gViewAspect = dst.height > 0 ? dst.width/dst.height : 4.0f/3.0f;
+    G.curCam = cam;
+    G.kartSprites = !direct;
     SetFog();
     if (direct) BeginDirectView(cam, dst);
     else {
@@ -434,6 +496,7 @@ void RenderWorldView(int view, Camera3D cam, int focusKart, Rectangle dst)
         BeginWorld(cam, cam.fovy);
     }
     DrawSkyAndTrack(cam);
+    StadiumDrawExtras(cam);
     BeginShaderMode(G.fogShader);
     /* blob shadows */
     rlDrawRenderBatchActive();
@@ -488,7 +551,10 @@ void RenderWorldView(int view, Camera3D cam, int focusKart, Rectangle dst)
             }
         }
     }
+    G.kartSprites = false;
+    DrawWater();
     DrawItemsWorld(cam);
+    HazardsDraw();
     ParticlesDraw(cam);
     EndShaderMode();
     if (direct) EndDirectView();
@@ -685,4 +751,173 @@ void DrawHUD(int view, Rectangle a)
         DrawTextCentered(TextFormat("%d%s PLACE!", k->place, OrdinalSuffix(k->place)), (int)(a.x + a.width*0.5f), (int)(a.y + a.height*0.55f), (int)(50*u), WHITE);
     }
     if (k->shrinkTimer > 0) DrawTextCentered("SHRUNK!", (int)(a.x + a.width*0.5f), (int)(a.y + a.height*0.75f), (int)(26*u), (Color){ 150, 220, 255, 255 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Mudslide Megadome extras: live jumbotron, flood-light glows,        */
+/* twinkling camera flashes in the crowd, neon chase lights            */
+/* ------------------------------------------------------------------ */
+static bool gJumboPass = false;
+static bool gJumboReady = false;
+
+static unsigned int XHash(unsigned int a, unsigned int b)
+{
+    unsigned int h = a*2654435761u ^ (b + 0x9e3779b9u + (a << 6) + (a >> 2));
+    h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; h *= 3266489917u; h ^= h >> 16;
+    return h;
+}
+static float XHashF(unsigned int a, unsigned int b) { return (XHash(a, b) & 0xFFFFFF)/16777216.0f; }
+
+static void GlowQuad(Vector3 c, Vector3 r, Vector3 u, float sz, Color col)
+{
+    Vector3 rr = Vector3Scale(r, sz), uu = Vector3Scale(u, sz);
+    Vector3 p0 = Vector3Subtract(Vector3Subtract(c, rr), uu), p1 = Vector3Subtract(Vector3Add(c, rr), uu);
+    Vector3 p2 = Vector3Add(Vector3Add(c, rr), uu), p3 = Vector3Add(Vector3Subtract(c, rr), uu);
+    rlColor4ub(col.r, col.g, col.b, 255);
+    rlTexCoord2f(0, 1); rlVertex3f(p0.x, p0.y, p0.z);
+    rlTexCoord2f(1, 1); rlVertex3f(p1.x, p1.y, p1.z);
+    rlTexCoord2f(1, 0); rlVertex3f(p2.x, p2.y, p2.z);
+    rlTexCoord2f(0, 0); rlVertex3f(p3.x, p3.y, p3.z);
+}
+
+void StadiumDrawExtras(Camera3D cam)
+{
+    const Track *tr = &T;
+    if (!tr->def || tr->def->scenery != SCENERY_STADIUM) return;
+    rlDrawRenderBatchActive();
+    /* jumbotron screens (not inside the jumbotron's own render) */
+    if (!gJumboPass) {
+        for (int j = 0; j < tr->numJumbo; j++) {
+            Vector3 c = tr->jumboC[j], r = tr->jumboRight[j], u = tr->jumboUp[j];
+            Vector3 p0 = Vector3Subtract(Vector3Subtract(c, r), u), p1 = Vector3Subtract(Vector3Add(c, r), u);
+            Vector3 p2 = Vector3Add(Vector3Add(c, r), u), p3 = Vector3Add(Vector3Subtract(c, r), u);
+            if (gJumboReady) { rlSetTexture(G.jumboRT.texture.id); rlBegin(RL_QUADS); rlColor4ub(235, 235, 245, 255); }
+            else { rlSetTexture(G.texWhite.id); rlBegin(RL_QUADS); rlColor4ub(20, 40, 110, 255); }
+            /* render textures are stored bottom-up */
+            rlTexCoord2f(0, 0); rlVertex3f(p0.x, p0.y, p0.z);
+            rlTexCoord2f(1, 0); rlVertex3f(p1.x, p1.y, p1.z);
+            rlTexCoord2f(1, 1); rlVertex3f(p2.x, p2.y, p2.z);
+            rlTexCoord2f(0, 1); rlVertex3f(p3.x, p3.y, p3.z);
+            rlEnd();
+            rlSetTexture(0);
+        }
+        rlDrawRenderBatchActive();
+    }
+    Vector3 f = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
+    Vector3 r = Vector3Normalize(Vector3CrossProduct(f, (Vector3){ 0, 1, 0 }));
+    Vector3 u = Vector3CrossProduct(r, f);
+    rlDisableDepthMask();
+    BeginBlendMode(BLEND_ADDITIVE);
+    rlSetTexture(G.texDot.id);
+    rlBegin(RL_QUADS);
+    /* flood-light glows */
+    for (int i = 0; i < tr->numLights; i++) {
+        Vector3 c = tr->lights[i];
+        float d = Vector3Distance(c, cam.position);
+        float k = Clamp(d/120.0f, 0.6f, 2.2f);
+        GlowQuad(c, r, u, 6.5f*k, (Color){ 70, 66, 52, 255 });
+        GlowQuad(c, r, u, 2.4f*k, (Color){ 210, 205, 180, 255 });
+    }
+    /* camera flashes: a new random set every 90 ms, each fading inside its slot */
+    unsigned int slot = (unsigned int)(G.time/0.09f);
+    float ph = fmodf(G.time, 0.09f)/0.09f;
+    if (tr->numFlashSpots > 0) for (int pass = 0; pass < 2; pass++) {
+        unsigned int sl = slot - (unsigned)pass;
+        float fade = pass == 0 ? 1.0f - 0.4f*ph : 0.6f*(1.0f - ph);
+        for (int j = 0; j < 14; j++) {
+            unsigned int h = XHash(sl, (unsigned)j);
+            int q = (int)(h % (unsigned)tr->numFlashSpots);
+            float a = XHashF(sl, j + 100u), b = XHashF(sl, j + 200u);
+            Vector3 A = tr->flashA[q];
+            Vector3 p = Vector3Add(A, Vector3Add(Vector3Scale(Vector3Subtract(tr->flashB[q], A), a), Vector3Scale(Vector3Subtract(tr->flashC[q], A), b)));
+            unsigned char v = (unsigned char)(255*fade);
+            GlowQuad(p, r, u, 1.5f + 0.6f*XHashF(sl, j + 300u), (Color){ v, v, (unsigned char)(v*0.95f), 255 });
+        }
+    }
+    /* neon sign: chase lights around the frame + a pulsing arrow glow */
+    if (tr->hasNeon) {
+        Vector3 c = tr->neonC, nr = tr->neonRight, nu = tr->neonUp;
+        int per = 40;
+        for (int i = 0; i < per; i++) {
+            float t = (float)i/per;
+            Vector3 p;
+            if (t < 0.3f) p = Vector3Add(Vector3Add(c, Vector3Scale(nr, -1 + 2*t/0.3f)), nu);
+            else if (t < 0.5f) p = Vector3Add(Vector3Add(c, nr), Vector3Scale(nu, 1 - 2*(t - 0.3f)/0.2f));
+            else if (t < 0.8f) p = Vector3Subtract(Vector3Add(c, Vector3Scale(nr, 1 - 2*(t - 0.5f)/0.3f)), nu);
+            else p = Vector3Subtract(Vector3Add(c, Vector3Scale(nu, -1 + 2*(t - 0.8f)/0.2f)), nr);
+            bool on = ((i + (int)(G.time*12)) % 4) == 0;
+            GlowQuad(p, r, u, on ? 0.55f : 0.3f, on ? (Color){ 255, 120, 220, 255 } : (Color){ 90, 30, 70, 255 });
+        }
+        float pulse = 0.5f + 0.5f*sinf(G.time*6.0f);
+        Vector3 ac = Vector3Add(c, Vector3Scale(nr, 0.48f));
+        unsigned char pv = (unsigned char)(60 + 90*pulse);
+        GlowQuad(ac, r, u, 4.0f, (Color){ pv, (unsigned char)(pv*0.85f), 0, 255 });
+    }
+    rlEnd();
+    rlSetTexture(0);
+    rlDrawRenderBatchActive();
+    EndBlendMode();
+    rlEnableDepthMask();
+}
+
+/* Refresh the jumbotron feed: a TV chase-cam on the race leader, every 3rd frame, 320x180. */
+void JumbotronUpdate(void)
+{
+    const Track *tr = &T;
+    if (!tr->def || tr->def->scenery != SCENERY_STADIUM || tr->numJumbo == 0 || R.numKarts == 0) return;
+    if (!G.jumboRT.id) {
+        G.jumboRT = LoadRenderTexture(320, 180);
+        SetTextureFilter(G.jumboRT.texture, TEXTURE_FILTER_BILINEAR);
+        gJumboReady = false;
+    }
+    if (gJumboReady && (G.jumboFrame++ % 3) != 0) return;
+    int lead = 0;
+    for (int i = 0; i < R.numKarts; i++) if (R.karts[i].place == 1) lead = i;
+    /* cycle between a chase view and a low trackside "TV" angle every 7 s */
+    const Kart *k = &R.karts[lead];
+    Vector3 fw = { sinf(k->heading), 0, cosf(k->heading) };
+    Vector3 rt = { fw.z, 0, -fw.x };
+    int mode = ((int)(G.time/7.0f)) % 2;
+    Vector3 want = mode == 0 ? Vector3Add(Vector3Subtract(k->pos, Vector3Scale(fw, 8.0f)), (Vector3){ 0, 3.6f, 0 })
+                             : Vector3Add(Vector3Add(k->pos, Vector3Add(Vector3Scale(fw, 10.0f), Vector3Scale(rt, 7.0f))), (Vector3){ 0, 2.0f, 0 });
+    Track *mt = (Track *)tr;
+    static int lastMode = -1, lastLead = -1;
+    if (mode != lastMode || lead != lastLead || Vector3Distance(mt->jumboCamPos, want) > 40) mt->jumboCamPos = want;
+    else mt->jumboCamPos = Vector3Lerp(mt->jumboCamPos, want, 0.35f);
+    lastMode = mode; lastLead = lead;
+    mt->jumboCamTarget = Vector3Add(k->pos, Vector3Add(Vector3Scale(fw, 3.0f), (Vector3){ 0, 1.0f, 0 }));
+    Camera3D cam = { 0 };
+    cam.position = mt->jumboCamPos; cam.target = mt->jumboCamTarget; cam.up = (Vector3){ 0, 1, 0 };
+    cam.fovy = mode == 0 ? 58.0f : 46.0f; cam.projection = CAMERA_PERSPECTIVE;
+
+    Camera3D saveCam = G.curCam;
+    bool saveSprites = G.kartSprites;
+    float saveAspect = gViewAspect;
+    gJumboPass = true;
+    gViewAspect = 16.0f/9.0f;
+    G.curCam = cam;
+    G.kartSprites = !RenderDirect();
+    SetFog();
+    BeginTextureMode(G.jumboRT);
+    ClearBackground(T.def->fog);
+    BeginWorld(cam, cam.fovy);
+    DrawSkyAndTrack(cam);
+    StadiumDrawExtras(cam);
+    BeginShaderMode(G.fogShader);
+    for (int i = 0; i < R.numKarts; i++) DrawCharacterKart(R.karts[i].charId, &R.karts[i], G.time + i*1.7f);
+    DrawItemsWorld(cam);
+    ParticlesDraw(cam);
+    EndShaderMode();
+    EndWorld();
+    /* broadcast overlay */
+    DrawRectangle(8, 8, 46, 16, (Color){ 0, 0, 0, 160 });
+    DrawCircle(18, 16, 4, ((int)(G.time*2) & 1) ? RED : (Color){ 120, 0, 0, 255 });
+    DrawText("LIVE", 26, 11, 10, WHITE);
+    for (int y = 0; y < 180; y += 3) DrawRectangle(0, y, 320, 1, (Color){ 0, 0, 0, 40 });
+    EndTextureMode();
+    gJumboPass = false;
+    gJumboReady = true;
+    G.curCam = saveCam;
+    G.kartSprites = saveSprites;
+    gViewAspect = saveAspect;
 }

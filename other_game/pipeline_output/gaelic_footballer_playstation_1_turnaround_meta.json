@@ -1,0 +1,116 @@
+{
+  "meta": {
+    "asset_name": "gaelic_footballer",
+    "target_console": "PlayStation 1",
+    "mode": "OPTION_B_Directional_Turnaround_Atlas",
+    "frame_width": 64,
+    "frame_height": 64,
+    "total_width": 256,
+    "total_height": 192,
+    "angles": [
+      "angle_0",
+      "angle_45",
+      "angle_90",
+      "angle_135",
+      "angle_180",
+      "angle_225",
+      "angle_270",
+      "angle_315",
+      "top_down"
+    ],
+    "notes": "Unfiltered / affine-wobble look, 256\u00d7256 atlas typical",
+    "transparent": true
+  },
+  "frames": {
+    "angle_0": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 0
+      }
+    ],
+    "angle_45": [
+      {
+        "frame_index": 0,
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 45
+      }
+    ],
+    "angle_90": [
+      {
+        "frame_index": 0,
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 90
+      }
+    ],
+    "angle_135": [
+      {
+        "frame_index": 0,
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 135
+      }
+    ],
+    "angle_180": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 64,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 180
+      }
+    ],
+    "angle_225": [
+      {
+        "frame_index": 0,
+        "x": 64,
+        "y": 64,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 225
+      }
+    ],
+    "angle_270": [
+      {
+        "frame_index": 0,
+        "x": 128,
+        "y": 64,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 270
+      }
+    ],
+    "angle_315": [
+      {
+        "frame_index": 0,
+        "x": 192,
+        "y": 64,
+        "w": 64,
+        "h": 64,
+        "angle_deg": 315
+      }
+    ],
+    "top_down": [
+      {
+        "frame_index": 0,
+        "x": 0,
+        "y": 128,
+        "w": 64,
+        "h": 64,
+        "angle_deg": -1
+      }
+    ]
+  }
+}

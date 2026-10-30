@@ -127,6 +127,7 @@ void KartUpdate(int idx, const KartInput *in, float dt)
     if (k->itemFlash > 0) k->itemFlash -= dt;
     k->scale = Approach(k->scale, k->shrinkTimer > 0 ? 0.5f : 1.0f, 2.5f*dt);
     k->squash = Approach(k->squash, 0, 2.5f*dt);
+    if (k->rescueT > 0 && HazardRescueUpdate(idx, dt)) return;   /* Rotor Rescue drone is carrying us */
 
     if (k->autopilot && k->human < 0) top *= RubberBand(k);
     if (k->autopilot && k->human >= 0) top *= 0.97f;    /* autopilot after finishing / autotest */
@@ -140,6 +141,7 @@ void KartUpdate(int idx, const KartInput *in, float dt)
     if (k->shrinkTimer > 0) speedMul *= 0.72f;
     if (k->discoTimer > 0) speedMul *= 1.12f;
     if (k->boostTimer > 0) speedMul *= 1.0f + k->boostPower;
+    if (T.def->followTerrain) speedMul *= HazardKartSpeedMul(idx);
     float topNow = top*speedMul;
 
     if (k->spinTimer > 0) {
@@ -292,7 +294,8 @@ void KartUpdate(int idx, const KartInput *in, float dt)
         along = 0;
         lat = sLat;
     }
-    if (wasSc && !k->onShortcut && k->scIdx > T.scN*2/3) {
+    /* counted once the kart is past the middle of the corridor: wide-shoulder exits (Shellby Shores) rejoin the road at ~2/3 */
+    if (wasSc && !k->onShortcut && k->scIdx >= T.scN/2) {
         k->shortcutsTaken++;
         if (G.autotest) ALog("SHORTCUT: kart %d (%s) completed the shortcut (lap %d)", idx, CHARACTERS[k->charId].name, k->lap + 1);
     }
@@ -321,6 +324,24 @@ void KartUpdate(int idx, const KartInput *in, float dt)
                                   (Vector3){ RandF(-3, 3), RandF(2, 5), RandF(-3, 3) }, (Color){ 255, 240, 160, 255 }, 0.35f, 0.25f, 12);
                 if (k->human >= 0) R.shake[k->human] = 0.25f*impact;
             }
+        }
+    }
+
+    /* v7 courses: gorge gaps, open river banks, boost floors */
+    if (T.def->numZones && !k->onShortcut) {
+        gy = TrackSurfaceY(&T, seg, lat, k->pos, gy);
+        unsigned short z = T.s[seg].zone;
+        if (k->grounded && (z & ZN_BOOSTFLOOR) && !(z & ZN_TUNNEL) && fabsf(lat) < hw && k->boostTimer < 0.15f && canDrive) Boost(k, 0.5f, 0.35f);
+        int nx = TrackWrap(&T, seg + 2);
+        if (k->grounded && (T.s[nx].zone & ZN_GAP) && !(z & ZN_GAP) && k->speed > top*0.55f) {
+            int g = 0;
+            while (g < 120 && (T.s[TrackWrap(&T, nx + g)].zone & ZN_GAP)) g++;
+            int land = TrackWrap(&T, nx + g + 3);
+            float tair = (g + 5)*T.spacing/fmaxf(k->speed, 1.0f);
+            k->vy = (T.s[land].pos.y - k->pos.y + 0.5f*GRAVITY*tair*tair)/tair;
+            k->grounded = false; k->airTime = 0; k->pos.y += 0.05f;
+            if (k->driftState) { k->driftState = 0; k->driftCharge = 0; k->sparkLevel = 0; }
+            if (G.autotest && k->human >= 0) ALog("JUMP: P1 launched over the gap at %.1f u/s (%d samples)", k->speed, g);
         }
     }
 
@@ -512,6 +533,7 @@ void KartAIInput(int idx, KartInput *in, float dt)
     float cAhead = CurvAhead(k->seg, ahead/2, ahead + 6);
     float inside = -Clamp(cAhead*55.0f, -1, 1)*hw*0.45f;
     float laneGoal = Clamp(k->aiLaneTarget*0.5f + inside, -hw + 2.0f, hw - 2.0f);
+    if (T.def->followTerrain) laneGoal = HazardAvoidLane(idx, laneGoal);
 
     /* dodge peels lying on the line */
     for (int p = 0; p < MAX_PROJECTILES; p++) {
@@ -578,7 +600,7 @@ void KartAIInput(int idx, KartInput *in, float dt)
     float cNear = CurvAhead(k->seg, 2, ahead + 4);
     if (k->aiDriftTimer > 0) k->aiDriftTimer -= dt;
     if (k->driftState == 0) {
-        if (!scApproach && fabsf(cNear) > 1.0f/60.0f && k->speed > top*0.7f && k->aiDriftTimer <= 0 && fabsf(steer) > 0.3f && k->grounded) {
+        if (!scApproach && fabsf(cNear) > (T.def->followTerrain ? 1.0f/105.0f : 1.0f/60.0f) && k->speed > top*0.7f && k->aiDriftTimer <= 0 && fabsf(steer) > 0.3f && k->grounded) {
             in->hop = in->hopPressed = true;
             k->aiDriftTimer = 1.0f;
         }
@@ -589,7 +611,7 @@ void KartAIInput(int idx, KartInput *in, float dt)
         /* hold while the bend continues the same way and we're not about to hit the wall */
         bool sameWay = cNear*k->driftDir < -1.0f/400.0f;    /* the bend still turns the way we're drifting */
         float edge = fabsf(k->lat)/(hw + 1.0f);
-        bool keep = sameWay && fabsf(cNear) > 1.0f/110.0f && edge < 0.92f;
+        bool keep = sameWay && fabsf(cNear) > (T.def->followTerrain ? 1.0f/160.0f : 1.0f/110.0f) && edge < 0.92f;
         /* commit to a drift until the blue spark unless the wall is close or the bend clearly flips */
         float commit = k->human >= 0 ? ORANGE_CHARGE + 0.05f : BLUE_CHARGE + 0.12f;   /* autopilot P1 goes for orange */
         if (k->driftCharge < commit && edge < 0.93f && cNear*k->driftDir < 0.0f) keep = true;

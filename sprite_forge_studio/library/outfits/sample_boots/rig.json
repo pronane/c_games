@@ -1,0 +1,68 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sample_boots",
+ "bones": [
+  "mixamorig:Hips",
+  "mixamorig:Spine",
+  "mixamorig:LeftUpLeg",
+  "mixamorig:RightUpLeg",
+  "mixamorig:Spine1",
+  "mixamorig:LeftLeg",
+  "mixamorig:RightLeg",
+  "mixamorig:Spine2",
+  "mixamorig:LeftFoot",
+  "mixamorig:RightFoot",
+  "mixamorig:Neck",
+  "mixamorig:LeftShoulder",
+  "mixamorig:LeftToeBase",
+  "mixamorig:RightShoulder",
+  "mixamorig:RightToeBase",
+  "mixamorig:Head",
+  "mixamorig:LeftArm",
+  "mixamorig:RightArm",
+  "mixamorig:LeftToe_End",
+  "mixamorig:RightToe_End",
+  "mixamorig:LeftForeArm",
+  "mixamorig:RightForeArm",
+  "mixamorig:HeadTop_End",
+  "mixamorig:LeftHand",
+  "mixamorig:RightHand"
+ ],
+ "materials": [
+  {
+   "name": "sample_boots",
+   "color": [
+    0.3,
+    0.18,
+    0.1
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sample_boots_mesh",
+    "f0": 0,
+    "f1": 144
+   }
+  ],
+  "source_file": "sample_boots.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "outfit": {
+   "hide": [
+    "feet"
+   ],
+   "slot": "Shoes"
+  }
+ },
+ "height_m": 0.3631,
+ "verts": 98,
+ "tris": 144
+}

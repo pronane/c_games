@@ -317,7 +317,7 @@ static inline void LitVertex(Vector3 p, Vector3 n, Color c)
     float d = n.x*0.32f + n.y*0.80f + n.z*0.50f;
     float s = 0.56f + 0.44f*(d > 0 ? d : 0.0f) + 0.10f*(0.5f + 0.5f*n.y);
     float rim = 1.0f - fabsf(n.z);                 /* edges catch a bit of light */
-    s += 0.06f*rim*rim;
+    s += (gSphereDetail > 2.0f ? 0.16f : 0.07f)*rim*rim;   /* stronger rim light on the HD models */
     Color o = ColorScale(c, s);
     if (gCap) { MB_Vertex(gCap, p, (Vector2){ 0.5f, 0.5f }, n, o); return; }
     rlColor4ub(o.r, o.g, o.b, o.a);

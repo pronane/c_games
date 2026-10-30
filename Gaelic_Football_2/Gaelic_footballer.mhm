@@ -1,0 +1,23 @@
+# Written by MakeHuman 1.2.1 alpha
+version v1.2.1
+uuid d7faee53-b6b9-40b3-83ea-a52b493bef58
+name Gaelic_football_player
+camera 0.0 0.0 -0.11675613466824666 0.47286011778537357 0.019562896635358255 1.0
+modifier breast/BreastSize 0.500000
+modifier breast/BreastFirmness 0.500000
+modifier macrodetails/Gender 0.964000
+modifier macrodetails/Age 0.500000
+modifier macrodetails/African 0.000000
+modifier macrodetails/Asian 0.000000
+modifier macrodetails/Caucasian 1.000000
+modifier macrodetails-universal/Muscle 1.000000
+modifier macrodetails-universal/Weight 0.521000
+modifier macrodetails-height/Height 0.500000
+modifier macrodetails-proportions/BodyProportions 0.500000
+skeleton game_engine.mhskel
+eyes HighPolyEyes 2c12f43b-1303-432c-b7ce-d78346baf2e6
+clothesHideFaces True
+expression determination01.mhpose
+skinMaterial skins/young_caucasian_male/young_caucasian_male.mhmat
+material HighPolyEyes 2c12f43b-1303-432c-b7ce-d78346baf2e6 eyes/materials/brown.mhmat
+subdivide False

@@ -1,0 +1,48 @@
+Sprite Forge Studio doctor  -  Linux-6.12.94+-x86_64-with-glibc2.41  -  Python 3.13.5
+component                   status  details
+----------------------------------------------------------------------------------------------------
+Python                      OK      3.13.5 (/tmp/rbin/python3) system
+numpy                       OK      2.5.4
+Pillow                      OK      13.0.0
+scipy                       MISSING not installed
+                                      -> disables: mocap skeleton fit, cut-out clean-up, scan mesh clean-up (fallbacks are slower/rougher)
+opencv-python-headless      MISSING not installed
+                                      -> disables: scan stereo (scan --run dense), fast video cut-out (4x slower numpy fallback)
+scikit-image                MISSING not installed
+                                      -> disables: scan --run marching cubes
+imageio-ffmpeg              MISSING not installed
+                                      -> disables: bundled ffmpeg binary (falls back to system ffmpeg / OpenCV decode)
+pycolmap                    --      not installed
+                                      -> disables: scan --run without a COLMAP install (falls back to colmap CLI on PATH)
+trimesh                     --      not installed
+                                      -> disables: scan --mesh for .stl/.dae/.gltf variants (OBJ/PLY/GLB work without it)
+fast-simplification         --      not installed
+                                      -> disables: quadric decimation for scan LODs (falls back to open3d, Blender, then vertex clustering)
+open3d                      --      not installed
+                                      -> disables: second quadric decimation backend (not needed if fast-simplification is installed)
+rembg                       --      not installed
+                                      -> disables: AI background removal for photos (built-in cut-out still works)
+PyAV                        --      not installed
+                                      -> disables: second video decoder fallback (not needed when imageio-ffmpeg is installed)
+tkinter (GUI)               OK      Tk 8.6.16
+video decode/encode         MISSING none 
+                                      -> disables: video / mocap / scan --video modes, PHOTO --video moves
+slow-motion interpolation   MISSING needs an ffmpeg executable
+                                      -> disables: --slowmo (clips are analysed at normal speed)
+FBX export                  OK      built-in pure-Python FBX 7.4 writer (sforge/fbx.py) - no Blender needed
+FBX / GLB import            OK      built-in pure-Python FBX 7.x (binary + ASCII) and glTF/GLB readers (sforge/fbxread.py, gltfread.py)
+library                     OK      /tmp/rel6/sprite_forge_studio/library: 8 assets
+SfM for scan --run          --      none
+                                      -> disables: forge.py scan --run (project prep and --mesh still work)
+MediaPipe pose (mocap)      --      no Python with mediapipe - run: python tools/setup_pose.py
+                                      -> disables: forge.py mocap (video -> 3D animation)
+pose model                  --      models/pose_landmarker_full.task missing - run: python tools/setup_pose.py
+                                      -> disables: forge.py mocap
+Blender (optional)          --      not found (not needed)
+                                      -> disables: only the optional --fbx-writer blender and Blender-based LOD decimation
+C compiler (optional)       --      not found
+                                      -> disables: only the raylib C example in spriteforge/
+raylib (optional)           --      not found (make -C spriteforge raylib fetches + builds it)
+                                      -> disables: only the C example
+----------------------------------------------------------------------------------------------------
+READY: sprites, photo/spec builds, consoles, GLB + FBX export. Missing core pieces: scipy, opencv-python-headless, scikit-image, imageio-ffmpeg, video decode/encode, slow-motion interpolation (see above).
