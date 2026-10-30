@@ -1,0 +1,1616 @@
+diff --git a/egyptian_fighter/.gitignore b/egyptian_fighter/.gitignore
+index 5410866..349577a 100644
+--- a/egyptian_fighter/.gitignore
++++ b/egyptian_fighter/.gitignore
+@@ -22,3 +22,7 @@ __pycache__/
+ Thumbs.db
+ # Photo sources for tools/build_sprites.py (large, real-person photos) - keep out of git
+ sprite_sources/
++
++# replays / --sim-test output
++*.efrec
++*.efrec.*
+diff --git a/egyptian_fighter/ONLINE_PLAN.md b/egyptian_fighter/ONLINE_PLAN.md
+new file mode 100644
+index 0000000..560f1dd
+--- /dev/null
++++ b/egyptian_fighter/ONLINE_PLAN.md
+@@ -0,0 +1,210 @@
++# Padel Wars (Egyptian Fighter) online: plan
++
++Plan written 29 Oct 2026 (Europe/London). Stage 1 implemented 30 Oct 2026 on the local branch
++`padel-wars-deterministic` (not pushed). Model: HD_Fighter's lockstep relay (`HD_Fighter/multiplayer/`).
++Line numbers in section 3 refer to the v4 source *before* Stage 1.
++
++## 0. Stage 1 status (deterministic sim, no networking) - DONE
++
++| Plan item | What was done | Differs from the plan? |
++|---|---|---|
++| #5 input | `src/input.c/.h`: `InputBits` (uint16) per player; held bits 0-4, "pressed this tick" bits 5-12. Keyboard + pads are sampled outside the sim (`Input_SampleFight`); `Game_SimTick(g, in[2])` only sees the bits. | Pressed edges are sent as event bits computed by the sampler (raylib `IsKeyPressed` / `Pad_Pressed`), not re-derived in the sim from the previous bits. That keeps local play bit-for-bit identical (e.g. holding J on the keyboard while tapping X on a pad still punches). It is just as deterministic: the bits *are* the input stream. |
++| #1-#3 time | `Game_SimTick` always steps `SIM_DT = 1/60 s`; `main.c` runs it from an accumulator (`Sim_StepsForFrame`, 60 Hz +-1.5 ms snaps to one tick per frame, max 4 catch-up ticks). No `GetFrameTime`/`GetTime` in the sim (`invincibleTimer` uses the step). | Timers stay `float` seconds advanced by a constant `SIM_DT` instead of integer frame counters: same values on every run, and identical to the old game at 60 fps. Integer counters can come with fixed-point (1b). |
++| #6 pause / fullscreen | Pause, controller-lost pause and the fullscreen toggle simply don't step the sim (no time is banked, no tap carries over). | Online mode must still not pause locally (stage 4). |
++| #4 RNG | `src/rng.h` xorshift32 (splitmix-seeded) in `Game.rng`; seed per fight (`EF_SEED` env, or the server's `go.seed` later). | - |
++| hash | `Sim_Hash` (FNV-1a 64, field by field, render data excluded) every 30 ticks. | - |
++| #7 config hash | `Sim_ConfigHash`: rule constants + per fighter the loaded frame counts / frame times / loop points / projectile kind (from `sprites.cfg` and the sheet image widths). Logged at every fight start; written into replays. | - |
++| textures | Not split into a `PlayerGfx` yet. Instead `Player.noGpu` makes the same loader read only image sizes, so `--sim-test` / `--replay` run without a window. Copying `Game` is a valid snapshot (used by the test). | Split later for rollback (stage 6). |
++| test | `--sim-test` (headless): 4 scripted fights x {run twice, 1 vs 3 ticks per frame, random 0-4 ticks + pause frames}, input-change sensitivity, CPU seed sensitivity, record -> replay round trip, accumulator checks. `--record <file>` / `--replay <file>`. | - |
++| #10 floats | Kept. See "Determinism" in README.md. | Fixed-point is stage 1b, needed for Windows<->browser cross-play. |
++
++## 1. Recommendation (short version)
++
++**Yes, lockstep + a thin relay is the right approach for this game.**
++- It is a 2-player fighter with about 12 buttons per player. A whole frame of input fits in one 16-bit number, so the relay only ever carries tiny messages.
++- Delay-based lockstep (adaptive delay of 2-6 frames) is what HD_Fighter already does, and it plays fine on normal home or 4G links.
++- Rollback would feel better on bad links, but it needs save/restore of the whole sim and re-simulating several frames per tick. Do that later, after the sim is clean (stage 6).
++- Arena FC already ships rollback, so it can serve as a reference.
++
++**Platforms:**
++- **Web first (Emscripten), native Windows second.** The web build is what makes "multiple devices" easy: phones, Macs and other PCs just open a link, with nothing to install and no SmartScreen warnings.
++- The native Windows build connects to the same relay and can play against web players, with the float caveat in section 3.
++- I would **not** build a web-only JavaScript rewrite. The C game is the game: compile it to wasm and keep one codebase.
++
++**Server: one shared module of code, independent deployments.** See section 4.
++- The relay code lives once in the repo as `multiplayer-core/`.
++- Each game runs its own instance with its own config, port/URL and hosting: HD_Fighter, Padel Wars, TurboTumble64 and optionally Arena FC.
++
++**Effort:** about 8-12 working days to get to a playable, tested web build, plus 2-4 days for native Windows. Details in section 5.
++
++## 2. How the C game talks to the relay
++
++| Build | Transport | Notes |
++|---|---|---|
++| Web (Emscripten) | `<emscripten/websocket.h>`: `emscripten_websocket_new`, `..._set_onmessage_callback`, `emscripten_websocket_send_utf8_text` | Built in, no extra library; link with `-lwebsocket.js`. Callbacks run on the main thread between frames, so no locking is needed. TLS (`wss://`) comes free from the browser. |
++| Native Windows / Linux | **libcurl WebSocket API** (`curl_ws_send` / `curl_ws_recv`, with `CURLOPT_CONNECT_ONLY=2L`), polled once per frame | Recommended. MSYS2 already has the package (`pacman -S mingw-w64-ucrt-x86_64-curl`), it supports `wss://` with TLS built in (OpenSSL or Windows Schannel), and the license is permissive. Downside: the build ships extra DLLs, or needs a bigger static link. |
++| Native (alternative) | Hand-written WS client over a raw TCP socket (~400 lines: HTTP upgrade + framing) | Only works with `ws://` (LAN or self-hosted). Hosted platforms (Render/Fly/Railway) force `wss://`, which means adding TLS (mbedTLS), and then curl is simpler. |
++| Raw UDP | Not recommended | Browsers cannot do UDP, so web and native couldn't share a relay, and lockstep doesn't need UDP at these input sizes. |
++
++Message format:
++- Keep HD_Fighter's JSON on the wire. A tiny JSON helper in C (a vendored copy of `cJSON`, MIT, 1 file) handles control messages.
++- Input messages are short and fixed-shape (`{"t":"input","base":N,"bits":[..],"ack":N,"epoch":E}`), so C can write them with `snprintf`.
++- A binary encoding is optional later. It isn't needed for 2 players × 60 Hz.
++
++The C client library (`mp_client.h/.c`, see section 4) hides the difference behind one API:
++`mp_connect(url)`, `mp_poll()`, `mp_send_input(frame, bits)`, `mp_get_input(slot, frame, &bits)`, `mp_send_hash(frame, h)`, plus event callbacks.
++It has two backends: `mp_ws_emscripten.c` and `mp_ws_curl.c`.
++
++## 3. Determinism audit (v4 source)
++
++Lockstep only works if both machines, given the same inputs, produce exactly the same fight on every frame. Today they would not. This table lists what has to change.
++
++| # | Where | Problem | Change |
++|---|---|---|---|
++| 1 | `game.c:621` `float dt = GetFrameTime();` used at `game.c:707` (prefight), `749-750` `Player_Update(dt)`, `755` `UpdateProjectiles(g, dt)` (projectile age at `game.c:387`, 4 s life), `758` `roundTimer -= dt`, `796` (result screen) | Real wall-clock frame time: a 59.8 fps machine and a 60.1 fps machine drift apart within seconds | The fight sim runs on a fixed step: `#define SIM_DT (1.0f/60.0f)`. Better still, use integer frame counters (`roundFrames`, `prefightFrames`, `age` in frames). |
++| 2 | `player.c` `Player_Update`: `stateTimer += dt`, animation `frameTimer += dt` (~`player.c:388`) drives `currentFrame`, state changes, hit windows (`Player_Progress`) and projectile launch | Same as #1, and this is where hits are decided | Count frames instead. Convert the `sprites.cfg` frame times to whole 60 Hz ticks at load time (`ticks = round(ft*60)`). |
++| 3 | `player.c:465` `p->invincibleTimer -= GetFrameTime();` | Reads raylib's clock inside the sim | Use an integer `invincibleFrames--`. |
++| 4 | `game.c:295, 309, 310, 315, 319, 322, 331, 334, 336`: `GetRandomValue` in `SimpleCPU` | Unseeded global RNG | Only matters for vs-CPU, but replace it anyway with a seeded PRNG (xorshift32/PCG) stored in `Game`, seeded from the server's `go.seed`. That also allows online vs-CPU and replays. |
++| 5 | `game.c:216-233` `ReadInputP1`, `236-256` `ReadInputP2` (`IsKeyDown`/`IsKeyPressed`), `263-278` `ApplyPad`, combined at `718-745` | The sim reads the keyboard and pad directly, and "pressed" edges depend on the local frame | Split it: `SampleLocalInput() -> uint16 bits` (outside the sim), then `Sim_Step(&g, bits1, bits2)`. Compute edges *inside* the sim from the previous frame's bits stored in the state. |
++| 6 | `main.c:47-52` controller-disconnect pause, `main.c:54` ESC/Start pause, `main.c:64` fullscreen toggle skips `Game_Update` | Any local pause or skipped frame desyncs the match | Online: these must not stop the sim. Show the overlay, but keep stepping or stall through the lockstep pacer. Separate "sim step" from "render frame" in `main.c`. |
++| 7 | Sim timing comes from asset files: `sprites.cfg` frame counts/times (`player.c:232, 239`), `loopFrom` (`player.c:213`), `projectileKind` (`player.c:203-208`, folder-name fallback `player.c:309-310`), `FRAME_COUNTS` defaults when a PNG/cfg is missing (`player.c:144, 151`) | Two players with different asset versions get different hit timing, which is a silent desync | Compute a **config hash** (FNV-1a over roster + each character's frame counts/ticks/loopFrom/projectileKind + `SIM_VERSION`) and send it in `create`/`join`. The relay refuses mismatches with a readable "update your game" message. |
++| 8 | `game.c:173-204` sprites load inside `StartFight` | Loading takes a different time on each device | Use HD_Fighter's `loaded` handshake: the server sends `go` (start frame, seed) only after both clients report loaded. |
++| 9 | `game.c:196` `getenv("EF_TEST_HP2")` | Test hook changes HP | Ignore it in online mode. |
++| 10 | Floats in the sim (positions, velocities: `MOVE_SPEED 4.5`, `GRAVITY 0.55`, `pos.x += vx`, `fabsf`/`fminf`) | Only `+ - * /` and fabs/fmin are used. These are exactly reproducible on x86-64 SSE2 and wasm **if** the compiler doesn't fuse or reorder them | Build with `-ffp-contract=off`, never `-ffast-math`; 64-bit Windows only (or `-msse2 -mfpmath=sse`). For guaranteed native↔web cross-play, move positions to fixed-point ints (e.g. 1/256 px). It's about half a day and removes the risk completely. Recommended. |
++| 11 | Update order: p1 then p2, hits resolved in a fixed order | OK as long as slot 0 is always player 1 on both machines | The relay's slot number decides P1/P2, not "who is local". |
++| OK | `player.c:604` `GetTime()` (invincibility flash), `sinf/cosf/powf` in draw code (`game.c:418-506, 826-959`), `pad.c:221/307` `GetFrameTime` (menu key repeat), `static logStates` (`player.c:326`) | Render or menu only | No change. Keep them out of the sim's state hash. |
++| Note | `Player` contains `SpriteSheet sheets[STATE_COUNT]` (GPU textures) next to the gameplay fields | Can't hash or snapshot the struct as raw memory | Move textures to a separate `PlayerGfx`. The sim state then becomes plain data, which also makes rollback possible later. |
++
++Desync detection: as in HD_Fighter, each client hashes the sim state every 30 frames and sends `hash`, and the relay compares them.
++- Hash the fields, not the raw struct, because of padding.
++- Log the first mismatch frame together with both states.
++
++## 4. Shared relay: one module in the repo, one deployment per game
++
++### 4.1 What is generic and what is HD_Fighter-specific today
++
++In `HD_Fighter/multiplayer/server.js` (982 lines):
++- **Generic:** rooms and codes, `quick`, `create`/`join`, slots, `ready` / `countdown` / `loaded` / `go` with seed and start frame, `input` relay with `base/bits/ack/epoch`, the history buffer (`blankHist`, `noteHist`, `packHist`, `histEnd`), `nack`, `hb`/`ping`/`pong`, `chooseDelay(rtt, jitter)`, hold/resume (`beginHold`, `sendResume`, `peer_hold`, `need_frame`, `peer_back`), forfeit, `match_end`, `give_up`, room expiry, `/health`, and static file serving.
++- **Game-specific:**
++  - `FIGHTERS` set (line 17) plus `pick`, `rememberPick` / `restorePick`;
++  - `INPUT_KEYS` plus `packLoose` (lines 21, 132) for old loose-input clients;
++  - the `state`/`hit`/`chat` passthrough (line 891);
++  - fixed 2 slots;
++  - hist size 6400 frames;
++  - the countdown length.
++
++In `public/`, `wire.mjs`, `pace.mjs` and `stall.mjs` are generic. `sim.mjs` and most of `game.js` (lobby UI, drawing) are HD_Fighter's own.
++
++### 4.2 Proposed layout
++
++```
++multiplayer-core/                 # shared CODE (one copy in the repo)
++  PROTOCOL.md                     # every message, field and state machine; protocol version
++  server/
++    relay.js                      # createRelay(gameConfig) -> { listen, close, httpHandler }
++    rooms.js  hist.js  delay.js  hold.js
++    bin/run.js                    # node bin/run.js --config ../../padel_wars/online/game.config.json
++  client-js/                      # for JS games (HD_Fighter)
++    wire.mjs  pace.mjs  stall.mjs  lockstep.mjs (input queue, delay, hashes, resume)
++  client-c/                       # for C/raylib games (Padel Wars, TurboTumble64)
++    mp_client.h  mp_client.c      # API from section 2
++    mp_ws_emscripten.c  mp_ws_curl.c
++    vendor/cJSON.c cJSON.h
++  test/
++    bots.mjs                      # headless node bot clients (fake 60 Hz players)
++    netem-proxy.js                # delay/jitter/drop/blackhole proxy (from hdperf stuckproxy)
++    relay.test.mjs
++
++HD_Fighter/multiplayer/           # this game's DEPLOYMENT: thin
++  game.config.json                # {gameId:"hd_fighter", slots:2, picks:[...], inputBits:12, protocol:2}
++  server.js                       # 10 lines: createRelay(require('./game.config.json'))
++  public/...                      # game client, imports ../../multiplayer-core/client-js
++  Dockerfile / render.yaml        # its own service, own URL
++
++egyptian_fighter/online/          # Padel Wars' DEPLOYMENT
++  game.config.json                # {gameId:"padel_wars", slots:2, picks:["char_egypt",...], inputBits:12,
++                                  #  configHashRequired:true, countdownMs:3000, histFrames:6400}
++  server.js  Dockerfile  render.yaml
++  web/shell.html                  # Emscripten page; the relay also serves the built .wasm/.data
++```
++
++`gameConfig` decides:
++- `gameId`: the relay rejects a client whose `hello.gameId` differs. That stops a Padel Wars build from joining an HD_Fighter instance by mistake.
++- slot count: 2 for the fighters, up to 4 for TurboTumble64.
++- the list of valid picks.
++- input width: 16 or 32 bits.
++- hash interval, history length, delay bounds and hold/forfeit times.
++- an optional `onPick`/`validate` hook.
++
++The core never knows what a "fighter" is.
++
++**Deployments are independent:**
++- Each game has its own process, URL, config, logs and free-tier sleep behaviour.
++- Updating or restarting one game's server does not touch the others.
++- Each game pins the core by protocol version, so a core change can't silently break a game that hasn't been redeployed.
++- Simplest way to do that: the game's Dockerfile copies `multiplayer-core/` from the same commit.
++
++**Fixes the core must include** (found while re-verifying HD_Fighter v5):
++- **Resume pacer bug (critical):**
++  - `resumeMatch` uses `createPacer(performance.now())`, which starts the pacer's clock at frame 0. The resumed client then freezes for `sim.frame/60` seconds.
++  - In v5, any drop more than ~9 s into a round ends in "Connection lost".
++  - Fix: `createPacer(performance.now() - sim.frame*FRAME_MS)`.
++  - Write-up: `/workspace/preview/hdfighter_pr1_v5/BUG_resume_pacer_freeze.md`.
++  - The C client's pacer must start from the resume frame in the same way.
++- Keep v5's connect timeout (4 s), backoff with jitter, "heartbeats don't count as liveness", the "Poor connection" banner and the 30 s reconnect hold. Those all re-tested well.
++
++### 4.3 The other games
++
++- **TurboTumble64** (C/raylib kart racer) can use the same core and `client-c`. 2-4 slots is a config change. It would need its own determinism audit: physics and items RNG.
++- **Arena FC** already has its own authoritative C# server with rollback, host migration and reconnect (`arena-fc/ONLINE.md`, `Server/Room.cs`).
++  - That is a different model: the server runs the sim.
++  - Don't force it onto the relay. At most, reuse `PROTOCOL.md` naming and the test bots.
++  - Being skeptical: making one core serve both an authoritative C# server and a JS relay would cost more than it saves.
++
++## 5. Staged plan
++
++| Stage | What | Effort | Done when |
++|---|---|---|---|
++| 0 | Land the v4 source in the repo (see `padelwars_repo_compare.md`) | 0.5 d | Repo builds v4 as-is |
++| 1 | **Sim refactor:** fixed step, frame counters, seeded PRNG, input bitmask with in-sim edges, textures split from state, `Sim_Step()`, `Sim_Hash()`. No networking yet. | 2-3 d | Offline game plays the same. A headless test that runs 10,000 frames of random inputs twice gives identical hashes. |
++| 1b | Fixed-point positions (optional but recommended for cross-play) | 0.5-1 d | Same tests, plus native and wasm hashes match |
++| 2 | Extract `multiplayer-core` from HD_Fighter (server + client-js), switch HD_Fighter to it, fix the resume-pacer bug | 2 d | HD_Fighter's existing browser tests pass on the core |
++| 3 | **Web build** of Padel Wars: emsdk, raylib built for `PLATFORM_WEB`, `--preload-file assets`, main loop via `emscripten_set_main_loop`, audio unlocked on first click/tap | 1.5-2 d | Runs in Chromium/Firefox/Safari, local 2P works |
++| 4 | `client-c` + online menu (Create / Join code / Quick match), lobby, ready/loaded/go, lockstep pacer with adaptive delay, hold/resume/forfeit overlays | 2-3 d | Two browsers play a full match through the relay. Drop, reconnect and forfeit all work. |
++| 5 | Native Windows client via curl WebSocket, cross-play with web | 2-4 d | Windows exe vs browser plays a full match with no hash mismatch |
++| 6 | Later: rollback (save/restore state, re-sim up to 7 frames), spectators, rematch | 3-5 d | Optional |
++
++**Main risks**
++1. **Web texture limits and download size:**
++   - `assets/char_mike/victory.png` is **10608×800**, which is over the 8192 px texture limit on many phones and older GPUs. 7 more sheets are wider than 4096.
++   - Sprites total about 52 MB of PNG, which is a heavy first load on mobile.
++   - Fix: re-pack into 2D atlases (rows of frames) at most 4096 px, use a half-size set on the web (Sprite Forge already exports 320×400 cells), and load characters on demand, or at least only the two picked ones.
++2. **Audio:** browsers block sound until a click or tap. Start `InitAudioDevice` (or resume the context) on the first input. Raylib's web audio otherwise works.
++3. **Gamepad on web:**
++   - `pad.c` uses GLFW raw-joystick code. Compile it with the existing `-DEF_NO_RAW_PAD` path, and rely on raylib's Gamepad-API mapping in the browser (works in Chromium/Firefox; Safari is patchier).
++   - `gamecontrollerdb.txt` (435 KB) isn't needed on web.
++   - Add touch buttons for phones later.
++4. **Native↔web float differences:** solved by 1b, or else limit cross-play to "same platform".
++5. **Hosting:** free tiers (e.g. Render) sleep after inactivity, so the first connect can take 30-60 s. HD_Fighter's "Waking the server..." screen covers this.
++6. **Settings file:** `gfx.c:133` writes `settings.cfg`. On web that needs IDBFS, or skip saving.
++7. **Native networking build:** curl adds DLLs and size to `build_release.bat`'s static-link attempts. Expect some MSYS2 fiddling.
++
++## 6. What can be tested here on the box (headless)
++
++The box has gcc, Node and Playwright, plus Chromium/Firefox/WebKit under Xvfb. It does not have emsdk (easy to install) or a Windows machine.
++
++- **Sim determinism:**
++  - Build the refactored sim *without raylib* as a native test binary.
++  - Run random and recorded input streams and compare hashes across runs and `-O0/-O2`.
++  - Compile the same files with emcc and run them in Node, so native vs wasm hashes can be compared. This is the key cross-play test.
++- **Relay:** node bot clients (`test/bots.mjs`) play thousands of frames against a local relay through the netem proxy: delay, jitter, burst loss, blackhole, stuck CONNECTING, 15 s outage, forfeit. These are the same scenarios that found the v5 pacer bug.
++- **Web build:**
++  - Playwright drives two browser contexts (Chromium×Firefox×WebKit) under Xvfb. WebGL runs on software rendering, slowly but correctly.
++  - Read the game's status via a small `Module.mp_status()` export, and record side-by-side videos as for HD_Fighter.
++- **Native Linux client:** raylib 5.5 source is already in `TurboTumble64/deps/`, so a Linux build of the native client (with curl) can run under Xvfb against a browser. That covers the curl backend.
++- **Not testable here:**
++  - real Windows .exe behaviour (MSYS2 static link, Schannel TLS, Windows Defender);
++  - real phones (texture limits, touch, Safari gamepad);
++  - real long-distance latency.
++
++These need a short manual test with the user.
+diff --git a/egyptian_fighter/README.md b/egyptian_fighter/README.md
+index 5649dc1..0baab8e 100644
+--- a/egyptian_fighter/README.md
++++ b/egyptian_fighter/README.md
+@@ -213,6 +213,9 @@ egyptian_fighter/
+ │   ├── player.h / player.c
+ │   ├── pad.h / pad.c      ← USB / XInput / EasySMX gamepad support
+ │   ├── gfx.h / gfx.c      ← fullscreen, TV scaling, fonts, texture filtering
++│   ├── input.h / input.c  ← keyboard + pads -> 16-bit input mask per fighter
++│   ├── rng.h              ← seeded PRNG for the CPU (deterministic)
++│   ├── sim.h / sim.c      ← sim hash, config hash, fixed step, record/replay, --sim-test
+ │   └── game.h / game.c    ← screens (select, PADEL WARS face-off, fight, result)
+ ├── assets/
+ │   ├── gamecontrollerdb.txt   ← controller mappings (SDL_GameControllerDB)
+@@ -427,3 +430,46 @@ turns to face the camera again and repeats (`loop victory 1`).
+ * **There is no photo of Mike's back.** The back view is reconstructed: his own front image is mirrored, the shirt print and face are
+   painted out and replaced with his own hair, and the image is slightly darkened. The turn is a flat "card flip" squeeze, not a real 3D turn.
+ * Fixed: the black patch on his shorts where the racket used to be.
++
++---
++
++## Determinism (Stage 1 of the online plan - see ONLINE_PLAN.md)
++
++The fight is now a deterministic simulation: the same inputs and seed give exactly the same
++fight on every run, whatever the frame rate. Nothing about how it plays or looks has changed
++(checked frame by frame against the previous version, see the Stage 1 report).
++
++* **Input**: each fighter's buttons are one 16-bit number per 1/60 s tick (`src/input.h`).
++  Keyboard and pads are read only by `input.c`; the fight code (`Game_SimTick`) sees just the bits.
++* **Fixed step**: the sim always advances 1/60 s per tick. `main.c` runs as many ticks as
++  real time needs (one per frame on a 60 Hz screen, max 4 to catch up after a stall).
++  Pause, a lost controller and F11 / Alt+Enter just stop the ticks; they can't change a fight.
++* **Random**: the CPU uses a seeded PRNG kept in the game state (`src/rng.h`).
++  `EF_SEED=1234` fixes the seed (for tests); otherwise every fight gets a new one.
++* **Hashes**: `Sim_Hash` (whole fight state) and `Sim_ConfigHash` (gameplay values from
++  `sprites.cfg` + sheet sizes + rules). The config hash is logged at each fight start
++  (`SIM: fight seed ..., config hash ...`); two machines must match it to play online.
++
++Test tools (no window needed, run from the `egyptian_fighter` folder):
++
++```
++bin/egyptian_fighter --sim-test              # plays 4 scripted fights in many ways, prints PASS/FAIL
++bin/egyptian_fighter --record fight.efrec    # play normally; each fight saved (fight.efrec, .2, ...)
++bin/egyptian_fighter --replay fight.efrec    # re-simulates it and checks every hash
++```
++
++**Floats - where fixed-point is needed.** Positions, velocities and timers are still `float`.
++Only `+ - * /`, `fabsf`, `fminf`/`fmaxf` and comparisons are used in the sim, which IEEE-754
++makes bit-exact on x86-64 (SSE2) and in WebAssembly, *provided the compiler doesn't fuse a
++multiply and an add* - so the builds pass `-ffp-contract=off` and must never use `-ffast-math`.
++That is enough for Windows-vs-Windows (and Linux) online play with the same exe. For
++**Windows-vs-browser cross-play** it is not a guarantee (different compilers / libm / possible
++FMA on ARM phones), so before stage 5 convert these to fixed-point integers (e.g. 1/256 px):
++`Player.position`, `velocity`, `opponentX`, `hitbox`/`hurtbox` (player.c `UpdatePhysics`,
++`GetHurtbox`, attack boxes), `Projectile.pos`/`vx`/`origin`/`spin`/`age` (game.c
++`SpawnProjectiles`, `UpdateProjectiles`, `KeepPlayersApart`, `CheckHits`), and the timers
++`frameTimer`, `stateTimer`, `invincibleTimer`, `roundTimer`, `prefightTimer` (as tick counts,
++with `sprites.cfg` frame times converted to ticks at load). Also: 32-bit x87 builds are not
++deterministic - ship 64-bit only.
++
++`.efrec` files and `sim_test_replay.efrec` (written by `--sim-test`) can be deleted at any time.
+diff --git a/egyptian_fighter/build.sh b/egyptian_fighter/build.sh
+index f82bd0c..ecf8667 100755
+--- a/egyptian_fighter/build.sh
++++ b/egyptian_fighter/build.sh
+@@ -3,15 +3,15 @@
+ set -e
+ cd "$(dirname "$0")"
+ mkdir -p bin
+-SRC="src/main.c src/player.c src/game.c src/demo.c src/pad.c src/gfx.c"
++SRC="src/main.c src/player.c src/game.c src/demo.c src/pad.c src/gfx.c src/input.c src/sim.c"
+ if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
+   # MSYS2's raylib links against the separate glfw3 package; fall back if it isn't needed
+-  gcc -std=c99 -O2 -Wall $SRC -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -o bin/egyptian_fighter.exe 2>/dev/null ||
+-  gcc -std=c99 -O2 -Wall $SRC -lraylib -lopengl32 -lgdi32 -lwinmm -o bin/egyptian_fighter.exe
++  gcc -std=c99 -O2 -Wall -ffp-contract=off $SRC -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -o bin/egyptian_fighter.exe 2>/dev/null ||
++  gcc -std=c99 -O2 -Wall -ffp-contract=off $SRC -lraylib -lopengl32 -lgdi32 -lwinmm -o bin/egyptian_fighter.exe
+   EXE=./bin/egyptian_fighter.exe
+ else
+   RAYLIB=${RAYLIB:-/usr/local}
+-  gcc -std=c99 -O2 -Wall $SRC -I"$RAYLIB/include" -I"$RAYLIB/src" -L"$RAYLIB/lib" -L"$RAYLIB/src" \
++  gcc -std=c99 -O2 -Wall -ffp-contract=off $SRC -I"$RAYLIB/include" -I"$RAYLIB/src" -L"$RAYLIB/lib" -L"$RAYLIB/src" \
+       -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 -o bin/egyptian_fighter
+   EXE=./bin/egyptian_fighter
+ fi
+diff --git a/egyptian_fighter/build_release.bat b/egyptian_fighter/build_release.bat
+index b5b2821..1cd89e2 100644
+--- a/egyptian_fighter/build_release.bat
++++ b/egyptian_fighter/build_release.bat
+@@ -31,8 +31,8 @@ if not exist "%UCRT%\include\raylib.h" (
+ )
+ 
+ if not exist release mkdir release
+-set "SRC=src\main.c src\player.c src\game.c src\demo.c src\pad.c src\gfx.c"
+-set "CFLAGS=-std=c99 -O2 -Wall -I"%UCRT%\include""
++set "SRC=src\main.c src\player.c src\game.c src\demo.c src\pad.c src\gfx.c src\input.c src\sim.c"
++set "CFLAGS=-std=c99 -O2 -Wall -ffp-contract=off -I"%UCRT%\include""
+ set "LIBS=-L"%UCRT%\lib" -lraylib -lopengl32 -lgdi32 -lwinmm"
+ 
+ echo Compiling (static, no console window)...
+diff --git a/egyptian_fighter/src/common.h b/egyptian_fighter/src/common.h
+index 3ce2353..701874f 100644
+--- a/egyptian_fighter/src/common.h
++++ b/egyptian_fighter/src/common.h
+@@ -17,6 +17,13 @@
+ #define SCREEN_HEIGHT 720
+ #define TARGET_FPS    60
+ 
++// The fight simulation always advances in fixed 1/60 s ticks (main.c accumulator), never by
++// the measured frame time, so the same inputs give the same fight on every machine.
++#define SIM_HZ        60
++#define SIM_DT        (1.0f / 60.0f)          // what the sim adds to its float timers
++#define SIM_DT_WALL   (1.0 / 60.0)            // wall-clock length of a tick (accumulator)
++#define SIM_MAX_STEPS_PER_FRAME 4     // catch-up limit after a stall (offline play)
++
+ #define GROUND_Y      640.0f
+ #define PLAYER_WIDTH  80.0f
+ #define PLAYER_HEIGHT 160.0f
+diff --git a/egyptian_fighter/src/game.c b/egyptian_fighter/src/game.c
+index 0806219..e95c1ce 100644
+--- a/egyptian_fighter/src/game.c
++++ b/egyptian_fighter/src/game.c
+@@ -1,4 +1,7 @@
+ #include "game.h"
++#include "input.h"
++#include <time.h>
++#include "sim.h"
+ 
+ // ------------------------------------------------------------------------------------
+ // Face-off captions.  Defaults here; assets/captions.cfg (one "folder = caption" per line)
+@@ -54,7 +57,8 @@ static void LoadCaptions(Game *g) {
+     TraceLog(LOG_INFO, "Loaded %s", CAPTIONS_FILE);
+ }
+ 
+-void Game_Init(Game *g) {
++// Roster + defaults only (no window needed): used by Game_Init and the headless tools.
++void Game_InitCore(Game *g) {
+     memset(g, 0, sizeof(Game));
+ 
+     g->characters[0] = (CharacterDef){ "RA",           "char_egypt",  "assets/stages/egypt.png",  "assets/portraits/ra.png" };
+@@ -75,7 +79,10 @@ void Game_Init(Game *g) {
+     g->winner = 0;
+     g->roundTimer = 99.0f;
+     g->paused = false;
++}
+ 
++void Game_Init(Game *g) {
++    Game_InitCore(g);
+     for (int i = 0; i < MAX_CHARACTERS; i++) {
+         if (FileExists(g->characters[i].stageFile)) {
+             g->stages[i] = Gfx_LoadTexture(g->characters[i].stageFile);   // mipmapped, trilinear
+@@ -170,13 +177,12 @@ static void MakeFace(Game *g, const Player *p, int slot) {
+ 
+ #define PREFIGHT_TIME 3.6f
+ 
+-static void StartFight(Game *g) {
+-    // Unload any previous sprites
+-    Player_UnloadSprites(&g->player1);
+-    Player_UnloadSprites(&g->player2);
+-
++// Everything the simulation needs to start a fight (no faces / stage textures).  gpu=false:
++// headless (sprite sizes only) for --sim-test / --replay; the values come out the same.
++void Game_BeginFightSim(Game *g, uint32_t seed, bool gpu) {
+     Player_Init(&g->player1, 300.0f, GROUND_Y, 1, g->selectP1);
+     Player_Init(&g->player2, 980.0f, GROUND_Y, -1, g->selectP2);
++    g->player1.noGpu = g->player2.noGpu = !gpu;
+ 
+     // Load sprites for the chosen characters
+     // Works even if many PNGs are missing – placeholders will be used + warnings printed
+@@ -192,15 +198,36 @@ static void StartFight(Game *g) {
+     g->pauseNote[0] = 0;
+     g->padWaitRelease = true;
+ 
++    // seeded PRNG for the CPU (the only randomness in the fight)
++    g->fightSeed = seed;
++    Rng_Seed(&g->rng, seed);
++    g->simTick = 0;
++
+     // test aid: EF_TEST_HP2=<n> starts player 2 with n health (quick KO / victory tests)
+     if (getenv("EF_TEST_HP2")) g->player2.health = atoi(getenv("EF_TEST_HP2"));
+ 
++    g->prefightTimer = 0.0f;
++    g->screen = SCREEN_PREFIGHT;
++}
++
++static void StartFight(Game *g) {
++    // Unload any previous sprites
++    Player_UnloadSprites(&g->player1);
++    Player_UnloadSprites(&g->player2);
++
++    // EF_SEED=<n> fixes the CPU's dice (tests / replays); otherwise a fresh seed per fight.
++    // Online play: the server sends the seed.
++    const char *seedEnv = getenv("EF_SEED");
++    uint32_t seed = seedEnv ? (uint32_t)strtoul(seedEnv, NULL, 10)
++                            : (uint32_t)time(NULL) ^ (uint32_t)(GetTime() * 1000003.0);
++    Game_BeginFightSim(g, seed, true);
++    TraceLog(LOG_INFO, "SIM: fight seed %u, config hash %016llx", (unsigned)seed,
++             (unsigned long long)Sim_ConfigHash(g));
++
+     // face-off screen first (also in the CPU modes)
+     FreeFaces(g);
+     MakeFace(g, &g->player1, 0);
+     MakeFace(g, &g->player2, 1);
+-    g->prefightTimer = 0.0f;
+-    g->screen = SCREEN_PREFIGHT;
+ }
+ 
+ void Game_Unload(Game *g) {
+@@ -213,73 +240,6 @@ void Game_Unload(Game *g) {
+     }
+ }
+ 
+-static void ReadInputP1(Player *p) {
+-    p->inputLeft = p->inputRight = p->inputDown = p->inputUp = false;
+-    p->inputPunch = p->inputKick = p->inputSpecial1 = p->inputSpecial2 = false;
+-    p->inputBlock = p->inputThrow = p->inputTaunt = p->inputJumpAttack = false;
+-
+-    p->inputLeft        = IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT);
+-    p->inputRight       = IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT);
+-    p->inputDown        = IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN);
+-    p->inputUp          = IsKeyDown(KEY_W) || IsKeyDown(KEY_UP);
+-
+-    p->inputPunch       = IsKeyPressed(KEY_J);
+-    p->inputKick        = IsKeyPressed(KEY_K);
+-    p->inputSpecial1    = IsKeyPressed(KEY_U);
+-    p->inputSpecial2    = IsKeyPressed(KEY_I);
+-    p->inputBlock       = IsKeyDown(KEY_L);
+-    p->inputThrow       = IsKeyPressed(KEY_O);
+-    p->inputTaunt       = IsKeyPressed(KEY_P);
+-    p->inputJumpAttack  = IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K);
+-}
+-
+-static void ReadInputP2(Player *p) {
+-    // Second player on the right side of the keyboard
+-    p->inputLeft = p->inputRight = p->inputDown = p->inputUp = false;
+-    p->inputPunch = p->inputKick = p->inputSpecial1 = p->inputSpecial2 = false;
+-    p->inputBlock = p->inputThrow = p->inputTaunt = p->inputJumpAttack = false;
+-
+-    p->inputLeft        = IsKeyDown(KEY_LEFT);
+-    p->inputRight       = IsKeyDown(KEY_RIGHT);
+-    p->inputDown        = IsKeyDown(KEY_DOWN);
+-    p->inputUp          = IsKeyDown(KEY_UP);
+-
+-    // Numpad style or alternative keys
+-    p->inputPunch       = IsKeyPressed(KEY_KP_1) || IsKeyPressed(KEY_Z);
+-    p->inputKick        = IsKeyPressed(KEY_KP_2) || IsKeyPressed(KEY_X);
+-    p->inputSpecial1    = IsKeyPressed(KEY_KP_4) || IsKeyPressed(KEY_C);
+-    p->inputSpecial2    = IsKeyPressed(KEY_KP_5) || IsKeyPressed(KEY_V);
+-    p->inputBlock       = IsKeyDown(KEY_KP_3) || IsKeyDown(KEY_B);
+-    p->inputThrow       = IsKeyPressed(KEY_KP_6) || IsKeyPressed(KEY_N);
+-    p->inputTaunt       = IsKeyPressed(KEY_KP_7) || IsKeyPressed(KEY_M);
+-    p->inputJumpAttack  = IsKeyPressed(KEY_KP_1) || IsKeyPressed(KEY_KP_2) ||
+-                          IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X);
+-}
+-
+-// Gamepad -> player inputs, OR-ed on top of the keyboard.  sel = pad index or PAD_ANY.
+-//   D-pad / left stick = move, up = jump, down = crouch   A = jump
+-//   X = punch  Y = kick  B or LT = special 1  RT = special 2
+-//   RB = block (hold)  LB = throw  Back/Select = taunt  (Start = pause, handled in main.c)
+-static void ApplyPad(Game *g, Player *p, int sel) {
+-    if (sel == PAD_NONE) return;
+-    bool aHeld = Pad_Down(sel, PB_A);
+-    if (g->padWaitRelease) aHeld = false;
+-    p->inputLeft       |= Pad_Down(sel, PB_LEFT);
+-    p->inputRight      |= Pad_Down(sel, PB_RIGHT);
+-    p->inputDown       |= Pad_Down(sel, PB_DOWN);
+-    p->inputUp         |= Pad_Down(sel, PB_UP) || aHeld;
+-    p->inputPunch      |= Pad_Pressed(sel, PB_X);
+-    p->inputKick       |= Pad_Pressed(sel, PB_Y);
+-    p->inputSpecial1   |= Pad_Pressed(sel, PB_B) || Pad_Pressed(sel, PB_LT);
+-    p->inputSpecial2   |= Pad_Pressed(sel, PB_RT);
+-    p->inputBlock      |= Pad_Down(sel, PB_RB);
+-    p->inputThrow      |= Pad_Pressed(sel, PB_LB);
+-    p->inputTaunt      |= Pad_Pressed(sel, PB_BACK);
+-    p->inputJumpAttack |= Pad_Pressed(sel, PB_X) || Pad_Pressed(sel, PB_Y);
+-}
+-
+-
+-
+ // CPU opponent.  Walks in, keeps facing the human (Player_Update does the facing),
+ // attacks with every move it has, blocks some incoming attacks and, for characters with
+ // a projectile special, zones from range.
+@@ -292,7 +252,7 @@ static void SimpleCPU(Game *g, Player *cpu, const Player *human) {
+     float dist = fabsf(dx);
+ 
+     // react to an attack in progress: block ~45% of the time when it can reach us
+-    if (Player_IsAttacking(human) && dist < 170.0f && GetRandomValue(0, 99) < 35) {
++    if (Player_IsAttacking(human) && dist < 170.0f && Rng_Range(&g->rng, 0, 99) < 35) {
+         cpu->inputBlock = true;
+         return;
+     }
+@@ -306,20 +266,20 @@ static void SimpleCPU(Game *g, Player *cpu, const Player *human) {
+     if (dist > 125.0f) {
+         // approach (sometimes fire the projectile from range instead)
+         if (cpu->projectileKind != PROJ_NONE && dist > 300.0f && g->cpuAttackCooldown == 0 &&
+-            GetRandomValue(0, 99) < 4) {
+-            if (GetRandomValue(0, 1)) cpu->inputSpecial1 = true; else cpu->inputSpecial2 = true;
++            Rng_Range(&g->rng, 0, 99) < 4) {
++            if (Rng_Range(&g->rng, 0, 1)) cpu->inputSpecial1 = true; else cpu->inputSpecial2 = true;
+             g->cpuAttackCooldown = 70;
+             return;
+         }
+         if (dx > 0) cpu->inputRight = true; else cpu->inputLeft = true;
+-        if (dist < 260.0f && g->cpuAttackCooldown == 0 && GetRandomValue(0, 99) < 2) {
++        if (dist < 260.0f && g->cpuAttackCooldown == 0 && Rng_Range(&g->rng, 0, 99) < 2) {
+             cpu->inputUp = true;               // jump in ...
+             g->cpuAttackCooldown = 20;
+         }
+-    } else if (dist < 95.0f && GetRandomValue(0, 99) < 3) {
++    } else if (dist < 95.0f && Rng_Range(&g->rng, 0, 99) < 3) {
+         if (dx > 0) cpu->inputLeft = true; else cpu->inputRight = true;   // make some room
+     } else if (g->cpuAttackCooldown == 0) {
+-        int r = GetRandomValue(0, 99);
++        int r = Rng_Range(&g->rng, 0, 99);
+         if      (r < 30) cpu->inputPunch = true;
+         else if (r < 55) cpu->inputKick = true;
+         else if (r < 67) cpu->inputThrow = true;
+@@ -328,12 +288,12 @@ static void SimpleCPU(Game *g, Player *cpu, const Player *human) {
+         else if (r < 92) cpu->inputDown = true;
+         else if (r < 95) { if (dx > 0) cpu->inputLeft = true; else cpu->inputRight = true; }
+         else             cpu->inputUp = true;
+-        g->cpuAttackCooldown = GetRandomValue(35, 80);
++        g->cpuAttackCooldown = Rng_Range(&g->rng, 35, 80);
+     }
+     // ... and attack in the air
+-    if (!cpu->onGround && cpu->state == STATE_JUMP && dist < 200.0f && GetRandomValue(0, 99) < 8)
++    if (!cpu->onGround && cpu->state == STATE_JUMP && dist < 200.0f && Rng_Range(&g->rng, 0, 99) < 8)
+         cpu->inputJumpAttack = true;
+-    if (GetRandomValue(0, 1500) < 1) cpu->inputTaunt = true;
++    if (Rng_Range(&g->rng, 0, 1500) < 1) cpu->inputTaunt = true;
+ }
+ 
+ static void HitPlayer(Player *def, int dir, int dmg) {
+@@ -615,6 +575,77 @@ static bool SelectDual(const Game *g) {
+     return g->mode == MODE_1P_VS_2P && Pad_ForPlayer(1) != PAD_NONE && Pad_ForPlayer(2) != PAD_NONE;
+ }
+ 
++// One fixed 1/60 s step of the fight simulation: pre-fight countdown, the fight itself and the
++// result poses.  Inputs come only from in[] - no raylib input, no clock, no rand().
++void Game_SimTick(Game *g, const InputBits in[2]) {
++    const float dt = SIM_DT;
++    if (g->paused) return;
++    if (g->screen != SCREEN_PREFIGHT && g->screen != SCREEN_FIGHT && g->screen != SCREEN_RESULT) return;
++    g->simTick++;
++
++    // ---------- PRE-FIGHT FACE-OFF ----------
++    if (g->screen == SCREEN_PREFIGHT) {
++        g->prefightTimer += dt;
++        bool skip = g->prefightTimer > 0.35f && ((in[0] | in[1]) & IN_CONFIRM);
++        if (skip || g->prefightTimer >= PREFIGHT_TIME) {
++            g->screen = SCREEN_FIGHT;
++            g->padWaitRelease = true;        // the A / Start that skipped must not jump / pause
++        }
++        return;
++    }
++
++    // ---------- FIGHT ----------
++    if (g->screen == SCREEN_FIGHT) {
++        // one 16-bit mask per fighter (sampled by input.c, or from the network / a replay)
++        Input_ToPlayer(&g->player1, in[0]);
++        Input_ToPlayer(&g->player2, in[1]);
++        if (g->mode == MODE_1P_VS_CPU)      SimpleCPU(g, &g->player2, &g->player1);
++        else if (g->mode == MODE_CPU_VS_1P) SimpleCPU(g, &g->player1, &g->player2);
++
++        g->player1.opponentX = g->player2.position.x;
++        g->player2.opponentX = g->player1.position.x;
++        Player_Update(&g->player1, dt);
++        Player_Update(&g->player2, dt);
++
++        KeepPlayersApart(&g->player1, &g->player2);
++        SpawnProjectiles(g, &g->player1, 1);
++        SpawnProjectiles(g, &g->player2, 2);
++        UpdateProjectiles(g, dt);
++        CheckHits(g);
++
++        g->roundTimer -= dt;
++        if (g->roundTimer <= 0.0f) {
++            g->roundTimer = 0.0f;
++            g->gameOver = true;
++            if (g->player1.health > g->player2.health) g->winner = 1;
++            else if (g->player2.health > g->player1.health) g->winner = 2;
++            else g->winner = 0;
++            if (g->winner) Player_SetState(g->winner == 1 ? &g->player1 : &g->player2, STATE_VICTORY);
++            g->screen = SCREEN_RESULT;
++        }
++        return;
++    }
++
++    // ---------- RESULT: keep animating the winner's pose / the loser landing ----------
++    if (g->screen == SCREEN_RESULT) {
++        // keep animating: the winner's victory pose (Mike keeps flexing), the loser lands
++        Player *pl[2] = { &g->player1, &g->player2 };
++        for (int k = 0; k < 2; k++) {
++            Player *q = pl[k];
++            q->inputLeft = q->inputRight = q->inputDown = q->inputUp = false;
++            q->inputPunch = q->inputKick = q->inputSpecial1 = q->inputSpecial2 = false;
++            q->inputBlock = q->inputThrow = q->inputTaunt = q->inputJumpAttack = false;
++            q->opponentX = 0.0f;
++            if (q->onGround) q->velocity.x = 0.0f;
++            Player_Update(q, dt);
++            q->attackActive = false;
++        }
++        return;
++    }
++}
++
++// Per-frame (render-rate) menus: select screen, controller test, leaving the result screen.
++// Not part of the deterministic simulation.
+ void Game_Update(Game *g) {
+     if (g->paused) return;
+ 
+@@ -702,72 +733,6 @@ void Game_Update(Game *g) {
+         return;
+     }
+ 
+-    // ---------- PRE-FIGHT FACE-OFF ----------
+-    if (g->screen == SCREEN_PREFIGHT) {
+-        g->prefightTimer += dt;
+-        bool skip = g->prefightTimer > 0.35f &&
+-                    (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
+-                     Pad_Pressed(PAD_ANY, PB_A) || Pad_Pressed(PAD_ANY, PB_START));
+-        if (skip || g->prefightTimer >= PREFIGHT_TIME) {
+-            g->screen = SCREEN_FIGHT;
+-            g->padWaitRelease = true;        // the A / Start that skipped must not jump / pause
+-        }
+-        return;
+-    }
+-
+-    // ---------- FIGHT ----------
+-    if (g->screen == SCREEN_FIGHT) {
+-        if (g->padWaitRelease && !Pad_Down(PAD_ANY, PB_A) && !Pad_Down(PAD_ANY, PB_START))
+-            g->padWaitRelease = false;
+-        if (g->mode == MODE_1P_VS_CPU) {
+-            ReadInputP1(&g->player1);
+-            ApplyPad(g, &g->player1, PAD_ANY);
+-            SimpleCPU(g, &g->player2, &g->player1);
+-        } else if (g->mode == MODE_CPU_VS_1P) {
+-            // the human is on the right: accept the P1 keys (WASD...) and the P2 keys
+-            Player tmp = g->player2;
+-            ReadInputP1(&g->player2);
+-            ReadInputP2(&tmp);
+-            Player *h = &g->player2;
+-            h->inputLeft |= tmp.inputLeft;   h->inputRight |= tmp.inputRight;
+-            h->inputDown |= tmp.inputDown;   h->inputUp |= tmp.inputUp;
+-            h->inputPunch |= tmp.inputPunch; h->inputKick |= tmp.inputKick;
+-            h->inputSpecial1 |= tmp.inputSpecial1; h->inputSpecial2 |= tmp.inputSpecial2;
+-            h->inputBlock |= tmp.inputBlock; h->inputThrow |= tmp.inputThrow;
+-            h->inputTaunt |= tmp.inputTaunt; h->inputJumpAttack |= tmp.inputJumpAttack;
+-            ApplyPad(g, h, PAD_ANY);
+-            SimpleCPU(g, &g->player1, &g->player2);
+-        } else {
+-            ReadInputP1(&g->player1);
+-            ReadInputP2(&g->player2);
+-            ApplyPad(g, &g->player1, Pad_ForPlayer(1));
+-            ApplyPad(g, &g->player2, Pad_ForPlayer(2));
+-        }
+-
+-        g->player1.opponentX = g->player2.position.x;
+-        g->player2.opponentX = g->player1.position.x;
+-        Player_Update(&g->player1, dt);
+-        Player_Update(&g->player2, dt);
+-
+-        KeepPlayersApart(&g->player1, &g->player2);
+-        SpawnProjectiles(g, &g->player1, 1);
+-        SpawnProjectiles(g, &g->player2, 2);
+-        UpdateProjectiles(g, dt);
+-        CheckHits(g);
+-
+-        g->roundTimer -= dt;
+-        if (g->roundTimer <= 0.0f) {
+-            g->roundTimer = 0.0f;
+-            g->gameOver = true;
+-            if (g->player1.health > g->player2.health) g->winner = 1;
+-            else if (g->player2.health > g->player1.health) g->winner = 2;
+-            else g->winner = 0;
+-            if (g->winner) Player_SetState(g->winner == 1 ? &g->player1 : &g->player2, STATE_VICTORY);
+-            g->screen = SCREEN_RESULT;
+-        }
+-        return;
+-    }
+-
+     // ---------- CONTROLLER TEST ----------
+     if (g->screen == SCREEN_PADTEST) {
+         bool startHeld = false;
+@@ -782,20 +747,8 @@ void Game_Update(Game *g) {
+         return;
+     }
+ 
+-    // ---------- RESULT ----------
++    // ---------- RESULT ----------  (the poses keep animating in Game_SimTick)
+     if (g->screen == SCREEN_RESULT) {
+-        // keep animating: the winner's victory pose (Mike keeps flexing), the loser lands
+-        Player *pl[2] = { &g->player1, &g->player2 };
+-        for (int k = 0; k < 2; k++) {
+-            Player *q = pl[k];
+-            q->inputLeft = q->inputRight = q->inputDown = q->inputUp = false;
+-            q->inputPunch = q->inputKick = q->inputSpecial1 = q->inputSpecial2 = false;
+-            q->inputBlock = q->inputThrow = q->inputTaunt = q->inputJumpAttack = false;
+-            q->opponentX = 0.0f;
+-            if (q->onGround) q->velocity.x = 0.0f;
+-            Player_Update(q, dt);
+-            q->attackActive = false;
+-        }
+         if (IsKeyPressed(KEY_R) || IsKeyPressed(KEY_ENTER) ||
+             Pad_Pressed(PAD_ANY, PB_A) || Pad_Pressed(PAD_ANY, PB_START)) {
+             // Back to select (fighter sprites only: stage / portrait textures stay loaded)
+diff --git a/egyptian_fighter/src/game.h b/egyptian_fighter/src/game.h
+index bcdd6f8..8c7656b 100644
+--- a/egyptian_fighter/src/game.h
++++ b/egyptian_fighter/src/game.h
+@@ -3,6 +3,7 @@
+ 
+ #include "player.h"
+ #include "pad.h"
++#include "rng.h"
+ 
+ typedef enum {
+     SCREEN_SELECT = 0,
+@@ -30,7 +31,7 @@ typedef struct {
+     float age;
+ } Projectile;
+ 
+-typedef struct {
++typedef struct Game {
+     Player player1;
+     Player player2;
+ 
+@@ -58,6 +59,9 @@ typedef struct {
+ 
+     Projectile projectiles[MAX_PROJECTILES];
+     int cpuAttackCooldown;
++    SimRng rng;            // fight PRNG (CPU decisions) - part of the hashed sim state
++    uint32_t fightSeed;    // seed it started from (recorded in replays)
++    uint32_t simTick;      // ticks since the fight was set up (pre-fight included)
+ 
+     // pre-fight screen
+     float prefightTimer;
+@@ -71,8 +75,12 @@ typedef struct {
+     char pauseNote[128];   // e.g. "P1 controller disconnected"
+ } Game;
+ 
++void Game_InitCore(Game *g);                              // roster + defaults, no window
+ void Game_Init(Game *g);
+-void Game_Update(Game *g);
++void Game_BeginFightSim(Game *g, uint32_t seed, bool gpu); // sim side of starting a fight
++#include "input.h"
++void Game_Update(Game *g);                               // menus, once per rendered frame
++void Game_SimTick(Game *g, const InputBits in[2]);       // one fixed SIM_DT step of the fight
+ void Game_Draw(const Game *g);
+ void Game_Unload(Game *g);
+ 
+diff --git a/egyptian_fighter/src/input.c b/egyptian_fighter/src/input.c
+new file mode 100644
+index 0000000..bc251e6
+--- /dev/null
++++ b/egyptian_fighter/src/input.c
+@@ -0,0 +1,117 @@
++// input.c - sampling layer: raylib keyboard + pads -> InputBits.  Nothing here is simulation.
++#include "input.h"
++#include "game.h"
++#include "pad.h"
++
++InputBits Input_KeysP1(void) {
++    InputBits b = 0;
++    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))  b |= IN_LEFT;
++    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) b |= IN_RIGHT;
++    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))  b |= IN_DOWN;
++    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))    b |= IN_UP;
++    if (IsKeyDown(KEY_L))     b |= IN_BLOCK;
++    if (IsKeyPressed(KEY_J))  b |= IN_PUNCH;
++    if (IsKeyPressed(KEY_K))  b |= IN_KICK;
++    if (IsKeyPressed(KEY_U))  b |= IN_SP1;
++    if (IsKeyPressed(KEY_I))  b |= IN_SP2;
++    if (IsKeyPressed(KEY_O))  b |= IN_THROW;
++    if (IsKeyPressed(KEY_P))  b |= IN_TAUNT;
++    if (IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K)) b |= IN_JATK;
++    return b;
++}
++
++InputBits Input_KeysP2(void) {
++    InputBits b = 0;
++    if (IsKeyDown(KEY_LEFT))  b |= IN_LEFT;
++    if (IsKeyDown(KEY_RIGHT)) b |= IN_RIGHT;
++    if (IsKeyDown(KEY_DOWN))  b |= IN_DOWN;
++    if (IsKeyDown(KEY_UP))    b |= IN_UP;
++    if (IsKeyDown(KEY_KP_3) || IsKeyDown(KEY_B))       b |= IN_BLOCK;
++    if (IsKeyPressed(KEY_KP_1) || IsKeyPressed(KEY_Z)) b |= IN_PUNCH;
++    if (IsKeyPressed(KEY_KP_2) || IsKeyPressed(KEY_X)) b |= IN_KICK;
++    if (IsKeyPressed(KEY_KP_4) || IsKeyPressed(KEY_C)) b |= IN_SP1;
++    if (IsKeyPressed(KEY_KP_5) || IsKeyPressed(KEY_V)) b |= IN_SP2;
++    if (IsKeyPressed(KEY_KP_6) || IsKeyPressed(KEY_N)) b |= IN_THROW;
++    if (IsKeyPressed(KEY_KP_7) || IsKeyPressed(KEY_M)) b |= IN_TAUNT;
++    if (IsKeyPressed(KEY_KP_1) || IsKeyPressed(KEY_KP_2) ||
++        IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_X))    b |= IN_JATK;
++    return b;
++}
++
++// Gamepad, OR-ed on top of the keyboard.  sel = pad index or PAD_ANY.
++//   D-pad / left stick = move, up = jump, down = crouch   A = jump
++//   X = punch  Y = kick  B or LT = special 1  RT = special 2
++//   RB = block (hold)  LB = throw  Back/Select = taunt  (Start = pause, handled in main.c)
++InputBits Input_Pad(int sel, bool ignoreA) {
++    if (sel == PAD_NONE) return 0;
++    InputBits b = 0;
++    bool aHeld = Pad_Down(sel, PB_A) && !ignoreA;
++    if (Pad_Down(sel, PB_LEFT))  b |= IN_LEFT;
++    if (Pad_Down(sel, PB_RIGHT)) b |= IN_RIGHT;
++    if (Pad_Down(sel, PB_DOWN))  b |= IN_DOWN;
++    if (Pad_Down(sel, PB_UP) || aHeld) b |= IN_UP;
++    if (Pad_Down(sel, PB_RB))    b |= IN_BLOCK;
++    if (Pad_Pressed(sel, PB_X))  b |= IN_PUNCH;
++    if (Pad_Pressed(sel, PB_Y))  b |= IN_KICK;
++    if (Pad_Pressed(sel, PB_B) || Pad_Pressed(sel, PB_LT)) b |= IN_SP1;
++    if (Pad_Pressed(sel, PB_RT)) b |= IN_SP2;
++    if (Pad_Pressed(sel, PB_LB)) b |= IN_THROW;
++    if (Pad_Pressed(sel, PB_BACK)) b |= IN_TAUNT;
++    if (Pad_Pressed(sel, PB_X) || Pad_Pressed(sel, PB_Y)) b |= IN_JATK;
++    return b;
++}
++
++static InputBits Confirm(void) {
++    return (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE) ||
++            Pad_Pressed(PAD_ANY, PB_A) || Pad_Pressed(PAD_ANY, PB_START)) ? IN_CONFIRM : 0;
++}
++
++void Input_SampleFight(Game *g, InputBits out[2]) {
++    if (g->screen == SCREEN_FIGHT && g->padWaitRelease &&
++        !Pad_Down(PAD_ANY, PB_A) && !Pad_Down(PAD_ANY, PB_START))
++        g->padWaitRelease = false;
++    bool w = g->padWaitRelease;
++    out[0] = out[1] = 0;
++    if (g->mode == MODE_1P_VS_CPU) {
++        out[0] = Input_KeysP1() | Input_Pad(PAD_ANY, w);
++    } else if (g->mode == MODE_CPU_VS_1P) {
++        // the human is on the right: accept the P1 keys (WASD...) and the P2 keys
++        out[1] = Input_KeysP1() | Input_KeysP2() | Input_Pad(PAD_ANY, w);
++    } else {
++        out[0] = Input_KeysP1() | Input_Pad(Pad_ForPlayer(1), w);
++        out[1] = Input_KeysP2() | Input_Pad(Pad_ForPlayer(2), w);
++    }
++    out[0] |= Confirm();     // either side may skip the face-off; the sim ORs both
++}
++
++void Input_ToPlayer(Player *p, InputBits b) {
++    p->inputLeft       = (b & IN_LEFT)  != 0;
++    p->inputRight      = (b & IN_RIGHT) != 0;
++    p->inputDown       = (b & IN_DOWN)  != 0;
++    p->inputUp         = (b & IN_UP)    != 0;
++    p->inputBlock      = (b & IN_BLOCK) != 0;
++    p->inputPunch      = (b & IN_PUNCH) != 0;
++    p->inputKick       = (b & IN_KICK)  != 0;
++    p->inputSpecial1   = (b & IN_SP1)   != 0;
++    p->inputSpecial2   = (b & IN_SP2)   != 0;
++    p->inputThrow      = (b & IN_THROW) != 0;
++    p->inputTaunt      = (b & IN_TAUNT) != 0;
++    p->inputJumpAttack = (b & IN_JATK)  != 0;
++}
++
++InputBits Input_FromPlayer(const Player *p) {
++    InputBits b = 0;
++    if (p->inputLeft)       b |= IN_LEFT;
++    if (p->inputRight)      b |= IN_RIGHT;
++    if (p->inputDown)       b |= IN_DOWN;
++    if (p->inputUp)         b |= IN_UP;
++    if (p->inputBlock)      b |= IN_BLOCK;
++    if (p->inputPunch)      b |= IN_PUNCH;
++    if (p->inputKick)       b |= IN_KICK;
++    if (p->inputSpecial1)   b |= IN_SP1;
++    if (p->inputSpecial2)   b |= IN_SP2;
++    if (p->inputThrow)      b |= IN_THROW;
++    if (p->inputTaunt)      b |= IN_TAUNT;
++    if (p->inputJumpAttack) b |= IN_JATK;
++    return b;
++}
+diff --git a/egyptian_fighter/src/input.h b/egyptian_fighter/src/input.h
+new file mode 100644
+index 0000000..0952e35
+--- /dev/null
++++ b/egyptian_fighter/src/input.h
+@@ -0,0 +1,50 @@
++// input.h - per-player fight input as a 16-bit mask (the only thing lockstep netplay sends).
++//
++// The fight simulation never reads raylib / the keyboard / pads directly.  Each 1/60 s tick it
++// receives one InputBits per player.  Bits 0-4 are "held" buttons; bits 5-12 are "pressed this
++// tick" events (edge-detected by the sampling layer, exactly like raylib IsKeyPressed /
++// Pad_Pressed did before, so local play behaves identically).
++#ifndef EF_INPUT_H
++#define EF_INPUT_H
++
++#include <stdint.h>
++#include "player.h"
++
++typedef uint16_t InputBits;
++
++enum {
++    // held
++    IN_LEFT    = 1 << 0,
++    IN_RIGHT   = 1 << 1,
++    IN_DOWN    = 1 << 2,
++    IN_UP      = 1 << 3,     // jump (keys, d-pad up / stick up, pad A)
++    IN_BLOCK   = 1 << 4,
++    // pressed this tick
++    IN_PUNCH   = 1 << 5,
++    IN_KICK    = 1 << 6,
++    IN_SP1     = 1 << 7,
++    IN_SP2     = 1 << 8,
++    IN_THROW   = 1 << 9,
++    IN_TAUNT   = 1 << 10,
++    IN_JATK    = 1 << 11,    // jump attack (punch or kick pressed; the CPU sets it on its own)
++    IN_CONFIRM = 1 << 12,    // Enter / Space / pad A / Start: skips the pre-fight face-off
++};
++#define IN_HELD_MASK  ((InputBits)0x001F)
++#define IN_PRESS_MASK ((InputBits)0x1FE0)
++
++struct Game;
++
++// Sampling layer (outside the sim): keyboard + USB / EasySMX pads -> bits for both fighters,
++// for the current mode.  A CPU-controlled slot gets 0 (the sim drives it).  Also drops a pad A
++// still held from the select screen (Game.padWaitRelease, a local-input filter - not sim state).
++void Input_SampleFight(struct Game *g, InputBits out[2]);
++
++InputBits Input_KeysP1(void);                 // WASD/arrows + J K U I L O P
++InputBits Input_KeysP2(void);                 // arrows + numpad / Z X C V B N M
++InputBits Input_Pad(int sel, bool ignoreA);   // one pad or PAD_ANY
++
++// bits <-> the Player's input flags (what player.c consumes)
++void      Input_ToPlayer(Player *p, InputBits b);
++InputBits Input_FromPlayer(const Player *p);
++
++#endif
+diff --git a/egyptian_fighter/src/main.c b/egyptian_fighter/src/main.c
+index bbc6d5b..5c7d7c3 100644
+--- a/egyptian_fighter/src/main.c
++++ b/egyptian_fighter/src/main.c
+@@ -1,10 +1,25 @@
+ #include "game.h"
+ #include "pad.h"
++#include "sim.h"
+ 
+ int RunDemo(int charIndex, const char *outDir);   // demo.c
+ 
+ int main(int argc, char **argv)
+ {
++    // Headless determinism tools (no window):  --sim-test   |   --replay <file.efrec>
++    if (argc >= 2 && strcmp(argv[1], "--sim-test") == 0) {
++        SetTraceLogLevel(LOG_WARNING);
++        return Sim_RunTests(argc, argv);
++    }
++    if (argc >= 3 && strcmp(argv[1], "--replay") == 0) {
++        SetTraceLogLevel(LOG_WARNING);
++        return Sim_Replay(argv[2], true);
++    }
++    // --record <file>: write every fight's per-tick inputs + checkpoint hashes (file, file.2, ...)
++    SimRecorder recorder;
++    Rec_Init(&recorder, "");
++    for (int i = 1; i + 1 < argc; i++) if (strcmp(argv[i], "--record") == 0) Rec_Init(&recorder, argv[i + 1]);
++
+     // Test mode: egyptian_fighter --demo <charIndex 0-6> [outDir]
+     if (argc >= 3 && strcmp(argv[1], "--demo") == 0) {
+         InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Egyptian Fighter - animation demo");
+@@ -38,6 +53,9 @@ int main(int argc, char **argv)
+     TraceLog(LOG_INFO, " The game will still run perfectly without them.");
+     TraceLog(LOG_INFO, "=================================================");
+ 
++    double simAccum = 0.0;                 // unsimulated time (seconds), < 1 tick normally
++    InputBits pendingPress[2] = { 0, 0 };  // "pressed" bits waiting for the next tick
++
+     while (!WindowShouldClose())
+     {
+         Pad_Update();          // hot-plug safe: re-checks every pad each frame
+@@ -60,7 +78,35 @@ int main(int argc, char **argv)
+         bool toggled = Gfx_HandleFullscreenKeys();
+ 
+         if (!game.paused && !toggled) {      // (the Enter of Alt+Enter is not a menu press)
++            // 1) sample keyboard + pads into one 16-bit mask per fighter (input.c)
++            InputBits in[2];
++            Input_SampleFight(&game, in);
++            pendingPress[0] |= in[0] & IN_PRESS_MASK;   // a tap is never lost on a 0-tick frame
++            pendingPress[1] |= in[1] & IN_PRESS_MASK;
++
++            // 2) fixed 1/60 s simulation steps (accumulator, sim.c)
++            int steps = Sim_StepsForFrame(&simAccum, GetFrameTime());
++            for (int i = 0; i < steps; i++) {
++                InputBits tick[2] = { (InputBits)((in[0] & IN_HELD_MASK) | pendingPress[0]),
++                                      (InputBits)((in[1] & IN_HELD_MASK) | pendingPress[1]) };
++                pendingPress[0] = pendingPress[1] = 0;      // presses go to the first tick only
++                Game_SimTick(&game, tick);
++                Rec_Tick(&recorder, &game, tick);
++            }
++
++            // 3) menus (select screen, leaving the result screen) - once per rendered frame
+             Game_Update(&game);
++            if (recorder.path[0]) {
++                if (!recorder.active && game.screen == SCREEN_PREFIGHT && game.simTick == 0)
++                    Rec_FightStart(&recorder, &game);
++                else if (recorder.active && game.screen == SCREEN_SELECT)
++                    Rec_FightEnd(&recorder, &game);
++            }
++        } else {
++            // paused or fullscreen toggled: the simulation simply does not step; no time
++            // is banked and no tap carries over, so pausing can never change a fight
++            simAccum = 0.0;
++            pendingPress[0] = pendingPress[1] = 0;
+         }
+ 
+         BeginDrawing();
+@@ -82,6 +128,7 @@ int main(int argc, char **argv)
+         EndDrawing();
+     }
+ 
++    Rec_FightEnd(&recorder, &game);
+     Game_Unload(&game);
+     Gfx_UnloadFonts();
+     CloseWindow();
+diff --git a/egyptian_fighter/src/player.c b/egyptian_fighter/src/player.c
+index 2023d2f..d495593 100644
+--- a/egyptian_fighter/src/player.c
++++ b/egyptian_fighter/src/player.c
+@@ -98,6 +98,27 @@ void Player_Init(Player *p, float startX, float startY, int facing, int characte
+     p->attackActive = false;
+ }
+ 
++// ---- headless (no window / no GPU) loading for --sim-test / --replay / a future server ----
++// With p->noGpu the loaders run exactly the same code but only read the image sizes: the
++// "texture" gets a dummy id and the right width/height, so frame counts, fallbacks and every
++// other value the simulation uses come out identical to a real load.
++static Texture2D SheetFromImage(const Player *p, Image img) {
++    if (!p->noGpu) return Gfx_TextureFromImage(img);
++    return (Texture2D){ .id = 1, .width = img.width, .height = img.height, .mipmaps = 1,
++                        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
++}
++static Texture2D SheetLoad(const Player *p, const char *path) {
++    if (!p->noGpu) return Gfx_LoadTexture(path);
++    Image img = LoadImage(path);
++    if (img.data == NULL) return (Texture2D){ 0 };
++    Texture2D t = SheetFromImage(p, img);
++    UnloadImage(img);
++    return t;
++}
++static void SheetFree(const Player *p, Texture2D t) {
++    if (!p->noGpu && t.id) UnloadTexture(t);
++}
++
+ static void LoadSpritesLegacy(Player *p, const char *assetsRoot, const CharacterDef *chars) {
+     char path[512];
+     const char *folder = chars[p->characterIndex].folder;
+@@ -118,7 +139,7 @@ static void LoadSpritesLegacy(Player *p, const char *assetsRoot, const Character
+                 idleAnchorX = (firstFrameBounds.x + firstFrameBounds.width * 0.5f) / frameWidth;
+                 idleVisibleHeight = visibleBounds.height;
+             }
+-            p->sheets[i].texture = Gfx_TextureFromImage(img);   // premultiplied + mipmapped
++            p->sheets[i].texture = SheetFromImage(p, img);   // premultiplied + mipmapped
+             UnloadImage(img);
+             p->sheets[i].loaded = true;
+             TraceLog(LOG_INFO, "Loaded: %s", path);
+@@ -136,7 +157,7 @@ static void LoadSpritesLegacy(Player *p, const char *assetsRoot, const Character
+             ImageDrawText(&placeholder, TextFormat("%d", i), 90, 200, 80, BLACK);
+             visibleBounds = (Rectangle){ 0.0f, 0.0f, 256.0f, 512.0f };
+             if (i == STATE_IDLE) idleVisibleHeight = visibleBounds.height;
+-            p->sheets[i].texture = Gfx_TextureFromImage(placeholder);
++            p->sheets[i].texture = SheetFromImage(p, placeholder);
+             UnloadImage(placeholder);
+             p->sheets[i].loaded = false;
+         }
+@@ -219,7 +240,7 @@ static bool LoadSpritesGrid(Player *p, const char *dir, const char *cfgPath) {
+             char path[768];
+             snprintf(path, sizeof(path), "%s/%s", dir, file);
+             // full-resolution sheet, premultiplied alpha + mipmaps + trilinear filtering (gfx.c)
+-            Texture2D tex = Gfx_LoadTexture(path);
++            Texture2D tex = SheetLoad(p, path);
+             if (tex.id == 0) { TraceLog(LOG_WARNING, "MISSING ASSET: %s", path); continue; }
+             int frames = tex.width / cellW;
+             if (frames != a) {
+@@ -249,7 +270,7 @@ static bool LoadSpritesGrid(Player *p, const char *dir, const char *cfgPath) {
+     if (!p->sheets[STATE_IDLE].loaded) {
+         TraceLog(LOG_WARNING, "%s has no idle animation - ignoring it", cfgPath);
+         for (int i = 0; i < STATE_COUNT; i++)
+-            if (p->sheets[i].texture.id) UnloadTexture(p->sheets[i].texture);
++            SheetFree(p, p->sheets[i].texture);
+         memset(p->sheets, 0, sizeof(p->sheets));
+         return false;
+     }
+@@ -313,7 +334,7 @@ void Player_LoadSprites(Player *p, const char *assetsRoot, const CharacterDef *c
+ void Player_UnloadSprites(Player *p) {
+     for (int i = 0; i < STATE_COUNT; i++) {
+         if (p->sheets[i].texture.id != 0 && !p->sheets[i].shared) {
+-            UnloadTexture(p->sheets[i].texture);
++            SheetFree(p, p->sheets[i].texture);
+         }
+         p->sheets[i].texture.id = 0;
+     }
+@@ -460,9 +481,9 @@ static void UpdatePhysics(Player *p, float dt) {
+     if (p->position.x > SCREEN_WIDTH - 40.0f) p->position.x = SCREEN_WIDTH - 40.0f;
+ }
+ 
+-static void HandleInputAndState(Player *p) {
++static void HandleInputAndState(Player *p, float dt) {
+     if (p->invincible) {
+-        p->invincibleTimer -= GetFrameTime();
++        p->invincibleTimer -= dt;          // sim step, never the wall clock
+         if (p->invincibleTimer <= 0.0f) {
+             p->invincible = false;
+         }
+@@ -543,7 +564,7 @@ static void HandleInputAndState(Player *p) {
+ void Player_Update(Player *p, float dt) {
+     p->stateTimer += dt;
+ 
+-    HandleInputAndState(p);
++    HandleInputAndState(p, dt);
+     UpdatePhysics(p, dt);
+     UpdateAnimation(p, dt);
+ 
+diff --git a/egyptian_fighter/src/player.h b/egyptian_fighter/src/player.h
+index acf7d72..fff40a9 100644
+--- a/egyptian_fighter/src/player.h
++++ b/egyptian_fighter/src/player.h
+@@ -35,6 +35,8 @@ typedef struct Player {
+     bool projectileFired;   // already launched during the current special
+     float opponentX;        // set by the game every frame: used to keep facing the opponent
+ 
++    bool noGpu;             // headless: sheets carry sizes only (see Player_LoadSprites)
++
+     // Sprite sheets (indexed by PlayerState)
+     SpriteSheet sheets[STATE_COUNT];
+ 
+diff --git a/egyptian_fighter/src/rng.h b/egyptian_fighter/src/rng.h
+new file mode 100644
+index 0000000..ed21bf0
+--- /dev/null
++++ b/egyptian_fighter/src/rng.h
+@@ -0,0 +1,28 @@
++// rng.h - tiny deterministic PRNG for the fight simulation (xorshift32 + splitmix seeding).
++// Same seed -> same sequence on every compiler / OS / wasm.  Lives in the Game state so it can
++// be hashed, saved and replayed.  Never use rand() or raylib's GetRandomValue() in the sim.
++#ifndef EF_RNG_H
++#define EF_RNG_H
++#include <stdint.h>
++
++typedef struct { uint32_t s; } SimRng;
++
++static inline void Rng_Seed(SimRng *r, uint32_t seed) {
++    uint32_t z = seed + 0x9E3779B9u;                 // splitmix32 step, so seed 0/1/2 differ a lot
++    z = (z ^ (z >> 16)) * 0x85EBCA6Bu;
++    z = (z ^ (z >> 13)) * 0xC2B2AE35u;
++    z ^= z >> 16;
++    r->s = z ? z : 0x6D2B79F5u;                     // xorshift state must not be 0
++}
++static inline uint32_t Rng_Next(SimRng *r) {
++    uint32_t x = r->s;
++    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
++    return r->s = x;
++}
++// inclusive range, like raylib's GetRandomValue(min, max)
++static inline int Rng_Range(SimRng *r, int min, int max) {
++    if (max < min) { int t = min; min = max; max = t; }
++    uint32_t span = (uint32_t)(max - min) + 1u;
++    return min + (int)(Rng_Next(r) % span);
++}
++#endif
+diff --git a/egyptian_fighter/src/sim.c b/egyptian_fighter/src/sim.c
+new file mode 100644
+index 0000000..9aba402
+--- /dev/null
++++ b/egyptian_fighter/src/sim.c
+@@ -0,0 +1,377 @@
++// sim.c - hashes, fixed-step accumulator, record / replay and the headless --sim-test.
++// Nothing in here opens a window: --sim-test and --replay run on a server or in CI.
++#include "sim.h"
++#include <inttypes.h>
++
++// ------------------------------------------------------------------------------ hash --
++typedef struct { uint64_t h; } Fnv;
++static void HBytes(Fnv *f, const void *p, size_t n) {
++    const unsigned char *b = (const unsigned char *)p;
++    for (size_t i = 0; i < n; i++) { f->h ^= b[i]; f->h *= 0x100000001B3ull; }
++}
++static void HU32(Fnv *f, uint32_t v) { unsigned char b[4] = { v, v >> 8, v >> 16, v >> 24 }; HBytes(f, b, 4); }
++static void HI(Fnv *f, int v)        { HU32(f, (uint32_t)v); }
++static void HB(Fnv *f, bool v)       { HU32(f, v ? 1u : 0u); }
++static void HF(Fnv *f, float v)      { uint32_t u; memcpy(&u, &v, 4); HU32(f, u); }   // exact bits
++static void HV(Fnv *f, Vector2 v)    { HF(f, v.x); HF(f, v.y); }
++static void HR(Fnv *f, Rectangle r)  { HF(f, r.x); HF(f, r.y); HF(f, r.width); HF(f, r.height); }
++static Fnv FnvNew(void) { Fnv f = { 0xCBF29CE484222325ull }; return f; }
++
++static void HashPlayer(Fnv *f, const Player *p) {
++    HV(f, p->position); HV(f, p->velocity);
++    HB(f, p->onGround); HI(f, p->facing);
++    HI(f, p->state); HI(f, p->prevState); HI(f, p->currentFrame);
++    HF(f, p->frameTimer); HF(f, p->stateTimer);
++    HI(f, p->health); HB(f, p->invincible); HF(f, p->invincibleTimer);
++    HB(f, p->attackActive); HR(f, p->hitbox); HR(f, p->hurtbox);
++    HI(f, p->characterIndex); HI(f, p->projectileKind); HB(f, p->projectileFired);
++    HF(f, p->opponentX);
++    HU32(f, Input_FromPlayer(p));
++}
++
++uint64_t Sim_Hash(const Game *g) {
++    Fnv f = FnvNew();
++    HU32(&f, g->simTick);
++    HI(&f, g->screen); HI(&f, g->mode);
++    HB(&f, g->gameOver); HI(&f, g->winner);
++    HF(&f, g->roundTimer); HF(&f, g->prefightTimer);
++    HI(&f, g->cpuAttackCooldown); HU32(&f, g->rng.s);
++    HashPlayer(&f, &g->player1);
++    HashPlayer(&f, &g->player2);
++    for (int i = 0; i < MAX_PROJECTILES; i++) {
++        const Projectile *pr = &g->projectiles[i];
++        HB(&f, pr->active);
++        if (!pr->active) continue;        // dead slots may hold stale values that no longer matter
++        HI(&f, pr->kind); HI(&f, pr->variant); HV(&f, pr->origin); HI(&f, pr->owner);
++        HV(&f, pr->pos); HF(&f, pr->vx); HF(&f, pr->spin); HF(&f, pr->age);
++    }
++    return f.h;
++}
++
++uint64_t Sim_PlayerConfigHash(const Player *p) {
++    Fnv f = FnvNew();
++    HI(&f, p->characterIndex);
++    HI(&f, p->projectileKind);
++    for (int i = 0; i < STATE_COUNT; i++) {
++        HI(&f, p->sheets[i].frameCount);
++        HF(&f, p->sheets[i].frameTime);
++        HI(&f, p->sheets[i].loopFrom);
++    }
++    return f.h;
++}
++
++static uint64_t RulesHash(void) {
++    Fnv f = FnvNew();
++    const float fl[] = { SIM_DT, GROUND_Y, PLAYER_WIDTH, PLAYER_HEIGHT, ANIM_SPEED_IDLE, ANIM_SPEED_WALK,
++        ANIM_SPEED_ATTACK, ANIM_SPEED_SPECIAL, ANIM_SPEED_JUMP, ANIM_SPEED_HIT, ANIM_SPEED_OTHER,
++        MOVE_SPEED, JUMP_FORCE, GRAVITY, MAX_FALL_SPEED, MOVE_TIME_PUNCH, MOVE_TIME_KICK,
++        MOVE_TIME_SPECIAL, MOVE_TIME_THROW, MOVE_TIME_JUMP_ATTACK, MOVE_TIME_HIT, ACTIVE_FROM,
++        ACTIVE_TO, PROJ_LAUNCH_AT, PROJ_SPEED_HIGH, PROJ_SPEED_LOW, PROJ_BOX };
++    for (size_t i = 0; i < sizeof(fl) / sizeof(fl[0]); i++) HF(&f, fl[i]);
++    const int in[] = { SCREEN_WIDTH, SCREEN_HEIGHT, MAX_HEALTH, MELEE_DAMAGE, PROJ_DAMAGE, PROJ_CHIP,
++        MAX_PROJECTILES, STATE_COUNT, MAX_CHARACTERS };
++    for (size_t i = 0; i < sizeof(in) / sizeof(in[0]); i++) HI(&f, in[i]);
++    return f.h;
++}
++
++uint64_t Sim_ConfigHash(const Game *g) {
++    Fnv f = FnvNew();
++    uint64_t a = RulesHash(), b = Sim_PlayerConfigHash(&g->player1), c = Sim_PlayerConfigHash(&g->player2);
++    HBytes(&f, &a, 8); HBytes(&f, &b, 8); HBytes(&f, &c, 8);
++    return f.h;
++}
++
++// ----------------------------------------------------------------------- fixed step --
++int Sim_StepsForFrame(double *accum, double frameDt) {
++    // Frame times within 1.5 ms of 1/60 count as exactly one tick, so a 60 Hz display runs one
++    // tick per frame (as the game always did); a stall runs at most SIM_MAX_STEPS_PER_FRAME.
++    if (fabs(frameDt - SIM_DT_WALL) < 0.0015) frameDt = SIM_DT_WALL;
++    if (frameDt > 0.25 || frameDt < 0.0) frameDt = SIM_DT_WALL;     // window drag / load stall
++    *accum += frameDt;
++    int steps = 0;
++    while (*accum + 1e-9 >= SIM_DT_WALL && steps < SIM_MAX_STEPS_PER_FRAME) { *accum -= SIM_DT_WALL; steps++; }
++    if (*accum >= SIM_DT_WALL) *accum = 0.0;                         // drop what can't be caught up
++    if (*accum < 0.0) *accum = 0.0;
++    return steps;
++}
++
++// ------------------------------------------------------------------- record / replay --
++void Rec_Init(SimRecorder *r, const char *path) {
++    memset(r, 0, sizeof(*r));
++    snprintf(r->path, sizeof(r->path), "%s", path);
++}
++
++void Rec_FightStart(SimRecorder *r, const Game *g) {
++    if (!r->path[0]) return;
++    if (r->f) Rec_FightEnd(r, g);
++    r->fights++;
++    char name[440];
++    if (r->fights == 1) snprintf(name, sizeof(name), "%s", r->path);
++    else snprintf(name, sizeof(name), "%s.%d", r->path, r->fights);
++    r->f = fopen(name, "w");
++    if (!r->f) { TraceLog(LOG_WARNING, "REPLAY: cannot write %s", name); return; }
++    r->active = true;
++    fprintf(r->f, "EFREC 1\n");
++    fprintf(r->f, "seed %u mode %d p1 %d p2 %d hp1 %d hp2 %d config %016" PRIx64 "\n",
++            (unsigned)g->fightSeed, (int)g->mode, g->player1.characterIndex, g->player2.characterIndex,
++            g->player1.health, g->player2.health, Sim_ConfigHash(g));
++    fprintf(r->f, "h %u %016" PRIx64 "\n", (unsigned)g->simTick, Sim_Hash(g));
++    TraceLog(LOG_INFO, "REPLAY: recording fight to %s", name);
++}
++
++void Rec_Tick(SimRecorder *r, const Game *g, const InputBits in[2]) {
++    if (!r->active || !r->f) return;
++    fprintf(r->f, "t %u %x %x\n", (unsigned)g->simTick, in[0], in[1]);
++    if (g->simTick % SIM_HASH_EVERY == 0) fprintf(r->f, "h %u %016" PRIx64 "\n", (unsigned)g->simTick, Sim_Hash(g));
++}
++
++void Rec_FightEnd(SimRecorder *r, const Game *g) {
++    if (!r->f) return;
++    fprintf(r->f, "end %u %016" PRIx64 "\n", (unsigned)g->simTick, Sim_Hash(g));
++    fclose(r->f);
++    r->f = NULL;
++    r->active = false;
++}
++
++// headless fight set-up (sprite sizes only)
++static void SetupHeadless(Game *g, int mode, int c1, int c2, uint32_t seed) {
++    Game_InitCore(g);
++    g->mode = (SelectMode)mode;
++    g->selectP1 = c1;
++    g->selectP2 = c2;
++    Game_BeginFightSim(g, seed, false);
++}
++
++int Sim_Replay(const char *path, bool verbose) {
++    FILE *f = fopen(path, "r");
++    if (!f) { printf("replay: cannot open %s\n", path); return 2; }
++    char line[256];
++    unsigned seed = 0; int mode = 0, c1 = 0, c2 = 0, hp1 = MAX_HEALTH, hp2 = MAX_HEALTH;
++    uint64_t cfg = 0;
++    if (!fgets(line, sizeof(line), f) || strncmp(line, "EFREC 1", 7) != 0 ||
++        !fgets(line, sizeof(line), f) ||
++        sscanf(line, "seed %u mode %d p1 %d p2 %d hp1 %d hp2 %d config %" SCNx64,
++               &seed, &mode, &c1, &c2, &hp1, &hp2, &cfg) != 7) {
++        printf("replay: %s is not an EFREC 1 file\n", path); fclose(f); return 2;
++    }
++    static Game g;
++    SetupHeadless(&g, mode, c1, c2, seed);
++    g.player1.health = hp1; g.player2.health = hp2;
++    uint64_t myCfg = Sim_ConfigHash(&g);
++    int bad = 0, checks = 0;
++    if (myCfg != cfg) {
++        printf("replay: CONFIG MISMATCH recorded %016" PRIx64 " here %016" PRIx64
++               " (different sprites.cfg / sheets / rules) - result will not match\n", cfg, myCfg);
++        bad++;
++    }
++    while (fgets(line, sizeof(line), f)) {
++        unsigned t; unsigned a, b; uint64_t h;
++        if (sscanf(line, "t %u %x %x", &t, &a, &b) == 3) {
++            InputBits in[2] = { (InputBits)a, (InputBits)b };
++            Game_SimTick(&g, in);
++            if (g.simTick != t) { printf("replay: tick %u, expected %u\n", g.simTick, t); bad++; break; }
++        } else if (sscanf(line, "h %u %" SCNx64, &t, &h) == 2 || sscanf(line, "end %u %" SCNx64, &t, &h) == 2) {
++            checks++;
++            uint64_t mine = Sim_Hash(&g);
++            if (t != g.simTick || mine != h) {
++                if (bad < 5) printf("replay: DESYNC at tick %u: recorded %016" PRIx64 " replayed %016" PRIx64 "\n", t, h, mine);
++                bad++;
++            }
++        }
++    }
++    fclose(f);
++    printf("replay %s: seed %u mode %d %s vs %s, %u ticks, %d hash checks, %s (P1 hp %d, P2 hp %d, winner %d)\n",
++           path, seed, mode, g.characters[c1].name, g.characters[c2].name, (unsigned)g.simTick, checks,
++           bad ? "FAIL" : "PASS", g.player1.health, g.player2.health, g.winner);
++    (void)verbose;
++    Player_UnloadSprites(&g.player1); Player_UnloadSprites(&g.player2);
++    return bad ? 1 : 0;
++}
++
++// ------------------------------------------------------------------------ sim test --
++// A scripted "human" (deterministic in the tick number only) for each non-CPU slot.
++typedef struct { SimRng r; InputBits hold; int left; bool attacks; } Script;
++static InputBits ScriptStep(Script *s) {
++    InputBits out;
++    bool fresh = false;
++    if (s->left <= 0) {
++        int r = Rng_Range(&s->r, 0, 99);
++        InputBits h = 0;
++        if (r < 30) h |= IN_RIGHT;
++        else if (r < 50) h |= IN_LEFT;
++        else if (r < 58) h |= IN_DOWN;
++        else if (r < 66) h |= IN_UP | (Rng_Range(&s->r, 0, 1) ? IN_RIGHT : IN_LEFT);
++        else if (r < 74) h |= IN_BLOCK;
++        if (s->attacks) {
++            static const InputBits AT[6] = { IN_PUNCH, IN_KICK, IN_SP1, IN_SP2, IN_THROW, IN_TAUNT };
++            int a = Rng_Range(&s->r, 0, 9);
++            if (a < 6) h |= AT[a];
++            if (a < 2) h |= IN_JATK;
++        }
++        s->hold = h; s->left = Rng_Range(&s->r, 4, 30); fresh = true;
++    }
++    out = s->hold & IN_HELD_MASK;
++    if (fresh) out |= s->hold & IN_PRESS_MASK;
++    s->left--;
++    return out;
++}
++
++typedef struct { const char *name; int mode, c1, c2; uint32_t seed; bool attacks; int skipAt; } Scenario;
++
++#define MAX_TICKS (99 * 60 + 400)
++#define MAX_CHECKS (MAX_TICKS / SIM_HASH_EVERY + 4)
++typedef struct { int n; uint64_t h[MAX_CHECKS]; uint32_t ticks; uint64_t final; int hp1, hp2, winner; } RunResult;
++
++// make the per-tick input stream once, exactly as a lockstep server would deliver it
++static int MakeInputs(const Scenario *sc, InputBits (*in)[2]) {
++    Script s1 = { 0 }, s2 = { 0 };
++    Rng_Seed(&s1.r, sc->seed * 3u + 1u); Rng_Seed(&s2.r, sc->seed * 7u + 5u);
++    s1.attacks = s2.attacks = sc->attacks;
++    for (int t = 0; t < MAX_TICKS; t++) {
++        in[t][0] = ScriptStep(&s1);
++        in[t][1] = ScriptStep(&s2);
++        if (t + 1 == sc->skipAt) in[t][0] |= IN_CONFIRM;
++        else in[t][0] &= (InputBits)~IN_CONFIRM;
++    }
++    return MAX_TICKS;
++}
++
++// batch: ticks per "frame" (0 = random 0..4 per frame, with pause frames in between)
++static void RunOnce(const Game *start, InputBits (*in)[2], int batch, uint32_t flipTick, RunResult *res) {
++    int human = start->mode == MODE_CPU_VS_1P ? 1 : 0;
++    static Game g;
++    g = *start;                                  // snapshot copy = a fresh fight
++    memset(res, 0, sizeof(*res));
++    SimRng fr; Rng_Seed(&fr, 99);
++    int t = 0, resultTicks = 0, frame = 0;
++    while (t < MAX_TICKS && resultTicks < 120) {
++        int k = batch ? batch : Rng_Range(&fr, 0, 4);
++        frame++;
++        if (frame % 37 == 0) {                   // a paused frame: the sim must not move
++            g.paused = true;
++            InputBits junk[2] = { 0xFFFF, 0xFFFF };
++            Game_SimTick(&g, junk);
++            g.paused = false;
++        }
++        for (int i = 0; i < k && t < MAX_TICKS && resultTicks < 120; i++, t++) {
++            InputBits b[2] = { in[t][0], in[t][1] };
++            if (flipTick && (uint32_t)t >= flipTick && (uint32_t)t < flipTick + 60) b[human] ^= IN_RIGHT | IN_LEFT;
++            Game_SimTick(&g, b);
++            if (g.simTick % SIM_HASH_EVERY == 0 && res->n < MAX_CHECKS) res->h[res->n++] = Sim_Hash(&g);
++            if (g.screen == SCREEN_RESULT) resultTicks++;
++        }
++    }
++    res->ticks = g.simTick; res->final = Sim_Hash(&g);
++    res->hp1 = g.player1.health; res->hp2 = g.player2.health; res->winner = g.winner;
++}
++
++static bool SameRun(const RunResult *a, const RunResult *b, int *firstDiff) {
++    *firstDiff = -1;
++    int n = a->n < b->n ? a->n : b->n;
++    for (int i = 0; i < n; i++) if (a->h[i] != b->h[i]) { *firstDiff = i; return false; }
++    if (a->n != b->n || a->ticks != b->ticks || a->final != b->final) { *firstDiff = n; return false; }
++    return true;
++}
++
++static int TestAccumulator(void) {
++    int fails = 0;
++    double acc = 0; int total = 0, bad = 0;
++    for (int i = 0; i < 6000; i++) {            // 60 Hz with +-1 ms vsync jitter: always 1 tick
++        double dt = SIM_DT + ((i * 7919) % 21 - 10) * 0.0001;
++        int n = Sim_StepsForFrame(&acc, dt); total += n; if (n != 1) bad++;
++    }
++    printf("  accumulator 60 Hz +-1 ms jitter : %d frames -> %d ticks, %d frames not 1 tick  %s\n",
++           6000, total, bad, bad ? "FAIL" : "ok");
++    fails += bad != 0;
++    acc = 0; total = 0;
++    for (int i = 0; i < 1200; i++) total += Sim_StepsForFrame(&acc, 1.0 / 120.0);
++    printf("  accumulator 120 Hz              : 1200 frames -> %d ticks (expect 600)  %s\n", total, total == 600 ? "ok" : "FAIL");
++    fails += total != 600;
++    acc = 0; total = 0;
++    for (int i = 0; i < 600; i++) total += Sim_StepsForFrame(&acc, 1.0 / 30.0);
++    printf("  accumulator 30 Hz               : 600 frames -> %d ticks (expect 1200)  %s\n", total, total == 1200 ? "ok" : "FAIL");
++    fails += total != 1200;
++    acc = 0; total = Sim_StepsForFrame(&acc, 3.0 / 60.0);
++    printf("  accumulator one 3/60 s frame    : %d ticks (expect 3)  %s\n", total, total == 3 ? "ok" : "FAIL");
++    fails += total != 3;
++    return fails;
++}
++
++int Sim_RunTests(int argc, char **argv) {
++    (void)argc; (void)argv;
++    static const Scenario SC[] = {
++        { "1P vs CPU   MIKE vs DARAGH ", MODE_1P_VS_CPU, 5, 6, 1234u, true,  0 },
++        { "CPU vs 1P   DEC vs DRAGON  ", MODE_CPU_VS_1P, 4, 2, 99u,   true,  40 },
++        { "1P vs 2P    RA vs FLAME    ", MODE_1P_VS_2P,  0, 3, 7u,    true,  30 },
++        { "1P vs 2P    PAUL vs MIKE (no attacks: time-out)", MODE_1P_VS_2P, 1, 5, 5u, false, 0 },
++    };
++    static InputBits in[MAX_TICKS][2];
++    static Game start;
++    static RunResult A, B, C, D, E, F;
++    int fails = 0;
++    printf("=== Padel Wars deterministic sim test (headless, no window) ===\n");
++    printf("tick %.9f s, hash checkpoint every %d ticks\n", SIM_DT, SIM_HASH_EVERY);
++    fails += TestAccumulator();
++
++    for (size_t s = 0; s < sizeof(SC) / sizeof(SC[0]); s++) {
++        const Scenario *sc = &SC[s];
++        SetupHeadless(&start, sc->mode, sc->c1, sc->c2, sc->seed);
++        MakeInputs(sc, in);
++        RunOnce(&start, in, 1, 0, &A);
++        RunOnce(&start, in, 1, 0, &B);
++        RunOnce(&start, in, 3, 0, &C);
++        RunOnce(&start, in, 0, 0, &D);
++        int d1, d2, d3;
++        bool ab = SameRun(&A, &B, &d1), ac = SameRun(&A, &C, &d2), ad = SameRun(&A, &D, &d3);
++        // sensitivity: a changed input must change the hash from (about) that tick on
++        RunOnce(&start, in, 1, 500, &E);
++        int de; bool ae = SameRun(&A, &E, &de);
++        bool cpu = sc->mode != MODE_1P_VS_2P, seedOk = true;
++        if (cpu) {                               // another CPU seed must play differently
++            static Game other;
++            SetupHeadless(&other, sc->mode, sc->c1, sc->c2, sc->seed + 1);
++            RunOnce(&other, in, 1, 0, &F);
++            int df; seedOk = !SameRun(&A, &F, &df);
++            Player_UnloadSprites(&other.player1); Player_UnloadSprites(&other.player2);
++        }
++        bool pass = ab && ac && ad && !ae && seedOk;
++        printf("\n[%s] %s\n", pass ? "PASS" : "FAIL", sc->name);
++        printf("  config hash %016" PRIx64 "  seed %u  %u ticks (%.1f s)  P1 hp %d  P2 hp %d  winner %d\n",
++               Sim_ConfigHash(&start), (unsigned)sc->seed, (unsigned)A.ticks, A.ticks * SIM_DT_WALL, A.hp1, A.hp2, A.winner);
++        printf("  run 1 vs run 2 (1 tick/frame)        : %s (%d checkpoints)\n", ab ? "identical" : "DIFFERENT", A.n);
++        printf("  1 tick/frame vs 3 ticks/frame        : %s\n", ac ? "identical" : "DIFFERENT");
++        printf("  1 tick/frame vs random 0-4 + pauses  : %s\n", ad ? "identical" : "DIFFERENT");
++        printf("  human L/R flipped for ticks 500-559  : %s (first differing checkpoint: tick %d)\n",
++               ae ? "NOT DETECTED" : "detected", (de + 1) * SIM_HASH_EVERY);
++        if (cpu) printf("  CPU seed+1                           : %s\n", seedOk ? "plays differently" : "SAME (RNG unused?)");
++        printf("  final hash %016" PRIx64 "\n", A.final);
++        if (!pass) fails++;
++
++        if (s == 0) {                            // record the same fight through the recorder, replay it
++            const char *rp = "sim_test_replay.efrec";
++            SimRecorder rec; Rec_Init(&rec, rp);
++            static Game g; g = start;
++            Rec_FightStart(&rec, &g);
++            int resultTicks = 0;
++            for (int t = 0; t < MAX_TICKS && resultTicks < 120; t++) {
++                Game_SimTick(&g, in[t]);
++                Rec_Tick(&rec, &g, in[t]);
++                if (g.screen == SCREEN_RESULT) resultTicks++;
++            }
++            Rec_FightEnd(&rec, &g);
++            int rr = Sim_Replay(rp, false);
++            printf("  record -> replay round trip          : %s\n", rr == 0 ? "PASS" : "FAIL");
++            if (rr) fails++;
++        }
++        Player_UnloadSprites(&start.player1); Player_UnloadSprites(&start.player2);
++    }
++    printf("\nper-fighter config hashes (gameplay values from sprites.cfg + sheet sizes):\n");
++    for (int c = 0; c < MAX_CHARACTERS; c++) {
++        static Game g;
++        SetupHeadless(&g, MODE_1P_VS_2P, c, c, 1);
++        printf("  %-14s %016" PRIx64 "  projectile %d\n", g.characters[c].name, Sim_PlayerConfigHash(&g.player1), g.player1.projectileKind);
++        Player_UnloadSprites(&g.player1); Player_UnloadSprites(&g.player2);
++    }
++    printf("\nSIM TEST: %s\n", fails ? "FAIL" : "PASS");
++    return fails ? 1 : 0;
++}
+diff --git a/egyptian_fighter/src/sim.h b/egyptian_fighter/src/sim.h
+new file mode 100644
+index 0000000..3a122a7
+--- /dev/null
++++ b/egyptian_fighter/src/sim.h
+@@ -0,0 +1,40 @@
++// sim.h - deterministic fight simulation helpers: state hash, config hash, fixed-step
++// accumulator, input record / replay and the headless --sim-test.
++#ifndef EF_SIM_H
++#define EF_SIM_H
++
++#include <stdint.h>
++#include <stdio.h>
++#include "game.h"
++
++#define SIM_HASH_EVERY 30            // checkpoint hash interval in ticks (0.5 s)
++
++// FNV-1a 64 over every simulation field, one by one (never the raw struct: padding and
++// textures).  Render-only data (textures, faces, select screen, pause overlay) is excluded.
++uint64_t Sim_Hash(const Game *g);
++
++// Hash of everything gameplay depends on that comes from data files rather than code:
++// per fighter the loaded frame counts / frame times / loop points of every animation and the
++// projectile kind (sprites.cfg + the sheet image widths), plus the rule constants in common.h.
++// Two machines must agree on this before a netplay fight starts.
++uint64_t Sim_PlayerConfigHash(const Player *p);
++uint64_t Sim_ConfigHash(const Game *g);
++
++// Fixed-step accumulator: how many SIM_DT ticks to run for a frame of frameDt seconds.
++int Sim_StepsForFrame(double *accum, double frameDt);
++
++// ---- input recording (one file per fight) ----
++typedef struct {
++    char path[400];
++    FILE *f;
++    int fights;
++    bool active;
++} SimRecorder;
++void Rec_Init(SimRecorder *r, const char *path);
++void Rec_FightStart(SimRecorder *r, const Game *g);          // call right after a fight is set up
++void Rec_Tick(SimRecorder *r, const Game *g, const InputBits in[2]);   // after Game_SimTick
++void Rec_FightEnd(SimRecorder *r, const Game *g);
++int  Sim_Replay(const char *path, bool verbose);             // headless; 0 = all hashes match
++int  Sim_RunTests(int argc, char **argv);                    // --sim-test; 0 = PASS
++
++#endif
