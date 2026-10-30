@@ -131,6 +131,20 @@ Vibration isn't used.
 
 ---
 
+## Online versus
+
+Press **Tab** (or **RB**) on the select screen until the mode says **ONLINE**. Then choose:
+
+* **Quick match**: you're paired with the next player who does the same.
+* **Create private room**: you get a 5-character code to send to a friend.
+* **Join room with code**: type the code and press Enter.
+
+In the room, pick your fighter and lock it in (Enter / A). Backspace / B un-readies, and Esc leaves the room. When both players are ready, the face-off plays and the fight starts on both screens at the same time. You always use the P1 keys (WASD + J K U I L O P) or any controller, whichever side you're on. There's no pause online. If someone's connection drops, the fight waits up to 30 s for them to come back.
+
+Both players need the same server. Run the shared server (`shared/netplay/server`, `npm start`) or deploy it to Render, then either copy `netplay.cfg.example` to `netplay.cfg` and set `server = wss://<your-app>.onrender.com/egyptian`, or start the game with `--server ws://host:3000/egyptian` (or set `EF_SERVER`). The default is `ws://localhost:3000/egyptian`.
+
+How it works (lockstep, the same protocol as HD Fighter) and its limits are in [`shared/netplay/README.md`](../shared/netplay/README.md). Both players should run the same build.
+
 ## Asset Folders
 
 ```

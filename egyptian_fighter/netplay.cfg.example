@@ -1,0 +1,3 @@
+# Server for ONLINE mode. Copy to netplay.cfg (next to the game) and point it at your hub.
+# ws:// for a local server, wss:// for a hosted one (Render, Fly.io...).
+server = ws://localhost:3000/egyptian

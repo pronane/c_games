@@ -20,7 +20,25 @@ float LerpAngle(float a, float b, float t)
     return a + WrapAngle(b - a)*t;
 }
 
+/* The race sim has its own generator so an online match can replay it from one seed.
+   Menus, the title demo and visual-only effects keep using rand(). */
+static uint32_t simRng = 0x9e3779b9u;
+
+void SimSeed(uint32_t seed) { simRng = seed ? seed : 0x9e3779b9u; }
+
+uint32_t SimRand(void)
+{
+    uint32_t x = simRng;
+    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    return simRng = x;
+}
+
 float RandF(float lo, float hi)
+{
+    return lo + (hi - lo)*((float)(SimRand() >> 8)/(float)(1u << 24));
+}
+
+float VisRandF(float lo, float hi)
 {
     return lo + (hi - lo)*((float)rand()/(float)RAND_MAX);
 }

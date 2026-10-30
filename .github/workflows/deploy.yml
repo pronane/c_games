@@ -8,5 +8,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      # postinstall also installs shared/netplay/server, which holds the relay
       - run: npm install --prefix HD_Fighter/multiplayer
       - run: timeout 3 npm start --prefix HD_Fighter/multiplayer || true
+      - run: npm test --prefix shared/netplay/server

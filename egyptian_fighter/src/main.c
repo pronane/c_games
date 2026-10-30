@@ -1,4 +1,5 @@
 #include "game.h"
+#include "online.h"
 #include "pad.h"
 
 int RunDemo(int charIndex, const char *outDir);   // demo.c
@@ -29,6 +30,8 @@ int main(int argc, char **argv)
 
     Game game;
     Game_Init(&game);
+    Online_Configure(argc, argv);   // server for the ONLINE mode: --server / EF_SERVER / netplay.cfg
+    Online_AutoStart(&game);
 
     // Important note printed once at startup
     TraceLog(LOG_INFO, "=================================================");
@@ -41,17 +44,19 @@ int main(int argc, char **argv)
     while (!WindowShouldClose())
     {
         Pad_Update();          // hot-plug safe: re-checks every pad each frame
+        Online_Poll(&game);    // online mode: server messages (the fight never pauses online)
+        bool online = game.mode == MODE_ONLINE;
 
         // a controller that belonged to a player was unplugged mid-fight -> pause
         int lost = Pad_LostPlayer();
-        if (lost && game.screen == SCREEN_FIGHT) {
+        if (lost && game.screen == SCREEN_FIGHT && !online) {
             game.paused = true;
             snprintf(game.pauseNote, sizeof(game.pauseNote),
                      "Controller for P%d disconnected - plug it back in (or use the keyboard)", lost);
         }
 
         // Pause only during fight: ESC or Start on any controller
-        if (game.screen == SCREEN_FIGHT && (IsKeyPressed(KEY_ESCAPE) || Pad_Pressed(PAD_ANY, PB_START))) {
+        if (game.screen == SCREEN_FIGHT && !online && (IsKeyPressed(KEY_ESCAPE) || Pad_Pressed(PAD_ANY, PB_START))) {
             game.paused = !game.paused;
             if (!game.paused) game.pauseNote[0] = 0;
         }
@@ -82,6 +87,7 @@ int main(int argc, char **argv)
         EndDrawing();
     }
 
+    Online_Shutdown();
     Game_Unload(&game);
     Gfx_UnloadFonts();
     CloseWindow();

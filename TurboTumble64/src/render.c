@@ -176,7 +176,7 @@ void RenderResize(void)
     int W = GetScreenWidth(), H = GetScreenHeight();
     W = W < 64 ? 64 : W;
     H = H < 64 ? 64 : H;
-    int views = (R.numHumans == 2) ? 2 : 1;
+    int views = (R.numHumans == 2 && G.netView < 0) ? 2 : 1;
     int vh = H/views;
     /* ORIGINAL: ~240 visible lines (N64 320x240 feel), integer point upscale.
        ENHANCED: rendered straight to the (4x MSAA) back buffer at native res. */
@@ -279,7 +279,7 @@ void ParticleSpawnEx(Vector3 p, Vector3 v, Color c, float life, float size, floa
     if (G.settings.visualMode == 1 && R.numParts < MAX_PARTICLES) {   /* ENHANCED: extra particles */
         Particle *e = &R.parts[R.numParts++];
         *e = *q;
-        e->v = (Vector3){ v.x*0.7f + RandF(-1, 1), v.y*0.8f, v.z*0.7f + RandF(-1, 1) };
+        e->v = (Vector3){ v.x*0.7f + VisRandF(-1, 1), v.y*0.8f, v.z*0.7f + VisRandF(-1, 1) };
         e->size = q->size*0.6f; e->life = e->maxLife = life*0.8f;
     }
 }
@@ -544,7 +544,7 @@ void DrawHUD(int view, Rectangle a)
 {
     Kart *k = &R.karts[R.humanKart[view]];
     float u = a.height/720.0f;
-    if (R.numHumans == 2) u = a.height/400.0f;
+    if (R.numHumans == 2 && G.netView < 0) u = a.height/400.0f;
     if (u < 0.5f) u = 0.5f;
     int fs = (int)(30*u);
 
@@ -629,7 +629,7 @@ void DrawHUD(int view, Rectangle a)
         const char *sp = TextFormat("%3d km/h", (int)kmh);
         int sw = MeasureText(sp, (int)(20*u));
         int sx = (int)(a.x + a.width - sw - 24*u), sy = (int)(a.y + a.height - 34*u);
-        if (R.numHumans == 1) sx = (int)(a.x + a.width*0.5f - sw*0.5f);
+        if (R.numHumans == 1 || G.netView >= 0) sx = (int)(a.x + a.width*0.5f - sw*0.5f);
         DrawTextOutlined(sp, sx, sy, (int)(20*u), (Color){ 220, 255, 220, 255 });
         if (k->driftState == 2) {
             Color sc = k->sparkLevel == 2 ? (Color){ 255, 150, 30, 255 } : k->sparkLevel == 1 ? (Color){ 60, 160, 255, 255 } : (Color){ 230, 230, 230, 255 };

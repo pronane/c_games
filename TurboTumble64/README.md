@@ -137,10 +137,20 @@ and writes `assets/characters/<slug>/` (`sprite.png`, `preview.png`, `character.
 
 Built-in characters live in `src/characters.c` (`CHARACTERS[]`) if you prefer code.
 
+## Online VS
+
+**ONLINE VS** on the mode menu races a friend over the internet (the other 6 karts are CPU drivers):
+
+1. **Quick match** pairs you with the next player who does the same. **Create private room** gives you a 5-character code to share, and **Join room with code** uses one.
+2. In the room, press Enter to choose your racer and a track. The first player's track and engine class are raced.
+3. When both are ready, the race starts on both screens at the same time. Each player sees their own kart full screen. There's no pause online. A dropped connection gets 30 s to come back.
+
+Both players need the same server. Run `shared/netplay/server` (`npm start`) or deploy it to Render, then either copy `netplay.cfg.example` to `netplay.cfg` next to the exe and set `server = wss://<your-app>.onrender.com/turbo`, or start the game with `--server ws://host:3000/turbo` (or set `TT_SERVER`). Both players should run the same build. See [`shared/netplay/README.md`](../shared/netplay/README.md) for how it works.
+
 ## Building by hand (MSYS2 UCRT64 shell)
 ```
 pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-raylib
-gcc -std=c99 -O2 src/*.c -o TurboTumble64.exe -lraylib -lopengl32 -lgdi32 -lwinmm -mwindows
+gcc -std=c99 -O2 src/*.c ../shared/netplay/c/netplay.c ../shared/netplay/c/netplay_ws.c -o TurboTumble64.exe -lraylib -lopengl32 -lgdi32 -lwinmm -lwinhttp -mwindows
 ```
 
 ## Testing

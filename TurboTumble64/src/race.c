@@ -72,9 +72,11 @@ void RaceStart(int trackIndex, bool attract)
 {
     TrackBuild(&T, trackIndex);
     memset(&R, 0, sizeof(R));
+    SimSeed(G.mode == MODE_ONLINE && !attract ? G.netSeed : (uint32_t)rand()*2654435761u + 1u);
     R.attract = attract;
     R.timeTrial = (!attract && G.mode == MODE_TT);
-    R.numHumans = attract ? 0 : (G.mode == MODE_VS ? 2 : 1);
+    R.numHumans = attract ? 0 : ((G.mode == MODE_VS || G.mode == MODE_ONLINE) ? 2 : 1);
+    R.netInputs = !attract && G.mode == MODE_ONLINE;
     if (G.autotest && !attract && G.mode != MODE_VS) R.numHumans = 1;
 
     int chars[MAX_RACERS], humanOf[MAX_RACERS];
@@ -89,9 +91,9 @@ void RaceStart(int trackIndex, bool attract)
         for (int h = 0; h < R.numHumans; h++) { chars[n] = G.humanChar[h]; humanOf[n] = h; used[G.humanChar[h]] = true; n++; }
         int pool[MAX_CHARACTERS], pn = 0;
         for (int c = 0; c < NUM_CHARACTERS; c++) if (!used[c]) pool[pn++] = c;
-        for (int i = pn - 1; i > 0; i--) { int j = rand() % (i + 1); int t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+        for (int i = pn - 1; i > 0; i--) { int j = (int)(SimRand() % (uint32_t)(i + 1)); int t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
         for (int i = 0; n < MAX_RACERS && i < pn; i++) { chars[n] = pool[i]; humanOf[n] = -1; n++; }
-        while (n < MAX_RACERS) { chars[n] = rand() % NUM_CHARACTERS; humanOf[n] = -1; n++; }
+        while (n < MAX_RACERS) { chars[n] = (int)(SimRand() % NUM_CHARACTERS); humanOf[n] = -1; n++; }
     }
     R.numKarts = n;
 
@@ -263,6 +265,23 @@ static void UpdateAttractCamera(float dt)
     c->projection = CAMERA_PERSPECTIVE;
 }
 
+/* Online buttons -> KartInput. Bits 0-4: steer -15..15 (+16), 5 accel, 6 brake, 7 hop, 8 item.
+   Presses come from the previous step's bits, which are part of the sim state. */
+static void NetKartInput(int h, KartInput *in)
+{
+    uint16_t b = R.netBits[h], p = R.netPrev[h];
+    memset(in, 0, sizeof(*in));
+    in->steer = Clamp(((int)(b & 31) - 16)/15.0f, -1, 1);
+    bool accel = b & (1 << 5), brake = b & (1 << 6), hop = b & (1 << 7), item = b & (1 << 8);
+    in->accel = accel;
+    in->brake = brake && !accel;
+    in->back = brake;
+    in->hop = hop;
+    in->hopPressed = hop && !(p & (1 << 7));
+    in->item = item;
+    in->itemPressed = item && !(p & (1 << 8));
+}
+
 void RaceUpdate(float dt)
 {
     R.simFrames++;
@@ -284,7 +303,7 @@ void RaceUpdate(float dt)
                     /* rocket start: hit the gas just as "1" shows (0.3s - 1.0s before GO) */
                     if (k->startBoostWindow > 0.3f && k->startBoostWindow < 1.0f) { k->boostTimer = 1.0f; k->boostPower = 0.35f; k->statBoosts++; if (!Quiet()) PlaySfx(SFX_BOOST, 0.8f, 1.0f); }
                     else if (k->startBoostWindow >= 1.6f) { k->spinTimer = 0.8f; }
-                } else if (k->human < 0 && rand() % 3 == 0) {
+                } else if (k->human < 0 && SimRand() % 3 == 0) {
                     k->boostTimer = 0.8f; k->boostPower = 0.3f;
                 }
             }
@@ -296,12 +315,16 @@ void RaceUpdate(float dt)
     for (int i = 0; i < R.numKarts; i++) {
         Kart *k = &R.karts[i];
         KartInput in;
-        if (k->human >= 0 && !k->autopilot) InputRead(k->human, &in);
+        if (k->human >= 0 && !k->autopilot) {
+            if (R.netInputs) NetKartInput(k->human, &in);
+            else InputRead(k->human, &in);
+        }
         else KartAIInput(i, &in, dt);
         if (R.phase == RACE_COUNTDOWN && in.accel && k->startBoostWindow < 0) k->startBoostWindow = R.countdown;
         if (in.itemPressed && (R.phase == RACE_RUNNING || R.phase == RACE_DONE || R.attract)) ItemUse(i);
         KartUpdate(i, &in, dt);
     }
+    if (R.netInputs) for (int h = 0; h < MAX_HUMANS; h++) R.netPrev[h] = R.netBits[h];
     if (R.timeTrial && R.phase == RACE_RUNNING && !R.karts[0].finished) GhostRecord();
     KartsCollide();
     ItemsUpdate(dt);
@@ -314,7 +337,7 @@ void RaceUpdate(float dt)
         UpdateChaseCam(h, dt);
         if (R.bannerTimer[h] > 0) R.bannerTimer[h] -= dt;
         Kart *k = &R.karts[R.humanKart[h]];
-        if (!Quiet()) {
+        if (!Quiet() && (G.netView < 0 || h == G.netView)) {
             EngineSet(h, k->speed/KartTopSpeed(k) + (k->boostTimer > 0 ? 0.25f : 0), G.screen == SCR_RACE ? 0.16f : 0.05f);
             DriftLoop(h, k->driftState == 2 && k->grounded, k->sparkLevel);
         }
@@ -356,15 +379,16 @@ void RaceEnd(void)
 void RaceDraw(void)
 {
     int W = GetScreenWidth(), H = GetScreenHeight();
-    int views = R.attract ? 1 : (R.numHumans == 2 ? 2 : 1);
+    int views = R.attract ? 1 : (R.numHumans == 2 && G.netView < 0 ? 2 : 1);
     int vh = H/views;
+    int hv0 = G.netView >= 0 ? G.netView : 0;     /* online: the one human this window plays */
     if (RenderDirect()) {
         ClearBackground(BLACK);
         for (int v = 0; v < views; v++)
-            RenderWorldView(v, R.cam[v], R.attract ? attractFocus : R.humanKart[v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
+            RenderWorldView(v, R.cam[hv0 + v], R.attract ? attractFocus : R.humanKart[hv0 + v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
     } else {
     for (int v = 0; v < views; v++) {
-        RenderWorldView(v, R.cam[v], R.attract ? attractFocus : R.humanKart[v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
+        RenderWorldView(v, R.cam[hv0 + v], R.attract ? attractFocus : R.humanKart[hv0 + v], (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
     }
     ClearBackground(BLACK);
     }
@@ -386,7 +410,7 @@ void RaceDraw(void)
     }
     if (views == 2) DrawRectangle(0, vh - 2, W, 4, BLACK);
     if (R.attract) return;
-    for (int v = 0; v < views; v++) DrawHUD(v, (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
+    for (int v = 0; v < views; v++) DrawHUD(hv0 + v, (Rectangle){ 0, (float)(v*vh), (float)W, (float)vh });
     float ms = fminf(W, H)*(views == 2 ? 0.26f : 0.24f);
     Rectangle mr = views == 2 ? (Rectangle){ W - ms - 16, H*0.5f - ms*0.5f, ms, ms } : (Rectangle){ W - ms - 20, H - ms - 50, ms, ms };
     DrawMinimap(mr);

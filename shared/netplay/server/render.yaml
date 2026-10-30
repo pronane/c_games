@@ -1,0 +1,11 @@
+# Render blueprint for the shared hub (HD Fighter at /, Egyptian Fighter at /egyptian,
+# TurboTumble64 at /turbo). To use it as a blueprint, copy it to the repository root.
+services:
+  - type: web
+    name: c-games-netplay
+    env: node
+    rootDir: shared/netplay/server
+    buildCommand: npm install
+    startCommand: node hub.js
+    plan: free
+    healthCheckPath: /api/health

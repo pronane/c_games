@@ -1,4 +1,5 @@
 #include "game.h"
+#include "online.h"
 
 // ------------------------------------------------------------------------------------
 // Face-off captions.  Defaults here; assets/captions.cfg (one "folder = caption" per line)
@@ -195,12 +196,89 @@ static void StartFight(Game *g) {
     // test aid: EF_TEST_HP2=<n> starts player 2 with n health (quick KO / victory tests)
     if (getenv("EF_TEST_HP2")) g->player2.health = atoi(getenv("EF_TEST_HP2"));
 
+    g->netPrev[0] = g->netPrev[1] = 0;
+
     // face-off screen first (also in the CPU modes)
     FreeFaces(g);
     MakeFace(g, &g->player1, 0);
     MakeFace(g, &g->player2, 1);
     g->prefightTimer = 0.0f;
     g->screen = SCREEN_PREFIGHT;
+}
+
+void Game_LoadFight(Game *g) { StartFight(g); }
+
+// Player_Init clears the struct: keep what Player_LoadSprites set.
+static void ResetFighter(Player *p, float x, int facing) {
+    SpriteSheet sheets[STATE_COUNT];
+    memcpy(sheets, p->sheets, sizeof(sheets));
+    float scale = p->spriteScale, anchor = p->spriteAnchorX;
+    int proj = p->projectileKind, ch = p->characterIndex;
+    Player_Init(p, x, GROUND_Y, facing, ch);
+    memcpy(p->sheets, sheets, sizeof(sheets));
+    p->spriteScale = scale;
+    p->spriteAnchorX = anchor;
+    p->projectileKind = proj;
+}
+
+void Game_ResetFight(Game *g) {
+    ResetFighter(&g->player1, 300.0f, 1);
+    ResetFighter(&g->player2, 980.0f, -1);
+    memset(g->projectiles, 0, sizeof(g->projectiles));
+    g->cpuAttackCooldown = 40;
+    g->gameOver = false;
+    g->winner = 0;
+    g->roundTimer = 99.0f;
+    g->paused = false;
+    g->pauseNote[0] = 0;
+    g->padWaitRelease = false;
+    g->netPrev[0] = g->netPrev[1] = 0;
+}
+
+// bits: 0 left 1 right 2 up 3 down 4 punch 5 kick 6 special1 7 special2 8 block 9 throw 10 taunt.
+// They are held states; a "pressed" move is down this frame and up the frame before.
+void Game_ApplyBits(Player *p, uint16_t b, uint16_t prev) {
+#define BIT_DOWN(i)  (((b) >> (i)) & 1)
+#define BIT_PRESS(i) (BIT_DOWN(i) && !(((prev) >> (i)) & 1))
+    p->inputLeft       = BIT_DOWN(0);
+    p->inputRight      = BIT_DOWN(1);
+    p->inputUp         = BIT_DOWN(2);
+    p->inputDown       = BIT_DOWN(3);
+    p->inputPunch      = BIT_PRESS(4);
+    p->inputKick       = BIT_PRESS(5);
+    p->inputSpecial1   = BIT_PRESS(6);
+    p->inputSpecial2   = BIT_PRESS(7);
+    p->inputBlock      = BIT_DOWN(8);
+    p->inputThrow      = BIT_PRESS(9);
+    p->inputTaunt      = BIT_PRESS(10);
+    p->inputJumpAttack = p->inputPunch || p->inputKick;
+#undef BIT_DOWN
+#undef BIT_PRESS
+}
+
+#define HASH_FIELD(h, v) ((h) = Np_HashBytes((h), &(v), (int)sizeof(v)))
+static uint32_t HashPlayer(uint32_t h, const Player *p) {
+    HASH_FIELD(h, p->position); HASH_FIELD(h, p->velocity); HASH_FIELD(h, p->onGround);
+    HASH_FIELD(h, p->facing); HASH_FIELD(h, p->state); HASH_FIELD(h, p->prevState);
+    HASH_FIELD(h, p->currentFrame); HASH_FIELD(h, p->frameTimer); HASH_FIELD(h, p->stateTimer);
+    HASH_FIELD(h, p->health); HASH_FIELD(h, p->invincible); HASH_FIELD(h, p->invincibleTimer);
+    HASH_FIELD(h, p->attackActive); HASH_FIELD(h, p->hitbox); HASH_FIELD(h, p->hurtbox);
+    HASH_FIELD(h, p->projectileFired); HASH_FIELD(h, p->characterIndex);
+    return h;
+}
+
+uint32_t Game_Hash(const Game *g) {
+    uint32_t h = NP_HASH_INIT;
+    h = HashPlayer(h, &g->player1);
+    h = HashPlayer(h, &g->player2);
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        const Projectile *pr = &g->projectiles[i];
+        if (!pr->active) continue;
+        HASH_FIELD(h, i); HASH_FIELD(h, pr->kind); HASH_FIELD(h, pr->owner);
+        HASH_FIELD(h, pr->pos); HASH_FIELD(h, pr->vx); HASH_FIELD(h, pr->age);
+    }
+    HASH_FIELD(h, g->roundTimer); HASH_FIELD(h, g->gameOver); HASH_FIELD(h, g->winner);
+    return h;
 }
 
 void Game_Unload(Game *g) {
@@ -610,9 +688,36 @@ static int GridMove(int sel, int dx, int dy) {
     return i;
 }
 
-// two independent cursors only in 1P vs 2P with two controllers plugged in
+// two independent cursors only in 1P vs 2P with two controllers plugged in (and online: one each)
 static bool SelectDual(const Game *g) {
+    if (g->mode == MODE_ONLINE) return true;
     return g->mode == MODE_1P_VS_2P && Pad_ForPlayer(1) != PAD_NONE && Pad_ForPlayer(2) != PAD_NONE;
+}
+
+// Everything in here must depend only on the players' input flags and dt: online,
+// both machines run it with the same inputs and must stay identical (Game_Hash).
+void Game_FightStep(Game *g, float dt) {
+    g->player1.opponentX = g->player2.position.x;
+    g->player2.opponentX = g->player1.position.x;
+    Player_Update(&g->player1, dt);
+    Player_Update(&g->player2, dt);
+
+    KeepPlayersApart(&g->player1, &g->player2);
+    SpawnProjectiles(g, &g->player1, 1);
+    SpawnProjectiles(g, &g->player2, 2);
+    UpdateProjectiles(g, dt);
+    CheckHits(g);
+
+    g->roundTimer -= dt;
+    if (g->roundTimer <= 0.0f) {
+        g->roundTimer = 0.0f;
+        g->gameOver = true;
+        if (g->player1.health > g->player2.health) g->winner = 1;
+        else if (g->player2.health > g->player1.health) g->winner = 2;
+        else g->winner = 0;
+        if (g->winner) Player_SetState(g->winner == 1 ? &g->player1 : &g->player2, STATE_VICTORY);
+        g->screen = SCREEN_RESULT;
+    }
 }
 
 void Game_Update(Game *g) {
@@ -630,17 +735,22 @@ void Game_Update(Game *g) {
             if (++g->startPending > 2) { g->startPending = 0; StartFight(g); }
             return;
         }
+        if (g->mode == MODE_ONLINE) {          // our cursor only; the other side comes from the server
+            Online_SelectUpdate(g);
+            return;
+        }
         if (IsKeyPressed(KEY_F1) || Pad_Pressed(PAD_ANY, PB_BACK)) {   // controller test / controls
             g->screen = SCREEN_PADTEST;
             return;
         }
         int modeStep = 0;
         if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_E) || Pad_Pressed(PAD_ANY, PB_RB)) modeStep = 1;
-        else if (IsKeyPressed(KEY_Q) || Pad_Pressed(PAD_ANY, PB_LB)) modeStep = 2;
+        else if (IsKeyPressed(KEY_Q) || Pad_Pressed(PAD_ANY, PB_LB)) modeStep = MODE_COUNT - 1;
         if (modeStep) {
-            g->mode = (g->mode + modeStep) % 3;
+            g->mode = (g->mode + modeStep) % MODE_COUNT;
             g->p1Ready = false;
             g->p2Ready = false;
+            if (g->mode == MODE_ONLINE) Online_Enter(g);
             return;
         }
 
@@ -703,6 +813,17 @@ void Game_Update(Game *g) {
     }
 
     // ---------- PRE-FIGHT FACE-OFF ----------
+    if (g->screen == SCREEN_ONLINE) {
+        Online_MenuUpdate(g);
+        return;
+    }
+
+    if (g->mode == MODE_ONLINE && (g->screen == SCREEN_PREFIGHT || g->screen == SCREEN_FIGHT)) {
+        if (g->screen == SCREEN_PREFIGHT) g->prefightTimer += dt;
+        Online_FightUpdate(g);
+        return;
+    }
+
     if (g->screen == SCREEN_PREFIGHT) {
         g->prefightTimer += dt;
         bool skip = g->prefightTimer > 0.35f &&
@@ -744,27 +865,7 @@ void Game_Update(Game *g) {
             ApplyPad(g, &g->player2, Pad_ForPlayer(2));
         }
 
-        g->player1.opponentX = g->player2.position.x;
-        g->player2.opponentX = g->player1.position.x;
-        Player_Update(&g->player1, dt);
-        Player_Update(&g->player2, dt);
-
-        KeepPlayersApart(&g->player1, &g->player2);
-        SpawnProjectiles(g, &g->player1, 1);
-        SpawnProjectiles(g, &g->player2, 2);
-        UpdateProjectiles(g, dt);
-        CheckHits(g);
-
-        g->roundTimer -= dt;
-        if (g->roundTimer <= 0.0f) {
-            g->roundTimer = 0.0f;
-            g->gameOver = true;
-            if (g->player1.health > g->player2.health) g->winner = 1;
-            else if (g->player2.health > g->player1.health) g->winner = 2;
-            else g->winner = 0;
-            if (g->winner) Player_SetState(g->winner == 1 ? &g->player1 : &g->player2, STATE_VICTORY);
-            g->screen = SCREEN_RESULT;
-        }
+        Game_FightStep(g, dt);
         return;
     }
 
@@ -926,6 +1027,7 @@ static bool SlotIsCpu(const Game *g, int slot) {
     return slot == 0 ? g->mode == MODE_CPU_VS_1P : g->mode == MODE_1P_VS_CPU;
 }
 static const char *SlotLabel(const Game *g, int slot) {
+    if (g->mode == MODE_ONLINE) return slot == Online_MySlot() ? "YOU" : "RIVAL";
     if (SlotIsCpu(g, slot)) return "CPU";
     if (slot == 0) return "P1";
     return g->mode == MODE_CPU_VS_1P ? "P1" : "P2";
@@ -961,14 +1063,14 @@ static void DrawSelect(const Game *g) {
     DrawCentered("EGYPTIAN FIGHTER", 22, 44, GOLD);
 
     // mode row
-    static const char *modes[3] = { "1P vs CPU", "CPU vs 1P", "1P vs 2P" };
+    static const char *modes[MODE_COUNT] = { "1P vs CPU", "CPU vs 1P", "1P vs 2P", "ONLINE" };
     int mw = 0;
-    for (int m = 0; m < 3; m++) mw += MeasureText(modes[m], 20) + 12 + 14;
+    for (int m = 0; m < MODE_COUNT; m++) mw += MeasureText(modes[m], 20) + 12 + 14;
     const char *mlab = "MODE:";
     int mx = SCREEN_WIDTH / 2 - (mw + MeasureText(mlab, 20) + 10) / 2;
     DrawText(mlab, mx, 78, 20, LIGHTGRAY);
     mx += MeasureText(mlab, 20) + 10;
-    for (int m = 0; m < 3; m++) {
+    for (int m = 0; m < MODE_COUNT; m++) {
         bool on = (int)g->mode == m;
         DrawChip(modes[m], mx, 75, 20, on ? GOLD : (Color){ 60, 60, 70, 220 }, on ? BLACK : GRAY);
         mx += MeasureText(modes[m], 20) + 12 + 14;
@@ -1023,11 +1125,12 @@ static void DrawSelect(const Game *g) {
         }
         // which inputs drive this slot
         const char *by;
-        if (SlotIsCpu(g, k)) by = "Picked with the same controller";
+        if (g->mode == MODE_ONLINE) by = k == Online_MySlot() ? "Keyboard or any controller" : "Online opponent";
+        else if (SlotIsCpu(g, k)) by = "Picked with the same controller";
         else if (dual) by = TextFormat("%s", Pad_Describe(Pad_ForPlayer(k + 1)));
         else by = "Keyboard or any controller";
         DrawText(by, px + 20, py + 352, 16, LIGHTGRAY);
-        if (dual) DrawText(k == 0 ? "keys: WASD + J ready, Backspace back" : "keys: arrows + Z ready, X back",
+        if (dual && g->mode != MODE_ONLINE) DrawText(k == 0 ? "keys: WASD + J ready, Backspace back" : "keys: arrows + Z ready, X back",
                            px + 20, py + 374, 16, GRAY);
     }
 
@@ -1088,6 +1191,7 @@ static void DrawSelect(const Game *g) {
         DrawRectangle(0, 300, SCREEN_WIDTH, 90, (Color){ 0, 0, 0, 200 });
         DrawCentered("LOADING FIGHTERS...", 326, 40, GOLD);
     }
+    if (g->mode == MODE_ONLINE) Online_DrawStatus(g);
 }
 
 void Game_Draw(const Game *g) {
@@ -1102,6 +1206,11 @@ void Game_Draw(const Game *g) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){30, 30, 50, 255});
     }
 
+    if (g->screen == SCREEN_ONLINE) {
+        Online_DrawMenu(g);
+        return;
+    }
+
     // ---------- SELECT SCREEN ----------
     if (g->screen == SCREEN_SELECT) {
         DrawSelect(g);
@@ -1111,6 +1220,7 @@ void Game_Draw(const Game *g) {
     // ---------- PRE-FIGHT FACE-OFF ----------
     if (g->screen == SCREEN_PREFIGHT) {
         DrawPrefight(g);
+        if (g->mode == MODE_ONLINE) Online_DrawStatus(g);
         return;
     }
 
@@ -1207,8 +1317,10 @@ void Game_Draw(const Game *g) {
     int tw = MeasureText(timerText, 40);
     DrawText(timerText, SCREEN_WIDTH/2 - tw/2, 25, 40, YELLOW);
 
+    if (g->mode == MODE_ONLINE) Online_DrawStatus(g);
+
     // Controls reminder
-    DrawText("P1: WASD+J/K/U/I/L/O/P   P2: Arrows+Z/X/C/V/B/N/M   ESC=Pause   "
+    if (g->mode != MODE_ONLINE) DrawText("P1: WASD+J/K/U/I/L/O/P   P2: Arrows+Z/X/C/V/B/N/M   ESC=Pause   "
              "Pad: X punch  Y kick  A jump  B/LT sp1  RT sp2  RB block  LB throw  Back taunt  Start pause",
              12, SCREEN_HEIGHT - 26, 14, LIGHTGRAY);
 
@@ -1220,6 +1332,7 @@ void Game_Draw(const Game *g) {
         if (g->winner == 1) msg = "PLAYER 1 WINS!";
         if (g->winner == 1) msg = (g->mode == MODE_CPU_VS_1P) ? "CPU WINS!" : "PLAYER 1 WINS!";
         if (g->winner == 2) msg = (g->mode == MODE_1P_VS_CPU) ? "CPU WINS!" : "PLAYER 2 WINS!";
+        if (g->mode == MODE_ONLINE && g->winner) msg = g->winner - 1 == Online_MySlot() ? "YOU WIN!" : "YOU LOSE";
         Gfx_DrawTitle(gTitleFont, msg, (Vector2){ SCREEN_WIDTH / 2.0f, 155 }, 64, GOLD, (Color){ 90, 20, 10, 255 }, 4);
         const char *back = "Press R / Enter or pad A / Start to return to Character Select";
         DrawText(back, SCREEN_WIDTH/2 - MeasureText(back, 22)/2, 198, 22, RAYWHITE);

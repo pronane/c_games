@@ -1,6 +1,7 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include <stdint.h>
 #include "player.h"
 #include "pad.h"
 
@@ -9,13 +10,16 @@ typedef enum {
     SCREEN_FIGHT,
     SCREEN_RESULT,
     SCREEN_PADTEST,      // controller test + controls help
-    SCREEN_PREFIGHT      // "PADEL WARS" face-off between select and fight
+    SCREEN_PREFIGHT,     // "PADEL WARS" face-off between select and fight
+    SCREEN_ONLINE        // online menu: quick match / create / join (online.c)
 } GameScreen;
 
 typedef enum {
     MODE_1P_VS_CPU = 0,
     MODE_CPU_VS_1P,
-    MODE_1P_VS_2P
+    MODE_1P_VS_2P,
+    MODE_ONLINE,         // two players over the internet (online.c)
+    MODE_COUNT
 } SelectMode;
 
 typedef struct {
@@ -69,11 +73,20 @@ typedef struct {
 
     bool padWaitRelease;   // ignore a pad A/Start still held from the select screen
     char pauseNote[128];   // e.g. "P1 controller disconnected"
+
+    uint16_t netPrev[2];   // online: last frame's input bits (press = down now, up before)
 } Game;
 
 void Game_Init(Game *g);
 void Game_Update(Game *g);
 void Game_Draw(const Game *g);
 void Game_Unload(Game *g);
+
+// online lockstep (online.c): the fight step is deterministic with a fixed dt and these inputs
+void Game_LoadFight(Game *g);                  // load selectP1/P2 sprites, face-off screen
+void Game_ResetFight(Game *g);                 // round start state, sprites kept
+void Game_FightStep(Game *g, float dt);        // one sim step from the players' input flags
+void Game_ApplyBits(Player *p, uint16_t bits, uint16_t prev);
+uint32_t Game_Hash(const Game *g);
 
 #endif

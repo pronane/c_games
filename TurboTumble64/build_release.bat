@@ -52,9 +52,9 @@ for /f "delims=" %%V in ('gcc -dumpversion 2^>nul') do set "GCCVER=%%V"
 echo [ok] gcc %GCCVER%
 
 rem ---------------------------------------------------------------- 3. compile
-set "SRC=src\main.c src\util.c src\characters.c src\tracks.c src\kart.c src\items.c src\render.c src\race.c src\menu.c src\audio.c src\input.c src\padraw.c"
+set "SRC=src\main.c src\util.c src\characters.c src\tracks.c src\kart.c src\items.c src\render.c src\race.c src\menu.c src\audio.c src\input.c src\padraw.c src\online.c ..\shared\netplay\c\netplay.c ..\shared\netplay\c\netplay_ws.c"
 set "CFLAGS=-std=c99 -O2 -Wall -Wno-missing-braces"
-set "SYSLIBS=-lopengl32 -lgdi32 -lwinmm"
+set "SYSLIBS=-lopengl32 -lgdi32 -lwinmm -lwinhttp"
 if exist "%GAME%.exe" del /q "%GAME%.exe" >nul 2>&1
 if exist "%GAME%.exe" (
     echo [ERROR] %GAME%.exe is in use - close the game and run me again.

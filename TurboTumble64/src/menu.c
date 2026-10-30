@@ -1,6 +1,7 @@
 /* menu.c : input mapping, title / mode / options / character / track select,
  * pause, results and Grand Prix standings screens */
 #include "common.h"
+#include "online.h"
 
 /* ------------------------------------------------------------------ */
 /* settings                                                             */
@@ -91,14 +92,15 @@ void MenusUpdate(float dt)
         else if (IsKeyPressed(KEY_ESCAPE)) G.quit = true;
         break;
     case SCR_MODE:
-        if (MenuUp()) Move(&G.menuSel, 5, -1);
-        if (MenuDown()) Move(&G.menuSel, 5, 1);
+        if (MenuUp()) Move(&G.menuSel, 6, -1);
+        if (MenuDown()) Move(&G.menuSel, 6, 1);
         if (MenuBack()) { PlaySfx(SFX_MENU_BACK, 0.7f, 1); GoToScreen(SCR_TITLE); break; }
         if (MenuOk()) {
             PlaySfx(SFX_MENU_OK, 0.7f, 1);
             int s = G.menuSel;
-            if (s == 3) { GoToScreen(SCR_OPTIONS); break; }
-            if (s == 4) { G.quit = true; break; }
+            if (s == 3) { OnlineEnter(); break; }
+            if (s == 4) { GoToScreen(SCR_OPTIONS); break; }
+            if (s == 5) { G.quit = true; break; }
             G.mode = s == 0 ? MODE_GP : (s == 1 ? MODE_TT : MODE_VS);
             G.numHumans = G.mode == MODE_VS ? 2 : 1;
             G.charLocked[0] = G.charLocked[1] = false;
@@ -122,7 +124,7 @@ void MenusUpdate(float dt)
             }
         }
         if (MenuOk() && G.menuSel == 6) { PlaySfx(SFX_MENU_OK, 0.7f, 1); GoToScreen(SCR_CONTROLS); break; }
-        if (MenuBack() || (MenuOk() && G.menuSel == 7)) { SaveSettings(); PlaySfx(SFX_MENU_BACK, 0.7f, 1); GoToScreen(SCR_MODE); G.menuSel = 3; }
+        if (MenuBack() || (MenuOk() && G.menuSel == 7)) { SaveSettings(); PlaySfx(SFX_MENU_BACK, 0.7f, 1); GoToScreen(SCR_MODE); G.menuSel = 4; }
     } break;
     case SCR_CONTROLS: {
         /* rows: 0..4 actions, 5 reset defaults, 6 back */
@@ -162,7 +164,7 @@ void MenusUpdate(float dt)
                 }
                 if (PlayerBack(p) && G.screenTime > 0.2f) {
                     PlaySfx(SFX_MENU_BACK, 0.7f, 1);
-                    GoToScreen(SCR_MODE);
+                    GoToScreen(G.mode == MODE_ONLINE ? SCR_ONLINE : SCR_MODE);
                     return;
                 }
             } else if (PlayerBack(p)) { G.charLocked[p] = false; PlaySfx(SFX_MENU_BACK, 0.7f, 1); }
@@ -182,11 +184,19 @@ void MenusUpdate(float dt)
         if (MenuOk() && G.screenTime > 0.2f) {
             PlaySfx(SFX_MENU_OK, 0.7f, 1);
             G.trackIndex = G.menuSel;
+            if (G.mode == MODE_ONLINE) { OnlineSubmitPick(); GoToScreen(SCR_ONLINE); break; }
             RaceStart(G.trackIndex, false);
             GoToScreen(SCR_RACE);
         }
         break;
+    case SCR_ONLINE:
+        OnlineMenuUpdate();
+        break;
     case SCR_RACE:
+        if (G.mode == MODE_ONLINE) {         /* no pause or skipping: the race is shared */
+            if (OnlineRaceOver()) { RaceEnd(); GoToScreen(SCR_RESULTS); }
+            break;
+        }
         if (G.paused) {
             if (MenuUp()) Move(&G.pauseSel, 3, -1);
             if (MenuDown()) Move(&G.pauseSel, 3, 1);
@@ -209,7 +219,9 @@ void MenusUpdate(float dt)
         }
         break;
     case SCR_RESULTS:
-        if (G.mode == MODE_GP) {
+        if (G.mode == MODE_ONLINE) {
+            if (MenuOk() && G.screenTime > 0.6f) { PlaySfx(SFX_MENU_OK, 0.7f, 1); OnlineBackToLobby(); }
+        } else if (G.mode == MODE_GP) {
             if (MenuOk() && G.screenTime > 0.6f) { PlaySfx(SFX_MENU_OK, 0.7f, 1); GoToScreen(SCR_STANDINGS); }
         } else {
             if (MenuUp()) Move(&G.menuSel, 3, -1);
@@ -407,7 +419,9 @@ static void DrawResults(void)
         DrawTextCentered(TextFormat("BEST LAP %s", FormatTime(k->bestLap)), W/2, (int)(240*u), (int)(26*u), (Color){ 160, 220, 255, 255 });
         DrawTextCentered(TextFormat("RECORD %s", FormatTime(G.bestTimes[T.index])), W/2, (int)(280*u), (int)(26*u), (Color){ 120, 255, 160, 255 });
     }
-    if (G.mode != MODE_GP) {
+    if (G.mode == MODE_ONLINE) {
+        DrawTextCentered("PRESS ENTER - back to the online room", W/2, (int)(p.y + p.height + 14*u), (int)(24*u), ((int)(G.time*2) & 1) ? WHITE : (Color){ 255, 230, 60, 255 });
+    } else if (G.mode != MODE_GP) {
         const char *opts[3] = { "RACE AGAIN", "CHANGE TRACK", "MAIN MENU" };
         for (int i = 0; i < 3; i++) {
             Color c = i == G.menuSel ? (Color){ 255, 230, 60, 255 } : WHITE;
@@ -599,6 +613,7 @@ void MenusDraw(void)
     if (G.screen == SCR_TROPHY) { DrawTrophyScreen(); return; }
     RaceDraw();
     if (G.screen == SCR_RACE) {
+        if (G.mode == MODE_ONLINE) OnlineDrawRaceStatus();
         if (G.paused) {
             DrawRectangle(0, 0, W, H, (Color){ 0, 0, 0, 140 });
             DrawTextCentered("PAUSED", W/2, (int)(H*0.28f), (int)(64*u), (Color){ 255, 230, 60, 255 });
@@ -611,6 +626,7 @@ void MenusDraw(void)
     if (G.screen == SCR_RESULTS) { DrawRectangle(0, 0, W, H, (Color){ 0, 0, 0, 90 }); DrawResults(); return; }
     if (G.screen == SCR_STANDINGS) { DrawRectangle(0, 0, W, H, (Color){ 0, 0, 0, 90 }); DrawStandings(); return; }
 
+    if (G.screen == SCR_ONLINE) { OnlineDraw(); return; }
     DrawRectangle(0, 0, W, H, (Color){ 0, 0, 20, G.screen == SCR_TITLE ? 60 : 150 });
     switch (G.screen) {
     case SCR_TITLE: {
@@ -636,17 +652,18 @@ void MenusDraw(void)
     } break;
     case SCR_MODE: {
         DrawLogo(W/2, (int)(50*u), (int)(60*u));
-        const char *opts[5] = { "GRAND PRIX", "TIME TRIAL", "VS  (2 PLAYERS)", "OPTIONS", "QUIT" };
-        const char *desc[5] = { "Race all 4 tracks for the Tumble Cup. Points: 9-6-3-1.",
+        const char *opts[6] = { "GRAND PRIX", "TIME TRIAL", "VS  (2 PLAYERS)", "ONLINE VS", "OPTIONS", "QUIT" };
+        const char *desc[6] = { "Race all 4 tracks for the Tumble Cup. Points: 9-6-3-1.",
                                 "Just you, the clock and three hot peppers.",
                                 "Split-screen showdown with 6 CPU rivals.",
+                                "Race a friend over the internet: quick match or a room code.",
                                 "Engine class, display style, volume.", "See you next time!" };
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6; i++) {
             bool s = i == G.menuSel;
-            Rectangle r = { W*0.5f - 240*u, 170*u + i*80*u, 480*u, 64*u };
+            Rectangle r = { W*0.5f - 240*u, 160*u + i*74*u, 480*u, 60*u };
             DrawRectangleRounded(r, 0.3f, 6, s ? (Color){ 230, 60, 60, 230 } : (Color){ 30, 30, 70, 210 });
             if (s) DrawRectangleRoundedLinesEx(r, 0.3f, 6, 4*u, (Color){ 255, 230, 60, 255 });
-            DrawTextCentered(opts[i], W/2, (int)(r.y + 14*u), (int)(36*u), WHITE);
+            DrawTextCentered(opts[i], W/2, (int)(r.y + 12*u), (int)(36*u), WHITE);
         }
         DrawTextCentered(desc[G.menuSel], W/2, (int)(H - 60*u), (int)(22*u), (Color){ 255, 240, 200, 255 });
         DrawTextCentered(TextFormat("Engine class: %dcc", G.settings.cc == 0 ? 50 : G.settings.cc == 1 ? 100 : 150), W/2, (int)(H - 30*u), (int)(18*u), (Color){ 180, 220, 255, 255 });

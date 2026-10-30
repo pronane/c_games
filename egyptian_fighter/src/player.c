@@ -460,9 +460,9 @@ static void UpdatePhysics(Player *p, float dt) {
     if (p->position.x > SCREEN_WIDTH - 40.0f) p->position.x = SCREEN_WIDTH - 40.0f;
 }
 
-static void HandleInputAndState(Player *p) {
+static void HandleInputAndState(Player *p, float dt) {
     if (p->invincible) {
-        p->invincibleTimer -= GetFrameTime();
+        p->invincibleTimer -= dt;
         if (p->invincibleTimer <= 0.0f) {
             p->invincible = false;
         }
@@ -543,7 +543,7 @@ static void HandleInputAndState(Player *p) {
 void Player_Update(Player *p, float dt) {
     p->stateTimer += dt;
 
-    HandleInputAndState(p);
+    HandleInputAndState(p, dt);
     UpdatePhysics(p, dt);
     UpdateAnimation(p, dt);
 

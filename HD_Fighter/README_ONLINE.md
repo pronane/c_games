@@ -2,6 +2,8 @@
 
 Two browsers share a room on the Node server in `multiplayer/`. The server relays inputs and keeps the room; each browser runs the fight.
 
+The room/relay code now lives in [`shared/netplay/server`](../shared/netplay/README.md) so Egyptian Fighter and TurboTumble64 use the same protocol. `multiplayer/server.js` only adds HD Fighter's settings and web client. `npm install` here also installs the shared package (`postinstall`).
+
 ## Play
 
 1. One player chooses **Create Private Room** or **Quick Play**. A private room gets a 5-character code such as `K7Q2M` (not a counter like `R0001`).
