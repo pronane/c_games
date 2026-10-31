@@ -140,17 +140,54 @@ def erase_region(keep, rgb, seed):
     return k2, int(reg.sum() + spur.sum())
 
 
-def person_cutout(photo, which="largest", out_dir="", model="", margin=12, loose_px=10, erase=(), log=print):
+def _load_landmarks_in(path):
+    """33 x [x, y, vis] in photo pixels: {"landmarks": [...]} or a bare list."""
+    d = json.load(open(path))
+    L = d["landmarks"] if isinstance(d, dict) else d
+    if len(L) != 33:
+        raise RuntimeError("%s: need 33 MediaPipe-format landmarks, got %d" % (path, len(L)))
+    return [[float(v) for v in l[:3]] + ([] if len(l) >= 3 else [1.0]) for l in L]
+
+
+def _have_rembg():
+    try:
+        import rembg  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def person_cutout(photo, which="largest", out_dir="", model="", margin=12, loose_px=10, erase=(), log=print,
+                  landmarks_in=None, exclude=()):
     im = ImageOps.exif_transpose(Image.open(photo)).convert("RGB")
     W, H = im.size
     out_dir = out_dir or os.path.splitext(photo)[0] + "_cutout"
     os.makedirs(out_dir, exist_ok=True)
-    A, mname = matte(im, model, log)
-    pdir = os.path.join(out_dir, "people")
-    d = detect_people(photo, pdir, log)
-    people = d["people"]
-    sel = choose(people, which)
-    masks = np.stack([np.asarray(Image.open(os.path.join(pdir, p["mask"]))).astype(np.float32) / 255 for p in people])
+    if landmarks_in:
+        # landmarks from outside (hand-placed, another detector): no pose network needed.  The matte is rembg
+        # when installed (limited to the region around this skeleton), else the offline pose-seeded GrabCut.
+        from . import posematte
+        lms_in = _load_landmarks_in(landmarks_in)
+        log("  landmarks: %s (33 points supplied, detector skipped)" % landmarks_in)
+        gc = posematte.pose_grabcut(im, lms_in, exclude, log=log)
+        if _have_rembg() and model != "grabcut":
+            A, mname = matte(im, model, log)
+            A = np.where(ndi.binary_dilation(gc > 0.1, iterations=12), A, 0.0)
+        else:
+            A, mname = gc, "pose-grabcut"
+        people = [{"index": 0, "landmarks": lms_in, "mask": None, "cx": 0, "area": 1}]
+        sel = people[0]
+        masks = posematte.person_mask_from_alpha(A)[None]
+    else:
+        A, mname = matte(im, model, log)
+        pdir = os.path.join(out_dir, "people")
+        d = detect_people(photo, pdir, log)
+        people = d["people"]
+        sel = choose(people, which)
+        masks = np.stack([np.asarray(Image.open(os.path.join(pdir, p["mask"]))).astype(np.float32) / 255 for p in people])
+        if mname == "threshold":     # no rembg: the border-colour cut-out fails on real backgrounds - use the pose
+            from . import posematte  # the detector just gave us to seed GrabCut instead
+            A, mname = posematte.pose_grabcut(im, sel["landmarks"], exclude, log=log), "pose-grabcut"
     owner = masks.argmax(0)
     weak = masks.max(0) < 0.15
     if weak.any() and len(people) > 1:      # nobody's mask covers it: nearest person

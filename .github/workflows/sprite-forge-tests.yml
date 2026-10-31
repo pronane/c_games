@@ -1,0 +1,28 @@
+name: Sprite Forge tests
+on:
+  push:
+    paths: ["sprite_forge/**", ".github/workflows/sprite-forge-tests.yml"]
+  pull_request:
+    paths: ["sprite_forge/**", ".github/workflows/sprite-forge-tests.yml"]
+jobs:
+  limbs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sprite_forge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-core.txt
+      # renders a front mannequin with exact landmarks and checks all 14 fighter moves front / 35 deg / 90 deg:
+      # limbs attached, one piece, feet present, no flapping, no snaps, no wrong-way knees / elbows
+      - run: python tools/test_limbs.py --selftest limbs_selftest
+      - run: python tools/test_v8.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: limbs-selftest
+          path: sprite_forge/limbs_selftest

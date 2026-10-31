@@ -22,13 +22,21 @@ def main(argv):
     ap.add_argument("--erase", action="append", default=[], metavar="X,Y[,TOL]",
                     help="remove an object the matte kept (bag, bin, post): region grown from this photo pixel; repeatable")
     ap.add_argument("--loose-px", type=int, default=10, help="keep matte pixels at most this far outside the person mask (drops touching objects)")
-    ap.add_argument("--matte-model", default="", help="rembg model (default birefnet-portrait)")
+    ap.add_argument("--matte-model", default="", help="rembg model (default birefnet-portrait); 'grabcut' = offline pose-seeded matte")
+    ap.add_argument("--landmarks-in", default="", metavar="JSON",
+                    help="33 MediaPipe-format points [x,y,vis] in photo pixels (hand-placed or from another tool): "
+                         "skips the pose detector; without rembg the matte is the offline pose-seeded GrabCut")
+    ap.add_argument("--exclude", action="append", default=[], metavar="X,Y,R",
+                    help="force a disc of the photo to background (another person, a bag); repeatable")
     ap.add_argument("--sprite", default="240x400:394:280", help="normal sprite cell WxH:baseline:stand_height")
     ap.add_argument("--hd", default="480x800:788:560", help="HD sprite cell WxH:baseline:stand_height")
     a = ap.parse_args(argv)
     from sforge import person as P
     print("Sprite Forge cutout: %s  (person = %s)" % (a.photo, a.person))
-    cut, info = P.person_cutout(a.photo, a.person, a.out, a.matte_model, loose_px=a.loose_px, erase=[tuple(float(v) for v in e.split(',')) for e in a.erase])
+    cut, info = P.person_cutout(a.photo, a.person, a.out, a.matte_model, loose_px=a.loose_px,
+                                erase=[tuple(float(v) for v in e.split(',')) for e in a.erase],
+                                landmarks_in=a.landmarks_in or None,
+                                exclude=[tuple(float(v) for v in e.split(',')) for e in a.exclude])
     res = P.verify(cut, a.out, info)
     for tag, spec, fn in (("sprite", a.sprite, "sprite.png"), ("HD sprite", a.hd, "sprite_hd.png")):
         w, h, b, st = _spec(spec)

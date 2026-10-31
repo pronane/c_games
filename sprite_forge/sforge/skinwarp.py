@@ -17,7 +17,8 @@ and exporters keep working) and replaces only the rendering:
   * the figure is grounded before it is drawn, so each frame is resampled once.
 
 Every output pixel is a pixel of the person's own photo, moved.  Nothing is generated.
-If a hidden hand was faked (rig.fist) the classic renderer is used for that build.
+v9.2: a hidden hand (rig.fist: a mirrored copy of the visible hand) is supported - the arm is skinned with the
+forearm cut at the wrist and the fist is drawn rigidly with the forearm, exactly as the classic renderer does it.
 
 Measured (mannequin test, 8 moves): the classic puppet has 4-5 separate pixel islands in kick / punch / jump
 frames (detached forearms and shins); this renderer has 3 (body + two hands/feet clusters) in every frame.
@@ -106,7 +107,7 @@ class SkinRig(PP.Rig):
     def __init__(self, cut, landmarks, pad_frac=0.75, colour_ref=None, ss=None):
         super().__init__(cut, landmarks, pad_frac=pad_frac, colour_ref=colour_ref)
         self.ss = int(ss or self.SS)
-        self._skin_ok = not self.fist
+        self._skin_ok = True
         self._limbs = {}
         self._body_src = None
         if self._skin_ok:
@@ -116,10 +117,14 @@ class SkinRig(PP.Rig):
         J, A = self.J, self.A
         sw = math.hypot(self.L[11][0] - self.L[12][0], self.L[11][1] - self.L[12][1])
         ru = 0.165 * sw
+        specs = []
         for k in ("n", "f"):
-            for kind, (a, b, c), R, names in (
-                    (ARM_R, ("S", "E", "T"), ru, ("u" + k, "u" + k + "_cap", "f" + k + "_cap", "f" + k)),
-                    (LEG_R, ("P", "K", "A"), self.r_leg, ("s" + k, "s" + k + "_cap", "t" + k + "_cap", "t" + k))):
+            specs.append(((ARM_R, k), ("S", "E", "T"), ru, ("u" + k, "u" + k + "_cap", "f" + k + "_cap", "f" + k)))
+            if k in self.fist:     # hidden hand: also the arm with the full (pocketed) forearm, used while it hangs
+                specs.append(((ARM_R, k, "full"), ("S", "E", "T"), ru, ("u" + k, "u" + k + "_cap", "f" + k + "_cap", "f" + k + "_full")))
+            specs.append(((LEG_R, k), ("P", "K", "A"), self.r_leg, ("s" + k, "s" + k + "_cap", "t" + k + "_cap", "t" + k)))
+        for key, (a, b, c), R, names in specs:
+                kind, k = key[0], key[1]
                 m = np.zeros(self.shape, bool)
                 for nm in names:
                     m |= self.pieces[nm]
@@ -131,14 +136,25 @@ class SkinRig(PP.Rig):
                 root, mid = np.asarray(J[k][a], np.float32), np.asarray(J[k][b], np.float32)
                 u = mid - root
                 u /= max(1e-6, float(np.hypot(*u)))
-                s_mid = ((P - mid) @ u) / (1.3 * R)
-                d_root = np.hypot(P[:, 0] - root[0], P[:, 1] - root[1])
+                # v9.2: weights measured ALONG the bone with short ramps (angle-blend skinning needs them short, or
+                # the bend spreads down the limb into an S-curve).  Root: 0 at 0.15R above the joint -> 1 at 0.45R
+                # past it, so everything below the hip line / outside the shoulder follows the limb (no inner-thigh
+                # pixels left behind as a flap).  Middle joint: a +-0.3R band around the elbow / knee.
+                s_mid = (P - mid) @ u
+                s_root = (P - root) @ u
                 L = _Layer()
-                L.P, L.C = P, premultiply(A[ys, xs])
-                L.wj = _smooth((s_mid + 1.0) * 0.5).astype(np.float32)
-                L.ws = _smooth((d_root - 0.35 * R) / (1.9 * R)).astype(np.float32)
+                src = getattr(self, "leg_src", A) if kind == LEG_R else A    # v9.2: legs without the hand patch
+                L.P, L.C = P, premultiply(src[ys, xs])
+                L.wj = _smooth((s_mid + 0.3 * R) / (0.6 * R)).astype(np.float32)
+                L.ws = _smooth((s_root + 0.15 * R) / (0.6 * R)).astype(np.float32)
                 L.kind, L.side = kind, k
-                self._limbs[(kind, k)] = L
+                self._limbs[key] = L
+        self._fists = {}
+        for k, img in self.fist.items():
+            a = np.asarray(img)
+            ys, xs = np.nonzero(a[..., 3] > 0)
+            if len(xs):
+                self._fists[k] = (np.stack([xs, ys], 1).astype(np.float32), premultiply(a[ys, xs]))
 
     def _body_layer(self):
         im = self.layer("torso")
@@ -164,8 +180,28 @@ class SkinRig(PP.Rig):
             M2 = M0 @ PP._tr(j2[0] - J[k][jb][0], j2[1] - J[k][jb][1]) @ PP._rot(d2, J[k][jb])
             return M1, M2, PP._ap(M2, J[k][jc])
 
-        def skin(L, Mb, M1, M2):
+        def _turn(P, ang, c):
+            """rotate points P about c by per-point angle ang (deg), same sense as PP._rot"""
+            t = np.radians(ang)
+            ct, st = np.cos(t), np.sin(t)
+            x, y = P[:, 0] - c[0], P[:, 1] - c[1]
+            return np.stack([c[0] + ct * x + st * y, c[1] - st * x + ct * y], 1)
+
+        def skin(L, Mb, M1, M2, seg=None):
+            """v9.2 angle-blend skinning: each pixel turns about the root joint by ws*d1 and then about the moved
+            middle joint by wj*(d2-d1).  Blending ANGLES (not positions, as linear blend skinning does) keeps
+            every pixel at its distance from the joint, so a shoulder or hip raised 90 deg fans out like a hinge
+            instead of collapsing into a thin 'noodle'."""
             P = L.P
+            if seg is not None:
+                a_, b_, ja, jb = seg
+                d1 = pose.get(a_, rest[a_]) - rest[a_]
+                d2 = (pose[b_] - rest[b_]) if b_ in pose else d1
+                c1 = np.asarray(J[L.side][ja], np.float32)
+                c2 = np.asarray(PP._ap(PP._rot(d1, J[L.side][ja]), J[L.side][jb]), np.float32)
+                Q = _turn(P, L.ws * d1, c1)
+                Q = _turn(Q, L.wj * L.ws * (d2 - d1), c2)
+                return _apply(Mb, Q)
             wj, ws = L.wj[:, None], L.ws[:, None]
             limb = _apply(M1, P) * (1.0 - wj) + _apply(M2, P) * wj
             return _apply(Mb, P) * (1.0 - ws) + limb * ws
@@ -175,19 +211,29 @@ class SkinRig(PP.Rig):
             Mt, Ms, _ = chain(k, "t" + k, "s" + k, "P", "K", "A")
             L = self._limbs.get((LEG_R, k))
             if L is not None:
-                draws.append((skin(L, M0, Mt, Ms), L.C))
+                draws.append((skin(L, M0, Mt, Ms, ("t" + k, "s" + k, "P", "K")), L.C))
         Pb, Cb = self._body_layer()
         draws.append((_apply(M0, Pb), Cb))
         for k in pose.get("arm_order", ("f", "n")):
             Mu, Mf, tip = chain(k, "u" + k, "f" + k, "S", "E", "T")
             L = self._limbs.get((ARM_R, k))
+            fist = None
+            if k in self._fists:
+                moved = max(abs(pose.get("u" + k, rest["u" + k]) - rest["u" + k]), abs(pose.get("f" + k, rest["f" + k]) - rest["f" + k]))
+                if moved < 12:
+                    L = self._limbs.get((ARM_R, k, "full"), L)
+                else:
+                    fist = self._fists[k]
             if L is not None:
-                draws.append((skin(L, M0, Mu, Mf), L.C))
+                draws.append((skin(L, M0, Mu, Mf, ("u" + k, "f" + k, "S", "E")), L.C))
+            if fist is not None:
+                draws.append((_apply(Mf, fist[0]), fist[1]))
             hands[k] = (PP._ap(Mf, J[k]["W"]), tip)
 
         low = max(float(p[c[:, 3] > 0.16, 1].max()) for p, c in draws if (c[:, 3] > 0.16).any())
         dy = self.ground - low - pose.get("lift", 0.0) * self.stand_h
         dx = pose.get("dx", 0.0) * self.stand_h
+        self.last_offset = (dx, dy)
         allp = np.concatenate([p for p, _ in draws])
         ox, oy = int(math.floor(allp[:, 0].min() + dx)) - 3, int(math.floor(allp[:, 1].min() + dy)) - 3
         ex, ey = int(math.ceil(allp[:, 0].max() + dx)) + 4, int(math.ceil(allp[:, 1].max() + dy)) + 4
@@ -207,6 +253,7 @@ class SkinRig(PP.Rig):
             acc = acc.reshape(Hc, ss, Wc, ss, 4).mean(axis=(1, 3))
         out = Image.new("RGBA", self.layer("torso").size, (0, 0, 0, 0))
         out.paste(Image.fromarray(unpremultiply(acc), "RGBA"), (ox, oy))
+        out = PP.despeckle(out)                      # v9.2: cut-out remnants (not effects - those come later)
         if pose.get("tint"):
             r, g, b, kk = pose["tint"]
             arr = np.asarray(out).astype(np.float32)

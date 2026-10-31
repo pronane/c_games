@@ -5,6 +5,21 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v9.2: photo puppets that hold together (limb test, 3/4 view, game adapters)
+
+* **`tools/test_limbs.py`**: renders every frame of every move straight from the rig (effects stripped) and fails
+  on a detached limb (bone coverage + floating pieces), a missing foot, flapping arms, a snap (>75 deg/frame arm,
+  >60 leg) or a knee / elbow bending the wrong way. `--selftest OUT` renders a front mannequin with exact landmarks,
+  so it runs anywhere (CI: `.github/workflows/sprite-forge-tests.yml`).
+* **3/4 fighter view** `--turn-yaw 35`: keeps the face and clothing print readable with the body side-on enough for
+  attacks. Recommended for 2D fighters; 90 deg needs a `--side-photo` for a real profile.
+* Fixes found by the test: joint discs at elbows, knees and hips (no seams on sharp bends or leans); hands that hang
+  against the thigh now move with the forearm (they used to stay on the leg); cut-out slivers are removed before
+  effects; the side of a turned head uses the cheek colour (no stretched-ear smear).
+* `--billboard8` / `--views` on a photo puppet fill missing views by **turning** the photo (was a squashed copy).
+* Game adapters: `tools/export_hdf.py` (HD Fighter), `tools/export_arenafc.py` (Arena FC CharacterSpec from the
+  photo's colours and build), next to `export_ef.py` and `export_tt64.py`.
+
 ## New in v9.1: bendier photo puppets (opt-in)
 
 Two `forge.py build` options for the front-photo puppet (`--fill puppet`). The defaults are unchanged.

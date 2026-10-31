@@ -73,6 +73,24 @@ def polish_sample(keys, n, rest, name="", cyclic=False, lag=None):
     return out
 
 
+CHAINS = (("un", "fn"), ("uf", "ff"), ("tn", "sn"), ("tf", "sf"))
+
+
+def clamp_joints(poses, keys, rest, margin=5.0):
+    """v9.2: distal lag makes a forearm / shin trail its upper segment, and on a fast swing that can bend an elbow
+    backwards or a knee forwards for a frame (special2 side-on: 15 deg).  Keep every joint angle (lower - upper)
+    inside the range the KEY poses use, +-margin, so lag adds follow-through but never an anatomically wrong bend."""
+    for a, b in CHAINS:
+        rels = [float(k.get(b, rest.get(b, 0.0))) - float(k.get(a, rest.get(a, 0.0))) for k in keys]
+        lo, hi = min(rels) - margin, max(rels) + margin
+        for p in poses:
+            if a in p and b in p:
+                rel = p[b] - p[a]
+                if rel < lo or rel > hi:
+                    p[b] = p[a] + min(max(rel, lo), hi)
+    return poses
+
+
 def weight_shift(poses, name, amount=0.006):
     n = len(poses)
     if name in ("idle", "taunt", "victory") and n > 2:
@@ -87,4 +105,4 @@ def weight_shift(poses, name, amount=0.006):
 
 
 def polished(keys, n, rest, name, cyclic=False):
-    return weight_shift(polish_sample(keys, n, rest, name, cyclic), name)
+    return weight_shift(clamp_joints(polish_sample(keys, n, rest, name, cyclic), keys, rest), name)
