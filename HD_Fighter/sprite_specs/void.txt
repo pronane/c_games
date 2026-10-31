@@ -19,3 +19,4 @@ shoes_colour=#0c0c12
 kit=black
 accessories=wraps
 accessory_colour=#27e0ff
+head = large

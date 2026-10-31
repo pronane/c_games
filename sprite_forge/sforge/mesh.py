@@ -136,7 +136,7 @@ def build_mannequin(spec=None, include_ball=True, prop=None, face=None):
     b.sphere("head", hc, R, "skin", seg=12, rings=8, scale=(0.92, 1.08, 1.0))
     hair = sp.hair_style.lower()
     hc2 = hc + np.array([0, 0.018, -0.012]) * hs
-    if hair in ("short", "long", "ponytail", "bun", "curly"):
+    if hair in ("short", "long", "ponytail", "bun", "curly", "messy"):
         b.sphere("head", hc2, R * 1.055, "hair", seg=12, rings=8, scale=(0.95, 1.06, 1.02), lat_max=math.pi * 0.42)
     elif hair == "buzz":
         b.sphere("head", hc2 + [0, -0.004, 0], R * 1.02, "hair", seg=12, rings=8, scale=(0.94, 1.07, 1.01), lat_max=math.pi * 0.38)
@@ -507,6 +507,23 @@ def _fighter_extras(b, J, sp, g, gx, gz, gl, hs, top, bottom, shoes):
     b.box("head", hc + np.array([-0.075, 0.03, 0.075]) * hs, hc + np.array([0.075, 0.048, 0.118]) * hs, "skin", taper=(1.0, 0.9))
     b.box("head", hc + np.array([-0.07, -0.105, 0.0]) * hs, hc + np.array([0.07, -0.045, 0.085]) * hs, "skin", taper=(0.78, 0.9))
     hair = sp.hair_style.lower()
+    acc_list = [a.strip().lower() for a in str(getattr(sp, 'accessories', '') or '').replace('+', ',').split(',') if a.strip()]
+
+    # angry brows + messy hair + headband tail (fighter portraits have strong brows and wild hair)
+    for sx in (-1, 1):
+        b.box("head", hc + np.array([sx * 0.075 - 0.032, 0.036 + (0.006 if sx > 0 else 0.0), 0.095]) * hs,
+              hc + np.array([sx * 0.075 + 0.032, 0.052 + (0.006 if sx > 0 else 0.0), 0.118]) * hs, "hair", taper=(1.0, 0.8))
+    if hair in ("messy", "short") and str(getattr(sp, "style", "")).lower() == "fighter":
+        rng = np.random.default_rng(7)
+        for i in range(16):
+            an = rng.uniform(-0.3, math.pi + 0.3)
+            base = hc + np.array([0.0, 0.055 + 0.03 * math.sin(an), -0.01]) * hs
+            d = np.array([math.cos(an) * -0.03, math.sin(an) * 0.075, math.cos(an) * -0.10 + 0.04]) * hs
+            b.cyl("head", base, base + d + np.array([0, -0.035, 0.0]) * hs, 0.034 * hs, 0.004 * hs, "hair", seg=5)
+    if "headband" in acc_list:
+        tail = hc + np.array([0, 0.05, -0.115]) * hs
+        for k, (dy, dz) in enumerate(((-0.12, -0.12), (-0.2, -0.07))):
+            b.box("head", tail + np.array([-0.014, dy * 0.4, -0.01]) * hs, tail + np.array([0.014, dy, dz]) * hs, "accessory")
     if hair == "spiky":
         for i in range(11):
             an = math.pi * (i / 10.0) * 1.15 - 0.15
@@ -530,5 +547,5 @@ def _fighter_extras(b, J, sp, g, gx, gz, gl, hs, top, bottom, shoes):
     if "wraps" in acc:
         for s_ in ("L", "R"):
             hd = J["hand_" + s_]
-            b.cyl("forearm_" + s_, hd + [0, 0.09, 0], hd + [0, 0.0, 0], 0.046 * gl ** 0.7, 0.04 * gl ** 0.7, "accessory", seg=8)
+            b.cyl("forearm_" + s_, hd + [0, 0.17, 0], hd + [0, 0.0, 0], 0.05 * gl ** 0.7, 0.042 * gl ** 0.7, "accessory", seg=8)
             b.sphere("hand_" + s_, hd + [0, -0.045, 0.005], 0.062 * sp.size("hands"), "accessory", seg=8, rings=6, scale=(0.9, 1.0, 1.0))

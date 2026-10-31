@@ -16,3 +16,4 @@ bottom_colour=#5a3590
 socks_colour=#222222
 shoes=barefoot
 kit=blue
+head = large
