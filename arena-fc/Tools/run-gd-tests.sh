@@ -6,7 +6,7 @@ set -u
 GODOT="${GODOT:-godot}"
 cd "$(dirname "$0")/.."
 status=0
-for t in Tests/gd/test_modules.gd Tests/gd/test_game.gd; do
+for t in Tests/gd/test_modules.gd Tests/gd/test_game.gd Tests/gd/test_rules.gd; do
   echo "=== $t"
   out=$("$GODOT" --headless --path . --script "res://$t" 2>&1); code=$?
   echo "$out" | grep -E "^(PASS|FAIL|RESULT)|SCRIPT ERROR|Parse Error"

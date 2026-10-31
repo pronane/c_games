@@ -22,9 +22,19 @@ var ring_mesh: MeshInstance3D
 var arrow_mesh: MeshInstance3D
 var cam_lbl: Label
 var cam_mode := 0
-var cam_zoom := 0.68
+var cam_zoom := 0.9
 var cam_names := ["Broadcast", "Telephoto", "Player cam", "Tactical"]
 var world: Node3D
+var switch_cd := 0.0
+var cam_look := Vector3.ZERO
+var humans: Array = []
+var two_player_mode := false
+var pad_ctl
+var hud_over: Control
+var pad_ui: Control
+var pad_info: Label
+var pad_learn_idx := -1
+var pad_learn_dev := 0
 var stadium: Node3D
 var menu: Control
 var editor: Control
@@ -70,6 +80,9 @@ const RecorderScript = preload("res://Scripts/Core/Net/ReplayRecorder.gd")
 const ReplayerScript = preload("res://Scripts/Core/Net/ReplayPlayer.gd")
 const AimScript = preload("res://Scripts/Godot/SetPieceAim.gd")
 const StadiumScript = preload("res://Scripts/Godot/StadiumKit.gd")
+const MatchRules = preload("res://Web/MatchRules.gd")
+const Controllers = preload("res://Web/Controllers.gd")
+const HudScript = preload("res://Web/HudOverlay.gd")
 var audio: Node                      # ProceduralAudio (the "Audio" autoload if present)
 var recorder: Node                   # ReplayRecorder: rolling highlight buffer + optional file
 var replayer: Node                   # ReplayPlayer
@@ -177,6 +190,8 @@ func _physics_process(delta: float) -> void:
 		aim.set_external_hold(bool(touch_down.get("shoot", false)))
 		return
 	if phase != "play":
+		if not net_mode:
+			update_visuals(delta)
 		phase_timer -= delta
 		if phase_timer <= 0.0:
 			if phase == "goal":
@@ -184,7 +199,7 @@ func _physics_process(delta: float) -> void:
 					setup_practice()
 				elif not start_instant_replay():
 					end_goal_break()
-			elif phase == "kickoff":
+			elif phase == "kickoff" or phase == "restart":
 				phase = "play"
 				say("Back under way!")
 				audio.play_whistle()
@@ -198,6 +213,10 @@ func _physics_process(delta: float) -> void:
 			setup_practice()
 
 func _input(event: InputEvent) -> void:
+	if pad_learn_idx >= 0 and event is InputEventJoypadButton and event.pressed:
+		pad_learn_button(event.device, event.button_index)
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and phase in ["play", "aim", "replay", "goal", "kickoff"] \
 			and (net_ui == null or not net_ui.visible):
 		if event.keycode == KEY_M:
@@ -318,7 +337,7 @@ func reset_positions() -> void:
 		(ball_mesh.material_override as ShaderMaterial).shader = load("res://Shaders/ball.gdshader")
 	world.add_child(ball_mesh)
 	ball = {"pos": Vector3(0, BALL_R, 0), "vel": Vector3.ZERO, "owner": TEAM - 1, "free": 0.0, "last": 0}
-	controlled = TEAM - 1
+	set_humans(two_player_mode)
 	build_selection_marker()
 
 
@@ -357,7 +376,8 @@ func build_selection_marker() -> void:
 func add_zoom(d: float) -> void:
 	cam_zoom = clampf(cam_zoom + d, 0.55, 2.4)
 
-func start_match() -> void:
+func start_match(two_player := false) -> void:
+	two_player_mode = two_player
 	if not net_mode:
 		if net != null:
 			net.close()
@@ -379,6 +399,8 @@ func say(text: String) -> void:
 	if feed.size() > 3:
 		feed.pop_front()
 	feed_lbl.text = "\n".join(PackedStringArray(feed))
+	if hud_over != null:
+		hud_over.show_banner(text)
 
 func goal(side: int) -> void:
 	score[side] += 1
@@ -386,6 +408,10 @@ func goal(side: int) -> void:
 	if stadium != null:
 		stadium.celebrate(0)
 	audio.play_goal()
+	for q in players:
+		if q["team"] == side and not q["keeper"]:
+			q["action"] = "celebrate"
+			q["atime"] = 4.0
 	phase = "goal"
 	phase_timer = 1.5 if not practice else 2.5
 
@@ -394,122 +420,356 @@ func step_match(delta: float) -> void:
 		net_send_input(delta)
 		net_apply_snapshots(delta)
 	else:
-		var cmd := read_input(delta)
-		# --- ball owner / dribble ---
-		if ball["owner"] >= 0:
-			var o: Dictionary = players[ball["owner"]]
-			var f: Vector3 = Vector3(o["facing"].x, 0, o["facing"].z).normalized()
-			if f.length() < 0.1:
-				f = Vector3(1, 0, 0)
-			ball["pos"] = o["pos"] + f * 0.46 + Vector3(0, BALL_R, 0)
-			ball["vel"] = o["vel"]
-			ball["last"] = ball["owner"]
-		else:
-			var bv: Vector3 = ball["vel"]
-			bv.y -= 9.81 * delta
-			ball["pos"] += bv * delta
-			if ball["pos"].y < BALL_R:
-				ball["pos"].y = BALL_R
-				if bv.y < 0:
-					bv.y = -bv.y * 0.48
-				if abs(bv.y) < 0.45:
-					bv.y = 0
-				bv.x *= max(0, 1 - 1.5 * delta)
-				bv.z *= max(0, 1 - 1.5 * delta)
-			ball["vel"] = bv
-			ball["free"] += delta
-
-		# --- AI + movement ---
-		for i in range(players.size()):
-			var p: Dictionary = players[i]
-			p["lock"] = max(0, float(p["lock"]) - delta)
-			var sign := 1.0 if p["team"] == 0 else -1.0
-			var goal_pos := Vector3(sign * HALF_L, 0, 0)
-			var own_goal := Vector3(-sign * HALF_L, 0, 0)
-			var wish := Vector3.ZERO
-			if p["keeper"]:
-				var target := Vector3(own_goal.x + sign * 1.6, 0, clamp(ball["pos"].z * 0.6, -GOAL_W, GOAL_W))
-				wish = (target - p["pos"]).normalized()
-			elif i == controlled:
-				wish = Vector3(cmd["move"].x, 0, cmd["move"].y)
-			elif ball["owner"] == i:
-				wish = (goal_pos - p["pos"]).normalized()
-				if rng.randf() < 0.012 and p["pos"].distance_to(goal_pos) < 28:
-					shoot(i, rng.randf_range(0.6, 1.0))
-				elif rng.randf() < 0.02:
-					pass_ball(i, false)
-			else:
-				var home: Vector3 = p["home"]
-				home.x += clamp(ball["pos"].x * 0.18, -6, 6)
-				home.z += clamp(ball["pos"].z * 0.15, -5, 5)
-				var nearest := -1
-				var nd := 1e9
-				for j in range(players.size()):
-					if players[j]["team"] == p["team"] and not players[j]["keeper"]:
-						var d: float = players[j]["pos"].distance_to(ball["pos"])
-						if d < nd:
-							nd = d
-							nearest = j
-				if nearest == i or (ball["owner"] < 0 and i == nearest):
-					wish = (ball["pos"] - p["pos"]).normalized()
-				else:
-					wish = (home - p["pos"]).normalized()
-				if ball["owner"] >= 0 and players[ball["owner"]]["team"] != p["team"] and p["pos"].distance_to(players[ball["owner"]]["pos"]) < 1.6 and p["lock"] <= 0:
-					if rng.randf() < 0.10:
-						ball["owner"] = i
-						p["lock"] = 0.2
-						say("Tackle!")
-						audio.play_tackle()
-			var speed := 5.4 + (0.8 if p["keeper"] else 0.0)
-			if cmd["sprint"] and i == controlled:
-				speed *= 1.3
-			p["vel"] = p["vel"].lerp(wish * speed, min(1, delta * 8))
-			p["pos"] += p["vel"] * delta
-			p["pos"].y = 0
-			p["pos"].x = clamp(p["pos"].x, -HALF_L - 2, HALF_L + 2)
-			p["pos"].z = clamp(p["pos"].z, -HALF_W - 2, HALF_W + 2)
-			if p["vel"].length() > 0.2:
-				p["facing"] = Vector3(p["vel"].x, 0, p["vel"].z).normalized()
-			p["phase"] += delta * (2.0 + p["vel"].length())
-
-		# --- free ball pickup ---
-		if ball["owner"] < 0 and ball["free"] > 0.1 and ball["pos"].y < 1.4:
-			for i in range(players.size()):
-				if players[i]["lock"] > 0:
-					continue
-				if players[i]["pos"].distance_to(ball["pos"]) < 1.05:
-					ball["owner"] = i
-					ball["vel"] = Vector3.ZERO
-					ball["free"] = 0
-					ball["last"] = i
-					if i < TEAM:
-						controlled = i
-					break
-
-		# --- rules ---
-		var bp: Vector3 = ball["pos"]
-		if abs(bp.x) > HALF_L and abs(bp.z) < GOAL_W and bp.y < GOAL_H:
-			goal(0 if bp.x > 0 else 1)
-			return
-		if abs(bp.x) > HALF_L + 1 or abs(bp.z) > HALF_W + 1:
-			ball["pos"] = Vector3(0, BALL_R, 0)
-			ball["vel"] = Vector3.ZERO
-			ball["owner"] = -1
-			ball["free"] = 1
-			say("Ball out of play — restart.")
-			audio.play_whistle()
-			if practice:
-				setup_practice()
-				return
+		step_offline(delta)
 
 	update_visuals(delta)
+
+# ---------------------------------------------------------------- offline simulation
+func team_of_ball_owner() -> int:
+	return -1 if ball["owner"] < 0 else int(players[ball["owner"]]["team"])
+
+func opp_positions(team: int) -> Array:
+	var out: Array = []
+	for q in players:
+		if q["team"] != team:
+			out.append(q["pos"])
+	return out
+
+## Rank (0 = closest) of player i among his team's outfield players by distance to the ball.
+func chase_rank(i: int) -> int:
+	var mine: float = players[i]["pos"].distance_to(ball["pos"])
+	var rank := 0
+	for j in range(players.size()):
+		if j != i and players[j]["team"] == players[i]["team"] and not players[j]["keeper"]:
+			if players[j]["pos"].distance_to(ball["pos"]) < mine - 0.001:
+				rank += 1
+	return rank
+
+func set_action(p: Dictionary, a: String, dur: float) -> void:
+	p["action"] = a
+	p["atime"] = dur
+
+func step_offline(delta: float) -> void:
+	var cmds := read_inputs(delta)
+	# --- ball ---
+	if ball["owner"] >= 0:
+		var o: Dictionary = players[ball["owner"]]
+		var f: Vector3 = Vector3(o["facing"].x, 0, o["facing"].z).normalized()
+		if f.length() < 0.1:
+			f = Vector3(1, 0, 0)
+		var run: float = clampf(o["vel"].length() / 5.0, 0.0, 1.0)
+		var touch: float = 0.5 + 0.18 * sin(float(o["phase"]) * 3.0) * run     # ball runs ahead, then is re-taken
+		ball["pos"] = o["pos"] + f * touch + Vector3(0, BALL_R, 0)
+		ball["vel"] = o["vel"]
+		ball["last"] = ball["owner"]
+	else:
+		var bv: Vector3 = ball["vel"]
+		bv.y -= 9.81 * delta
+		bv *= max(0.0, 1.0 - 0.06 * delta)
+		ball["pos"] += bv * delta
+		if ball["pos"].y < BALL_R:
+			ball["pos"].y = BALL_R
+			if bv.y < 0:
+				bv.y = -bv.y * 0.48
+				if bv.y > 1.5:
+					audio.play_ball_bounce()
+			if abs(bv.y) < 0.45:
+				bv.y = 0
+			bv.x *= max(0, 1 - 1.5 * delta)
+			bv.z *= max(0, 1 - 1.5 * delta)
+		ball["vel"] = bv
+		ball["free"] += delta
+		for side in [-1.0, 1.0]:
+			var w: Dictionary = MatchRules.woodwork(ball["pos"], ball["vel"], side, HALF_L, GOAL_W, GOAL_H, BALL_R)
+			if w["hit"]:
+				ball["pos"] = w["pos"]
+				ball["vel"] = w["vel"]
+				audio.play_post()
+				say("Off the woodwork!" if w["kind"] == "post" else "Off the bar!")
+				break
+
+	# --- players ---
+	var ball_team := team_of_ball_owner()
+	for i in range(players.size()):
+		var p: Dictionary = players[i]
+		p["lock"] = max(0, float(p["lock"]) - delta)
+		p["atime"] = float(p.get("atime", 0.0)) - delta
+		if p["atime"] <= 0.0 and p["action"] != "celebrate":
+			p["action"] = "idle"
+		var sign := 1.0 if p["team"] == 0 else -1.0
+		var goal_pos := Vector3(sign * HALF_L, 0, 0)
+		var own_goal := Vector3(-sign * HALF_L, 0, 0)
+		var wish := Vector3.ZERO
+		var speed := 5.4
+		if p["keeper"]:
+			var kt: Vector3 = MatchRules.keeper_target(own_goal.x, sign, ball["pos"], ball["vel"], GOAL_W)
+			var to: Vector3 = kt - p["pos"]
+			var heading: bool = ball["owner"] < 0 and -sign * ball["vel"].x > 8.0
+			if heading:
+				if not p.get("reading", false):
+					p["reading"] = true                       # misjudges each shot a little; faster shots fool him more
+					p["kerr"] = rng.randfn(0.0, 0.9 + ball["vel"].length() * 0.05)
+				kt.z = clampf(kt.z + float(p["kerr"]), -GOAL_W - 0.6, GOAL_W + 0.6)
+				to = kt - p["pos"]
+			else:
+				p["reading"] = false
+			if to.length() > 0.2:
+				wish = to.normalized()
+			speed = 8.0 if heading else 6.0
+			if heading and to.length() > 0.6:
+				p["action"] = "dive"
+				p["atime"] = 0.3
+			if ball["owner"] == i:
+				p["hold"] = float(p.get("hold", 0.0)) + delta
+				wish = Vector3.ZERO
+				if p["hold"] > 1.1:
+					p["hold"] = 0.0
+					pass_ball(i, false)
+			else:
+				p["hold"] = 0.0
+		elif human_of(i) >= 0:
+			var cmd: Dictionary = cmds[human_of(i)]
+			wish = Vector3(cmd["move"].x, 0, cmd["move"].y)
+			speed *= 1.0 + 0.3 * float(cmd["move"].length() > 0.1 and cmd["sprint"])
+		elif ball["owner"] == i:
+			wish = ai_carrier(i, p, goal_pos, delta)
+			speed = 5.6
+		else:
+			wish = ai_off_ball(i, p, sign, ball_team, delta)
+			if ball_team != p["team"] and chase_rank(i) < 2:
+				speed = 5.9
+		p["vel"] = p["vel"].lerp(wish * speed, min(1, delta * 8))
+		p["pos"] += p["vel"] * delta
+		p["pos"].y = 0
+		p["pos"].x = clamp(p["pos"].x, -HALF_L - 2, HALF_L + 2)
+		p["pos"].z = clamp(p["pos"].z, -HALF_W - 2, HALF_W + 2)
+		if p["vel"].length() > 0.2:
+			p["facing"] = p["facing"].slerp(Vector3(p["vel"].x, 0, p["vel"].z).normalized(), min(1.0, delta * 12.0))
+		p["phase"] += delta * (2.0 + p["vel"].length())
+
+	keeper_saves()
+
+	# --- free ball pickup ---
+	if ball["owner"] < 0 and ball["free"] > 0.1 and ball["pos"].y < 1.4:
+		for i in range(players.size()):
+			if players[i]["lock"] > 0:
+				continue
+			if players[i]["pos"].distance_to(ball["pos"]) < 1.05:
+				ball["owner"] = i
+				ball["vel"] = Vector3.ZERO
+				ball["free"] = 0
+				ball["last"] = i
+				if not players[i]["keeper"]:
+					assign_ctrl(int(players[i]["team"]), i)
+				break
+	auto_switch(delta)
+
+	# --- rules ---
+	var bp: Vector3 = ball["pos"]
+	if abs(bp.x) > HALF_L and abs(bp.z) < GOAL_W and bp.y < GOAL_H:
+		goal(0 if bp.x > 0 else 1)
+		return
+	if abs(bp.x) > HALF_L + 0.6 or abs(bp.z) > HALF_W + 0.6:
+		ball_out()
+
+func ai_carrier(i: int, p: Dictionary, goal_pos: Vector3, delta: float) -> Vector3:
+	var to_goal: Vector3 = (goal_pos - p["pos"])
+	to_goal.y = 0
+	var dir := to_goal.normalized()
+	var avoid := Vector3.ZERO
+	for q in players:
+		if q["team"] != p["team"]:
+			var d: Vector3 = q["pos"] - p["pos"]
+			var l := d.length()
+			if l < 4.5 and l > 0.01 and d.normalized().dot(dir) > 0.2:
+				var side := Vector3(-d.z, 0, d.x).normalized()
+				if side.dot(dir) < 0:
+					side = -side
+				avoid += side * (4.5 - l) / 4.5
+	var pr: float = MatchRules.pressure(p["pos"], opp_positions(p["team"]))
+	var dg: float = to_goal.length()
+	if dg < 24.0 and rng.randf() < delta * (1.5 if dg < 16.0 else 0.8):
+		shoot(i, rng.randf_range(0.55, 0.95))
+	elif rng.randf() < delta * (0.3 + pr * 3.0):
+		pass_ball(i, false)
+	return (dir + avoid * 1.6).normalized()
+
+func ai_off_ball(i: int, p: Dictionary, sign: float, ball_team: int, delta: float) -> Vector3:
+	var home: Vector3 = p["home"]
+	home.x += clamp(ball["pos"].x * 0.18, -6, 6)
+	home.z += clamp(ball["pos"].z * 0.15, -5, 5)
+	var rank := chase_rank(i)
+	if ball_team == p["team"]:
+		home.x += sign * 9.0                              # support the attack, spread wide
+		home.z += (-6.0 if p["slot"] % 2 == 0 else 6.0)
+		return (home - p["pos"]).normalized() if p["pos"].distance_to(home) > 1.0 else Vector3.ZERO
+	if ball_team < 0:
+		if rank == 0:
+			return (ball["pos"] - p["pos"]).normalized()
+		return (home - p["pos"]).normalized() if p["pos"].distance_to(home) > 1.0 else Vector3.ZERO
+	# opponents have it: two press, the rest hold shape between ball and goal
+	var holder: Dictionary = players[ball["owner"]]
+	if rank == 0:
+		var to: Vector3 = holder["pos"] - p["pos"]
+		if to.length() < 1.6 and p["lock"] <= 0 and rng.randf() < delta * 3.0:
+			try_tackle(i, ball["owner"])
+		return to.normalized()
+	if rank == 1:
+		var cut: Vector3 = holder["pos"] + Vector3(-sign * 3.0, 0, 0)
+		return (cut - p["pos"]).normalized()
+	return (home - p["pos"]).normalized() if p["pos"].distance_to(home) > 1.0 else Vector3.ZERO
+
+func try_tackle(tackler: int, victim: int, sliding := false) -> void:
+	var t: Dictionary = players[tackler]
+	var v: Dictionary = players[victim]
+	t["lock"] = 0.5
+	set_action(t, "slide" if sliding else "tackle", 0.45)
+	if rng.randf() < MatchRules.foul_chance(t["vel"], v["facing"], sliding):
+		foul(tackler, victim)
+		return
+	ball["owner"] = tackler
+	say("Tackle!")
+	audio.play_tackle()
+
+func foul(tackler: int, victim: int) -> void:
+	var v: Dictionary = players[victim]
+	say("Foul!  Free kick.")
+	audio.play_whistle()
+	var spot: Vector3 = v["pos"]
+	spot.y = BALL_R
+	free_kick(int(v["team"]), spot)
+
+## Free kick to `team` at `spot`. A human team in shooting range gets the aim mode; otherwise the nearest
+## player takes it quickly.
+func free_kick(team: int, spot: Vector3) -> void:
+	spot.x = clamp(spot.x, -HALF_L + 1.0, HALF_L - 1.0)
+	spot.z = clamp(spot.z, -HALF_W + 1.0, HALF_W - 1.0)
+	var sign := 1.0 if team == 0 else -1.0
+	if team == 0 and not practice and spot.distance_to(Vector3(HALF_L, 0, 0)) < 34.0:
+		var taker := nearest_outfield(0, spot)
+		var wall_c := spot + (Vector3(HALF_L, 0, 0) - spot).normalized() * 9.15
+		var k := 0
+		for j in range(TEAM, players.size()):
+			if players[j]["keeper"]:
+				continue
+			players[j]["pos"] = wall_c + Vector3(0, 0, (k - 1.5) * 0.9)
+			players[j]["vel"] = Vector3.ZERO
+			k += 1
+			if k >= 3:
+				break
+		players[taker]["pos"] = spot - Vector3(0.9, 0, 0)
+		players[taker]["facing"] = Vector3(1, 0, 0)
+		ball["pos"] = spot
+		ball["vel"] = Vector3.ZERO
+		ball["owner"] = -1
+		ball["free"] = 0.0
+		controlled = taker
+		phase = "aim"
+		aim.start_aim(spot, Vector3(1, 0, 0))
+		return
+	restart_with(team, spot, "Free kick")
+
+func nearest_outfield(team: int, pos: Vector3) -> int:
+	var best := -1
+	var bd := 1e9
+	for j in range(players.size()):
+		if players[j]["team"] == team and not players[j]["keeper"]:
+			var d: float = players[j]["pos"].distance_to(pos)
+			if d < bd:
+				bd = d
+				best = j
+	return best
+
+func restart_with(team: int, spot: Vector3, label: String) -> void:
+	var taker := nearest_outfield(team, spot)
+	if label == "Goal kick":
+		taker = team * TEAM                             # the keeper
+	for p in players:
+		p["vel"] = Vector3.ZERO
+	players[taker]["pos"] = Vector3(spot.x, 0, spot.z) - Vector3(clampf(spot.x, -1, 1) * 0.0, 0, 0)
+	players[taker]["lock"] = 0.0
+	ball["pos"] = Vector3(spot.x, BALL_R, spot.z)
+	ball["vel"] = Vector3.ZERO
+	ball["owner"] = taker
+	ball["free"] = 0.0
+	ball["last"] = taker
+	if not players[taker]["keeper"]:
+		assign_ctrl(team, taker)
+	say(label + ".")
+	audio.play_whistle()
+	phase = "restart"
+	phase_timer = 0.9
+
+func ball_out() -> void:
+	if practice:
+		setup_practice()
+		return
+	var last_team := 0
+	if ball["last"] >= 0 and ball["last"] < players.size():
+		last_team = int(players[ball["last"]]["team"])
+	var r: Dictionary = MatchRules.restart_for(ball["pos"], last_team, HALF_L, HALF_W)
+	var label: String = {"throw": "Throw-in", "corner": "Corner", "goal_kick": "Goal kick"}[r["kind"]]
+	restart_with(int(r["team"]), r["spot"], label)
+
+func keeper_saves() -> void:
+	if ball["owner"] >= 0:
+		return
+	for i in range(players.size()):
+		var k: Dictionary = players[i]
+		if not k["keeper"] or k["lock"] > 0:
+			continue
+		var sign := 1.0 if k["team"] == 0 else -1.0
+		if -sign * ball["vel"].x <= 0.0:
+			continue
+		var reach_pt: Vector3 = k["pos"] + Vector3(0, 1.0, 0)
+		var miss: float = ball["pos"].distance_to(reach_pt)
+		if miss > 1.9 or ball["pos"].y > 2.7 or ball["free"] < 0.1:
+			continue
+		var spd: float = ball["vel"].length()
+		if spd < 10.0:
+			ball["owner"] = i
+			ball["vel"] = Vector3.ZERO
+			say("Keeper claims it.")
+			return
+		k["lock"] = 0.6
+		if rng.randf() < MatchRules.save_chance(miss, spd, 1.9):
+			ball["vel"] = Vector3(sign * spd * 0.35, 3.0, (ball["pos"].z - k["pos"].z) * 4.0 + rng.randf_range(-3.0, 3.0))
+			set_action(k, "dive", 0.6)
+			say("Great save!")
+			audio.play_tackle()
+		return
+
+func auto_switch(delta: float) -> void:
+	switch_cd = max(0.0, switch_cd - delta)
+	if switch_cd > 0.0:
+		return
+	for h in humans:
+		if ball["owner"] == h["ctrl"]:
+			continue
+		var best := nearest_outfield(int(h["team"]), ball["pos"])
+		if best >= 0 and best != h["ctrl"]:
+			var dc: float = players[h["ctrl"]]["pos"].distance_to(ball["pos"])
+			var db: float = players[best]["pos"].distance_to(ball["pos"])
+			if db < dc - 2.5:
+				h["ctrl"] = best
+				switch_cd = 0.6
+	controlled = humans[0]["ctrl"]
 
 func update_visuals(delta: float) -> void:
 	for i in range(rigs.size()):
 		var r: Node3D = rigs[i]
 		r.position = players[i]["pos"]
 		r.rotation.y = atan2(players[i]["facing"].x, players[i]["facing"].z)
-		animate_rig(r, players[i]["vel"].length(), t + players[i]["phase"], players[i]["action"])
+		var pi_: Dictionary = players[i]
+		var tb: Vector3 = ball["pos"] - pi_["pos"]
+		var yaw_rel: float = clampf(wrapf(atan2(tb.x, tb.z) - atan2(pi_["facing"].x, pi_["facing"].z), -PI, PI), -0.9, 0.9)
+		animate_rig(r, pi_["vel"].length(), pi_["phase"], pi_["action"], yaw_rel)
+		var hop := 0.0
+		if pi_["action"] == "celebrate":
+			hop = absf(sin(t * 7.0 + float(i))) * 0.3
+		elif pi_["action"] == "slide":
+			hop = -0.12
+		r.position.y = hop
 	ball_mesh.position = ball["pos"]
 	ball_mesh.rotation_degrees += Vector3(ball["vel"].z, 0, -ball["vel"].x) * delta * 150.0
 	update_browser_camera(delta)
@@ -851,9 +1111,14 @@ func update_browser_camera(delta: float) -> void:
 	var bpos: Vector3 = ball["pos"]
 	var ppos: Vector3 = players[controlled]["pos"]
 	var facing: Vector3 = players[controlled]["facing"]
-	var look := Vector3(bpos.x, 1.2, bpos.z)
-	var target := Vector3(bpos.x - 5, 18, bpos.z + 34)
-	var fov := 48.0
+	# broadcast framing: look slightly ahead of where the ball is going, never past the stands
+	var bv: Vector3 = ball["vel"]
+	if ball["owner"] >= 0 and ball["owner"] < players.size():
+		bv = players[ball["owner"]]["vel"] * 1.6
+	var lead := Vector3(bv.x, 0, bv.z).limit_length(16.0) * 0.6
+	var look := Vector3(clampf(bpos.x + lead.x, -HALF_L + 8.0, HALF_L - 8.0), 1.0, bpos.z * 0.9 + lead.z * 0.3)
+	var target := Vector3(look.x - 3.0, 15.0, look.z + 30.0)
+	var fov := 46.0 + clampf(bv.length() * 0.35, 0.0, 6.0)
 	match cam_mode:
 		1:
 			target = Vector3(bpos.x - 2, 12, bpos.z + 30)
@@ -876,9 +1141,15 @@ func update_browser_camera(delta: float) -> void:
 		look = Vector3(bpos.x + 18.0, 1.4, bpos.z)
 		target = Vector3(bpos.x - 12.0, 4.2, bpos.z)
 		fov = 52.0
-	var w := minf(1.0, delta * 3.0)
+	if phase == "goal" and cam_mode != 3:                 # cinematic: swing round the scorer
+		var ang := t * 0.7
+		look = Vector3(bpos.x, 1.4, bpos.z)
+		target = look + Vector3(cos(ang) * 11.0, 3.6, sin(ang) * 11.0)
+		fov = 40.0
+	var w := 1.0 - exp(-delta * (2.4 if phase == "goal" else 3.2))      # frame-rate independent spring
 	cam.position = cam.position.lerp(target, w)
-	cam.look_at_from_position(cam.position, look, Vector3.UP)
+	cam_look = cam_look.lerp(look, 1.0 - exp(-delta * 5.0))
+	cam.look_at_from_position(cam.position, cam_look, Vector3.UP)
 	cam.fov = lerpf(cam.fov, fov, w)
 	if cam_lbl:
 		var extra := ""
@@ -896,41 +1167,88 @@ func update_browser_camera(delta: float) -> void:
 		arrow_mesh.position = Vector3(ppos.x, 2.15 + a * 0.18 + sin(t * 3.2) * 0.1, ppos.z)
 		arrow_mesh.scale = Vector3(a, a, a)
 
-func animate_rig(r: Node3D, speed: float, time: float, action: String) -> void:
+func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw := 0.0) -> void:
 	var sk := r.get_meta("sk") as Skeleton3D
 	if sk == null:
 		return
 	var amp: float = clamp(speed / 6.0, 0.0, 1.0)
-	var s: float = sin(time * 6.0) * amp * 0.7
-	var s2: float = sin(time * 6.0 + PI) * amp * 0.7
-	pose_bone(sk, "LThigh", Vector3(s, 0, 0))
-	pose_bone(sk, "RThigh", Vector3(s2, 0, 0))
-	pose_bone(sk, "LShin", Vector3(max(0, -s) * 0.8, 0, 0))
-	pose_bone(sk, "RShin", Vector3(max(0, -s2) * 0.8, 0, 0))
-	pose_bone(sk, "LUpperArm", Vector3(-s * 0.6, 0, -0.18))
-	pose_bone(sk, "RUpperArm", Vector3(-s2 * 0.6, 0, 0.18))
-	pose_bone(sk, "Chest", Vector3(amp * 0.06, 0, 0))
-	if action == "celebrate":
-		pose_bone(sk, "LUpperArm", Vector3(0, 0, -2.4))
-		pose_bone(sk, "RUpperArm", Vector3(0, 0, 2.4))
+	var ph: float = time * 1.05                                    # `time` is the player's accumulated stride phase
+	var s: float = sin(ph) * amp * 0.9
+	var lk: float = max(0.0, sin(ph + 1.3)) * amp * 1.25        # knee flexes as the leg swings through
+	var rk: float = max(0.0, sin(ph + 1.3 + PI)) * amp * 1.25
+	var breathe: float = sin(time * 1.9) * 0.025
+	# defaults: running / idle
+	var hips := Vector3(0, 0, 0)
+	var chest := Vector3(amp * 0.16 + breathe, s * 0.22, 0)
+	var spine := Vector3(amp * 0.08, -s * 0.12, 0)
+	var lth := Vector3(s, 0, 0.03)
+	var rth := Vector3(-s, 0, -0.03)
+	var lsh := Vector3(lk, 0, 0)
+	var rsh := Vector3(rk, 0, 0)
+	var lua := Vector3(-s * 0.9, 0, -0.14 - amp * 0.1)
+	var rua := Vector3(s * 0.9, 0, 0.14 + amp * 0.1)
+	var lfa := Vector3(-0.35 - amp * 0.9, 0, 0)
+	var rfa := Vector3(-0.35 - amp * 0.9, 0, 0)
+	var head := Vector3(0, look_yaw * 0.65, 0)
+	var neck := Vector3(0, look_yaw * 0.3, 0)
+	match action:
+		"kick":
+			rth = Vector3(-1.25, 0, 0); rsh = Vector3(0.1, 0, 0)
+			lth = Vector3(0.25, 0, 0.03); lsh = Vector3(0.3, 0, 0)
+			chest = Vector3(-0.12, -0.25, 0); lua = Vector3(0.6, 0, -0.9); rua = Vector3(-0.5, 0, 0.7)
+		"tackle":
+			chest = Vector3(0.45, 0, 0); spine = Vector3(0.25, 0, 0)
+			rth = Vector3(-1.05, 0, 0); rsh = Vector3(0.5, 0, 0)
+			lth = Vector3(0.5, 0, 0.03); lsh = Vector3(1.0, 0, 0)
+			lua = Vector3(0.4, 0, -0.8); rua = Vector3(0.4, 0, 0.8)
+		"slide":
+			hips = Vector3(-1.2, 0, 0)
+			rth = Vector3(-1.4, 0, 0); lth = Vector3(-0.9, 0, 0.1); rsh = Vector3(0.1, 0, 0); lsh = Vector3(1.2, 0, 0)
+			lua = Vector3(-0.2, 0, -1.1); rua = Vector3(-0.2, 0, 1.1)
+		"dive":
+			hips = Vector3(0, 0, 1.15)
+			lua = Vector3(0, 0, -2.7); rua = Vector3(0, 0, 2.7)
+			lth = Vector3(0.3, 0, 0.3); rth = Vector3(-0.3, 0, -0.3)
+		"celebrate":
+			var j: float = sin(time * 3.0)
+			chest = Vector3(-0.15, 0, 0); head = Vector3(-0.25, 0, 0)
+			lua = Vector3(0, 0, -2.5 - 0.25 * j); rua = Vector3(0, 0, 2.5 + 0.25 * j)
+			lfa = Vector3(-0.3, 0, 0); rfa = Vector3(-0.3, 0, 0)
+			lth = Vector3(0.15 * j, 0, 0.1); rth = Vector3(-0.15 * j, 0, -0.1)
+	pose_bone(sk, "Hips", hips)
+	pose_bone(sk, "Spine", spine)
+	pose_bone(sk, "Chest", chest)
+	pose_bone(sk, "Neck", neck)
+	pose_bone(sk, "Head", head)
+	pose_bone(sk, "LThigh", lth)
+	pose_bone(sk, "RThigh", rth)
+	pose_bone(sk, "LShin", lsh)
+	pose_bone(sk, "RShin", rsh)
+	pose_bone(sk, "LUpperArm", lua)
+	pose_bone(sk, "RUpperArm", rua)
+	pose_bone(sk, "LForearm", lfa)
+	pose_bone(sk, "RForearm", rfa)
 
 func pose_bone(sk: Skeleton3D, name: String, euler: Vector3) -> void:
 	if bone_index.has(name):
 		sk.set_bone_pose_rotation(int(bone_index[name]), Quaternion.from_euler(euler))
 
-func pass_ball(from: int, through: bool) -> void:
+func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO) -> void:
 	if ball["owner"] != from:
 		return
 	var p: Dictionary = players[from]
 	var sign := 1.0 if p["team"] == 0 else -1.0
+	var opps := opp_positions(p["team"])
+	var hk := human_of(from)
 	var best := -1
 	var best_score := -1e9
 	for j in range(players.size()):
-		if players[j]["team"] != p["team"] or j == from or players[j]["keeper"]:
+		if players[j]["team"] != p["team"] or j == from:
 			continue
-		var d: float = p["pos"].distance_to(players[j]["pos"])
-		var forward: float = (players[j]["pos"].x - p["pos"].x) * sign
-		var sc: float = forward * 0.2 - d * 0.1 + rng.randf() * 2.0
+		var sc: float = MatchRules.pass_score(p["pos"], players[j]["pos"], sign, opps, input_dir if hk >= 0 else Vector3.ZERO)
+		if players[j]["keeper"]:
+			sc -= 8.0
+		sc += rng.randf() * 0.8
 		if sc > best_score:
 			best_score = sc
 			best = j
@@ -938,80 +1256,139 @@ func pass_ball(from: int, through: bool) -> void:
 		return
 	ball["owner"] = -1
 	p["lock"] = 0.4
-	var dir: Vector3 = (players[best]["pos"] + Vector3(sign * (4.0 if through else 0), 0, 0) - ball["pos"]).normalized()
-	dir = dir.rotated(Vector3.UP, rng.randf_range(-0.06, 0.06))
-	ball["vel"] = dir * (16.0 if through else 13.0) + Vector3(0, 1.0 if through else 0.4, 0)
+	set_action(p, "kick", 0.3)
+	var r: Dictionary = players[best]
+	var spd: float = MatchRules.pass_speed(p["pos"].distance_to(r["pos"]), through)
+	var aim_pt: Vector3 = MatchRules.lead_point(ball["pos"], r["pos"], r["vel"], spd, 0.9 if through else 0.15)
+	if through:
+		aim_pt.x += sign * 3.0
+	var dir: Vector3 = (aim_pt - ball["pos"])
+	dir.y = 0
+	dir = dir.normalized().rotated(Vector3.UP, rng.randf_range(-0.04, 0.04))
+	var lob: float = 0.4 + (1.2 if through else 0.0) + p["pos"].distance_to(r["pos"]) * 0.03
+	ball["vel"] = dir * spd + Vector3(0, lob, 0)
 	ball["pos"] += dir * 0.5 + Vector3(0, 0.03, 0)
 	ball["free"] = 0
 	ball["last"] = from
-	say("Pass.")
+	if hk >= 0 and not players[best]["keeper"]:
+		humans[hk]["ctrl"] = best
+		controlled = humans[0]["ctrl"]
+	say("Through ball." if through else "Pass.")
 	audio.play_pass()
 
-func shoot(from: int, power: float) -> void:
+func shoot(from: int, power: float, aim_z := 0.0) -> void:
 	if ball["owner"] != from:
 		return
 	var p: Dictionary = players[from]
 	var sign := 1.0 if p["team"] == 0 else -1.0
 	ball["owner"] = -1
 	p["lock"] = 0.6
-	var target := Vector3(sign * HALF_L, rng.randf_range(0.4, 1.9), rng.randf_range(-GOAL_W * 0.8, GOAL_W * 0.8))
+	set_action(p, "kick", 0.4)
+	var keeper_z := 0.0
+	for q in players:
+		if q["keeper"] and q["team"] != p["team"]:
+			keeper_z = q["pos"].z
+	# place it into the corner the keeper is not covering; the stick nudges it further
+	var pick: float = (-signf(keeper_z) if absf(keeper_z) > 0.3 else (1.0 if rng.randf() < 0.5 else -1.0)) * GOAL_W * 0.72
+	pick = clampf(pick + aim_z * GOAL_W * 0.4, -GOAL_W * 0.92, GOAL_W * 0.92)
+	var target := Vector3(sign * HALF_L, rng.randf_range(0.35, 1.7), pick)
+	var dist: float = ball["pos"].distance_to(target)
+	var err: float = MatchRules.shot_error(dist, MatchRules.pressure(p["pos"], opp_positions(p["team"])), power)
 	var dir: Vector3 = (target - ball["pos"]).normalized()
-	dir = dir.rotated(Vector3.UP, rng.randf_range(-0.09, 0.09))
-	ball["vel"] = dir * lerp(18.0, 29.0, power) + Vector3(0, lerp(2.2, 6.0, power), 0)
+	dir = dir.rotated(Vector3.UP, rng.randfn(0.0, err))
+	dir.y += rng.randfn(0.0, err * 0.5)
+	dir = dir.normalized()
+	ball["vel"] = dir * lerp(18.0, 29.0, power) + Vector3(0, lerp(1.2, 4.5, power), 0)
 	ball["free"] = 0
 	ball["last"] = from
 	say("Shot!")
 	audio.play_kick()
 
-func switch_player() -> void:
-	var best := controlled
-	var bd := 1e9
-	for i in range(TEAM):
-		if players[i]["keeper"]:
-			continue
-		var d: float = players[i]["pos"].distance_to(ball["pos"])
-		if d < bd:
-			bd = d
-			best = i
-	controlled = best
+func switch_player(k := 0) -> void:
+	var h: Dictionary = humans[k]
+	var best := nearest_outfield(int(h["team"]), ball["pos"])
+	if best >= 0:
+		h["ctrl"] = best
+		controlled = humans[0]["ctrl"]
 
 func edge(key: String, now: bool) -> bool:
 	var was: bool = prev.get(key, false)
 	prev[key] = now
 	return now and not was
 
-func read_input(delta: float) -> Dictionary:
-	var move := Vector2.ZERO
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): move.x -= 1
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): move.x += 1
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): move.y -= 1
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): move.y += 1
-	var jx := Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
-	var jy := Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
-	if abs(jx) > 0.2 or abs(jy) > 0.2:
-		move += Vector2(jx, jy)
-	move += touch_move
-	if move.length() > 1:
+func human_of(i: int) -> int:
+	for k in range(humans.size()):
+		if humans[k]["ctrl"] == i:
+			return k
+	return -1
+
+func assign_ctrl(team: int, i: int) -> void:
+	for h in humans:
+		if h["team"] == team:
+			h["ctrl"] = i
+	controlled = humans[0]["ctrl"] if humans.size() > 0 else controlled
+
+func set_humans(two_player: bool) -> void:
+	humans = [{"team": 0, "ctrl": TEAM - 1, "pad": 0, "charge": 0.0, "last_move": Vector3(1, 0, 0)}]
+	if two_player:
+		humans.append({"team": 1, "ctrl": 2 * TEAM - 1, "pad": 1, "charge": 0.0, "last_move": Vector3(-1, 0, 0)})
+	two_player_mode = two_player
+	controlled = TEAM - 1
+
+## One command dictionary per human: {"move": Vector2, "sprint": bool}. Fires shoot/pass/tackle/switch itself.
+func read_inputs(delta: float) -> Array:
+	var cmds: Array = []
+	for k in range(humans.size()):
+		cmds.append(read_human(k, delta))
+	read_global_keys()
+	return cmds
+
+func read_human(k: int, delta: float) -> Dictionary:
+	var h: Dictionary = humans[k]
+	var scheme: Dictionary = Controllers.KB_P1 if k == 0 else Controllers.KB_P2
+	var move: Vector2 = Controllers.kb_move(scheme, k == 0 and not two_player_mode)
+	var held: Dictionary = Controllers.kb_held(scheme)
+	# pads: in one-player mode every pad drives P1; in two-player mode pad 0 -> P1, pad 1 -> P2
+	var pads: Array = pad_ctl.pads()
+	for dev in pads:
+		if two_player_mode and int(dev) != k:
+			continue
+		move += pad_ctl.move_of(int(dev))
+		var ph: Dictionary = pad_ctl.held(int(dev))
+		for a in Controllers.ACTIONS:
+			held[a] = held[a] or ph[a]
+	if k == 0:
+		move += touch_move
+		for a in Controllers.ACTIONS:
+			held[a] = held[a] or bool(touch_down.get(a, false))
+	if move.length() > 1.0:
 		move = move.normalized()
-	var sprint: bool = Input.is_key_pressed(KEY_SHIFT) or Input.is_joy_button_pressed(0, JOY_BUTTON_RIGHT_SHOULDER) or touch_down.get("sprint", false)
-	var shoot_now: bool = Input.is_key_pressed(KEY_SPACE) or Input.is_joy_button_pressed(0, JOY_BUTTON_X) or touch_down.get("shoot", false)
-	var cmd := {"move": move, "sprint": sprint}
-	if shoot_now:
-		charge = min(1.0, charge + delta / 0.9)
-	elif charge > 0:
-		if ball["owner"] == controlled:
-			shoot(controlled, max(0.25, charge))
-		charge = 0
-	if edge("pass", Input.is_key_pressed(KEY_E) or Input.is_joy_button_pressed(0, JOY_BUTTON_A) or touch_down.get("pass", false)):
-		pass_ball(controlled, false)
-	if edge("through", Input.is_key_pressed(KEY_Q) or Input.is_joy_button_pressed(0, JOY_BUTTON_Y) or touch_down.get("through", false)):
-		pass_ball(controlled, true)
-	if edge("switch", Input.is_key_pressed(KEY_TAB) or Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER) or touch_down.get("switch", false)):
-		switch_player()
-	if edge("tackle", Input.is_key_pressed(KEY_F) or Input.is_joy_button_pressed(0, JOY_BUTTON_B) or touch_down.get("tackle", false)):
-		if ball["owner"] >= 0 and ball["owner"] >= TEAM and players[controlled]["pos"].distance_to(players[ball["owner"]]["pos"]) < 2.0:
-			ball["owner"] = controlled
-			say("Ball won!")
+	var cmd := {"move": move, "sprint": held["sprint"]}
+	var me: int = h["ctrl"]
+	if move.length() > 0.2:
+		h["last_move"] = Vector3(move.x, 0, move.y)
+	if held["shoot"]:
+		h["charge"] = min(1.0, float(h["charge"]) + delta / 0.9)
+	elif float(h["charge"]) > 0.0:
+		if ball["owner"] == me:
+			shoot(me, max(0.25, float(h["charge"])), move.y)
+		h["charge"] = 0.0
+	if k == 0:
+		charge = h["charge"]
+	var key := "h%d_" % k
+	if edge(key + "pass", held["pass"]):
+		pass_ball(me, false, h["last_move"])
+	if edge(key + "through", held["through"]):
+		pass_ball(me, true, h["last_move"])
+	if edge(key + "switch", held["switch"]):
+		switch_player(k)
+	if edge(key + "tackle", held["tackle"]):
+		var o: int = ball["owner"]
+		if o >= 0 and players[o]["team"] != h["team"] and players[me]["pos"].distance_to(players[o]["pos"]) < 2.2:
+			try_tackle(me, o, players[me]["vel"].length() > 4.5)
+	return cmd
+
+func read_global_keys() -> void:
 	if edge("cam", Input.is_key_pressed(KEY_C)):
 		cam_mode = (cam_mode + 1) % cam_names.size()
 	for m in range(cam_names.size()):
@@ -1021,9 +1398,14 @@ func read_input(delta: float) -> Dictionary:
 		add_zoom(-0.14)
 	if edge("zout", Input.is_key_pressed(KEY_MINUS) or Input.is_key_pressed(KEY_KP_SUBTRACT)):
 		add_zoom(0.14)
-	if Input.is_key_pressed(KEY_ESCAPE):
+	if Input.is_key_pressed(KEY_ESCAPE) or (pad_ctl != null and _any_pad_start()):
 		show_menu()
-	return cmd
+
+func _any_pad_start() -> bool:
+	for dev in pad_ctl.pads():
+		if Input.is_joy_button_pressed(int(dev), JOY_BUTTON_START):
+			return true
+	return false
 
 # ---------------------------------------------------------------- UI
 func build_ui() -> void:
@@ -1038,6 +1420,11 @@ func build_ui() -> void:
 	score_lbl = mk_label("HAR  0  -  0  NOR", 30, Vector2(20, 16), Vector2(400, 46), hud)
 	clock_lbl = mk_label("00:00", 18, Vector2(-420, 20), Vector2(400, 36), hud)
 	clock_lbl.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	hud_over = HudScript.new()
+	hud_over.boot = self
+	hud.add_child(hud_over)
+	score_lbl.visible = false
+	clock_lbl.visible = false
 	feed_lbl = mk_label("", 16, Vector2(20, -110), Vector2(460, 100), hud)
 	feed_lbl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	feed_lbl.offset_top = -120
@@ -1050,13 +1437,14 @@ func build_ui() -> void:
 	replay_label.offset_bottom = 154
 	replay_label.add_theme_color_override("font_color", Color("#ffd166"))
 	replay_label.visible = false
-	cam_lbl = mk_label("Broadcast  ·  zoom 147%", 14, Vector2(20, 66), Vector2(420, 28), hud)
+	cam_lbl = mk_label("Broadcast  ·  zoom 147%", 14, Vector2(20, 84), Vector2(420, 28), hud)
 	var hint := mk_label("WASD / stick move · SHIFT sprint · E pass · Q through · SPACE shoot (hold) · F tackle · TAB switch · C / 1-4 camera · wheel or +/- zoom · V replay · M sound · ESC menu", 12, Vector2(20, -32), Vector2(1240, 26), hud)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.offset_top = -34
 	hint.offset_bottom = -8
 	build_touch(layer)
 	build_net_ui(layer)
+	build_pad_ui(layer)
 
 	menu = Control.new()
 	menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1082,8 +1470,10 @@ func build_ui() -> void:
 	sub.add_theme_font_size_override("font_size", 15)
 	vb.add_child(sub)
 	vb.add_child(mk_button("PLAY 5-A-SIDE", start_match))
+	vb.add_child(mk_button("2 PLAYERS · LOCAL VERSUS", start_match.bind(true)))
 	vb.add_child(mk_button("FREE-KICK PRACTICE (AIM)", start_practice))
 	vb.add_child(mk_button("PLAY WITH FRIENDS", show_net_ui))
+	vb.add_child(mk_button("CONTROLLER SETUP (USB / GAMEPAD)", show_pad_ui))
 	vb.add_child(mk_button("CHARACTER EDITOR", show_editor))
 	vb.add_child(mk_button("HOW TO PLAY", show_help))
 	var info := Label.new()
@@ -1244,6 +1634,9 @@ func setup_modules() -> void:
 	if audio == null:
 		audio = AudioScript.new()
 		add_child(audio)
+	pad_ctl = Controllers.new()
+	pad_ctl.load_saved()
+	Input.joy_connection_changed.connect(_on_joy_changed)
 	recorder = RecorderScript.new()
 	add_child(recorder)
 	replayer = ReplayerScript.new()
@@ -1307,7 +1700,12 @@ func end_goal_break() -> void:
 	phase = "kickoff"
 	phase_timer = 1.0
 
+func _on_joy_changed(device: int, connected: bool) -> void:
+	var n := Input.get_joy_name(device)
+	say("Controller %s: %s%s" % ["connected" if connected else "removed", n, "" if (not connected or Input.is_joy_known(device)) else "  (generic pad: use CONTROLLER SETUP to remap)"])
+
 func start_practice() -> void:
+	two_player_mode = false
 	if net != null:
 		net.close()
 	net_mode = false
@@ -1373,6 +1771,8 @@ func show_menu() -> void:
 	if net != null:
 		net.close()
 	phase = "menu"
+	if pad_ui != null:
+		pad_ui.visible = false
 	menu.visible = true
 	editor.visible = false
 	hud.visible = false
@@ -1380,8 +1780,90 @@ func show_menu() -> void:
 		c.queue_free()
 	preview = null
 
+func build_pad_ui(layer: CanvasLayer) -> void:
+	pad_ui = Control.new()
+	pad_ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pad_ui.visible = false
+	layer.add_child(pad_ui)
+	var bg := ColorRect.new()
+	bg.color = Color(0, 0, 0, 0.78)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pad_ui.add_child(bg)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	vb.offset_left = 80
+	vb.offset_top = 90
+	vb.offset_right = 760
+	vb.offset_bottom = 640
+	pad_ui.add_child(vb)
+	var t := Label.new()
+	t.text = "CONTROLLER SETUP"
+	t.add_theme_font_size_override("font_size", 40)
+	t.add_theme_color_override("font_color", Color("#2bdb85"))
+	vb.add_child(t)
+	pad_info = Label.new()
+	pad_info.add_theme_font_size_override("font_size", 16)
+	vb.add_child(pad_info)
+	vb.add_child(mk_button("REMAP PAD 1 (press each button when asked)", pad_learn_start.bind(0)))
+	vb.add_child(mk_button("REMAP PAD 2", pad_learn_start.bind(1)))
+	vb.add_child(mk_button("RESET PADS TO DEFAULT", pad_reset))
+	vb.add_child(mk_button("BACK", hide_pad_ui))
+
+func show_pad_ui() -> void:
+	pad_ui.visible = true
+	menu.visible = false
+	refresh_pad_info()
+
+func hide_pad_ui() -> void:
+	pad_learn_idx = -1
+	pad_ui.visible = false
+	menu.visible = true
+
+func refresh_pad_info(prompt := "") -> void:
+	var lines: Array = []
+	var pads: Array = pad_ctl.pads()
+	if pads.is_empty():
+		lines.append("No gamepad detected. Plug in a USB pad and press any button on it (browsers only expose a pad after a button press).")
+	for dev in pads:
+		var d := int(dev)
+		var b: Dictionary = pad_ctl.binds_for(d)
+		lines.append("Pad %d: %s   [%s layout]   P%d" % [d + 1, Input.get_joy_name(d), "standard" if Input.is_joy_known(d) else "generic / adapter", d + 1])
+		lines.append("   pass=%d  through=%d  shoot=%d  tackle=%d  switch=%d  sprint=%d" % [b["pass"], b["through"], b["shoot"], b["tackle"], b["switch"], b["sprint"]])
+	lines.append("")
+	lines.append("Left stick or D-pad moves. Pad 1 plays P1, pad 2 plays P2 in 2-player mode; with one player every pad controls P1.")
+	if prompt != "":
+		lines.append("")
+		lines.append(prompt)
+	pad_info.text = "\n".join(PackedStringArray(lines))
+
+func pad_learn_start(dev: int) -> void:
+	if not pad_ctl.pads().has(dev):
+		refresh_pad_info("Pad %d is not connected." % (dev + 1))
+		return
+	pad_learn_dev = dev
+	pad_learn_idx = 0
+	refresh_pad_info("Press the button for  %s  (pad %d)" % [Controllers.ACTIONS[0].to_upper(), dev + 1])
+
+func pad_learn_button(dev: int, button: int) -> void:
+	if dev != pad_learn_dev:
+		return
+	pad_ctl.set_bind(dev, Controllers.ACTIONS[pad_learn_idx], button)
+	pad_learn_idx += 1
+	if pad_learn_idx >= Controllers.ACTIONS.size():
+		pad_learn_idx = -1
+		pad_ctl.save()
+		refresh_pad_info("Saved. Bindings are remembered for this pad.")
+	else:
+		refresh_pad_info("Press the button for  %s  (pad %d)" % [Controllers.ACTIONS[pad_learn_idx].to_upper(), dev + 1])
+
+func pad_reset() -> void:
+	for dev in pad_ctl.pads():
+		pad_ctl.reset_binds(int(dev))
+	pad_ctl.save()
+	refresh_pad_info("Reset to the default layout.")
+
 func show_help() -> void:
-	say("WASD / left stick to move. Hold SPACE then release to shoot. E pass, Q through ball, F tackle, TAB switch player.")
+	say("P1: WASD, SHIFT sprint, E pass, Q through, SPACE shoot (hold), F tackle.  P2: arrows, / sprint, comma pass, L through, period shoot, ; tackle.  Gamepads: stick/D-pad, A pass, Y through, X shoot, B tackle.")
 
 func show_editor() -> void:
 	phase = "editor"

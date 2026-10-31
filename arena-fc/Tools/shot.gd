@@ -25,4 +25,8 @@ func _run() -> void:
 	b.ball["pos"] = Vector3(51.5, 0.6, 0.5); b.ball["vel"] = Vector3(14, 1, 0); b.ball["owner"] = -1; b.ball["free"] = 1.0
 	await create_timer(0.8).timeout
 	root.get_texture().get_image().save_png(out + "/goal.png")
+	b.show_menu()
+	b.start_match(true)
+	await create_timer(3.0).timeout
+	root.get_texture().get_image().save_png(out + "/two_player.png")
 	quit()

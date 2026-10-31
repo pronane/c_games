@@ -90,7 +90,7 @@ func _run() -> void:
 	var sk: Skeleton3D = rig.get_meta("sk")
 	ok(sk.get_bone_count() == 18, "18 bones built: %d" % sk.get_bone_count())
 	var mi: MeshInstance3D = rig.get_meta("mi")
-	ok((mi.mesh as ArrayMesh).get_surface_count() == 8, "8 surfaces")
+	ok((mi.mesh as ArrayMesh).get_surface_count() == 9, "9 surfaces (skin, shirt, shorts, socks, trim, badge, hair, eyes, boots)")
 	var bad := rd.duplicate(true); bad["bi"][0] = 99
 	ok(PR.validate(bad) != "", "bad bone index rejected: " + PR.validate(bad))
 	var bad2 := rd.duplicate(true); bad2["bones"][3]["n"] = "X"; bad2["bones"][2]["n"] = "Y"
