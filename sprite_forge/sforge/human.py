@@ -69,6 +69,58 @@ def _macro_subset(npz_path, out_path):
     return len(keep) // 2
 
 
+def targets_from_files(root, out_path):
+    """build macro_targets.npz from MakeHuman's own CC0 .target text files (data/targets/macrodetails/**/*.target:
+    'vertex dx dy dz' in decimetres) - the same arrays the pip wheel's targets.npz holds, for machines without PyPI"""
+    arrs = {}
+    base = os.path.join(root, "macrodetails")
+    for dp, _, files in os.walk(base):
+        for f in files:
+            if not f.endswith(".target"):
+                continue
+            idx, vec = [], []
+            for line in open(os.path.join(dp, f)):
+                if not line.strip() or line.startswith("#"):
+                    continue
+                t = line.split()
+                idx.append(int(t[0])); vec.append([float(t[1]), float(t[2]), float(t[3])])
+            key = "targets/macrodetails/" + os.path.relpath(os.path.join(dp, f[:-7]), base).replace(os.sep, "/")
+            arrs[key + ".index"] = np.array(idx, np.uint32)
+            arrs[key + ".vector"] = np.round(np.array(vec, float).reshape(-1, 3) * 1000).astype(np.int16)
+    if not arrs:
+        raise FileNotFoundError("no .target files under %s" % base)
+    np.savez_compressed(out_path, **arrs)
+    return len(arrs) // 2
+
+
+def setup_from_git(dest=None, log=print):
+    """the CC0 assets from github.com/makehumancommunity/makehuman with git only (sparse checkout, ~110 MB of text
+    targets packed to a few MB) - for networks that allow git but not raw downloads / PyPI"""
+    import subprocess, tempfile
+    dest = assets_dir(dest)
+    os.makedirs(dest, exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix="sfs_mhgit_")
+    try:
+        env = dict(os.environ, GIT_LFS_SKIP_SMUDGE="1")
+        subprocess.check_call(["git", "clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse",
+                               "https://github.com/makehumancommunity/makehuman.git", tmp + "/mh"], env=env)
+        subprocess.check_call(["git", "-C", tmp + "/mh", "sparse-checkout", "set", "--no-cone", "/makehuman/data/3dobjs/base.obj",
+                               "/makehuman/data/rigs/default.mhskel", "/makehuman/data/rigs/default_weights.mhw",
+                               "/makehuman/data/targets/macrodetails/", "/LICENSE.ASSETS.md"], env=env)
+        mh = os.path.join(tmp, "mh", "makehuman", "data")
+        for f, rel in (("base.obj", "3dobjs/base.obj"), ("default.mhskel", "rigs/default.mhskel"),
+                       ("default_weights.mhw", "rigs/default_weights.mhw")):
+            shutil.copyfile(os.path.join(mh, rel), os.path.join(dest, f))
+        lic = os.path.join(tmp, "mh", "LICENSE.ASSETS.md")
+        if os.path.isfile(lic):
+            shutil.copyfile(lic, os.path.join(dest, "LICENSE.ASSETS.md"))
+        n = targets_from_files(os.path.join(mh, "targets"), os.path.join(dest, "macro_targets.npz"))
+        log("MakeHuman CC0 assets from git -> %s (%d macro targets)" % (dest, n))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return dest
+
+
 def setup(dest=None, src=None, log=print):
     """get the CC0 assets into dest.  src: a folder holding base.obj, default.mhskel, default_weights.mhw and
     targets.npz (or macro_targets.npz) - e.g. a MakeHuman data folder; otherwise download (GitHub raw + pip)."""
@@ -385,6 +437,7 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="forge.py human", description="v7 MakeHuman mode: a parametric human rig from the CC0 MakeHuman assets -> library rig (use it with build --rig NAME)")
     ap.add_argument("--setup", action="store_true", help="get the CC0 assets (download, or --from DIR)")
     ap.add_argument("--from", dest="src", help="--setup: copy the assets from this folder instead of downloading")
+    ap.add_argument("--from-git", action="store_true", help="--setup: get the assets with git only (sparse clone of makehumancommunity/makehuman; no PyPI / raw downloads)")
     ap.add_argument("--assets", help="assets folder (default <studio>/assets/makehuman or $SFS_MAKEHUMAN)")
     ap.add_argument("--status", action="store_true", help="say whether the assets are present")
     for k in PARAMS:
@@ -398,6 +451,8 @@ def main(argv):
     ap.add_argument("--glb", help="also write this GLB")
     a = ap.parse_args(argv)
     if a.setup:
+        if a.from_git:
+            setup_from_git(a.assets); return 0
         setup(a.assets, a.src); return 0
     if a.status:
         d = assets_dir(a.assets)

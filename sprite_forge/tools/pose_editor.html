@@ -1,0 +1,218 @@
+<title>Sprite Forge Pose Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: tool page. Stage (canvas) left, controls right; timeline under the stage; stacks on phones. */
+:root{
+  --bg:#eef1ef; --panel:#ffffff; --ink:#18201d; --muted:#56635d; --line:#d3dad6; --stage:#e3e8e5; --ground:#b9c3be;
+  --accent:#1f5e4a; --near:#1f5e4a; --far:#8aa79c; --handle:#e0621e; --key:#1f5e4a; --keysoft:#dcebe4;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121715;--panel:#1a211e;--ink:#e4ebe7;--muted:#9aa9a2;--line:#2c3632;--stage:#202825;--ground:#3a4641;--accent:#6cc4a1;--near:#6cc4a1;--far:#4f6b61;--handle:#ff8a4c;--key:#6cc4a1;--keysoft:#1f3a30;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121715;--panel:#1a211e;--ink:#e4ebe7;--muted:#9aa9a2;--line:#2c3632;--stage:#202825;--ground:#3a4641;--accent:#6cc4a1;--near:#6cc4a1;--far:#4f6b61;--handle:#ff8a4c;--key:#6cc4a1;--keysoft:#1f3a30;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14.5px/1.5 var(--body);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-family:var(--display);text-transform:uppercase;font-size:2.2rem;margin:0;letter-spacing:.01em}
+.sub{color:var(--muted);margin:.3em 0 18px;max-width:75ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+canvas{display:block;width:100%;height:auto;background:var(--stage);border-radius:6px;touch-action:none;cursor:crosshair}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select{font:500 13px var(--body);padding:7px 11px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);color:var(--panel);border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--handle);outline-offset:1px}
+label{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin:10px 0 4px}
+input[type=range]{width:100%}
+input[type=number],input[type=text]{width:100%;font:13px var(--mono);padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.timeline{position:relative;height:46px;margin-top:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px}
+.timeline .tick{position:absolute;top:8px;width:14px;height:28px;margin-left:-7px;border-radius:4px;background:var(--keysoft);border:2px solid var(--key);cursor:pointer}
+.timeline .tick.sel{background:var(--key)}
+.timeline .head{position:absolute;top:0;bottom:0;width:2px;background:var(--handle);pointer-events:none}
+textarea{width:100%;min-height:150px;font:12px/1.45 var(--mono);border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:8px}
+.vals{font:12px var(--mono);color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin-top:8px}
+.vals b{color:var(--ink);font-weight:500}
+.hint{font-size:.84rem;color:var(--muted)}
+.legend{display:flex;gap:14px;font-size:.8rem;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+</style>
+
+<div class="wrap">
+  <h1>Pose Editor</h1>
+  <p class="sub">Make a custom move for Sprite Forge. Drag the orange handles to pose the side-on fighter, add keyframes along the timeline, preview it, then copy the JSON into a file and build with <code>--custom-move yourmove.json</code>. Sprite Forge renders it on your photo character at any camera angle.</p>
+  <div class="grid">
+    <div class="card">
+      <canvas id="stage" width="760" height="560" aria-label="Pose stage: drag the handles to pose the figure"></canvas>
+      <div class="timeline" id="timeline" aria-label="Keyframe timeline"><div class="head" id="playhead"></div></div>
+      <div class="row" style="margin-top:10px">
+        <button id="addKey">Add key at playhead</button>
+        <button id="delKey">Delete key</button>
+        <button id="play" class="primary">Play</button>
+        <label style="margin:0 0 0 auto;display:flex;align-items:center;gap:6px">Playhead <input id="tpos" type="range" min="0" max="1" step="0.01" value="0" style="width:140px"></label>
+      </div>
+      <div class="legend"><span><span class="sw" style="background:var(--near)"></span>near side (person's right)</span><span><span class="sw" style="background:var(--far)"></span>far side (person's left)</span><span><span class="sw" style="background:var(--handle)"></span>drag handles</span></div>
+    </div>
+    <div class="card">
+      <label for="preset">Start from</label>
+      <select id="preset" style="width:100%"></select>
+      <label for="mname">Move name</label>
+      <input id="mname" type="text" value="my_move">
+      <div class="row">
+        <div style="flex:1"><label for="frames">Frames</label><input id="frames" type="number" min="2" max="40" value="8"></div>
+        <div style="flex:1"><label for="fps">FPS</label><input id="fps" type="number" min="4" max="60" value="14"></div>
+      </div>
+      <label for="keyT">Selected key time (0 to 1)</label>
+      <input id="keyT" type="number" min="0" max="1" step="0.01" value="0">
+      <label for="open">Torso open to camera (deg)</label>
+      <input id="open" type="range" min="-60" max="90" value="0">
+      <label for="lift">Lift off ground (m)</label>
+      <input id="lift" type="range" min="0" max="0.8" step="0.01" value="0">
+      <label for="neck">Head tilt (deg)</label>
+      <input id="neck" type="range" min="-40" max="40" value="-6">
+      <div class="vals" id="vals"></div>
+      <label for="json">Move JSON</label>
+      <textarea id="json" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px"><button id="copy" class="primary">Copy JSON</button><button id="load">Load from box</button></div>
+      <p class="hint" id="msg" aria-live="polite"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRESETS = {"jab": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.35, "pose": {"hips": [4, -2.5, 0], "spine": [4, -5.25, 0], "chest": [2, -8.75, 0], "neck": [-6, -4.125, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [88, 2, 0], "arm_R": [50, 18, 0], "elbow_L": 20, "elbow_R": 128}}, {"t": 0.55, "pose": {"hips": [4, -0.8000000000000007, 0], "spine": [4, -3.000000000000001, 0], "chest": [2, -5.0, 0], "neck": [-6, -6.05, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [90, 0, 0], "arm_R": [50, 18, 0], "elbow_L": 4, "elbow_R": 128}}, {"t": 0.8, "pose": {"hips": [4, -5.8999999999999995, 0], "spine": [4, -9.75, 0], "chest": [2, -16.25, 0], "neck": [-6, -0.27500000000000036, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [80, 6, 0], "arm_R": [50, 18, 0], "elbow_L": 60, "elbow_R": 128}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "punch": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.25, "pose": {"hips": [4, -4.199999999999999, 0], "spine": [4, -7.5, 0], "chest": [2, -12.5, 0], "neck": [-6, -2.2, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [70, 14, 0], "elbow_L": 108, "elbow_R": 100}}, {"t": 0.45, "pose": {"hips": [4, 6.0, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [32, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 36, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [90, -4, 0], "elbow_L": 108, "elbow_R": 6}}, {"t": 0.62, "pose": {"hips": [4, 6.0, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [32, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 36, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [90, -4, 0], "elbow_L": 108, "elbow_R": 8}}, {"t": 0.82, "pose": {"hips": [4, -4.199999999999999, 0], "spine": [4, -7.5, 0], "chest": [2, -12.5, 0], "neck": [-6, -2.2, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [66, 14, 0], "elbow_L": 108, "elbow_R": 95}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "kick": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.16, "pose": {"hips": [4, -4.199999999999999, 0], "spine": [4, -7.5, 0], "chest": [2, -12.5, 0], "neck": [-6, -2.2, 0], "leg_L": [24, 7, 0], "leg_R": [30, 6, 0], "knee_L": 26, "knee_R": 70, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.3, "pose": {"hips": [4, 2.6000000000000014, 0], "spine": [4, 1.5000000000000013, 0], "chest": [2, 2.500000000000001, 0], "neck": [-6, -9.9, 0], "leg_L": [24, 7, 0], "leg_R": [70, 6, 0], "knee_L": 26, "knee_R": 105, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.4, "pose": {"hips": [-8, 6, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [24, 7, 0], "leg_R": [86, 6, 0], "knee_L": 26, "knee_R": 80, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.52, "pose": {"hips": [-14, 6, 0], "spine": [-8, 6, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [24, 7, 0], "leg_R": [92, 6, 0], "knee_L": 26, "knee_R": 10, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "ankle_R": -25}}, {"t": 0.66, "pose": {"hips": [-14, 6, 0], "spine": [-8, 6, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [24, 7, 0], "leg_R": [92, 6, 0], "knee_L": 26, "knee_R": 8, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "ankle_R": -25}}, {"t": 0.8, "pose": {"hips": [4, -0.8000000000000007, 0], "spine": [4, -3.000000000000001, 0], "chest": [2, -5.0, 0], "neck": [-6, -6.05, 0], "leg_L": [24, 7, 0], "leg_R": [70, 6, 0], "knee_L": 26, "knee_R": 100, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "roundhouse": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.25, "pose": {"hips": [4, -0.8000000000000007, 0], "spine": [4, -3.000000000000001, 0], "chest": [2, -5.0, 0], "neck": [-6, -6.05, 0], "leg_L": [24, 7, 0], "leg_R": [60, 30, 0], "knee_L": 26, "knee_R": 110, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.5, "pose": {"hips": [-10, 25, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [24, 7, 0], "leg_R": [85, 25, 20], "knee_L": 26, "knee_R": 12, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.65, "pose": {"hips": [-10, 25, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [24, 7, 0], "leg_R": [85, 25, 20], "knee_L": 26, "knee_R": 10, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.82, "pose": {"hips": [4, -2.5, 0], "spine": [4, -5.25, 0], "chest": [2, -8.75, 0], "neck": [-6, -4.125, 0], "leg_L": [24, 7, 0], "leg_R": [55, 20, 0], "knee_L": 26, "knee_R": 100, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "uppercut": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.25, "pose": {"hips": [20, -11.0, 0], "spine": [4, -9.75, 0], "chest": [2, -16.25, 0], "neck": [-6, -0.27500000000000036, 0], "leg_L": [60, 8, 0], "leg_R": [30, 8, 0], "knee_L": 80, "knee_R": 70, "arm_L": [64, 10, 0], "arm_R": [30, 16, 0], "elbow_L": 108, "elbow_R": 100}}, {"t": 0.5, "pose": {"hips": [4, 4.300000000000001, 0], "spine": [4, 3.750000000000001, 0], "chest": [2, 6.25, 0], "neck": [-6, -11.825, 0], "leg_L": [30, 8, 0], "leg_R": [-16, 7, 0], "knee_L": 30, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [130, 6, 0], "elbow_L": 108, "elbow_R": 70, "lift": 0.06}}, {"t": 0.68, "pose": {"hips": [4, 6.0, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [165, 4, 0], "elbow_L": 108, "elbow_R": 40, "lift": 0.1}}, {"t": 0.85, "pose": {"hips": [4, -2.5, 0], "spine": [4, -5.25, 0], "chest": [2, -8.75, 0], "neck": [-6, -4.125, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [90, 12, 0], "elbow_L": 108, "elbow_R": 100}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "special1": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.22, "pose": {"hips": [10, -11.0, 0], "spine": [4, -12.0, 0], "chest": [2, -20.0, 0], "neck": [-6, 1.6500000000000004, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [30, 20, 0], "arm_R": [25, 22, 0], "elbow_L": 110, "elbow_R": 110}}, {"t": 0.42, "pose": {"hips": [4, 0.8999999999999986, 0], "spine": [4, -0.7500000000000018, 0], "chest": [2, -1.2500000000000018, 0], "neck": [-6, -7.975, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [70, 8, 0], "arm_R": [68, 8, 0], "elbow_L": 60, "elbow_R": 60}}, {"t": 0.58, "pose": {"hips": [4, 6.0, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [34, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 38, "knee_R": 22, "arm_L": [90, 2, 0], "arm_R": [90, 2, 0], "elbow_L": 6, "elbow_R": 6}}, {"t": 0.78, "pose": {"hips": [4, 6.0, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [34, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 38, "knee_R": 22, "arm_L": [90, 2, 0], "arm_R": [90, 2, 0], "elbow_L": 6, "elbow_R": 6}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "block": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.4, "pose": {"hips": [4, -11.0, 0], "spine": [-4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [96, 8, 0], "arm_R": [92, 12, 0], "elbow_L": 132, "elbow_R": 134}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [-6, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [98, 8, 0], "arm_R": [94, 12, 0], "elbow_L": 134, "elbow_R": 136}}], "hit": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.2, "pose": {"hips": [4, -11.0, 0], "spine": [-14, -16.5, 0], "chest": [-8, -27.5, 0], "neck": [18, 5.5, 0], "leg_L": [14, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 16, "knee_R": 22, "arm_L": [40, 30, 0], "arm_R": [30, 35, 0], "elbow_L": 60, "elbow_R": 70}}, {"t": 0.45, "pose": {"hips": [4, -11.0, 0], "spine": [-10, -16.5, 0], "chest": [2, -27.5, 0], "neck": [10, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [48, 24, 0], "arm_R": [40, 26, 0], "elbow_L": 80, "elbow_R": 90}}, {"t": 0.75, "pose": {"hips": [4, -11.0, 0], "spine": [-3, -16.5, 0], "chest": [2, -27.5, 0], "neck": [2, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "jumpattack": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [60, 7, 0], "leg_R": [30, 7, 0], "knee_L": 80, "knee_R": 70, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.25, "pose": {"hips": [4, -0.8000000000000007, 0], "spine": [4, -3.000000000000001, 0], "chest": [2, -5.0, 0], "neck": [-6, -6.05, 0], "leg_L": [70, 7, 0], "leg_R": [80, 7, 0], "knee_L": 100, "knee_R": 110, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "lift": 0.35}}, {"t": 0.38, "pose": {"hips": [-8, 6, 0], "spine": [4, 3.750000000000001, 0], "chest": [2, 6.25, 0], "neck": [-6, -11.825, 0], "leg_L": [80, 7, 0], "leg_R": [74, 7, 0], "knee_L": 55, "knee_R": 118, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "lift": 0.45}}, {"t": 0.5, "pose": {"hips": [-12, 6, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [86, 7, 0], "leg_R": [70, 7, 0], "knee_L": 8, "knee_R": 120, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "ankle_L": -25, "lift": 0.5}}, {"t": 0.72, "pose": {"hips": [-12, 6, 0], "spine": [4, 6.0, 0], "chest": [2, 10.0, 0], "neck": [-6, -13.75, 0], "leg_L": [86, 7, 0], "leg_R": [70, 7, 0], "knee_L": 8, "knee_R": 120, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "ankle_L": -25, "lift": 0.42}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [60, 7, 0], "leg_R": [30, 7, 0], "knee_L": 80, "knee_R": 70, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "sweep": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.25, "pose": {"hips": [26, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [90, 8, 0], "leg_R": [30, 20, 0], "knee_L": 130, "knee_R": 60, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128, "lift": -0.0}}, {"t": 0.5, "pose": {"hips": [26, 10, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [90, 8, 0], "leg_R": [60, 40, 0], "knee_L": 130, "knee_R": 6, "arm_L": [30, 30, 0], "arm_R": [50, 18, 0], "elbow_L": 30, "elbow_R": 128}}, {"t": 0.68, "pose": {"hips": [26, 20, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [90, 8, 0], "leg_R": [60, 40, 0], "knee_L": 130, "knee_R": 6, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}], "victory": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.25, "pose": {"hips": [4, -11.0, 0], "spine": [-4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [120, 10, 0], "elbow_L": 108, "elbow_R": 80}}, {"t": 0.45, "pose": {"hips": [4, -11.0, 0], "spine": [-6, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [168, 8, 0], "elbow_L": 108, "elbow_R": 12, "lift": 0.03}}, {"t": 0.65, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [150, 8, 0], "elbow_L": 108, "elbow_R": 50}}, {"t": 0.85, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [168, 8, 0], "elbow_L": 108, "elbow_R": 12, "lift": 0.03}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [168, 8, 0], "elbow_L": 108, "elbow_R": 14}}], "taunt": [{"t": 0, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}, {"t": 0.2, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [80, 4, 0], "arm_R": [50, 18, 0], "elbow_L": 20, "elbow_R": 128, "wrist_L": -30}}, {"t": 0.4, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [80, 4, 0], "arm_R": [50, 18, 0], "elbow_L": 40, "elbow_R": 128, "wrist_L": 30}}, {"t": 0.6, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [80, 4, 0], "arm_R": [50, 18, 0], "elbow_L": 20, "elbow_R": 128, "wrist_L": -30}}, {"t": 0.8, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [80, 4, 0], "arm_R": [50, 18, 0], "elbow_L": 40, "elbow_R": 128, "wrist_L": 30}}, {"t": 1, "pose": {"hips": [4, -11.0, 0], "spine": [4, -16.5, 0], "chest": [2, -27.5, 0], "neck": [-6, 5.5, 0], "leg_L": [24, 7, 0], "leg_R": [-16, 7, 0], "knee_L": 26, "knee_R": 22, "arm_L": [64, 10, 0], "arm_R": [50, 18, 0], "elbow_L": 108, "elbow_R": 128}}]};
+const L = {ua: 0.28, fa: 0.34, th: 0.42, sh: 0.41, torso: 0.51, neck: 0.12};
+const BASE = {arm_L:[64,10,0], arm_R:[50,18,0], elbow_L:108, elbow_R:128, leg_L:[24,7,0], leg_R:[-16,7,0], knee_L:26, knee_R:22,
+              hips:[4,-11,0], spine:[4,-16.5,0], chest:[2,-27.5,0], neck:[-6,5.5,0], lift:0};
+const cv = document.getElementById('stage'), cx = cv.getContext('2d');
+let keys = [], sel = 0, playT = 0, playing = false, drag = null;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const clone = o => JSON.parse(JSON.stringify(o));
+const D = Math.PI / 180;
+
+function full(p){ const o = clone(BASE); for (const k in p) o[k] = clone(p[k]); return o; }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function smooth(t){ return t*t*(3-2*t); }
+function poseAt(t){
+  if (!keys.length) return full({});
+  const ks = keys.slice().sort((a,b)=>a.t-b.t);
+  if (t <= ks[0].t) return full(ks[0].pose);
+  if (t >= ks[ks.length-1].t) return full(ks[ks.length-1].pose);
+  for (let i=0;i<ks.length-1;i++){ const a=ks[i], b=ks[i+1];
+    if (t>=a.t && t<=b.t){ const u = smooth((t-a.t)/Math.max(1e-6,b.t-a.t)); const A=full(a.pose), B=full(b.pose), o={};
+      for (const k in A){ o[k] = Array.isArray(A[k]) ? A[k].map((v,j)=>lerp(v,B[k][j],u)) : lerp(A[k],B[k],u); } return o; } }
+}
+// side view facing right: angle from 'down', + = forward (screen right)
+function dir(a){ return [Math.sin(a*D), Math.cos(a*D)]; }
+function skeleton(p){
+  const S = 255, gx = 360, gy = 520;
+  const lean = (p.hips[0] + p.spine[0] + p.chest[0]);
+  const pel = [gx, gy - (L.th + L.sh) * S - p.lift * S];
+  const td = dir(180 - lean); const neck = [pel[0] + td[0]*L.torso*S, pel[1] + td[1]*L.torso*S];
+  const hd = dir(180 - lean - p.neck[0]); const head = [neck[0] + hd[0]*L.neck*1.6*S, neck[1] + hd[1]*L.neck*1.6*S];
+  const open = -(p.hips[1] + p.spine[1] + p.chest[1]);           // + = chest turned to the camera
+  const sh = side => [neck[0] + (side==='R' ? -1 : 1) * Math.sin(open*D) * 0.06 * S, neck[1] + 0.02*S];
+  const J = {pel, neck, head};
+  for (const s of ['L','R']){
+    const fa = p['arm_'+s][0] - lean, ea = fa + p['elbow_'+s];
+    const S0 = sh(s), E = [S0[0] + dir(fa)[0]*L.ua*S, S0[1] + dir(fa)[1]*L.ua*S], H = [E[0] + dir(ea)[0]*L.fa*S, E[1] + dir(ea)[1]*L.fa*S];
+    const ft = p['leg_'+s][0], st = ft - p['knee_'+s];
+    const K = [pel[0] + dir(ft)[0]*L.th*S, pel[1] + dir(ft)[1]*L.th*S], F = [K[0] + dir(st)[0]*L.sh*S, K[1] + dir(st)[1]*L.sh*S];
+    Object.assign(J, {['S'+s]:S0, ['E'+s]:E, ['H'+s]:H, ['K'+s]:K, ['F'+s]:F});
+  }
+  // auto-ground the lowest foot unless lifted
+  const low = Math.max(J.FL[1], J.FR[1]); const dy = gy - p.lift*S - low;
+  for (const k in J) J[k] = [J[k][0], J[k][1] + dy];
+  J.lean = lean; J.S = S; J.gy = gy; return J;
+}
+function draw(){
+  const p = poseAt(playing ? playT : (keys[sel] ? keys[sel].t : playT));
+  const J = skeleton(p);
+  cx.clearRect(0,0,cv.width,cv.height);
+  cx.fillStyle = css('--ground'); cx.fillRect(0, J.gy+2, cv.width, 3);
+  // onion skin of neighbouring keys
+  if (!playing) keys.forEach((k,i)=>{ if (Math.abs(i-sel)===1) limb(skeleton(full(k.pose)), css('--line'), css('--line'), 4); });
+  limb(J, css('--far'), css('--near'), 9);
+  if (!playing) for (const h of handles(J)){ cx.beginPath(); cx.arc(h.x,h.y,9,0,7); cx.fillStyle = css('--handle'); cx.fill(); }
+  showVals(p);
+}
+function limb(J, far, near, w){
+  const seg = (a,b,c) => { cx.strokeStyle=c; cx.lineWidth=w; cx.lineCap='round'; cx.beginPath(); cx.moveTo(a[0],a[1]); cx.lineTo(b[0],b[1]); cx.stroke(); };
+  seg(J.SL,J.EL,far); seg(J.EL,J.HL,far); seg(J.pel,J.KL,far); seg(J.KL,J.FL,far);
+  seg(J.pel,J.neck,near); cx.beginPath(); cx.arc(J.head[0],J.head[1],0.1*J.S,0,7); cx.fillStyle=near; cx.fill();
+  seg(J.pel,J.KR,near); seg(J.KR,J.FR,near); seg(J.SR,J.ER,near); seg(J.ER,J.HR,near);
+}
+function handles(J){ return [
+  {id:'EL',x:J.EL[0],y:J.EL[1]},{id:'HL',x:J.HL[0],y:J.HL[1]},{id:'KL',x:J.KL[0],y:J.KL[1]},{id:'FL',x:J.FL[0],y:J.FL[1]},
+  {id:'ER',x:J.ER[0],y:J.ER[1]},{id:'HR',x:J.HR[0],y:J.HR[1]},{id:'KR',x:J.KR[0],y:J.KR[1]},{id:'FR',x:J.FR[0],y:J.FR[1]},
+  {id:'neck',x:J.neck[0],y:J.neck[1]}]; }
+function ang(from, to){ return Math.atan2(to[0]-from[0], to[1]-from[1]) / D; }   // from 'down', + = forward
+function clampv(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function applyDrag(m){
+  const k = keys[sel]; if (!k) return; const p = full(k.pose); const J = skeleton(p); const s = drag.slice(-1);
+  if (drag==='neck'){ const lean = clampv(180 - ang(J.pel, m), -40, 80); k.pose.hips=[lean*0.4,p.hips[1],0]; k.pose.spine=[lean*0.35,p.spine[1],0]; k.pose.chest=[lean*0.25,p.chest[1],0]; }
+  else if (drag[0]==='E'){ const a = ang(J['S'+s], m) + J.lean; k.pose['arm_'+s] = [Math.round(clampv(a,-60,185)), p['arm_'+s][1], p['arm_'+s][2]]; }
+  else if (drag[0]==='H'){ const a = ang(J['E'+s], m) + J.lean; k.pose['elbow_'+s] = Math.round(clampv(a - p['arm_'+s][0], 0, 160)); }
+  else if (drag[0]==='K'){ const a = ang(J.pel, m); k.pose['leg_'+s] = [Math.round(clampv(a,-50,130)), p['leg_'+s][1], p['leg_'+s][2]]; }
+  else if (drag[0]==='F'){ const a = ang(J['K'+s], m); k.pose['knee_'+s] = Math.round(clampv(p['leg_'+s][0] - a, 0, 150)); }
+  sync();
+}
+function pt(e){ const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; }
+cv.addEventListener('pointerdown', e => { if (playing || !keys[sel]) return; const m = pt(e); const J = skeleton(full(keys[sel].pose));
+  let best=null, bd=1e9; for (const h of handles(J)){ const d=Math.hypot(h.x-m[0],h.y-m[1]); if (d<bd){bd=d;best=h.id;} }
+  if (bd < 28){ drag = best; cv.setPointerCapture(e.pointerId); } });
+cv.addEventListener('pointermove', e => { if (drag){ applyDrag(pt(e)); } });
+cv.addEventListener('pointerup', () => { drag = null; });
+function showVals(p){
+  const f = v => Array.isArray(v) ? v.map(x=>Math.round(x)).join(', ') : (Math.round(v*100)/100);
+  document.getElementById('vals').innerHTML = ['arm_R','elbow_R','arm_L','elbow_L','leg_R','knee_R','leg_L','knee_L','chest','lift']
+    .map(k=>`<span>${k}</span><b>${f(p[k])}</b>`).join('');
+}
+function renderTimeline(){
+  const tl = document.getElementById('timeline'); tl.querySelectorAll('.tick').forEach(n=>n.remove());
+  keys.forEach((k,i)=>{ const d=document.createElement('button'); d.className='tick'+(i===sel?' sel':''); d.style.left=(k.t*100)+'%'; d.title='key t='+k.t; d.setAttribute('aria-label','Key at '+k.t);
+    d.onclick=()=>{ sel=i; playT=k.t; sync(); }; tl.appendChild(d); });
+  document.getElementById('playhead').style.left = (playT*100)+'%';
+}
+function sync(){
+  keys.sort((a,b)=>a.t-b.t); sel = Math.min(sel, keys.length-1);
+  const k = keys[sel]; if (k){ const p = full(k.pose);
+    document.getElementById('keyT').value = k.t; document.getElementById('open').value = Math.round(-(p.hips[1]+p.spine[1]+p.chest[1]) - 55);
+    document.getElementById('lift').value = p.lift || 0; document.getElementById('neck').value = Math.round(p.neck[0]); }
+  document.getElementById('tpos').value = playT;
+  renderTimeline(); draw(); writeJSON();
+}
+function writeJSON(){
+  const out = {name: document.getElementById('mname').value.trim() || 'my_move', frames: +document.getElementById('frames').value || 8,
+               fps: +document.getElementById('fps').value || 14, loop:false, base:'fighter',
+               keys: keys.map(k=>({t:+k.t.toFixed(3), pose:k.pose}))};
+  document.getElementById('json').value = JSON.stringify(out, null, 1);
+}
+document.getElementById('addKey').onclick = () => { const t = +(+document.getElementById('tpos').value).toFixed(2);
+  keys.push({t, pose: clone(poseAt(t))}); sel = keys.findIndex(k=>k.t===t); sync(); msg('Key added at t = '+t); };
+document.getElementById('delKey').onclick = () => { if (keys.length>2){ keys.splice(sel,1); sel=Math.max(0,sel-1); sync(); } else msg('A move needs at least 2 keys.'); };
+document.getElementById('keyT').oninput = e => { const k=keys[sel]; if(k){ k.t = clampv(+e.target.value,0,1); playT=k.t; sync(); } };
+document.getElementById('tpos').oninput = e => { playT = +e.target.value; if (!playing){ renderTimeline(); const p=poseAt(playT); const J=skeleton(p);
+  cx.clearRect(0,0,cv.width,cv.height); cx.fillStyle=css('--ground'); cx.fillRect(0,J.gy+2,cv.width,3); limb(J,css('--far'),css('--near'),9); showVals(p);} };
+document.getElementById('open').oninput = e => { const k=keys[sel]; if(!k) return; const o = +e.target.value + 55;
+  const p=full(k.pose); k.pose.hips=[p.hips[0],-0.2*o,0]; k.pose.spine=[p.spine[0],-0.3*o,0]; k.pose.chest=[p.chest[0],-0.5*o,0]; sync(); };
+document.getElementById('lift').oninput = e => { const k=keys[sel]; if(k){ k.pose.lift = +e.target.value; sync(); } };
+document.getElementById('neck').oninput = e => { const k=keys[sel]; if(k){ const p=full(k.pose); k.pose.neck=[+e.target.value,p.neck[1],0]; sync(); } };
+['mname','frames','fps'].forEach(id => document.getElementById(id).oninput = writeJSON);
+document.getElementById('play').onclick = () => { playing = !playing; document.getElementById('play').textContent = playing ? 'Stop' : 'Play';
+  if (playing){ const t0 = performance.now(); const fr = +document.getElementById('frames').value||8, fps = +document.getElementById('fps').value||14; const dur = fr/fps*1000;
+    const step = now => { if(!playing) { draw(); return; } playT = ((now-t0)%dur)/dur; renderTimeline(); draw(); requestAnimationFrame(step); }; requestAnimationFrame(step); } };
+document.getElementById('copy').onclick = () => { const ta = document.getElementById('json');
+  navigator.clipboard.writeText(ta.value).then(()=>msg('Copied. Save it as '+(document.getElementById('mname').value||'my_move')+'.json')).catch(()=>{ ta.select(); msg('Select-all done: press Ctrl/Cmd+C to copy.'); }); };
+document.getElementById('load').onclick = () => { try { const d = JSON.parse(document.getElementById('json').value);
+  keys = d.keys.map(k=>({t:+k.t, pose:k.pose||{}})); document.getElementById('mname').value = d.name||'my_move';
+  document.getElementById('frames').value = d.frames||8; document.getElementById('fps').value = d.fps||14; sel=0; sync(); msg('Loaded '+keys.length+' keys.'); }
+  catch(err){ msg('That box does not hold valid move JSON: '+err.message); } };
+function msg(t){ document.getElementById('msg').textContent = t; }
+const ps = document.getElementById('preset');
+ps.innerHTML = '<option value="">Fighting stance (blank move)</option>' + Object.keys(PRESETS).map(k=>`<option value="${k}">Fighter pack: ${k}</option>`).join('');
+ps.onchange = () => { const v = ps.value; keys = v ? clone(PRESETS[v]) : [{t:0,pose:{}},{t:0.5,pose:{}},{t:1,pose:{}}];
+  document.getElementById('mname').value = v ? v+'_custom' : 'my_move'; sel=0; playT=0; sync(); };
+keys = clone(PRESETS.kick); document.getElementById('mname').value = 'kick_custom'; ps.value = 'kick'; sync();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+</script>

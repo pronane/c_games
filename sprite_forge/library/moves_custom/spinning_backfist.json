@@ -1,0 +1,8 @@
+{"name": "spinning_backfist", "label": "Spinning Backfist", "frames": 8, "fps": 14, "loop": false, "base": "fighter",
+ "desc": "example pose-it-yourself move: turn away, whip the lead arm round at head height",
+ "keys": [
+  {"t": 0.0, "pose": {}},
+  {"t": 0.25, "pose": {"hips": [4, 40, 0], "spine": [4, 30, 0], "chest": [2, 30, 0], "neck": [-6, -40, 0], "leg_R": [10, 7, 0]}},
+  {"t": 0.5, "pose": {"hips": [4, 80, 0], "spine": [4, 50, 0], "chest": [2, 50, 0], "neck": [-6, -70, 0], "arm_L": [80, 70, 0], "elbow_L": 40}},
+  {"t": 0.65, "pose": {"hips": [4, 60, 0], "spine": [4, 30, 0], "chest": [2, 20, 0], "neck": [-6, -40, 0], "arm_L": [88, 20, 0], "elbow_L": 8}},
+  {"t": 1.0, "pose": {}}]}

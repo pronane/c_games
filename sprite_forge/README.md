@@ -5,6 +5,99 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v9.5: a better three-quarter view (photo3d)
+
+The 3D engine's turned views were the weakest output: an outline puffed up like a balloon, a flat face, and grain
+where points fought for the same pixel. Three changes fix that, and none of them needs more than the one photo:
+
+* **Real body shape**: torso and legs take their depth from the free CC0 **MakeHuman** body. Each photo row is
+  matched to the same body height on the template, and the template's real cross-section is scaled to the row's
+  width, giving a flatter back, a rounded chest and round thighs. The shoulders stay round, and every row is centred
+  on the bones so that limbs stay attached when they swing. Set it up once with
+  `forge.py human --setup --from-git`, which sparse-clones the assets from GitHub, needs no pip and makes about
+  30 MB. Without the assets, photo3d falls back to the inflated outline. `--body3d template|inflate|auto`.
+* **Real face depth**: MediaPipe's 468-point canonical face (Apache-2.0, vendored in `sforge/data/mediapipe_face/`)
+  is posed onto the photo's face from the eyes, nose and mouth corners with solvePnP (a slightly turned head is
+  followed). Its depth is blended into the head, giving the nose, eye sockets, lips, chin and the cheeks turning
+  away, in place of three guessed bumps.
+* **Surface drawing**: each pixel averages the points of the front surface within 1.2 cm of the nearest one, in
+  place of a single point winning, which removes grain and checkerboard. Side walls take a colour blurred down the
+  body rather than streaks, and the silhouette is closed front to back, so the white seam down a side-on figure is
+  gone. Knees and elbows now bend half-way on both sides of the cut, so a bent joint stays closed.
+  `--surface3d crisp|smooth|points` (default crisp: it measured best).
+
+Measured on the Mike test photo (`tools/quality_report.py`, against the proportion-corrected photo at the same
+size; fighter14, 96 frames):
+
+| build | identity (aligned SSIM) | face sharpness | BRISQUE idle (photo) | colour dE top / legs |
+|---|---|---|---|---|
+| 2D skin 35 deg | 0.48 | 56% | 14.3 (18.1) | 4.7 / 6.4 |
+| photo3d 35 deg v9.4 | 0.42 | 71% | 18.0 (12.9) | 2.4 / 9.0 |
+| **photo3d 35 deg v9.5** | **0.44** | 67% | **11.8** (12.9) | 4.7 / **7.8** |
+| photo3d 90 deg v9.4 | 0.31 | 81% | 23.1 (13.6) | 17.3 / 8.5 |
+| **photo3d 90 deg v9.5** | **0.40** | 42% | 22.5 (13.6) | 19.4 / **8.2** |
+
+The 35-degree view now looks more natural than the photo scaled to the same size (BRISQUE 11.8 against 12.9),
+and identity is up at both angles. Face sharpness at 90 degrees is lower: v9.4's figure was raised by aliased point
+grain, which the surface drawing removes. In tests, sharpening brought the number back but lowered identity and
+naturalness, so it is off.
+
+Limb test (`tools/test_limbs.py --engine photo3d`) at 35 and 90 degrees: 11 PASS, 3 WARN and 0 FAIL. The warnings
+are the same speed warnings as in v9.4 (kick, throw and jumpattack keys), and no limb comes off.
+
+Still limited: the sides and back are estimated, and the template is one average adult body (fine for most adults,
+not for a child or a very heavy build yet). More photos or a turn-around video of the same person are the next step
+up; they will be optional, never required.
+
+## New in v9.4: measured realism, dress-as, pose-it-yourself, squads, references
+
+Measured with independent tools (`tools/quality_report.py`: YuNet + Haar face detection, aligned-face SSIM identity,
+BRISQUE naturalness, CIELAB colour, head ratio vs Drillis & Contini adult norms; models via `tools/setup_quality_models.sh`).
+On a real phone photo: head 0.185 -> 0.152 of height (norm 0.130), front view BRISQUE 11.6 -> 9.0 at full sharpness,
+side view sharpness 20% -> 81% and BRISQUE 32.9 -> 23.1 (photo3d instead of the 2D turn).
+
+* `--proportions auto|on|off` (+ `--proportion-strength`): phone-camera perspective (big head, short legs) corrected
+  once, up front; the head is scaled uniformly so the face keeps its shape. auto = only when clearly distorted.
+* photo3d: fighter motion pack (`sforge/fightpack.py`, `--motion-pack`): side-on staging, torso opened to the camera,
+  strikes in profile, uppercut / sweep / low block / knockdown / get-up / roundhouse extras, smear frames on fast moves;
+  back surfaces continue the front's colour at the edge (no seam), sleeves and trouser legs keep their real fabric all
+  round, wider halo clean-up, `--normal-maps` for 2D dynamic lighting. Limb test at 35 deg: 0 fails, 3 warnings (the
+  fastest strikes at 6-8 frames).
+* `--dress-as police|postman|astronaut|firefighter|builder|chef|doctor|ninja|file.json` (`sforge/outfits.py`):
+  garments recoloured on the photo's own pixels with shading kept, plus props from the pose (caps, helmets, badges,
+  satchels, belts, hi-vis, gloves, chest units). Generic - no real insignia or lettering.
+* Pose-it-yourself: `tools/pose_editor.html` (drag a skeleton, keyframes) -> JSON -> `--custom-move file.json`
+  (`sforge/posekit.py`), rendered by any engine at any angle. Example: `library/moves_custom/spinning_backfist.json`.
+* Video-to-move: `forge.py mocap` clips -> `--mocap clip.json --moves idle,kick2=mocap_kick2:8:14` on photo3d.
+  `tools/test_video_move.py` proves the chain without a camera (recovered motion within 1.5 deg per bone).
+* Style lock / match: `tools/style_match.py GAME_SPRITES SRC DST` learns pixel size, palette, outline and colour from
+  the game's own sprites and restyles a build to fit.
+* Engines / editors: `tools/export_engines.py --all` -> Aseprite (JSON + Lua import), Phaser 3 atlas + anims, Godot 4
+  SpriteFrames, GIF / WebP previews (Unity: plugins/unity).
+* Squad mode: `tools/squad.py PEOPLE OUT --roster roster.csv [--game arena-fc|ef|hdf|tt64]` - one scale for everybody
+  (heights from the roster), outfits per member, line-up sheet, game files.
+* Learned body: `tools/learned_body.py import MESH` binds any reconstructed / generated mesh (LHM-class models, Meshy,
+  Tripo, a scan) to the skeleton as a library rig; `run PHOTO --cmd ...` drives a GPU reconstruction model first.
+* Reference library: `tools/refs.py add|list|cut|bench|motions|dataset` - photos and videos with consent and licence
+  records (store git-ignored); `bench` scores every engine on every consented person, `motions` turns videos into
+  library moves, `dataset` writes a consented-only manifest for future training.
+
+## New in v9.3 (experimental): photo -> 3D body, any camera angle, GPU when available
+
+* `--puppet-engine photo3d` inflates the cut-out into a 3D body (front = the photo's own pixels; depth, sides and back
+  estimated from the silhouette and edge colours; a nose / brow / chin profile from the face landmarks), skins it to
+  the standard rig and drives it with the skeletal motion library - the same clips as spec / GLB builds. The torso
+  twists, shoulders roll, a kick is a real hip-knee-ankle chain, and `--turn-yaw` is just a camera angle on the same
+  body (front, 35 deg fighter, 90 deg side, 8-way). The head keeps facing the opponent within a natural neck range.
+* Motions are sampled by pose change, not clock time, so a fast strike gets in-betweens instead of one big jump.
+* `--device auto|cpu|cuda|mps` (env `SFS_DEVICE`): skinning and the z-buffer run through `sforge/accel.py` - PyTorch on
+  CUDA / Apple MPS when installed (`requirements-gpu.txt`), NumPy otherwise. ~0.5 s per 512 px frame on 2 CPU cores.
+* `tools/test_limbs.py --engine photo3d` checks it with 3D-aware motion tests (bone speed and swing measured on the 3D
+  bones, knees against the body's own hinge). Status on a real photo at 35 deg: idle, walk, crouch, block, victory pass;
+  the football-derived kick / jump / special clips still move too far per frame at the fighter preset's frame counts
+  and the hidden-hand arm can lose coverage - a fighter motion set for the 3D rig is the next step. Opt-in; defaults
+  are unchanged.
+
 ## New in v9.2: photo puppets that hold together (limb test, 3/4 view, game adapters)
 
 * **`tools/test_limbs.py`**: renders every frame of every move straight from the rig (effects stripped) and fails

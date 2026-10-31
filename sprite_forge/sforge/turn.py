@@ -101,11 +101,14 @@ class Relief:
         return zc + 0.5 * d * e, zc - 0.5 * d * e
 
 
+CHIN_T = 0.868          # chin height / stature of the MakeHuman base body (Drillis & Contini 0.870)
+
+
 class Template:
     """CC0 MakeHuman body from the Sprite Forge library: real cross-sections at the same body height"""
     name = "template"
 
-    def __init__(self, geo, params=None, assets=None, log=print):
+    def __init__(self, geo, params=None, assets=None, log=print, chin_key=False):
         from . import human
         self.g = geo
         p = {"gender": 1.0, "age": 0.55, "muscle": 0.5, "weight": 0.55}
@@ -138,6 +141,9 @@ class Template:
         # photo row -> template height, piecewise linear through matching body landmarks
         py = [g["ground"], g["ankle_m"], g["knee_m"], g["hip_m"], g["shoulder"], g["top"]]
         ty = [0.0, self.keys_t["ankle"], self.keys_t["knee"], self.keys_t["hip"], self.keys_t["shoulder"], self.Ht]
+        if chin_key and "chin" in g and g["top"] < g["chin"] < g["shoulder"]:
+            # the neck: without a chin key a short-necked photo's chin row reads the template's jaw (head-deep)
+            py.append(g["chin"]); ty.append(CHIN_T * self.Ht)
         order = np.argsort(py)
         self.py = np.array(py)[order]; self.ty = np.array(ty)[order]
         self.S = g["stand_h"] / self.Ht            # photo px per template metre

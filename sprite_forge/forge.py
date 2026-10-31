@@ -259,6 +259,29 @@ def cmd_build(a):
         cfg.qa = False
     if getattr(a, "puppet_engine", None):
         cfg.puppet_engine = a.puppet_engine
+    if getattr(a, "dress_as", None):
+        cfg.dress_as = a.dress_as
+    for path in (getattr(a, "custom_move", None) or []):        # v9.4 pose-it-yourself moves (sforge/posekit.py)
+        from sforge import posekit
+        from sforge.photo3d import fighter_camera
+        spec_, _ = posekit.load(path, fighter_camera(cfg.turn, "fighter3d")[1] or 55.0)
+        cfg.moves = [m for m in cfg.moves if m.name != spec_.name] + [spec_]
+    if getattr(a, "motion_pack", None):
+        cfg.motion_pack = a.motion_pack
+    if getattr(a, "normal_maps", False):
+        cfg.normal_maps = True
+    if getattr(a, "body3d", None):
+        cfg.body3d = a.body3d
+    if getattr(a, "surface3d", None):
+        cfg.surface3d = a.surface3d
+    if getattr(a, "no_smear", False):
+        cfg.smear = False
+    if getattr(a, "proportions", None):
+        cfg.proportions = a.proportions
+    if getattr(a, "proportion_strength", None) is not None:
+        cfg.proportion_strength = a.proportion_strength
+    if getattr(a, "device", None):
+        cfg.device = "" if a.device == "auto" else a.device
     if getattr(a, "motion_style", None):
         cfg.motion_style = a.motion_style
     if a.footlock:
@@ -632,7 +655,17 @@ v9:
     v9x = b.add_argument_group("v9 EXTRAS")
     v9x.add_argument("--fx", help="post passes: 'outline=2,cel=3,pixel=4,colors=32,light=-1:-1:1,rim=0.4,outline_colour=#101018'")
     v9x.add_argument("--maps", help="'normal,emissive' (emissive=#59f2ff to pick the glow colour) -> maps/")
-    v9x.add_argument("--puppet-engine", choices=["classic", "skin"], help="v9.1 photo puppet renderer: skin = smooth bending elbows / knees (default classic)")
+    v9x.add_argument("--puppet-engine", choices=["classic", "skin", "photo3d"], help="photo puppet renderer: skin = smooth bending elbows / knees (v9.1); photo3d = the photo inflated into a 3D body driven by the skeletal motion library, any camera angle (v9.3) (default classic)")
+    v9x.add_argument("--custom-move", action="append", help="v9.4 add a pose-it-yourself move: a keyframe JSON from the Pose Editor (repeatable; replaces a preset move of the same name)")
+    v9x.add_argument("--dress-as", help="v9.4 dress the photo character: police | postman | astronaut | firefighter | builder | chef | doctor | ninja | path/to/outfit.json (library/outfits_photo/*.json too)")
+    v9x.add_argument("--motion-pack", choices=["auto", "fighter3d", "none"], help="v9.4 photo3d motion set: fighter3d = side-on 2D-fighter staging (torso opened to the camera, strikes in profile); auto = fighter3d for fighter move sets (default auto)")
+    v9x.add_argument("--normal-maps", action="store_true", help="v9.4 photo3d: also write atlas_normal.png + moves_normal/ for 2D dynamic lighting (Godot / Unity 2D lights)")
+    v9x.add_argument("--body3d", choices=["auto", "template", "inflate"], help="v9.5 photo3d body shape: template = real cross-sections of the CC0 MakeHuman body fitted to the outline (forge.py human --setup --from-git); inflate = the outline puffed up; auto = template when installed (default auto)")
+    v9x.add_argument("--surface3d", choices=["smooth", "crisp", "points"], help="v9.5 photo3d drawing: crisp = each pixel averages the points of the front surface (no grain, no blur); smooth = the same with a bilinear footprint (softer); points = v9.4 nearest point (default crisp; measured best identity / naturalness at 35 deg)")
+    v9x.add_argument("--no-smear", action="store_true", help="v9.4 photo3d: no smear frames on fast strikes")
+    v9x.add_argument("--proportions", choices=["auto", "on", "off"], help="v9.4 correct phone-camera perspective (big head, short legs) towards adult proportions; auto = only when clearly distorted (default auto)")
+    v9x.add_argument("--proportion-strength", type=float, help="v9.4 0..1, how far towards adult norms (default 0.65)")
+    v9x.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], help="v9.3 compute backend for photo3d: auto = CUDA / Apple MPS through PyTorch when available, else NumPy (default auto; env SFS_DEVICE)")
     v9x.add_argument("--motion-style", choices=["classic", "polish"], help="v9.1 photo puppet in-betweens: polish = smooth curves + limb lag when a move has more frames than key poses (default classic)")
     v9x.add_argument("--footlock", action="store_true", help="pin planted feet with 2-bone IK (no foot sliding) - mannequin / library moves")
     v9x.add_argument("--framedata", action="store_true", help="hit / hurt boxes + startup / active / recovery -> framedata.json + framedata.cfg")
