@@ -422,6 +422,7 @@ def main():
     ap.add_argument("--frames", default="", help="only these frame indices (e.g. 0,1)")
     ap.add_argument("--samples", type=int, default=24)
     ap.add_argument("--blend", action="store_true", help="also save the .blend")
+    ap.add_argument("--resume", action="store_true", help="skip states whose sheet already exists")
     a = ap.parse_args()
     from PIL import Image
     sp, ch, rig, rest, Wb = build(a.spec)
@@ -433,6 +434,8 @@ def main():
     only = [int(x) for x in a.frames.split(",") if x != ""]
     tmp = os.path.join(a.out, "_frame.png")
     for s in a.states.split(","):
+        if a.resume and os.path.exists(os.path.join(a.out, "%s_%s.png" % (sp.name, s))):
+            continue
         sts = HF.states(s)
         cells = []
         for i, st in enumerate(sts):
