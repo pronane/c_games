@@ -53,7 +53,7 @@ def test_review_gate_edit_and_delete(monkeypatch):
     # Mocks validate orchestration, not model quality. Real feature alignment runs.
     configured(monkeypatch)
     monkeypatch.setattr(module.models, 'separate_guitar', lambda a, sr: (a, sr, {'model': 'test double', 'device': 'cpu'}))
-    monkeypatch.setattr(module.models, 'transcribe', lambda _: [{'id': 0, 'time': .3, 'duration': .4, 'midi': 57, 'amplitude': .7}])
+    monkeypatch.setattr(module.models, 'transcribe', lambda _, **kwargs: [{'id': 0, 'time': .3, 'duration': .4, 'midi': 57, 'amplitude': .7}])
     response = upload(original_offset='33')
     assert response.status_code == 202
     key = response.json()['id']

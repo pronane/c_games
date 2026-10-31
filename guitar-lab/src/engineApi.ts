@@ -1,3 +1,11 @@
+import type { InstrumentProfile, Notation } from "./instruments";
+export type InstrumentSnapshot = InstrumentProfile & {
+  tuning: string;
+  capo: number;
+  notation: Notation;
+  open_strings: number[];
+  max_fret: number;
+};
 export type EngineNote = {
   id: number;
   time: number;
@@ -37,6 +45,7 @@ export type EngineResult = {
     separation: { model: string; device: string; warning?: string };
     transcription: string;
     edited: boolean;
+    instrument_profile: InstrumentSnapshot;
   };
   warnings: string[];
 };
@@ -49,6 +58,7 @@ export type Job = {
   device: { model?: string; device?: string; warning?: string };
   duration: number;
   original_offset: number;
+  instrument_profile: InstrumentSnapshot;
   expires_at: number;
   result: EngineResult | null;
 };

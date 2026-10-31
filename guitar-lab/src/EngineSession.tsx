@@ -16,6 +16,7 @@ import {
 } from "./engineApi";
 import { fingering, note } from "./analysis";
 import ModelInstaller from "./ModelInstaller";
+import { tabPosition, type ResolvedInstrument } from "./instruments";
 
 type Props = {
   reference: { name: string; buffer: AudioBuffer } | null;
@@ -24,15 +25,19 @@ type Props = {
   start: number;
   length: number;
   recording: boolean;
+  profile: ResolvedInstrument;
 };
 const pending = ["queued", "separating", "analysing"];
-const tuning = [64, 59, 55, 50, 45, 40];
-function withTab(n: EngineNote): EngineNote {
-  const position = fingering(n.midi);
+function withTab(n: EngineNote, profile: ResolvedInstrument): EngineNote {
+  const position = tabPosition(n.midi, profile);
   return {
     ...n,
-    string: n.string ?? position?.string ?? 1,
-    fret: n.fret ?? position?.fret ?? 0,
+    string: profile.openStrings.length
+      ? (n.string ?? position?.string ?? null)
+      : null,
+    fret: profile.openStrings.length
+      ? (n.fret ?? position?.fret ?? null)
+      : null,
   };
 }
 
@@ -43,7 +48,10 @@ export default function EngineSession({
   start,
   length,
   recording,
+  profile,
 }: Props) {
+  const tuning = profile.openStrings,
+    showTab = tuning.length > 0 && profile.settings.notation === "tablature";
   const [health, setHealth] = useState<Health | null>(null),
     [healthError, setHealthError] = useState(""),
     [consent, setConsent] = useState(false),
@@ -96,7 +104,17 @@ export default function EngineSession({
     setError("");
     setDirty(false);
     setBusy(false);
-  }, [reference, take, kind, start, length]);
+  }, [
+    reference,
+    take,
+    kind,
+    start,
+    length,
+    profile.id,
+    profile.settings.tuning,
+    profile.settings.capo,
+    profile.settings.notation,
+  ]);
   useEffect(() => {
     if (!job || !pending.includes(job.status)) return;
     const controller = new AbortController();
@@ -107,7 +125,7 @@ export default function EngineSession({
         });
         setJob(next);
         if (next.result) {
-          setEdits(next.result.take_notes.map(withTab));
+          setEdits(next.result.take_notes.map((n) => withTab(n, profile)));
           setDirty(false);
         }
       } catch (e) {
@@ -147,7 +165,27 @@ export default function EngineSession({
       body.set("consent", "true");
       body.set("kind", kind);
       body.set("original_offset", String(start));
+      body.set("instrument", profile.id);
+      body.set("tuning", profile.settings.tuning);
+      body.set("capo", String(profile.settings.capo));
+      body.set("notation", profile.settings.notation);
       const next = await api<Job>("/api/jobs", { method: "POST", body });
+      const accepted = next.instrument_profile;
+      if (
+        !accepted ||
+        accepted.id !== profile.id ||
+        accepted.midi_min !== profile.midi_min ||
+        accepted.midi_max !== profile.midi_max ||
+        accepted.capo !== profile.settings.capo ||
+        accepted.notation !== profile.settings.notation ||
+        JSON.stringify(accepted.open_strings) !==
+          JSON.stringify(profile.openStrings)
+      ) {
+        await api("/api/jobs/" + next.id, { method: "DELETE" });
+        throw Error(
+          "The engine did not accept this instrument configuration. Update/restart the engine before comparing; the session was deleted.",
+        );
+      }
       if (current !== generation.current || !mounted.current) {
         await api("/api/jobs/" + next.id, { method: "DELETE" });
         return;
@@ -219,7 +257,7 @@ export default function EngineSession({
       });
       if (current === generation.current) {
         setJob(next);
-        setEdits(next.result!.take_notes.map(withTab));
+        setEdits(next.result!.take_notes.map((n) => withTab(n, profile)));
         setDirty(false);
       }
     } catch (e) {
@@ -241,16 +279,17 @@ export default function EngineSession({
         </span>
       </div>
       <p className="panel-desc">
-        The full-band reference is never treated as a clean guitar performance.
-        Upload only your selected {Math.max(0, duration).toFixed(1)}-second
-        excerpts, then check the guitar before grading.
+        The full-band reference is never treated as a clean instrument
+        performance. Upload only your selected{" "}
+        {Math.max(0, duration).toFixed(1)}-second excerpts, then check the{" "}
+        {profile.separation_stem} stem before comparing.
       </p>
       <div className="engine-capabilities">
         <span
           className={health?.models.separation.configured ? "available" : ""}
         >
-          {health?.models.separation.configured ? "●" : "○"} Guitar separation ·
-          htdemucs_6s
+          {health?.models.separation.configured ? "●" : "○"} {profile.name}{" "}
+          separation · htdemucs_6s
         </span>
         <span
           className={health?.models.transcription.configured ? "available" : ""}
@@ -266,7 +305,7 @@ export default function EngineSession({
       {health && !ready && (
         <p className="engine-warning">
           {kind === "mix" && !health.models.separation.configured
-            ? "Guitar separation weights are not provisioned on this server. Supply an isolated guitar reference, or install the documented model. "
+            ? "Six-source separation weights are not provisioned on this server. Supply an isolated instrument reference, or install the documented model. "
             : ""}
           {!health.models.transcription.configured
             ? "The specialist transcription model also needs installation. "
@@ -312,7 +351,7 @@ export default function EngineSession({
             <CloudUpload size={16} />
             {busy
               ? "Preparing / uploading excerpts…"
-              : "Upload excerpts & prepare guitar"}
+              : `Upload excerpts & prepare ${profile.separation_stem}`}
           </button>
         </>
       )}
@@ -347,8 +386,8 @@ export default function EngineSession({
             <div className="stem-review">
               <h3>
                 {kind === "mix"
-                  ? "Extracted guitar"
-                  : "Supplied guitar reference"}{" "}
+                  ? `Extracted ${profile.separation_stem}`
+                  : `Supplied ${profile.separation_stem} reference`}{" "}
                 · quality check
               </h3>
               <audio
@@ -360,8 +399,8 @@ export default function EngineSession({
               />
               <p>
                 Listen for missing notes, other instruments or watery/warbling
-                artefacts. A guitar stem may contain several guitar parts. If it
-                is not usable, delete this session and provide a cleaner
+                artefacts. An instrument stem may contain overlapping parts. If
+                it is not usable, delete this session and provide a cleaner
                 reference.
               </p>
               {job.status === "review" && (
@@ -461,7 +500,11 @@ export default function EngineSession({
               <div className="transcription-head">
                 <h3>
                   Editable transcription{" "}
-                  <span>STANDARD TUNING · ESTIMATED</span>
+                  <span>
+                    {profile.name.toUpperCase()} ·{" "}
+                    {profile.settings.tuning.toUpperCase()} · CAPO{" "}
+                    {profile.settings.capo} · ESTIMATED
+                  </span>
                 </h3>
                 <div className="segmented">
                   {["Notes & tab", "Reference notes", "Differences"].map(
@@ -471,7 +514,7 @@ export default function EngineSession({
                         onClick={() => setDisplay(x)}
                         key={x}
                       >
-                        {x}
+                        {x === "Notes & tab" && !showTab ? "Notes" : x}
                       </button>
                     ),
                   )}
@@ -492,8 +535,8 @@ export default function EngineSession({
                           <th>Start (s)</th>
                           <th>Length (s)</th>
                           <th>Note</th>
-                          <th>String</th>
-                          <th>Fret</th>
+                          <th hidden={!showTab}>String</th>
+                          <th hidden={!showTab}>Fret</th>
                           <th />
                         </tr>
                       </thead>
@@ -532,17 +575,20 @@ export default function EngineSession({
                                 value={n.midi}
                                 onChange={(e) => {
                                   const midi = Number(e.target.value),
-                                    pos = fingering(midi);
+                                    pos = tabPosition(midi, profile);
                                   update(n.id, {
                                     midi,
-                                    string: pos?.string ?? 1,
-                                    fret: pos?.fret ?? 0,
+                                    string: pos?.string ?? null,
+                                    fret: pos?.fret ?? null,
                                   });
                                 }}
                               >
                                 {Array.from(
-                                  { length: 49 },
-                                  (_, i) => i + 40,
+                                  {
+                                    length:
+                                      profile.midi_max - profile.midi_min + 1,
+                                  },
+                                  (_, i) => i + profile.midi_min,
                                 ).map((m) => (
                                   <option key={m} value={m}>
                                     {note(m)}
@@ -550,7 +596,7 @@ export default function EngineSession({
                                 ))}
                               </select>
                             </td>
-                            <td>
+                            <td hidden={!showTab}>
                               <select
                                 aria-label={`Note ${n.id} string`}
                                 value={n.string ?? 1}
@@ -564,18 +610,17 @@ export default function EngineSession({
                               >
                                 {tuning.map((_, i) => (
                                   <option key={i} value={i + 1}>
-                                    {i + 1} ({["e", "B", "G", "D", "A", "E"][i]}
-                                    )
+                                    {i + 1} ({note(tuning[i])})
                                   </option>
                                 ))}
                               </select>
                             </td>
-                            <td>
+                            <td hidden={!showTab}>
                               <input
                                 aria-label={`Note ${n.id} fret`}
                                 type="number"
                                 min="0"
-                                max="24"
+                                max={profile.maxFret}
                                 value={n.fret ?? 0}
                                 onChange={(e) => {
                                   const fret = Number(e.target.value);
@@ -619,9 +664,9 @@ export default function EngineSession({
                             id: Math.max(-1, ...v.map((n) => n.id)) + 1,
                             time: 0,
                             duration: Math.min(0.3, job.duration),
-                            midi: 64,
-                            string: 1,
-                            fret: 0,
+                            midi: tuning[0] ?? 60,
+                            string: tuning.length ? 1 : null,
+                            fret: tuning.length ? 0 : null,
                             amplitude: 0.5,
                           },
                         ]);
@@ -645,9 +690,9 @@ export default function EngineSession({
                       saved notes.
                     </p>
                   )}
-                  <div className="tab-scroll">
+                  <div className="tab-scroll" hidden={!showTab}>
                     <div className="tab">
-                      {["e", "B", "G", "D", "A", "E"].map((s, i) => (
+                      {tuning.map(note).map((s, i) => (
                         <div className="tab-row" key={s}>
                           <b>{s}</b>
                           {edits.slice(0, 24).map((n) => (

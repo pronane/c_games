@@ -22,6 +22,7 @@ import soundfile as sf
 from . import models
 from .analysis import align, observations
 from .model_store import install_stream, InvalidCheckpoint
+from .instruments import resolve_profile, CATALOGUE
 
 MAX_BYTES = 40 * 1024 * 1024
 TTL_SECONDS = 3600
@@ -38,6 +39,7 @@ class Job:
     kind: str
     original_offset: float
     duration: float
+    profile: dict = field(default_factory=resolve_profile)
     status: str = 'queued'
     stage: str = 'Waiting for audio worker'
     created: float = field(default_factory=time.time)
@@ -95,7 +97,7 @@ def get_job(key):
 def serialize(job):
     return {'id': job.id, 'status': job.status, 'stage': job.stage, 'error': job.error,
             'device': job.device, 'result': job.result, 'original_offset': job.original_offset,
-            'duration': job.duration, 'expires_at': job.created+TTL_SECONDS,
+            'duration': job.duration, 'instrument_profile': job.profile, 'expires_at': job.created+TTL_SECONDS,
             'guitar_url': f'/api/jobs/{job.id}/guitar' if job.status in ('review', 'analysing', 'complete') else None}
 
 
@@ -110,16 +112,16 @@ def run_job(job, phase):
         if phase == 'separate':
             audio, sr = sf.read(job.folder/'reference.wav', always_2d=True, dtype='float32')
             if job.kind == 'mix':
-                job.status, job.stage = 'separating', 'Extracting guitar with htdemucs_6s'
-                guitar, sr, provenance = models.separate_guitar(audio, sr)
+                job.status, job.stage = 'separating', f"Extracting {job.profile['separation_stem']} with htdemucs_6s"
+                guitar, sr, provenance = models.separate_instrument(audio, sr, job.profile['separation_stem'])
                 job.device = provenance
             else:
                 guitar = audio
-                job.device = {'model': 'User-supplied isolated guitar', 'device': 'not needed',
+                job.device = {'model': f"User-supplied isolated {job.profile['name']}", 'device': 'not needed',
                               'quality': 'Human review required; not independently verified.'}
             cancelled(job)
             sf.write(job.folder/'guitar.wav', guitar, sr, subtype='PCM_16')
-            job.status, job.stage = 'review', 'Listen to the guitar reference and approve its quality'
+            job.status, job.stage = 'review', 'Listen to the instrument reference and approve its quality'
         else:
             job.status, job.stage = 'analysing', 'Aligning harmonic features within the selected passage'
             import librosa
@@ -128,11 +130,11 @@ def run_job(job, phase):
             take = librosa.resample(take.mean(axis=1), orig_sr=take_sr, target_sr=sr)
             alignment = align(reference.mean(axis=1), take, sr)
             cancelled(job)
-            job.stage = 'Transcribing reference guitar with Basic Pitch'
-            reference_notes = models.transcribe(job.folder/'guitar.wav')
+            job.stage = f"Transcribing reference {job.profile['name']} with Basic Pitch"
+            reference_notes = models.transcribe_profile(job.folder/'guitar.wav', job.profile)
             cancelled(job)
             job.stage = 'Transcribing your take with Basic Pitch'
-            take_notes = models.transcribe(job.folder/'take.wav')
+            take_notes = models.transcribe_profile(job.folder/'take.wav', job.profile)
             cancelled(job)
             versions = {}
             for name in ('librosa', 'demucs', 'basic-pitch', 'torch', 'onnxruntime'):
@@ -143,9 +145,9 @@ def run_job(job, phase):
             job.result = {'alignment': alignment, 'reference_notes': reference_notes, 'take_notes': take_notes,
                           'comparison': observations(reference_notes, take_notes, alignment),
                           'provenance': {'separation': job.device, 'transcription': 'Basic Pitch ONNX (CPU provider by default)',
-                                         'versions': versions, 'edited': False},
-                          'warnings': ['Basic Pitch estimates can miss or invent chord notes.',
-                                       'Reference may contain multiple guitars and separation artefacts.',
+                                         'versions': versions, 'instrument_profile': job.profile, 'edited': False},
+                          'warnings': [job.profile['status'], 'Basic Pitch estimates can miss or invent notes.',
+                                       'Reference may contain overlapping parts and separation artefacts.',
                                        'Manual song position is assumed; this is not whole-song recognition.']}
             job.status, job.stage = 'complete', 'Comparison ready — review uncertainty and correct notes if needed'
     except Exception as exc:
@@ -162,7 +164,7 @@ def run_job(job, phase):
 @app.get('/api/health')
 def health():
     cleanup()
-    return {'service': 'Fretwork Python engine', 'models': models.capabilities(),
+    return {'service': 'Fretwork Python engine', 'models': models.capabilities(), 'instruments': CATALOGUE,
             'retention_seconds': TTL_SECONDS, 'max_passage_seconds': 60,
             'privacy': 'Selected excerpts uploaded only after consent. Temporary files deleted on deletion, expiry or clean shutdown.'}
 
@@ -214,15 +216,20 @@ async def install_separation_model(checkpoint: UploadFile = File(...), x_fretwor
 @app.post('/api/jobs', status_code=202)
 async def create_job(reference: UploadFile = File(...), take: UploadFile = File(...),
                      consent: bool = Form(False), kind: str = Form(...),
-                     original_offset: float = Form(0), x_fretwork_client: str | None = Header(None)):
+                     original_offset: float = Form(0), instrument: str = Form('guitar'), tuning: str = Form('standard'),
+                     capo: int = Form(0), notation: str | None = Form(None), x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
         raise HTTPException(422, 'Explicit upload consent is required.')
     if kind not in ('mix', 'isolated') or not math.isfinite(original_offset) or original_offset < 0:
         raise HTTPException(422, 'Invalid reference type or original timestamp.')
+    try:
+        profile = resolve_profile(instrument, tuning, capo, notation)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     caps = models.capabilities()
     if kind == 'mix' and not caps['separation']['configured']:
-        raise HTTPException(503, 'Guitar separation model unavailable. Provision htdemucs_6s weights; no audio was saved.')
+        raise HTTPException(503, 'Six-source instrument separation model unavailable. Provision htdemucs_6s weights; no job audio was saved.')
     if not caps['transcription']['configured']:
         raise HTTPException(503, 'Basic Pitch transcription model unavailable. Provision nmp.onnx; no audio was saved.')
     cleanup()
@@ -233,7 +240,7 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
         folder = ROOT/key
         folder.mkdir(mode=0o700)
         # Reserve capacity before streaming uploads.
-        job = Job(key, folder, kind, original_offset, 0, stage='Receiving consented excerpts')
+        job = Job(key, folder, kind, original_offset, 0, profile=profile, stage='Receiving consented excerpts')
         JOBS[key] = job
     try:
         rd = await save_audio(reference, folder/'reference.wav')
@@ -255,6 +262,7 @@ def status(key: str):
     return serialize(get_job(key))
 
 
+@app.get('/api/jobs/{key}/stem')
 @app.get('/api/jobs/{key}/guitar')
 def guitar(key: str):
     job = get_job(key)
@@ -288,7 +296,7 @@ class NoteEdit(BaseModel):
     id: int = Field(ge=0)
     time: float = Field(ge=0, le=60, allow_inf_nan=False)
     duration: float = Field(gt=0, le=60, allow_inf_nan=False)
-    midi: int = Field(ge=40, le=88)
+    midi: int = Field(ge=21, le=108)
     amplitude: float = Field(default=.5, ge=0, le=1, allow_inf_nan=False)
     string: int | None = Field(default=None, ge=1, le=6)
     fret: int | None = Field(default=None, ge=0, le=24)
@@ -308,10 +316,14 @@ def edit_notes(key: str, body: Edits, x_fretwork_client: str | None = Header(Non
         if any(n.time+n.duration > job.duration+.1 for n in body.notes) or len({n.id for n in body.notes}) != len(body.notes):
             raise HTTPException(422, 'Notes must fit within the passage and have unique IDs.')
         for n in body.notes:
+            if not job.profile['midi_min'] <= n.midi <= job.profile['midi_max']:
+                raise HTTPException(422, 'Note is outside the selected instrument range.')
             if (n.string is None) != (n.fret is None):
                 raise HTTPException(422, 'Supply both string and fret or neither.')
-            if n.string is not None and [64, 59, 55, 50, 45, 40][n.string-1]+n.fret != n.midi:
-                raise HTTPException(422, 'Tab position must agree with the MIDI note in standard tuning.')
+            if n.string is not None:
+                strings = job.profile['open_strings']
+                if n.string > len(strings) or n.fret > job.profile['max_fret'] or strings[n.string-1]+n.fret != n.midi:
+                    raise HTTPException(422, 'Tab must agree with this instrument, tuning and capo.')
         notes = [n.model_dump() for n in body.notes]
         job.result['take_notes'] = sorted(notes, key=lambda n: (n['time'], n['midi']))
         job.result['comparison'] = observations(job.result['reference_notes'], notes, job.result['alignment'])

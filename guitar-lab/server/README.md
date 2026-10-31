@@ -47,6 +47,10 @@ The official Demucs package's `demucs/remote/files.txt` identifies the checkpoin
 - Auto retries on CPU only for known memory/unsupported-operation RuntimeErrors, with the **same model, float32, overlap and shift settings**. Other errors fail visibly. Real GPU/MPS inference remains untested in this sandbox; unit tests cover routing and fallback semantics.
 - Basic Pitch currently uses its ONNX **CPU provider**, including on GPU-equipped servers. It retains full functionality, but this stage is not GPU-accelerated in v0.2. This is disclosed in provenance. Adding an ONNX GPU provider is a separate benchmarked optimization.
 
+## Instrument profiles
+
+See [INSTRUMENT_PROFILES.md](../INSTRUMENT_PROFILES.md). Multipart jobs now accept `instrument`, `tuning`, `capo` and `notation` (standard guitar by default). Both languages read `shared/instruments.json`; jobs snapshot and validate the resolved profile, use its dedicated stem and transcription bounds, and validate edits against its range/tuning/capo. Bass and piano are experimental; no real-world accuracy claim or piano pedal grading is made. The existing `/guitar` endpoint is retained alongside a generic `/stem` alias.
+
 ## Workflow / API
 
 1. UI uses already-decoded audio to generate equal-length, 44.1 kHz PCM WAV excerpts. Only the selected original timestamp and 1–60 seconds of reference/take are sent, not the entire song. Beginning of the take corresponds to the manually selected reference timestamp. Permission checkbox is never preselected.
@@ -54,7 +58,7 @@ The official Demucs package's `demucs/remote/files.txt` identifies the checkpoin
 3. Poll `GET /api/jobs/{id}` for queue/separation state.
 4. `GET /api/jobs/{id}/guitar` serves the guitar excerpt for review. **No transcription/comparison starts before explicit approval.** For an isolated reference this is the provided guitar, labelled accordingly.
 5. `POST /api/jobs/{id}/approve` JSON `{ "approved": true }` starts harmonic/chroma DTW and real Basic Pitch transcription of both passages.
-6. Results include alignment map, estimated reference/take note events, one-to-one note-pair observations, raw onset/duration differences and model provenance. MIDI pitches are restricted to E2–E6. DTW is constrained within the manually chosen passage, not a whole-song search.
+6. Results include alignment map, estimated reference/take note events, one-to-one note-pair observations, raw onset/duration differences and model provenance. MIDI pitches are restricted to the resolved instrument profile (standard guitar E2–E6; bass E1–G4; piano A0–C8). DTW is constrained within the manually chosen passage, not a whole-song search.
 7. `PUT /api/jobs/{id}/notes` accepts edited take events and recomputes observations. It does not rerun the alignment or change reference transcription. String/fret edits must agree with the pitch in standard tuning. UI labels unsaved changes. Notes/tab can be added, removed and corrected.
 8. `DELETE /api/jobs/{id}` makes the session immediately inaccessible. If inference is running, physical deletion occurs when that stage exits; it cannot be force-interrupted safely in this single-process worker version.
 

@@ -1,0 +1,53 @@
+[
+  {
+    "id": "guitar",
+    "name": "Guitar",
+    "midi_min": 38,
+    "midi_max": 88,
+    "separation_stem": "guitar",
+    "transcription_method": "basic_pitch_onnx",
+    "default_notation": "tablature",
+    "notations": ["tablature", "notes"],
+    "supports_capo": true,
+    "tunings": {
+      "standard": [64, 59, 55, 50, 45, 40],
+      "drop_d": [64, 59, 55, 50, 45, 38],
+      "dadgad": [62, 57, 55, 50, 45, 38]
+    },
+    "feedback": [
+      "pitch_candidates",
+      "timing_candidates",
+      "sustain_candidates",
+      "chord_estimates"
+    ],
+    "status": "Experimental audio analysis; no physical fretting diagnosis."
+  },
+  {
+    "id": "bass",
+    "name": "Bass (4-string)",
+    "midi_min": 26,
+    "midi_max": 67,
+    "separation_stem": "bass",
+    "transcription_method": "basic_pitch_onnx",
+    "default_notation": "tablature",
+    "notations": ["tablature", "notes"],
+    "supports_capo": false,
+    "tunings": { "standard": [43, 38, 33, 28], "drop_d": [43, 38, 33, 26] },
+    "feedback": ["pitch_candidates", "timing_candidates", "sustain_candidates"],
+    "status": "Experimental bass routing; low-register transcription needs real-instrument validation."
+  },
+  {
+    "id": "piano",
+    "name": "Piano / keyboard",
+    "midi_min": 21,
+    "midi_max": 108,
+    "separation_stem": "piano",
+    "transcription_method": "basic_pitch_onnx",
+    "default_notation": "notes",
+    "notations": ["notes"],
+    "supports_capo": false,
+    "tunings": {},
+    "feedback": ["pitch_candidates", "timing_candidates", "sustain_candidates"],
+    "status": "Experimental polyphonic audio routing; pedal/expression grading, staff engraving and MIDI comparison are not implemented."
+  }
+]

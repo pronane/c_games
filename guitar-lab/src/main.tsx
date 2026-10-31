@@ -4,7 +4,6 @@ import {
   AudioLines,
   ArrowUpRight,
   Upload,
-  Mic,
   Play,
   Pause,
   Headphones,
@@ -12,13 +11,21 @@ import {
   Check,
   Music2,
   RotateCcw,
-  Square,
   Info,
   SlidersHorizontal,
 } from "lucide-react";
-import { compare, note, fingering, type Features } from "./analysis";
+import { compare, note, type Features } from "./analysis";
 import "./style.css";
 import EngineSession from "./EngineSession";
+import AudioInput from "./AudioInput";
+import MidiInput from "./MidiInput";
+import InstrumentSetup from "./InstrumentSetup";
+import {
+  defaultSettings,
+  resolveInstrument,
+  tabPosition,
+  type InstrumentSettings,
+} from "./instruments";
 type Clip = { name: string; buffer: AudioBuffer };
 type Result = {
   reference: Features;
@@ -27,6 +34,9 @@ type Result = {
   chords: { time: number; name: string }[];
 };
 function App() {
+  const [settings, setSettings] =
+    useState<InstrumentSettings>(defaultSettings());
+  const profile = resolveInstrument(settings);
   const [reference, setReference] = useState<Clip | null>(null),
     [take, setTake] = useState<Clip | null>(null),
     [kind, setKind] = useState("mix"),
@@ -41,10 +51,8 @@ function App() {
     [playing, setPlaying] = useState(""),
     [demo, setDemo] = useState(false);
   const ctx = useRef<AudioContext | null>(null),
-    sources = useRef<AudioBufferSourceNode[]>([]),
-    recorder = useRef<MediaRecorder | null>(null),
-    stream = useRef<MediaStream | null>(null),
-    timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    sources = useRef<AudioBufferSourceNode[]>([]);
+
   const getCtx = () => ctx.current ?? (ctx.current = new AudioContext());
   const invalidate = () => {
     setResult(null);
@@ -120,53 +128,6 @@ function App() {
       setError(String(e));
     }
   }
-  async function record() {
-    if (recording) {
-      recorder.current?.stop();
-      return;
-    }
-    try {
-      await getCtx().resume();
-      const media = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
-      stream.current = media;
-      const r = new MediaRecorder(media);
-      recorder.current = r;
-      const chunks: BlobPart[] = [];
-      r.ondataavailable = (e) => chunks.push(e.data);
-      r.onstop = async () => {
-        if (timer.current) clearTimeout(timer.current);
-        media.getTracks().forEach((t) => t.stop());
-        setRecording(false);
-        try {
-          const buffer = await getCtx().decodeAudioData(
-            await new Blob(chunks, { type: r.mimeType }).arrayBuffer(),
-          );
-          setTake({ name: "Your guitar recording", buffer });
-          setDemo(false);
-          invalidate();
-        } catch {
-          setError(
-            "Could not read the microphone recording. Try uploading an audio file instead.",
-          );
-        }
-      };
-      r.start();
-      setRecording(true);
-      timer.current = setTimeout(() => {
-        if (r.state === "recording") r.stop();
-      }, length * 1000);
-    } catch {
-      setError(
-        "Microphone unavailable. Allow microphone access over HTTPS, or upload a recording.",
-      );
-    }
-  }
   async function mono(clip: Clip, offset: number, duration: number) {
     const offline = new OfflineAudioContext(
         1,
@@ -208,7 +169,17 @@ function App() {
           worker.terminate();
           reject(Error("Analysis failed. Try a shorter passage."));
         };
-        worker.postMessage({ a, b, duration }, [a.buffer, b.buffer]);
+        worker.postMessage(
+          {
+            a,
+            b,
+            duration,
+            midi_min: profile.midi_min,
+            midi_max: profile.midi_max,
+            chords: profile.feedback.includes("chord_estimates"),
+          },
+          [a.buffer, b.buffer],
+        );
       });
       setResult(analysed);
     } catch (e) {
@@ -218,6 +189,8 @@ function App() {
     }
   }
   function demoClips() {
+    setSettings(defaultSettings("guitar"));
+    setView("Tablature");
     stop();
     const context = getCtx();
     function make(imperfect: boolean) {
@@ -296,13 +269,29 @@ function App() {
             <span>Find your next breakthrough.</span>
           </h1>
           <p>
-            Your guitar, alongside the original. Turn a practice take into a
+            Your instrument, alongside the original. Turn a practice take into a
             clear next step.
           </p>
-          <button className="demo" onClick={demoClips}>
+          <button
+            className="demo"
+            disabled={recording || busy}
+            onClick={demoClips}
+          >
             Try a sample session <ArrowUpRight size={16} />
           </button>
         </section>
+        <InstrumentSetup
+          settings={settings}
+          disabled={recording || busy}
+          onChange={(next) => {
+            stop();
+            setSettings(next);
+            setTake(null);
+            setDemo(false);
+            invalidate();
+            setView(next.notation === "tablature" ? "Tablature" : "Notes");
+          }}
+        />
         <div className="step-line">
           <span className="step selected">
             1 <b>Set up your session</b>
@@ -367,15 +356,15 @@ function App() {
                   invalidate();
                 }}
               >
-                Isolated guitar
+                Isolated {profile.name}
               </button>
             </div>
             <div className="notice">
               <Headphones size={17} />
               <p>
                 {kind === "mix"
-                  ? "A full mix includes bass, drums and vocals. We can explore timing, but guitar-only pitch grading needs an isolated guitar stem. Use the specialist engine below to extract and review the guitar before comparison."
-                  : "Best for comparison. Use a clean guitar stem or a teacher’s reference. Note and chord detection is still experimental."}
+                  ? "A full mix includes bass, drums and vocals. We can explore timing, but instrument-specific pitch comparison needs an isolated reference stem. Use the specialist engine below to extract and review the selected instrument before comparison."
+                  : "Best for comparison. Use a clean instrument stem or a teacher’s reference. Note and chord detection is still experimental."}
               </p>
             </div>
           </section>
@@ -388,30 +377,27 @@ function App() {
             <p className="panel-desc">
               Record a passage, or bring a take you already have.
             </p>
-            <div className={"record-box " + (recording ? "recording" : "")}>
-              <div className="record-wave">
-                {Array.from({ length: 39 }, (_, i) => (
-                  <i
-                    key={i}
-                    style={{
-                      height: 8 + Math.abs(Math.sin(i * 1.7)) * 24,
-                      animationDelay: i * 0.03 + "s",
-                    }}
-                  />
-                ))}
-              </div>
-              <button className="record-button" onClick={record}>
-                {recording ? <Square size={17} /> : <Mic size={18} />}{" "}
-                {recording ? "Stop recording" : "Record your guitar"}
-              </button>
-              <span>
-                {recording
-                  ? `Recording · stops after ${length}s`
-                  : take
-                    ? take.name
-                    : "Use headphones for a cleaner recording"}
-              </span>
-            </div>
+            <AudioInput
+              key={JSON.stringify(settings)}
+              profile={profile}
+              duration={length}
+              onRecording={(active) => {
+                setRecording(active);
+                if (active) stop();
+              }}
+              onTake={(name, buffer) => {
+                setTake({ name, buffer });
+                setDemo(false);
+                invalidate();
+              }}
+            />
+            {take && (
+              <p className="helper" role="status">
+                Take ready: {take.name} · {take.buffer.duration.toFixed(1)}s ·{" "}
+                {take.buffer.numberOfChannels === 1 ? "mono" : "stereo"}
+              </p>
+            )}
+            <MidiInput duration={length} />
             <label className="upload-take">
               <Upload size={15} /> Or upload a recording
               <input
@@ -444,6 +430,7 @@ function App() {
                 <label>Passage length</label>
                 <select
                   value={length}
+                  disabled={recording}
                   onChange={(e) => {
                     setLength(Number(e.target.value));
                     invalidate();
@@ -486,6 +473,7 @@ function App() {
           </div>
         )}
         <EngineSession
+          profile={profile}
           reference={reference}
           take={take}
           kind={kind}
@@ -550,7 +538,7 @@ function App() {
                   </strong>
                   <p>
                     {kind === "mix"
-                      ? "Separate the guitar before pitch comparison."
+                      ? "Separate the selected instrument before pitch comparison."
                       : "Spectral overlap, not a playing accuracy score."}
                   </p>
                 </div>
@@ -563,7 +551,7 @@ function App() {
                   </strong>
                   <p>
                     {kind === "mix"
-                      ? "Against mixed-track attacks, not guitar-specific."
+                      ? "Against mixed-track attacks, not instrument-specific."
                       : "Nearest attack distance; includes input latency."}
                   </p>
                 </div>
@@ -611,7 +599,12 @@ function App() {
                   Inside your take <span>ESTIMATED</span>
                 </h3>
                 <div className="segmented">
-                  {["Tablature", "Notes", "Chords"].map((x) => (
+                  {(profile.openStrings.length
+                    ? profile.feedback.includes("chord_estimates")
+                      ? ["Tablature", "Notes", "Chords"]
+                      : ["Tablature", "Notes"]
+                    : ["Notes"]
+                  ).map((x) => (
                     <button
                       key={x}
                       className={view === x ? "chosen" : ""}
@@ -625,18 +618,20 @@ function App() {
               {view === "Tablature" ? (
                 <div className="tab-scroll">
                   <div className="tab">
-                    {["e", "B", "G", "D", "A", "E"].map((s, i) => (
-                      <div className="tab-row" key={i}>
-                        <b>{s}</b>
-                        {events.map((e, j) => (
-                          <span key={j}>
-                            {fingering(e.midi)?.string === i + 1
-                              ? fingering(e.midi)?.fret
-                              : "—"}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
+                    {profile.openStrings
+                      .map((m) => note(m))
+                      .map((s, i) => (
+                        <div className="tab-row" key={i}>
+                          <b>{s}</b>
+                          {events.map((e, j) => (
+                            <span key={j}>
+                              {tabPosition(e.midi, profile)?.string === i + 1
+                                ? tabPosition(e.midi, profile)?.fret
+                                : "—"}
+                            </span>
+                          ))}
+                        </div>
+                      ))}
                   </div>
                 </div>
               ) : (
@@ -654,9 +649,9 @@ function App() {
               )}
               <p className="caution">
                 Candidate dominant notes only; chords are two-second major/minor
-                guesses. Tab uses suggested standard-tuning positions, not
-                detected finger placement. Dense chords and harmonics can be
-                misread.
+                guesses. Tab uses the selected tuning and capo to suggest
+                positions, not detected finger placement. Dense chords and
+                harmonics can be misread.
               </p>
               <div className="focus">
                 <div className="focus-icon">
@@ -666,7 +661,7 @@ function App() {
                   <h3>Your next practice focus</h3>
                   <p>
                     {kind === "mix"
-                      ? "Start by supplying an isolated guitar reference. Full-band attacks and pitch energy cannot reliably tell us which guitar notes you missed."
+                      ? "Start by supplying an isolated instrument reference. Full-band attacks and pitch energy cannot reliably tell us which instrument notes you missed."
                       : result.match.error !== null && result.match.error > 0.09
                         ? "Loop this passage slowly and listen for late transitions. Check recording latency before treating the measured offset as a timing mistake."
                         : "Listen for consistent sustain and clean transitions. This prototype cannot yet diagnose buzzing, fretting pressure or individual missing chord tones."}
