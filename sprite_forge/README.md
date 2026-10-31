@@ -5,6 +5,50 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v9.5: a better three-quarter view (photo3d)
+
+The 3D engine's turned views were the weakest output: an outline puffed up like a balloon, a flat face, and grain
+where points fought for the same pixel. Three changes fix that, and none of them needs more than the one photo:
+
+* **Real body shape**: torso and legs take their depth from the free CC0 **MakeHuman** body. Each photo row is
+  matched to the same body height on the template, and the template's real cross-section is scaled to the row's
+  width, giving a flatter back, a rounded chest and round thighs. The shoulders stay round, and every row is centred
+  on the bones so that limbs stay attached when they swing. Set it up once with
+  `forge.py human --setup --from-git`, which sparse-clones the assets from GitHub, needs no pip and makes about
+  30 MB. Without the assets, photo3d falls back to the inflated outline. `--body3d template|inflate|auto`.
+* **Real face depth**: MediaPipe's 468-point canonical face (Apache-2.0, vendored in `sforge/data/mediapipe_face/`)
+  is posed onto the photo's face from the eyes, nose and mouth corners with solvePnP (a slightly turned head is
+  followed). Its depth is blended into the head, giving the nose, eye sockets, lips, chin and the cheeks turning
+  away, in place of three guessed bumps.
+* **Surface drawing**: each pixel averages the points of the front surface within 1.2 cm of the nearest one, in
+  place of a single point winning, which removes grain and checkerboard. Side walls take a colour blurred down the
+  body rather than streaks, and the silhouette is closed front to back, so the white seam down a side-on figure is
+  gone. Knees and elbows now bend half-way on both sides of the cut, so a bent joint stays closed.
+  `--surface3d crisp|smooth|points` (default crisp: it measured best).
+
+Measured on the Mike test photo (`tools/quality_report.py`, against the proportion-corrected photo at the same
+size; fighter14, 96 frames):
+
+| build | identity (aligned SSIM) | face sharpness | BRISQUE idle (photo) | colour dE top / legs |
+|---|---|---|---|---|
+| 2D skin 35 deg | 0.48 | 56% | 14.3 (18.1) | 4.7 / 6.4 |
+| photo3d 35 deg v9.4 | 0.42 | 71% | 18.0 (12.9) | 2.4 / 9.0 |
+| **photo3d 35 deg v9.5** | **0.44** | 67% | **11.8** (12.9) | 4.7 / **7.8** |
+| photo3d 90 deg v9.4 | 0.31 | 81% | 23.1 (13.6) | 17.3 / 8.5 |
+| **photo3d 90 deg v9.5** | **0.40** | 42% | 22.5 (13.6) | 19.4 / **8.2** |
+
+The 35-degree view now looks more natural than the photo scaled to the same size (BRISQUE 11.8 against 12.9),
+and identity is up at both angles. Face sharpness at 90 degrees is lower: v9.4's figure was raised by aliased point
+grain, which the surface drawing removes. In tests, sharpening brought the number back but lowered identity and
+naturalness, so it is off.
+
+Limb test (`tools/test_limbs.py --engine photo3d`) at 35 and 90 degrees: 11 PASS, 3 WARN and 0 FAIL. The warnings
+are the same speed warnings as in v9.4 (kick, throw and jumpattack keys), and no limb comes off.
+
+Still limited: the sides and back are estimated, and the template is one average adult body (fine for most adults,
+not for a child or a very heavy build yet). More photos or a turn-around video of the same person are the next step
+up; they will be optional, never required.
+
 ## New in v9.4: measured realism, dress-as, pose-it-yourself, squads, references
 
 Measured with independent tools (`tools/quality_report.py`: YuNet + Haar face detection, aligned-face SSIM identity,

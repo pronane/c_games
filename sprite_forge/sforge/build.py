@@ -142,6 +142,8 @@ class BuildConfig:
     dress_as: str = ""                 # v9.4 dress-as template: police | postman | astronaut | ... | path/to/outfit.json
     motion_pack: str = "auto"          # v9.4 photo3d motions: auto (fighter3d for fighter move sets) | fighter3d | none
     normal_maps: bool = False          # v9.4 photo3d: also write normal-map sheets (2D dynamic lighting)
+    surface3d: str = "crisp"           # v9.5 photo3d drawing: crisp (depth-averaged, nearest pixel) | smooth (bilinear) | points (v9.4)
+    body3d: str = "auto"               # v9.5 photo3d body shape: auto (MakeHuman template when installed) | template | inflate
     smear: bool = True                 # v9.4 photo3d: smear frames on fast strikes
     proportions: str = "auto"          # v9.4 phone-perspective correction: auto | on | off
     proportion_strength: float = 0.65  # v9.4 how far towards adult norms (0..1)
@@ -757,7 +759,8 @@ def _photo3d_moves(cfg, report, cut, lms, cut_ref):
     from . import photo3d as P3, accel
     t0 = time.time()
     be = accel.backend(cfg.device or None, log=report.log)
-    body = P3.PhotoBody(cut, lms, colour_ref=cut_ref, log=report.log)
+    surf = {"smooth": True, "crisp": "nearest", "points": False}[cfg.surface3d]
+    body = P3.PhotoBody(cut, lms, colour_ref=cut_ref, body=cfg.body3d, surface=surf, log=report.log)
     report.timing("photo3d body (%d points)" % len(body.P), time.time() - t0)
     th, _ = _target_h(cfg)
     yaw = float(cfg.turn or 0.0)
@@ -775,9 +778,13 @@ def _photo3d_moves(cfg, report, cut, lms, cut_ref):
                     "camera (from --turn-yaw %g), strikes turn into profile%s" % (op, yaw, "; smear frames on fast moves" if cfg.smear else ""))
     nfr = sum(len(v) for v in frames.values())
     report.timing("photo3d frames (%d, %s)" % (nfr, be.name), time.time() - t0)
-    report.note("photo3d: ONE front photo inflated into a 3D body (depth, sides and back ESTIMATED from the silhouette and "
-                "edge colours; front = the photo's own pixels), skinned to the standard rig and driven by the skeletal "
-                "motion library; camera yaw %g deg; compute backend %s" % (yaw, be.name))
+    shape = ("torso / leg depth from the CC0 MakeHuman body's cross-sections fitted to the outline"
+             if body.body_src == "template" else "depth inflated from the silhouette (MakeHuman template not installed)")
+    face = "face relief from MediaPipe's canonical face fitted to the landmarks" if body.face_src == "mediapipe" \
+        else "face relief estimated (no usable face landmarks)"
+    report.note("photo3d: ONE front photo made into a 3D body (%s; %s; sides and back ESTIMATED from the edge colours; "
+                "front = the photo's own pixels), skinned to the standard rig and driven by the skeletal motion library; "
+                "camera yaw %g deg; drawing %s; compute backend %s" % (shape, face, yaw, cfg.surface3d, be.name))
     out = {}
     for m in cfg.moves:
         cells, clip = [], False

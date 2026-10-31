@@ -55,6 +55,36 @@ class NumpyBackend:
         return out.reshape(H, W, 4)
 
 
+    def splat_soft(self, x, y, z, rgb, W, H, eps=0.015, cover=0.2, bilinear=True):
+        """surface splat: every point spreads over its 2x2 pixel footprint (bilinear weights); a pixel takes the
+        weighted mean of the points within `eps` (metres) of its nearest depth - the front surface is averaged
+        instead of one arbitrary point winning, so interleaved points no longer show as grain / checkerboard"""
+        if not bilinear:                              # each point on its nearest pixel: crisper, still depth-averaged
+            x, y = np.round(x), np.round(y)
+        x0 = np.floor(x).astype(np.int64); y0 = np.floor(y).astype(np.int64)
+        fx = (x - x0).astype(np.float32); fy = (y - y0).astype(np.float32)
+        K, Wt, Z, I = [], [], [], []
+        idx = np.arange(len(x))
+        for dx, dy, w in ((0, 0, (1 - fx) * (1 - fy)), (1, 0, fx * (1 - fy)), (0, 1, (1 - fx) * fy), (1, 1, fx * fy)):
+            xi, yi = x0 + dx, y0 + dy
+            ok = (xi >= 0) & (xi < W) & (yi >= 0) & (yi < H) & (w > 1e-3)
+            K.append(yi[ok] * W + xi[ok]); Wt.append(w[ok]); Z.append(z[ok]); I.append(idx[ok])
+        K = np.concatenate(K); Wt = np.concatenate(Wt); Z = np.concatenate(Z); I = np.concatenate(I)
+        zbuf = np.full(H * W, -1e30)
+        np.maximum.at(zbuf, K, Z)
+        keep = Z >= zbuf[K] - eps
+        K, Wt, I = K[keep], Wt[keep], I[keep]
+        acc = np.zeros((H * W, 3)); wsum = np.zeros(H * W)
+        np.add.at(wsum, K, Wt)
+        for c in range(3):
+            np.add.at(acc[:, c], K, Wt * rgb[I, c])
+        out = np.zeros((H * W, 4), np.uint8)
+        cov = wsum >= cover
+        out[cov, :3] = np.clip(acc[cov] / wsum[cov, None], 0, 255).astype(np.uint8)
+        out[cov, 3] = 255
+        return out.reshape(H, W, 4)
+
+
 class TorchBackend:
     gpu = True
 
@@ -108,6 +138,33 @@ class TorchBackend:
         out = t.zeros((H * W, 4), dtype=t.uint8, device=self.dev)
         out[key[win], :3] = t.clamp(rgb[win], 0, 255).to(t.uint8)
         out[key[win], 3] = 255
+        return self.get(out.reshape(H, W, 4))
+
+
+    def splat_soft(self, x, y, z, rgb, W, H, eps=0.015, cover=0.2, bilinear=True):
+        t = self.t
+        x, y, z, rgb = (v if t.is_tensor(v) else self.put(v) for v in (x, y, z, rgb))
+        if not bilinear:
+            x, y = t.round(x), t.round(y)
+        x0 = t.floor(x); y0 = t.floor(y)
+        fx, fy = x - x0, y - y0
+        x0, y0 = x0.long(), y0.long()
+        idx = t.arange(len(x), device=self.dev)
+        K, Wt, Z, I = [], [], [], []
+        for dx, dy, w in ((0, 0, (1 - fx) * (1 - fy)), (1, 0, fx * (1 - fy)), (0, 1, (1 - fx) * fy), (1, 1, fx * fy)):
+            xi, yi = x0 + dx, y0 + dy
+            ok = (xi >= 0) & (xi < W) & (yi >= 0) & (yi < H) & (w > 1e-3)
+            K.append(yi[ok] * W + xi[ok]); Wt.append(w[ok]); Z.append(z[ok]); I.append(idx[ok])
+        K = t.cat(K); Wt = t.cat(Wt); Z = t.cat(Z); I = t.cat(I)
+        zbuf = t.full((H * W,), -1e30, dtype=Z.dtype, device=self.dev).scatter_reduce(0, K, Z, reduce="amax", include_self=True)
+        keep = Z >= zbuf[K] - eps
+        K, Wt, I = K[keep], Wt[keep], I[keep]
+        wsum = t.zeros(H * W, dtype=Wt.dtype, device=self.dev).index_add_(0, K, Wt)
+        acc = t.zeros((H * W, 3), dtype=Wt.dtype, device=self.dev).index_add_(0, K, Wt[:, None] * rgb[I])
+        out = t.zeros((H * W, 4), dtype=t.uint8, device=self.dev)
+        cov = wsum >= cover
+        out[cov, :3] = t.clamp(acc[cov] / wsum[cov, None], 0, 255).to(t.uint8)
+        out[cov, 3] = 255
         return self.get(out.reshape(H, W, 4))
 
 

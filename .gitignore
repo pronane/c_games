@@ -19,3 +19,5 @@ screenshots/*.jpg
 sprite_forge/tools/models/
 # reference library store (people's photos / videos)
 sprite_forge/library/refs/
+# MakeHuman CC0 assets (forge.py human --setup [--from-git])
+sprite_forge/assets/makehuman/

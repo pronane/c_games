@@ -46,6 +46,16 @@ def _smooth(t):
     return t * t * (3 - 2 * t)
 
 
+def _meet(ia, ib, w, s, upper, lower, start=0.86):
+    """the far end of an upper limb bends half-way with the lower one, matching the lower limb's first rows (which
+    are half upper-bone at the joint): both sides of the elbow / knee cut move alike, so a bent joint stays closed"""
+    k = s > start
+    ia, ib, w = ia.copy(), ib.copy(), w.copy()
+    ia[k] = upper; ib[k] = lower
+    w[k] = 0.5 * _smooth((s[k] - start) / (1.0 - start))
+    return ia, ib, w
+
+
 def _seg_param(xs, ys, p, q):
     """position of pixels along segment p->q (0 at p, 1 at q)"""
     d = np.array(q, float) - np.array(p, float)
@@ -54,7 +64,8 @@ def _seg_param(xs, ys, p, q):
 
 
 class PhotoBody:
-    def __init__(self, cut, landmarks, colour_ref=None, detail=820, look=0.8, sharpen=0.0, head_rim=False, log=print):
+    def __init__(self, cut, landmarks, colour_ref=None, detail=820, look=0.8, sharpen=0.0, head_rim=False, body="auto",
+                 template_params=None, face="auto", surface="nearest", log=print):
         from .puppet import Rig
         cut = cut.convert("RGBA")
         bb = cut.getchannel("A").getbbox() or (0, 0, cut.width, cut.height)
@@ -131,6 +142,10 @@ class PhotoBody:
                 parts.append(("fist" + k_, fa[..., 3] > 60, fa))
         # ---- depth maps
         zmap = {}
+        model = self._body_model(rig, body, template_params, log)
+        self.body_src = "template" if model is not None else "inflate"
+        self.face, self.face_src = face, "bumps"
+        self.surface = surface
         for key, m, src in parts:
             m = m & (src[..., 3] > 60)
             if m.sum() < 12:
@@ -139,36 +154,95 @@ class PhotoBody:
             w = ndi.maximum_filter(e, size=int(2 * e.max()) + 1)
             kd = DEPTH.get(key if key in ("head", "torso") else key[:-1], 0.95)
             z = kd * np.sqrt(np.clip(e * (2 * w - e), 0, None))
-            if key == "head":                        # face profile: nose, brow and chin from the landmarks
+            zbk = None
+            if model is not None and (key == "torso" or key[0] in "ts" and not key.startswith("fist")):
+                z_inf = z
+                z, zbk = self._template_depth(model, key, m, z)
+                if key == "torso":
+                    # shoulders: the template's torso has no deltoids (they belong to its arms), the photo's torso
+                    # rows up there do - keep the round inflated shoulder down to the chest, where the arms attach
+                    sh_y = 0.5 * (piv["upperarm_L"][1] + piv["upperarm_R"][1])
+                    ch_y = sh_y + 0.22 * (piv["hips"][1] - sh_y)
+                    wt = _smooth((yy - sh_y) / max(1.0, ch_y - sh_y))
+                    z = wt * z + (1 - wt) * z_inf
+                    zbk = wt * zbk + (1 - wt) * z_inf
+            ff = None
+            if key == "head" and self.face != "bumps":
+                from . import facemesh
+                ff = facemesh.fit(L, m.shape, log=log)
+                if ff is not None:
+                    z, _fm = facemesh.relief_into(z, m, ff)
+                    self.face_src = "mediapipe"
+            if key == "head" and ff is None:          # face profile: nose, brow and chin from the landmarks
                 hw = float(e.max())
                 for c, amp, sig in ((nose, 0.42, 0.13), ((eyes + nose) / 2 - [0, 0.18 * hw], 0.12, 0.30),
                                     (mouth + 0.5 * (chin - mouth), 0.10, 0.25)):
                     d2 = (xx - c[0]) ** 2 + (yy - c[1]) ** 2
                     z = z + amp * hw * np.exp(-d2 / (2 * (sig * hw) ** 2)) * m
-            zmap[key] = (m, z)
+            zmap[key] = (m, z, z if zbk is None else zbk)
         # arms / hands that cover the body in the photo sit in front of it
         zbody = np.zeros((H, W)); mbody = np.zeros((H, W), bool)
-        for key, (m, z) in zmap.items():
+        for key, (m, z, _) in zmap.items():
             if key in ("head", "torso") or key[0] in "ts":
                 zbody = np.maximum(zbody, np.where(m, z, 0)); mbody |= m
         self.zoff = {}
-        for key, (m, z) in zmap.items():
+        for key, (m, z, _) in zmap.items():
             if key[0] in "uf" and key != "head":
                 ov = m & mbody
+                # the shoulder itself always overlaps the torso in the photo: it says nothing about the arm being
+                # in front (with the deeper template chest it pushed a hanging arm off its shoulder when turned)
+                s_ = side[key[-1]]
+                S_, E_ = piv["upperarm_" + s_], piv["forearm_" + s_]
+                rr = 0.45 * float(np.hypot(*(E_ - S_)))
+                ov &= (xx - S_[0]) ** 2 + (yy - S_[1]) ** 2 > rr * rr
                 off = 0.0
                 if ov.sum() > 20:
                     off = max(0.0, float(np.percentile((zbody - z)[ov], 85)) + 0.01 * rig.stand_h)
                 self.zoff[key] = off
+        for k_ in ("n", "f"):          # one arm, one depth: the pivots move by the largest offset, so must every piece
+            ks = [k for k in self.zoff if k[-1] == k_ and (k[0] in "uf")]
+            if ks:
+                top = max(self.zoff[k] for k in ks)
+                for k in ks:
+                    self.zoff[k] = top
+        if model is not None and "head" in zmap and "torso" in zmap:
+            # the round head sits where the template's neck carries it (head forward of the chest), not on the
+            # body's centre plane - otherwise a shelf shows under the jaw when the body turns
+            mt = zmap["torso"][0]
+            ty = np.nonzero(mt.any(1))[0]
+            if len(ty):
+                y_ = int(ty.min()) + 2
+                xr = np.nonzero(mt[y_])[0]
+                zt = 0.5 * (zmap["torso"][1][y_, xr] - zmap["torso"][2][y_, xr])
+                self.zoff["head"] = float(np.median(zt))
+        body_union = np.zeros((H, W), bool)
+        for m_, _, _ in zmap.values():
+            body_union |= m_
         # ---- points
         Ps, Cs, Ns, IA, IB, WS, FR, PI = [], [], [], [], [], [], [], []
         self.part_keys = []
         for key, src_ in [(p[0], p[2]) for p in parts]:
             if key not in zmap:
                 continue
-            m, z = zmap[key]
+            m, z, zbk = zmap[key]
             ys, xs = np.nonzero(m)
-            zf = z[ys, xs] + self.zoff.get(key, 0.0)
-            gy, gx = np.gradient(z)
+            zo = self.zoff.get(key, 0.0)
+            if key[0] == "u" and zo:
+                # the arm comes forward from the shoulder (which stays on the body) to the elbow; a whole arm
+                # moved forward left its root off the torso once the body turned
+                s_ = side[key[-1]]
+                sp = _seg_param(xs.astype(float), ys.astype(float), piv["upperarm_" + s_], piv["forearm_" + s_])
+                zo = zo * np.clip(sp, 0.0, 1.0)
+            zf = z[ys, xs] + zo
+            zg = z
+            tmpl = self.body_src == "template" and (key == "torso" or key[0] in "ts" and not key.startswith("fist"))
+            if tmpl:
+                # template sections already close front-to-back at the silhouette: extend the surface past the
+                # mask (nearest value) so the cut between head / torso / thigh / shin is not read as a cliff
+                # (a cliff makes a wall of edge-coloured points that shows as stripes when the body turns)
+                _, (iy, ix) = ndi.distance_transform_edt(~m, return_indices=True)
+                zg = z[iy, ix]
+            gy, gx = np.gradient(zg)
             gx, gy = gx[ys, xs], gy[ys, xs]
             nf = np.stack([-gx, gy, np.ones_like(gx)], 1); nf /= np.linalg.norm(nf, axis=1, keepdims=True)
             nb = nf * np.array([1, 1, -1.0])
@@ -185,12 +259,27 @@ class PhotoBody:
                 col_b = col_f * (1 - tb) + col_b * tb
             ia, ib, w = self._weights(key, xs.astype(float), ys.astype(float), side)
             X = (xs - self.x0) / self.S; Y = (self.y0 - ys) / self.S
-            zb = -z[ys, xs] + self.zoff.get(key, 0.0)
+            zb = -zbk[ys, xs] + zo
             # steep walls (towards the silhouette the surface drops several px in depth per px across): fill each
             # step with a short column of points, so the surface stays solid when the body turns (no checkerboard
             # of front and back points at glancing angles)
             gm = np.hypot(gx, gy)
-            ne = np.clip(np.ceil(gm) - 1, 0, 14).astype(int)
+            cap = 14
+            # outer silhouette (next to background, not another part): the wall closes front to back - from the
+            # gradient alone it stopped short and the background showed through as a seam down the turned body
+            # thigh / shin also close at the knee cut: a cap inside the leg at rest that fills the joint when it
+            # bends (the torso's cut to the thighs is NOT capped: the hips are wider than the thighs' tops and a cap
+            # there stuck out as a line at the waist)
+            outer = ~body_union
+            if tmpl and key[0] in "ts":
+                other = zmap.get(("s" if key[0] == "t" else "t") + key[1])
+                if other is not None:
+                    outer = outer | other[0]
+            rim = (m & ndi.binary_dilation(outer))[ys, xs]
+            gap = z[ys, xs] + zbk[ys, xs]
+            gm = np.where(rim, np.maximum(gm, gap), gm)
+            cap = 40
+            ne = np.clip(np.ceil(gm) - 1, 0, cap).astype(int)
             rep = np.repeat(np.arange(len(xs)), ne)
             jj = np.concatenate([np.arange(1, n + 1) for n in ne]) if ne.sum() else np.zeros(0, int)
             frac_ = jj / (ne[rep] + 1.0) if len(rep) else np.zeros(0)
@@ -199,6 +288,15 @@ class PhotoBody:
             wall_f = col_f
             if key == "head" and len(rep):
                 wall_f = self._head_rim(m, z, src_, ys, xs, col_f.copy(), full=True)
+            if len(rep) and self.surface:
+                # a wall shows one photo pixel per row stretched sideways: blur its colour down the body (not
+                # across), so turned views show cloth / skin instead of horizontal bands of edge colours
+                img_ = np.zeros((H, W, 3), np.float32); img_[ys, xs] = wall_f
+                mf_ = np.zeros((H, W), np.float32); mf_[ys, xs] = 1
+                sg = (3.0, 0.7)
+                num = np.stack([ndi.gaussian_filter(img_[..., c], sg) for c in range(3)], -1)
+                den = ndi.gaussian_filter(mf_, sg)[..., None]
+                wall_f = (num / np.maximum(den, 1e-4))[ys, xs]
             Xf, Yf = col(X), col(Y)
             zf2 = np.concatenate([zf, zf[rep] - gm[rep] * frac_]) if len(rep) else zf
             zb2 = np.concatenate([zb, zb[rep] + gm[rep] * frac_]) if len(rep) else zb
@@ -222,11 +320,77 @@ class PhotoBody:
         # lever when the arm swings and the sleeve drifts off its bone
         for k_, s_ in side.items():
             dz = max(self.zoff.get("u" + k_, 0.0), self.zoff.get("f" + k_, 0.0)) / self.S
-            for b in ("upperarm_", "forearm_", "hand_"):
+            for b in ("forearm_", "hand_"):            # the shoulder stays on the body
                 self.piv3[b + s_][2] += dz
             self.tip3[s_][2] += dz
         self.lowest = float(self.P[:, 1].min())
         log("photo3d: %d points (%d px front), %d bones, %.0f px/m" % (len(self.P), int(self.front.sum()), len(BONES), self.S))
+
+    # ------------------------------------------------------------------ body shape
+    @staticmethod
+    def _body_model(rig, body, params, log):
+        """MakeHuman CC0 template fitted to the photo's body heights (forge.py human --setup), else None"""
+        if body == "inflate":
+            return None
+        from . import human
+        if not human.have_assets():
+            if body == "template":
+                raise SystemExit("photo3d --body template: MakeHuman assets missing (forge.py human --setup --from-git)")
+            log("photo3d: body = inflated outline (MakeHuman template not installed: forge.py human --setup --from-git)")
+            return None
+        from types import SimpleNamespace
+        from .turn import Template, geometry
+        r0 = SimpleNamespace(pad=0, padt=0, J=rig.J, L=rig.L, top=rig.top, ground=rig.ground, crotch=rig.crotch)
+        g = geometry(r0, *rig.A.shape[:2])
+        try:
+            return Template(g, params, log=log, chin_key=True)
+        except Exception as ex:                      # a broken asset install must not stop a build
+            log("photo3d: template body failed (%s) - inflated outline instead" % ex)
+            return None
+
+    def _template_depth(self, model, key, m, z_inf):
+        """front / back depth of torso and leg rows from the template's real cross-sections at the same body
+        height, scaled to the photo's row width (chest forward, bottom back, a flat-ish back, round thighs).
+        Returns (front z, back depth) both measured from the body's centre plane like the inflated map."""
+        part = "torso" if key == "torso" else key[0] + key[1]
+        H, W = m.shape
+        zf = np.zeros((H, W)); zb = np.zeros((H, W))
+        rows = []
+        for y in np.nonzero(m.any(1))[0]:
+            xr = np.nonzero(m[y])[0]
+            # one span per row: split pieces (a gap under the arm) keep one section, as in the photo outline
+            rows.append((y, xr.min(), xr.max(), xr))
+        if not rows:
+            return z_inf, z_inf
+        s = np.array([model.row_scale(part, y, x0, x1) for y, x0, x1, _ in rows], float)
+        S = model.S
+        s = np.clip(ndi.gaussian_filter1d(s, 6, mode="nearest"), 0.7 * S, 1.5 * S)
+        for (y, x0, x1, xr), sr in zip(rows, s):
+            u = np.clip((xr - (x0 + x1) / 2.0) / max(0.5, (x1 - x0 + 1) / 2.0), -1, 1)
+            f, b = model.section(part, y, x0, x1, u, sr)
+            f, b = np.asarray(f, float), np.asarray(b, float)
+            # each row centred on the bones' plane: the rig's joints all sit at z = 0, so the template's posture
+            # (chest forward, bottom back) would put the shoulders / hips off their pivots and the limbs would
+            # come away from the body when they swing. The cross-section's own shape (flat back, round chest) stays
+            zc = float(np.median(0.5 * (f + b)))
+            f, b = f - zc, b - zc
+            if key[0] == "t":
+                # a thigh is never much deeper than wide: the template's top-of-thigh slices include the buttock
+                # and made a thin sheet stick out behind the hip on turned views
+                lim = 0.62 * float(x1 - x0 + 1)
+                f, b = np.minimum(f, lim), np.maximum(b, -lim)
+            zf[y, xr] = f; zb[y, xr] = -b
+        # smooth the posture offsets between rows (template slices are 3 mm apart), keep the outline
+        mf = m.astype(float)
+        def sm(a, sig=1.5):
+            return ndi.gaussian_filter(a * mf, sig) / np.maximum(ndi.gaussian_filter(mf, sig), 1e-3) * mf
+        zf, zb = sm(zf), sm(zb)
+        # the template's own z origin is not this rig's: centre each part on its bones (z = 0), keeping the shape
+        # within the part (chest forward / bottom back). Off-centre legs slid sideways off their joints when turned
+        c = float(np.median((0.5 * (zf - zb))[m]))
+        zf, zb = zf - c, zb + c
+        # the inflated map still rules the last few px to the silhouette (template sections are clipped there)
+        return np.where(m, zf, 0.0), np.where(m, zb, 0.0)
 
     # ------------------------------------------------------------------ head rim
     def _head_rim(self, m, z, src, ys, xs, col, full=False):
@@ -307,7 +471,8 @@ class PhotoBody:
         kind = key[:-1]
         if kind == "u":
             s = _seg_param(xs, ys, pv["upperarm_" + s_], pv["forearm_" + s_])
-            return B("chest"), B("upperarm_" + s_), _smooth((s + 0.08) / 0.22)
+            ia, ib, w = B("chest"), B("upperarm_" + s_), _smooth((s + 0.08) / 0.22)
+            return _meet(ia, ib, w, s, BI["upperarm_" + s_], BI["forearm_" + s_])
         if kind in ("f", "fist"):
             s = _seg_param(xs, ys, pv["forearm_" + s_], pv["hand_" + s_])
             ia, ib = B("upperarm_" + s_), B("forearm_" + s_)
@@ -319,7 +484,8 @@ class PhotoBody:
             return ia, ib, w
         if kind == "t":
             s = _seg_param(xs, ys, pv["thigh_" + s_], pv["shin_" + s_])
-            return B("hips"), B("thigh_" + s_), _smooth((s + 0.12) / 0.3)
+            ia, ib, w = B("hips"), B("thigh_" + s_), _smooth((s + 0.12) / 0.3)
+            return _meet(ia, ib, w, s, BI["thigh_" + s_], BI["shin_" + s_])
         if kind == "s":
             s = _seg_param(xs, ys, pv["shin_" + s_], pv["foot_" + s_])
             ia, ib = B("thigh_" + s_), B("shin_" + s_)
@@ -395,7 +561,10 @@ class PhotoBody:
         # soft back-face culling: points facing the camera win depth ties by 4 cm, so a facing-away point only shows
         # where it really is in front (an arm crossing the body) - hard culling opened gaps at the silhouette
         sz = sz + 0.04 * np.clip(nzv * 4.0, -1.0, 1.0)
-        img = be.splat(sx, sy, sz, rgb, Ws, Hs)
+        if self.surface and not normals and hasattr(be, "splat_soft"):
+            img = be.splat_soft(sx, sy, sz, rgb, Ws, Hs, eps=0.012, bilinear=self.surface != "nearest")
+        else:
+            img = be.splat(sx, sy, sz, rgb, Ws, Hs)
         img = _close_cracks(img)
         from .puppet import despeckle
         img = np.asarray(despeckle(Image.fromarray(img, "RGBA"), frac=0.01)).copy()   # incl. loose bits (a strap end)
