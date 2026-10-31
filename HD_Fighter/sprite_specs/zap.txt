@@ -19,3 +19,4 @@ shoes_colour=#f5d000
 kit=blue
 accessories=mask,wraps
 accessory_colour=#1e5fd0
+head = large

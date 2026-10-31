@@ -18,3 +18,4 @@ shoes=barefoot
 kit=blue
 accessories=wraps
 accessory_colour=#17a3a3
+head = large

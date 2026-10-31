@@ -850,7 +850,7 @@ function drawFighter(f, context) {
     drawSilhouette(f, context);
     return;
   }
-  const scale = window.innerWidth < 900 ? 1.8 : 1.2;
+  const scale = window.innerWidth < 900 ? 2.0 : 1.4;
   const fw = sheet.fw || 192;
   const fh = sheet.h || 256;
   const sw = fw * scale;
