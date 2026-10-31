@@ -159,11 +159,31 @@ def _frames(o=OPEN):
 
 _CACHE = {}
 
+# per-character changes on top of the shared frames: {char: {state: {frame: {channel: value}}}}
+# Naomi holds a katana in the rear hand: in the two-palm thrust a bent wrist lays the blade flat and out of the
+# cell, so her sword wrist stays straight (blade forward and up, like her other strikes).
+OVERRIDES = {
+    "naomi": {"special1": {1: dict(wrist_R=0), 2: dict(wrist_R=0), 3: dict(wrist_R=0)}},
+}
 
-def frames(state, o=OPEN):
+
+def frames(state, o=OPEN, char=None):
     if o not in _CACHE:
         _CACHE[o] = _frames(o)
-    return _CACHE[o][state]
+    fr = _CACHE[o][state]
+    ov = OVERRIDES.get(char or "", {}).get(state)
+    if ov:
+        fr = [P(p, **ov.get(i, {})) for i, p in enumerate(fr)]
+    return fr
+
+
+def motion_name(state, char=None):
+    return "hd_%s_%s" % (char, state) if state in OVERRIDES.get(char or "", {}) else "hd_" + state
+
+
+def moves_for(char=None):
+    """the --moves string for one fighter (uses its overridden motions where it has any)"""
+    return ",".join("%s=%s:%d:%d%s" % (s, motion_name(s, char), n, f, ":loop" if lp else "") for s, (n, f, lp) in STATES.items())
 
 
 def register(o=OPEN):
@@ -178,10 +198,16 @@ def register(o=OPEN):
         else:
             keys = [(i / max(1, n - 1), p) for i, p in enumerate(fr)]
         M("hd_" + s, "HDFighter", "HD Fighter %s (%d hand-posed frames)" % (s, n), keys=keys, loop=loop)
+    for ch, sts in OVERRIDES.items():
+        for s in sts:
+            n, _f, loop = STATES[s]
+            fr = frames(s, o, ch)
+            keys = [(i / n, p) for i, p in enumerate(fr)] + [(1.0, fr[0])] if loop else [(i / max(1, n - 1), p) for i, p in enumerate(fr)]
+            M(motion_name(s, ch), "HDFighter", "HD Fighter %s %s" % (ch, s), keys=keys, loop=loop)
     _CACHE["_reg"] = o
 
 
-def states(state, o=OPEN):
+def states(state, o=OPEN, char=None):
     """FrameState per frame of a state (exact authored poses)"""
     from .rig import evaluate
-    return [evaluate(p) for p in frames(state, o)]
+    return [evaluate(p) for p in frames(state, o, char)]

@@ -436,7 +436,7 @@ def main():
     for s in a.states.split(","):
         if a.resume and os.path.exists(os.path.join(a.out, "%s_%s.png" % (sp.name, s))):
             continue
-        sts = HF.states(s)
+        sts = HF.states(s, char=sp.extra.get("sculpt", sp.name))
         cells = []
         for i, st in enumerate(sts):
             if only and i not in only:

@@ -8,10 +8,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 FORGE="$HERE/../../sprite_forge"
 OUT="${1:-/tmp/hd_fighter_sprites}"
 cd "$FORGE"
-M="$(python3 -c 'import sys; sys.path.insert(0, "."); from sforge import hdfighter as H; print(H.MOVES)')"
+M_FOR() { python3 -c "import sys; sys.path.insert(0, \".\"); from sforge import hdfighter as H; print(H.moves_for(\"$1\"))"; }
 pids=()
 for c in kairo lyra naomi brutus void zap; do
-  python3 forge.py build --spec "$HERE/$c.txt" --moves "$M" --yaw 90 --frame 192x256 --figure-h 158 --ground-y 244 \
+  python3 forge.py build --spec "$HERE/$c.txt" --moves "$(M_FOR $c)" --yaw 90 --frame 192x256 --figure-h 158 --ground-y 244 \
     --pivot-x 92 --quality final --expressions off --strips --no-glb --no-fbx --no-cache --out "$OUT/$c" > "$OUT.$c.log" 2>&1 &
   pids+=($!)
   if (( ${#pids[@]} >= ${JOBS:-2} )); then wait "${pids[0]}"; pids=("${pids[@]:1}"); fi
