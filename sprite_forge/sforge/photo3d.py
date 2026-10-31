@@ -54,7 +54,7 @@ def _seg_param(xs, ys, p, q):
 
 
 class PhotoBody:
-    def __init__(self, cut, landmarks, colour_ref=None, detail=820, look=0.8, log=print):
+    def __init__(self, cut, landmarks, colour_ref=None, detail=820, look=0.8, sharpen=0.0, head_rim=False, log=print):
         from .puppet import Rig
         cut = cut.convert("RGBA")
         bb = cut.getchannel("A").getbbox() or (0, 0, cut.width, cut.height)
@@ -67,6 +67,7 @@ class PhotoBody:
                 colour_ref = colour_ref.convert("RGBA").resize(cut.size, Image.LANCZOS)
         self.log = log
         self.look = look
+        self.sharpen, self.head_rim = sharpen, head_rim
         rig = Rig(cut, lms, colour_ref=colour_ref)
         self.rig = rig
         A = rig.A
@@ -111,7 +112,7 @@ class PhotoBody:
         # ---- colour sources with the matte edge replaced by interior colour (a halo would wrap round the sides)
         from .turn import _edge_fixed_rgb
         def fixed(a):
-            out = np.array(a, copy=True); out[..., :3] = _edge_fixed_rgb(np.asarray(a), inset=2); return out
+            out = np.array(a, copy=True); out[..., :3] = _edge_fixed_rgb(np.asarray(a), inset=4); return out
         A_f, T_f = fixed(A), fixed(rig.torso_rgba)
         L_f = T_f if rig.leg_src is rig.torso_rgba else (A_f if rig.leg_src is A else fixed(rig.leg_src))
         # ---- parts: (key, mask, rgba source, depth ratio, bone function)
@@ -172,17 +173,41 @@ class PhotoBody:
             nf = np.stack([-gx, gy, np.ones_like(gx)], 1); nf /= np.linalg.norm(nf, axis=1, keepdims=True)
             nb = nf * np.array([1, 1, -1.0])
             col_f = src_[ys, xs, :3].astype(np.float32)
-            if key == "head":
+            if key == "head" and self.head_rim:     # 3D keeps the real ears at the side; the rim fill is optional
                 col_f = self._head_rim(m, z, src_, ys, xs, col_f)
             col_b = self._back_colours(key, m, src_, ys, xs)
+            # continuity: near the silhouette the back IS the photo's edge colour; the estimated back colour only takes
+            # over towards the middle of the back (a hard front / back split showed as a seam on every turned view)
+            tb = _smooth(nf[:, 2] * 1.6)[:, None]
+            if key[0] in "ufts" and not key.startswith("fist"):
+                col_b = col_f * 0.96            # sleeves / trouser legs: same fabric all round - keep its real texture
+            else:
+                col_b = col_f * (1 - tb) + col_b * tb
             ia, ib, w = self._weights(key, xs.astype(float), ys.astype(float), side)
             X = (xs - self.x0) / self.S; Y = (self.y0 - ys) / self.S
             zb = -z[ys, xs] + self.zoff.get(key, 0.0)
-            Ps += [np.stack([X, Y, zf / self.S], 1), np.stack([X, Y, zb / self.S], 1)]
-            Cs += [col_f, col_b]; Ns += [nf, nb]
-            IA += [ia, ia]; IB += [ib, ib]; WS += [w, w]
-            FR += [np.ones(len(xs), bool), np.zeros(len(xs), bool)]
-            PI += [np.full(2 * len(xs), len(self.part_keys), np.int16)]; self.part_keys.append(key)
+            # steep walls (towards the silhouette the surface drops several px in depth per px across): fill each
+            # step with a short column of points, so the surface stays solid when the body turns (no checkerboard
+            # of front and back points at glancing angles)
+            gm = np.hypot(gx, gy)
+            ne = np.clip(np.ceil(gm) - 1, 0, 14).astype(int)
+            rep = np.repeat(np.arange(len(xs)), ne)
+            jj = np.concatenate([np.arange(1, n + 1) for n in ne]) if ne.sum() else np.zeros(0, int)
+            frac_ = jj / (ne[rep] + 1.0) if len(rep) else np.zeros(0)
+            def col(v, r=rep):
+                return np.concatenate([v, v[r]]) if len(r) else v
+            wall_f = col_f
+            if key == "head" and len(rep):
+                wall_f = self._head_rim(m, z, src_, ys, xs, col_f.copy(), full=True)
+            Xf, Yf = col(X), col(Y)
+            zf2 = np.concatenate([zf, zf[rep] - gm[rep] * frac_]) if len(rep) else zf
+            zb2 = np.concatenate([zb, zb[rep] + gm[rep] * frac_]) if len(rep) else zb
+            nn = len(Xf)
+            Ps += [np.stack([Xf, Yf, zf2 / self.S], 1), np.stack([Xf, Yf, zb2 / self.S], 1)]
+            Cs += [np.concatenate([col_f, wall_f[rep]]) if len(rep) else col_f, col(col_b)]; Ns += [col(nf), col(nb)]
+            IA += [col(ia), col(ia)]; IB += [col(ib), col(ib)]; WS += [col(w), col(w)]
+            FR += [np.ones(nn, bool), np.zeros(nn, bool)]
+            PI += [np.full(2 * nn, len(self.part_keys), np.int16)]; self.part_keys.append(key)
         self.P = np.concatenate(Ps).astype(np.float32); self.C = np.concatenate(Cs).astype(np.float32)
         self.N = np.concatenate(Ns).astype(np.float32)
         self.ia = np.concatenate(IA).astype(np.int64); self.ib = np.concatenate(IB).astype(np.int64)
@@ -193,11 +218,18 @@ class PhotoBody:
         self.piv3 = {b: np.array([(p[0] - self.x0) / self.S, (self.y0 - p[1]) / self.S, 0.0]) for b, p in piv.items()}
         self.tip3 = {s_: np.array([(J[k_]["T"][0] - self.x0) / self.S, (self.y0 - J[k_]["T"][1]) / self.S, 0.0])
                      for k_, s_ in side.items()}
+        # arms drawn in front of the body sit forward in depth: their joints sit there too, or the offset acts as a
+        # lever when the arm swings and the sleeve drifts off its bone
+        for k_, s_ in side.items():
+            dz = max(self.zoff.get("u" + k_, 0.0), self.zoff.get("f" + k_, 0.0)) / self.S
+            for b in ("upperarm_", "forearm_", "hand_"):
+                self.piv3[b + s_][2] += dz
+            self.tip3[s_][2] += dz
         self.lowest = float(self.P[:, 1].min())
         log("photo3d: %d points (%d px front), %d bones, %.0f px/m" % (len(self.P), int(self.front.sum()), len(BONES), self.S))
 
     # ------------------------------------------------------------------ head rim
-    def _head_rim(self, m, z, src, ys, xs, col):
+    def _head_rim(self, m, z, src, ys, xs, col, full=False):
         """outer band of the face (ear, hair edge, background fringe) -> the row's cheek colour, smoothed vertically;
         the face itself (inner 60%) is untouched"""
         H, W = m.shape
@@ -220,7 +252,8 @@ class PhotoBody:
                 sk[:, c] = np.interp(np.arange(H), idx, ndi.gaussian_filter1d(sk[idx, c], 4))
             top = ys.min(); hh = max(1, ys.max() - top)
             crown = ((ys - top) / hh) < 0.18                 # the very top keeps its own scalp / hair
-            wgt = np.clip((rel - 0.62) / 0.25, 0, 1) * np.where(crown, 0.4, 0.9)
+            wgt = np.clip((rel - 0.62) / 0.25, 0, 1) * np.where(crown, 0.4, 0.9) if not full else \
+                np.where(crown, 0.3, 0.85) * np.clip((rel - 0.3) / 0.3, 0, 1)
             col = col * (1 - wgt[:, None]) + sk[ys] * wgt[:, None]
         return col
 
@@ -324,7 +357,9 @@ class PhotoBody:
         self._pp = pp
         return M
 
-    def render(self, state, yaw=0.0, cell=(512, 512), baseline=None, fig_px_per_m=None, ss=2, be=None, lift=None):
+    def render(self, state, yaw=0.0, cell=(512, 512), baseline=None, fig_px_per_m=None, ss=2, be=None, lift=None, normals=False):
+        """normals=True: the same frame as a tangent-space-style normal map (view-space normal -> RGB, flat = 128,128,255)
+        for 2D dynamic lighting (Godot CanvasItem normal maps, Unity 2D lights, Laigter-style workflows)"""
         """RGBA frame: feet on `baseline`, body centre on the cell centre, `fig_px_per_m` screen pixels per metre"""
         be = be or accel.backend()
         Wc, Hc = cell
@@ -351,27 +386,30 @@ class PhotoBody:
         lam = np.clip(Nn @ LIGHT, 0, 1)
         shade = np.clip((AMB + (1 - AMB) * lam) / self.base, 0.55, 1.12)
         rgb = self.C * shade[:, None]
+        if normals:
+            nv = Nn @ view.T
+            rgb = np.stack([(nv[:, 0] * 0.5 + 0.5), (nv[:, 1] * 0.5 + 0.5), np.clip(nv[:, 2], 0, 1) * 0.5 + 0.5], 1) * 255.0
         Ws, Hs = Wc * ss, Hc * ss
         sx = Wc * ss / 2.0 + Q[:, 0] * scale; sy = baseline * ss - Q[:, 1] * scale; sz = Q[:, 2]
-        # edge-on surface (sides of the body, a twisted torso): points spread apart in depth and the background
-        # shows through as a crack, so those points are splatted 3x3 (copies just behind the original)
         nzv = (Nn @ view.T)[:, 2]
-        g = np.abs(nzv) < 0.45
-        if g.any():
-            ox = np.array([1, -1, 0, 0, 1, -1, 1, -1], np.float32); oy = np.array([0, 0, 1, -1, 1, 1, -1, -1], np.float32)
-            gx, gy, gz, gc = sx[g], sy[g], sz[g], rgb[g]
-            sx = np.concatenate([sx] + [gx + a for a in ox]); sy = np.concatenate([sy] + [gy + b for b in oy])
-            sz = np.concatenate([sz] + [gz - 2e-3] * len(ox)); rgb = np.concatenate([rgb] + [gc] * len(ox))
+        # soft back-face culling: points facing the camera win depth ties by 4 cm, so a facing-away point only shows
+        # where it really is in front (an arm crossing the body) - hard culling opened gaps at the silhouette
+        sz = sz + 0.04 * np.clip(nzv * 4.0, -1.0, 1.0)
         img = be.splat(sx, sy, sz, rgb, Ws, Hs)
         img = _close_cracks(img)
         from .puppet import despeckle
-        img = np.asarray(despeckle(Image.fromarray(img, "RGBA"))).copy()
+        img = np.asarray(despeckle(Image.fromarray(img, "RGBA"), frac=0.01)).copy()   # incl. loose bits (a strap end)
         im = Image.fromarray(img, "RGBA")
         if ss > 1:
             a = img[..., 3:4].astype(np.float32) / 255.0
             pm = np.concatenate([img[..., :3] * a, a * 255.0], -1).reshape(Hc, ss, Wc, ss, 4).mean(axis=(1, 3))
             rgb_ = np.where(pm[..., 3:4] > 0, pm[..., :3] / np.maximum(pm[..., 3:4] / 255.0, 1e-6), 0)
             im = Image.fromarray(np.concatenate([rgb_, pm[..., 3:4]], -1).clip(0, 255).astype(np.uint8), "RGBA")
+        if self.sharpen > 0:                       # restore the crispness the box downsample takes off
+            from PIL import ImageFilter
+            a_ = im.getchannel("A")
+            im = im.convert("RGB").filter(ImageFilter.UnsharpMask(radius=1.0, percent=int(100 * self.sharpen), threshold=2)).convert("RGBA")
+            im.putalpha(a_)
         return im
 
 
@@ -433,19 +471,81 @@ def sample_states(motion, n, loop=None, fine=96, keep_ends=True):
     return [fs[i] for i in idx]
 
 
-def render_moves(body, moves, yaw, cell, baseline, fig_px_per_m, log=print, be=None):
-    """moves: [MoveSpec] -> {name: [RGBA cells]} using the skeletal motion library"""
+def fighter_camera(yaw, pack):
+    """fighter pack: the camera is side-on (90) and `yaw` becomes how open the torso is to the camera
+    (35 = a 3/4 face -> torso opened 55 deg).  -> (camera yaw, open degrees)"""
+    if pack == "fighter3d":
+        y = float(yaw or 0.0)
+        return 90.0, float(max(0.0, min(90.0, 90.0 - y))) if 0.0 < y < 90.0 else (55.0 if y == 0 else 0.0)
+    return float(yaw or 0.0), 0.0
+
+
+def resolve_motion(m, pack="none", open_deg=55.0):
     from .moves import motion_for
-    from . import anim
     from .motions import find_motion
+    if m.motion and (m.motion.startswith("mocap_") or m.motion.startswith("custom_")):   # video-to-move / pose editor
+        from .motions import LIB
+        if m.motion in LIB:
+            return LIB[m.motion], True
+    if pack == "fighter3d":
+        from . import fightpack
+        mo = fightpack.motion_for_move(m.name, pack, open_deg)
+        if mo is not None:
+            return mo, True
+    mo = motion_for(m)
+    return (mo or find_motion("idle")), mo is not None
+
+
+def _smear(prev, cur, k=0.38):
+    """classic fighting-game smear: where a limb was a frame ago (and is not now), a faint copy behind it"""
+    a_prev = np.asarray(prev)[..., 3] > 80
+    a_cur = np.asarray(cur)[..., 3] > 80
+    trail = a_prev & ~ndi.binary_dilation(a_cur, iterations=2)
+    trail = ndi.binary_opening(trail, iterations=2)          # thin outlines from a small body shift are not a smear
+    lab, n = ndi.label(trail)
+    if n:
+        sz = ndi.sum(trail, lab, range(1, n + 1))
+        keep = np.zeros(n + 1, bool); keep[1:] = sz >= 0.012 * max(1, a_cur.sum())   # limb-sized trails only
+        trail = keep[lab]
+    if trail.sum() < 30:
+        return cur
+    g = np.zeros_like(np.asarray(prev))
+    g[trail] = np.asarray(prev)[trail]
+    g[..., :3] = (g[..., :3].astype(np.float32) * 0.85 + 255 * 0.15).astype(np.uint8)
+    g[..., 3] = (g[..., 3].astype(np.float32) * k).astype(np.uint8)
+    out = Image.fromarray(g, "RGBA")
+    out.alpha_composite(cur)
+    return out
+
+
+def render_moves(body, moves, yaw, cell, baseline, fig_px_per_m, log=print, be=None, pack="none", smear=True,
+                 smear_deg=38.0, ss=2, normals=None):
+    """normals: a dict to fill with {move: [normal-map frames]} (same placement, no smear)"""
+    """moves: [MoveSpec] -> {name: [RGBA cells]} using the skeletal motion library (or the fighter pack)"""
     be = be or accel.backend(log=log)
+    cam, open_deg = fighter_camera(yaw, pack)
     out, missing = {}, []
+    look0 = body.look
     for m in moves:
-        mo = motion_for(m) or find_motion("idle")
-        if motion_for(m) is None:
+        mo, ok = resolve_motion(m, pack, open_deg)
+        if not ok:
             missing.append(m.name)
+        body.look = 0.0 if mo.category == "Fighter3D" else look0      # the pack aims the head itself
         states = sample_states(mo, m.frames, m.loop)
-        out[m.name] = [body.render(st, yaw=yaw, cell=cell, baseline=baseline, fig_px_per_m=fig_px_per_m, be=be) for st in states]
+        fr = [body.render(st, yaw=cam, cell=cell, baseline=baseline, fig_px_per_m=fig_px_per_m, be=be, ss=ss) for st in states]
+        if normals is not None:
+            normals[m.name] = [body.render(st, yaw=cam, cell=cell, baseline=baseline, fig_px_per_m=fig_px_per_m, be=be, ss=ss,
+                                           normals=True) for st in states]
+        if smear and len(fr) > 2 and not m.loop:
+            R = [[np.asarray(st.world[b])[:3, :3] for b in BONES] for st in states]
+            sm = list(fr)
+            for i in range(1, len(fr)):
+                d = max(_rot_angle(R[i - 1][j], R[i][j]) for j in range(len(BONES)))
+                if math.degrees(d) > smear_deg:
+                    sm[i] = _smear(fr[i - 1], fr[i])
+            fr = sm
+        out[m.name] = fr
+    body.look = look0
     if missing:
         log("photo3d: no skeletal motion for %s - idle used" % ", ".join(missing))
     return out

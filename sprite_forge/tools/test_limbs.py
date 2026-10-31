@@ -118,11 +118,12 @@ def reversals(series, cyclic, min_amp):
 
 class Photo3DRig:
     """test adapter for --engine photo3d: 'poses' are indices into the skeletal motion states of each move"""
-    def __init__(self, cut, lms, yaw):
+    def __init__(self, cut, lms, yaw, pack="fighter3d"):
         from sforge import photo3d as P3, rig as RG
         self.P3, self.RG = P3, RG
         self.body = P3.PhotoBody(cut, lms, log=lambda *a: None)
-        self.yaw = float(yaw or 0)
+        self.pack = pack
+        self.yaw, self.open = P3.fighter_camera(float(yaw or 0), pack)
         self.side = abs(math.sin(math.radians(self.yaw))) > 0.5
         self.cell, self.base, self.ppm = (640, 640), 600, 360 / RG.HEIGHT
         self.stand_h = 360
@@ -134,7 +135,9 @@ class Photo3DRig:
         from sforge.moves import motion_for
         from sforge import anim
         from sforge.motions import find_motion
-        mo = motion_for(move) or find_motion("idle")
+        mo, _ = self.P3.resolve_motion(move, self.pack, self.open)
+        if mo.category == "Fighter3D":
+            self.body.look = 0.0
         sts = self.P3.sample_states(mo, move.frames, move.loop)      # exactly what the build renders
         i0 = len(self.states); self.states += sts
         return [{"_s": i0 + i} for i in range(len(sts))], bool(move.loop)

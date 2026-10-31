@@ -5,6 +5,39 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v9.4: measured realism, dress-as, pose-it-yourself, squads, references
+
+Measured with independent tools (`tools/quality_report.py`: YuNet + Haar face detection, aligned-face SSIM identity,
+BRISQUE naturalness, CIELAB colour, head ratio vs Drillis & Contini adult norms; models via `tools/setup_quality_models.sh`).
+On a real phone photo: head 0.185 -> 0.152 of height (norm 0.130), front view BRISQUE 11.6 -> 9.0 at full sharpness,
+side view sharpness 20% -> 81% and BRISQUE 32.9 -> 23.1 (photo3d instead of the 2D turn).
+
+* `--proportions auto|on|off` (+ `--proportion-strength`): phone-camera perspective (big head, short legs) corrected
+  once, up front; the head is scaled uniformly so the face keeps its shape. auto = only when clearly distorted.
+* photo3d: fighter motion pack (`sforge/fightpack.py`, `--motion-pack`): side-on staging, torso opened to the camera,
+  strikes in profile, uppercut / sweep / low block / knockdown / get-up / roundhouse extras, smear frames on fast moves;
+  back surfaces continue the front's colour at the edge (no seam), sleeves and trouser legs keep their real fabric all
+  round, wider halo clean-up, `--normal-maps` for 2D dynamic lighting. Limb test at 35 deg: 0 fails, 3 warnings (the
+  fastest strikes at 6-8 frames).
+* `--dress-as police|postman|astronaut|firefighter|builder|chef|doctor|ninja|file.json` (`sforge/outfits.py`):
+  garments recoloured on the photo's own pixels with shading kept, plus props from the pose (caps, helmets, badges,
+  satchels, belts, hi-vis, gloves, chest units). Generic - no real insignia or lettering.
+* Pose-it-yourself: `tools/pose_editor.html` (drag a skeleton, keyframes) -> JSON -> `--custom-move file.json`
+  (`sforge/posekit.py`), rendered by any engine at any angle. Example: `library/moves_custom/spinning_backfist.json`.
+* Video-to-move: `forge.py mocap` clips -> `--mocap clip.json --moves idle,kick2=mocap_kick2:8:14` on photo3d.
+  `tools/test_video_move.py` proves the chain without a camera (recovered motion within 1.5 deg per bone).
+* Style lock / match: `tools/style_match.py GAME_SPRITES SRC DST` learns pixel size, palette, outline and colour from
+  the game's own sprites and restyles a build to fit.
+* Engines / editors: `tools/export_engines.py --all` -> Aseprite (JSON + Lua import), Phaser 3 atlas + anims, Godot 4
+  SpriteFrames, GIF / WebP previews (Unity: plugins/unity).
+* Squad mode: `tools/squad.py PEOPLE OUT --roster roster.csv [--game arena-fc|ef|hdf|tt64]` - one scale for everybody
+  (heights from the roster), outfits per member, line-up sheet, game files.
+* Learned body: `tools/learned_body.py import MESH` binds any reconstructed / generated mesh (LHM-class models, Meshy,
+  Tripo, a scan) to the skeleton as a library rig; `run PHOTO --cmd ...` drives a GPU reconstruction model first.
+* Reference library: `tools/refs.py add|list|cut|bench|motions|dataset` - photos and videos with consent and licence
+  records (store git-ignored); `bench` scores every engine on every consented person, `motions` turns videos into
+  library moves, `dataset` writes a consented-only manifest for future training.
+
 ## New in v9.3 (experimental): photo -> 3D body, any camera angle, GPU when available
 
 * `--puppet-engine photo3d` inflates the cut-out into a 3D body (front = the photo's own pixels; depth, sides and back

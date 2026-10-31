@@ -139,6 +139,12 @@ class BuildConfig:
     fx: str = ""                       # "outline=2,cel=3,pixel=4,light=-1:-1:1,rim=0.4" post passes on every frame
     maps: str = ""                     # "normal,emissive" -> maps/ atlas_normal.png / atlas_emissive.png
     puppet_engine: str = "classic"     # v9.1: classic | skin (smooth bending limbs, sforge/skinwarp.py) | photo3d (v9.3)
+    dress_as: str = ""                 # v9.4 dress-as template: police | postman | astronaut | ... | path/to/outfit.json
+    motion_pack: str = "auto"          # v9.4 photo3d motions: auto (fighter3d for fighter move sets) | fighter3d | none
+    normal_maps: bool = False          # v9.4 photo3d: also write normal-map sheets (2D dynamic lighting)
+    smear: bool = True                 # v9.4 photo3d: smear frames on fast strikes
+    proportions: str = "auto"          # v9.4 phone-perspective correction: auto | on | off
+    proportion_strength: float = 0.65  # v9.4 how far towards adult norms (0..1)
     device: str = ""                   # v9.3 compute backend: '' / auto | cpu | cuda | mps  (env SFS_DEVICE)
     motion_style: str = "classic"      # v9.1: classic | polish (smooth in-betweens, sforge/motionpolish.py)
     footlock: bool = False             # pin planted feet (removes foot sliding in walk / idle)
@@ -528,11 +534,27 @@ def _puppet_photo(cfg, report):
         raise ValueError("--fill puppet needs the landmarks.json from `forge.py cutout` (looked for %s)" % lm)
     info = _json.load(open(lm))
     cut = Image.open(cfg.photo).convert("RGBA")
+    warped = False
+    if cfg.proportions != "off":                  # v9.4: undo phone-camera perspective (big head, short legs)
+        from . import proportions as PRP
+        cut, lms_fix, pinfo = PRP.correct(cut, info["landmarks"], strength=cfg.proportion_strength,
+                                          mode=cfg.proportions, log=report.log)
+        if pinfo:
+            warped = True
+            info = dict(info); info["landmarks"] = lms_fix
+            report.note("proportions: phone perspective corrected - head %.3f -> %.3f of height, hips %.3f -> %.3f "
+                        "(head scaled uniformly, body remapped row by row; --proportions off to keep the photo's)" % (
+                            pinfo["head_before"], pinfo["head_after"], pinfo["hip_before"], pinfo["hip_after"]))
+    if cfg.dress_as:                               # v9.4 dress-as template (sforge/outfits.py)
+        from . import outfits as OF
+        cut, osum = OF.dress(cut, info["landmarks"], cfg.dress_as, log=report.log)
+        report.note("outfit: %s - garments recoloured on the photo's own pixels (shading kept), props drawn from the "
+                    "pose landmarks; generic, no real insignia" % osum)
     if cfg.flip:
         report.warning("--flip ignored for the puppet (it would mirror text on clothing); the game flips at run time")
     lms = info["landmarks"]
     oth_p = os.path.join(os.path.dirname(os.path.abspath(cfg.photo)), "others_mask.png")
-    others = Image.open(oth_p) if os.path.isfile(oth_p) else None
+    others = Image.open(oth_p) if os.path.isfile(oth_p) and not warped else None   # the mask no longer lines up after a warp
     if cfg.quality == "draft":       # v8 speed: Quick preview poses a smaller copy of the cut-out (about 1.6x the cell figure)
         bbh = (cut.getchannel("A").getbbox() or (0, 0, 1, cut.height))
         k = min(1.0, 1.6 * _target_h(cfg)[0] / max(1.0, float(bbh[3] - bbh[1])))
@@ -740,8 +762,17 @@ def _photo3d_moves(cfg, report, cut, lms, cut_ref):
     th, _ = _target_h(cfg)
     yaw = float(cfg.turn or 0.0)
     t0 = time.time()
+    nmaps = {} if cfg.normal_maps else None
+    pack = cfg.motion_pack
+    if pack == "auto":                              # 2D-fighter staging when the move set is a fighter set
+        pack = "fighter3d" if any(m.name in ("punch", "kick", "block", "special1") for m in cfg.moves) else "none"
     frames = P3.render_moves(body, cfg.moves, yaw, (cfg.frame_w, cfg.frame_h), cfg.ground_y, th / P3.RG.HEIGHT,
-                             log=report.log, be=be)
+                             log=report.log, be=be, pack=pack, smear=cfg.smear, normals=nmaps,
+                             ss={"draft": 1, "best": 3}.get(cfg.quality, 2))     # measured: no sharpening, 2-3x supersampling
+    if pack == "fighter3d":
+        cam, op = P3.fighter_camera(yaw, pack)
+        report.note("photo3d: fighter motion pack (sforge/fightpack.py) - side-on fight axis, torso opened %g deg to the "
+                    "camera (from --turn-yaw %g), strikes turn into profile%s" % (op, yaw, "; smear frames on fast moves" if cfg.smear else ""))
     nfr = sum(len(v) for v in frames.values())
     report.timing("photo3d frames (%d, %s)" % (nfr, be.name), time.time() - t0)
     report.note("photo3d: ONE front photo inflated into a 3D body (depth, sides and back ESTIMATED from the silhouette and "
@@ -750,7 +781,7 @@ def _photo3d_moves(cfg, report, cut, lms, cut_ref):
     out = {}
     for m in cfg.moves:
         cells, clip = [], False
-        for im in frames[m.name]:
+        for fi, im in enumerate(frames[m.name]):
             a = _np.asarray(im.getchannel("A")) > 40
             ys_, xs_ = _np.nonzero(a)
             if len(xs_) and (xs_.min() < 4 or ys_.min() < 4 or xs_.max() >= cfg.frame_w - 4):
@@ -759,6 +790,8 @@ def _photo3d_moves(cfg, report, cut, lms, cut_ref):
                 lo = _lowest_solid(im)
                 if lo and abs(lo - cfg.ground_y) <= 3:     # snap a grounded frame exactly onto the ground line
                     im = _shift(im, cfg.ground_y - lo)
+                    if nmaps is not None:
+                        nmaps[m.name][fi] = _shift(nmaps[m.name][fi], cfg.ground_y - lo)
             cells.append(im)
         note = "photo3d: skeletal motion on a 3D body made from the one photo - NOT a real photo of this move"
         if clip:
@@ -767,6 +800,7 @@ def _photo3d_moves(cfg, report, cut, lms, cut_ref):
         out[m.name] = (cells, "filled:photo3d", note)
         report.log("  photo3d %-13s %2d frames%s" % (m.name, len(cells), "  CLIPPED" if clip else ""))
     cfg._photo3d = body
+    cfg._normal_frames = nmaps
     return out
 
 
@@ -1712,6 +1746,18 @@ def build(cfg: BuildConfig, log=print, progress=None):
             C.prune()
         except Exception:
             pass
+    nf = getattr(cfg, "_normal_frames", None)
+    if nf:                                        # v9.4 photo3d normal maps: moves_normal/ + atlas_normal.png
+        os.makedirs(os.path.join(out, "moves_normal"), exist_ok=True)
+        rows = [m.name for m in cfg.moves if m.name in nf]
+        cols_ = max(len(nf[r]) for r in rows)
+        page = Image.new("RGBA", (cols_ * cfg.frame_w, len(rows) * cfg.frame_h), (0, 0, 0, 0))
+        for r_, mv in enumerate(rows):
+            for i_, im in enumerate(nf[mv]):
+                im.save(os.path.join(out, "moves_normal", "%s_%02d.png" % (mv, i_)))
+                page.paste(im, (i_ * cfg.frame_w, r_ * cfg.frame_h))
+        page.save(os.path.join(out, "atlas_normal.png"))
+        log("  normal maps: atlas_normal.png + moves_normal/ (same layout as atlas.png; for 2D dynamic lighting)")
     log("Done in %.1fs -> %s" % (time.time() - t0, os.path.abspath(out)))
     if progress:
         progress(1.0)

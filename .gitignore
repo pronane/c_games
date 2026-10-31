@@ -15,3 +15,7 @@ screenshots/*.jpg
 **/Build/
 *.vscode
 **/.vscode
+# downloaded by tools/setup_quality_models.sh (third-party licences)
+sprite_forge/tools/models/
+# reference library store (people's photos / videos)
+sprite_forge/library/refs/
