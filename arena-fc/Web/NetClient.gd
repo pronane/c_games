@@ -60,17 +60,24 @@ func connect_to(p_url: String, p_name: String, p_room: String, p_create: bool, p
 	close()
 	_explicit = false
 	url = p_url.strip_edges()
-	// Same-origin relative path (e.g. "/ws"): upgrade to wss:// or ws:// based on page protocol.
-	// This lets the browser build connect to the Node edge proxy on the public host instead of
-	// a raw ws:// address that browsers block on HTTPS pages.
+	# Same-origin relative path (e.g. "/ws"): upgrade to wss:// or ws:// based on page protocol.
+	# This lets the browser build connect to the Node edge proxy on the public host instead of
+	# a raw ws:// address that browsers block on HTTPS pages.
 	if url.begins_with("/"):
 		if OS.has_feature("web"):
-			var proto := JavaScriptBridge.eval("window.location.protocol")
-			var host := JavaScriptBridge.eval("window.location.host")
-			var secure := proto.has("https")
-			url = (secure ? "wss://" : "ws://") + host + url
+			var proto := str(JavaScriptBridge.eval("window.location.protocol"))
+			var host := str(JavaScriptBridge.eval("window.location.host"))
+			var secure := proto.begins_with("https")
+			url = ("wss://" if secure else "ws://") + host + url
 		else:
 			url = "ws://127.0.0.1:7777" + url
+	# Page-relative ("./ws"): resolves against the page URL, so the same build works at the site root and
+	# under a sub-path such as /arena/ on the shared Node hub.
+	if url == "ws" or url.begins_with("./") or url.begins_with("../"):
+		if OS.has_feature("web"):
+			url = str(JavaScriptBridge.eval("new URL(%s, window.location.href).href.replace(/^http/, 'ws')" % JSON.stringify(url)))
+		else:
+			url = "ws://127.0.0.1:7777"
 	if not url.contains("://"):
 		url = "ws://" + url
 	if url.ends_with("/"):

@@ -1,155 +1,179 @@
 # SetPieceAim.gd
-# Tier 3 — Aimed set pieces
-# Provides aiming logic for free kicks, penalties, and corner placement.
-# Shows a trajectory line + power meter, then fires the ball along the aimed vector.
-# Attach to the match/ball node or an autoload "SetPieceAim".
-
+# Aimed set pieces: free-kick / penalty / corner aiming with a trajectory preview and a power meter.
+#
+#   var aim := SetPieceAim.new(); add_child(aim)
+#   aim.shot_fired.connect(func(velocity, direction, power): ...)
+#   aim.start_aim(spot, Vector3.RIGHT)        # attack_dir = the way the taker is attacking
+#
+# Controls (polled directly, so no InputMap entries are needed):
+#   A / Left , D / Right  turn the aim        hold Space (or call set_charging(true)) to charge
+#   release Space         fire                 Escape cancels
+# Touch/gamepad front ends can call nudge(), set_charging() and fire_shot() themselves.
+#
+# The velocity formula is the same one BrowserBoot.shoot() uses, so what the preview shows is
+# what a normal shot would do at that power.
 class_name SetPieceAim
 extends Node3D
-
-@export var aim_line_length: float = 30.0
-@export var max_power: float = 30.0
-@export var power_charge_rate: float = 12.0  # power per second
-@export var aim_arc_degrees: float = 45.0    # total horizontal aim arc
-@export var line_segment_count: int = 20
 
 signal aim_started()
 signal aim_updated(angle_deg: float, power: float)
 signal aim_cancelled()
-signal shot_fired(direction: Vector3, power: float)
+signal shot_fired(velocity: Vector3, direction: Vector3, power: float)
+
+@export var aim_arc_degrees: float = 60.0          # total sweep, centred on attack_dir
+@export var turn_speed_deg: float = 40.0           # degrees per second while a key is held
+@export var charge_seconds: float = 0.9            # empty to full
+@export var min_speed: float = 18.0
+@export var max_speed: float = 29.0
+@export var min_lift: float = 2.2
+@export var max_lift: float = 6.0
+@export var gravity: float = 9.81
+@export var ball_radius: float = 0.11
+@export var preview_steps: int = 40
 
 var aiming := false
-var aim_angle_deg := 0.0   # -aim_arc_degrees/2 .. +aim_arc_degrees/2 relative to goal
-var power := 0.0
+var aim_angle_deg := 0.0            # 0 = straight at the goal; + turns anticlockwise seen from above
+var power := 0.0                    # 0..1
+var charging := false
 var aim_start_pos := Vector3.ZERO
-var target_node: Node3D = null  # the ball or a placement marker
-var line_mesh: ImmediateMesh = null
-var power_meter: Control = null
+var attack_dir := Vector3.RIGHT
+
+var _mesh := ImmediateMesh.new()
+var _line: MeshInstance3D
+var _min_power := 0.25
 
 func _ready() -> void:
-	if target_node == null:
-		# Try to find a ball node named "ball_mesh" or similar
-		var ball := get_node_or_null("../ball_mesh")
-		if ball:
-			target_node = ball
+	_line = MeshInstance3D.new()
+	_line.name = "AimLine"
+	_line.mesh = _mesh
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.vertex_color_use_as_albedo = true
+	mat.no_depth_test = true
+	_line.material_override = mat
+	_line.visible = false
+	add_child(_line)
 
-func _input(event: InputEvent) -> void:
-	if not aiming:
-		return
-	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_accept") and not event.is_pressed():
-		# Release to shoot on accept-up, or cancel
-		if event.is_action_pressed("ui_cancel"):
-			cancel_aim()
-		elif event.is_action_pressed("ui_accept"):
-			fire_shot()
-	elif event.is_action_pressed("aim_left"):
-		aim_angle_deg = clamp(aim_angle_deg + 2.0, -aim_arc_degrees / 2.0, aim_arc_degrees / 2.0)
-		_update_aim()
-	elif event.is_action_pressed("aim_right"):
-		aim_angle_deg = clamp(aim_angle_deg - 2.0, -aim_arc_degrees / 2.0, aim_arc_degrees / 2.0)
-		_update_aim()
-	elif event.is_action_pressed("charge_power"):
-		# Held to increase power
-		pass
-
-func _physics_process(delta: float) -> void:
-	if not aiming:
-		return
-	if Input.is_action_pressed("charge_power"):
-		power = clamp(power + power_charge_rate * delta, 0.0, max_power)
-		_update_aim()
-
-func start_aim(start_pos: Vector3) -> void:
+# ---------------------------------------------------------------- API
+func start_aim(start_pos: Vector3, p_attack_dir: Vector3 = Vector3.RIGHT) -> void:
 	aiming = true
 	aim_start_pos = start_pos
+	attack_dir = Vector3(p_attack_dir.x, 0.0, p_attack_dir.z).normalized()
+	if attack_dir.length_squared() < 0.5:
+		attack_dir = Vector3.RIGHT
 	aim_angle_deg = 0.0
 	power = 0.0
-	if target_node:
-		target_node.global_position = start_pos
-	_create_aim_line()
+	charging = false
+	_line.visible = true
+	_redraw()
 	aim_started.emit()
 
 func cancel_aim() -> void:
 	if not aiming:
 		return
-	aiming = false
-	_destroy_aim_line()
+	_end()
 	aim_cancelled.emit()
+
+func nudge(delta_deg: float) -> void:
+	if not aiming:
+		return
+	var half := aim_arc_degrees / 2.0
+	aim_angle_deg = clampf(aim_angle_deg + delta_deg, -half, half)
+	_redraw()
+	aim_updated.emit(aim_angle_deg, power)
+
+## Alias of set_external_hold(): true starts charging, false fires.
+func set_charging(on: bool) -> void:
+	set_external_hold(on)
 
 func fire_shot() -> void:
 	if not aiming:
 		return
-	aiming = false
-	var direction := _direction_from_angle(aim_angle_deg)
-	_destroy_aim_line()
-	shot_fired.emit(direction, power)
+	var p := maxf(_min_power, power)
+	var dir := direction_for(aim_angle_deg)
+	var vel := shot_velocity(dir, p)
+	_end()
+	shot_fired.emit(vel, dir, p)
 
 func get_aim_data() -> Dictionary:
-	return {
-		"aiming": aiming,
-		"angle_deg": aim_angle_deg,
-		"power": power,
-		"max_power": max_power,
-		"start_pos": aim_start_pos,
-	}
+	return {"aiming": aiming, "angle_deg": aim_angle_deg, "power": power, "start_pos": aim_start_pos}
 
-# ---------------------------------------------------------------- internal
-func _update_aim() -> void:
+## Unit direction on the pitch for an aim angle.
+func direction_for(angle_deg: float) -> Vector3:
+	return attack_dir.rotated(Vector3.UP, deg_to_rad(angle_deg)).normalized()
+
+## Initial ball velocity. Same shape as BrowserBoot.shoot(): dir * lerp(18, 29, p) + up * lerp(2.2, 6, p).
+func shot_velocity(dir: Vector3, p: float) -> Vector3:
+	return dir * lerpf(min_speed, max_speed, p) + Vector3(0.0, lerpf(min_lift, max_lift, p), 0.0)
+
+# ---------------------------------------------------------------- input
+func _physics_process(delta: float) -> void:
 	if not aiming:
 		return
-	_destroy_aim_line()
-	_create_aim_line()
-	aim_updated.emit(aim_angle_deg, power)
+	var turn := 0.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		turn += 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		turn -= 1.0
+	if turn != 0.0:
+		nudge(turn * turn_speed_deg * delta)
+	var space := Input.is_key_pressed(KEY_SPACE)
+	if space:
+		charging = true
+	if charging:
+		power = minf(1.0, power + delta / charge_seconds)
+		_redraw()
+		aim_updated.emit(aim_angle_deg, power)
+		if not space and not _external_hold:
+			fire_shot()
+	if Input.is_key_pressed(KEY_ESCAPE):
+		cancel_aim()
 
-func _create_aim_line() -> void:
-	if line_mesh:
-		line_mesh.queue_free()
-	line_mesh = ImmediateMesh.new()
-	var line_inst := MeshInstance3D.new()
-	line_inst.mesh = line_mesh
-	line_inst.name = "AimLine"
-	add_child(line_inst)
+var _external_hold := false
+## For touch buttons: hold true while the button is down, false on release (that fires).
+func set_external_hold(on: bool) -> void:
+	if on:
+		_external_hold = true
+		charging = aiming
+	elif _external_hold:
+		_external_hold = false
+		if aiming:
+			fire_shot()
 
-	var start := aim_start_pos
-	var dir := _direction_from_angle(aim_angle_deg)
-	var surface := ArrayMesh.new()
-	# We'll draw with ImmediateMesh for simplicity
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	var vertices := PackedVector3Array()
-	var colors := PackedColorArray()
+# ---------------------------------------------------------------- drawing
+func _end() -> void:
+	aiming = false
+	charging = false
+	_external_hold = false
+	_mesh.clear_surfaces()
+	if _line != null:
+		_line.visible = false
 
-	# Draw trajectory segments
-	var steps := line_segment_count
-	var gravity := 9.81
-	var vel := dir * power
-	var pos := start
-	var dt := 0.05
-	var y_vel := dir.y * power * 0.5  # slight lift component
+func trajectory(dir: Vector3, p: float) -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	var pos := aim_start_pos
+	pos.y = maxf(pos.y, ball_radius)
+	var vel := shot_velocity(dir, maxf(p, _min_power))
+	var dt := 1.0 / 30.0
+	for i in range(preview_steps):
+		pts.append(pos)
+		vel.y -= gravity * dt
+		pos += vel * dt
+		if pos.y <= ball_radius:       # first bounce ends the preview
+			pos.y = ball_radius
+			pts.append(pos)
+			break
+	return pts
 
-	for i in range(steps + 1):
-		vertices.append(pos)
-		# Color: green at start, red at end
-		var t := float(i) / float(steps)
-		colors.append(Color.lerp(Color("#00ff00"), Color("#ff0000"), t))
-		# Simple physics step
-		pos += dir * power * dt
-		pos.y += y_vel * dt - 0.5 * gravity * dt * dt
-		y_vel -= gravity * dt
-
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_COLOR] = colors
-	surface.add_surface_from_arrays(Mesh.PRIMITIVE_LINE_STRIP, arrays)
-	line_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINE_STRIP, arrays)
-
-func _destroy_aim_line() -> void:
-	if line_mesh:
-		line_mesh.queue_free()
-		line_mesh = null
-
-func _direction_from_angle(angle_deg: float) -> Vector3:
-	# angle is relative to facing goal (Z axis). Convert to 2D direction on XZ plane.
-	var rad := deg_to_rad(angle_deg)
-	var x := sin(rad)
-	var z := -cos(rad)  # negative Z is "forward" toward goal
-	return Vector3(x, 0.0, z).normalized()
+func _redraw() -> void:
+	_mesh.clear_surfaces()
+	var pts := trajectory(direction_for(aim_angle_deg), power)
+	if pts.size() < 2:
+		return
+	_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	var c0 := Color(0.2, 1.0, 0.2)
+	var c1 := Color(1.0, 0.2, 0.2)
+	for i in range(pts.size()):
+		_mesh.surface_set_color(c0.lerp(c1, float(i) / float(pts.size() - 1)))
+		_mesh.surface_add_vertex(pts[i])
+	_mesh.surface_end()
