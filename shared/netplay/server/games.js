@@ -61,7 +61,7 @@ const hubGames = [
       { route: '/assets', dir: path.join(root, 'HD_Fighter', 'assets_hd') },
     ],
   },
-  { path: '/egyptian', game: egyptianFighter },
+  { path: '/egyptian', game: egyptianFighter, static: [{ route: '/', dir: path.join(root, 'shared', 'netplay', 'server', 'egyptian-public') }] },
   { path: '/turbo', game: turboTumble },
 ].concat(arenaFc ? [arenaFc] : []);
 
