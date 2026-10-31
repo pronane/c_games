@@ -1,0 +1,5 @@
+# Validated runtime versions. PyPI's Linux wheels include CUDA libraries, but
+# inference falls back to CPU when no CUDA device is available. For a smaller
+# CPU-only installation use matching +cpu wheels from PyTorch's official index.
+torch==2.2.2
+torchaudio==2.2.2
