@@ -37,12 +37,20 @@ const turboTumble = {
 // Arena FC is a different kind of game: its authoritative server is the .NET program in arena-fc/Server,
 // not a lockstep relay. The hub serves its browser build and proxies /arena/ws to that server.
 // Opt-in: set ARENA_BACKEND (e.g. ws://127.0.0.1:7777) so existing deployments keep their exact routes.
+// Two modes. ARENA_BACKEND=ws://... proxies to the .NET server. ARENA_NATIVE=1 runs the server in this
+// process (arena/server.js, a Node port of the browser edition's match), so no .NET is needed at all.
+const arenaWeb = [{ route: '/', dir: process.env.ARENA_WEB_DIR || path.join(root, 'arena-fc', 'build', 'web') }];
 const arenaFc = process.env.ARENA_BACKEND ? {
   path: '/arena',
   name: 'arena-fc',
   proxy: { target: process.env.ARENA_BACKEND, wsPath: '/ws' },
-  static: [{ route: '/', dir: process.env.ARENA_WEB_DIR || path.join(root, 'arena-fc', 'build', 'web') }],
-} : null;
+  static: arenaWeb,
+} : (process.env.ARENA_NATIVE === '1' ? {
+  path: '/arena',
+  name: 'arena-fc',
+  native: { wsPath: '/ws' },
+  static: arenaWeb,
+} : null);
 
 const hubGames = [
   {

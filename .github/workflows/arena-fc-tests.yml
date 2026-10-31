@@ -29,3 +29,10 @@ jobs:
         with: { node-version: 20 }
       - working-directory: shared/netplay/server
         run: npm ci && npm test
+      - name: Arena FC Node server against the protocol suites written for the .NET server
+        working-directory: shared/netplay/server
+        run: |
+          node arena/standalone.js --port 7791 &
+          sleep 2
+          python3 ../../../arena-fc/Tools/net_smoketest.py --url ws://127.0.0.1:7791 --seconds 4
+          python3 ../../../arena-fc/Tools/net_v2_smoketest.py --url ws://127.0.0.1:7791
