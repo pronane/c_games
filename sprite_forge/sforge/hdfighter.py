@@ -110,10 +110,10 @@ def _frames(o=OPEN):
     # ---- special 1: two-palm energy thrust (fireball) - thrust on frames 1-2
     gather = PR(0.2, arm_L=(26, 22, 0), arm_R=(22, 24, 0), elbow_L=112, elbow_R=112, hips=(10, -0.25 * o, 0),
                 knee_L=40, knee_R=36)
-    push = PR(1.0, arm_L=(90, 2, 0), arm_R=(88, 2, 0), elbow_L=4, elbow_R=6, wrist_L=-60, wrist_R=-60,
+    push = PR(1.0, arm_L=(90, 2, 0), arm_R=(88, 2, 0), elbow_L=4, elbow_R=6, wrist_L=-35, wrist_R=-35,
               leg_L=(40, 7, 0), knee_L=46, leg_R=(-26, 7, 0), knee_R=8, hips=(8, 8, 0))
     F["special1"] = [gather, push, P(push, arm_L=(92, 2, 0), arm_R=(90, 2, 0)),
-                     P(push, elbow_L=24, elbow_R=26, wrist_L=-30, wrist_R=-30), PR(0.4, arm_L=(70, 8, 0), elbow_L=70), G()]
+                     P(push, arm_L=(66, 8, 0), arm_R=(64, 8, 0), elbow_L=70, elbow_R=72, wrist_L=-10, wrist_R=-10), PR(0.4, arm_L=(70, 8, 0), elbow_L=70), G()]
 
     # ---- special 2: rising uppercut - fist at the top on frames 1-2
     load = PR(0.3, hips=(24, -0.2 * o, 0), leg_L=(70, 8, 0), leg_R=(36, 8, 0), knee_L=96, knee_R=84,
@@ -129,7 +129,7 @@ def _frames(o=OPEN):
     F["super"] = [G(leg_L=(68, 7, 0), leg_R=(40, 7, 0), knee_L=96, knee_R=84, hips=(18, -0.2 * o, 0),
                     arm_L=(30, 30, 0), arm_R=(30, 30, 0), elbow_L=90, elbow_R=90),
                   fly, P(fly, leg_L=(100, 7, 0), knee_L=2),
-                  PR(0.8, leg_R=(92, 30, 0), knee_R=8, ankle_R=-20, leg_L=(10, 7, 0), knee_L=30, flat=0, hips=(-14, 40, 0)),
+                  PR(0.8, leg_R=(70, 20, 0), knee_R=96, leg_L=(10, 7, 0), knee_L=30, flat=0, hips=(-8, 24, 0)),   # re-chamber
                   PR(0.6, leg_R=(60, 20, 0), knee_R=90, flat=0),
                   G(leg_L=(60, 7, 0), leg_R=(32, 7, 0), knee_L=88, knee_R=76, hips=(18, -0.2 * o, 0)), G()]
 
