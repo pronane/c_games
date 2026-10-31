@@ -62,7 +62,7 @@ const hubGames = [
     ],
   },
   { path: '/egyptian', game: egyptianFighter, static: [{ route: '/', dir: path.join(root, 'shared', 'netplay', 'server', 'egyptian-public') }] },
-  { path: '/turbo', game: turboTumble },
+  { path: '/turbo', game: turboTumble, static: [{ route: '/', dir: require('path').join(require('path').join(__dirname, '..', '..', '..'), 'shared', 'netplay', 'server', 'turbo-public') }] },
 ].concat(arenaFc ? [arenaFc] : []);
 
 module.exports = { hdFighter, egyptianFighter, turboTumble, hubGames };
