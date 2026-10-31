@@ -1,0 +1,1 @@
+idle=fight_idle:5:6:loop,walk=fight_walk:7:8:loop,crouch=crouch:2:8,jump=jump:5:10,lp=punch:4:12,hp=swing_attack:5:12,lk=low_kick_pass:4:12,hk=kick:5:12,block=guard:2:8,throw=throw:5:10,special1=special_1:6:12,special2=special_2:5:12,super=jump_attack:7:12,hit=hit:3:10,win=victory:5:8,lose=ko:3:8

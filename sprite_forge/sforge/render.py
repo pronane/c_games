@@ -49,18 +49,23 @@ def pose_triangles(T, B, state):
 class RenderSettings:
     def __init__(self, cell_w=256, cell_h=256, figure_h=190, baseline=None, anchor_x=None,
                  yaw=65.0, pitch=6.0, ss=3, outline=True, outline_rgb=(22, 24, 28), light=(-0.45, 0.75, 0.55),
-                 ambient=0.42, follow_root=False):
+                 ambient=0.42, follow_root=False, hd=None):
         self.cell_w, self.cell_h, self.figure_h = cell_w, cell_h, figure_h
         self.baseline = baseline if baseline is not None else int(cell_h * 0.93)
         self.anchor_x = anchor_x if anchor_x is not None else cell_w // 2
         self.yaw, self.pitch, self.ss, self.outline = yaw, pitch, ss, outline
         self.outline_rgb, self.light, self.ambient = outline_rgb, np.array(light) / np.linalg.norm(light), ambient
         self.follow_root = follow_root
+        import os
+        self.hd = bool(int(os.environ.get("SFORGE_HD", "0"))) if hd is None else hd
 
 
 def render_tris(P, mats, colors, rs: RenderSettings, root_xz=(0, 0), wire=False, rgb=None, two_sided=False):
     """P: posed triangles (n,3,3) in world metres.  rgb: optional per-triangle colours (n,3) 0-1 (library rigs);
     two_sided: draw back faces too (imported meshes often have mixed winding)."""
+    if getattr(rs, "hd", False) and rgb is None and not wire and mats is not None and len(P):
+        from .render_hd import render_hd
+        return render_hd(P, mats, colors, rs, root_xz, key=len(P))
     view = rx(rs.pitch) @ ry(rs.yaw)
     Q = P.copy()
     if rs.follow_root:

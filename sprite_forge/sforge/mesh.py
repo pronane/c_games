@@ -28,7 +28,8 @@ def palette(kit="home", skin="medium", spec=None):
     return sp.colours()
 
 
-DETAIL = 1.0   # segment multiplier for cylinders/spheres (console polygon budgets); 1.0 = standard mannequin
+import os as _os
+DETAIL = float(_os.environ.get('SFORGE_DETAIL', '1.0'))   # segment multiplier for cylinders/spheres (console polygon budgets); 1.0 = standard mannequin
 
 
 def _seg(n, lo=3):
@@ -121,6 +122,9 @@ def build_mannequin(spec=None, include_ball=True, prop=None, face=None):
     from .spec import CharacterSpec
     sp = spec or CharacterSpec()
     g = sp.girth; gx = g ** 0.6          # sideways growth limited (arms stay attached)
+    fighter = str(getattr(sp, "style", "") or "").lower() == "fighter"
+    gz = g * (1.38 if fighter else 1.0)        # torso depth (front-back) - the mannequin was a plank in side view
+    gl = g * (1.22 if fighter else 1.0)        # limb thickness
     J = rest_world()
     b = MeshBuilder()
     hs = sp.size("head")
@@ -178,42 +182,44 @@ def build_mannequin(spec=None, include_ball=True, prop=None, face=None):
     if top in ("jersey", "tshirt", "longsleeve", "hoodie"):
         b.cyl("chest", J["neck"] + [0, -0.05, 0.005], J["neck"] + [0, -0.005, 0.005], (0.075 * gx, 0.07 * g), (0.068 * gx, 0.062 * g), "trim", seg=10)
     # ---- torso
-    b.cyl("chest", J["chest"] + [0, -0.07, 0], J["chest"] + [0, 0.19, 0], (0.165 * gx, 0.105 * g), (0.205 * gx, 0.115 * g), "shirt", seg=10)
-    b.cyl("chest", J["chest"] + [0, 0.19, 0], J["neck"] + [0, -0.01, 0], (0.205 * gx, 0.115 * g), (0.09 * gx, 0.07 * g), "shirt", seg=10, cap0=False)
-    b.cyl("spine", J["hips"] + [0, 0.0, 0], J["chest"] + [0, -0.03, 0], (0.155 * gx, 0.1 * g), (0.165 * gx, 0.105 * g), "shirt", seg=10)
+    b.cyl("chest", J["chest"] + [0, -0.07, 0], J["chest"] + [0, 0.19, 0], (0.165 * gx, 0.105 * gz), (0.205 * gx, 0.115 * gz), "shirt", seg=10)
+    b.cyl("chest", J["chest"] + [0, 0.19, 0], J["neck"] + [0, -0.01, 0], (0.205 * gx, 0.115 * gz), (0.09 * gx, 0.07 * gz), "shirt", seg=10, cap0=False)
+    b.cyl("spine", J["hips"] + [0, 0.0, 0], J["chest"] + [0, -0.03, 0], (0.155 * gx, 0.1 * gz), (0.165 * gx, 0.105 * gz), "shirt", seg=10)
     if top == "hoodie":
         b.sphere("chest", J["neck"] + [0, 0.02, -0.09], 0.09, "shirt", seg=8, rings=5, scale=(1.2, 0.8, 0.8))
-    b.cyl("hips", J["hips"] + [0, -0.17, 0], J["hips"] + [0, 0.04, 0], (0.172 * gx, 0.112 * g), (0.162 * gx, 0.105 * g), "shorts", seg=10)
+    b.cyl("hips", J["hips"] + [0, -0.17, 0], J["hips"] + [0, 0.04, 0], (0.172 * gx, 0.112 * gz), (0.162 * gx, 0.105 * gz), "shorts", seg=10)
     hand_s, foot_s = sp.size("hands"), sp.size("feet")
     for s, sg in (("L", 1), ("R", -1)):
         sh = J["upperarm_" + s]
         sleeve = "skin" if top == "tank" else "shirt"
-        b.sphere("upperarm_" + s, sh + [0, -0.01, 0], 0.068 * g ** 0.8, sleeve, seg=8, rings=5)
-        b.cyl("upperarm_" + s, sh + [0, -0.02, 0], sh + [0, -0.15, 0], 0.062 * g ** 0.8, 0.056 * g ** 0.8, sleeve)
+        b.sphere("upperarm_" + s, sh + [0, -0.01, 0], 0.068 * gl ** 0.8, sleeve, seg=8, rings=5)
+        b.cyl("upperarm_" + s, sh + [0, -0.02, 0], sh + [0, -0.15, 0], 0.062 * gl ** 0.8, 0.056 * gl ** 0.8, sleeve)
         long_sl = top in ("longsleeve", "hoodie")
         arm_m = "shirt" if long_sl else "skin"
-        b.cyl("upperarm_" + s, sh + [0, -0.15, 0], J["forearm_" + s] + [0, 0.01, 0], 0.046 * g ** 0.8 * (1.15 if long_sl else 1), 0.042 * g ** 0.8 * (1.15 if long_sl else 1), arm_m, cap0=False)
-        b.cyl("forearm_" + s, J["forearm_" + s] + [0, 0.02, 0], J["hand_" + s] + [0, 0.0, 0], 0.042 * g ** 0.7 * (1.12 if long_sl else 1), 0.032 * g ** 0.7 * (1.12 if long_sl else 1), arm_m)
+        b.cyl("upperarm_" + s, sh + [0, -0.15, 0], J["forearm_" + s] + [0, 0.01, 0], 0.046 * gl ** 0.8 * (1.15 if long_sl else 1), 0.042 * gl ** 0.8 * (1.15 if long_sl else 1), arm_m, cap0=False)
+        b.cyl("forearm_" + s, J["forearm_" + s] + [0, 0.02, 0], J["hand_" + s] + [0, 0.0, 0], 0.042 * gl ** 0.7 * (1.12 if long_sl else 1), 0.032 * gl ** 0.7 * (1.12 if long_sl else 1), arm_m)
         hd = J["hand_" + s]
         b.cyl("hand_" + s, hd + [0, 0.005, 0], hd + [0, -0.10 * hand_s, 0.0], (0.022 * hand_s, 0.045 * hand_s), (0.018 * hand_s, 0.038 * hand_s), "skin", seg=6)
         b.cyl("hand_" + s, hd + [0, -0.02, 0.035 * hand_s], hd + [sg * 0.01, -0.06 * hand_s, 0.06 * hand_s], 0.013 * hand_s, 0.011 * hand_s, "skin", seg=5)
         th = J["thigh_" + s]
         trousers = bottom in ("trousers", "pants", "jeans")
-        b.cyl("thigh_" + s, th + [0, 0.03, 0], th + [0, -0.19, 0], 0.092 * g, 0.084 * g, "shorts")
-        b.cyl("thigh_" + s, th + [0, -0.19, 0], J["shin_" + s] + [0, 0.0, 0], 0.072 * g * (1.12 if trousers else 1), 0.056 * g * (1.15 if trousers else 1), "shorts" if trousers else "skin", cap0=False)
+        b.cyl("thigh_" + s, th + [0, 0.03, 0], th + [0, -0.19, 0], 0.092 * gl, 0.084 * gl, "shorts")
+        b.cyl("thigh_" + s, th + [0, -0.19, 0], J["shin_" + s] + [0, 0.0, 0], 0.072 * gl * (1.12 if trousers else 1), 0.056 * gl * (1.15 if trousers else 1), "shorts" if trousers else "skin", cap0=False)
         sn = J["shin_" + s]
         if trousers:
-            b.cyl("shin_" + s, sn + [0, 0.02, 0], J["foot_" + s] + [0, 0.02, 0], 0.064 * g, 0.056 * g, "shorts")
+            b.cyl("shin_" + s, sn + [0, 0.02, 0], J["foot_" + s] + [0, 0.02, 0], 0.064 * gl, 0.056 * gl, "shorts")
         else:
-            b.cyl("shin_" + s, sn + [0, 0.02, 0], sn + [0, -0.09, 0], 0.056 * g, 0.058 * g, "skin")
+            b.cyl("shin_" + s, sn + [0, 0.02, 0], sn + [0, -0.09, 0], 0.056 * gl, 0.058 * gl, "skin")
             if shoes == "barefoot":
-                b.cyl("shin_" + s, sn + [0, -0.09, 0], J["foot_" + s] + [0, 0.0, 0], 0.058 * g, 0.042 * g, "skin", cap0=False)
+                b.cyl("shin_" + s, sn + [0, -0.09, 0], J["foot_" + s] + [0, 0.0, 0], 0.058 * gl, 0.042 * gl, "skin", cap0=False)
             else:
-                b.cyl("shin_" + s, sn + [0, -0.09, 0], sn + [0, -0.14, 0], 0.06 * g, 0.059 * g, "trim", cap1=False)
-                b.cyl("shin_" + s, sn + [0, -0.14, 0], J["foot_" + s] + [0, 0.0, 0], 0.059 * g, 0.042 * g, "socks", cap0=False)
+                b.cyl("shin_" + s, sn + [0, -0.09, 0], sn + [0, -0.14, 0], 0.06 * gl, 0.059 * gl, "trim", cap1=False)
+                b.cyl("shin_" + s, sn + [0, -0.14, 0], J["foot_" + s] + [0, 0.0, 0], 0.059 * gl, 0.042 * gl, "socks", cap0=False)
         ft = J["foot_" + s]
         fl = 0.19 * foot_s
         b.box("foot_" + s, ft + [-0.048 * foot_s, -0.082, -0.065], ft + [0.048 * foot_s, 0.03 if shoes != "barefoot" else 0.0, fl], "boots", taper=(0.85, 0.55))
+    if fighter:
+        _fighter_extras(b, J, sp, g, gx, gz, gl, hs, top, bottom, shoes)
     acc = [a.strip().lower() for a in str(getattr(sp, "accessories", "") or "").replace("+", ",").split(",") if a.strip()]
     if acc:
         add_accessories(b, J, sp, acc, hs, g, gx)
@@ -341,7 +347,7 @@ ACCESSORIES = {
     "crown": "crown (gold)", "horns": "two horns", "glasses": "glasses", "sunglasses": "sunglasses", "mask": "face mask",
     "backpack": "backpack", "belt": "belt", "wristbands": "wristbands", "gloves": "gloves", "kneepads": "knee pads",
     "shoulder_pads": "shoulder pads", "armor": "chest plate", "scarf": "scarf (physics tails)",
-    "cape": "cape (physics cloth)", "satchel": "shoulder bag (strap + bag)", "visor": "glowing visor (emissive)",
+    "cape": "cape (physics cloth)", "satchel": "shoulder bag (strap + bag)", "visor": "glowing visor (emissive)", "wraps": "hand wraps", "hood": "hood",
 }
 PHYSICS_ACCESSORIES = ("scarf", "cape")
 
@@ -408,6 +414,8 @@ def add_accessories(b, J, sp, acc, hs, g, gx):
                 b.sphere("upperarm_" + s, J["upperarm_" + s] + [0, 0.01, 0], 0.085 * g ** 0.8, "accessory", seg=8, rings=5, scale=(1.1, 0.7, 1.1), lat_max=math.pi * 0.55)
         elif a == "armor":
             b.cyl("chest", J["chest"] + [0, -0.06, 0], J["chest"] + [0, 0.2, 0], (0.178 * gx, 0.12 * g), (0.215 * gx, 0.128 * g), "accessory", seg=10)
+        elif a in ("wraps", "hood"):
+            pass     # fighter style adds these in _fighter_extras
         elif a in PHYSICS_ACCESSORIES:
             pass     # physics chains: sforge/physics.py adds them per frame (they swing)
         else:
@@ -464,3 +472,63 @@ def apply_pattern(T, B, M, name, J, levels=2):
     on = pattern_value(name, St.mean(1), J)
     Sm = np.where(on, MATS.index("pattern"), si).astype(M.dtype)
     return (np.concatenate([T[~sel], St]), np.concatenate([B[~sel], Sb]), np.concatenate([M[~sel], Sm]))
+
+
+def _fighter_extras(b, J, sp, g, gx, gz, gl, hs, top, bottom, shoes):
+    """Extra volume that makes the mannequin read as a fighter: pecs/abs, deltoids, biceps, calves, fists, brow/jaw,
+    robe/hakama, hood, spiky hair, hand wraps.  Driven by spec.top / bottom / hair_style / accessories."""
+    hc = J["head"] + np.array([0, 0.105, 0.0]) * hs
+    R = 0.112 * hs
+    bare = top in ("bare", "none", "shirtless")
+    torso_m = "skin" if bare else "shirt"
+    ch = J["chest"]
+    # chest + abs volume
+    for sx in (-1, 1):
+        b.sphere("chest", ch + np.array([sx * 0.075 * gx, 0.105, 0.075 * gz]), 0.082 * g, torso_m, seg=10, rings=6, scale=(1.0, 0.82, 0.72))
+    for k in range(3):
+        for sx in (-1, 1):
+            b.sphere("spine", J["hips"] + np.array([sx * 0.04 * gx, 0.075 + 0.06 * k, 0.085 * gz]), 0.036 * g, torso_m, seg=6, rings=4, scale=(1.0, 0.9, 0.55))
+    # shoulders / biceps / calves
+    for s_ in ("L", "R"):
+        sh = J["upperarm_" + s_]
+        arm_m = "shirt" if top in ("longsleeve", "hoodie", "robe", "kimono") else "skin"
+        b.sphere("upperarm_" + s_, sh + [0, -0.01, 0.0], 0.085 * gl ** 0.8, arm_m, seg=10, rings=7)
+        b.sphere("upperarm_" + s_, sh + [0, -0.095, 0.012], 0.058 * gl ** 0.8, arm_m, seg=8, rings=5, scale=(1, 1.4, 1.05))
+        b.sphere("forearm_" + s_, J["forearm_" + s_] + [0, -0.07, 0.0], 0.05 * gl ** 0.7, arm_m, seg=8, rings=5, scale=(1, 1.5, 1))
+        sn = J["shin_" + s_]
+        leg_m = "shorts" if bottom in ("trousers", "pants", "jeans") else "skin"
+        if bottom == "shorts":
+            b.sphere("thigh_" + s_, J["thigh_" + s_] + [0, -0.215, 0.01], 0.078 * gl, "skin", seg=10, rings=6, scale=(1, 1.5, 1.0))
+            b.cyl("thigh_" + s_, J["thigh_" + s_] + [0, 0.045, 0], J["thigh_" + s_] + [0, -0.17, 0], (0.118 * gl, 0.118 * gl), (0.11 * gl, 0.11 * gl), "shorts", seg=10)
+        b.sphere("shin_" + s_, sn + [0, -0.11, -0.02], 0.062 * gl, leg_m, seg=8, rings=5, scale=(1, 1.7, 1.0))
+        hd = J["hand_" + s_]
+        b.sphere("hand_" + s_, hd + [0, -0.045, 0.005], 0.058 * sp.size("hands"), "skin", seg=8, rings=6, scale=(0.9, 1.0, 1.0))
+    # head: brow ridge + jaw
+    b.box("head", hc + np.array([-0.075, 0.03, 0.075]) * hs, hc + np.array([0.075, 0.048, 0.118]) * hs, "skin", taper=(1.0, 0.9))
+    b.box("head", hc + np.array([-0.07, -0.105, 0.0]) * hs, hc + np.array([0.07, -0.045, 0.085]) * hs, "skin", taper=(0.78, 0.9))
+    hair = sp.hair_style.lower()
+    if hair == "spiky":
+        for i in range(11):
+            an = math.pi * (i / 10.0) * 1.15 - 0.15
+            base = hc + np.array([0.0, 0.07 + 0.02 * math.sin(an * 2), -0.02]) * hs
+            tip = base + np.array([0.0, math.sin(an) * 0.13, math.cos(an) * -0.12 + 0.03]) * hs
+            b.cyl("head", base + np.array([0, 0.02, 0]) * hs, tip + np.array([0, 0.03, 0.05]) * hs, 0.034 * hs, 0.004 * hs, "hair", seg=5)
+        b.sphere("head", hc + np.array([0, 0.02, -0.012]) * hs, R * 1.07, "hair", seg=12, rings=8, scale=(0.96, 1.08, 1.04), lat_max=math.pi * 0.46)
+    if hair == "hood" or "hood" in str(getattr(sp, "accessories", "")):
+        b.sphere("head", hc + np.array([0, 0.012, -0.03]) * hs, R * 1.32, "shirt", seg=14, rings=9, scale=(1.0, 1.08, 1.1), lat_max=math.pi * 0.78)
+        b.sphere("head", hc + np.array([0, -0.005, 0.05]) * hs, R * 0.96, "kart_dark", seg=10, rings=6, scale=(0.95, 1.05, 0.5), lat_max=math.pi * 0.9)
+        b.sphere("head", hc + np.array([0, -0.005, 0.09]) * hs, R * 0.9, "skin", seg=10, rings=6, scale=(0.82, 0.95, 0.45), lat_max=math.pi * 0.9)
+    # robe / hakama (wide trouser legs + sash + sleeves)
+    if top in ("robe", "kimono"):
+        for s_ in ("L", "R"):
+            b.cyl("thigh_" + s_, J["thigh_" + s_] + [0, 0.05, 0], J["shin_" + s_] + [0, 0.0, 0.0], (0.145 * gl, 0.15 * gl), (0.15 * gl, 0.155 * gl), "shirt", seg=10, cap1=False)
+            b.cyl("shin_" + s_, J["shin_" + s_] + [0, 0.0, 0.0], J["foot_" + s_] + [0, 0.02, 0], (0.15 * gl, 0.155 * gl), (0.125 * gl, 0.13 * gl), "shirt", seg=10, cap0=False)
+            b.cyl("forearm_" + s_, J["forearm_" + s_] + [0, 0.03, 0], J["hand_" + s_] + [0, 0.05, 0], 0.075 * gl, 0.1 * gl, "shirt", seg=8)
+        b.cyl("hips", J["hips"] + [0, 0.01, 0], J["hips"] + [0, 0.1, 0], (0.19 * gx, 0.145 * gz), (0.18 * gx, 0.14 * gz), "trim", seg=12)
+        b.cyl("hips", J["hips"] + [0, -0.12, 0], J["hips"] + [0, 0.02, 0], (0.2 * gx, 0.16 * gz), (0.19 * gx, 0.15 * gz), "shirt", seg=12)
+    acc = [a.strip().lower() for a in str(getattr(sp, "accessories", "") or "").replace("+", ",").split(",") if a.strip()]
+    if "wraps" in acc:
+        for s_ in ("L", "R"):
+            hd = J["hand_" + s_]
+            b.cyl("forearm_" + s_, hd + [0, 0.09, 0], hd + [0, 0.0, 0], 0.046 * gl ** 0.7, 0.04 * gl ** 0.7, "accessory", seg=8)
+            b.sphere("hand_" + s_, hd + [0, -0.045, 0.005], 0.062 * sp.size("hands"), "accessory", seg=8, rings=6, scale=(0.9, 1.0, 1.0))

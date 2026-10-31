@@ -85,6 +85,7 @@ class CharacterSpec:
     accessory2_colour: str = ""
     pattern: str = ""            # v9: hoops stripes sash chest_band halves check camo dots (on the top)
     pattern_colour: str = ""
+    style: str = ""              # "fighter" = thicker torso/limbs, pecs/abs, brow/jaw, fists, robe/hood/spiky options
     extra: dict = field(default_factory=dict)
 
     # ---- derived numbers used by the mesh builder

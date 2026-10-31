@@ -501,9 +501,7 @@ function loadFighterSheets(char) {
     const file = entry ? entry[0] : `sprites/${char}_${s}.png`;
     const count = entry ? entry[1] : 5;
     const img = new Image();
-    // These three idle sheets are not one fighter per frame (see PR notes).
-    const broken = (char === 'brutus' || char === 'void' || char === 'zap') && s === 'idle';
-    fighterImgs[char][s] = { img, count, w: 0, h: 0, fw: 192, frames: count, broken };
+    fighterImgs[char][s] = { img, count, w: 0, h: 0, fw: 192, frames: count };
     img.onload = () => {
       fighterImgs[char][s].w = img.width;
       fighterImgs[char][s].h = img.height;
@@ -841,19 +839,18 @@ if (bootCode) {
   setTimeout(() => { if (!room) startJoin(bootCode); }, 200);
 }
 
-const BROKEN_CHARS = new Set(['brutus', 'void', 'zap']);
 
 function drawFighter(f, context) {
-  if (BROKEN_CHARS.has(f.char)) {
+  // Always draw the selected fighter's own sprites. If a state sheet is still loading, fall back to that
+  // fighter's idle (never another look-alike); the placeholder only shows before any sheet has loaded.
+  const ok = (x) => x && x.img && x.img.complete && x.img.naturalWidth;
+  const set = fighterImgs[f.char] || {};
+  const sheet = ok(set[f.state]) ? set[f.state] : (ok(set.idle) ? set.idle : null);
+  if (!sheet) {
     drawSilhouette(f, context);
     return;
   }
-  const sheet = fighterImgs[f.char]?.[f.state] || fighterImgs[f.char]?.idle;
-  if (!sheet || !sheet.img.complete || !sheet.img.naturalWidth || sheet.broken) {
-    drawSilhouette(f, context);
-    return;
-  }
-  const scale = window.innerWidth < 900 ? 1.6 : 1.05;
+  const scale = window.innerWidth < 900 ? 1.8 : 1.2;
   const fw = sheet.fw || 192;
   const fh = sheet.h || 256;
   const sw = fw * scale;
