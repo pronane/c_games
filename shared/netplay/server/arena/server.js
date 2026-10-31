@@ -280,7 +280,7 @@ function createArenaServer(opts = {}) {
 
   wss.on('connection', (ws) => {
     perIp.set(ws.ip, (perIp.get(ws.ip) || 0) + 1);
-    ws.isAlive = true;
+    ws.isAlive = true; ws.missed = 0;
     ws.on('pong', () => { ws.isAlive = true; });
     ws.on('message', (d, bin) => { ws.isAlive = true; onMessage(ws, d, bin); });
     ws.on('close', () => {
@@ -322,7 +322,9 @@ function createArenaServer(opts = {}) {
         pingAcc = 0;
         for (const room of rooms.values()) broadcast(room, { t: 'ping', ms: Date.now() });
         for (const ws of wss.clients) {
-          if (ws.isAlive === false) { ws.terminate(); continue; }
+          // tolerate ~12 s of silence (6 missed pings): mobile tabs and test clients stall briefly
+          if (ws.isAlive) ws.missed = 0; else ws.missed = (ws.missed || 0) + 1;
+          if (ws.missed >= 6) { ws.terminate(); continue; }
           ws.isAlive = false;
           try { ws.ping(); } catch (_) { /* closing */ }
         }
