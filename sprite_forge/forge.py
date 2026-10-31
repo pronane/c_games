@@ -270,6 +270,10 @@ def cmd_build(a):
         cfg.motion_pack = a.motion_pack
     if getattr(a, "normal_maps", False):
         cfg.normal_maps = True
+    if getattr(a, "body3d", None):
+        cfg.body3d = a.body3d
+    if getattr(a, "surface3d", None):
+        cfg.surface3d = a.surface3d
     if getattr(a, "no_smear", False):
         cfg.smear = False
     if getattr(a, "proportions", None):
@@ -656,6 +660,8 @@ v9:
     v9x.add_argument("--dress-as", help="v9.4 dress the photo character: police | postman | astronaut | firefighter | builder | chef | doctor | ninja | path/to/outfit.json (library/outfits_photo/*.json too)")
     v9x.add_argument("--motion-pack", choices=["auto", "fighter3d", "none"], help="v9.4 photo3d motion set: fighter3d = side-on 2D-fighter staging (torso opened to the camera, strikes in profile); auto = fighter3d for fighter move sets (default auto)")
     v9x.add_argument("--normal-maps", action="store_true", help="v9.4 photo3d: also write atlas_normal.png + moves_normal/ for 2D dynamic lighting (Godot / Unity 2D lights)")
+    v9x.add_argument("--body3d", choices=["auto", "template", "inflate"], help="v9.5 photo3d body shape: template = real cross-sections of the CC0 MakeHuman body fitted to the outline (forge.py human --setup --from-git); inflate = the outline puffed up; auto = template when installed (default auto)")
+    v9x.add_argument("--surface3d", choices=["smooth", "crisp", "points"], help="v9.5 photo3d drawing: crisp = each pixel averages the points of the front surface (no grain, no blur); smooth = the same with a bilinear footprint (softer); points = v9.4 nearest point (default crisp; measured best identity / naturalness at 35 deg)")
     v9x.add_argument("--no-smear", action="store_true", help="v9.4 photo3d: no smear frames on fast strikes")
     v9x.add_argument("--proportions", choices=["auto", "on", "off"], help="v9.4 correct phone-camera perspective (big head, short legs) towards adult proportions; auto = only when clearly distorted (default auto)")
     v9x.add_argument("--proportion-strength", type=float, help="v9.4 0..1, how far towards adult norms (default 0.65)")
