@@ -25,6 +25,7 @@ var cam_mode := 0
 var cam_zoom := 0.68
 var cam_names := ["Broadcast", "Telephoto", "Player cam", "Tactical"]
 var world: Node3D
+var stadium: Node3D
 var menu: Control
 var editor: Control
 var hud: Control
@@ -68,6 +69,7 @@ const AudioScript = preload("res://Scripts/Core/Audio/ProceduralAudio.gd")
 const RecorderScript = preload("res://Scripts/Core/Net/ReplayRecorder.gd")
 const ReplayerScript = preload("res://Scripts/Core/Net/ReplayPlayer.gd")
 const AimScript = preload("res://Scripts/Godot/SetPieceAim.gd")
+const StadiumScript = preload("res://Scripts/Godot/StadiumKit.gd")
 var audio: Node                      # ProceduralAudio (the "Audio" autoload if present)
 var recorder: Node                   # ReplayRecorder: rolling highlight buffer + optional file
 var replayer: Node                   # ReplayPlayer
@@ -221,25 +223,13 @@ func _input(event: InputEvent) -> void:
 
 # ---------------------------------------------------------------- static world
 func build_static() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_SKY
-	var sky := Sky.new()
-	var psm := ProceduralSkyMaterial.new()
-	psm.sky_top_color = Color("#12305c")
-	psm.sky_horizon_color = Color("#6d8ca6")
-	sky.sky_material = psm
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.65
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-	var sun := DirectionalLight3D.new()
-	sun.light_energy = 1.5
-	sun.rotation_degrees = Vector3(-52, -38, 0)
-	sun.shadow_enabled = true
-	add_child(sun)
+	stadium = StadiumScript.new()
+	stadium.half_l = HALF_L
+	stadium.half_w = HALF_W
+	stadium.goal_w = GOAL_W
+	stadium.goal_h = GOAL_H
+	add_child(stadium)
+	stadium.build()
 
 	var pitch := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -249,52 +239,6 @@ func build_static() -> void:
 	(pitch.material_override as ShaderMaterial).shader = load("res://Shaders/pitch.gdshader")
 	pitch.position.y = 0.012
 	add_child(pitch)
-
-	var white := StandardMaterial3D.new()
-	white.albedo_color = Color(0.95, 0.97, 1.0)
-	for side in [-1, 1]:
-		for z in [-GOAL_W, GOAL_W]:
-			var post := MeshInstance3D.new()
-			var cyl := CylinderMesh.new()
-			cyl.top_radius = 0.06
-			cyl.bottom_radius = 0.06
-			cyl.height = GOAL_H
-			post.mesh = cyl
-			post.material_override = white
-			post.position = Vector3(side * HALF_L, GOAL_H * 0.5, z)
-			add_child(post)
-		var bar := MeshInstance3D.new()
-		var bc := CylinderMesh.new()
-		bc.top_radius = 0.06
-		bc.bottom_radius = 0.06
-		bc.height = GOAL_W * 2.0
-		bar.mesh = bc
-		bar.material_override = white
-		bar.rotation_degrees.x = 90
-		bar.position = Vector3(side * HALF_L, GOAL_H, 0)
-		add_child(bar)
-		var net_mat := ShaderMaterial.new()
-		net_mat.shader = load("res://Shaders/net.gdshader")
-		var back := MeshInstance3D.new()
-		var bm := QuadMesh.new()
-		bm.size = Vector2(GOAL_W * 2.0, GOAL_H)
-		back.mesh = bm
-		back.material_override = net_mat
-		back.rotation_degrees.y = 90
-		back.position = Vector3(side * (HALF_L + 2.0), GOAL_H * 0.5, 0)
-		add_child(back)
-
-	var stand_mat := StandardMaterial3D.new()
-	stand_mat.albedo_color = Color("#252b36")
-	for side in [-1, 1]:
-		for r in range(7):
-			var box := MeshInstance3D.new()
-			var bm2 := BoxMesh.new()
-			bm2.size = Vector3(HALF_L * 2.0 + 40.0, 0.8 + r * 1.2, 2.1)
-			box.mesh = bm2
-			box.material_override = stand_mat
-			box.position = Vector3(0, r * 0.7, side * (HALF_W + 8.0 + r * 2.1))
-			add_child(box)
 
 	world = Node3D.new()
 	world.name = "World"
@@ -439,6 +383,8 @@ func say(text: String) -> void:
 func goal(side: int) -> void:
 	score[side] += 1
 	say("GOAL!  %d - %d" % [score[0], score[1]])
+	if stadium != null:
+		stadium.celebrate(0)
 	audio.play_goal()
 	phase = "goal"
 	phase_timer = 1.5 if not practice else 2.5
