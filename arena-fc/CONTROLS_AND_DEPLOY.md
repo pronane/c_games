@@ -53,9 +53,7 @@ One container runs both (`arena-fc/option-b/Dockerfile`, `start.sh`), so you dep
 
 Set `TRUST_PROXY=1` behind any of these, and `ARENA_ALLOWED_ORIGINS` to your site's origin.
 
-**Blocker:** `Scripts/Core/Net/*.cs` (the server's protocol and snapshot types) are missing from the
-repository (see `MISSING_NET_SOURCES.md`), so the .NET server cannot be built until they are restored. If
-they cannot be found, the alternative is a Node-side authoritative server, i.e. port the match simulation
-(`Match.cs`, or the simpler browser sim in `Web/BrowserBoot.gd` + `Web/MatchRules.gd`) to JavaScript and run
-it inside the hub. That is a real piece of work but it would let everything run on the existing Node
-deployment with no .NET at all.
+**No .NET needed any more:** `arena-fc/ARENA_NODE.md` describes a Node port of the match that runs inside the same hub
+(`ARENA_NATIVE=1`, `arena-fc/option-a/Dockerfile`). It speaks the same protocol, passes the existing protocol
+tests and serves the browser build, so you can deploy the whole thing on your existing Node service. The C#
+server stays blocked on the missing `Scripts/Core/Net/*.cs` and is only needed for the desktop 11-a-side game.
