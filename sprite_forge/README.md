@@ -5,6 +5,22 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v9.3 (experimental): photo -> 3D body, any camera angle, GPU when available
+
+* `--puppet-engine photo3d` inflates the cut-out into a 3D body (front = the photo's own pixels; depth, sides and back
+  estimated from the silhouette and edge colours; a nose / brow / chin profile from the face landmarks), skins it to
+  the standard rig and drives it with the skeletal motion library - the same clips as spec / GLB builds. The torso
+  twists, shoulders roll, a kick is a real hip-knee-ankle chain, and `--turn-yaw` is just a camera angle on the same
+  body (front, 35 deg fighter, 90 deg side, 8-way). The head keeps facing the opponent within a natural neck range.
+* Motions are sampled by pose change, not clock time, so a fast strike gets in-betweens instead of one big jump.
+* `--device auto|cpu|cuda|mps` (env `SFS_DEVICE`): skinning and the z-buffer run through `sforge/accel.py` - PyTorch on
+  CUDA / Apple MPS when installed (`requirements-gpu.txt`), NumPy otherwise. ~0.5 s per 512 px frame on 2 CPU cores.
+* `tools/test_limbs.py --engine photo3d` checks it with 3D-aware motion tests (bone speed and swing measured on the 3D
+  bones, knees against the body's own hinge). Status on a real photo at 35 deg: idle, walk, crouch, block, victory pass;
+  the football-derived kick / jump / special clips still move too far per frame at the fighter preset's frame counts
+  and the hidden-hand arm can lose coverage - a fighter motion set for the 3D rig is the next step. Opt-in; defaults
+  are unchanged.
+
 ## New in v9.2: photo puppets that hold together (limb test, 3/4 view, game adapters)
 
 * **`tools/test_limbs.py`**: renders every frame of every move straight from the rig (effects stripped) and fails

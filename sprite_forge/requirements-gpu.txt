@@ -1,0 +1,5 @@
+# Sprite Forge Studio - optional GPU backend (v9.3).  The photo3d engine's skinning and z-buffer run on CUDA (NVIDIA)
+# or MPS (Apple silicon) through PyTorch when it is installed; without it the same code runs on NumPy.
+# NVIDIA:  pip install torch --index-url https://download.pytorch.org/whl/cu124   (match your CUDA driver)
+# Apple / CPU-only:  pip install torch
+torch>=2.3

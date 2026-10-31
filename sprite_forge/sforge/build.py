@@ -138,7 +138,8 @@ class BuildConfig:
     # ---- v9 EXTRAS (sforge/fx.py, footlock.py, framedata.py, blend.py, qa.py, lod.py)
     fx: str = ""                       # "outline=2,cel=3,pixel=4,light=-1:-1:1,rim=0.4" post passes on every frame
     maps: str = ""                     # "normal,emissive" -> maps/ atlas_normal.png / atlas_emissive.png
-    puppet_engine: str = "classic"     # v9.1: classic | skin (smooth bending limbs, sforge/skinwarp.py)
+    puppet_engine: str = "classic"     # v9.1: classic | skin (smooth bending limbs, sforge/skinwarp.py) | photo3d (v9.3)
+    device: str = ""                   # v9.3 compute backend: '' / auto | cpu | cuda | mps  (env SFS_DEVICE)
     motion_style: str = "classic"      # v9.1: classic | polish (smooth in-betweens, sforge/motionpolish.py)
     footlock: bool = False             # pin planted feet (removes foot sliding in walk / idle)
     framedata: bool = False            # hitboxes / hurtboxes / startup-active-recovery -> framedata.json + framedata.cfg
@@ -561,6 +562,8 @@ def _puppet_photo(cfg, report):
         report.note("colours: %s on the photo's own pixels (regions found from the pose landmarks + colour clusters; "
                     "shading kept). Region masks are ESTIMATED - check regions_preview.png" % rinfo.get("summary", "recolour"))
         cfg._regions_preview = rinfo.get("preview"); cfg._regions_png = rinfo.get("regions_png")
+    if cfg.puppet_engine == "photo3d":            # v9.3: skinned 3D point body + skeletal motion library
+        return _photo3d_moves(cfg, report, cut, lms, cut_ref)
     turned = bool(cfg.turn) and abs(((cfg.turn + 180) % 360) - 180) > 0.5
     TN = None
     if turned:
@@ -722,6 +725,48 @@ def _puppet_photo(cfg, report):
             return im.resize((max(1, int(im.width * k)), size), Image.LANCZOS)
         cfg._face_render, cfg._face_close = _face_render, _face_close
         cfg._face_estimated = True
+    return out
+
+
+def _photo3d_moves(cfg, report, cut, lms, cut_ref):
+    """v9.3 PHOTO 3D (sforge/photo3d.py): the cut-out inflated into a 3D body, skinned to the standard rig and driven
+    by the skeletal motion library; any --turn yaw is a camera angle on the same body"""
+    import numpy as _np
+    from . import photo3d as P3, accel
+    t0 = time.time()
+    be = accel.backend(cfg.device or None, log=report.log)
+    body = P3.PhotoBody(cut, lms, colour_ref=cut_ref, log=report.log)
+    report.timing("photo3d body (%d points)" % len(body.P), time.time() - t0)
+    th, _ = _target_h(cfg)
+    yaw = float(cfg.turn or 0.0)
+    t0 = time.time()
+    frames = P3.render_moves(body, cfg.moves, yaw, (cfg.frame_w, cfg.frame_h), cfg.ground_y, th / P3.RG.HEIGHT,
+                             log=report.log, be=be)
+    nfr = sum(len(v) for v in frames.values())
+    report.timing("photo3d frames (%d, %s)" % (nfr, be.name), time.time() - t0)
+    report.note("photo3d: ONE front photo inflated into a 3D body (depth, sides and back ESTIMATED from the silhouette and "
+                "edge colours; front = the photo's own pixels), skinned to the standard rig and driven by the skeletal "
+                "motion library; camera yaw %g deg; compute backend %s" % (yaw, be.name))
+    out = {}
+    for m in cfg.moves:
+        cells, clip = [], False
+        for im in frames[m.name]:
+            a = _np.asarray(im.getchannel("A")) > 40
+            ys_, xs_ = _np.nonzero(a)
+            if len(xs_) and (xs_.min() < 4 or ys_.min() < 4 or xs_.max() >= cfg.frame_w - 4):
+                clip = True
+            if len(ys_) and _np.asarray(im)[cfg.ground_y + 1:, :, 3].max(initial=0) == 0:
+                lo = _lowest_solid(im)
+                if lo and abs(lo - cfg.ground_y) <= 3:     # snap a grounded frame exactly onto the ground line
+                    im = _shift(im, cfg.ground_y - lo)
+            cells.append(im)
+        note = "photo3d: skeletal motion on a 3D body made from the one photo - NOT a real photo of this move"
+        if clip:
+            note += "; CLIPPED at the cell edge - use a wider --frame"
+            report.warning("photo3d: %s is clipped by the %dx%d cell" % (m.name, cfg.frame_w, cfg.frame_h))
+        out[m.name] = (cells, "filled:photo3d", note)
+        report.log("  photo3d %-13s %2d frames%s" % (m.name, len(cells), "  CLIPPED" if clip else ""))
+    cfg._photo3d = body
     return out
 
 
@@ -1650,7 +1695,10 @@ def build(cfg: BuildConfig, log=print, progress=None):
     filled = [r[0] for r in report.rows if r[1].startswith("filled")]
     if filled:
         pup = [r[0] for r in report.rows if r[1] in ("filled:puppet", "filled:turned-puppet")]
-        if pup and len(pup) == len(filled):
+        p3d = [r[0] for r in report.rows if r[1] == "filled:photo3d"]
+        if p3d and len(p3d) == len(filled):
+            log("  NOTE: %d moves are skeletal motions on a 3D body estimated from the photo (not real photos of those moves): %s" % (len(filled), ", ".join(filled)))
+        elif pup and len(pup) == len(filled):
             log("  NOTE: %d moves are procedural photo-puppet poses (not real photos of those moves): %s" % (len(filled), ", ".join(filled)))
         else:
             log("  NOTE: %d moves were FILLED (placeholders, not real poses): %s" % (len(filled), ", ".join(filled)))

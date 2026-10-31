@@ -259,6 +259,8 @@ def cmd_build(a):
         cfg.qa = False
     if getattr(a, "puppet_engine", None):
         cfg.puppet_engine = a.puppet_engine
+    if getattr(a, "device", None):
+        cfg.device = "" if a.device == "auto" else a.device
     if getattr(a, "motion_style", None):
         cfg.motion_style = a.motion_style
     if a.footlock:
@@ -632,7 +634,8 @@ v9:
     v9x = b.add_argument_group("v9 EXTRAS")
     v9x.add_argument("--fx", help="post passes: 'outline=2,cel=3,pixel=4,colors=32,light=-1:-1:1,rim=0.4,outline_colour=#101018'")
     v9x.add_argument("--maps", help="'normal,emissive' (emissive=#59f2ff to pick the glow colour) -> maps/")
-    v9x.add_argument("--puppet-engine", choices=["classic", "skin"], help="v9.1 photo puppet renderer: skin = smooth bending elbows / knees (default classic)")
+    v9x.add_argument("--puppet-engine", choices=["classic", "skin", "photo3d"], help="photo puppet renderer: skin = smooth bending elbows / knees (v9.1); photo3d = the photo inflated into a 3D body driven by the skeletal motion library, any camera angle (v9.3) (default classic)")
+    v9x.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], help="v9.3 compute backend for photo3d: auto = CUDA / Apple MPS through PyTorch when available, else NumPy (default auto; env SFS_DEVICE)")
     v9x.add_argument("--motion-style", choices=["classic", "polish"], help="v9.1 photo puppet in-betweens: polish = smooth curves + limb lag when a move has more frames than key poses (default classic)")
     v9x.add_argument("--footlock", action="store_true", help="pin planted feet with 2-bone IK (no foot sliding) - mannequin / library moves")
     v9x.add_argument("--framedata", action="store_true", help="hit / hurt boxes + startup / active / recovery -> framedata.json + framedata.cfg")

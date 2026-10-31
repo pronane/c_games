@@ -116,8 +116,59 @@ def reversals(series, cyclic, min_amp):
     return n, max(turns) if turns else 0.0
 
 
+class Photo3DRig:
+    """test adapter for --engine photo3d: 'poses' are indices into the skeletal motion states of each move"""
+    def __init__(self, cut, lms, yaw):
+        from sforge import photo3d as P3, rig as RG
+        self.P3, self.RG = P3, RG
+        self.body = P3.PhotoBody(cut, lms, log=lambda *a: None)
+        self.yaw = float(yaw or 0)
+        self.side = abs(math.sin(math.radians(self.yaw))) > 0.5
+        self.cell, self.base, self.ppm = (640, 640), 600, 360 / RG.HEIGHT
+        self.stand_h = 360
+        self.last_offset = (0.0, 0.0)
+        self.rest = {}
+        self.states = []
+
+    def poses(self, move):
+        from sforge.moves import motion_for
+        from sforge import anim
+        from sforge.motions import find_motion
+        mo = motion_for(move) or find_motion("idle")
+        sts = self.P3.sample_states(mo, move.frames, move.loop)      # exactly what the build renders
+        i0 = len(self.states); self.states += sts
+        return [{"_s": i0 + i} for i in range(len(sts))], bool(move.loop)
+
+    def render(self, pose):
+        st = self.states[pose["_s"]] if "_s" in pose else self.RG.evaluate({})
+        return self.body.render(st, yaw=self.yaw, cell=self.cell, baseline=self.base, fig_px_per_m=self.ppm)
+
+    def pose3d(self, pose):
+        """posed 3D joints (world metres) + the hips' rotation (body forward = its z column)"""
+        st = self.states[pose["_s"]] if "_s" in pose else self.RG.evaluate({})
+        self.body.pose_matrices(st)
+        pp = self.body._pp
+        out = {}
+        for k, s_ in (("n", "L"), ("f", "R")):
+            out.update({k + "S": pp["upperarm_" + s_], k + "E": pp["forearm_" + s_], k + "T": pp["tip_" + s_],
+                        k + "P": pp["thigh_" + s_], k + "K": pp["shin_" + s_], k + "A": pp["foot_" + s_]})
+        return out, np.asarray(st.world["hips"])[:3, :3]
+
+    def pose_joints(self, pose):
+        self.render(pose)
+        j = self.body.last_joints
+        out = {"neck": j["neck"], "pelvis": j["hips"]}
+        for k, s_ in (("n", "L"), ("f", "R")):
+            out.update({k + "S": j["upperarm_" + s_], k + "E": j["forearm_" + s_], k + "W": j["hand_" + s_],
+                        k + "T": j["tip_" + s_], k + "P": j["thigh_" + s_], k + "K": j["shin_" + s_], k + "A": j["foot_" + s_]})
+        return out
+
+
 def make_rig(cut, lms, engine, turn):
     from sforge import puppet as PP
+    if engine == "photo3d":
+        rig = Photo3DRig(cut, lms, turn)
+        return rig, None
     if turn:
         from sforge import turn as TN
         res = TN.build_turned(cut, lms, yaw=float(turn), depth="auto", log=lambda *a: None)
@@ -136,6 +187,8 @@ def make_rig(cut, lms, engine, turn):
 
 def poses_for(keyfn, rig, move, motion):
     from sforge import puppet as PP
+    if hasattr(rig, "poses"):
+        return rig.poses(move)
     keys, cyc = keyfn(move.name, move.frames)
     keys = PP.normalize_keys(keys, rig.rest)      # exactly what build.py does
     if len(keys) == move.frames:
@@ -154,7 +207,7 @@ def check(cut_path, lm_path, engine="skin", motion="polish", turn=None, preset="
     lms = d["landmarks"] if isinstance(d, dict) else d
     rig, keyfn = make_rig(cut, lms, engine, turn)
     side = bool(getattr(rig, "side", False))
-    report = {"engine": "side-rig" if side else engine, "motion": motion, "turn": turn, "preset": preset,
+    report = {"engine": engine if engine == "photo3d" else ("side-rig" if side else engine), "motion": motion, "turn": turn, "preset": preset,
               "limits": LIMITS, "moves": {}}
     # reference: bone coverage in the rest pose.  A landmark can sit on the silhouette edge (a sloping shoulder), so
     # a bone is judged against itself standing still: "came off" = coverage fell well below its rest value.
@@ -169,6 +222,7 @@ def check(cut_path, lm_path, engine="skin", motion="polish", turn=None, preset="
     for mv in MV.preset(preset):
         poses, cyc = poses_for(keyfn, rig, mv, motion)
         frames, angles, fails = [], {k: [] for k in SEGMENTS}, []
+        dirs3 = {k: [] for k in SEGMENTS}
         for i, p in enumerate(poses):
             p = strip_fx(p)
             im = rig.render(p)
@@ -190,13 +244,26 @@ def check(cut_path, lm_path, engine="skin", motion="polish", turn=None, preset="
             sizes = ndi.sum(np.ones_like(lab), lab, range(1, n + 1)) if n else np.array([0])
             total = float(sizes.sum()) or 1.0
             big = int((sizes > LIMITS["piece_frac"] * total).sum())
-            for sname, (s0, s1) in SEGMENTS.items():
-                angles[sname].append(seg_angle(J, s0, s1))
+            if hasattr(rig, "pose3d"):          # 3D body: motion measured on the real 3D bones, not their projection
+                J3, Rh = rig.pose3d(p)
+                fwd = Rh[:, 2]
+                for sname, (s0, s1) in SEGMENTS.items():
+                    d = np.asarray(J3[s1]) - np.asarray(J3[s0]); d = d / max(1e-9, np.linalg.norm(d))
+                    dirs3[sname].append(d)
+                    angles[sname].append(math.degrees(math.atan2(float(d @ fwd), float(-d[1]))))   # sagittal swing
+            else:
+                for sname, (s0, s1) in SEGMENTS.items():
+                    angles[sname].append(seg_angle(J, s0, s1))
             bad = [b for b, c in cov.items() if c < need[b]] + \
                   ["foot " + k for k, c in feet.items() if c < LIMITS["foot"]] + \
                   (["%d floating parts" % (big - 1)] if big > 1 else [])
             hyper = []
-            if side:     # knee must not bend forwards, elbow must not bend backwards (angles from 'down', +=forward)
+            if hasattr(rig, "pose3d"):           # knees must not bend forwards (3D, in the body's own sagittal plane)
+                for k in ("n", "f"):
+                    knee = wrap(angles["shin " + k][-1] - angles["thigh " + k][-1])
+                    if knee > LIMITS["hyper"] + 8:
+                        hyper.append("knee %s bends forward %.0f deg" % (k, knee))
+            elif side:     # knee must not bend forwards, elbow must not bend backwards (angles from 'down', +=forward)
                 for k in ("n", "f"):
                     knee = wrap(seg_angle(J, k + "K", k + "A") - seg_angle(J, k + "P", k + "K"))
                     elbow = wrap(seg_angle(J, k + "E", k + "T") - seg_angle(J, k + "S", k + "E"))   # forearm = elbow -> hand tip, as the rig defines it
@@ -211,7 +278,11 @@ def check(cut_path, lm_path, engine="skin", motion="polish", turn=None, preset="
         motion_issues, mstats = [], {}
         rhythm = RHYTHMIC.get(mv.name, ())
         for sname, ser in angles.items():
-            sp = [abs(wrap(b - a_)) for a_, b in zip(ser, ser[1:] + ([ser[0]] if cyc else []))] or [0.0]
+            if dirs3[sname]:                     # 3D: true angle between successive bone directions
+                dv = dirs3[sname]
+                sp = [math.degrees(math.acos(float(np.clip(a_ @ b, -1, 1)))) for a_, b in zip(dv, dv[1:] + ([dv[0]] if cyc else []))] or [0.0]
+            else:
+                sp = [abs(wrap(b - a_)) for a_, b in zip(ser, ser[1:] + ([ser[0]] if cyc else []))] or [0.0]
             nrev, amp = reversals(ser, cyc, LIMITS["flap_amp"])
             mstats[sname] = dict(peak_speed=round(max(sp), 1), reversals=nrev, max_swing=round(amp, 1))
             exempt = rhythm == "all" or sname in rhythm
@@ -268,7 +339,7 @@ def _markdown(rep, path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--cutout"); ap.add_argument("--landmarks")
-    ap.add_argument("--engine", default="skin", choices=["skin", "classic"])
+    ap.add_argument("--engine", default="skin", choices=["skin", "classic", "photo3d"])
     ap.add_argument("--motion", default="polish", choices=["polish", "classic"])
     ap.add_argument("--turn", default=None)
     ap.add_argument("--preset", default="fighter14")
