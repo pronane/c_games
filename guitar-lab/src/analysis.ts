@@ -36,7 +36,12 @@ export function fingering(midi: number) {
     .sort((a, b) => a.fret - b.fret)[0];
 }
 // Goertzel narrow-band energy: deliberately lightweight, not a polyphonic transcription model.
-export function extract(samples: Float32Array, rate: number): Features {
+export function extract(
+  samples: Float32Array,
+  rate: number,
+  midiMin = 40,
+  midiMax = 88,
+): Features {
   const hop = Math.round(rate * 0.08),
     size = Math.min(4096, Math.round(rate * 0.12));
   const events: Event[] = [],
@@ -55,7 +60,7 @@ export function extract(samples: Float32Array, rate: number): Features {
     previous = rms;
     if (rms < 0.008) continue;
     const powers: number[] = [];
-    for (let midi = 40; midi <= 88; midi++) {
+    for (let midi = midiMin; midi <= midiMax; midi++) {
       const freq = 440 * 2 ** ((midi - 69) / 12),
         coeff = 2 * Math.cos((2 * Math.PI * freq) / rate);
       let a = 0,
@@ -74,9 +79,9 @@ export function extract(samples: Float32Array, rate: number): Features {
     // Harmonics can dominate: highest spectral bin is only a candidate note.
     const peak = Math.max(...powers),
       idx = powers.indexOf(peak),
-      midi = idx + 40;
+      midi = idx + midiMin;
     powers.forEach((p, i) => {
-      chroma[(i + 40) % 12] += p;
+      chroma[(i + midiMin) % 12] += p;
     });
     const last = events.at(-1);
     if (

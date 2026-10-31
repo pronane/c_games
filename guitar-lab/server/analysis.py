@@ -56,7 +56,7 @@ def observations(reference_notes, take_notes, alignment):
     for i, ref in enumerate(reference_notes):
         if i not in used:
             findings.append({'kind': 'unmatched_reference', 'reference_time': ref['time'], 'reference_midi': ref['midi'],
-                             'detail': 'Not matched in the take; not proof of a missed string.'})
+                             'detail': 'Not matched in the take; not proof of a missed note.'})
     timed = [abs(f['raw_timing_seconds']) for f in findings if f['kind'] == 'matched']
     return {'findings': findings, 'mean_absolute_timing_seconds': float(np.mean(timed)) if timed else None,
             'pitch_difference_candidates': sum(f['kind'] == 'pitch_difference' for f in findings),

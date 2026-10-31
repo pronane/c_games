@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "test": "tsx --test src/*.test.ts",
-    "test:e2e": "node tests/browser-smoke.mjs"
+    "test:e2e": "node tests/browser-smoke.mjs",
+    "test:inputs": "node tests/input-smoke.mjs",
+    "test:profiles": "node tests/profile-smoke.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

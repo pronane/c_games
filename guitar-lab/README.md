@@ -1,5 +1,13 @@
 # Fretwork — guitar comparison prototype v0.2
 
+## Instrument profiles and tuning
+
+Choose guitar, four-string bass or piano before playing. Shared instrument profiles drive pitch limits, stem/method selection, tuning/capo-aware tab, notation and feedback policy. An optional live single-note tuner works through the selected audio input. See [instrument profiles and limitations](INSTRUMENT_PROFILES.md). Bass/piano routing is experimental, not validated instrument-specific coaching.
+
+## USB audio / MIDI input
+
+The studio supports OS/browser-exposed USB audio interfaces with device selection, mono/stereo input routing, PCM recording, a level meter and clipping warnings. USB MIDI keyboards/adapters have a separate local note-capture and `.mid` export path. See [USB input setup, compatibility and limitations](USB_INPUTS.md). Comparison routing now follows the selected profile; real-world bass/piano accuracy is not yet validated.
+
 ## Specialist engine milestone
 
 The studio now includes a **separate Python engine workflow** with explicit excerpt-upload consent, guitar-stem listening approval, librosa chroma/DTW passage alignment, actual Basic Pitch ONNX transcription, editable notes/standard-tuning tab, and uncertainty-labelled timing/pitch/duration observations. See [server setup and limitations](server/README.md).
