@@ -9,6 +9,7 @@ const express = require('express');
 const http = require('http');
 const { createRelay } = require('./relay');
 const { createWsProxy } = require('./proxy');
+const { createArenaServer } = require('./arena/server');
 
 function noStore(res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -38,8 +39,8 @@ function routeUpgrades(server, entries) {
       socket.destroy();
       return;
     }
-    if (hit.proxy) {
-      hit.proxy.upgrade(req, socket, head);
+    if (hit.proxy || hit.native) {
+      (hit.proxy || hit.native).upgrade(req, socket, head);
       return;
     }
     hit.relay.wss.handleUpgrade(req, socket, head, (ws) => hit.relay.wss.emit('connection', ws, req));
@@ -82,6 +83,13 @@ function createHub(games, opts = {}) {
   const server = http.createServer(app);
   const entries = games.map((g) => {
     const path = g.path || '/';
+    if (g.native) {
+      const base = path === '/' ? '' : path;
+      return {
+        path, wsPath: base + (g.native.wsPath || '/ws'), native: createArenaServer(Object.assign({ quiet: !!g.native.quiet }, g.native)),
+        static: g.static, name: g.name || 'arena-fc',
+      };
+    }
     if (g.proxy) {
       const base = path === '/' ? '' : path;
       return {
@@ -95,6 +103,7 @@ function createHub(games, opts = {}) {
     return { path, relay: createRelay(Object.assign({ logPrefix: games.length > 1 }, g.game)), static: g.static };
   });
   const healthOf = async (e) => {
+    if (e.native) return e.native.health();
     if (e.proxy) {
       const up = await e.proxy.health();
       return Object.assign({ ok: up, game: e.name, backend: up ? 'up' : 'down' }, e.proxy.stats());
@@ -104,6 +113,12 @@ function createHub(games, opts = {}) {
   for (const e of entries) {
     const base = e.path === '/' ? '' : e.path;
     for (const s of e.static || []) mountStatic(app, [{ route: base + (s.route === '/' ? '' : s.route || '') || '/', dir: s.dir }]);
+    if (e.native) {
+      app.get(e.wsPath, (req, res) => res.status(426).type('text/plain').send('WebSocket endpoint\n'));
+      app.get(`${base}/api/health`, (req, res) => res.json(e.native.health()));
+      app.get(`${base}/health`, (req, res) => res.json(e.native.health()));
+      continue;
+    }
     if (e.proxy) {
       // A plain GET of the socket path is not a WebSocket: say so instead of leaking the backend's status page.
       app.get(e.wsPath, (req, res) => res.status(426).type('text/plain').send('WebSocket endpoint\n'));
@@ -119,7 +134,7 @@ function createHub(games, opts = {}) {
       .then((list) => res.json({ ok: list.every((h) => h.ok !== false), protocol: 2, games: list })));
   }
   routeUpgrades(server, entries);
-  return { listen: listenOn(server), close: closer(server, entries.map((e) => e.relay || e.proxy)), app, server, relays: entries };
+  return { listen: listenOn(server), close: closer(server, entries.map((e) => e.relay || e.proxy || e.native)), app, server, relays: entries };
 }
 
 module.exports = { createServer, createHub, createRelay, createWsProxy };

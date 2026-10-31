@@ -1,0 +1,15 @@
+# Render blueprint: the whole hub, including Arena FC online, in one Node web service (no .NET).
+# Copy to the repository root to use it. Export the Web build into arena-fc/build/web first and commit it
+# (or build it in CI), because the service serves that folder at /arena/.
+services:
+  - type: web
+    name: c-games-hub
+    env: docker
+    dockerfilePath: arena-fc/option-a/Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /arena/api/health
+    envVars:
+      - { key: ARENA_NATIVE, value: "1" }
+      - { key: TRUST_PROXY, value: "1" }
+      # - { key: ARENA_ALLOWED_ORIGINS, value: "https://your-site.example" }
