@@ -422,7 +422,7 @@ class Fighter:
             else:
                 if self.state == "block":
                     self.set_state("idle")
-                elif self.state != "crouch":
+                elif self.state != "crouch" or not act["down"]:   # stand up when down is released
                     self.set_state("idle")
 
         self.blocking = (self.state == "block")
@@ -435,7 +435,9 @@ class Fighter:
             self.vx = self.facing * 70
 
         # --- attacks ---
-        can_atk = (self.state not in ("jump", "crouch", "block", "hit")
+        # down + punch (special1) starts from a crouch: holding down puts the fighter in crouch before this check
+        special_from_crouch = self.state == "crouch" and act["down"] and (act["lp"] or act["hp"])
+        can_atk = ((self.state not in ("jump", "crouch", "block", "hit") or special_from_crouch)
                    and self.attack_cooldown <= 0)
 
         if can_atk:
