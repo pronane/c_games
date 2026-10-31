@@ -97,8 +97,32 @@ public partial class MatchView : Node3D
         if (Input.CameraPressed) Cam.Cycle();
         if (Hud.Paused) { Hud.Update(Engine, dt, Input.Charge, Cam.ModeName); return; }
         Engine.Step(dt, cmd);
+        PlayEventSounds();
         Sync(dt);
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
+    }
+
+    private MatchEvent? _lastSoundEvent;
+
+    /// <summary>Plays the procedural sound for each match event raised since the last tick.
+    /// The "Audio" autoload is Scripts/Core/Audio/ProceduralAudio.gd; without it this does nothing.</summary>
+    private void PlayEventSounds()
+    {
+        var events = Engine.Events;
+        if (events.Count == 0) return;
+        var newest = events[events.Count - 1];
+        if (ReferenceEquals(newest, _lastSoundEvent)) return;
+        int start = events.Count - 1;                       // first call: only the latest event
+        if (_lastSoundEvent != null)
+        {
+            int seen = events.LastIndexOf(_lastSoundEvent);
+            start = seen >= 0 ? seen + 1 : Math.Max(0, events.Count - 8);   // trimmed out of the list: catch up a little
+        }
+        var audio = GetNodeOrNull("/root/Audio");
+        if (audio != null)
+            for (int i = start; i < events.Count; i++)
+                audio.Call("play_for_event", events[i].Kind.ToString());
+        _lastSoundEvent = newest;
     }
 
     private void Sync(float dt)
