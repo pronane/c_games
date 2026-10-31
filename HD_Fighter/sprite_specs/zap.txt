@@ -1,16 +1,18 @@
+# HD Fighter sculpt spec (fictional character). `sculpt` picks the Sprite Forge v10 costume preset (sforge/sculpt.py);
+# the colour keys below recolour it. Build: HD_Fighter/sprite_specs/build_sprites.sh
 name = zap
 style = fighter
 height_cm=180
 weight_kg=86
 build=muscular
-skin_tone=light_medium
+skin_tone = #c98a5a
 hair_colour=#f5d000
 hair_style=spiky
 facial_hair=none
-eye_colour=blue
+eye_colour = #3a6fd0
 top=bare
 top_colour=#e0a878
-trim_colour=#f5d000
+trim_colour = #f5c800
 bottom=trousers
 bottom_colour=#1e5fd0
 socks_colour=#f5d000
@@ -18,5 +20,6 @@ shoes=boots
 shoes_colour=#f5d000
 kit=blue
 accessories=mask,wraps
-accessory_colour=#1e5fd0
+accessory_colour = #1e5fd0
 head = large
+sculpt = zap

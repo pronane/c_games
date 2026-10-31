@@ -423,6 +423,9 @@ def find_motion(name):
     """Resolve a move name (any case/spacing) to a library motion, or None."""
     from .moves import slug
     s = slug(name)
+    if s.startswith("hd_") and s not in LIB:       # v10: HD Fighter hand-posed frame library
+        from .hdfighter import register
+        register()
     if s in LIB:
         return LIB[s]
     if s in ALIASES:

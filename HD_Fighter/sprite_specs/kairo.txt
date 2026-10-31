@@ -1,22 +1,25 @@
+# HD Fighter sculpt spec (fictional character). `sculpt` picks the Sprite Forge v10 costume preset (sforge/sculpt.py);
+# the colour keys below recolour it. Build: HD_Fighter/sprite_specs/build_sprites.sh
 name = kairo
 style = fighter
 height_cm=178
 weight_kg=82
 build=muscular
-skin_tone=tan
+skin_tone = #b77a4c
 hair_colour=black
 hair_style=messy
 facial_hair=none
 eye_colour=dark_brown
 top=bare
 top_colour=#d09a6a
-trim_colour=#e0b800
+trim_colour = #f0b818
 bottom=shorts
-bottom_colour=#d01818
+bottom_colour = #cc1820
 socks_colour=#d01818
 shoes=barefoot
 kit=red
 accessories=headband,wraps
-accessory_colour=#f2f2f2
-accessory2_colour=#e0b800
+accessory_colour = #f2efe8
+accessory2_colour = #e8b020
 head = large
+sculpt = kairo

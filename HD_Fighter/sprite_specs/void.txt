@@ -1,9 +1,11 @@
+# HD Fighter sculpt spec (fictional character). `sculpt` picks the Sprite Forge v10 costume preset (sforge/sculpt.py);
+# the colour keys below recolour it. Build: HD_Fighter/sprite_specs/build_sprites.sh
 name = void
 style = fighter
 height_cm=186
 weight_kg=72
 build=athletic
-skin_tone=#cfc8d6
+skin_tone = #cfc8d6
 hair_colour=black
 hair_style=hood
 facial_hair=none
@@ -20,3 +22,5 @@ kit=black
 accessories=wraps
 accessory_colour=#27e0ff
 head = large
+emissive_colour = #27e0ff
+sculpt = void
