@@ -8,6 +8,7 @@
 const express = require('express');
 const http = require('http');
 const { createRelay } = require('./relay');
+const { createWsProxy } = require('./proxy');
 
 function noStore(res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -26,13 +27,19 @@ function pathOf(req) {
   return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
 }
 
-// entries: [{ path, relay }]. An exact path wins; otherwise the '/' entry takes it.
+// entries: [{ path, relay }] or [{ path, wsPath, proxy }]. The WebSocket path of an entry is `wsPath`
+// when it has one (a proxied game lives at e.g. '/arena/ws'), otherwise `path`. An exact match wins;
+// otherwise the '/' relay entry takes it.
 function routeUpgrades(server, entries) {
   server.on('upgrade', (req, socket, head) => {
     const p = pathOf(req);
-    const hit = entries.find((e) => e.path === p) || entries.find((e) => e.path === '/');
+    const hit = entries.find((e) => (e.wsPath || e.path) === p) || entries.find((e) => e.relay && e.path === '/');
     if (!hit) {
       socket.destroy();
+      return;
+    }
+    if (hit.proxy) {
+      hit.proxy.upgrade(req, socket, head);
       return;
     }
     hit.relay.wss.handleUpgrade(req, socket, head, (ws) => hit.relay.wss.emit('connection', ws, req));
@@ -68,31 +75,51 @@ function createServer(game = {}, opts = {}) {
   return { listen: listenOn(server), close: closer(server, [relay]), app, server, relay };
 }
 
-// games: [{ path: '/egyptian', game: {...}, static: [...] }]
+// games: [{ path: '/egyptian', game: {...}, static: [...] }]   lockstep relay (this package)
+//        [{ path: '/arena', name, proxy: { target, wsPath }, static: [...] }]   WebSocket proxy to another server
 function createHub(games, opts = {}) {
   const app = express();
   const server = http.createServer(app);
-  const entries = games.map((g) => ({
-    path: g.path || '/',
-    relay: createRelay(Object.assign({ logPrefix: games.length > 1 }, g.game)),
-    static: g.static,
-  }));
+  const entries = games.map((g) => {
+    const path = g.path || '/';
+    if (g.proxy) {
+      const base = path === '/' ? '' : path;
+      return {
+        path,
+        wsPath: base + (g.proxy.wsPath || '/ws'),
+        proxy: createWsProxy(Object.assign({ label: g.name || 'proxy' }, g.proxy)),
+        static: g.static,
+        name: g.name || 'proxy',
+      };
+    }
+    return { path, relay: createRelay(Object.assign({ logPrefix: games.length > 1 }, g.game)), static: g.static };
+  });
+  const healthOf = async (e) => {
+    if (e.proxy) {
+      const up = await e.proxy.health();
+      return Object.assign({ ok: up, game: e.name, backend: up ? 'up' : 'down' }, e.proxy.stats());
+    }
+    return e.relay.health();
+  };
   for (const e of entries) {
     const base = e.path === '/' ? '' : e.path;
     for (const s of e.static || []) mountStatic(app, [{ route: base + (s.route === '/' ? '' : s.route || '') || '/', dir: s.dir }]);
+    if (e.proxy) {
+      // A plain GET of the socket path is not a WebSocket: say so instead of leaking the backend's status page.
+      app.get(e.wsPath, (req, res) => res.status(426).type('text/plain').send('WebSocket endpoint\n'));
+      app.get(`${base}/api/health`, (req, res) => healthOf(e).then((h) => res.status(h.ok ? 200 : 503).json(h)));
+      continue;
+    }
     app.get(`${base}/api/rooms`, (req, res) => res.json(e.relay.roomList()));
     app.get(`${base}/api/health`, (req, res) => res.json(e.relay.health()));
   }
   mountStatic(app, opts.static);
   if (!entries.some((e) => e.path === '/')) {
-    app.get('/api/health', (req, res) => res.json({
-      ok: true,
-      protocol: 2,
-      games: entries.map((e) => Object.assign({ path: e.path }, e.relay.health())),
-    }));
+    app.get('/api/health', (req, res) => Promise.all(entries.map(async (e) => Object.assign({ path: e.path }, await healthOf(e))))
+      .then((list) => res.json({ ok: list.every((h) => h.ok !== false), protocol: 2, games: list })));
   }
   routeUpgrades(server, entries);
-  return { listen: listenOn(server), close: closer(server, entries.map((e) => e.relay)), app, server, relays: entries };
+  return { listen: listenOn(server), close: closer(server, entries.map((e) => e.relay || e.proxy)), app, server, relays: entries };
 }
 
-module.exports = { createServer, createHub, createRelay };
+module.exports = { createServer, createHub, createRelay, createWsProxy };

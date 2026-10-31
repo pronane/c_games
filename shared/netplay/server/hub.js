@@ -2,6 +2,7 @@
 //   ws(s)://host/          HD Fighter (and its web client at /)
 //   ws(s)://host/egyptian  Egyptian Fighter
 //   ws(s)://host/turbo     TurboTumble64
+//   ws(s)://host/arena/ws  Arena FC (only when ARENA_BACKEND is set; page at /arena/)
 const { createHub } = require('./index');
 const { hubGames } = require('./games');
 

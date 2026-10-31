@@ -1,24 +1,17 @@
-# Arena FC — Option B: Node static edge + .NET authoritative server behind /ws proxy
-# Single Render Docker service (paid plan required for Docker on Render).
+# Render blueprint: Arena FC + HD Fighter + Egyptian Fighter + TurboTumble64 on ONE web service.
+# Copy it to the repository root to use it as a blueprint. Render needs a paid plan for Docker.
 #
-# Topology:
-#   https://arena-fc.onrender.com/          -> Express static (Godot WASM) + COOP/COEP
-#   https://arena-fc.onrender.com/health    -> health check
-#   wss://arena-fc.onrender.com/ws          -> http-proxy-middleware -> ws://127.0.0.1:7777 (.NET)
-#
-# Render injects PORT automatically. The Node edge binds to $PORT (public).
-# The .NET server binds to 127.0.0.1:7777 (internal only, not exposed publicly).
-
+#   https://<app>.onrender.com/arena/          Arena FC web build
+#   wss://<app>.onrender.com/arena/ws          -> shared Node hub -> .NET server on 127.0.0.1:7777
+#   https://<app>.onrender.com/                HD Fighter;  /egyptian and /turbo are the C games' sockets
 services:
   - type: web
-    name: arena-fc
-    env: docker
-    repo: https://github.com/YOUR_OWNER/arena-fc   # <-- replace with your repo
-    dockerfilePath: ./Dockerfile
-    plan: starter                                  # Docker requires paid Render plan
-    healthCheckPath: /health
+    name: c-games-online
+    runtime: docker
+    dockerfilePath: ./arena-fc/option-b/Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /arena/api/health      # 200 only while the .NET server is accepting connections
     envVars:
-      - key: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
-        value: 1
-      - key: ASPNETCORE_URLS
-        value: http://127.0.0.1:7777               # .NET listens internally only
+      - key: ARENA_ALLOWED_ORIGINS          # your public URL; empty allows any origin
+        value: https://c-games-online.onrender.com
