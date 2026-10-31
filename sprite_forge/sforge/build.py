@@ -89,6 +89,7 @@ class BuildConfig:
     view_cut: float = 0.0              # keep the top fraction of each view's figure (0.55 = bust, for karts); 0 = full
     view_figure_h: int = 0             # px figure height in view cells (0 = figure_h)
     view_moves: List[str] = field(default_factory=list)          # moves animated per view (empty = all)
+    view_fill: str = "turn"            # v9.2 photo views with no source: turn (estimated 3D turn) | squash (old)
     view_frames: int = 6               # frames taken from a per-view video / folder
     view_frame_pngs: bool = True       # write views/<view>/<move>_NN.png too
     # OUTPUT PROFILE (sforge/profiles.py, profiles/*.json)
@@ -587,12 +588,16 @@ def _puppet_photo(cfg, report):
         if cfg.puppet_engine == "skin":
             from . import skinwarp as SKW
             rig = SKW.SkinRig(cut, lms, colour_ref=cut_ref)
-            if not rig._skin_ok:
-                report.note("puppet-engine skin: hidden hand copied from the visible one - classic renderer used for this build")
+            if rig.fist:
+                report.note("puppet-engine skin: hidden hand - forearm cut at the wrist and a mirrored copy of the visible "
+                            "hand drawn as the fist while that arm moves (v9.2; earlier versions fell back to classic)")
         else:
             rig = PP.Rig(cut, lms, colour_ref=cut_ref)
         known = PP.KNOWN_MOVES
         keyfn = lambda name, n: PP.move_keys(name, rig.rest, n)
+    if getattr(rig, "crotch_clamped", False):
+        report.note("puppet: legs touch below the hips (no gap at the crotch) - crotch set to 24% of the thigh so the "
+                    "thighs move from the hip, not mid-thigh")
     report.note("puppet: rig from %s (%d landmarks), stand height %d px, hidden hand: %s" % (
         os.path.basename(lm), len(info["landmarks"]), rig.stand_h, ("copy of the visible hand" if rig.fist else "none")))
     th, _ = _target_h(cfg)
@@ -603,6 +608,7 @@ def _puppet_photo(cfg, report):
     all_poses = {}
     for m in cfg.moves:
         keys, cyc = keyfn(m.name, m.frames)
+        keys = PP.normalize_keys(keys, rig.rest)      # v9.2: explicit + unwrapped, so in-betweens never pop or spin
         if m.name not in known:
             report.warning("puppet: no key poses for '%s' - idle pose used" % m.name)
         if len(keys) == m.frames:
@@ -1101,7 +1107,31 @@ def collect_views(cfg, report, sp, frames):
     for v, (raws, m, sv, src) in loaded.items():
         have[v] = [V.apply(im, m, sv * k, cfg) for im in raws]
         report.note("view %-11s %-4d real: %s%s" % (v, V.ANGLE[v], os.path.basename(src), " (%d frames)" % len(raws) if len(raws) > 1 else ""))
+    # v9.2: missing views of a photo puppet are TURNED (sforge/turn.py: per-row depth from a body template, the
+    # far side / back estimated from edge colours) instead of a squashed copy of the front.  Same scale as front.
+    turned_src = {}
+    cl = getattr(cfg, "_cut_lms", None)
+    if cl is not None and loaded and cfg.view_fill != "squash":
+        from . import turn as TN
+        cut_, lms_ = cl
+        ref_v = "front" if "front" in loaded else next(iter(loaded))
+        sref = loaded[ref_v][2] * k
+        for v in wanted:
+            if v in have or V.ANGLE[v] == 0:
+                continue
+            try:
+                res = TN.build_turned(cut_, lms_, yaw=float(V.ANGLE[v]), log=lambda *a: None)
+                im = res.composite
+                mt = V.measure(im, cfg.view_cut)
+                if mt:
+                    have[v] = [V.apply(im, mt, sref, cfg)]           # turned rows keep the photo's pixel scale
+                    turned_src[v] = "turned:%d" % V.ANGLE[v]
+            except Exception as e:          # never fail a build over an estimated view
+                report.warning("view %s: turn failed (%s), falling back to a squashed copy" % (v, e))
     filled = V.fill_views(have, wanted, cfg.pivot_x)
+    for v_, t_ in turned_src.items():
+        if v_ in filled:
+            filled[v_] = (filled[v_][0], "filled:" + t_ + " (estimated sides/back from ONE front photo)")
     for v in wanted:
         if v not in filled:
             continue

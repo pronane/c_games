@@ -74,6 +74,47 @@ def _poly(shape, pts):
     return np.asarray(m) > 0
 
 
+def _outer_side(shape, p0, p1, cx):
+    """pixels on the side of the line p0-p1 facing away from the body centre column cx"""
+    H, W = shape
+    yy, xx = np.mgrid[0:H, 0:W]
+    d = np.array(p1, float) - np.array(p0, float)
+    nrm = np.array([d[1], -d[0]]) / max(1e-6, math.hypot(*d))
+    mid = (np.array(p0, float) + np.array(p1, float)) / 2
+    if (cx - mid[0]) * nrm[0] > 0:          # normal points towards the body: flip
+        nrm = -nrm
+    return ((xx - p0[0]) * nrm[0] + (yy - p0[1]) * nrm[1]) > 0
+
+
+def _arm_band(alpha, p0, p1, cx, hw, n=11):
+    """v9.2: where the arm really is.  Joint landmarks are often off the sleeve centre (a detector's shoulder point
+    sits on the joint, a hand-placed one may sit anywhere in the sleeve), so a capsule around the bone takes a strip
+    of chest on one side and leaves sleeve on the torso on the other.  The OUTER silhouette edge is reliable
+    (nothing is beside the arm), so put the cut line one typical half-width `hw` inside it.
+    Returns (q0, q1): the bone shifted along its normal; the shift is clamped to 0.8*hw."""
+    H, W = alpha.shape
+    p0 = np.array(p0, float); p1 = np.array(p1, float)
+    d = p1 - p0; L = math.hypot(*d)
+    if L < 4:
+        return tuple(p0), tuple(p1)
+    d /= L
+    nrm = np.array([d[1], -d[0]])
+    mid = (p0 + p1) / 2
+    if (cx - mid[0]) * nrm[0] > 0:
+        nrm = -nrm
+    ds = []
+    for t in np.linspace(0.2, 0.85, n):
+        q = p0 + d * L * t
+        for r in range(0, int(3 * hw)):
+            x, y = int(round(q[0] + nrm[0] * r)), int(round(q[1] + nrm[1] * r))
+            if not (0 <= x < W and 0 <= y < H) or not alpha[y, x]:
+                ds.append(r); break
+    if len(ds) < n // 2:
+        return tuple(p0), tuple(p1)
+    shift = float(np.clip(np.median(ds) - hw, -0.8 * hw, 0.8 * hw))
+    return tuple(p0 + nrm * shift), tuple(p1 + nrm * shift)
+
+
 def _fill_from_nearest(rgba, todo, known, blur=6):
     """gap left by a moved limb: nearest known body colour, then smoothed (no new detail invented)"""
     if not todo.any():
@@ -121,8 +162,18 @@ class Rig:
         hy = int(max(J["n"]["P"][1], J["f"]["P"][1]))
         col = alpha[:, mx]
         yc = next((y for y in range(hy, H) if not col[y]), int((hy + J["n"]["K"][1]) / 2))
+        # v9.2: legs that touch (jeans, trousers, a skirt) have no gap until the knees or below, which put the crotch
+        # mid-thigh and left the upper thighs glued to the torso (a "flap" between the legs in crouch / jump / kick).
+        # The anatomical crotch is ~20-30% of the way from hip to knee, so clamp it there.
+        thigh = max(1.0, min(J["n"]["K"][1], J["f"]["K"][1]) - hy)
+        if yc > hy + 0.32 * thigh:
+            yc = int(hy + 0.24 * thigh)
+            self.crotch_clamped = True
+        else:
+            self.crotch_clamped = False
         self.crotch = yc
         ru, rf = 0.165 * sw, 0.145 * sw
+        ru_side, rf_side = {}, {}
         self.r_leg = 0.17 * sw
         yy, xx = np.mgrid[0:H, 0:W]
         # body hull (torso + pelvis) - where a moved arm leaves a gap that must be filled
@@ -136,7 +187,15 @@ class Rig:
                 t = (y - P[1]) / max(1, K[1] - P[1]); return P[0] + t * (K[0] - P[0])
             t = (y - K[1]) / max(1, A_[1] - K[1]); return K[0] + t * (A_[0] - K[0])
         seam = np.array([(cl("n", y) + cl("f", y)) / 2 for y in range(H)])
-        below = (yy >= yc) & alpha
+        # v9.2: the leg / pelvis boundary is a V (hip line at the hip joints, down to the crotch only in the middle),
+        # not a flat line at crotch height: a flat line left a rectangle of trousers on the torso that hung between
+        # the thighs when they spread (crouch, jump, kick).
+        hpx = sorted([J["n"]["P"][0], J["f"]["P"][0]])
+        hw = max(1.0, (hpx[1] - hpx[0]) / 2.0)
+        mxc = (hpx[0] + hpx[1]) / 2.0
+        hip_y = (J["n"]["P"][1] + J["f"]["P"][1]) / 2.0
+        vline = hip_y + np.clip(1.0 - np.abs(xx - mxc) / hw, 0.0, 1.0) * (yc - hip_y)
+        below = (yy >= vline) & alpha
         near_side = xx >= seam[:, None]
         pieces = {}
         for k, side_mask in (("n", near_side), ("f", ~near_side)):
@@ -149,11 +208,51 @@ class Rig:
             pieces["t" + k] = th
             pieces["t" + k + "_cap"] = _disc(alpha.shape, J[k]["P"], (yc - J[k]["P"][1]) + self.r_leg) & alpha & ~below & hull
         legs_all = below
-        arm_used = np.zeros_like(alpha)
+        if colour_ref is not None and colour_ref.size == cut.size:
+            Ac = np.zeros_like(A); Ac[padt:padt + h0, pad:pad + w0] = np.asarray(colour_ref.convert("RGBA"))
+            A3 = Ac[..., :3].astype(int)
+        else:
+            A3 = A[..., :3].astype(int)
+        skin = (A3[..., 0] > 70) & (A3[..., 0] > A3[..., 1] + 10) & (A3[..., 0] > A3[..., 2] + 8) & alpha
+        # v9.2: a hand hanging against the thigh sits below the hip line, so it was cut out WITH the leg: the forearm
+        # lifted without its hand and a "ghost hand" stayed on the thigh.  Skin-coloured pixels around the wrist ->
+        # fingertip line move to the forearm; the leg gets that patch repainted from its own neighbouring pixels.
+        hand_on_leg = np.zeros_like(alpha)
         for k in ("n", "f"):
-            # outside the body hull the sleeve can be wider than the capsule: take a wider band there
-            up = (_capsule(alpha.shape, J[k]["S"], J[k]["E"], ru) | (_capsule(alpha.shape, J[k]["S"], J[k]["E"], 1.7 * ru) & ~hull)) & alpha & ~legs_all
-            fo = (_capsule(alpha.shape, J[k]["E"], J[k]["T"], rf) | (_capsule(alpha.shape, J[k]["E"], J[k]["T"], 1.7 * rf) & ~hull)) & alpha & ~legs_all
+            hw_ = 0.12 * sw
+            # the whole forearm + hand line (elbow -> fingertips): a hanging forearm can cross the hip line too
+            hcap = _capsule(alpha.shape, J[k]["E"], J[k]["T"], hw_) | _disc(alpha.shape, J[k]["T"], hw_)
+            above = _capsule(alpha.shape, J[k]["E"], J[k]["W"], 0.08 * sw) & alpha & ~legs_all
+            like = skin
+            if above.sum() > 20:                      # sleeve colour of this forearm where it is clearly arm
+                ref = np.median(A3[above], 0)
+                like = like | (np.abs(A3 - ref).sum(-1) < 45)
+            hp = hcap & legs_all & like
+            if hp.sum() > 0.002 * sw * sw:
+                hp = ndi.binary_opening(hp, iterations=1)
+                lab_, n_ = ndi.label(hp)              # keep only what touches the hand / wrist end
+                if n_:
+                    keep = set(np.unique(lab_[_capsule(alpha.shape, J[k]["W"], J[k]["T"], hw_) & hp])) - {0}
+                    hp = np.isin(lab_, list(keep))
+                hand_on_leg |= ndi.binary_dilation(hp, iterations=2) & hcap & legs_all
+        self.hand_on_leg = hand_on_leg
+        self.leg_src = _fill_from_nearest(A, hand_on_leg, legs_all & ~hand_on_leg) if hand_on_leg.any() else A
+        arm_used = np.zeros_like(alpha)
+        self.arm_width = {}
+        for k in ("n", "f"):
+            # v9.2: arm width from the person's own silhouette.  An arm hanging against the body can't be told
+            # from the torso by colour (sleeve = top), so a fixed capsule took a strip of torso with it (a bag
+            # strap, the chest print) and left a notch.  Measure the distance from the bone line to the OUTER
+            # silhouette edge (the arm's free side) and use it as the half-width on both sides.
+            hu, hf = 0.11 * sw, 0.10 * sw          # typical half-widths of a clothed upper arm / forearm, front view
+            uS, uE = _arm_band(alpha, J[k]["S"], J[k]["E"], self.cx, hu)
+            fE, fW = _arm_band(alpha, J[k]["E"], J[k]["W"], self.cx, hf)
+            fT = (J[k]["T"][0] + fW[0] - J[k]["W"][0], J[k]["T"][1] + fW[1] - J[k]["W"][1])
+            self.arm_width[k] = (round(math.hypot(uS[0] - J[k]["S"][0], uS[1] - J[k]["S"][1])),
+                                 round(math.hypot(fE[0] - J[k]["E"][0], fE[1] - J[k]["E"][1])))   # cut-line shifts (px)
+            up = (_capsule(alpha.shape, uS, uE, hu) | (_capsule(alpha.shape, uS, uE, 1.7 * hu) & ~hull & _outer_side(alpha.shape, uS, uE, self.cx))) & alpha & ~legs_all
+            fo = (_capsule(alpha.shape, fE, fT, hf) | (_capsule(alpha.shape, fE, fT, 1.7 * hf) & ~hull & _outer_side(alpha.shape, fE, fT, self.cx))) & alpha & ~legs_all
+            fo |= hand_on_leg & (_capsule(alpha.shape, J[k]["E"], J[k]["T"], 0.2 * sw) | _disc(alpha.shape, J[k]["T"], 0.2 * sw))
             up &= ~fo
             # keep the shoulder itself on the torso: only pixels below the armpit-ish line move
             up &= ~(_disc(alpha.shape, J[k]["S"], 0.55 * ru) & hull)
@@ -167,12 +266,6 @@ class Rig:
         # and a MIRRORED COPY of the person's other (visible) hand is attached as the fist.  The pocket area
         # is filled like any other uncovered body area.  Flagged in the build notes.
         self.fist = {}
-        if colour_ref is not None and colour_ref.size == cut.size:
-            Ac = np.zeros_like(A); Ac[padt:padt + h0, pad:pad + w0] = np.asarray(colour_ref.convert("RGBA"))
-            A3 = Ac[..., :3].astype(int)
-        else:
-            A3 = A[..., :3].astype(int)
-        skin = (A3[..., 0] > 70) & (A3[..., 0] > A3[..., 1] + 10) & (A3[..., 0] > A3[..., 2] + 8) & alpha
         hand_px = {}
         for k in ("n", "f"):
             c = J[k]["W"]; hc = ((J[k]["W"][0] + J[k]["T"][0]) / 2, (J[k]["W"][1] + J[k]["T"][1]) / 2)
@@ -223,7 +316,8 @@ class Rig:
             if name == "torso":
                 L = np.zeros_like(self.A); L[self.torso_mask] = self.torso_rgba[self.torso_mask]
             else:
-                L = np.zeros_like(self.A); m = self.pieces[name]; L[m] = self.A[m]
+                src = self.leg_src if name[0] in "ts" else self.A        # legs: hand patch repainted
+                L = np.zeros_like(self.A); m = self.pieces[name]; L[m] = src[m]
             self._layers[name] = Image.fromarray(L, "RGBA")
         return self._layers[name]
 
@@ -250,6 +344,27 @@ class Rig:
         d.line([(0, self.crotch), (im.width, self.crotch)], fill=(255, 0, 0, 255), width=2)
         bb = im.getchannel("A").getbbox()
         return im.crop(bb)
+
+    # ------------------------------------------------------------------ pose -> joints (v9.2, for QA)
+    def pose_joints(self, pose):
+        """where every joint lands for `pose`, in render() canvas coords BEFORE grounding (add self.last_offset).
+        Keys: neck, S/E/W/T (arm) and P/K/A (leg) per side 'n' / 'f'."""
+        J, rest = self.J, self.rest
+        pelvis = ((J["n"]["P"][0] + J["f"]["P"][0]) / 2, (J["n"]["P"][1] + J["f"]["P"][1]) / 2)
+        M0 = _rot(-pose.get("lean", 0.0), pelvis) @ _scale(pose.get("sx", 1.0), pose.get("sy", 1.0), pelvis)
+        out = {"neck": _ap(M0, ((J["n"]["S"][0] + J["f"]["S"][0]) / 2, (J["n"]["S"][1] + J["f"]["S"][1]) / 2)),
+               "pelvis": _ap(M0, pelvis)}
+        for k in ("n", "f"):
+            for (a, b), (ja, jb, jc, jd) in ((("u" + k, "f" + k), ("S", "E", "W", "T")), (("t" + k, "s" + k), ("P", "K", "A", None))):
+                d1 = pose.get(a, rest[a]) - rest[a]
+                d2 = (pose[b] - rest[b]) if b in pose else d1
+                R1 = _rot(d1, J[k][ja])
+                j2 = _ap(R1, J[k][jb])
+                M2 = M0 @ _tr(j2[0] - J[k][jb][0], j2[1] - J[k][jb][1]) @ _rot(d2, J[k][jb])
+                out[k + ja] = _ap(M0, J[k][ja]); out[k + jb] = _ap(M0 @ R1, J[k][jb]); out[k + jc] = _ap(M2, J[k][jc])
+                if jd:
+                    out[k + jd] = _ap(M2, J[k][jd])
+        return out
 
     # ------------------------------------------------------------------ pose -> image
     def render(self, pose):
@@ -297,7 +412,8 @@ class Rig:
         low = int(rows.max()) if len(rows) else self.ground
         dy = self.ground - low - pose.get("lift", 0.0) * self.stand_h
         dx = pose.get("dx", 0.0) * self.stand_h
-        out = canvas.transform(canvas.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy), resample=Image.BICUBIC)
+        self.last_offset = (dx, dy)
+        out = despeckle(canvas.transform(canvas.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy), resample=Image.BICUBIC))
         if pose.get("tint"):
             r, g, b, k = pose["tint"]
             arr = np.asarray(out).astype(np.float32)
@@ -344,6 +460,25 @@ class Rig:
 
 def _sub(p, q):
     return (p[0] - q[0], p[1] - q[1])
+
+
+def despeckle(im, frac=0.004, thr=40):
+    """v9.2: drop small pieces that are not attached to the figure (cut-out remnants such as a sliver of a
+    hand that was removed, or a bag strap tip).  Pieces >= frac of the figure's area are kept, so a limb that
+    really came off is NOT hidden (the limb test still sees it).  Run before effects (orbs are separate pieces)."""
+    from scipy import ndimage as _ndi
+    a = np.array(im)
+    m = a[..., 3] > thr
+    lab, n = _ndi.label(_ndi.binary_dilation(m, iterations=1))
+    if n <= 1:
+        return im
+    sizes = _ndi.sum(m, lab, range(1, n + 1))
+    keep = np.zeros(n + 1, bool); keep[1:] = sizes >= frac * sizes.sum()
+    drop = ~keep[lab] & (a[..., 3] > 0)
+    if not drop.any():
+        return im
+    a[drop] = 0
+    return Image.fromarray(a, "RGBA")
 
 
 def _effect(im, kind, c, col, r):
@@ -399,6 +534,43 @@ def _lerp(a, b, t):
     return out
 
 
+_CHAINS = (("un", "fn"), ("uf", "ff"), ("tn", "sn"), ("tf", "sf"))
+_DEFAULTS = dict(lean=0.0, lift=0.0, dx=0.0, sx=1.0, sy=1.0)
+
+
+def normalize_keys(keys, rest):
+    """v9.2: make every key pose explicit before it is interpolated.
+
+    Two interpolation bugs came from implicit values:
+      * a limb missing from one key (= its rest angle, or following its upper segment) and set in the next was not
+        blended - _lerp switched to the new value half-way, so the limb popped (crouch frame 0 was already a full crouch);
+      * the same direction written two ways (165 and -150) was interpolated through the long way round, so a forearm
+        spun 315 deg through the body instead of moving 45 deg.
+    Here each segment gets its value (rest, or the upper segment's delta for a missing lower segment, the same rule
+    render() uses), and each segment's sequence is unwrapped so consecutive keys differ by at most 180 deg."""
+    out = []
+    for k in keys:
+        e = dict(k)
+        for a, b in _CHAINS:
+            va = e.get(a, rest[a])
+            vb = e[b] if b in e else rest[b] + (va - rest[a])
+            e[a], e[b] = float(va), float(vb)
+        for kk, dv in _DEFAULTS.items():
+            e.setdefault(kk, dv)
+        out.append(e)
+    for a, b in _CHAINS:
+        # upper segment (shoulder / hip): shortest path from key to key.  Lower segment (forearm / shin): kept
+        # within +-180 deg of its own upper segment - an elbow or knee never passes through straight-back, so the
+        # joint angle is unambiguous, and the "shortest path" of the absolute angle could bend it backwards.
+        for i in range(len(out)):
+            if i:
+                d = (out[i][a] - out[i - 1][a] + 180.0) % 360.0 - 180.0
+                out[i][a] = out[i - 1][a] + d
+            rel = (out[i][b] - out[i][a] + 180.0) % 360.0 - 180.0
+            out[i][b] = out[i][a] + rel
+    return out
+
+
 def _sample(keys, n):
     """n poses from key poses spread evenly over the move"""
     if n <= len(keys):
@@ -445,19 +617,34 @@ def move_keys(name, rest, n):
                             un=R["un"] - 10 * s, uf=R["uf"] - 10 * s, lean=2 + 1.5 * s))
         return out, True
     crouch = dict(tn=38, sn=-12, tf=-38, sf=12, un=35, fn=150, uf=-30, ff=165, lean=3)
+    def B(a, b, t):            # v9.2: rest-aware blend (_lerp({}, x, t) jumped straight to x for every limb)
+        na, nb = normalize_keys([a, b], R)
+        return _lerp(na, nb, t)
     if name == "crouch":
-        return [_lerp({}, crouch, 0.35), _lerp({}, crouch, 0.7), crouch, crouch], False
+        return [B({}, crouch, 0.35), B({}, crouch, 0.7), crouch, crouch], False
     tuck = dict(tn=62, sn=-48, tf=-62, sf=48, un=60, fn=160, uf=-55, ff=160)
     if name == "jump":
-        return [_lerp({}, crouch, 0.5), dict(un=150, fn=165, uf=-150, ff=-165, sy=1.03),
-                tuck, tuck, dict(tuck, lean=4), dict(tn=20, sn=0, tf=-20, sf=0, un=70, fn=120, uf=-70, ff=-120),
-                dict(tn=8, sn=0, tf=-8, sf=0, un=40, fn=60, uf=-40, ff=-60), _lerp({}, crouch, 0.4)], False
+        # v9.2: arms go up ONCE (take-off -> apex) and come down steadily through the tuck to the landing.  The old
+        # keys went up, down, out and in again (two big reversals = flapping) and moved 117 deg in one frame.
+        def arms(u, f):
+            return dict(un=u, fn=f, uf=-u, ff=-f)
+        return [B({}, crouch, 0.5),
+                dict(arms(85, 120), tn=10, sn=0, tf=-10, sf=0, sy=1.02),
+                dict(arms(140, 160), tn=35, sn=-25, tf=-35, sf=25),
+                dict(arms(110, 140), tn=62, sn=-48, tf=-62, sf=48),
+                dict(arms(85, 120), tn=62, sn=-48, tf=-62, sf=48, lean=3),
+                dict(arms(60, 95), tn=30, sn=-10, tf=-30, sf=10),
+                dict(arms(40, 70), tn=10, sn=0, tf=-10, sf=0),
+                B({}, crouch, 0.4)], False
     if name == "punch":
         return [dict(g), dict(g, un=70, fn=95, lean=3), dict(g, un=86, fn=88, lean=6), dict(g, un=86, fn=88, lean=6),
                 dict(g, un=70, fn=120, lean=3), dict(g)], False
     if name == "kick":
-        return [dict(g, tn=45, sn=-25), dict(g, tn=70, sn=30, lean=-6), dict(g, tn=82, sn=82, lean=-10, uf=-40, ff=-150),
-                dict(g, tn=82, sn=82, lean=-10, uf=-40, ff=-150), dict(g, tn=50, sn=0, lean=-4), dict(g, tn=15, sn=5)], False
+        # v9.2: chamber -> extend -> hold -> re-chamber -> down (the shin no longer snaps 85 deg on the way back), and
+        # the guard forearm stays continuous (210 = the same direction as -150, without the 315 deg spin)
+        return [dict(g, tn=40, sn=-20), dict(g, tn=65, sn=20, lean=-5), dict(g, tn=80, sn=70, lean=-9, uf=-40, ff=210),
+                dict(g, tn=80, sn=72, lean=-9, uf=-40, ff=210), dict(g, tn=72, sn=35, lean=-7, uf=-30, ff=190),
+                dict(g, tn=45, sn=-5, lean=-3), dict(g, tn=15, sn=5)], False
     if name in ("pyramid_blast", "special1", "special_1"):
         push = dict(un=76, fn=78, uf=72, ff=76, lean=2)
         return [dict(un=25, fn=130, uf=35, ff=120, lean=-3), dict(push, glow_hands="nf", glow=BLUE),
@@ -465,27 +652,32 @@ def move_keys(name, rest, n):
                 dict(push, glow_hands="nf", glow=BLUE, orb=BLUE, orb_hand="nf", orb_r=0.05, orb_ahead=0.02),
                 dict(push, glow_hands="nf", glow=BLUE), dict(un=40, fn=100, uf=40, ff=100)], False
     if name in ("bum_fireball", "special2", "special_2"):     # overarm throw (the game launches the projectile)
-        return [dict(g, un=-35, fn=-70, lean=-4), dict(g, un=150, fn=200, lean=-8, glow_hands="n", glow=ORANGE),
-                dict(g, un=160, fn=205, lean=-8, glow_hands="n", glow=ORANGE),
-                dict(g, un=120, fn=105, lean=0, glow_hands="n", glow=ORANGE, orb=ORANGE, orb_hand="n", orb_ahead=0.0),
-                dict(g, un=78, fn=76, lean=2, glow_hands="n", glow=ORANGE),
-                dict(g, un=70, fn=70, lean=3, glow_hands="n", glow=ORANGE), dict(g, un=60, fn=60, lean=4), dict(g)], False
+        # v9.2: wind-up -> over the top -> release -> follow-through in steps of <= 70 deg (was 159 deg in one frame)
+        O = dict(glow_hands="n", glow=ORANGE)
+        return [dict(g, un=-25, fn=-50, lean=-3), dict(g, un=35, fn=20, lean=-5, **O), dict(g, un=100, fn=90, lean=-7, **O),
+                dict(g, un=150, fn=160, lean=-8, **O), dict(g, un=158, fn=200, lean=-6, **O),
+                dict(g, un=125, fn=140, lean=-2, orb=ORANGE, orb_hand="n", orb_ahead=0.0, **O),
+                dict(g, un=90, fn=95, lean=2, **O), dict(g, un=75, fn=80, lean=3), dict(g, un=60, fn=100, lean=4), dict(g)], False
     if name == "block":      # forearms crossed in front of the face
         blk = dict(un=42, fn=195, uf=-38, ff=165, lean=-4)
         return [_lerp({}, blk, 0.5), blk, dict(blk, lean=-5), blk, dict(blk, lean=-5), blk], False
     if name == "hit":
-        return [dict(un=45, fn=70, uf=-45, ff=-70, lean=-12, dx=-0.02, tint=RED + (0.30,)),
-                dict(un=55, fn=90, uf=-55, ff=-90, lean=-15, dx=-0.03, tint=RED + (0.15,)),
-                dict(un=40, fn=60, uf=-40, ff=-60, lean=-11, dx=-0.025), dict(un=25, fn=30, uf=-25, ff=-30, lean=-7, dx=-0.015),
+        # v9.2: a recoil (head and chest snap back, arms jolt up a little) instead of both arms flung out to the sides
+        return [dict(un=22, fn=40, uf=-22, ff=-40, lean=-12, dx=-0.02, tint=RED + (0.30,)),
+                dict(un=28, fn=50, uf=-28, ff=-50, lean=-15, dx=-0.03, tint=RED + (0.15,)),
+                dict(un=20, fn=35, uf=-20, ff=-35, lean=-11, dx=-0.025), dict(un=12, fn=15, uf=-12, ff=-15, lean=-7, dx=-0.015),
                 dict(lean=-3, dx=-0.005), dict()], False
     if name == "throw":      # grab with both hands, lift overhead, toss forward
         grab = dict(un=80, fn=82, uf=76, ff=82, lean=5)
-        return [grab, dict(grab, un=88, fn=95), dict(un=140, fn=150, uf=135, ff=150, lean=-8),
-                dict(un=170, fn=178, uf=165, ff=178, lean=-12), dict(un=100, fn=92, uf=95, ff=92, lean=9),
+        return [grab, dict(grab, un=100, fn=110, uf=96, ff=108, lean=2), dict(un=140, fn=150, uf=135, ff=150, lean=-8),
+                dict(un=170, fn=178, uf=165, ff=178, lean=-12), dict(un=135, fn=135, uf=130, ff=135, lean=-2),
+                dict(un=100, fn=92, uf=95, ff=92, lean=9), dict(un=60, fn=70, uf=45, ff=55, lean=4),
                 dict(un=40, fn=60, uf=20, ff=40)], False
     if name in ("jump_attack", "jumpattack"):   # flying kick: near leg out, far leg tucked
-        fly = dict(g, tn=62, sn=62, tf=35, sf=-55, lean=-4)
-        return [dict(tuck), dict(g, tn=60, sn=20, tf=40, sf=-50), fly, fly, dict(fly, lean=-6), dict(tuck)], False
+        # v9.2: the far leg stays tucked on its own side (it used to swing 100 deg across the near leg)
+        fly = dict(g, tn=75, sn=55, tf=-45, sf=35, lean=-4)
+        return [dict(tuck), dict(g, tn=66, sn=6, tf=-55, sf=42), fly, dict(fly, lean=-6, sn=60),
+                dict(g, tn=68, sn=12, tf=-58, sf=45, lean=-2), dict(tuck, sn=-40)], False
     if name == "taunt":      # wave, other hand on the hip
         hip = dict(uf=-38, ff=40)
         return [dict(hip, un=150, fn=170), dict(hip, un=155, fn=200, lean=-2), dict(hip, un=150, fn=165),

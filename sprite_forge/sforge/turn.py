@@ -313,6 +313,8 @@ def build_turned(cut, landmarks, yaw=90.0, depth="auto", side=None, side_faces="
     # ---- part masks + textures (cut-out coords)
     masks = {}
     tex = _edge_fixed_rgb(A0)
+    # v9.2: legs use the rig's leg source (a hand that hung against the thigh is repainted out of it)
+    leg_tex = _edge_fixed_rgb(crop(rig.leg_src)) if getattr(rig, "hand_on_leg", None) is not None and rig.hand_on_leg.any() else tex
     solid = A0[..., 3] > 127
     for k in ("n", "f"):
         masks["u" + k] = crop(rig.pieces["u" + k])
@@ -434,7 +436,7 @@ def build_turned(cut, landmarks, yaw=90.0, depth="auto", side=None, side_faces="
     back = {}
     for part, lst in sections.items():
         acc = np.zeros((h0, w0, 3), np.float32); wt = np.zeros((h0, w0), np.float32)
-        T = torso_tex if part == "torso" else tex
+        T = torso_tex if part == "torso" else (leg_tex if part[0] in "ts" else tex)
         for y, x0, x1, xs, zf, zb in lst:
             w = x1 - x0 + 1
             band = max(3, int(0.22 * w))
@@ -472,9 +474,10 @@ def build_turned(cut, landmarks, yaw=90.0, depth="auto", side=None, side_faces="
     xoff = Wout / 2.0
     layers, zmean = {}, {}
     for part, lst in sections.items():
-        T = torso_tex if part == "torso" else tex
+        T = torso_tex if part == "torso" else (leg_tex if part[0] in "ts" else tex)
         img, zm = _render_part(lst, T, back[part], ct, st, cx, xoff, Wout, h0,
-                               side_info, g, near_sign=(1 if yaw % 360 < 180 else -1))
+                               side_info, g, near_sign=(1 if yaw % 360 < 180 else -1),
+                               head=(int(g["top"]), int(g["chin"])) if part == "torso" else None)
         layers[part] = img; zmean[part] = zm
     # lighting balance: a side view shows the photo's edge columns (one of them often sun-lit, the other in
     # shade) stretched across the side of the body; pull each garment's turned colour back towards the
@@ -551,10 +554,24 @@ def _part_zc(lst, y):
     return best[1] if best else 0.0
 
 
-def _render_part(lst, T, B, ct, st, cx, xoff, Wout, H, side_info, g, near_sign=1):
+def _render_part(lst, T, B, ct, st, cx, xoff, Wout, H, side_info, g, near_sign=1, head=None):
     """rasterise every cross-section loop (front sheet = photo, back sheet = edge colour), z-buffered"""
     WS = Wout * SS_X
     P_x, P_y, P_z, P_c, P_s = [], [], [], [], []
+    skin_rows = {}
+    if head is not None:          # cheek colour per head row, smoothed vertically (no row-to-row banding)
+        ys_, cs_ = [], []
+        for y, x0, x1, xs, zf, zb in lst:
+            if head[0] <= y <= head[1] and x1 - x0 > 8:
+                xi_ = np.clip(np.round(xs).astype(int), x0, x1)
+                uu_ = np.abs((xs - (x0 + x1) / 2) / max(0.5, (x1 - x0 + 1) / 2))
+                cu = (uu_ >= 0.35) & (uu_ <= 0.65)
+                if cu.sum() >= 2:
+                    ys_.append(y); cs_.append(np.median(T[y, xi_[cu]].astype(np.float32), 0))
+        if ys_:
+            cs_ = np.array(cs_)
+            cs_ = np.stack([ndi.gaussian_filter1d(cs_[:, c], 6, mode="nearest") for c in range(3)], 1)
+            skin_rows = dict(zip(ys_, cs_))
     for y, x0, x1, xs, zf, zb in lst:
         n = len(xs)
         X = np.concatenate([xs, xs[::-1]]) - cx
@@ -565,6 +582,16 @@ def _render_part(lst, T, B, ct, st, cx, xoff, Wout, H, side_info, g, near_sign=1
         uu = np.abs((xs - (x0 + x1) / 2) / max(0.5, (x1 - x0 + 1) / 2))
         wseam = np.clip((uu - 0.80) / 0.2, 0, 1)[:, None] * 0.6
         cf = cf * (1 - wseam) + cb / 0.9 * wseam
+        if head is not None and head[0] <= y <= head[1] and x1 - x0 > 8:
+            # v9.2 head: the outer band of a face row is ear / hair edge / background fringe; turned, it is
+            # stretched round the whole side of the head (a pink-red smear).  Use the row's own cheek colour there
+            # (median between 35% and 65% out from the centre, so nose/eyes/ears are excluded), blended in smoothly.
+            if y in skin_rows:
+                skin = skin_rows[y]
+                hk = (y - head[0]) / max(1.0, head[1] - head[0])       # crown rows: keep the scalp's own edge
+                wh = np.clip((uu - 0.62) / 0.25, 0, 1)[:, None] * (0.9 if hk > 0.18 else 0.5)
+                cf = cf * (1 - wh) + skin * wh
+                cb = cb * (1 - wh[::1] * 0.8) + skin * 0.9 * (wh * 0.8)
         C = np.concatenate([cf, cb[::-1]])
         isf = np.concatenate([np.ones(n, bool), np.zeros(n, bool)])
         # closed loop
@@ -737,6 +764,30 @@ class SideRig:
             self.hand_hidden_side = kh
         self._layers = lay
         self._bbox = {}
+        # v9.2 joint discs: at a sharp elbow / knee bend the rigid upper and lower pieces swing apart and leave a
+        # wedge-shaped seam (the forearm looks detached in 3/4 views).  A disc of the limb's own colour, as wide
+        # as the limb at that joint, is drawn between the two pieces so the bend always reads as one limb.
+        self.discs = {}
+        for k in ("n", "f"):
+            for up, lo, j in (("u", "f", "E"), ("t", "s", "K"), ("t", "t", "P")):   # P: torso leans, legs don't
+                c = J[k][j]
+                m = (arr(lay[up + k])[..., 3] > 128) | (arr(lay[lo + k])[..., 3] > 128)
+                R = int(self.r_arm * 2.0 if up == "u" else self.r_leg * 2.0)
+                x0, y0 = int(c[0]) - R, int(c[1]) - R
+                sub = m[max(0, y0):y0 + 2 * R + 1, max(0, x0):x0 + 2 * R + 1]
+                if sub.sum() < 20:
+                    continue
+                dt = ndi.distance_transform_edt(np.pad(sub, 1))[1:-1, 1:-1]
+                yy, xx = np.ogrid[0:sub.shape[0], 0:sub.shape[1]]
+                near_c = (xx + max(0, x0) - c[0]) ** 2 + (yy + max(0, y0) - c[1]) ** 2 <= (0.6 * R) ** 2
+                rad = float(dt[near_c].max()) if near_c.any() else 0.0
+                if rad < 2:
+                    continue
+                Lu = arr(lay[up + k])
+                band = (Lu[..., 3] > 128)
+                band[:max(0, y0)] = False; band[y0 + 2 * R + 1:] = False; band[:, :max(0, x0)] = False; band[:, x0 + 2 * R + 1:] = False
+                col = np.median(Lu[band][:, :3], 0) if band.sum() > 10 else np.array([128, 128, 128])
+                self.discs[k + j] = (rad * 0.92, tuple(int(v) for v in col))
         d_ = PP._dir
         self.rest = {"un": d_(J["n"]["S"], J["n"]["E"]), "fn": d_(J["n"]["E"], J["n"]["T"]),
                      "uf": d_(J["f"]["S"], J["f"]["E"]), "ff": d_(J["f"]["E"], J["f"]["T"]),
@@ -749,7 +800,48 @@ class SideRig:
     def layer(self, name):
         return self._layers[name]
 
+    def _joint_disc(self, key, M, canvas):
+        """v9.2: limb-coloured disc at an elbow / knee (see __init__), anti-aliased, drawn in place"""
+        if key not in self.discs:
+            return
+        rad, col = self.discs[key]
+        k, j = key[0], key[1]
+        cx, cy = self.PP._ap(M, self.J[k][j])
+        ss = 4
+        n = int(2 * rad + 4)
+        d = Image.new("L", (n * ss, n * ss), 0)
+        ox, oy = cx - n / 2.0, cy - n / 2.0
+        from PIL import ImageDraw as _ID
+        _ID.Draw(d).ellipse([(n / 2.0 - rad) * ss, (n / 2.0 - rad) * ss, (n / 2.0 + rad) * ss, (n / 2.0 + rad) * ss], fill=255)
+        d = d.resize((n, n), Image.LANCZOS)
+        disc = Image.new("RGBA", (n, n), col + (255,)); disc.putalpha(d)
+        x, y = int(round(ox)), int(round(oy))
+        if x >= 0 and y >= 0 and x + n <= canvas.width and y + n <= canvas.height:
+            canvas.alpha_composite(disc, dest=(x, y))
+
     _warp = None  # set below
+
+    def pose_joints(self, pose):
+        """v9.2 QA: joint positions for `pose` before grounding (add self.last_offset); legs are not leaned here"""
+        PP = self.PP
+        J, rest = self.J, self.rest
+        pelvis = ((J["n"]["P"][0] + J["f"]["P"][0]) / 2, (J["n"]["P"][1] + J["f"]["P"][1]) / 2)
+        M0 = PP._rot(-pose.get("lean", 0.0), pelvis) @ PP._scale(pose.get("sx", 1.0), pose.get("sy", 1.0), pelvis)
+        out = {"neck": PP._ap(M0, ((J["n"]["S"][0] + J["f"]["S"][0]) / 2, (J["n"]["S"][1] + J["f"]["S"][1]) / 2)),
+               "pelvis": pelvis}
+        for k in ("n", "f"):
+            for (a, b), (ja, jb, jc), base in ((("u" + k, "f" + k), ("S", "E", "W"), M0), (("t" + k, "s" + k), ("P", "K", "A"), np.eye(3))):
+                if ja == "S" and "T" in J[k]:
+                    d1_ = pose.get(a, rest[a]) - rest[a]; d2_ = (pose[b] - rest[b]) if b in pose else d1_
+                    j2_ = PP._ap(PP._rot(d1_, J[k]["S"]), J[k]["E"])
+                    out[k + "T"] = PP._ap(base @ PP._tr(j2_[0] - J[k]["E"][0], j2_[1] - J[k]["E"][1]) @ PP._rot(d2_, J[k]["E"]), J[k]["T"])
+                d1 = pose.get(a, rest[a]) - rest[a]
+                d2 = (pose[b] - rest[b]) if b in pose else d1
+                R1 = PP._rot(d1, J[k][ja])
+                j2 = PP._ap(R1, J[k][jb])
+                M2 = base @ PP._tr(j2[0] - J[k][jb][0], j2[1] - J[k][jb][1]) @ PP._rot(d2, J[k][jb])
+                out[k + ja] = PP._ap(base, J[k][ja]); out[k + jb] = PP._ap(base @ R1, J[k][jb]); out[k + jc] = PP._ap(M2, J[k][jc])
+        return out
 
     def render(self, pose):
         """like puppet.Rig.render, side-on draw order: far arm, far leg, body, near leg, near arm"""
@@ -771,15 +863,15 @@ class SideRig:
         hands = {}
         def leg(k):
             Mt, Ms, foot = chain(k, "t" + k, "s" + k, "P", "K", "A", I)
-            for nm, M in (("s" + k, Ms), ("t" + k + "_cap", Mt), ("t" + k, Mt), ("s" + k + "_cap", Ms)):
-                self._warp(nm, M, canvas)
+            for nm, M in (("s" + k, Ms), ("@" + k + "K", Mt), ("@" + k + "P", Mt), ("t" + k + "_cap", Mt), ("t" + k, Mt), ("s" + k + "_cap", Ms)):
+                self._joint_disc(nm[1:], M, canvas) if nm[0] == "@" else self._warp(nm, M, canvas)
         def arm(k):
             Mu, Mf, tip = chain(k, "u" + k, "f" + k, "S", "E", "T", M0)
-            seq = [("u" + k, Mu), ("u" + k + "_cap", Mu), ("f" + k, Mf), ("f" + k + "_cap", Mf)]
+            seq = [("u" + k, Mu), ("u" + k + "_cap", Mu), ("@" + k + "E", Mu), ("f" + k, Mf), ("f" + k + "_cap", Mf)]
             if k in self.fist:
                 seq.append(("f" + k + "_fist", Mf))
             for nm, M in seq:
-                self._warp(nm, M, canvas)
+                self._joint_disc(nm[1:], M, canvas) if nm[0] == "@" else self._warp(nm, M, canvas)
             hands[k] = PP._ap(Mf, J[k]["W"]), tip
         # legs are not leaned with the body (they carry it); the body leans about the pelvis
         arm("f"); leg("f")
@@ -790,7 +882,8 @@ class SideRig:
         low = int(rows.max()) if len(rows) else self.ground
         dy = self.ground - low - pose.get("lift", 0.0) * self.stand_h
         dx = pose.get("dx", 0.0) * self.stand_h
-        out = canvas.transform(canvas.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy), resample=Image.BICUBIC)
+        self.last_offset = (dx, dy)
+        out = PP.despeckle(canvas.transform(canvas.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy), resample=Image.BICUBIC))
         if pose.get("tint"):
             r, g_, b, k = pose["tint"]
             arr = np.asarray(out).astype(np.float32)
@@ -855,16 +948,20 @@ def side_move_keys(name, rest, n):
         return [_lerp(base, crouch, 0.4), _lerp(base, crouch, 0.8), crouch, crouch], False
     tuck = _m(G, tf=100, sf=-12, tn=88, sn=-22, lean=6)
     if name == "jump":
+        # v9.2: knees come up through a half-tuck and go down through a half-extension (was 95 deg in one frame)
         return [_lerp(base, crouch, 0.6), _m(G, tf=4, sf=-2, tn=-6, sn=-8, lean=0, un=40, fn=150),
-                tuck, tuck, _m(tuck, lean=8), _m(G, tf=30, sf=0, tn=10, sn=-10, lean=2), _m(G, tf=10, sf=0, tn=-4, sn=-6),
+                _m(G, tf=55, sf=-6, tn=45, sn=-15, lean=3), tuck, _m(tuck, lean=8),
+                _m(G, tf=55, sf=-5, tn=40, sn=-15, lean=4), _m(G, tf=20, sf=0, tn=4, sn=-10, lean=2),
                 _lerp(base, crouch, 0.45)], False
     if name == "punch":
         hit = _m(S, uf=25, ff=160, un=86, fn=89, lean=9, dx=0.015)
         return [base, _m(base, un=45, fn=120, lean=5), hit, hit, _m(base, un=55, fn=110, lean=5), base], False
     if name == "kick":
-        return [_m(base, tn=20, sn=-40, lean=-4), _m(G, tf=10, sf=0, tn=62, sn=10, lean=-10),
-                _m(G, tf=8, sf=0, tn=88, sn=90, lean=-16, uf=60, ff=110), _m(G, tf=8, sf=0, tn=88, sn=90, lean=-16, uf=60, ff=110),
-                _m(G, tf=10, sf=0, tn=50, sn=-20, lean=-8), base], False
+        # v9.2: chamber -> extend -> hold -> re-chamber -> down; the shin moves <= 60 deg a frame (was 107)
+        ext = _m(G, tf=8, sf=0, tn=88, sn=90, lean=-16, uf=60, ff=110)
+        return [_m(base, tn=40, sn=-40, lean=-4), _m(G, tf=10, sf=0, tn=70, sn=0, lean=-10),
+                _m(ext, sn=60, lean=-14), ext, _m(ext, tn=80, sn=40, lean=-12),
+                _m(G, tf=10, sf=0, tn=40, sn=-15, lean=-8), base], False
     if name in ("pyramid_blast", "special1", "special_1"):      # two-handed push: the shot leaves at chest height
         wind = _m(S, un=-25, fn=60, uf=-20, ff=60, lean=-7)
         push = _m(S, un=93, fn=97, uf=91, ff=95, lean=4, dx=0.0, glow_hands="nf", glow=BLUE)   # hands at ~0.75 H = the game's spawn height
@@ -872,26 +969,27 @@ def side_move_keys(name, rest, n):
                 _m(push, orb=BLUE, orb_hand="nf", orb_r=0.05, orb_ahead=0.02), push, base], False
     if name in ("bum_fireball", "special2", "special_2"):      # low under-arm throw from a lunge: the shot leaves low
         lunge = dict(tf=58, sf=-4, tn=-34, sn=-40)
-        back = _m(S, G, un=-70, fn=-85, lean=-4)
-        down = _m(G, lunge, un=-10, fn=-15, lean=14, glow_hands="n", glow=ORANGE)
+        back = _m(S, G, un=-70, fn=-58, lean=-4)        # v9.2: elbow slightly bent FORWARD (was bent backwards)
+        down = _m(G, lunge, un=-10, fn=5, lean=14, glow_hands="n", glow=ORANGE)
         rel = _m(G, lunge, un=38, fn=50, lean=18, uf=30, ff=120, glow_hands="n", glow=ORANGE)
-        return [back, _m(back, un=-85, fn=-100, glow_hands="n", glow=ORANGE), down, rel, _m(rel, orb=ORANGE, orb_hand="n", orb_ahead=0.02),
+        return [back, _m(back, un=-85, fn=-75, glow_hands="n", glow=ORANGE), down, rel, _m(rel, orb=ORANGE, orb_hand="n", orb_ahead=0.02),
                 _m(rel, un=70, fn=80, lean=14), _lerp(_m(G, lunge, lean=10), base, 0.5), base], False
     if name == "block":
         blk = _m(S, un=58, fn=178, uf=64, ff=176, lean=-6)
         return [_lerp(base, blk, 0.5), blk, _m(blk, lean=-7), blk, _m(blk, lean=-7), blk], False
     if name == "hit":
-        return [_m(S, un=-30, fn=-10, uf=-40, ff=-25, lean=-16, dx=-0.02, tint=RED + (0.30,)),
-                _m(S, un=-40, fn=-20, uf=-50, ff=-30, lean=-19, dx=-0.03, tint=RED + (0.15,)),
-                _m(S, un=-20, fn=20, uf=-25, ff=10, lean=-13, dx=-0.025), _m(base, lean=-8, dx=-0.015),
-                _m(base, lean=-3, dx=-0.005), base], False
+        # v9.2: the guard is knocked open and comes back through in-betweens (the forearm used to swing 149 deg in a frame)
+        return [_m(S, un=-10, fn=40, uf=-5, ff=50, lean=-16, dx=-0.02, tint=RED + (0.30,)),
+                _m(S, un=-15, fn=35, uf=-10, ff=45, lean=-19, dx=-0.03, tint=RED + (0.15,)),
+                _m(S, un=0, fn=70, uf=10, ff=80, lean=-13, dx=-0.025), _m(S, un=8, fn=110, uf=25, ff=105, lean=-8, dx=-0.015),
+                _m(S, un=10, fn=140, uf=35, ff=125, lean=-3, dx=-0.005), base], False
     if name == "throw":
         grab = _m(S, un=82, fn=86, uf=84, ff=88, lean=9, dx=0.01)
         return [grab, _m(grab, un=60, fn=110, uf=60, ff=110, lean=2), _m(S, un=150, fn=165, uf=145, ff=160, lean=-12),
                 _m(S, un=168, fn=178, uf=162, ff=176, lean=-14), _m(S, un=96, fn=92, uf=96, ff=92, lean=12, dx=0.01), base], False
     if name in ("jump_attack", "jumpattack"):
         fly = _m(G, tf=100, sf=-10, tn=72, sn=74, lean=-10)
-        return [tuck, _m(G, tf=95, sf=-15, tn=55, sn=20, lean=-6), fly, fly, _m(fly, lean=-12), tuck], False
+        return [tuck, _m(G, tf=95, sf=-15, tn=55, sn=20, lean=-6), fly, _m(fly, lean=-12), _m(fly, tn=75, sn=25, lean=-8), tuck], False
     if name == "taunt":            # 'come on' - rear hand beckons, lead hand relaxed
         a_ = _m(S, uf=8, ff=25, un=80, fn=150, lean=-3)
         b_ = _m(a_, fn=105)
