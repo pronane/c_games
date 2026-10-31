@@ -63,6 +63,20 @@ var net_reconnecting := false
 var net_host_notice := ""
 var ui_layer: CanvasLayer
 const NetClientScript = preload("res://Web/NetClient.gd")
+const RigBuilder = preload("res://Scripts/Godot/ProceduralRig3D.gd")
+const AudioScript = preload("res://Scripts/Core/Audio/ProceduralAudio.gd")
+const RecorderScript = preload("res://Scripts/Core/Net/ReplayRecorder.gd")
+const ReplayerScript = preload("res://Scripts/Core/Net/ReplayPlayer.gd")
+const AimScript = preload("res://Scripts/Godot/SetPieceAim.gd")
+var audio: Node                      # ProceduralAudio (the "Audio" autoload if present)
+var recorder: Node                   # ReplayRecorder: rolling highlight buffer + optional file
+var replayer: Node                   # ReplayPlayer
+var aim: Node3D                      # SetPieceAim
+var practice := false                # free-kick practice mode
+var practice_timer := 0.0
+var replay_label: Label
+var feed_prev: Array = []
+var feed_primed := false
 var phase_timer := 0.0
 var t := 0.0
 var clock := 0.0
@@ -80,7 +94,9 @@ var away_cols := [Color("#1d4ed8"), Color("#f8fafc"), Color("#1e3a8a")]
 # ---------------------------------------------------------------- lifecycle
 func _ready() -> void:
 	rng.seed = 2026
-	rig_data = JSON.parse_string(FileAccess.get_file_as_string("res://Data/rig_default.json"))
+	# user://rig_override.json (e.g. exported from Sprite Forge) wins if it validates, else the shipped rig.
+	rig_data = RigBuilder.load_rig_data()
+	setup_modules()
 	var bones: Array = rig_data["bones"]
 	for i in range(bones.size()):
 		bone_index[bones[i]["n"]] = i
@@ -145,21 +161,47 @@ func _physics_process(delta: float) -> void:
 		cam.position = Vector3(sin(t * 0.12) * 2.0, 2.6, 8.0)
 		cam.look_at_from_position(cam.position, Vector3(0, 1.0, 0), Vector3.UP)
 		return
+	if phase == "replay":
+		update_visuals(delta)
+		if net_mode:
+			net_send_input(delta)          # you keep playing while you watch
+		if Input.is_key_pressed(KEY_ENTER) or Input.is_key_pressed(KEY_X):
+			replayer.stop()
+			_on_replay_finished()
+		return
+	if phase == "aim":
+		update_visuals(delta)
+		aim.nudge(-touch_move.x * aim.turn_speed_deg * delta)
+		aim.set_external_hold(bool(touch_down.get("shoot", false)))
+		return
 	if phase != "play":
 		phase_timer -= delta
 		if phase_timer <= 0.0:
 			if phase == "goal":
-				reset_positions()
-				phase = "kickoff"
-				phase_timer = 1.0
+				if practice:
+					setup_practice()
+				elif not start_instant_replay():
+					end_goal_break()
 			elif phase == "kickoff":
 				phase = "play"
 				say("Back under way!")
+				audio.play_whistle()
 		return
 	clock += delta * 15.0
 	step_match(delta)
+	recorder.capture(delta, players, ball, score, clock)
+	if practice:
+		practice_timer -= delta
+		if practice_timer <= 0.0:
+			setup_practice()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and phase in ["play", "aim", "replay", "goal", "kickoff"] \
+			and (net_ui == null or not net_ui.visible):
+		if event.keycode == KEY_M:
+			say("Sound on" if audio.toggle() else "Sound off")
+		elif event.keycode == KEY_V and phase == "play":
+			start_instant_replay()
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			add_zoom(-0.09)
@@ -281,63 +323,10 @@ func packed_v2(flat: Array) -> PackedVector2Array:
 	return out
 
 func mat_for(idx: int, cols: Array) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	match idx:
-		0: m.albedo_color = Color("#d69a72")
-		1: m.albedo_color = cols[0]
-		2: m.albedo_color = cols[1]
-		3: m.albedo_color = cols[2]
-		4: m.albedo_color = cols[1]
-		5: m.albedo_color = Color("#ffd166")
-		6: m.albedo_color = Color("#241811")
-		7: m.albedo_color = Color("#2b2d42")
-		_: m.albedo_color = Color("#14151a")
-	m.roughness = 0.72
-	return m
+	return RigBuilder.material_for(idx, cols)
 
 func make_rig(cols: Array) -> Node3D:
-	var root := Node3D.new()
-	var sk := Skeleton3D.new()
-	root.add_child(sk)
-	var bones: Array = rig_data["bones"]
-	for i in range(bones.size()):
-		var b: Dictionary = bones[i]
-		var idx := sk.add_bone(b["n"])
-		if int(b["p"]) >= 0:
-			sk.set_bone_parent(idx, int(b["p"]))
-		var h := v3(b["h"])
-		var ph := v3(bones[int(b["p"])]["h"]) if int(b["p"]) >= 0 else Vector3.ZERO
-		var local := h - ph
-		sk.set_bone_rest(idx, Transform3D(Basis.IDENTITY, local))
-		sk.set_bone_pose_position(idx, local) # Godot 4.7: poses are independent of rest
-	var skin := Skin.new()
-	for i in range(bones.size()):
-		skin.add_bind(i, Transform3D(Basis.IDENTITY, v3(bones[i]["h"])).inverse())
-
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = packed_v3(rig_data["pos"])
-	arrays[Mesh.ARRAY_NORMAL] = packed_v3(rig_data["nrm"])
-	arrays[Mesh.ARRAY_TEX_UV] = packed_v2(rig_data["uv"])
-	arrays[Mesh.ARRAY_BONES] = PackedInt32Array(rig_data["bi"])
-	arrays[Mesh.ARRAY_WEIGHTS] = PackedFloat32Array(rig_data["w"])
-	var am := ArrayMesh.new()
-	for mi in rig_data["mats"]:
-		var triangles: Array = rig_data["idx"][mi]
-		if triangles.size() == 0:
-			continue
-		arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(triangles)
-		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		am.surface_set_material(am.get_surface_count() - 1, mat_for(int(mi), cols))
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = am
-	mesh_inst.skin = skin
-	sk.add_child(mesh_inst)
-	mesh_inst.skeleton = NodePath("..")
-	root.set_meta("sk", sk)
-	root.set_meta("mi", mesh_inst)
-	root.set_meta("cols", cols)
-	return root
+	return RigBuilder.build(rig_data, cols)
 
 func recolor(r: Node3D, cols: Array) -> void:
 	var am := (r.get_meta("mi") as MeshInstance3D).mesh as ArrayMesh
@@ -351,6 +340,10 @@ var formation := [Vector2(-0.86, 0), Vector2(-0.52, 0), Vector2(-0.12, -0.48), V
 
 func reset_positions() -> void:
 	score = [0, 0]
+	# queue_free() only takes effect at the end of the frame, so keep the ball out of the purge and
+	# reuse it unless it is itself already doomed (show_menu() frees every child of `world`).
+	if ball_mesh != null and is_instance_valid(ball_mesh) and ball_mesh.get_parent() == world:
+		world.remove_child(ball_mesh)
 	for c in world.get_children():
 		c.queue_free()
 	players.clear()
@@ -371,7 +364,7 @@ func reset_positions() -> void:
 			r.position = p["pos"]
 			world.add_child(r)
 			rigs.append(r)
-	if ball_mesh == null or not is_instance_valid(ball_mesh):
+	if ball_mesh == null or not is_instance_valid(ball_mesh) or ball_mesh.is_queued_for_deletion():
 		ball_mesh = MeshInstance3D.new()
 		var sm := SphereMesh.new()
 		sm.radius = BALL_R
@@ -429,10 +422,13 @@ func start_match() -> void:
 	hud.visible = true
 	clock = 0.0
 	feed.clear()
+	practice = false
 	reset_positions()
 	say("Kick off! Arena FC browser edition.")
+	audio.play_whistle()
 	phase = "kickoff"
 	phase_timer = 1.0
+	start_recording()
 
 func say(text: String) -> void:
 	feed.append(text)
@@ -443,8 +439,9 @@ func say(text: String) -> void:
 func goal(side: int) -> void:
 	score[side] += 1
 	say("GOAL!  %d - %d" % [score[0], score[1]])
+	audio.play_goal()
 	phase = "goal"
-	phase_timer = 3.0
+	phase_timer = 1.5 if not practice else 2.5
 
 func step_match(delta: float) -> void:
 	if net_mode:
@@ -516,6 +513,7 @@ func step_match(delta: float) -> void:
 						ball["owner"] = i
 						p["lock"] = 0.2
 						say("Tackle!")
+						audio.play_tackle()
 			var speed := 5.4 + (0.8 if p["keeper"] else 0.0)
 			if cmd["sprint"] and i == controlled:
 				speed *= 1.3
@@ -553,8 +551,14 @@ func step_match(delta: float) -> void:
 			ball["owner"] = -1
 			ball["free"] = 1
 			say("Ball out of play — restart.")
+			audio.play_whistle()
+			if practice:
+				setup_practice()
+				return
 
-	# --- visuals ---
+	update_visuals(delta)
+
+func update_visuals(delta: float) -> void:
 	for i in range(rigs.size()):
 		var r: Node3D = rigs[i]
 		r.position = players[i]["pos"]
@@ -619,6 +623,8 @@ func _on_net_begin(_info: Dictionary) -> void:
 	start_match()                 # builds rigs / ball / ring / hud
 	net_prev_snap = {}
 	net_latest_snap = {}
+	feed_prev = []
+	feed_primed = false
 	if net_ui != null:
 		net_ui.visible = false
 	say("Online match started! Room " + net.room)
@@ -635,6 +641,7 @@ func _on_net_end(info: Dictionary) -> void:
 	if net_ui != null:
 		net_ui.visible = true
 	net_mode = false
+	recorder.stop_recording()
 	refresh_net_lobby()
 
 func _on_net_error(msg: String) -> void:
@@ -773,12 +780,19 @@ func net_apply_snapshots(delta: float) -> void:
 		ball["owner"] = int(bb.get("owner", -1))
 	var sc: Array = b.get("score", [0, 0])
 	if sc.size() >= 2:
+		if feed_primed and int(sc[0]) + int(sc[1]) > score[0] + score[1]:
+			audio.play_goal()
 		score = [int(sc[0]), int(sc[1])]
 	clock = float(b.get("clock", clock))
 	var ctrls: Array = b.get("ctrls", [])
 	if net.slot >= 0 and net.slot < ctrls.size() and int(ctrls[net.slot]) >= 0 and int(ctrls[net.slot]) < players.size():
 		controlled = int(ctrls[net.slot])
 	var evs: Array = b.get("ev", [])
+	var fresh: Array = AudioScript.new_lines(feed_prev, evs, feed_primed)
+	for line in fresh:
+		audio.play_for_event(AudioScript.event_for_text(str(line)))
+	feed_prev = evs.duplicate()
+	feed_primed = true
 	if evs.size() > 0:
 		feed.clear()
 		for e in evs:
@@ -817,7 +831,7 @@ func build_net_ui(layer: CanvasLayer) -> void:
 	v.add_child(title)
 	mk_label("Same authoritative server as the desktop game · room codes · up to 4 players", 13, Vector2.ZERO, Vector2(560, 24), v)
 	mk_label("SERVER ADDRESS", 13, Vector2.ZERO, Vector2(560, 20), v)
-	net_url_edit = mk_edit("wss://YOUR-PUBLIC-HOST/ws", "/ws")
+	net_url_edit = mk_edit("wss://YOUR-PUBLIC-HOST/arena/ws", "./ws")   # "./ws" = next to this page
 	v.add_child(net_url_edit)
 	mk_label("YOUR NAME", 13, Vector2.ZERO, Vector2(560, 20), v)
 	net_name_edit = mk_edit("Your name", "Web Player")
@@ -843,7 +857,7 @@ func build_net_ui(layer: CanvasLayer) -> void:
 	v.add_child(mk_button("RECONNECT TO LAST MATCH", func():
 		if not net.reconnect_saved():
 			_set_net_status("No saved session to reconnect to.")))
-	net_status = mk_label("Option B: Node edge proxies /ws to the .NET server. Use wss://YOUR-PUBLIC-HOST/ws.", 12, Vector2.ZERO, Vector2(560, 40), v)
+	net_status = mk_label("Online: leave the address as ./ws when you opened this page from the game server; it finds the right wss:// address itself.", 12, Vector2.ZERO, Vector2(560, 40), v)
 	v.add_child(mk_button("LEAVE / BACK TO MENU", leave_net))
 
 func net_connect(create: bool) -> void:
@@ -912,6 +926,10 @@ func update_browser_camera(delta: float) -> void:
 			fov = 58.0
 	target = look + (target - look) * cam_zoom
 	target.y = maxf(target.y, 2.2)
+	if phase == "aim":
+		look = Vector3(bpos.x + 18.0, 1.4, bpos.z)
+		target = Vector3(bpos.x - 12.0, 4.2, bpos.z)
+		fov = 52.0
 	var w := minf(1.0, delta * 3.0)
 	cam.position = cam.position.lerp(target, w)
 	cam.look_at_from_position(cam.position, look, Vector3.UP)
@@ -981,6 +999,7 @@ func pass_ball(from: int, through: bool) -> void:
 	ball["free"] = 0
 	ball["last"] = from
 	say("Pass.")
+	audio.play_pass()
 
 func shoot(from: int, power: float) -> void:
 	if ball["owner"] != from:
@@ -996,6 +1015,7 @@ func shoot(from: int, power: float) -> void:
 	ball["free"] = 0
 	ball["last"] = from
 	say("Shot!")
+	audio.play_kick()
 
 func switch_player() -> void:
 	var best := controlled
@@ -1076,8 +1096,16 @@ func build_ui() -> void:
 	feed_lbl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	feed_lbl.offset_top = -120
 	feed_lbl.offset_bottom = -20
+	replay_label = mk_label("INSTANT REPLAY   ·   ENTER to skip", 30, Vector2(0, 110), Vector2(700, 44), hud)
+	replay_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	replay_label.offset_left = -350
+	replay_label.offset_right = 350
+	replay_label.offset_top = 110
+	replay_label.offset_bottom = 154
+	replay_label.add_theme_color_override("font_color", Color("#ffd166"))
+	replay_label.visible = false
 	cam_lbl = mk_label("Broadcast  ·  zoom 147%", 14, Vector2(20, 66), Vector2(420, 28), hud)
-	var hint := mk_label("WASD / stick move · SHIFT sprint · E pass · Q through · SPACE shoot (hold) · F tackle · TAB switch · C / 1-4 camera · wheel or +/- zoom · ESC menu", 12, Vector2(20, -32), Vector2(1240, 26), hud)
+	var hint := mk_label("WASD / stick move · SHIFT sprint · E pass · Q through · SPACE shoot (hold) · F tackle · TAB switch · C / 1-4 camera · wheel or +/- zoom · V replay · M sound · ESC menu", 12, Vector2(20, -32), Vector2(1240, 26), hud)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.offset_top = -34
 	hint.offset_bottom = -8
@@ -1108,6 +1136,7 @@ func build_ui() -> void:
 	sub.add_theme_font_size_override("font_size", 15)
 	vb.add_child(sub)
 	vb.add_child(mk_button("PLAY 5-A-SIDE", start_match))
+	vb.add_child(mk_button("FREE-KICK PRACTICE (AIM)", start_practice))
 	vb.add_child(mk_button("PLAY WITH FRIENDS", show_net_ui))
 	vb.add_child(mk_button("CHARACTER EDITOR", show_editor))
 	vb.add_child(mk_button("HOW TO PLAY", show_help))
@@ -1263,7 +1292,137 @@ func build_touch(layer: CanvasLayer) -> void:
 			cb.pressed.connect(func(): add_zoom(amount))
 		hud.add_child(cb)
 
+# ---------------------------------------------------------------- modules: audio / replay / set pieces
+func setup_modules() -> void:
+	audio = get_node_or_null("/root/Audio")        # autoload when present, otherwise our own
+	if audio == null:
+		audio = AudioScript.new()
+		add_child(audio)
+	recorder = RecorderScript.new()
+	add_child(recorder)
+	replayer = ReplayerScript.new()
+	replayer.frame_ready.connect(_on_replay_frame)
+	replayer.replay_finished.connect(_on_replay_finished)
+	add_child(replayer)
+	aim = AimScript.new()
+	aim.shot_fired.connect(_on_aim_shot)
+	aim.aim_cancelled.connect(_on_aim_cancelled)
+	add_child(aim)
+
+func start_recording() -> void:
+	recorder.clear_buffer()
+	recorder.stop_recording()
+	recorder.prune(10)
+	var room_code := "LOCAL"
+	if net_mode and net != null:
+		room_code = str(net.room)
+	recorder.start_recording(room_code, int(rng.seed), TEAM)
+
+## Show the last few seconds again. Returns false when there is not enough footage yet.
+func start_instant_replay() -> bool:
+	var frames: Array = recorder.get_highlight(6.0)
+	if frames.size() < 15:
+		return false
+	replayer.load_frames(frames, recorder.record_hz, recorder.actions)
+	replayer.speed = 0.6 if not net_mode else 1.0
+	replay_label.visible = true
+	phase = "replay"
+	replayer.play()
+	return true
+
+func _on_replay_frame(fr: Dictionary) -> void:
+	var arr: Array = fr["players"]
+	for i in range(mini(arr.size(), players.size())):
+		var q: Dictionary = arr[i]
+		var np := Vector3(float(q["x"]), 0.0, float(q["z"]))
+		var old: Vector3 = players[i]["pos"]
+		players[i]["vel"] = Vector3(players[i]["vel"]).lerp((np - old) * 60.0, 0.3)
+		players[i]["pos"] = np
+		var f := Vector3(float(q["fx"]), 0.0, float(q["fz"]))
+		players[i]["facing"] = f.normalized() if f.length_squared() > 0.001 else Vector3(1, 0, 0)
+		players[i]["action"] = str(q["a"])
+	var bb: Dictionary = fr["ball"]
+	ball["pos"] = Vector3(float(bb["x"]), float(bb["y"]), float(bb["z"]))
+	ball["vel"] = Vector3.ZERO
+	ball["owner"] = int(bb["owner"])
+
+func _on_replay_finished() -> void:
+	replay_label.visible = false
+	if net_mode:
+		phase = "play"                    # live snapshots take over again on the next frame
+		recorder.clear_buffer()
+	else:
+		end_goal_break()
+
+func end_goal_break() -> void:
+	var keep: Array = score.duplicate()  # reset_positions() zeroes the score; a goal should not
+	reset_positions()
+	score = keep
+	phase = "kickoff"
+	phase_timer = 1.0
+
+func start_practice() -> void:
+	if net != null:
+		net.close()
+	net_mode = false
+	menu.visible = false
+	editor.visible = false
+	hud.visible = true
+	clock = 0.0
+	feed.clear()
+	practice = true
+	score = [0, 0]
+	setup_practice()
+	say("Free-kick practice: A/D aim · hold SPACE to charge, release to shoot · ESC menu")
+
+func setup_practice() -> void:
+	var keep: Array = score.duplicate()
+	reset_positions()
+	score = keep
+	var spot := Vector3(HALF_L - rng.randf_range(20.0, 28.0), BALL_R, rng.randf_range(-12.0, 12.0))
+	var taker := TEAM - 1
+	players[taker]["pos"] = spot - Vector3(0.9, 0, 0)
+	players[taker]["facing"] = Vector3(1, 0, 0)
+	for i in range(TEAM - 1):                          # team mates wait back
+		players[i]["pos"] = Vector3(spot.x - 6.0 - 3.0 * i, 0, spot.z + (i - 1.5) * 5.0)
+	var to_goal := (Vector3(HALF_L, 0, 0) - spot)
+	var wall_c := spot + to_goal.normalized() * 9.15    # opponents' wall at 9.15 m
+	for k in range(3):
+		var w: Dictionary = players[TEAM + 1 + k]
+		w["pos"] = wall_c + Vector3(0, 0, (k - 1) * 0.9)
+		w["facing"] = Vector3(-1, 0, 0)
+	ball["pos"] = spot
+	ball["vel"] = Vector3.ZERO
+	ball["owner"] = -1
+	ball["free"] = 0.0
+	controlled = taker
+	phase = "aim"
+	aim.start_aim(spot, Vector3(1, 0, 0))
+
+func _on_aim_shot(velocity: Vector3, _direction: Vector3, power: float) -> void:
+	ball["vel"] = velocity
+	ball["owner"] = -1
+	ball["free"] = 0.0
+	ball["last"] = controlled
+	players[controlled]["lock"] = 0.8
+	players[controlled]["action"] = "kick"
+	audio.play_kick()
+	say("Shot!  %d%% power" % int(power * 100.0))
+	practice_timer = 7.0
+	phase = "play"
+
+func _on_aim_cancelled() -> void:
+	if practice and phase == "aim":
+		show_menu()
+
 func show_menu() -> void:
+	practice = false
+	if recorder != null:
+		recorder.stop_recording()
+	if aim != null and aim.aiming:
+		aim.cancel_aim()
+	if replay_label != null:
+		replay_label.visible = false
 	net_mode = false
 	if net != null:
 		net.close()

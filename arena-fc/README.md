@@ -122,7 +122,7 @@ rendering. Here is what Arena FC actually has, and what it does not.
   Characters are stylised low‑poly procedural figures — clearly not AAA graphics.
 * No career mode, transfers, online multiplayer, VAR, skill moves, tactical depth,
   replay editor, or thousands of animation clips.
-* No audio at all (no sound effects or crowd noise).
+* Sound is procedural only (`Scripts/Core/Audio/ProceduralAudio.gd`: kicks, tackles, whistle, goal, crowd). There are no recorded samples, music or commentary.
 * Web edition is a deliberately reduced 5‑a‑side game (see §3).
 * iOS requires a Mac; Android/macOS packages are unsigned.
 

@@ -10,6 +10,10 @@ config/features=PackedStringArray("4.7", "GL Compatibility", "C#", "Forward Plus
 config/icon="res://icon.svg"
 boot_splash/show_image=false
 
+[autoload]
+
+Audio="*res://Scripts/Core/Audio/ProceduralAudio.gd"
+
 [display]
 window/size/viewport_width=1280
 window/size/viewport_height=720

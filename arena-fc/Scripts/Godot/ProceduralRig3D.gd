@@ -1,239 +1,250 @@
 # ProceduralRig3D.gd
-# Generates a skinned football player rig procedurally in Godot — no FBX/Obj needed.
-# Drop this into arena-fc/Scripts/Godot/ and instance ProceduralRig3D in your scene.
-# Exports: player mesh with 18-bone skeleton, kit colors, height scale.
-
+# Builds the skinned 18-bone player from rig data (Data/rig_default.json) at runtime, with no
+# FBX/OBJ import step. BrowserBoot.gd uses this for every player, and it is also the entry point
+# for putting Sprite Forge output on the pitch:
+#
+#   * rig JSON: drop a file in the same schema at user://rig_override.json (or pass a path)
+#     and load_rig_data() uses it instead of the shipped one. The schema is checked first, so a
+#     bad file falls back to the default instead of producing a broken mesh.
+#   * GLB: Sprite Forge's exporter writes a skinned GLB (model.glb) with baked clips. Its bones are named
+#     differently (hips / thigh_L / upperarm_L ...); load_glb() imports it at runtime and report_glb()
+#     maps those names onto Arena's and lists any required bone that is missing.
+#
+# Rig data schema: bones[{n,p,h}] (name, parent index, head position), pos/nrm/uv flat float lists,
+# bi/w four bone indices / weights per vertex, mats (material ids), idx {material id -> triangle indices}.
 class_name ProceduralRig3D
 extends Node3D
 
+const DEFAULT_RIG := "res://Data/rig_default.json"
+const OVERRIDE_RIG := "user://rig_override.json"
+
+## Bone names Arena FC's animation code poses by name (BrowserBoot.animate_rig and the C# rig).
+const REQUIRED_BONES := ["Hips", "Spine", "Chest", "Head"]
+
 @export var kit_primary: Color = Color("#d7263d")
 @export var kit_secondary: Color = Color("#f8fafc")
-@export var height: float = 1.8
-@export var build_save_to_tres: bool = false
+@export var kit_tertiary: Color = Color("#14213d")
+@export var rig_path: String = ""
 
-# 18-bone skeleton definition (matches Arena FC rig_data.json convention)
-const BONE_NAMES := [
-	"Hips", "Spine", "Chest", "Neck", "Head",
-	"LThigh", "LShin", "LFoot",
-	"RThigh", "RShin", "RFoot",
-	"LUpperArm", "LLowerArm", "LHand",
-	"RUpperArm", "RLowerArm", "RHand",
-	"Root"
-]
-
+var rig_data: Dictionary = {}
 var skeleton: Skeleton3D
 var mesh_instance: MeshInstance3D
-var skin: Skin
 
 func _ready() -> void:
-	build_rig()
+	if get_child_count() == 0:
+		build_rig()
 
+## Node-style use: instance the scene node, set the exports, and it builds itself.
 func build_rig() -> void:
-	# Clean previous
-	for child in get_children():
-		if child is MeshInstance3D or child is Skeleton3D:
-			child.queue_free()
+	for c in get_children():
+		c.queue_free()
+	rig_data = load_rig_data(rig_path)
+	var root := build(rig_data, [kit_primary, kit_secondary, kit_tertiary])
+	skeleton = root.get_meta("sk")
+	mesh_instance = root.get_meta("mi")
+	for c in root.get_children():
+		root.remove_child(c)
+		add_child(c)
+	root.free()
 
-	skeleton = Skeleton3D.new()
-	add_child(skeleton)
+# ---------------------------------------------------------------- data
+## Rig data from `path`, else user://rig_override.json, else the shipped default.
+static func load_rig_data(path: String = "") -> Dictionary:
+	var candidates: Array = []
+	if not path.is_empty():
+		candidates.append(path)
+	candidates.append(OVERRIDE_RIG)
+	candidates.append(DEFAULT_RIG)
+	for p in candidates:
+		if not FileAccess.file_exists(p):
+			continue
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(p))
+		if typeof(parsed) != TYPE_DICTIONARY:
+			push_warning("ProceduralRig3D: %s is not a JSON object, skipping" % p)
+			continue
+		var problem := validate(parsed)
+		if problem.is_empty():
+			return parsed
+		push_warning("ProceduralRig3D: %s rejected: %s" % [p, problem])
+	return {}
 
-	# Bone rest poses (local positions relative to parent)
-	var bone_positions := {
-		"Root": Vector3(0, 0, 0),
-		"Hips": Vector3(0, 0.9 * height / 1.8, 0),
-		"Spine": Vector3(0, 1.25 * height / 1.8, 0),
-		"Chest": Vector3(0, 1.55 * height / 1.8, 0),
-		"Neck": Vector3(0, 1.75 * height / 1.8, 0),
-		"Head": Vector3(0, 1.95 * height / 1.8, 0),
-		"LThigh": Vector3(-0.18, 0.9 * height / 1.8, 0),
-		"LShin": Vector3(-0.18, 0.45 * height / 1.8, 0),
-		"LFoot": Vector3(-0.18, 0.05 * height / 1.8, 0),
-		"RThigh": Vector3(0.18, 0.9 * height / 1.8, 0),
-		"RShin": Vector3(0.18, 0.45 * height / 1.8, 0),
-		"RFoot": Vector3(0.18, 0.05 * height / 1.8, 0),
-		"LUpperArm": Vector3(-0.22, 1.5 * height / 1.8, 0),
-		"LLowerArm": Vector3(-0.35, 1.25 * height / 1.8, 0),
-		"LHand": Vector3(-0.42, 1.05 * height / 1.8, 0),
-		"RUpperArm": Vector3(0.22, 1.5 * height / 1.8, 0),
-		"RLowerArm": Vector3(0.35, 1.25 * height / 1.8, 0),
-		"RHand": Vector3(0.42, 1.05 * height / 1.8, 0),
-	}
+## "" when the rig data is usable, otherwise the first problem found.
+static func validate(d: Dictionary) -> String:
+	for k in ["bones", "pos", "nrm", "uv", "bi", "w", "mats", "idx"]:
+		if not d.has(k):
+			return "missing '%s'" % k
+	var bones: Array = d["bones"]
+	if bones.is_empty():
+		return "no bones"
+	var names := {}
+	for i in range(bones.size()):
+		var b: Variant = bones[i]
+		if typeof(b) != TYPE_DICTIONARY or not (b.has("n") and b.has("p") and b.has("h")):
+			return "bone %d needs n, p and h" % i
+		if int(b["p"]) >= i:
+			return "bone %d has parent %d (parents must come first)" % [i, int(b["p"])]
+		if (b["h"] as Array).size() != 3:
+			return "bone %d head must be [x,y,z]" % i
+		names[str(b["n"])] = true
+	for r in REQUIRED_BONES:
+		if not names.has(r):
+			return "missing required bone '%s'" % r
+	var verts: int = (d["pos"] as Array).size() / 3
+	if verts == 0 or (d["pos"] as Array).size() % 3 != 0:
+		return "pos must be a flat list of x,y,z"
+	if (d["nrm"] as Array).size() != verts * 3 or (d["uv"] as Array).size() != verts * 2:
+		return "nrm/uv length does not match pos"
+	if (d["bi"] as Array).size() != verts * 4 or (d["w"] as Array).size() != verts * 4:
+		return "bi/w must have 4 entries per vertex"
+	for v in d["bi"]:
+		if int(v) < 0 or int(v) >= bones.size():
+			return "bone index %d out of range" % int(v)
+	for m in d["mats"]:
+		var tri: Variant = d["idx"][str(int(m))] if typeof(d["idx"]) == TYPE_DICTIONARY else d["idx"][int(m)]
+		if (tri as Array).size() % 3 != 0:
+			return "material %d index list is not a multiple of 3" % int(m)
+		for t in tri:
+			if int(t) < 0 or int(t) >= verts:
+				return "triangle index %d out of range" % int(t)
+	return ""
 
-	var bone_parents := {
-		"Root": -1,
-		"Hips": "Root",
-		"Spine": "Hips",
-		"Chest": "Spine",
-		"Neck": "Chest",
-		"Head": "Neck",
-		"LThigh": "Hips",
-		"LShin": "LThigh",
-		"LFoot": "LShin",
-		"RThigh": "Hips",
-		"RShin": "RThigh",
-		"RFoot": "RShin",
-		"LUpperArm": "Chest",
-		"LLowerArm": "LUpperArm",
-		"LHand": "LLowerArm",
-		"RUpperArm": "Chest",
-		"RLowerArm": "RUpperArm",
-		"RHand": "RLowerArm",
-	}
+# ---------------------------------------------------------------- building
+static func material_for(idx: int, cols: Array) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	match idx:
+		0: m.albedo_color = Color("#d69a72")        # skin
+		1: m.albedo_color = cols[0]                 # shirt
+		2: m.albedo_color = cols[1]                 # shorts
+		3: m.albedo_color = cols[2]                 # socks
+		4: m.albedo_color = cols[1]
+		5: m.albedo_color = Color("#ffd166")
+		6: m.albedo_color = Color("#241811")        # hair
+		7: m.albedo_color = Color("#2b2d42")
+		_: m.albedo_color = Color("#14151a")        # boots
+	m.roughness = 0.72
+	return m
 
-	# Add bones
-	for i in range(BONE_NAMES.size()):
-		var name := BONE_NAMES[i]
-		var idx := skeleton.add_bone(name)
-		var parent_name := bone_parents[name]
-		var parent_idx := -1
-		if parent_name >= 0:
-			parent_idx = parent_name
-		elif parent_name != "":
-			parent_idx := skeleton.find_bone(parent_name)
-		if parent_idx >= 0:
-			skeleton.set_bone_parent(idx, parent_idx)
+static func _v3(a: Array) -> Vector3:
+	return Vector3(float(a[0]), float(a[1]), float(a[2]))
 
-		var local_pos := bone_positions[name]
-		if parent_idx >= 0:
-			var parent_pos := bone_positions[BONE_NAMES[parent_idx]] if parent_name >= 0 else bone_positions[parent_name]
-			local_pos = local_pos - parent_pos
-		skeleton.set_bone_rest(idx, Transform3D(Basis.IDENTITY, local_pos))
+static func _packed_v3(flat: Array) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	out.resize(flat.size() / 3)
+	for i in range(out.size()):
+		out[i] = Vector3(float(flat[i * 3]), float(flat[i * 3 + 1]), float(flat[i * 3 + 2]))
+	return out
 
-	# Build skinned mesh (capsule-based body segments)
-	var surface_tool := SurfaceTool.new()
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+## Root Node3D > Skeleton3D > MeshInstance3D, with meta sk / mi / cols (what BrowserBoot expects).
+static func build(d: Dictionary, cols: Array) -> Node3D:
+	var root := Node3D.new()
+	var sk := Skeleton3D.new()
+	root.add_child(sk)
+	var bones: Array = d["bones"]
+	for i in range(bones.size()):
+		var b: Dictionary = bones[i]
+		var idx := sk.add_bone(str(b["n"]))
+		var par := int(b["p"])
+		if par >= 0:
+			sk.set_bone_parent(idx, par)
+		var local := _v3(b["h"]) - (_v3(bones[par]["h"]) if par >= 0 else Vector3.ZERO)
+		sk.set_bone_rest(idx, Transform3D(Basis.IDENTITY, local))
+		sk.set_bone_pose_position(idx, local)      # Godot 4.7: poses are independent of rest
+	var skin := Skin.new()
+	for i in range(bones.size()):
+		skin.add_bind(i, Transform3D(Basis.IDENTITY, _v3(bones[i]["h"])).inverse())
 
-	var mat_skin := StandardMaterial3D.new()
-	mat_skin.albedo_color = kit_secondary
-	var mat_kit := StandardMaterial3D.new()
-	mat_kit.albedo_color = kit_primary
-
-	func add_segment(bone_a: String, bone_b: String, radius: float, material: Material):
-		var pos_a := bone_positions[bone_a]
-		var pos_b := bone_positions[bone_b]
-		var dir := (pos_b - pos_a).normalized()
-		var len := pos_a.distance_to(pos_b)
-		if len < 0.01:
-			return
-		var up := Vector3.UP
-		if abs(dir.dot(up)) > 0.9:
-			up = Vector3.FORWARD
-		var side := dir.cross(up).normalized()
-		up = side.cross(dir).normalized()
-
-		var rings := 8
-		var ring_step := TAU / rings
-		var verts := []
-		var normals := []
-		var bones_arr := []
-		var weights := []
-		var uvs := []
-
-		for r in range(rings + 1):
-			var angle := r * ring_step
-			var circ := Vector3(cos(angle), 0, sin(angle))
-			var offset := (side * circ.x + up * circ.y) * radius
-			var p1 := pos_a + offset
-			var p2 := pos_b + offset
-			verts.append(p1)
-			verts.append(p2)
-			normals.append(circ)
-			normals.append(circ)
-			var ba := skeleton.find_bone(bone_a)
-			var bb := skeleton.find_bone(bone_b)
-			bones_arr.append([ba, bb])
-			bones_arr.append([ba, bb])
-			weights.append([0.5, 0.5])
-			weights.append([0.5, 0.5])
-			uvs.append([float(r) / rings, 0.0])
-			uvs.append([float(r) / rings, 1.0])
-
-		for r in range(rings):
-			var i0 := r * 2
-			var i1 := i0 + 1
-			var i2 := (r + 1) * 2
-			var i3 := i2 + 1
-			surface_tool.add_normal(normals[i0])
-			surface_tool.add_vertex(verts[i0])
-			surface_tool.add_bones(bones_arr[i0])
-			surface_tool.add_weights(weights[i0])
-			surface_tool.add_uv(uvs[i0])
-			surface_tool.add_normal(normals[i2])
-			surface_tool.add_vertex(verts[i2])
-			surface_tool.add_bones(bones_arr[i2])
-			surface_tool.add_weights(weights[i2])
-			surface_tool.add_uv(uvs[i2])
-			surface_tool.add_normal(normals[i3])
-			surface_tool.add_vertex(verts[i3])
-			surface_tool.add_bones(bones_arr[i3])
-			surface_tool.add_weights(weights[i3])
-			surface_tool.add_uv(uvs[i3])
-			surface_tool.add_normal(normals[i0])
-			surface_tool.add_vertex(verts[i0])
-			surface_tool.add_bones(bones_arr[i0])
-			surface_tool.add_weights(weights[i0])
-			surface_tool.add_uv(uvs[i0])
-			surface_tool.add_normal(normals[i3])
-			surface_tool.add_vertex(verts[i3])
-			surface_tool.add_bones(bones_arr[i3])
-			surface_tool.add_weights(weights[i3])
-			surface_tool.add_uv(uvs[i3])
-			surface_tool.add_normal(normals[i1])
-			surface_tool.add_vertex(verts[i1])
-			surface_tool.add_bones(bones_arr[i1])
-			surface_tool.add_weights(weights[i1])
-			surface_tool.add_uv(uvs[i1])
-
-	# Torso
-	add_segment("Hips", "Chest", 0.22, mat_kit)
-	# Neck + Head
-	add_segment("Chest", "Head", 0.10, mat_skin)
-	# Arms
-	add_segment("Chest", "LHand", 0.07, mat_kit)
-	add_segment("Chest", "RHand", 0.07, mat_kit)
-	# Legs
-	add_segment("Hips", "LFoot", 0.12, mat_kit)
-	add_segment("Hips", "RFoot", 0.12, mat_kit)
-
-	surface_tool.add_material(mat_kit)
-	var array_mesh := surface_tool.commit()
+	var uv := PackedVector2Array()
+	var uv_flat: Array = d["uv"]
+	uv.resize(uv_flat.size() / 2)
+	for i in range(uv.size()):
+		uv[i] = Vector2(float(uv_flat[i * 2]), float(uv_flat[i * 2 + 1]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = _packed_v3(d["pos"])
+	arrays[Mesh.ARRAY_NORMAL] = _packed_v3(d["nrm"])
+	arrays[Mesh.ARRAY_TEX_UV] = uv
+	arrays[Mesh.ARRAY_BONES] = PackedInt32Array(d["bi"])
+	arrays[Mesh.ARRAY_WEIGHTS] = PackedFloat32Array(d["w"])
+	var am := ArrayMesh.new()
+	for mi in d["mats"]:
+		var tri: Array = d["idx"][str(int(mi))] if typeof(d["idx"]) == TYPE_DICTIONARY else d["idx"][int(mi)]
+		if tri.is_empty():
+			continue
+		arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(tri)
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		am.surface_set_material(am.get_surface_count() - 1, material_for(int(mi), cols))
 	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = array_mesh
-	mesh_inst.skeleton = NodePath("Skeleton3D")
-	add_child(mesh_inst)
-
-	# Skin bind poses
-	skin = Skin.new()
-	for i in range(skeleton.get_bone_count()):
-		skin.add_bind(i, skeleton.get_bone_rest(i).inverse())
+	mesh_inst.mesh = am
 	mesh_inst.skin = skin
+	sk.add_child(mesh_inst)
+	mesh_inst.skeleton = NodePath("..")
+	root.set_meta("sk", sk)
+	root.set_meta("mi", mesh_inst)
+	root.set_meta("cols", cols)
+	return root
 
-	mesh_instance = mesh_inst
+# ---------------------------------------------------------------- Sprite Forge GLB
+## Import a Sprite Forge (or any skinned) GLB at runtime. Returns null and warns on failure.
+static func load_glb(path: String) -> Node3D:
+	var doc := GLTFDocument.new()
+	var state := GLTFState.new()
+	var err := doc.append_from_file(path, state)
+	if err != OK:
+		push_warning("ProceduralRig3D: cannot read GLB %s (error %d)" % [path, err])
+		return null
+	var scene := doc.generate_scene(state)
+	return scene as Node3D
 
-	if build_save_to_tres:
-		ResourceSaver.save(array_mesh, "res://Data/procedural_player_mesh.tres")
-		print("[ProceduralRig3D] Saved procedural mesh to res://Data/procedural_player_mesh.tres")
+## Sprite Forge's skeleton uses different bone names from Arena's. Both name sets map onto the same
+## body, so a Sprite Forge GLB can be matched to Arena bones through this table.
+const SPRITE_FORGE_BONES := {
+	"hips": "Hips", "spine": "Spine", "chest": "Chest", "neck": "Neck", "head": "Head",
+	"upperarm_l": "LUpperArm", "forearm_l": "LForearm", "hand_l": "LHand",
+	"upperarm_r": "RUpperArm", "forearm_r": "RForearm", "hand_r": "RHand",
+	"thigh_l": "LThigh", "shin_l": "LShin", "foot_l": "LFoot",
+	"thigh_r": "RThigh", "shin_r": "RShin", "foot_r": "RFoot",
+}
 
-# Create a football
-func make_ball(radius: float = 0.11) -> MeshInstance3D:
+## {arena bone name -> bone name in `sk`}. Exact Arena names win, then the Sprite Forge names above.
+static func bone_map(sk: Skeleton3D) -> Dictionary:
+	var out := {}
+	for i in range(sk.get_bone_count()):
+		var n := sk.get_bone_name(i)
+		if n in SPRITE_FORGE_BONES.values():
+			out[n] = n
+	for i in range(sk.get_bone_count()):
+		var n := sk.get_bone_name(i)
+		var alias: String = SPRITE_FORGE_BONES.get(n.to_lower(), "")
+		if not alias.is_empty() and not out.has(alias):
+			out[alias] = n
+	return out
+
+## How well a loaded GLB matches the bones Arena FC animates.
+## {skeletons, bones, map: {arena -> glb}, missing: [required arena bones not found], animations, ok}
+static func report_glb(scene: Node) -> Dictionary:
+	var sks := scene.find_children("*", "Skeleton3D", true, false)
+	var out := {"skeletons": sks.size(), "bones": [], "map": {}, "missing": [], "animations": [], "ok": false}
+	if sks.is_empty():
+		return out
+	var sk: Skeleton3D = sks[0]
+	for i in range(sk.get_bone_count()):
+		out["bones"].append(sk.get_bone_name(i))
+	out["map"] = bone_map(sk)
+	for r in REQUIRED_BONES:
+		if not out["map"].has(r):
+			out["missing"].append(r)
+	for ap in scene.find_children("*", "AnimationPlayer", true, false):
+		out["animations"].append_array((ap as AnimationPlayer).get_animation_list())
+	out["ok"] = out["missing"].is_empty()
+	return out
+
+# ---------------------------------------------------------------- misc
+static func make_ball(radius: float = 0.11) -> MeshInstance3D:
 	var sphere := SphereMesh.new()
 	sphere.radius = radius
+	sphere.height = radius * 2.0
 	var inst := MeshInstance3D.new()
 	inst.mesh = sphere
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#ffffff")
-	inst.material_override = mat
-	return inst
-
-# Create pitch markings (lines)
-func make_pitch_line(start: Vector3, end: Vector3, width: float = 0.02) -> MeshInstance3D:
-	var cyl := CylinderMesh.new()
-	cyl.radius = width
-	cyl.height = start.distance_to(end)
-	var inst := MeshInstance3D.new()
-	inst.mesh = cyl
-	inst.position = (start + end) / 2
-	inst.look_at_from_position(inst.position, end, Vector3.UP)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color("#ffffff")
 	inst.material_override = mat
