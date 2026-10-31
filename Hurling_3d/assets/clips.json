@@ -1,0 +1,125 @@
+{
+ "fps": 30,
+ "joints": [
+  "hips",
+  "spine",
+  "chest",
+  "neck",
+  "head",
+  "L_arm",
+  "L_fore",
+  "L_hand",
+  "L_thigh",
+  "L_shin",
+  "L_foot",
+  "R_arm",
+  "R_fore",
+  "R_hand",
+  "R_thigh",
+  "R_shin",
+  "R_foot",
+  "hurley"
+ ],
+ "hurley_joint": "hurley",
+ "grip_offset_m": 0.3,
+ "clips": {
+  "idle": {
+   "seconds": 2.4,
+   "frames": 72,
+   "loop": true,
+   "contact_seconds": null
+  },
+  "jog": {
+   "seconds": 0.86,
+   "frames": 26,
+   "loop": true,
+   "contact_seconds": null
+  },
+  "sprint": {
+   "seconds": 0.62,
+   "frames": 19,
+   "loop": true,
+   "contact_seconds": null
+  },
+  "solo_run": {
+   "seconds": 0.74,
+   "frames": 22,
+   "loop": true,
+   "contact_seconds": null
+  },
+  "strike_overhead": {
+   "seconds": 1.2,
+   "frames": 37,
+   "loop": false,
+   "contact_seconds": 0.6
+  },
+  "strike_ground": {
+   "seconds": 0.9,
+   "frames": 28,
+   "loop": false,
+   "contact_seconds": 0.342
+  },
+  "puckout": {
+   "seconds": 1.7,
+   "frames": 52,
+   "loop": false,
+   "contact_seconds": 1.326
+  },
+  "pickup_flick": {
+   "seconds": 1.0,
+   "frames": 31,
+   "loop": false,
+   "contact_seconds": 0.4
+  },
+  "handpass": {
+   "seconds": 0.8,
+   "frames": 25,
+   "loop": false,
+   "contact_seconds": 0.36000000000000004
+  },
+  "catch_high": {
+   "seconds": 1.1,
+   "frames": 34,
+   "loop": false,
+   "contact_seconds": 0.462
+  },
+  "block_hook": {
+   "seconds": 0.8,
+   "frames": 25,
+   "loop": false,
+   "contact_seconds": 0.32000000000000006
+  },
+  "shoulder_charge": {
+   "seconds": 0.9,
+   "frames": 28,
+   "loop": false,
+   "contact_seconds": 0.36000000000000004
+  },
+  "hit_react": {
+   "seconds": 0.7,
+   "frames": 22,
+   "loop": false,
+   "contact_seconds": null
+  },
+  "knocked_down": {
+   "seconds": 1.6,
+   "frames": 49,
+   "loop": false,
+   "contact_seconds": null
+  },
+  "get_up": {
+   "seconds": 1.4,
+   "frames": 43,
+   "loop": false,
+   "contact_seconds": null
+  },
+  "celebrate": {
+   "seconds": 1.6,
+   "frames": 49,
+   "loop": false,
+   "contact_seconds": null
+  }
+ },
+ "verts": 690,
+ "tris": 1276
+}
