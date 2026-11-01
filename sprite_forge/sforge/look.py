@@ -18,17 +18,30 @@ from PIL import Image
 from .appearance import Appearance, KEYS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATES = [os.path.join(ROOT, "assets", "makehuman", "template.glb"),
-             os.path.join(ROOT, "..", "Gaelic_Football_3d", "assets", "source", "makehuman_template.glb")]
+TEMPLATES = [os.path.join(ROOT, "assets", "makehuman", "template.glb")]      # your own rigged MakeHuman template
+# otherwise the built-in CC0 template (sforge.mhtemplate: MakeHuman CC0 body + Sprite Forge's own clips), made once
 CELL = (192, 256)
 BG = (0.36, 0.52, 0.30)
 
 
-def default_template(path=None):
+def default_template(path=None, make=True):
     for p in ([path] if path else []) + ([os.environ["SFS_MH_TEMPLATE"]] if os.environ.get("SFS_MH_TEMPLATE") else []) + TEMPLATES:
         if p and os.path.isfile(p):
             return os.path.abspath(p)
+    if path:
+        return None
+    from . import mhtemplate, human as HU
+    if os.path.isfile(mhtemplate.path()):
+        return mhtemplate.path()
+    if make and HU.have_assets():
+        return mhtemplate.ensure(log=lambda *a: None)
     return None
+
+
+def pick_clips(available, wanted="idle,run,kick_run,catch,hand_pass", fallback="idle,walk,run,jump,kick"):
+    """the wanted clips that exist in this template, else the built-in template's names"""
+    w = [c for c in wanted.split(",") if c in available]
+    return w if len(w) >= 4 else [c for c in fallback.split(",") if c in available] or list(available)[:5]
 
 
 def read_looks(text):
@@ -74,7 +87,8 @@ class Builder:
             raise FileNotFoundError("MakeHuman library missing: python3 forge.py human --setup --full")
         self.template_path = default_template(template)
         if not self.template_path:
-            raise FileNotFoundError("no MakeHuman template GLB (pass --template, or copy one to %s)" % TEMPLATES[0])
+            raise FileNotFoundError("no MakeHuman template GLB: %s not found" % template if template else
+                                    "no MakeHuman template GLB (forge.py human --setup --full makes the built-in one)")
         self.tm = mhchar.Template.load(self.template_path, self.lib)
         self.poser = mhrender.Poser(self.template_path)
         self._kits = {}
@@ -129,9 +143,10 @@ class Builder:
     def glb(self, ch, path):
         from . import glbpack
         bio = io.BytesIO(); self.kit("home").save(bio, "PNG")
-        images = dict(ch.images); images["kit"] = bio.getvalue()
+        from . import mhchar
+        images = mhchar.engine_images(ch.images); images["kit"] = bio.getvalue()
         return glbpack.pack_parts(self.template_path, path, ch.parts, images,
-                                  alpha_keys=("hair_", "eyebrows_", "eyelashes_", "facial_hair"),
+                                  alpha_keys=("hair_", "eyebrows_", "eyelashes_", "facial_hair", "beard_shell"),
                                   extras={"generator": "sprite_forge forge.py look"})
 
 
@@ -145,10 +160,14 @@ def main(argv):
     ap_.add_argument("--preview", help="write a face + full-figure preview PNG")
     ap_.add_argument("--glb", help="write the character GLB (meshes per part on the template's skeleton + clips)")
     ap_.add_argument("--sprites", help="write sprite strips + frames + meta.json to this folder")
-    ap_.add_argument("--clips", default="idle,run,kick_run,catch,hand_pass", help="clips for --sprites")
+    ap_.add_argument("--clips", default="", help="clips for --sprites (default: idle, run, kick ... whatever the template has)")
     ap_.add_argument("--frames", type=int, default=8)
     ap_.add_argument("--save-look", help="write the final look (key = value lines) here")
     ap_.add_argument("--keys", action="store_true", help="list the appearance keys and exit")
+    ap_.add_argument("--verify-blender", metavar="OUT",
+                     help="optional check: rebuild the look(s) with MakeHuman's own code in Blender (MPFB2) and compare "
+                          "with Sprite Forge's build; writes verify.json + Cycles portraits.  Needs the bpy module with "
+                          "MPFB2 installed (only for this check - Sprite Forge never needs Blender)")
     a = ap_.parse_args(argv)
     if a.keys:
         from .appearance import SLIDERS
@@ -156,6 +175,22 @@ def main(argv):
             r = ("%g..%g" % rng) if kind == "slider" else ("|".join(rng) if kind == "choice" else "#rrggbb or name")
             print("%-18s %-11s %-7s %-40s %s" % (key, group, kind, label, r))
         return 0
+    if a.verify_blender:
+        import subprocess, tempfile
+        src = a.look
+        if not src or a.set:
+            looks = read_looks(open(a.look, encoding="utf-8").read()) if a.look else [("look", Appearance())]
+            tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
+            for n, ap in looks:
+                parse_set(a.set, ap); tmp.write(look_text(ap, n))
+            tmp.close(); src = tmp.name
+        try:
+            import bpy  # noqa: F401
+        except ImportError:
+            print("the Blender check needs Blender as a Python module (pip install bpy) with MPFB2 installed; "
+                  "everything else in Sprite Forge works without it"); return 2
+        tool = os.path.join(ROOT, "tools", "mh_verify_blender.py")
+        return subprocess.call([sys.executable, tool, "--look", src, "--out", a.verify_blender])
     ap = Appearance()
     if a.look:
         looks = read_looks(open(a.look, encoding="utf-8").read())
@@ -181,7 +216,8 @@ def main(argv):
     if a.glb:
         n = b.glb(ch, a.glb); print("GLB -> %s (%.1f MB, %d meshes)" % (a.glb, n / 1e6, len(ch.parts)))
     if a.sprites:
-        b.sprites(ch, [c.strip() for c in a.clips.split(",") if c.strip()], a.frames, a.sprites)
+        clips = [c.strip() for c in a.clips.split(",") if c.strip()] or pick_clips(b.poser.clips)
+        b.sprites(ch, clips, a.frames, a.sprites)
     print("done in %.1fs" % (time.time() - t0))
     return 0
 

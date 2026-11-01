@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(HERE)); sys.path.insert(0, HERE)
 import bpy, addon_utils                                   # noqa: E402
 from mathutils import Vector                              # noqa: E402
 from sforge import mhlib                                  # noqa: E402
-from gaelic_squad import read_squad                       # noqa: E402
+from sforge.look import read_looks                       # noqa: E402
 
 EXT = "bl_ext.user_default.mpfb"
 
@@ -109,7 +109,7 @@ def portrait(path, bm):
 
 def main():
     ap_ = argparse.ArgumentParser()
-    ap_.add_argument("--squad", required=True)
+    ap_.add_argument("--squad", "--look", dest="squad", required=True, help="look file (key = value lines) or squad file ([variant] blocks)")
     ap_.add_argument("--out", required=True)
     ap_.add_argument("--pack", default="", help="MakeHuman system asset pack zip (loaded into MPFB if missing)")
     ap_.add_argument("--only", default="")
@@ -118,7 +118,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     HS = enable_mpfb(); ensure_assets(a.pack)
     lib = mhlib.Library()
-    looks = read_squad(a.squad)
+    looks = [ap for _n, ap in read_looks(open(a.squad, encoding="utf-8").read())]
     only = {int(x) for x in a.only.split(",") if x}
     report = []
     for n, ap in enumerate(looks):

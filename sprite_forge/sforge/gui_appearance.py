@@ -40,12 +40,12 @@ class AppearanceTab:
         cb.bind("<<ComboboxSelected>>", lambda e: self.changed())
         body = ttk.Frame(self.frame); body.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
         # left: scrolling controls
-        wrap = ttk.Frame(body, width=440); wrap.pack(side=tk.LEFT, fill=tk.Y); wrap.pack_propagate(False)
-        cv = tk.Canvas(wrap, highlightthickness=0, width=420)
+        wrap = ttk.Frame(body, width=470); wrap.pack(side=tk.LEFT, fill=tk.Y); wrap.pack_propagate(False)
+        cv = tk.Canvas(wrap, highlightthickness=0, width=450)
         sb = ttk.Scrollbar(wrap, orient=tk.VERTICAL, command=cv.yview)
         inner = ttk.Frame(cv)
         inner.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")))
-        cv.create_window((0, 0), window=inner, anchor="nw", width=418)
+        cv.create_window((0, 0), window=inner, anchor="nw", width=448)
         cv.configure(yscrollcommand=sb.set)
         cv.pack(side=tk.LEFT, fill=tk.BOTH, expand=True); sb.pack(side=tk.RIGHT, fill=tk.Y)
         cv.bind("<Button-4>", lambda e: cv.yview_scroll(-3, "units")); cv.bind("<Button-5>", lambda e: cv.yview_scroll(3, "units"))
@@ -75,7 +75,7 @@ class AppearanceTab:
                 else:
                     v = tk.StringVar(value=d)
                     f = ttk.Frame(lf); f.grid(row=r, column=1, columnspan=2, sticky="ew", padx=3)
-                    e = ttk.Entry(f, textvariable=v, width=12); e.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                    e = ttk.Entry(f, textvariable=v, width=9); e.pack(side=tk.LEFT)
                     e.bind("<Return>", lambda ev, k=key: self._set(k)); e.bind("<FocusOut>", lambda ev, k=key: self._set(k))
                     sw = tk.Label(f, width=3, relief=tk.SUNKEN); sw.pack(side=tk.LEFT, padx=3)
                     ttk.Button(f, text="Pick...", command=lambda k=key: self._pick(k)).pack(side=tk.LEFT)
@@ -189,16 +189,18 @@ class AppearanceTab:
         self.read_controls(); ap = self._copy()
         self._bg(lambda b: (b.glb(b.character(ap, self.kit.get()), path), "GLB -> " + path)[1])
 
-    def export_sprites(self, folder=None, clips="idle,run,kick_run,catch,hand_pass", frames=8):
+    def export_sprites(self, folder=None, clips=None, frames=8):
         folder = folder or filedialog.askdirectory(title="Sprites folder")
         if not folder:
             return
         self.read_controls(); ap = self._copy()
 
         def work(b):
+            from .look import pick_clips
+            cl = clips.split(",") if clips else pick_clips(b.poser.clips)
             ch = b.character(ap, self.kit.get())
-            b.sprites(ch, clips.split(","), frames, folder, log=lambda *a: None)
-            return "sprites (%s, %d frames, 192x256, facing right) -> %s" % (clips, frames, folder)
+            b.sprites(ch, cl, frames, folder, log=lambda *a: None)
+            return "sprites (%s, %d frames, 192x256, facing right) -> %s" % (", ".join(cl), frames, folder)
         self._bg(work)
 
     def _copy(self):
@@ -258,7 +260,7 @@ class AppearanceTab:
             face = MR.render(ch, MR.rest(ch), MR.View.face(yaw), (PREVIEW_H, PREVIEW_H), bg=(0.36, 0.52, 0.30))
             out = Image.new("RGBA", (face.width + im.width, PREVIEW_H)); out.paste(face, (0, 0)); out.paste(im, (face.width, 0))
             return out
-        clip = "run" if view.endswith("run") else "kick_run"
+        clip = "run" if view.endswith("run") else ("kick_run" if "kick_run" in b.poser.clips else "kick")
         cells = b.sprites(ch, [clip], 6, None)[clip]
         sheet = MR.contact_sheet(cells, 3)
         return sheet.resize((int(sheet.width * 0.9), int(sheet.height * 0.9)), Image.LANCZOS)
