@@ -46,7 +46,23 @@ static const char *SKIN_VS =
 "}\n";
 
 static Model model; static ModelAnimation *anims; static int animCount; static Shader sh; static int locView, locWire;
-static Texture2D kits[6]; static const char *KITS[6] = { "home", "away", "gk_home", "gk_away", "referee", "umpire" };
+static Texture2D kits[6];
+static int partVariant[512], partRole[512], nParts = 0, nVariants = 1, curVariant = 0;   /* .parts sidecar (squad GLBs) */
+enum { R_BODY, R_KIT, R_HAIR, R_BROWS, R_LASHES, R_EYES };
+static void loadParts(const char *glb)
+{
+    char path[600]; snprintf(path, sizeof path, "%.*s.parts", (int)(strlen(glb) - 4), glb);
+    FILE *f = fopen(path, "r"); if (!f) return;
+    char line[256]; int i, v; char role[32];
+    while (fgets(line, sizeof line, f)) {
+        if (line[0] == '#' || sscanf(line, "%d %d %31s", &i, &v, role) != 3 || i < 0 || i >= 512) continue;
+        partVariant[i] = v; if (v + 1 > nVariants) nVariants = v + 1;
+        partRole[i] = !strcmp(role, "kit") ? R_KIT : !strcmp(role, "hair") ? R_HAIR : !strcmp(role, "brows") ? R_BROWS :
+                      !strcmp(role, "lashes") ? R_LASHES : !strcmp(role, "eyes") ? R_EYES : R_BODY;
+        if (i + 1 > nParts) nParts = i + 1;
+    }
+    fclose(f);
+} static const char *KITS[6] = { "home", "away", "gk_home", "gk_away", "referee", "umpire" };
 
 static int findAnim(const char *n) { for (int i = 0; i < animCount; i++) if (!strcmp(anims[i].name, n)) return i; return -1; }
 static int findBone(const char *n) { for (int i = 0; i < model.boneCount; i++) if (!strcmp(model.bones[i].name, n)) return i; return 0; }
@@ -68,9 +84,19 @@ static void drawAt(Camera3D cam, Vector3 p, float yaw, int kit, int wire)
 {
     SetShaderValue(sh, locView, &cam.position, SHADER_UNIFORM_VEC3);
     int w = wire; SetShaderValue(sh, locWire, &w, SHADER_UNIFORM_INT);
-    model.materials[model.meshMaterial[0]].maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
     if (wire) rlEnableWireMode();
-    DrawModelEx(model, p, (Vector3){ 0, 1, 0 }, yaw, (Vector3){ 1, 1, 1 }, WHITE);
+    if (nParts) {                                   /* squad GLB: only this variant's meshes, kit on the garments */
+        Matrix m = MatrixMultiply(MatrixRotateY(yaw * DEG2RAD), MatrixTranslate(p.x, p.y, p.z));
+        for (int i = 0; i < model.meshCount && i < nParts; i++) {
+            if (partVariant[i] != curVariant) continue;
+            Material mat = model.materials[model.meshMaterial[i]];
+            if (partRole[i] == R_KIT) mat.maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
+            DrawMesh(model.meshes[i], mat, MatrixMultiply(m, model.transform));
+        }
+    } else {
+        model.materials[model.meshMaterial[0]].maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
+        DrawModelEx(model, p, (Vector3){ 0, 1, 0 }, yaw, (Vector3){ 1, 1, 1 }, WHITE);
+    }
     if (wire) rlDisableWireMode();
 }
 
@@ -159,6 +185,32 @@ static void cellDeform(int i, int cw, int ch)    /* joint close-ups mid-move: sh
     Camera3D c = camLook((Vector3){ 0, 1.0f, 0.1f }, 50 + i * 25, 12, 1.9f, 34);
     begin3D(c, cw, ch); drawAt(c, (Vector3){ 0 }, 0, 0, 0); end3D();
 }
+static void cellFace(int i, int cw, int ch)
+{
+    curVariant = i % nVariants;
+    pose(findAnim("idle"), 0.0f);
+    Vector3 h = boneAt("idle", 0.0f, "head"); h.y += 0.075f; h.z += 0.03f;
+    float fd = getenv("MV_FACE_DIST") ? (float)atof(getenv("MV_FACE_DIST")) : 0.62f;
+    float fy = getenv("MV_FACE_YAW") ? (float)atof(getenv("MV_FACE_YAW")) : 25.0f;
+    float fp = getenv("MV_FACE_PITCH") ? (float)atof(getenv("MV_FACE_PITCH")) : 4.0f;
+    h.y += getenv("MV_FACE_DY") ? (float)atof(getenv("MV_FACE_DY")) : 0.0f;
+    Camera3D c = camLook(h, fy, fp, fd, 30);
+    begin3D(c, cw, ch); drawAt(c, (Vector3){ 0 }, 0, 0, 0); end3D();
+}
+static void cellSquad(int i, int cw, int ch)     /* every look: face close-up row + full body row */
+{
+    curVariant = i % nVariants;
+    pose(findAnim("idle"), 0.0f);
+    if (i < nVariants) {
+        Vector3 h = boneAt("idle", 0.0f, "head"); h.y += 0.07f; h.z += 0.03f;
+        Camera3D c = camLook(h, 25, 4, 0.75f, 30);
+        begin3D(c, cw, ch); drawAt(c, (Vector3){ 0 }, 0, 0, 0); end3D();
+    } else {
+        Camera3D c = camLook((Vector3){ 0, 0.95f, 0 }, 25, 8, 3.0f, 36);
+        begin3D(c, cw, ch); ground((Vector3){ 0 }); drawAt(c, (Vector3){ 0 }, 0, (i / nVariants) % 2 ? 1 : 0, 0); end3D();
+    }
+    curVariant = 0;
+}
 static void cellKits(int i, int cw, int ch)
 {
     Camera3D c = camLook((Vector3){ 0, 0.95f, 0 }, 25, 8, 3.2f, 36);
@@ -175,6 +227,8 @@ int main(int argc, char **argv)
     InitWindow(640, 480, "modelview");
     double t0 = GetTime();
     model = LoadModel(argv[1]);
+    loadParts(argv[1]);
+    if (getenv("MV_VARIANT")) curVariant = atoi(getenv("MV_VARIANT"));
     anims = LoadModelAnimations(argv[1], &animCount);
     double tLoad = GetTime() - t0;
     int valid = 0; for (int i = 0; i < animCount; i++) valid += IsModelAnimationValid(model, anims[i]);
@@ -201,6 +255,10 @@ int main(int argc, char **argv)
     snprintf(p, sizeof p, "%s_wire.png", argv[3]); sheet(p, TextFormat("%s - wireframe: %d tris, %d verts", label, tris, verts), 4, 1, 360, 420, cellWire);
     snprintf(p, sizeof p, "%s_anims.png", argv[3]); sheet(p, TextFormat("%s - run, drop kick, catch, solo, hand pass, dive save, celebrate, knocked down", label), 6, 8, 200, 250, cellAnim);
     snprintf(p, sizeof p, "%s_deform.png", argv[3]); sheet(p, TextFormat("%s - joints mid-move: catch, drop kick, hand pass, dive", label), 4, 1, 360, 420, cellDeform);
+    if (nParts && getenv("MV_FACES")) {          /* one big face per look (for Blender comparisons) */
+        snprintf(p, sizeof p, "%s_faces.png", argv[3]); sheet(p, TextFormat("%s - faces", label), nVariants, 1, 420, 420, cellFace);
+    }
+    if (nParts) { snprintf(p, sizeof p, "%s_squad.png", argv[3]); sheet(p, TextFormat("%s - %d looks (home and away kit)", label, nVariants), nVariants, 2, 220, 300, cellSquad); }
     snprintf(p, sizeof p, "%s_kits.png", argv[3]); sheet(p, TextFormat("%s - kits", label), 6, 1, 240, 420, cellKits);
     CloseWindow();
     return 0;

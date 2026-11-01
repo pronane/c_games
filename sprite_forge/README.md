@@ -5,6 +5,40 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v10.2: change a character's features (Appearance tab, `forge.py look`)
+Realistic characters are built from the CC0 MakeHuman library: its base mesh, its own morph targets, and its fitted
+hair, eyebrows, eyelashes and eyes.  Every feature is one key, so the same look drives the Studio sliders, a text
+file, the 3D model and the sprites.
+* **Body:** arm, shoulder, chest, back, thigh and calf muscle; shoulder width.
+* **Face:** nose size and width, lips (thin to full), mouth width, cheekbones, cheek fullness, jaw, chin, eye size,
+  ears, eyebrow height.
+* **Hair:** 12 styles (bald, buzz, 4 short, long, ponytail, 2 bobs, braid, afro), any colour, a balding hairline
+  (0 full to 1 balding; strands fade out, no hard edge), stubble, moustache, goatee or beard (strand cards, not
+  paint), 12 eyebrow shapes, thin to bushy, dark or light.
+* **Skin and eyes:** 11 MakeHuman skins, 9 eye colours, optional skin tint.
+
+Use it three ways:
+* **Studio, Appearance tab:** sliders with a live preview (face + body, front, side, back, or run / kick sprites;
+  about 3-5 s per change). Load / save a look, randomise, export a GLB or sprites.
+* **Command line:** `forge.py look --set "hair_style=long01,facial_hair=beard,muscle_arms=0.8" --preview me.png
+  --glb me.glb --sprites out/ --clips run,kick_run` (`forge.py look --keys` lists every key).
+* **Squads:** a file with one `[variant]` block per look. `tools/gaelic_squad.py` builds all of them into one GLB
+  for Gaelic Football 3D (each player gets a look; skeleton and 32 clips unchanged).
+
+Sprites come from the same character: the 3D model is posed with the template's clips and drawn by a software
+renderer (`sforge/mhrender.py`: textured, lit, alpha-tested strands), 192x256 cells facing right with the feet on
+y = 248, plus `meta.json`.
+
+**Checked against MakeHuman itself.** `tools/mh_verify_blender.py` builds every squad look a second time with
+MPFB2 (MakeHuman for Blender, MakeHuman's own code) and compares: body vertices 0.000 mm apart over 9 looks, fitted
+hair / brows / lashes / eyes 0.0 mm apart, plus a Cycles portrait of each.  `tools/test_look.py` runs in CI.
+
+Setup: `forge.py human --setup --full` (CC0 MakeHuman library, about 280 MB) and a rigged template GLB (default:
+Gaelic Football 3D's MakeHuman player; or `--template`, `$SFS_MH_TEMPLATE`, `assets/makehuman/template.glb`).
+Limits: one body type per template (the template's skeleton is kept, so very large height or proportion changes
+are not offered); hair is MakeHuman's card hair, which reads well at game distance and in sprites but is not
+strand-level; the preview renderer has no shadows.
+
 ## New in v9.5: a better three-quarter view (photo3d)
 
 The 3D engine's turned views were the weakest output: an outline puffed up like a balloon, a flat face, and grain

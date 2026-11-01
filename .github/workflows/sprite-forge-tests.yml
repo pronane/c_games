@@ -25,6 +25,8 @@ jobs:
       - run: python tools/test_hd_v10.py kairo
       # v10.1: game-ready 3D character (Gaelic Football player): watertight, budget, UVs, weights, kits, clips kept
       - run: python tools/test_gamemesh.py
+      # v10.2: appearance keys -> MakeHuman targets, template re-skinning, software renderer, squad parts table
+      - run: python tools/test_look.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -263,6 +263,14 @@ so kicks release on the true contact frame.
   `python3 sprite_forge/tools/gaelic_forge.py --out /tmp/gf --install` (about 20 s; needs the Sprite Forge
   core requirements). The design (proportions, kit colours, hoops, crest) is in
   `sprite_forge/sforge/footballer.py`.
+* **Squad looks (since v3.4):** the players are realistic MakeHuman footballers with nine different looks
+  (hair styles and colours, a balding veteran, beards, a moustache, skins, eye colours, muscle and face shapes),
+  defined in `assets/source/squad.txt`.  `assets/models/gaelic_player.glb` holds every look's meshes (body, kit,
+  hair, brows, lashes, eyes, facial hair) on the same 52-bone skeleton and 32 clips, and
+  `assets/models/gaelic_player.parts` says which look and role each mesh has.  Each player draws one look; the
+  kit texture is swapped per team as before.  Rebuild: `python3 sprite_forge/tools/gaelic_squad.py --out /tmp/sq
+  --install` (needs the MakeHuman library: `python3 sprite_forge/forge.py human --setup --full`).  Without the
+  .parts file the game draws the GLB as one player, as before.
 * `tools/convert_assets.sh` rebuilds the *animation clips* and the old MakeHuman model from the FBX files
   (needs FBX2glTF, python3, numpy and pillow). After running it, run `gaelic_forge.py --install` again to
   put the Forge footballer back on the new clips.

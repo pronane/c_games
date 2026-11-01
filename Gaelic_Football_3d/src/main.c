@@ -250,6 +250,57 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
     *t = fmodf(s->runPhase, clipLen(*clip));
 }
 
+/* ---- squad looks (v3.3): gaelic_player.parts lists, per mesh, which look (variant) it belongs to and its role
+ * (body / kit / hair / brows / lashes / eyes).  Each player draws only his look's meshes; the kit texture goes on the
+ * kit garments.  Without a .parts file the model is one look (mesh 0 takes the kit), as before. */
+enum { ROLE_BODY, ROLE_KIT, ROLE_HAIR, ROLE_BROWS, ROLE_LASHES, ROLE_EYES };
+#define MAX_PARTS 512
+#define MAX_LOOKS 32
+static int partRole[MAX_PARTS], nParts = 0, nLooks = 1;
+static int lookFirst[MAX_LOOKS], lookCount[MAX_LOOKS];
+
+static void loadParts(const char *glb)
+{
+    char path[512]; snprintf(path, sizeof path, "%.*s.parts", (int)(strlen(glb) - 4), glb);
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    char line[256], role[32]; int i, v, maxv = -1;
+    for (int k = 0; k < MAX_LOOKS; k++) { lookFirst[k] = -1; lookCount[k] = 0; }
+    while (fgets(line, sizeof line, f)) {
+        if (line[0] == '#' || sscanf(line, "%d %d %31s", &i, &v, role) != 3) continue;
+        if (i < 0 || i >= MAX_PARTS || v < 0 || v >= MAX_LOOKS) continue;
+        partRole[i] = !strcmp(role, "kit") ? ROLE_KIT : !strcmp(role, "hair") ? ROLE_HAIR : !strcmp(role, "brows") ? ROLE_BROWS :
+                      !strcmp(role, "lashes") ? ROLE_LASHES : !strcmp(role, "eyes") ? ROLE_EYES : ROLE_BODY;
+        if (lookFirst[v] < 0) lookFirst[v] = i;
+        lookCount[v] = i - lookFirst[v] + 1;
+        if (v > maxv) maxv = v;
+        if (i + 1 > nParts) nParts = i + 1;
+    }
+    fclose(f);
+    if (nParts > model.meshCount || maxv < 0) { nParts = 0; nLooks = 1; return; }
+    nLooks = maxv + 1;
+    TraceLog(LOG_INFO, "GAME: %d squad looks in %d meshes", nLooks, nParts);
+}
+
+/* A view of the model holding only one look's meshes (they are contiguous in the GLB). */
+static Model lookModel(int look)
+{
+    Model m = model;
+    if (!nParts) return m;
+    look = ((look % nLooks) + nLooks) % nLooks;
+    m.meshes = &model.meshes[lookFirst[look]];
+    m.meshMaterial = &model.meshMaterial[lookFirst[look]];
+    m.meshCount = lookCount[look];
+    return m;
+}
+
+/* Players get looks in a fixed shuffle so team-mates differ; officials take their own. */
+static int lookOf(const AnimState *s)
+{
+    int i = (int)(s - as);
+    return (i * 7 + 3) % (nLooks > 0 ? nLooks : 1);
+}
+
 /* Blend and upload the pose for one character, keeping a copy for bone queries. */
 static void poseCharacter(AnimState *s, int clip, float t, float dt)
 {
@@ -274,11 +325,12 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     }
     memcpy(s->pose, scratchPose, sizeof(Transform) * nb);
     double t0 = GetTime();
+    Model lm = lookModel(lookOf(s));                              /* only this character's look is skinned */
 #if RAYLIB_VERSION_MAJOR < 6
-    if (gpuSkin) UpdateModelAnimationBones(model, scratch, 0);   /* 52 matrices; vertices skinned on the GPU */
+    if (gpuSkin) UpdateModelAnimationBones(lm, scratch, 0);      /* 52 matrices; vertices skinned on the GPU */
     else
 #endif
-    ANIM_UPDATE(model, scratch, 0);                               /* CPU skinning + VBO re-upload */
+    ANIM_UPDATE(lm, scratch, 0);                                  /* CPU skinning + VBO re-upload */
     tSkin += GetTime() - t0;
     skinnedThisFrame++;
 }
@@ -299,9 +351,21 @@ static void drawCharacter(AnimState *s, float x, float z, float yaw, int kit, fl
         return;
     }
     poseCharacter(s, clip, t, dt);
-    model.materials[model.meshMaterial[0]].maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
-    DrawModelEx(model, W(x, 0, z), (Vector3){ 0, 1, 0 }, yaw * RAD2DEG, (Vector3){ 1, 1, 1 }, WHITE);
-    if (haveLit) drawPlanarShadow(&model, W(x, 0, z), yaw * RAD2DEG);
+    Model lm = lookModel(lookOf(s));
+    if (nParts) {
+        Vector3 wp = W(x, 0, z);
+        Matrix tr = MatrixMultiply(model.transform, MatrixMultiply(MatrixRotateY(yaw), MatrixTranslate(wp.x, wp.y, wp.z)));
+        int first = lookFirst[((lookOf(s) % nLooks) + nLooks) % nLooks];
+        for (int i = 0; i < lm.meshCount; i++) {
+            Material mat = model.materials[lm.meshMaterial[i]];
+            if (partRole[first + i] == ROLE_KIT) mat.maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
+            DrawMesh(lm.meshes[i], mat, tr);
+        }
+    } else {
+        model.materials[model.meshMaterial[0]].maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
+        DrawModelEx(model, W(x, 0, z), (Vector3){ 0, 1, 0 }, yaw * RAD2DEG, (Vector3){ 1, 1, 1 }, WHITE);
+    }
+    if (haveLit) drawPlanarShadow(&lm, W(x, 0, z), yaw * RAD2DEG);
     else DrawCylinder(W(x, 0.01f, z), 0.42f, 0.42f, 0.005f, 12, (Color){ 0, 0, 0, 70 });
 }
 
@@ -1805,6 +1869,7 @@ int main(int argc, char **argv)
             for (int k = 0; k < C_COUNT; k++)
                 if (strcmp(anims[i].name, CLIP_NAMES[k]) == 0 && IsModelAnimationValid(model, anims[i])) clipIdx[k] = i;
         haveModel = model.meshCount > 0 && MODEL_BONECOUNT(model) <= MAX_BONES;
+        loadParts(PLAYER_GLB);
         for (int k = 0; k < C_COUNT; k++) if (clipIdx[k] < 0) { haveModel = 0; TraceLog(LOG_WARNING, "GAME: clip '%s' missing", CLIP_NAMES[k]); }
     }
     stadiumInit();

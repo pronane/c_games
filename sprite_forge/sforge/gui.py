@@ -152,6 +152,9 @@ class Studio:
         self.buildtab = buildtab = ttk.Frame(self.nb); self.helptab = helptab = ttk.Frame(self.nb); self.libtab_frame = ttk.Frame(self.nb)
         from .icons import tk_icon
         self.hometab = hometab = ttk.Frame(self.nb); self.nb.add(hometab, text=" Start  ", image=tk_icon("start"), compound=tk.LEFT)
+        self.looktab = ttk.Frame(self.nb); self.nb.add(self.looktab, text=" Appearance  ", image=tk_icon("start"), compound=tk.LEFT)
+        from .gui_appearance import AppearanceTab
+        self.look = AppearanceTab(self, self.looktab)
         self.nb.add(buildtab, text=" Build (advanced)  ", image=tk_icon("build"), compound=tk.LEFT)
         self.nb.add(self.libtab_frame, text=" Library  ", image=tk_icon("library"), compound=tk.LEFT)
         self.nb.add(helptab, text=" Help  ", image=tk_icon("help"), compound=tk.LEFT)
@@ -1370,7 +1373,7 @@ def run_script(app, steps, caplog=None, flag="/tmp/sfs_gui_done"):
             log_cap(st["cap"])
         if "tab" in st:
             t = st["tab"]   # v8: ints keep the pre-v8 order (0 Build, 1 Library, 2 Help); "start" = the Start tab
-            app.nb.select({"start": app.hometab, "build": app.buildtab, "library": app.libtab_frame, "help": app.helptab}.get(t) if isinstance(t, str)
+            app.nb.select({"start": app.hometab, "appearance": app.looktab, "build": app.buildtab, "library": app.libtab_frame, "help": app.helptab}.get(t) if isinstance(t, str)
                           else [app.buildtab, app.libtab_frame, app.helptab][int(t)])
         if "mode" in st:
             app.v["mode"].set(st["mode"])
@@ -1557,6 +1560,18 @@ def main():
             if d.get("open_console"):
                 app.console_cb.event_generate("<Button-1>")
                 app.root.after(300, lambda: app.console_cb.event_generate("<Down>"))
+            if d.get("appearance") is not None:  # v10.2 Appearance tab: {"values": {...}, "view": ..., "save": png}
+                a_ = d["appearance"]; app.nb.select(app.looktab)
+                if a_.get("view"):
+                    app.look.view.set(a_["view"])
+                if a_.get("randomise") is not None:
+                    app.look.randomise(a_["randomise"])
+                app.look.set_values(a_.get("values", {}))
+                def shot():
+                    if a_.get("save") and app.look.last_image is not None:
+                        app.look.last_image.save(a_["save"])
+                    finished(app)
+                app.root.after(0, lambda: app.look._rebuild(shot)); return
             if d.get("home") is not None:      # v8 Start-tab wizard: {"target": label, "step": n, "action": "preview_turn"|"build"}
                 h = d["home"]; app.nb.select(app.hometab)
                 if h.get("target"):
