@@ -91,8 +91,20 @@ def pack(template, out_path, V, N, UV, F, joints, weights, png_bytes, name="play
               for c in an["channels"] if c["target"]["node"] in remap]
         anims.append({"name": an.get("name", "anim"), "channels": ch, "samplers": sm})
     # ---- the new mesh
-    V = np.asarray(V, np.float32); N = np.asarray(N, np.float32); UV = np.asarray(UV, np.float32)
+    V = np.asarray(V, np.float32); N = np.asarray(N, np.float64); UV = np.asarray(UV, np.float32)
     F = np.asarray(F)
+    # glTF requires unit normals: vertices that only touch degenerate triangles get their neighbours' average
+    ln = np.linalg.norm(N, axis=1)
+    bad = ln < 1e-6
+    if bad.any():
+        acc = np.zeros_like(N)
+        for k in range(3):
+            for c in range(3):
+                np.add.at(acc, F[:, k], N[F[:, c]] * (~bad[F[:, c]])[:, None])
+        N[bad] = acc[bad]
+        ln = np.linalg.norm(N, axis=1)
+        N[ln < 1e-6] = (0.0, 1.0, 0.0)
+    N = (N / np.linalg.norm(N, axis=1, keepdims=True)).astype(np.float32)
     idx_t = (np.uint16, 5123) if len(V) < 65535 else (np.uint32, 5125)
     J = np.asarray(joints); jt = (np.uint8, 5121) if J.max() < 256 else (np.uint16, 5123)
     attrs = {"POSITION": out.add(V, 5126, "VEC3", 34962, True), "NORMAL": out.add(N, 5126, "VEC3", 34962),

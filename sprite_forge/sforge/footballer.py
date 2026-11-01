@@ -193,7 +193,7 @@ def build(sk: Skeleton, musc=0.8):
                 and (abs(p.a[0]) < 0.09) and p.a[2] > -0.03 and max(p.b) > 0.05:
             b.prims.append(Prim(p.bone, p.kind, p.a, p.b, p.ra, p.rb, p.rot, "cloth", "jersey", "jersey", p.grow + 0.011,
                                 (((0, -1, 0), -0.865),), M=p.M))
-    b.ell("pelvis", (0, 0.925, 0.02), (0.172, 0.10, 0.125), cuts=(((0, -1, 0), -0.865),), **G)
+    b.ell("pelvis", (0, 0.925, 0.02), (0.165, 0.10, 0.122), cuts=(((0, -1, 0), -0.865),), **G)
     b.ell("spine_01", (0, 1.06, zc + 0.004), (0.152, 0.14, 0.118), **G)
     b.ell("spine_03", (0, 1.27, zc + 0.0), (0.190, 0.178, 0.138), **G)
     b.ell("spine_03", (0, 1.40, -0.006), (0.185, 0.052, 0.088), **G)                                # shoulder yoke
@@ -205,12 +205,12 @@ def build(sk: Skeleton, musc=0.8):
         D.ell_seg(ua, ua, la, 0.10, (0.068, 0.08, 0.07), side=0.006, sgn=s, cuts=((tuple(ax), cut),), **G)
     b.ell("neck_01", (0, 1.455, 0.012), (0.080, 0.022, 0.074), **G)             # collar band
     S = dict(layer="shorts", mat="cloth", paint="shorts")
-    b.ell("pelvis", (0, 0.895, 0.004), (0.176, 0.13, 0.130), cuts=(((0, 1, 0), 0.98),), **S)        # one rounded seat
+    b.ell("pelvis", (0, 0.895, 0.006), (0.166, 0.13, 0.124), cuts=(((0, 1, 0), 0.98),), **S)        # one rounded seat
     for side, s in SIDES:
         th, cf = "thigh_" + side, "calf_" + side
         A, Bp = P(th), P(cf); ax = (Bp - A) / np.linalg.norm(Bp - A)
         hem = A + (Bp - A) * 0.36
-        D.cap(th, A + np.array([0.010 * s, 0.03, 0]), hem, 0.098, 0.092, cuts=((tuple(ax), float(ax @ hem)),), **S)
+        D.cap(th, A + np.array([0.008 * s, 0.03, 0]), hem, 0.094, 0.088, cuts=((tuple(ax), float(ax @ hem)),), **S)
     SO = dict(layer="socks", mat="cloth", paint="socks")
     for side, s in SIDES:
         cf, ft = "calf_" + side, "foot_" + side
