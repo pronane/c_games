@@ -415,6 +415,23 @@ def shutdown(request: Request, x_fretwork_client: str | None = Header(None)):
 # program on one address runs everything (used by the Windows launcher). Registered last so
 # every /api route above takes precedence. In development, Vite serves the studio instead.
 UI_DIR = Path(os.getenv('FRETWORK_UI_DIR', Path(__file__).resolve().parents[1]/'dist'))
+# Python takes file types from the Windows registry, where other software often registers .js
+# as text/plain; browsers then refuse to run the studio ("Expected a JavaScript module").
+# Set the web types explicitly so the studio loads on every machine.
+WEB_TYPES = {'.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.html': 'text/html',
+             '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm',
+             '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf',
+             '.sf2': 'application/octet-stream', '.png': 'image/png', '.ico': 'image/x-icon'}
+
+
+def fix_web_types():
+    import mimetypes
+    mimetypes.init()
+    for ext, kind in WEB_TYPES.items():
+        mimetypes.add_type(kind, ext)
+
+
 if (UI_DIR/'index.html').is_file():
     from fastapi.staticfiles import StaticFiles
+    fix_web_types()
     app.mount('/', StaticFiles(directory=UI_DIR, html=True), name='studio')

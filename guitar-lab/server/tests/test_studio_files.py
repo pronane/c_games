@@ -36,3 +36,25 @@ def test_shutdown_only_for_the_local_launcher(monkeypatch):
     import time
     time.sleep(.4)
     assert raised == [signal.SIGINT]
+
+
+def test_studio_scripts_served_as_javascript_even_if_the_registry_says_text(tmp_path, monkeypatch):
+    import mimetypes
+    (tmp_path/'index.html').write_text('<!doctype html><title>Studio</title>')
+    (tmp_path/'app.js').write_text('console.log(1)')
+    (tmp_path/'font.woff2').write_bytes(b'wOF2')
+    monkeypatch.setenv('FRETWORK_UI_DIR', str(tmp_path))
+    # What a Windows registry entry can do to Python's file types.
+    real_init = mimetypes.init
+    def broken_init(*a, **k):
+        real_init(*a, **k)
+        mimetypes.add_type('text/plain', '.js')
+    monkeypatch.setattr(mimetypes, 'init', broken_init)
+    mimetypes.add_type('text/plain', '.js')
+    from server import app as module
+    module = importlib.reload(module)
+    client = TestClient(module.app)
+    assert client.get('/app.js').headers['content-type'].startswith('text/javascript')
+    assert client.get('/font.woff2').headers['content-type'] == 'font/woff2'
+    monkeypatch.delenv('FRETWORK_UI_DIR')
+    importlib.reload(module)
