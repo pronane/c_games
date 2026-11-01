@@ -252,3 +252,15 @@ def test_webm_video_decodes_audio_only(tmp_path):
     assert 5.5 < len(audio)/sr < 6.5
     spectrum = np.abs(np.fft.rfft(audio[:sr, 0]))
     assert abs(np.argmax(spectrum) - 220) < 3      # 1-second window: one bin per Hz
+
+
+def test_musicxml_leaves_out_notes_with_no_tab_position():
+    """alphaTab fails to draw a tab staff containing a note with no string ('reading push')."""
+    notes = sa.fingering([{'time': i*.3, 'duration': .25, 'midi': m} for i, m in enumerate([55, 38, 47, 36, 59])], STANDARD, 24)
+    assert sum(n['string'] is None for n in notes) == 2
+    root = ET.fromstring(sa.musicxml(notes, [i*.6 for i in range(8)], None, STANDARD).split('\n', 2)[2])
+    pitched = [n for n in root.iter('note') if n.find('pitch') is not None]
+    assert len(pitched) == 3 and all(n.find('notations/technical/fret') is not None for n in pitched)
+    # Without tab (e.g. piano), every note stays.
+    root = ET.fromstring(sa.musicxml(notes, [i*.6 for i in range(8)], None, [], tab=False).split('\n', 2)[2])
+    assert sum(1 for n in root.iter('note') if n.find('pitch') is not None) == 5

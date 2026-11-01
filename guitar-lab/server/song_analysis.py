@@ -615,6 +615,10 @@ def musicxml(notes, beats, key, tuning, title='Transcription', part_name='Guitar
     """
     fifths = (key or {}).get('fifths', 0)
     flats = fifths < 0
+    if tab and tuning:
+        # A note with no string/fret can't sit on a tab staff, and notation viewers (alphaTab)
+        # fail to draw the score when given one. Callers report how many were left out.
+        notes = [n for n in notes if n.get('string') and n.get('fret') is not None]
     events = {}
     for n in notes:
         s = max(0, time_to_sixteenths(n['time'], beats))
