@@ -40,6 +40,7 @@ export type EngineResult = {
     mean_absolute_timing_seconds: number | null;
     pitch_difference_candidates: number;
     uncertainty: string;
+    method?: string;
   };
   provenance: {
     separation: { model: string; device: string; warning?: string };

@@ -1796,3 +1796,65 @@ footer span:first-child {
   flex-direction: column;
   gap: 6px;
 }
+.processing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 16px;
+}
+.processing-label {
+  font-size: 12px;
+  color: #55624d;
+}
+.processing .segmented button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.processing small {
+  flex-basis: 100%;
+}
+.link-button {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  color: #283f2b;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.paste-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.paste-tab textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  padding: 10px;
+  border: 1px solid #ccd7be;
+  border-radius: 6px;
+  white-space: pre;
+  overflow-x: auto;
+}
+.tab-text-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.tab-text-row label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.tab-text-row input {
+  width: 70px;
+}

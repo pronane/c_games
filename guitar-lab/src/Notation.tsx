@@ -11,12 +11,17 @@ import {
 import bravuraWoff2 from "@coderline/alphatab/font/Bravura.woff2?url";
 import bravuraWoff from "@coderline/alphatab/font/Bravura.woff?url";
 
-// Renders MusicXML as standard notation plus tablature (when the part has string/fret data).
+// Renders a score as standard notation plus tablature (when the part has string/fret data).
+// Accepts MusicXML text, or the bytes of any file alphaTab reads (Guitar Pro 3-7, MusicXML).
 export default function Notation({
   musicxml,
+  bytes,
+  track = 0,
   tab,
 }: {
-  musicxml: string;
+  musicxml?: string;
+  bytes?: Uint8Array;
+  track?: number;
   tab: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
@@ -40,21 +45,21 @@ export default function Notation({
       api = new AlphaTabApi(host.current, settings);
       api.error.on((e) => setError(e.message));
       const score = importer.ScoreLoader.loadScoreFromBytes(
-        new TextEncoder().encode(musicxml),
+        bytes ?? new TextEncoder().encode(musicxml ?? ""),
         settings,
       );
       // MusicXML tab staves import as tab-only; show notation above the tab as well.
-      for (const track of score.tracks)
-        for (const staff of track.staves) {
+      for (const t of score.tracks)
+        for (const staff of t.staves) {
           staff.showStandardNotation = true;
           staff.showTablature = tab && staff.tuning.length > 0;
         }
-      api.renderScore(score, [0]);
+      api.renderScore(score, [Math.min(track, score.tracks.length - 1)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
     return () => api?.destroy();
-  }, [musicxml, tab]);
+  }, [musicxml, bytes, track, tab]);
   return (
     <div className="notation">
       {error && (

@@ -80,3 +80,31 @@ def test_explicit_gpu_policy_does_not_fallback(monkeypatch):
     monkeypatch.setenv('FRETWORK_DEVICE', 'cuda')
     with pytest.raises(RuntimeError, match='out of memory'):
         run_with_fallback(lambda _: (_ for _ in ()).throw(RuntimeError('out of memory')), hardware(True))
+
+
+def test_score_informed_finds_wrong_missed_late_and_extra_notes():
+    from server.analysis import score_informed
+    hop = .01
+    onset = np.zeros((600, 88))
+    def hit(t, midi, s=.9):
+        onset[int(round(t/hop)), midi-21] = s
+    refs = [{'time': t, 'duration': .3, 'midi': m} for t, m in
+            [(0, 50), (.5, 52), (1, 54), (1.5, 55), (2, 57), (2.5, 59), (3, 50), (3, 57), (3, 62)]]
+    lat = .04
+    hit(0+lat, 50); hit(.5+lat, 52)
+    hit(1+lat, 55)                 # wrong: 55 played instead of 54
+    # 1.5 (55) missed entirely
+    hit(2+lat+.18, 57)             # late by 180 ms
+    hit(2.5+lat, 59, .4)           # quiet but present
+    hit(3+lat, 50); hit(3+lat, 57); hit(3+lat, 62)   # chord, all there
+    take_notes = [{'time': 4.2, 'duration': .2, 'midi': 64, 'amplitude': .8},     # extra
+                  {'time': 3.04, 'duration': .3, 'midi': 74, 'amplitude': .8}]    # overtone of 62: ignored
+    out = score_informed(refs, take_notes, {'onset': onset, 'note': onset, 'hop': hop})
+    kinds = [(f['kind'], f.get('reference_midi'), f.get('take_midi')) for f in out['findings']]
+    assert abs(out['estimated_latency_seconds']-lat) < .011
+    assert ('pitch_difference', 54, 55) in kinds
+    assert ('unmatched_reference', 55, None) in kinds
+    assert ('timing_difference', 57, 57) in kinds
+    assert ('unmatched_take', None, 64) in kinds
+    assert sum(k[0] == 'matched' for k in kinds) == 6
+    assert not any(k == ('unmatched_take', None, 74) for k in kinds)

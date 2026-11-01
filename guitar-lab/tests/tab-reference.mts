@@ -1,0 +1,11 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import * as alphaTab from "@coderline/alphatab";
+import { scoreToPiece, synthesize } from "../src/tabScore.ts";
+import { encodeWav } from "../src/engineApi.ts";
+const s = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(readFileSync("tests/fixtures/drop-d-riff.gp")), new alphaTab.Settings());
+const piece = scoreToPiece(s, 0);
+const rate = 44100, audio = synthesize(piece.notes, rate, piece.duration, 1);
+const blob = encodeWav([audio], rate);
+writeFileSync("/tmp/claude-0/tab/reference.wav", Buffer.from(await blob.arrayBuffer()));
+writeFileSync("/tmp/claude-0/tab/piece.json", JSON.stringify(piece));
+console.log(piece.notes.length, "notes", piece.duration.toFixed(2), "s", "bars", piece.bars.length);

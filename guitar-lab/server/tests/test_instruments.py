@@ -32,7 +32,7 @@ def wav():
 def test_bass_profile_used_for_separation_and_transcription(monkeypatch):
     calls = []
     monkeypatch.setattr(module.models, 'capabilities', lambda: {'separation': {'configured': True}, 'transcription': {'configured': True}})
-    monkeypatch.setattr(module.models, 'separate_instrument', lambda a, sr, stem: (calls.append(stem) or a, sr, {'stem': stem}))
+    monkeypatch.setattr(module.models, 'separate_instrument', lambda a, sr, stem, policy=None: (calls.append(stem) or a, sr, {'stem': stem}))
     def transcribe(path, **kwargs):
         calls.append(kwargs)
         return [{'id': 0, 'time': .3, 'duration': .4, 'midi': 28, 'amplitude': .6}]

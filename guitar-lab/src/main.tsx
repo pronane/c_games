@@ -21,6 +21,8 @@ import AudioInput from "./AudioInput";
 import MidiInput from "./MidiInput";
 import InstrumentSetup from "./InstrumentSetup";
 import SongLab from "./SongLab";
+import TabLab, { type TabSource } from "./TabLab";
+import ProcessingToggle, { type Processing } from "./ProcessingToggle";
 import type { BarMark } from "./feedback";
 import {
   defaultSettings,
@@ -52,7 +54,12 @@ function App() {
     [recording, setRecording] = useState(false),
     [playing, setPlaying] = useState(""),
     [demo, setDemo] = useState(false),
-    [bars, setBars] = useState<BarMark[] | undefined>(undefined);
+    [bars, setBars] = useState<BarMark[] | undefined>(undefined),
+    [referenceNotes, setReferenceNotes] = useState<
+      { time: number; duration: number; midi: number; string: number | null; fret: number | null }[] | undefined
+    >(undefined),
+    [processing, setProcessing] = useState<Processing>("cpu"),
+    [tabIncoming, setTabIncoming] = useState<TabSource | null>(null);
   const ctx = useRef<AudioContext | null>(null),
     sources = useRef<AudioBufferSourceNode[]>([]);
 
@@ -72,6 +79,7 @@ function App() {
         buffer,
       });
       setBars(undefined);
+      setReferenceNotes(undefined);
       setDemo(false);
       invalidate();
     } catch (e) {
@@ -223,6 +231,7 @@ function App() {
     }
     setReference({ name: "Studio exercise · E–C–D–G", buffer: make(false) });
     setBars(undefined);
+      setReferenceNotes(undefined);
     setTake({ name: "Practice take · a few rough edges", buffer: make(true) });
     setKind("isolated");
     setStart(0);
@@ -297,15 +306,22 @@ function App() {
             setView(next.notation === "tablature" ? "Tablature" : "Notes");
           }}
         />
+        <ProcessingToggle value={processing} onChange={setProcessing} disabled={recording || busy} />
         <SongLab
           settings={settings}
           onSettings={(next) => {
             setSettings(next);
             setView(next.notation === "tablature" ? "Tablature" : "Notes");
           }}
+          processing={processing}
+          onPracticeTab={(source) => {
+            setTabIncoming(source);
+            document.getElementById("tab-lesson")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
           onCompare={(ref, takeClip, at, seconds, barMarks) => {
             stop();
             setBars(barMarks);
+            setReferenceNotes(undefined);
             setReference(ref);
             setTake(takeClip);
             setKind("isolated");
@@ -316,6 +332,27 @@ function App() {
             document
               .getElementById("compare")
               ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        />
+        <TabLab
+          settings={settings}
+          incoming={tabIncoming}
+          onSettings={(next) => {
+            setSettings(next);
+            setView(next.notation === "tablature" ? "Tablature" : "Notes");
+          }}
+          onCompare={(ref, takeClip, at, seconds, barMarks, notes) => {
+            stop();
+            setReference(ref);
+            setTake(takeClip);
+            setKind("isolated");
+            setStart(Number(at.toFixed(2)));
+            setLength(Number(seconds.toFixed(2)));
+            setBars(barMarks);
+            setReferenceNotes(notes);
+            setDemo(false);
+            invalidate();
+            document.getElementById("compare")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
         />
         <div className="step-line" id="compare">
@@ -414,6 +451,7 @@ function App() {
               onTake={(name, buffer) => {
                 setTake({ name, buffer });
                 setBars(undefined);
+      setReferenceNotes(undefined);
                 setDemo(false);
                 invalidate();
               }}
@@ -510,6 +548,8 @@ function App() {
           length={length}
           recording={recording}
           bars={bars}
+          referenceNotes={referenceNotes}
+          processing={processing}
         />
         <section className="results">
           <div className="results-heading">

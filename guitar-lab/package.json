@@ -10,7 +10,8 @@
     "test:e2e": "node tests/browser-smoke.mjs",
     "test:inputs": "node tests/input-smoke.mjs",
     "test:profiles": "node tests/profile-smoke.mjs",
-    "test:song": "node tests/song-smoke.mjs"
+    "test:song": "node tests/song-smoke.mjs",
+    "test:tab": "node tests/tab-smoke.mjs"
   },
   "dependencies": {
     "@coderline/alphatab": "~1.8.4",

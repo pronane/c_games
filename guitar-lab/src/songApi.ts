@@ -75,12 +75,14 @@ export type Score = {
 export function createSong(
   source: { file: File } | { url: string },
   instrument: string,
+  processing: "cpu" | "gpu" = "cpu",
 ) {
   const body = new FormData();
   if ("file" in source) body.set("file", source.file);
   else body.set("url", source.url);
   body.set("consent", "true");
   body.set("instrument", instrument);
+  body.set("processing", processing);
   return api<Song>("/api/songs", { method: "POST", body });
 }
 export const getSong = (id: string) => api<Song>(`/api/songs/${id}`);
@@ -127,4 +129,29 @@ export function locateTake(id: string, take: Blob, parts: string[], role: string
   body.set("parts", parts.join(","));
   body.set("role", role);
   return api<LocateResult>(`/api/songs/${id}/locate`, { method: "POST", body });
+}
+
+export type TextTabResult = {
+  notes: { time: number; duration: number; midi: number; string: number; fret: number }[];
+  bars: number[];
+  beats: number[];
+  bpm: number;
+  warnings: string[];
+  key: KeyInfo | null;
+  musicxml: string;
+};
+/** Plain-text (ASCII) tab -> timed notes and notation, for the current instrument and tuning. */
+export function parseTextTab(body: {
+  text: string;
+  instrument: string;
+  tuning: string;
+  capo: number;
+  bpm: number;
+  title: string;
+}) {
+  return api<TextTabResult>("/api/tabs/text", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }

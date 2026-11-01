@@ -80,3 +80,125 @@ def observations(reference_notes, take_notes, alignment):
             'timing_difference_candidates': sum(f['kind'] == 'timing_difference' for f in findings),
             'estimated_latency_seconds': latency,
             'uncertainty': 'Experimental note-event comparison. Separation, transcription and alignment errors compound. No calibrated accuracy score; no finger-pressure, buzz or string-specific diagnosis.'}
+
+
+# ---------------------------------------------------------------- checking a take against known notes
+
+def score_informed(reference_notes, take_notes, post, onset_hit=.3, wrong_hit=.45, extra_amp=.5,
+                   early=.12, late=.25, near=.06, rival=.6, timing_tolerance=.12):
+    """Compare a take with notes known exactly (an uploaded tab), not with a transcription.
+
+    For each written note, ask the transcription model's onset activations whether that pitch
+    started near its written time. Far more reliable than transcribing the take blind and
+    matching two uncertain note lists. `post` holds Basic Pitch's (frames, 88) 'onset' and
+    'note' activations and 'hop' seconds per frame. Same output shape as observations().
+    """
+    onset, hop = np.asarray(post['onset']), float(post['hop'])
+    frames = onset.shape[0]
+    refs = sorted(reference_notes, key=lambda n: (n['time'], n['midi']))
+
+    def span(t0, t1):
+        return max(0, int(np.floor(t0/hop))), min(frames, int(np.ceil(t1/hop))+1)
+
+    def peak(midi, t0, t1):
+        i = midi-21
+        a, b = span(t0, t1)
+        if not 0 <= i < 88 or b <= a:
+            return 0.0, None
+        k = int(np.argmax(onset[a:b, i]))
+        return float(onset[a+k, i]), (a+k)*hop
+
+    # Each note's search window stops halfway to the next written note at the same pitch, so
+    # repeated notes cannot claim the same attack.
+    nxt = {}
+    by_pitch = {}
+    for idx, r in enumerate(refs):
+        by_pitch.setdefault(r['midi'], []).append(idx)
+    for idxs in by_pitch.values():
+        for a, b in zip(idxs, idxs[1:]+[None]):
+            nxt[a] = refs[b]['time'] if b is not None else None
+
+    def window(idx, latency):
+        r = refs[idx]
+        hi = r['time']+latency+late
+        if nxt[idx] is not None:
+            hi = min(hi, (r['time']+nxt[idx])/2+latency)
+        prev_same = [refs[j]['time'] for j in by_pitch[r['midi']] if j < idx]
+        lo = r['time']+latency-early
+        if prev_same:
+            lo = max(lo, (prev_same[-1]+r['time'])/2+latency)
+        return lo, hi
+
+    # Pass 1: the player's constant offset (latency left after recording), from clear hits.
+    offsets = []
+    for idx, r in enumerate(refs):
+        s, t = peak(r['midi'], *window(idx, 0.0))
+        if s >= .5:
+            offsets.append(t-r['time'])
+    latency = float(np.clip(np.median(offsets), -.1, .4)) if len(offsets) >= 3 else 0.0
+
+    def nearest(midi, t0, t1, expected):
+        """The attack closest to `expected` among clear onset peaks; else the strongest."""
+        i = midi-21
+        a, b = span(t0, t1)
+        if not 0 <= i < 88 or b <= a:
+            return 0.0, None
+        seg = onset[a:b, i]
+        peaks = [k for k in range(len(seg)) if seg[k] >= onset_hit
+                 and (k == 0 or seg[k] >= seg[k-1]) and (k == len(seg)-1 or seg[k] >= seg[k+1])]
+        if not peaks:
+            k = int(np.argmax(seg))
+            return float(seg[k]), (a+k)*hop
+        strongest = max(peaks, key=lambda k: seg[k])
+        close = [k for k in peaks if abs((a+k)*hop-expected) <= near and seg[k] >= rival*seg[strongest]]
+        k = min(close, key=lambda k: abs((a+k)*hop-expected)) if close else strongest
+        return float(seg[k]), (a+k)*hop
+
+    findings = []
+    claimed = []
+    for idx, r in enumerate(refs):
+        lo, hi = window(idx, latency)
+        s, t = nearest(r['midi'], lo, hi, r['time']+latency)
+        if s >= onset_hit:
+            d = t-latency-r['time']
+            claimed.append((r['midi'], t))
+            findings.append({'kind': 'timing_difference' if abs(d) > timing_tolerance else 'matched',
+                             'reference_time': r['time'], 'take_time': t, 'reference_midi': r['midi'],
+                             'take_midi': r['midi'], 'raw_timing_seconds': t-r['time'],
+                             'latency_compensated_seconds': d, 'onset_strength': s})
+            continue
+        # Not there: a strong attack a semitone or two away (or an octave) is a wrong note.
+        best = (0.0, None, None)
+        for dm in (-2, -1, 1, 2, -12, 12):
+            s2, t2 = peak(r['midi']+dm, r['time']+latency-early, r['time']+latency+late)
+            if s2 > best[0]:
+                best = (s2, r['midi']+dm, t2)
+        if best[0] >= wrong_hit and not any(m == r['midi'] for m, _ in claimed if abs(_-r['time']-latency) < .05):
+            findings.append({'kind': 'pitch_difference', 'reference_time': r['time'], 'take_time': best[2],
+                             'reference_midi': r['midi'], 'take_midi': best[1],
+                             'raw_timing_seconds': best[2]-r['time'], 'latency_compensated_seconds': best[2]-latency-r['time']})
+            claimed.append((best[1], best[2]))
+        else:
+            findings.append({'kind': 'unmatched_reference', 'reference_time': r['time'], 'reference_midi': r['midi'],
+                             'detail': 'No attack of this note heard near its written time.'})
+
+    # Extra notes: confident attacks not explained by the tab (or an overtone of a written note).
+    for n in take_notes:
+        if n.get('amplitude', 1) < extra_amp:
+            continue
+        t = n['time']-latency
+        if any(abs(m-n['midi']) in (0, 12, 19, 24) and abs(ct-n['time']) < .15 for m, ct in claimed):
+            continue
+        if any(abs(r['midi']-n['midi']) in (0, 12, 19, 24) and r['time']-.15 <= t <= r['time']+max(r['duration'], .15)
+               for r in refs):
+            continue
+        findings.append({'kind': 'unmatched_take', 'take_time': n['time'], 'take_midi': n['midi'],
+                         'detail': 'A note we did not expect from the tab.'})
+
+    timed = [abs(f['latency_compensated_seconds']) for f in findings if f['kind'] in ('matched', 'timing_difference')]
+    return {'findings': findings, 'mean_absolute_timing_seconds': float(np.mean(timed)) if timed else None,
+            'pitch_difference_candidates': sum(f['kind'] == 'pitch_difference' for f in findings),
+            'timing_difference_candidates': sum(f['kind'] == 'timing_difference' for f in findings),
+            'estimated_latency_seconds': latency, 'method': 'score-informed (written notes checked one by one)',
+            'uncertainty': 'Written notes are exact; whether each was played is judged from the transcription model\'s '
+                           'note-onset evidence. Quiet, muted or heavily bent notes can be judged missed.'}

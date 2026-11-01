@@ -39,18 +39,12 @@ import {
   type Target,
 } from "./songAudio";
 import { encodeWav } from "./engineApi";
-import {
-  addClicks,
-  clickTimes,
-  detectHits,
-  jitteredTimes,
-  loadLatency,
-  saveLatency,
-  summariseLatency,
-  type LatencyResult,
-} from "./practice";
+import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
+import { Recorder } from "./recorder";
+import LatencyCheck from "./LatencyCheck";
+import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
-import { inputConstraints, captureError, mergeCapture } from "./audioInputs";
+import { captureError } from "./audioInputs";
 import { names } from "./analysis";
 import {
   resolveInstrument,
@@ -64,6 +58,9 @@ type Props = {
   settings: InstrumentSettings;
   onSettings: (next: InstrumentSettings) => void;
   onCompare: (reference: Clip, take: Clip, start: number, length: number, bars?: BarMark[]) => void;
+  processing?: "cpu" | "gpu";
+  /** Open the generated tab in the tab lesson, e.g. after correcting it in a tab editor. */
+  onPracticeTab?: (source: TabSource) => void;
 };
 type Track = { id: string; label: string; verdict: string; isPart: boolean };
 /** A recorded take; `speed` is the playback speed it was played along to. */
@@ -74,7 +71,7 @@ type Listen = "mixer" | "only" | "without";
 const GUIDE_LEVEL = 0.25;
 const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
 
-export default function SongLab({ settings, onSettings, onCompare }: Props) {
+export default function SongLab({ settings, onSettings, onCompare, processing = "cpu", onPracticeTab }: Props) {
   const profile = resolveInstrument(settings);
   const [mode, setMode] = useState<"file" | "url">("file"),
     [file, setFile] = useState<File | null>(null),
@@ -106,8 +103,6 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     [mixUrl, setMixUrl] = useState(""),
     [clickOn, setClickOn] = useState(false),
     [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
-    [measuring, setMeasuring] = useState<"" | "speakers" | "play-along">(""),
-    [latencyNote, setLatencyNote] = useState(""),
     [locating, setLocating] = useState(false),
     [located, setLocated] = useState<(LocateResult & { buffer: AudioBuffer }) | null>(null);
   const ctx = useRef<AudioContext | null>(null),
@@ -115,7 +110,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     clock = useRef({ context: 0, song: 0, speed: 1, loop: null as null | { start: number; end: number } }),
     raf = useRef(0),
     songId = useRef<string | null>(null),
-    mic = useRef<{ stream: MediaStream; node: AudioWorkletNode } | null>(null);
+    rec = useRef<Recorder | null>(null);
 
   const result = song?.status === "complete" ? song.result : null;
   const parts: SongPart[] = result?.parts ?? [];
@@ -157,7 +152,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
   useEffect(
     () => () => {
       stop();
-      releaseMic();
+      rec.current?.release();
       if (songId.current) deleteSong(songId.current).catch(() => {});
       ctx.current?.close().catch(() => {});
     },
@@ -187,6 +182,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
       const created = await createSong(
         mode === "file" ? { file: file! } : { url: url.trim() },
         settings.instrument,
+        processing,
       );
       songId.current = created.id;
       setSong(created);
@@ -367,108 +363,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
   }, [solo, muted, listen, targetId, speed, clickOn]);
 
   // ---------------------------------------------------------------- play along + record
-  function releaseMic() {
-    mic.current?.stream.getTracks().forEach((t) => t.stop());
-    mic.current?.node.disconnect();
-    mic.current = null;
-  }
-
-  async function ensureMic(c: AudioContext) {
-    if (mic.current) return;
-    const stream = await navigator.mediaDevices.getUserMedia(inputConstraints(""));
-    await c.audioWorklet.addModule(new URL("./capture.worklet.js?no-inline", import.meta.url).href);
-    const source = c.createMediaStreamSource(stream),
-      node = new AudioWorkletNode(c, "fretwork-capture", {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [1],
-        channelCount: 1,
-        channelCountMode: "explicit",
-      }),
-      silent = c.createGain();
-    silent.gain.value = 0;
-    source.connect(node).connect(silent).connect(c.destination);
-    mic.current = { stream, node };
-  }
-
-  /** Record `frames` mono samples from now (or until Stop). */
-  function capture(frames: number, timeoutSeconds: number) {
-    const chunks: Float32Array[][] = [];
-    return new Promise<Float32Array>((resolve, reject) => {
-      const port = mic.current!.node.port;
-      const timer = setTimeout(() => reject(Error("Recording did not finish.")), timeoutSeconds * 1000);
-      port.onmessage = ({ data }) => {
-        if (data.type === "chunk") chunks.push(data.channels);
-        if (data.type === "done") {
-          clearTimeout(timer);
-          try {
-            resolve(mergeCapture(chunks, 1, data.frames)[0]);
-          } catch (e) {
-            reject(e);
-          }
-        }
-      };
-      port.postMessage({ type: "start", channels: 1, maxFrames: frames });
-    });
-  }
-
-  // ---------------------------------------------------------------- one-time delay check
-  /**
-   * Plays eight clicks and listens. "speakers": the microphone hears the clicks directly
-   * (no headphones). "play-along": wearing headphones, the player plucks a muted string on
-   * each click. Either way the median delay is what every recording on this device needs
-   * taking off so timing feedback is about the player, not the hardware.
-   */
-  async function measureLatency(method: "speakers" | "play-along") {
-    setError("");
-    setLatencyNote("");
-    stop();
-    setMeasuring(method);
-    try {
-      const c = context();
-      await c.resume();
-      await ensureMic(c);
-      const gap = method === "speakers" ? 0.5 : 0.75,
-        count = 8,
-        lead = method === "speakers" ? 0.3 : 4 * gap,
-        // Speaker test: uneven spacing, so a regular noise (a fan, a metronome, a test
-        // microphone's own beep) cannot line up with every click and look like a result.
-        clicks = method === "speakers" ? jitteredTimes(lead, count, gap) : Array.from({ length: count }, (_, i) => lead + i * gap),
-        rate = c.sampleRate,
-        seconds = clicks[clicks.length - 1] + 1.1,
-        pulse = c.createBuffer(1, Math.ceil(seconds * rate), rate),
-        data = pulse.getChannelData(0);
-      // Play-along gets a four-click count-in before the eight that are measured.
-      const all = method === "speakers" ? clicks : [...Array.from({ length: 4 }, (_, i) => i * gap), ...clicks];
-      addClicks([data], rate, all.map((time, i) => ({ time, accent: i % 4 === 0 })), 0, 1, method === "speakers" ? 0.9 : 0.5);
-      const source = c.createBufferSource();
-      source.buffer = pulse;
-      source.connect(c.destination);
-      const startAt = c.currentTime + 0.1,
-        recordFrom = c.currentTime;
-      source.start(startAt);
-      const raw = await capture(Math.ceil((startAt - recordFrom + seconds) * rate), seconds + 5);
-      const offsets = detectHits(raw, rate, clicks.map((t) => startAt - recordFrom + t));
-      const measured = summariseLatency(offsets, method);
-      if (measured.ok) {
-        saveLatency(measured);
-        setLatency(measured);
-        setLatencyNote(`Measured ${measured.ms} ms (±${measured.spreadMs} ms from ${measured.used} clicks). Recordings on this device now use it.`);
-      } else {
-        setLatencyNote(
-          measured.used < 5
-            ? method === "speakers"
-              ? "The microphone didn't hear the clicks clearly. Take headphones off, turn the volume up and try again."
-              : "Not enough plucks were heard. Play one short, loud note on every click and try again."
-            : `Results were too uneven to trust (±${measured.spreadMs} ms). Try again${method === "play-along" ? ", keeping each pluck right on the click" : " in a quieter room"}.`,
-        );
-      }
-    } catch (e) {
-      setError(captureError(e));
-    } finally {
-      setMeasuring("");
-    }
-  }
+  const recorder = () => rec.current ?? (rec.current = new Recorder(context()));
 
   // ---------------------------------------------------------------- an earlier recording
   /** Upload a recording made elsewhere; find where in the song it belongs, then use it as a take. */
@@ -521,7 +416,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     try {
       const c = context();
       await c.resume();
-      await ensureMic(c);
+      await recorder().ensure();
       setPreparing(speed !== 1);
       await new Promise((r) => setTimeout(r, 0));
       const band = toBuffer(render("without", range.start, range.end, c.sampleRate, { guide, click: clickOn }), c.sampleRate);
@@ -550,12 +445,12 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
       const recordFrom = c.currentTime;
       const totalFrames = Math.ceil((songStart - recordFrom + length + 0.6) * c.sampleRate);
       setRecording(true);
-      const raw = await capture(totalFrames, length + countIn + 10);
+      const raw = await recorder().capture(totalFrames, length + countIn + 10);
       setRecording(false);
       stop();
       // Trim to the song start, then remove the delay: the measured one if this device has
       // been calibrated, otherwise what the browser reports (often an underestimate).
-      const reported = latency?.ok ? latency.ms / 1000 : (c.outputLatency || 0) + (c.baseLatency || 0);
+      const reported = recorder().delay(latency);
       const lead = Math.round((songStart - recordFrom + reported) * c.sampleRate);
       const aligned = raw.subarray(Math.min(raw.length, Math.max(0, lead)));
       // Refine against the music being replaced: attack-envelope cross-correlation.
@@ -955,6 +850,21 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
               <a className="download" href={xmlUrl} download={`${song!.name.replace(/\.[^.]+$/, "")} - ${score.label}.musicxml`}>
                 <Download size={14} /> Download MusicXML (opens in MuseScore, Guitar Pro, Sibelius)
               </a>
+              {onPracticeTab && (
+                <div className="presets">
+                  <button
+                    onClick={() =>
+                      onPracticeTab({ name: `${song!.name.replace(/\.[^.]+$/, "")} - ${score.label}`, musicxml: score.musicxml })
+                    }
+                  >
+                    Practise from this tab
+                  </button>
+                </div>
+              )}
+              <p className="helper">
+                Notes look wrong? Download the MusicXML, fix it in MuseScore or Guitar Pro, then load it under "Learn from a tab
+                or score" below. Or use a tab you already have.
+              </p>
             </div>
           )}
 
@@ -966,25 +876,13 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
             {speed !== 1 ? ` at ${Math.round(speed * 100)}% speed` : ""} while we record you. Afterwards your take
             drops into the song in its place.
           </p>
-          <div className="latency">
-            <p className="helper">
-              <b>Recording delay:</b>{" "}
-              {latency?.ok
-                ? `${latency.ms} ms, measured ${latency.measured} (${latency.method === "speakers" ? "speaker test" : "play-along test"}).`
-                : "not measured on this device yet. Timing results include your device's delay until you measure it once."}
-            </p>
-            <div className="presets">
-              <button disabled={!!measuring || recording} onClick={() => measureLatency("speakers")}>
-                {measuring === "speakers" ? "Listening…" : "Measure with speakers"}
-              </button>
-              <button disabled={!!measuring || recording} onClick={() => measureLatency("play-along")}>
-                {measuring === "play-along" ? "Pluck on each click…" : "Measure with headphones"}
-              </button>
-            </div>
-            {measuring === "speakers" && <p className="helper">Headphones off, volume up, stay quiet for five seconds.</p>}
-            {measuring === "play-along" && <p className="helper">After four count-in clicks, pluck a muted string exactly on each of the next eight clicks.</p>}
-            {latencyNote && <p className="helper" role="status">{latencyNote}</p>}
-          </div>
+          <LatencyCheck
+            recorder={recorder}
+            latency={latency}
+            disabled={recording}
+            onBefore={stop}
+            onMeasured={setLatency}
+          />
           <label className="consent">
             <input id="guide" type="checkbox" checked={guide} onChange={(e) => setGuide(e.target.checked)} />
             <span>Keep the original quietly in my headphones as a guide</span>
@@ -995,7 +893,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
                 <Mic size={15} /> Play along & record
               </button>
             ) : (
-              <button className="primary recording" onClick={() => mic.current?.node.port.postMessage({ type: "stop" })}>
+              <button className="primary recording" onClick={() => rec.current?.stop()}>
                 <Square size={15} /> Stop
               </button>
             )}

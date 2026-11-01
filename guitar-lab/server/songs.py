@@ -28,6 +28,7 @@ from . import models
 from . import song_analysis as sa
 from .instruments import CATALOGUE, resolve_profile
 from .runtime import EXECUTOR, LOCK, ROOT, TTL_SECONDS
+from .devices import policy_for
 
 router = APIRouter(prefix='/api/songs')
 SONGS: dict = {}
@@ -52,6 +53,7 @@ class Song:
     cancelled: bool = False
     active: bool = True
     notes: dict = field(default_factory=dict)     # part id -> transcribed notes (pre-fingering)
+    policy: str = 'cpu'                           # separation device: 'cpu' or 'auto' (graphics card)
 
 
 def client(x_fretwork_client):
@@ -207,7 +209,7 @@ def run_song(song: Song):
         write_track(tracks, 'mix', audio, sr)
         check(song)
         song.status, song.stage = 'separating', 'Separating every instrument (htdemucs_6s, six stems)'
-        stems, sr_s, provenance = models.run_demucs(audio, sr)
+        stems, sr_s, provenance = models.run_demucs(audio, sr, song.policy)
         check(song)
         song.stage = 'Finding which instruments play'
         peak = float(np.max(np.abs(audio)))
@@ -322,11 +324,15 @@ def run_song(song: Song):
 
 @router.post('', status_code=202)
 async def create_song(file: UploadFile | None = File(None), url: str | None = Form(None),
-                      consent: bool = Form(False), instrument: str = Form('guitar'),
+                      consent: bool = Form(False), instrument: str = Form('guitar'), processing: str = Form('cpu'),
                       x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
         raise HTTPException(422, 'Explicit upload consent is required.')
+    try:
+        policy = policy_for(processing)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     if (file is None) == (not url):
         raise HTTPException(422, 'Provide either a song file or a link, not both.')
     try:
@@ -346,7 +352,7 @@ async def create_song(file: UploadFile | None = File(None), url: str | None = Fo
         folder = ROOT/f'song-{key}'
         folder.mkdir(mode=0o700)
         song = Song(key, folder, instrument, (file.filename if file else '') or 'Uploaded song',
-                    stage='Receiving the song')
+                    stage='Receiving the song', policy=policy)
         SONGS[key] = song
     try:
         if file is not None:

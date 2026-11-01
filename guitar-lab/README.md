@@ -1,4 +1,37 @@
-# Fretwork — guitar comparison prototype v0.3
+# Fretwork — guitar comparison prototype v0.4
+
+## Learn from a tab or score (new in v0.4)
+
+Separation can't guarantee a clean part from every recording, so this mode doesn't depend on it.
+
+1. Upload a Guitar Pro file (.gp, .gp3–.gp5, .gpx), MusicXML (.musicxml, .xml, .mxl) or a text tab (.txt), or paste a text tab.
+2. Pick the track. The app shows notation and tab, says if the tab needs a different tuning or capo and retunes the tuner in one tap, and offers a Guitar Pro download.
+3. Play the app's own rendition (a plucked-string synth at the exact written pitches), with click, loop and 50–100% speed without pitch change.
+4. Record along with a count-in, with the tab quietly in your headphones or just the click. The measured device delay is removed.
+5. **Check my take against the tab**: each written note is checked against your recording ("did this pitch start near its written time?"), rather than comparing two uncertain transcriptions. The result is the score per bar, the top issues and a next step.
+
+Text tab has no rhythm: notes are placed by where they sit between bar lines and rounded to sixteenths. Guitar Pro and MusicXML repeats are played once in written order.
+
+The song breakdown links here too: **Practise from this tab** sends its generated tab to this mode. If the generated notes are wrong, download the MusicXML, fix it in MuseScore or Guitar Pro, and load the corrected file.
+
+### How reliable is the tab check? (GuitarSet, 60 real performances, 13,807 notes)
+
+Each recording is checked against exactly what the player played, so anything flagged is a false alarm. Mistakes are then planted by editing the tab.
+
+| | |
+| --- | --- |
+| Correct notes called correct | 89% |
+| Correct notes wrongly flagged: wrong note / missed / off the beat | 2.6% / 2.1% / 6.8% |
+| Extra notes flagged per minute | 3.6 |
+| Wrong notes caught (1–2 semitones off) | 72% |
+| Missed notes caught | 68% |
+| Notes 150 ms late caught | 42% |
+
+On an original Drop D riff played back on a different guitar sound with three planted mistakes (a wrong note, a missed note, a late note), it reported exactly those three and nothing else. Settings favour few false accusations over catching every small timing slip. Run `python -m benchmarks.feedback_check` to reproduce.
+
+## Processing: CPU or graphics card
+
+Separation runs on the CPU by default. **Separate instruments on → Graphics card** is enabled when the analysis server has a usable NVIDIA (CUDA) or Apple (MPS) GPU. It is much faster and falls back to CPU, with a note, if the card runs out of memory. Transcription always runs on the CPU. The server default can be changed with `FRETWORK_DEVICE` (`cpu`, `auto`, `cuda`, `mps`).
 
 ## Learn a song (new in v0.3)
 
