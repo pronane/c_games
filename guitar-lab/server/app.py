@@ -7,10 +7,11 @@ import math
 import os
 from pathlib import Path
 import shutil
+import threading
 import time
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import numpy as np
@@ -395,3 +396,25 @@ def delete_job(key: str, x_fretwork_client: str | None = Header(None)):
             JOBS.pop(key, None)
     # Running inference cannot be interrupted safely in this single-worker version.
     # Session is immediately inaccessible; files removed when current stage exits.
+
+
+@app.post('/api/shutdown', status_code=202)
+def shutdown(request: Request, x_fretwork_client: str | None = Header(None)):
+    """Let the Windows uninstaller/updater stop a running app. Only enabled by the local
+    launcher (FRETWORK_LOCAL_APP=1) and only for requests from this computer."""
+    client(x_fretwork_client)
+    if os.getenv('FRETWORK_LOCAL_APP') != '1' or (request.client and request.client.host not in ('127.0.0.1', '::1')):
+        raise HTTPException(403, 'Shutdown is only available to the local launcher.')
+    import signal
+    threading.Timer(.2, lambda: signal.raise_signal(signal.SIGINT)).start()
+    return {'stopping': True}
+
+
+# ---------------------------------------------------------------- the studio itself
+# When the studio has been built (npm run build -> dist/), serve it from here too, so one
+# program on one address runs everything (used by the Windows launcher). Registered last so
+# every /api route above takes precedence. In development, Vite serves the studio instead.
+UI_DIR = Path(os.getenv('FRETWORK_UI_DIR', Path(__file__).resolve().parents[1]/'dist'))
+if (UI_DIR/'index.html').is_file():
+    from fastapi.staticfiles import StaticFiles
+    app.mount('/', StaticFiles(directory=UI_DIR, html=True), name='studio')

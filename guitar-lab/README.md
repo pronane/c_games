@@ -1,5 +1,8 @@
 # Fretwork — guitar comparison prototype v0.4
 
+**On Windows:** double-click `windows\install.bat`, then use the **Guitar Lab** shortcut. See [windows/README.md](windows/README.md).
+Everything runs on your PC: the engine also serves the studio at `http://localhost:8000`.
+
 ## Learn from a tab or score (new in v0.4)
 
 Separation can't guarantee a clean part from every recording, so this mode doesn't depend on it.
