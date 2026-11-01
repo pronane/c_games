@@ -46,6 +46,22 @@ def test_one_to_one_matching_and_no_false_certainty():
     assert 'No calibrated' in result['uncertainty']
 
 
+def test_late_correct_note_is_timing_not_pitch():
+    ref = [{'time': 1., 'midi': 60, 'duration': .3}, {'time': 1.3, 'midi': 64, 'duration': .3}]
+    take = [{'time': 1.25, 'midi': 60, 'duration': .3}, {'time': 1.3, 'midi': 64, 'duration': .3}]
+    result = observations(ref, take, {'map': [[0, 0], [2, 2]]})
+    assert [f['kind'] for f in result['findings']] == ['timing_difference', 'matched']
+    assert result['findings'][0]['latency_compensated_seconds'] == pytest.approx(.25)
+
+
+def test_latency_is_compensated_for_labels_but_reported_raw():
+    ref = [{'time': 1., 'midi': 60, 'duration': .3}]
+    take = [{'time': 1.06, 'midi': 60, 'duration': .3}]
+    result = observations(ref, take, {'map': [[0, 0], [2, 2]], 'median_offset_seconds': -.06})
+    assert result['findings'][0]['kind'] == 'matched'
+    assert result['findings'][0]['raw_timing_seconds'] == pytest.approx(.06)
+
+
 def test_alignment_on_identical_musical_signal():
     sr = 22050
     t = np.arange(sr*2)/sr

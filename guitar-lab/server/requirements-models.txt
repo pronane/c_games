@@ -2,4 +2,5 @@
 # Install matching torch/torchaudio builds first, and Basic Pitch with --no-deps
 # separately as documented in README to avoid unnecessary TensorFlow installation.
 -r requirements-transcription.txt
-demucs==4.0.1
+# 4.1.0 loads checkpoints under PyTorch >= 2.6 (weights_only default); 4.0.1 fails.
+demucs==4.1.0

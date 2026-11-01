@@ -28,7 +28,10 @@ self.onmessage = (
     for (let t = 0; allowChords && t < duration; t += 2)
       chords.push({
         time: t,
-        name: chord(extract(b.slice(t * 16000, (t + 2) * 16000), 16000).chroma)
+        name: chord(
+          extract(b.slice(t * 16000, (t + 2) * 16000), 16000, midi_min, midi_max)
+            .chroma,
+        )
           .name,
       });
     self.postMessage({

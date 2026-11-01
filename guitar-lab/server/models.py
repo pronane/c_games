@@ -86,12 +86,19 @@ def separate_stem(audio, sr, stem):
                                       'quality': 'Uncalibrated; human listening approval required.'}
 
 
+# Basic Pitch's library defaults (0.5/0.3) roughly tripled the note count on plucked guitar
+# (harmonics, ringing notes re-triggered). 0.7/0.5 raised onset+pitch F1 from 0.48 to 0.86
+# on an isolated test part and 0.50 to 0.72 on a separated stem. Validate on real recordings.
+ONSET_THRESHOLD = float(os.getenv('FRETWORK_ONSET_THRESHOLD', '0.7'))
+FRAME_THRESHOLD = float(os.getenv('FRETWORK_FRAME_THRESHOLD', '0.5'))
+
+
 def transcribe(path, midi_min=40, midi_max=88):
     if not capabilities()['transcription']['configured']:
         raise ModelUnavailable('Specialist transcription is not configured. Install Basic Pitch ONNX and provision nmp.onnx; see server/README.md.')
     from basic_pitch.inference import predict
     _, _, events = predict(str(path), model_or_model_path=str(transcription_path()),
-                           onset_threshold=.5, frame_threshold=.3, minimum_note_length=100,
+                           onset_threshold=ONSET_THRESHOLD, frame_threshold=FRAME_THRESHOLD, minimum_note_length=100,
                            minimum_frequency=440*2**((midi_min-69)/12), maximum_frequency=440*2**((midi_max-69)/12))
     import soundfile as sf
     duration = sf.info(path).duration
