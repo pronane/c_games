@@ -2,12 +2,14 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Play, Square, Download, Music2 } from "lucide-react";
 import * as alphaTab from "@coderline/alphatab";
 import { synthesize } from "./tabScore";
+import { useGuitarSound } from "./guitarTone";
+import GuitarSoundPicker from "./GuitarSoundPicker";
 import { api, type EngineNote } from "./engineApi";
 import type { ResolvedInstrument } from "./instruments";
 import type { BarMark } from "./feedback";
 const Notation = lazy(() => import("./Notation"));
 
-type Listen = "heard" | "reference" | "both" | "recording" | "";
+type Listen = "heard" | "written" | "reference" | "both" | "recording" | "";
 type Scored = { notes: EngineNote[]; musicxml: string; unplayable_notes: number };
 
 /**
@@ -35,7 +37,8 @@ export default function HeardTake({
     [playing, setPlaying] = useState<Listen>(""),
     [scored, setScored] = useState<Scored | null>(null),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [sound, setSound] = useGuitarSound();
   const context = () => ctx.current ?? (ctx.current = new AudioContext());
   // Tempo for the notation grid: from the bar lines when the take came from a song or tab.
   const bpm = useMemo(() => {
@@ -86,10 +89,12 @@ export default function HeardTake({
       if (!recording) return;
       buffer = recording;
     } else {
-      const heard = synthesize(takeNotes, rate, length, 1, 0.3),
-        written = synthesize(referenceNotes, rate, length, 1, 0.3);
+      // "As written": only the notes that made it into the tab of your take.
+      const tabbed = scored ? scored.notes.filter((n) => n.string != null && n.fret != null) : [],
+        heard = synthesize(which === "written" ? tabbed : takeNotes, rate, length, 1, 0.3, sound),
+        written = synthesize(referenceNotes, rate, length, 1, 0.3, sound);
       buffer = c.createBuffer(2, heard.length, rate);
-      if (which === "heard") {
+      if (which === "heard" || which === "written") {
         buffer.getChannelData(0).set(heard);
         buffer.getChannelData(1).set(heard);
       } else if (which === "reference") {
@@ -164,15 +169,17 @@ export default function HeardTake({
       </h3>
       <p className="helper">
         The app plays back the {takeNotes.length} notes it picked out of your recording, on its own {profile.name.toLowerCase()}{" "}
-        sound. A note you played but can't hear here wasn't picked up; a note you hear but didn't play is a detection
+        sound (set the amp and pedals below to match yours). A note you played but can't hear here wasn't picked up; a note you hear but didn't play is a detection
         mistake. Compare it with {referenceLabel.toLowerCase()} and with your actual recording.
       </p>
       <div className="presets">
         {button("heard", "What the app heard", !takeNotes.length)}
+        {scored && button("written", "My take as written in the tab", !scored.notes.length)}
         {button("reference", referenceLabel, !referenceNotes.length)}
         {button("both", "Both (original left, you right)", !takeNotes.length || !referenceNotes.length)}
         {button("recording", "My recording", !recording)}
       </div>
+      <GuitarSoundPicker sound={sound} onChange={setSound} />
       <div className="presets">
         <button disabled={busy || !takeNotes.length} onClick={showNotation}>
           {busy ? "Writing it out…" : "Show my take as notation and tab"}

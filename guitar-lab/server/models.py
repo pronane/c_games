@@ -103,14 +103,29 @@ ONSET_THRESHOLD = float(os.getenv('FRETWORK_ONSET_THRESHOLD', '0.7'))
 FRAME_THRESHOLD = float(os.getenv('FRETWORK_FRAME_THRESHOLD', '0.5'))
 
 
-def transcribe(path, midi_min=40, midi_max=88, posteriors=False):
+# Overdrive smears onsets and spreads energy into harmonics, so Basic Pitch's onset confidence
+# drops on driven guitar and real notes fall under the clean thresholds. Measured on a
+# multi-guitar tab rendered clean / crunch / high-gain (note F1, 50 ms onsets): high gain
+# solo .56 -> .67 and rhythm .45 -> .58 at 0.5/0.3; crunch solo .61 -> .68 at 0.6/0.4 with
+# rhythm unchanged. 'auto' trusts the tone guess less (it is a heuristic), so it only moves
+# halfway. Clean stays at the GuitarSet-tuned defaults.
+TONE_THRESHOLDS = {'clean': None, 'crunch': (0.6, 0.4), 'distorted': (0.5, 0.3), 'auto-distorted': (0.6, 0.4)}
+
+
+def thresholds_for(tone: str | None, chosen_by_user: bool):
+    key = tone if chosen_by_user or tone != 'distorted' else 'auto-distorted'
+    return TONE_THRESHOLDS.get(key) or (ONSET_THRESHOLD, FRAME_THRESHOLD)
+
+
+def transcribe(path, midi_min=40, midi_max=88, posteriors=False, thresholds=None):
     """Note events; with posteriors=True also Basic Pitch's per-frame onset/note activations
     ({'onset', 'note': (frames, 88) arrays, pitch index = MIDI-21, 'hop': seconds per frame})."""
     if not capabilities()['transcription']['configured']:
         raise ModelUnavailable('Specialist transcription is not configured. Install Basic Pitch ONNX and provision nmp.onnx; see server/README.md.')
     from basic_pitch.inference import predict
     output, _, events = predict(str(path), model_or_model_path=str(transcription_path()),
-                           onset_threshold=ONSET_THRESHOLD, frame_threshold=FRAME_THRESHOLD, minimum_note_length=100,
+                           onset_threshold=(thresholds or (ONSET_THRESHOLD, FRAME_THRESHOLD))[0],
+                           frame_threshold=(thresholds or (ONSET_THRESHOLD, FRAME_THRESHOLD))[1], minimum_note_length=100,
                            minimum_frequency=440*2**((midi_min-69)/12), maximum_frequency=440*2**((midi_max-69)/12))
     import soundfile as sf
     duration = sf.info(path).duration
