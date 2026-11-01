@@ -40,14 +40,14 @@ def prim_bmesh(pr: SC.Prim, Wb):
     if pr.kind == "ell":
         bmesh.ops.create_uvsphere(bm, u_segments=28, v_segments=18, radius=1.0)
         S = np.diag(list(np.asarray(pr.b, float) + g) + [1.0])
-        R = np.eye(4); R[:3, :3] = euler(*pr.rot)
+        R = np.eye(4); R[:3, :3] = pr.axes() if pr.axes() is not None else np.eye(3)
         T = np.eye(4); T[:3, 3] = pr.a
         L = T @ R @ S
     elif pr.kind == "box":
         bmesh.ops.create_cube(bm, size=2.0)
         h = np.asarray(pr.b, float) + g
         S = np.diag(list(h) + [1.0])
-        R = np.eye(4); R[:3, :3] = euler(*pr.rot)
+        R = np.eye(4); R[:3, :3] = pr.axes() if pr.axes() is not None else np.eye(3)
         T = np.eye(4); T[:3, 3] = pr.a
         L = T @ R @ S
         bmesh.ops.bevel(bm, geom=list(bm.edges), offset=min(pr.rb / max(h.min(), 1e-3), 0.95), segments=3, affect="EDGES",

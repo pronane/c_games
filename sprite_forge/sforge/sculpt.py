@@ -55,6 +55,12 @@ class Prim:
     cuts: tuple = ()          # ((nx,ny,nz), d): keep n.p <= d (bone-local)
     sub: bool = False         # subtractive (carves its layer)
     fine: bool = False        # meshed in the fine (head) pass
+    M: tuple = None           # v10.1: 3x3 axes of an ell / box (columns, bone-local); overrides rot
+
+    def axes(self):
+        if self.M is not None:
+            return np.asarray(self.M, float)
+        return euler(*self.rot) if self.rot != (0, 0, 0) else None
 
     def local_aabb(self):
         if self.kind == "cap":
@@ -63,8 +69,9 @@ class Prim:
             lo, hi = np.minimum(a, b) - r, np.maximum(a, b) + r
         else:
             c = np.array(self.a, float)
-            r = np.max(np.abs(self.b)) * (1.0 if self.rot == (0, 0, 0) else 1.0) + self.grow
-            ext = np.array(self.b, float) + self.grow if self.rot == (0, 0, 0) else np.array([r, r, r])
+            R = self.axes()
+            h = np.array(self.b, float) + self.grow
+            ext = h if R is None else np.abs(R) @ h          # exact box extent of the rotated half-extents
             lo, hi = c - ext, c + ext
         return lo, hi
 
@@ -134,8 +141,8 @@ def prim_sdf(pr: Prim, P):
         d = sd_cap(P, pr.a, pr.b, pr.ra, pr.rb)
     else:
         q = P
-        if pr.rot != (0, 0, 0):
-            R = euler(*pr.rot)
+        R = pr.axes()
+        if R is not None:
             c = np.asarray(pr.a, float)
             q = (P - c) @ R + c          # inverse rotation about the centre
         d = sd_ell(q, pr.a, pr.b) if pr.kind == "ell" else sd_box(q, pr.a, pr.b, pr.rb)
@@ -355,7 +362,7 @@ def body(b: B, g=1.0, musc=0.6, fem=False, hs=1.0, slim_limbs=1.0, hands="fist",
     b.ell("head", (0, 0.128, 0.074), (0.066 * hs, 0.016 if fem else 0.019, 0.026), **H)          # brow ridge
     for s in (1, -1):
         b.ell("head", (0.044 * s, 0.093, 0.062), (0.026, 0.017, 0.026), **H)                     # cheekbones
-        b.ell("head", (0.085 * s * hs, 0.103, -0.008), (0.011, 0.026, 0.019), **H)                # ears
+        b.ell("head", (0.083 * s * hs, 0.100, -0.006), (0.009, 0.022, 0.015), **H)                # ears
     b.cap("head", (0, 0.116, 0.090), (0, 0.083, 0.110), 0.008, 0.013 if not fem else 0.010, **H)  # nose
     b.ell("head", (0, 0.060, 0.086), (0.020, 0.010 if fem else 0.007, 0.012), **H)               # lips
 
