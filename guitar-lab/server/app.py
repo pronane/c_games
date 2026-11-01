@@ -17,13 +17,15 @@ import numpy as np
 import soundfile as sf
 
 from . import models
-from .analysis import align, observations
+from .analysis import align, observations, score_informed
 from .model_store import install_stream, InvalidCheckpoint
 from .instruments import resolve_profile, CATALOGUE
+from .devices import policy_for
 
 MAX_BYTES = 40 * 1024 * 1024
 from .runtime import ROOT, LOCK, EXECUTOR, TTL_SECONDS
 from . import songs
+from . import tabs
 JOBS = {}
 
 
@@ -43,6 +45,9 @@ class Job:
     error: str | None = None
     cancelled: bool = False
     active: bool = True
+    policy: str = 'cpu'
+    # Notes from an uploaded tab/score: the exact reference, so it is not transcribed.
+    reference_notes: list | None = None
 
 
 def cleanup():
@@ -76,6 +81,7 @@ async def lifespan(app):
 
 app = FastAPI(title='Fretwork analysis engine', lifespan=lifespan)
 app.include_router(songs.router)
+app.include_router(tabs.router)
 
 
 def client(x_fretwork_client: str | None):
@@ -106,13 +112,14 @@ def cancelled(job):
 
 
 def run_job(job, phase):
+    chained = False
     try:
         cancelled(job)
         if phase == 'separate':
             audio, sr = sf.read(job.folder/'reference.wav', always_2d=True, dtype='float32')
             if job.kind == 'mix':
                 job.status, job.stage = 'separating', f"Extracting {job.profile['separation_stem']} with htdemucs_6s"
-                guitar, sr, provenance = models.separate_instrument(audio, sr, job.profile['separation_stem'])
+                guitar, sr, provenance = models.separate_instrument(audio, sr, job.profile['separation_stem'], job.policy)
                 job.device = provenance
             else:
                 guitar = audio
@@ -120,6 +127,12 @@ def run_job(job, phase):
                               'quality': 'Human review required; not independently verified.'}
             cancelled(job)
             sf.write(job.folder/'guitar.wav', guitar, sr, subtype='PCM_16')
+            if job.reference_notes is not None:
+                # The reference is the app's own rendering of a tab: nothing to approve.
+                job.status, job.stage = 'queued', 'Comparing your take with the tab'
+                chained = True
+                EXECUTOR.submit(run_job, job, 'analyse')
+                return
             job.status, job.stage = 'review', 'Listen to the instrument reference and approve its quality'
         else:
             job.status, job.stage = 'analysing', 'Aligning harmonic features within the selected passage'
@@ -129,11 +142,17 @@ def run_job(job, phase):
             take = librosa.resample(take.mean(axis=1), orig_sr=take_sr, target_sr=sr)
             alignment = align(reference.mean(axis=1), take, sr)
             cancelled(job)
-            job.stage = f"Transcribing reference {job.profile['name']} with Basic Pitch"
-            reference_notes = models.transcribe_profile(job.folder/'guitar.wav', job.profile)
+            if job.reference_notes is not None:
+                reference_notes = job.reference_notes
+            else:
+                job.stage = f"Transcribing reference {job.profile['name']} with Basic Pitch"
+                reference_notes = models.transcribe_profile(job.folder/'guitar.wav', job.profile)
             cancelled(job)
             job.stage = 'Transcribing your take with Basic Pitch'
-            take_notes = models.transcribe_profile(job.folder/'take.wav', job.profile)
+            if job.reference_notes is not None:
+                take_notes, post = models.transcribe_profile(job.folder/'take.wav', job.profile, posteriors=True)
+            else:
+                take_notes = models.transcribe_profile(job.folder/'take.wav', job.profile)
             cancelled(job)
             versions = {}
             for name in ('librosa', 'demucs', 'basic-pitch', 'torch', 'onnxruntime'):
@@ -142,18 +161,25 @@ def run_job(job, phase):
                 except importlib.metadata.PackageNotFoundError:
                     pass
             job.result = {'alignment': alignment, 'reference_notes': reference_notes, 'take_notes': take_notes,
-                          'comparison': observations(reference_notes, take_notes, alignment),
-                          'provenance': {'separation': job.device, 'transcription': 'Basic Pitch ONNX (CPU provider by default)',
+                          'comparison': score_informed(reference_notes, take_notes, post) if job.reference_notes is not None
+                          else observations(reference_notes, take_notes, alignment),
+                          'provenance': {'separation': job.device,
+                                         'transcription': 'Reference: notes from the uploaded tab/score. Take: Basic Pitch ONNX (CPU).'
+                                         if job.reference_notes is not None else 'Basic Pitch ONNX (CPU provider by default)',
                                          'versions': versions, 'instrument_profile': job.profile, 'edited': False},
-                          'warnings': [job.profile['status'], 'Basic Pitch estimates can miss or invent notes.',
-                                       'Reference may contain overlapping parts and separation artefacts.',
-                                       'Manual song position is assumed; this is not whole-song recognition.']}
+                          'warnings': [job.profile['status'], 'Basic Pitch estimates can miss or invent notes.']+(
+                                       ['Reference notes come from the uploaded tab; only your take is estimated.']
+                                       if job.reference_notes is not None else
+                                       ['Reference may contain overlapping parts and separation artefacts.',
+                                        'Manual song position is assumed; this is not whole-song recognition.'])}
             job.status, job.stage = 'complete', 'Comparison ready — review uncertainty and correct notes if needed'
     except Exception as exc:
         job.status, job.stage = 'failed', 'Processing stopped; no substitute algorithm was used'
         job.error = str(exc)
     finally:
         with LOCK:
+            if chained:
+                return
             job.active = False
             if job.cancelled:
                 shutil.rmtree(job.folder, ignore_errors=True)
@@ -216,10 +242,18 @@ async def install_separation_model(checkpoint: UploadFile = File(...), x_fretwor
 async def create_job(reference: UploadFile = File(...), take: UploadFile = File(...),
                      consent: bool = Form(False), kind: str = Form(...),
                      original_offset: float = Form(0), instrument: str = Form('guitar'), tuning: str = Form('standard'),
-                     capo: int = Form(0), notation: str | None = Form(None), x_fretwork_client: str | None = Header(None)):
+                     capo: int = Form(0), notation: str | None = Form(None), processing: str = Form('cpu'),
+                     reference_notes: str | None = Form(None), x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
         raise HTTPException(422, 'Explicit upload consent is required.')
+    try:
+        policy = policy_for(processing)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    tab_notes = parse_reference_notes(reference_notes) if reference_notes else None
+    if tab_notes is not None and kind != 'isolated':
+        raise HTTPException(422, 'Tab reference notes need the rendered tab as an isolated reference.')
     if kind not in ('mix', 'isolated') or not math.isfinite(original_offset) or original_offset < 0:
         raise HTTPException(422, 'Invalid reference type or original timestamp.')
     try:
@@ -239,7 +273,8 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
         folder = ROOT/key
         folder.mkdir(mode=0o700)
         # Reserve capacity before streaming uploads.
-        job = Job(key, folder, kind, original_offset, 0, profile=profile, stage='Receiving consented excerpts')
+        job = Job(key, folder, kind, original_offset, 0, profile=profile, stage='Receiving consented excerpts',
+                  policy=policy, reference_notes=tab_notes)
         JOBS[key] = job
     try:
         rd = await save_audio(reference, folder/'reference.wav')
@@ -247,6 +282,11 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
         if abs(rd-td) > .1:
             raise HTTPException(422, 'Reference and take excerpts must have the same duration.')
         job.duration = min(rd, td)
+        if tab_notes is not None:
+            if any(n['time'] > job.duration+.1 for n in tab_notes):
+                raise HTTPException(422, 'Tab notes run past the end of the rendered reference.')
+            if any(not profile['midi_min'] <= n['midi'] <= profile['midi_max'] for n in tab_notes):
+                raise HTTPException(422, 'The tab has notes outside the selected instrument and tuning.')
         EXECUTOR.submit(run_job, job, 'separate')
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
@@ -289,6 +329,20 @@ def approve(key: str, body: Approval, x_fretwork_client: str | None = Header(Non
         job.status, job.stage = 'queued', 'Waiting for alignment and transcription worker'
         EXECUTOR.submit(run_job, job, 'analyse')
     return serialize(job)
+
+
+def parse_reference_notes(raw: str):
+    """JSON list of {time, duration, midi[, string, fret]} from an uploaded tab, validated."""
+    import json
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, list) or len(data) > 5000:
+            raise ValueError
+        notes = [NoteEdit(id=i, **{k: n[k] for k in ('time', 'duration', 'midi', 'string', 'fret') if k in n}).model_dump()
+                 for i, n in enumerate(data)]
+    except Exception as exc:
+        raise HTTPException(422, 'Reference notes must be a list of {time, duration, midi} (max 5000).') from exc
+    return sorted(notes, key=lambda n: (n['time'], n['midi']))
 
 
 class NoteEdit(BaseModel):

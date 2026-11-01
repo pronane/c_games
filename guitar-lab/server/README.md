@@ -41,7 +41,8 @@ The official Demucs package's `demucs/remote/files.txt` identifies the checkpoin
 
 ### GPU/CPU policy
 
-- `FRETWORK_DEVICE=auto` (default): CUDA, supported Apple MPS, otherwise CPU for Demucs.
+- `FRETWORK_DEVICE=cpu` (default). Each request can choose `processing=cpu|gpu`; `gpu` is accepted only when a CUDA or MPS device is usable and behaves like `auto` below.
+- `FRETWORK_DEVICE=auto`: CUDA, supported Apple MPS, otherwise CPU for Demucs.
 - `cpu`: explicitly use CPU.
 - `cuda` / `mps`: require the chosen backend; no silent fallback.
 - Auto retries on CPU only for known memory/unsupported-operation RuntimeErrors, with the **same model, float32, overlap and shift settings**. Other errors fail visibly. Real GPU/MPS inference remains untested in this sandbox; unit tests cover routing and fallback semantics.
@@ -109,3 +110,8 @@ Validation (1 Nov 2026, CPU, Python 3.13, torch 2.15, Demucs 4.1.0): 48 Python t
 - `GET /api/songs/{id}/tracks/{track}?format=mp3|flac`: `mix`, each stem, each guitar part.
 - `POST /api/songs/{id}/score` JSON `{part: id|"all", role: "any"|"lead"|"rhythm", tuning, capo}`: fingered notes and MusicXML.
 - `DELETE /api/songs/{id}`. Same one-hour expiry and consent model as practice jobs.
+
+### Tabs
+
+- `POST /api/tabs/text` JSON `{text, instrument, tuning, capo, bpm, title}`: plain-text tab to timed notes, key and MusicXML.
+- `POST /api/jobs` accepts `reference_notes` (JSON list of `{time, duration, midi, string?, fret?}`) with `kind=isolated`: the reference audio is the app's rendering of a tab, review is skipped, and the take is checked note by note against these notes (score-informed) instead of transcribing the reference.

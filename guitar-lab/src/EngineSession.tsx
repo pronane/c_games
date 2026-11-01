@@ -17,6 +17,7 @@ import {
 import { fingering, note } from "./analysis";
 import ModelInstaller from "./ModelInstaller";
 import { summarise, type BarMark } from "./feedback";
+import type { Processing } from "./ProcessingToggle";
 import { tabPosition, type ResolvedInstrument } from "./instruments";
 
 type Props = {
@@ -29,6 +30,9 @@ type Props = {
   profile: ResolvedInstrument;
   /** Bar starts within the compared passage, when it came from a song breakdown. */
   bars?: BarMark[];
+  /** Exact reference notes when the reference is the app's rendering of an uploaded tab. */
+  referenceNotes?: { time: number; duration: number; midi: number; string?: number | null; fret?: number | null }[];
+  processing?: Processing;
 };
 const pending = ["queued", "separating", "analysing"];
 function withTab(n: EngineNote, profile: ResolvedInstrument): EngineNote {
@@ -53,6 +57,8 @@ export default function EngineSession({
   recording,
   profile,
   bars,
+  referenceNotes,
+  processing = "cpu",
 }: Props) {
   const tuning = profile.openStrings,
     showTab = tuning.length > 0 && profile.settings.notation === "tablature";
@@ -167,7 +173,17 @@ export default function EngineSession({
       body.set("reference", original, "reference.wav");
       body.set("take", performance, "take.wav");
       body.set("consent", "true");
-      body.set("kind", kind);
+      body.set("kind", referenceNotes ? "isolated" : kind);
+      body.set("processing", processing);
+      if (referenceNotes)
+        body.set(
+          "reference_notes",
+          JSON.stringify(
+            referenceNotes
+              .filter((n) => n.time < duration)
+              .map((n) => ({ ...n, duration: Math.max(0.03, Math.min(n.duration, duration - n.time)) })),
+          ),
+        );
       body.set("original_offset", String(start));
       body.set("instrument", profile.id);
       body.set("tuning", profile.settings.tuning);
@@ -837,8 +853,9 @@ function Summary({
         ))}
       </div>
       <p className="helper">
-        Scores come from automatic note detection on both recordings, so treat a single low bar with suspicion and
-        listen back before drilling it.
+        {result.comparison.method?.startsWith("score-informed")
+          ? "Checked note by note against the tab's written notes. Only your recording is estimated, so these scores are more reliable than song comparisons; still listen back before drilling a bar."
+          : "Scores come from automatic note detection on both recordings, so treat a single low bar with suspicion and listen back before drilling it."}
       </p>
     </div>
   );

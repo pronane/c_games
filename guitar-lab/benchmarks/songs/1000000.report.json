@@ -1,0 +1,143 @@
+{
+ "title": "1,000,000",
+ "artist": "Nine Inch Nails",
+ "licence": "CC BY-NC-SA 3.0 US",
+ "seconds_to_process": 483.4,
+ "duration": 250.6,
+ "instruments": {
+  "guitar": {
+   "plays": true,
+   "app": "present"
+  },
+  "bass": {
+   "plays": true,
+   "app": "present"
+  },
+  "drums": {
+   "plays": true,
+   "app": "present"
+  },
+  "vocals": {
+   "plays": true,
+   "app": "present"
+  },
+  "piano": {
+   "plays": false,
+   "app": "absent"
+  },
+  "other": {
+   "plays": true,
+   "app": "present"
+  }
+ },
+ "separation_si_sdr_db": {
+  "guitar": {
+   "raw_mix": -2.0,
+   "app": -2.3
+  },
+  "bass": {
+   "raw_mix": -9.4,
+   "app": 1.6
+  },
+  "drums": {
+   "raw_mix": -5.8,
+   "app": 2.7
+  },
+  "vocals": {
+   "raw_mix": -4.4,
+   "app": 3.0
+  }
+ },
+ "tempo": {
+  "true_bpm": 136,
+  "app_bpm": 135.9,
+  "error_percent": 0.1
+ },
+ "key": {
+  "app": "G major",
+  "true": null,
+  "confidence": "low"
+ },
+ "tuning": "d_standard",
+ "guitar_parts": {
+  "Guitar (centre)": {
+   "role": "lead and rhythm",
+   "notes": 173,
+   "lead_bars": [
+    33,
+    40,
+    43,
+    51,
+    53,
+    71,
+    73,
+    74,
+    81,
+    85,
+    89,
+    93,
+    97,
+    101,
+    117,
+    121,
+    125,
+    133
+   ],
+   "carries": {
+    "Gtr": 0.07,
+    "Gtr2": 0.27
+   }
+  },
+  "Guitar (right)": {
+   "role": "lead and rhythm",
+   "notes": 158,
+   "lead_bars": [
+    43,
+    73,
+    77,
+    81,
+    85,
+    89,
+    93,
+    97,
+    101,
+    113,
+    117,
+    121,
+    125,
+    129,
+    133
+   ],
+   "carries": {
+    "Gtr": 0.01,
+    "Gtr2": 0.28
+   }
+  }
+ },
+ "guitar_notes_vs_isolated_track": {
+  "isolated_track_notes": 318,
+  "app_notes": 304,
+  "precision": 0.22,
+  "recall": 0.21,
+  "f1": 0.22,
+  "f1_ignoring_octave": 0.25
+ },
+ "chords_first_bars": [
+  "Csus4",
+  "N",
+  "D7",
+  "Gmaj7",
+  "N",
+  "D",
+  "Gmaj7",
+  "F",
+  "D7",
+  "Gmaj7",
+  "N",
+  "D",
+  "Gmaj7",
+  "F",
+  "Gmaj7",
+  "N"
+ ]
+}

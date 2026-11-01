@@ -1,4 +1,37 @@
-# Fretwork — guitar comparison prototype v0.3
+# Fretwork — guitar comparison prototype v0.4
+
+## Learn from a tab or score (new in v0.4)
+
+Separation can't guarantee a clean part from every recording, so this mode doesn't depend on it.
+
+1. Upload a Guitar Pro file (.gp, .gp3–.gp5, .gpx), MusicXML (.musicxml, .xml, .mxl) or a text tab (.txt), or paste a text tab.
+2. Pick the track. The app shows notation and tab, says if the tab needs a different tuning or capo and retunes the tuner in one tap, and offers a Guitar Pro download.
+3. Play the app's own rendition (a plucked-string synth at the exact written pitches), with click, loop and 50–100% speed without pitch change.
+4. Record along with a count-in, with the tab quietly in your headphones or just the click. The measured device delay is removed.
+5. **Check my take against the tab**: each written note is checked against your recording ("did this pitch start near its written time?"), rather than comparing two uncertain transcriptions. The result is the score per bar, the top issues and a next step.
+
+Text tab has no rhythm: notes are placed by where they sit between bar lines and rounded to sixteenths. Guitar Pro and MusicXML repeats are played once in written order.
+
+The song breakdown links here too: **Practise from this tab** sends its generated tab to this mode. If the generated notes are wrong, download the MusicXML, fix it in MuseScore or Guitar Pro, and load the corrected file.
+
+### How reliable is the tab check? (GuitarSet, 60 real performances, 13,807 notes)
+
+Each recording is checked against exactly what the player played, so anything flagged is a false alarm. Mistakes are then planted by editing the tab.
+
+| | |
+| --- | --- |
+| Correct notes called correct | 89% |
+| Correct notes wrongly flagged: wrong note / missed / off the beat | 2.6% / 2.1% / 6.8% |
+| Extra notes flagged per minute | 3.6 |
+| Wrong notes caught (1–2 semitones off) | 72% |
+| Missed notes caught | 68% |
+| Notes 150 ms late caught | 42% |
+
+On an original Drop D riff played back on a different guitar sound with three planted mistakes (a wrong note, a missed note, a late note), it reported exactly those three and nothing else. Settings favour few false accusations over catching every small timing slip. Run `python -m benchmarks.feedback_check` to reproduce.
+
+## Processing: CPU or graphics card
+
+Separation runs on the CPU by default. **Separate instruments on → Graphics card** is enabled when the analysis server has a usable NVIDIA (CUDA) or Apple (MPS) GPU. It is much faster and falls back to CPU, with a note, if the card runs out of memory. Transcription always runs on the CPU. The server default can be changed with `FRETWORK_DEVICE` (`cpu`, `auto`, `cuda`, `mps`).
 
 ## Learn a song (new in v0.3)
 
@@ -14,21 +47,34 @@ Pick your instrument, then add a song (upload, or a direct https link to an audi
 - **Your take in the song**: hear the band with your take in place of the part you replaced, download the mix, or send it to the comparison engine.
 - **Feedback**: the comparison now opens with an estimated match score, a score per bar, the top issues ("2 wrong notes in bar 6", "rushed bar 4 (about 120 ms early)") and one next step.
 
-### What it gets right and wrong
+### How accurate is it? (measured 1 Nov 2026)
 
-Measured on original, synthetic test songs (FluidSynth General MIDI instruments), not commercial recordings:
+**Real guitarists: [GuitarSet](https://zenodo.org/records/3371780)** (CC BY 4.0). 360 recordings by six players in five styles, every note's string and fret captured with a hexaphonic pickup. Guitar alone, no band. Run with `python -m benchmarks.guitarset`.
 
-| Check | Result |
+| What | Solos | Chord playing | All |
+| --- | --- | --- | --- |
+| Notes (onset ±50 ms, right pitch), F1 | 0.88 | 0.69 | 0.78 |
+| Tab: right string and fret, given the right notes | 0.44 | 0.79 | — |
+| Chords (major/minor, time-weighted) | — | 0.51 | — |
+| Key exactly right | 0.33 | 0.56 | 0.44 |
+| Tempo within 4% (allowing double/half) | 0.76 | 0.66 | 0.71 |
+
+**A real band: Nine Inch Nails, "1,000,000"** from *The Slip* (2008), using the band's own multitrack stems, released under CC BY-NC-SA 3.0 US ([archive](https://archive.org/details/NineInchNails-TheSlipMulti-trackStems)). The stems are summed into the mix, the mix goes through the app as a user's upload would, and the output is scored against the stems. Run with `python -m benchmarks.multitrack`.
+
+| What | Result |
 | --- | --- |
-| Instruments present (5-instrument song) | all correct |
-| Three guitars (rhythm left, lead right bars 5–8, lead centre bars 11–14) | all three parts and their lead bars found exactly |
-| Lead transcription, centre lead | 32/32 notes |
-| Lead transcription, right lead | F1 0.74 (a few octave ghosts and misses) |
-| Strummed 6-string rhythm chords | ~25% of chord tones; chord symbols carry this part |
-| Key / tempo / chords (E minor, 110 BPM, Em–C–G–D) | correct |
-| E♭-tuned song | suggests half step down |
+| Which instruments play (guitar, bass, drums, vocals, other; no piano) | all correct |
+| Tempo (band's figure 136 BPM) | 135.9 BPM |
+| Bass / drums / vocals separation (SI-SDR vs doing nothing) | +11.0 / +8.5 / +7.4 dB |
+| Guitar separation | failed: −2.3 dB vs −2.0 dB for the raw mix; most of the main guitar track lands outside the guitar stem |
+| Guitar notes vs the same transcriber on the band's isolated guitar tracks | F1 0.22 |
+| Tuning suggestion | D standard (likely wrong; low notes from the bass) |
 
-It will not always be right. Expect errors with dense distorted mixes, doubled guitars panned together, two guitars at the same stereo position playing at once (cannot be separated by panning), bends, slides, harmonics, and tempo changes. Tab positions are suggestions. Check by ear and against a trusted source; use the note editor to correct.
+**Could a newer separator fix that?** BS-RoFormer SW (a six-stem community model) on the same song: guitar −0.8 dB vs Demucs −2.4 dB. It keeps 86% of the second guitar in its guitar stem (Demucs 54%). Neither model finds the band's main, very low guitar track: Demucs puts most of it under "other", RoFormer under "bass". RoFormer also needed 48 minutes for this 4-minute song on a 2-core CPU (Demucs a few minutes), and its licence is unknown, so it is not used. On our synthetic songs it won on the acoustic one (13.3 vs 2.0 dB) and lost on the distorted one (1.6 vs 17.5 dB). A licensed RoFormer-class guitar model on a GPU is the most promising upgrade.
+
+**What that means.** On a clean guitar recording the notes are mostly right and good enough to learn from, with a note editor for the rest. Chords, key and tab positions are a starting point to check, not an answer. On a full commercial mix everything depends on getting a clean guitar out first. The open six-stem model does that well for clearly recorded guitars (17.5 dB on our distorted three-guitar test song) and badly for heavily processed ones like this NIN track. When it fails, every guitar-specific result after it fails too. It will not always be right, and the app says so on every result.
+
+Earlier synthetic checks (FluidSynth instruments): three guitars split into the right parts and lead bars; centre lead 32/32 notes; E minor, 110 BPM and Em–C–G–D found; an E♭-tuned song correctly suggests half step down.
 
 ## Instrument profiles and tuning
 

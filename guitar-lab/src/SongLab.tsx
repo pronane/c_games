@@ -12,14 +12,18 @@ import {
   Repeat,
   SlidersHorizontal,
   Gauge,
+  Timer,
+  Search,
 } from "lucide-react";
 import {
   createSong,
   deleteSong,
   getSong,
   requestScore,
+  locateTake,
   trackUrl,
   tuningName,
+  type LocateResult,
   type Score,
   type Song,
   type SongPart,
@@ -35,8 +39,12 @@ import {
   type Target,
 } from "./songAudio";
 import { encodeWav } from "./engineApi";
+import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
+import { Recorder } from "./recorder";
+import LatencyCheck from "./LatencyCheck";
+import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
-import { inputConstraints, captureError, mergeCapture } from "./audioInputs";
+import { captureError } from "./audioInputs";
 import { names } from "./analysis";
 import {
   resolveInstrument,
@@ -50,6 +58,9 @@ type Props = {
   settings: InstrumentSettings;
   onSettings: (next: InstrumentSettings) => void;
   onCompare: (reference: Clip, take: Clip, start: number, length: number, bars?: BarMark[]) => void;
+  processing?: "cpu" | "gpu";
+  /** Open the generated tab in the tab lesson, e.g. after correcting it in a tab editor. */
+  onPracticeTab?: (source: TabSource) => void;
 };
 type Track = { id: string; label: string; verdict: string; isPart: boolean };
 /** A recorded take; `speed` is the playback speed it was played along to. */
@@ -60,7 +71,7 @@ type Listen = "mixer" | "only" | "without";
 const GUIDE_LEVEL = 0.25;
 const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
 
-export default function SongLab({ settings, onSettings, onCompare }: Props) {
+export default function SongLab({ settings, onSettings, onCompare, processing = "cpu", onPracticeTab }: Props) {
   const profile = resolveInstrument(settings);
   const [mode, setMode] = useState<"file" | "url">("file"),
     [file, setFile] = useState<File | null>(null),
@@ -89,13 +100,17 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     [scoreBusy, setScoreBusy] = useState(false),
     [recording, setRecording] = useState(false),
     [take, setTake] = useState<Take | null>(null),
-    [mixUrl, setMixUrl] = useState("");
+    [mixUrl, setMixUrl] = useState(""),
+    [clickOn, setClickOn] = useState(false),
+    [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
+    [locating, setLocating] = useState(false),
+    [located, setLocated] = useState<(LocateResult & { buffer: AudioBuffer }) | null>(null);
   const ctx = useRef<AudioContext | null>(null),
     current = useRef<AudioBufferSourceNode | null>(null),
     clock = useRef({ context: 0, song: 0, speed: 1, loop: null as null | { start: number; end: number } }),
     raf = useRef(0),
     songId = useRef<string | null>(null),
-    mic = useRef<{ stream: MediaStream; node: AudioWorkletNode } | null>(null);
+    rec = useRef<Recorder | null>(null);
 
   const result = song?.status === "complete" ? song.result : null;
   const parts: SongPart[] = result?.parts ?? [];
@@ -137,7 +152,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
   useEffect(
     () => () => {
       stop();
-      releaseMic();
+      rec.current?.release();
       if (songId.current) deleteSong(songId.current).catch(() => {});
       ctx.current?.close().catch(() => {});
     },
@@ -167,6 +182,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
       const created = await createSong(
         mode === "file" ? { file: file! } : { url: url.trim() },
         settings.instrument,
+        processing,
       );
       songId.current = created.id;
       setSong(created);
@@ -231,7 +247,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     from: number,
     to: number,
     rate: number,
-    opts: { guide?: boolean; speed?: number } = {},
+    opts: { guide?: boolean; speed?: number; click?: boolean } = {},
   ) {
     const atSpeed = opts.speed ?? speed;
     const frames = Math.max(1, Math.ceil((to - from) * rate)),
@@ -265,7 +281,14 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
           mixInto(out, applySchedule(chans, buffer.sampleRate, shift(only)), GUIDE_LEVEL);
       }
     }
-    return atSpeed === 1 ? out : (timeStretch(out, rate, atSpeed) as [Float32Array, Float32Array]);
+    const result = atSpeed === 1 ? out : (timeStretch(out, rate, atSpeed) as [Float32Array, Float32Array]);
+    // Clicks go in after stretching so they stay short and crisp at any speed.
+    if (opts.click) addClicks(result, rate, clickTimes(result_beats(), from, to), from, atSpeed);
+    return result;
+  }
+
+  function result_beats() {
+    return result?.tempo.beats ?? [];
   }
 
   function toBuffer(channels: Float32Array[], rate: number) {
@@ -318,7 +341,7 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     setPreparing(speed !== 1);
     await new Promise((r) => setTimeout(r, 0));
     try {
-      const audio = toBuffer(render(how, from, to, c.sampleRate), c.sampleRate);
+      const audio = toBuffer(render(how, from, to, c.sampleRate, { click: clickOn }), c.sampleRate);
       start(audio, c.currentTime + 0.05, from, speed, loopOn ? range : null);
       setPlaying(true);
       tick();
@@ -337,13 +360,51 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
   // Re-render when what is heard changes mid-playback.
   useEffect(() => {
     if (playing && !recording) play();
-  }, [solo, muted, listen, targetId, speed]);
+  }, [solo, muted, listen, targetId, speed, clickOn]);
 
   // ---------------------------------------------------------------- play along + record
-  function releaseMic() {
-    mic.current?.stream.getTracks().forEach((t) => t.stop());
-    mic.current?.node.disconnect();
-    mic.current = null;
+  const recorder = () => rec.current ?? (rec.current = new Recorder(context()));
+
+  // ---------------------------------------------------------------- an earlier recording
+  /** Upload a recording made elsewhere; find where in the song it belongs, then use it as a take. */
+  async function findTake(file: File) {
+    if (!song || !target) return;
+    setError("");
+    setLocated(null);
+    setLocating(true);
+    stop();
+    try {
+      const c = context(),
+        decoded = await c.decodeAudioData(await file.arrayBuffer()),
+        mono = new Float32Array(decoded.length);
+      for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+        const d = decoded.getChannelData(ch);
+        for (let i = 0; i < d.length; i++) mono[i] += d[i] / decoded.numberOfChannels;
+      }
+      const buffer = c.createBuffer(1, mono.length, c.sampleRate);
+      buffer.getChannelData(0).set(mono);
+      const found = await locateTake(song.id, encodeWav([mono], c.sampleRate), target.parts, target.role);
+      setLocated({ ...found, buffer });
+      if (found.candidates[0]) useLocated(buffer, found.candidates[0].start);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  function useLocated(buffer: AudioBuffer, start: number) {
+    if (!target) return;
+    const end = Math.min(duration, start + buffer.duration);
+    setTake({
+      buffer,
+      start,
+      end,
+      speed: 1,
+      target: target.id,
+      detail: `Placed at ${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")} (bar ${barAt(start)}) by matching its notes to the original.`,
+    });
+    setMixUrl("");
   }
 
   async function recordAlong() {
@@ -355,27 +416,10 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
     try {
       const c = context();
       await c.resume();
-      if (!mic.current) {
-        const stream = await navigator.mediaDevices.getUserMedia(inputConstraints(""));
-        await c.audioWorklet.addModule(
-          new URL("./capture.worklet.js?no-inline", import.meta.url).href,
-        );
-        const source = c.createMediaStreamSource(stream),
-          node = new AudioWorkletNode(c, "fretwork-capture", {
-            numberOfInputs: 1,
-            numberOfOutputs: 1,
-            outputChannelCount: [1],
-            channelCount: 1,
-            channelCountMode: "explicit",
-          }),
-          silent = c.createGain();
-        silent.gain.value = 0;
-        source.connect(node).connect(silent).connect(c.destination);
-        mic.current = { stream, node };
-      }
+      await recorder().ensure();
       setPreparing(speed !== 1);
       await new Promise((r) => setTimeout(r, 0));
-      const band = toBuffer(render("without", range.start, range.end, c.sampleRate, { guide }), c.sampleRate);
+      const band = toBuffer(render("without", range.start, range.end, c.sampleRate, { guide, click: clickOn }), c.sampleRate);
       const reference = render("only", range.start, range.end, c.sampleRate);
       setPreparing(false);
       const beat = 60 / (result!.tempo.bpm || 100) / speed,
@@ -398,24 +442,15 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
       start(band, songStart, range.start, speed, null);
       setPlaying(true);
       tick();
-      const chunks: Float32Array[][] = [];
       const recordFrom = c.currentTime;
       const totalFrames = Math.ceil((songStart - recordFrom + length + 0.6) * c.sampleRate);
-      const frames = await new Promise<number>((resolve, reject) => {
-        const port = mic.current!.node.port;
-        port.onmessage = ({ data }) => {
-          if (data.type === "chunk") chunks.push(data.channels);
-          if (data.type === "done") resolve(data.frames);
-        };
-        setTimeout(() => reject(Error("Recording did not finish.")), (length + countIn + 10) * 1000);
-        port.postMessage({ type: "start", channels: 1, maxFrames: totalFrames });
-        setRecording(true);
-      });
+      setRecording(true);
+      const raw = await recorder().capture(totalFrames, length + countIn + 10);
       setRecording(false);
       stop();
-      const [raw] = mergeCapture(chunks, 1, frames);
-      // Trim to the song start, then remove the output/input latency the browser reports.
-      const reported = (c.outputLatency || 0) + (c.baseLatency || 0);
+      // Trim to the song start, then remove the delay: the measured one if this device has
+      // been calibrated, otherwise what the browser reports (often an underestimate).
+      const reported = recorder().delay(latency);
       const lead = Math.round((songStart - recordFrom + reported) * c.sampleRate);
       const aligned = raw.subarray(Math.min(raw.length, Math.max(0, lead)));
       // Refine against the music being replaced: attack-envelope cross-correlation.
@@ -434,8 +469,8 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
         target: target.id,
         detail:
           (est
-            ? `Lined up automatically: ${Math.round(reported * 1000)} ms device delay + ${Math.round(est.seconds * 1000)} ms from matching your attacks to the original.`
-            : `Lined up using the ${Math.round(reported * 1000)} ms delay your device reports. Your take did not match the original closely enough to fine-tune.`) +
+            ? `Lined up automatically: ${Math.round(reported * 1000)} ms ${latency?.ok ? "measured" : "reported"} device delay + ${Math.round(est.seconds * 1000)} ms from matching your attacks to the original.`
+            : `Lined up using the ${Math.round(reported * 1000)} ms delay ${latency?.ok ? "measured on this device" : "your device reports"}. Your take did not match the original closely enough to fine-tune.`) +
           (speed !== 1 ? ` Recorded at ${Math.round(speed * 100)}% speed.` : ""),
       });
     } catch (e) {
@@ -740,6 +775,10 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
             />
             <span className="mono">{fmt(position)} · bar {barAt(position)}</span>
             <label className="speed">
+              <input id="click-on" type="checkbox" checked={clickOn} onChange={(e) => setClickOn(e.target.checked)} />
+              <Timer size={13} /> Click
+            </label>
+            <label className="speed">
               <Gauge size={13} /> Speed
               <select id="speed" value={speed} disabled={recording} onChange={(e) => setSpeed(Number(e.target.value))}>
                 {SPEEDS.map((v) => <option key={v} value={v}>{Math.round(v * 100)}%</option>)}
@@ -811,6 +850,21 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
               <a className="download" href={xmlUrl} download={`${song!.name.replace(/\.[^.]+$/, "")} - ${score.label}.musicxml`}>
                 <Download size={14} /> Download MusicXML (opens in MuseScore, Guitar Pro, Sibelius)
               </a>
+              {onPracticeTab && (
+                <div className="presets">
+                  <button
+                    onClick={() =>
+                      onPracticeTab({ name: `${song!.name.replace(/\.[^.]+$/, "")} - ${score.label}`, musicxml: score.musicxml })
+                    }
+                  >
+                    Practise from this tab
+                  </button>
+                </div>
+              )}
+              <p className="helper">
+                Notes look wrong? Download the MusicXML, fix it in MuseScore or Guitar Pro, then load it under "Learn from a tab
+                or score" below. Or use a tab you already have.
+              </p>
             </div>
           )}
 
@@ -822,6 +876,13 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
             {speed !== 1 ? ` at ${Math.round(speed * 100)}% speed` : ""} while we record you. Afterwards your take
             drops into the song in its place.
           </p>
+          <LatencyCheck
+            recorder={recorder}
+            latency={latency}
+            disabled={recording}
+            onBefore={stop}
+            onMeasured={setLatency}
+          />
           <label className="consent">
             <input id="guide" type="checkbox" checked={guide} onChange={(e) => setGuide(e.target.checked)} />
             <span>Keep the original quietly in my headphones as a guide</span>
@@ -832,12 +893,45 @@ export default function SongLab({ settings, onSettings, onCompare }: Props) {
                 <Mic size={15} /> Play along & record
               </button>
             ) : (
-              <button className="primary recording" onClick={() => mic.current?.node.port.postMessage({ type: "stop" })}>
+              <button className="primary recording" onClick={() => rec.current?.stop()}>
                 <Square size={15} /> Stop
               </button>
             )}
             {recording && <span className="job-stage"><span className="status-dot" /> Recording · bar {barAt(position)}</span>}
           </div>
+          <label className="drop compact">
+            <input
+              id="earlier-take"
+              type="file"
+              accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg"
+              disabled={locating || recording}
+              onChange={(e) => e.target.files?.[0] && findTake(e.target.files[0])}
+            />
+            <Search size={15} />
+            <span>{locating ? "Finding where it fits…" : "Or upload a recording you made earlier and we'll find where it fits"}</span>
+          </label>
+          {located && (
+            <div className="located" role="status">
+              <p className="helper">
+                {located.confidence === "repeated"
+                  ? "This part repeats in the song. Pick the right place:"
+                  : located.confidence === "low"
+                    ? "Not a confident match. Check the place, or pick another:"
+                    : "Found it:"}
+              </p>
+              <div className="presets">
+                {located.candidates.map((c, i) => (
+                  <button
+                    key={i}
+                    className={take?.buffer === located.buffer && Math.abs(take.start - c.start) < 0.01 ? "on" : ""}
+                    onClick={() => useLocated(located.buffer, c.start)}
+                  >
+                    Bar {c.bar ?? "?"} · {fmt(c.start)} · {Math.round(c.similarity * 100)}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {take && (
             <div className="take-card">
               <p className="helper">{take.detail}</p>

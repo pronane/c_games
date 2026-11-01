@@ -198,3 +198,40 @@ def test_downbeat_follows_chord_changes_when_bass_hits_every_beat():
         sel = (t >= a) & (t < b)
         harmonic[sel] = np.sin(2*np.pi*root*t[sel])+np.sin(2*np.pi*root*1.26*t[sel])
     assert sa.downbeat_phase(beats, sr, None, harmonic.astype(np.float32)) == 1
+
+
+def _phrase(sr, notes, step=.25):
+    out = []
+    for m in notes:
+        t = np.arange(int(sr*step))/sr
+        f = 440*2**((m-69)/12)
+        out.append((np.sin(2*np.pi*f*t)+.4*np.sin(4*np.pi*f*t))*np.exp(-t*4))
+    return np.concatenate(out).astype(np.float32)
+
+
+def test_locate_finds_the_take_and_flags_repeats():
+    sr = 22050
+    verse = _phrase(sr, [64, 67, 71, 67]*4)            # bars 1-2
+    chorus = _phrase(sr, [69, 72, 76, 72, 74, 77, 81, 77]*2)  # bars 3-4, and again at 7-8
+    bridge = _phrase(sr, [62, 66, 69, 66]*4)           # bars 5-6
+    song = np.concatenate([verse, chorus, bridge, chorus])
+    bars = [i*2.0 for i in range(8)]
+    # A take of the bridge played on a different-sounding instrument, a little slower.
+    import librosa
+    take = librosa.effects.time_stretch(_phrase(sr, [62, 66, 69, 66]*4)*.5, rate=.95)
+    found = sa.locate(song, take, sr, bars)
+    assert found['candidates'][0]['bar'] == 5
+    chorus_take = _phrase(sr, [69, 72, 76, 72, 74, 77, 81, 77]*2)
+    found = sa.locate(song, chorus_take, sr, bars)
+    assert {c['bar'] for c in found['candidates'][:2]} == {3, 7}
+    assert found['confidence'] in ('repeated', 'moderate', 'low')
+    with pytest.raises(ValueError):
+        sa.locate(song, take[:sr], sr, bars)
+
+
+def test_locate_tolerates_silent_stretches_in_the_reference():
+    sr = 22050
+    lead = _phrase(sr, [69, 72, 76, 72, 74, 77, 81, 77]*2)
+    song = np.concatenate([np.zeros(len(lead), np.float32), lead, np.zeros(len(lead), np.float32)])
+    found = sa.locate(song, lead*.7, sr, [i*2.0 for i in range(6)])
+    assert found['candidates'][0]['bar'] == 3
