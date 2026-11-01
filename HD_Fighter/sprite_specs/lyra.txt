@@ -1,21 +1,24 @@
+# HD Fighter sculpt spec (fictional character). `sculpt` picks the Sprite Forge v10 costume preset (sforge/sculpt.py);
+# the colour keys below recolour it. Build: HD_Fighter/sprite_specs/build_sprites.sh
 name = lyra
 style = fighter
 height_cm=172
 weight_kg=64
 build=athletic
-skin_tone=medium
-hair_colour=#5a2a8a
+skin_tone = #a8704a
+hair_colour = #6a3a9a
 hair_style=ponytail
 facial_hair=none
 eye_colour=brown
 top=tank
 top_colour=#f2f2f2
-trim_colour=#17a3a3
+trim_colour = #1fa6a0
 bottom=trousers
-bottom_colour=#17a3a3
+bottom_colour = #1fa6a0
 socks_colour=#17a3a3
 shoes=barefoot
 kit=blue
 accessories=wraps
 accessory_colour=#17a3a3
 head = large
+sculpt = lyra

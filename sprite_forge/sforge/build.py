@@ -221,6 +221,8 @@ def _render_mannequin_move(job):
     from . import mesh, render, anim, physics
     from . import expressions as X
     sp, prop, rs, m = job[:4]
+    if str(getattr(sp, "extra", {}).get("sculpt", "")).strip():      # v10: sculpted character + sculpt renderer
+        return _render_sculpt_move(sp, rs, m)
     faces = job[4] if len(job) > 4 else None
     phys = job[5] if len(job) > 5 else False
     base = (repr(sp.to_dict()), prop)
@@ -249,6 +251,28 @@ def _render_mannequin_move(job):
         M2 = np.concatenate([M[keep], np.array([mesh.MATS.index(x) for x in cm], M.dtype)]) if len(ct) else M[keep]
         out.append(render.render_tris(P2, M2, cols, rs, (st.root_t[0], st.root_t[2])))
     return out
+
+
+def _sculpt_settings(sp, rs):
+    from . import render_sculpt as RS
+    ex = sp.extra
+    return RS.SculptSettings(rs.cell_w, rs.cell_h, rs.figure_h / max(sp.scale, 1e-6), rs.baseline, rs.anchor_x,
+                             yaw=rs.yaw, pitch=float(ex.get("pitch", 4.0)), ss=max(int(ex.get("supersample", 3)), 2),
+                             ink=float(ex.get("ink", 1.0)), ao=float(ex.get("ao", 0.55)), rim=float(ex.get("rim", 1.0)))
+
+
+def _render_sculpt_move(sp, rs, m):
+    """v10 sculpt path: the character is meshed once per worker, then every frame is skinned and shaded"""
+    from . import sculpt as SC, render_sculpt as RS
+    from . import anim
+    key = ("sculpt", repr(sp.to_dict()))
+    if _MESH.get("_sculpt") != key:
+        ch = SC.build_character(sp)
+        _MESH["_sculpt"] = key; _MESH["_sculpt_obj"] = (ch, SC.mesh_character(ch, log=lambda *a: None))
+    ch, sm = _MESH["_sculpt_obj"]
+    ss = _sculpt_settings(sp, rs)
+    mo = motion_for(m)
+    return [RS.render_frame(ch, sm, st, ss) for st in anim.states_for(mo, m.frames, m.loop)]
 
 
 def glb_v9_extras(cfg, sp):

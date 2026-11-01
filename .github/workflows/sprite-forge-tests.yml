@@ -1,9 +1,9 @@
 name: Sprite Forge tests
 on:
   push:
-    paths: ["sprite_forge/**", ".github/workflows/sprite-forge-tests.yml"]
+    paths: ["sprite_forge/**", "HD_Fighter/sprite_specs/**", ".github/workflows/sprite-forge-tests.yml"]
   pull_request:
-    paths: ["sprite_forge/**", ".github/workflows/sprite-forge-tests.yml"]
+    paths: ["sprite_forge/**", "HD_Fighter/sprite_specs/**", ".github/workflows/sprite-forge-tests.yml"]
 jobs:
   limbs:
     runs-on: ubuntu-latest
@@ -21,6 +21,8 @@ jobs:
       # limbs attached, one piece, feet present, no flapping, no snaps, no wrong-way knees / elbows
       - run: python tools/test_limbs.py --selftest limbs_selftest
       - run: python tools/test_v8.py
+      # v10: HD Fighter hand-posed frames (attack peaks on frames 1-2, meta.json frame counts) + a full sculpt build
+      - run: python tools/test_hd_v10.py kairo
       - uses: actions/upload-artifact@v4
         if: always()
         with:
