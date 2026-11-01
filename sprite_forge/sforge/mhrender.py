@@ -130,6 +130,7 @@ def render(ch, posed, view: View = None, size=(420, 420), ss=2, bg=None, light=(
     L = np.asarray(light, float) / np.linalg.norm(light)
     zb = np.full((H, W), -1e9); col = np.zeros((H, W, 3)); cov = np.zeros((H, W))
     rng = np.random.default_rng(7)
+    dither = rng.uniform(0.3, 0.7, (H, W))
     opaque = [x for x in posed if x[0].role not in ALPHA_ROLES]
     alpha = [x for x in posed if x[0].role in ALPHA_ROLES]
     for group, is_alpha in ((opaque, False), (alpha, True)):
@@ -175,22 +176,26 @@ def render(ch, posed, view: View = None, size=(420, 420), ss=2, bg=None, light=(
                 if p.C is not None:
                     cc = (p.C[f] * b[..., None]).sum(1)
                     rgb *= cc[:, :3]; a *= cc[:, 3]
-                if is_alpha:
-                    keep = a > 0.5
+                if is_alpha:                                          # dithered alpha: soft, wispy edges after
+                    keep = a > dither[yy, xx]                         # the supersampled image is filtered down
                     yy, xx, f, b, zz, rgb = yy[keep], xx[keep], f[keep], b[keep], zz[keep], rgb[keep]
                     if not len(yy):
                         continue
                 if Nv is not None:
                     n = (Nv[f] * b[..., None]).sum(1)
                     n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-12
-                    if is_alpha:
-                        n = np.where((n[:, 2:3] < 0), -n, n)              # two-sided cards face the camera
+                    if is_alpha and p.role != "hair":                 # brows / lashes: two-sided cards face the camera
+                        n = np.where((n[:, 2:3] < 0), -n, n)              # (hair has smooth volume normals)
                     nl = n @ (R @ L)
                     rim = np.clip(1 - np.abs(n[:, 2]), 0, 1) ** 3
                     shade = 0.42 + 0.66 * np.clip(nl, 0, 1) + 0.18 * rim
                     if p.role == "eyes":
                         shade = 0.75 + 0.3 * np.clip(nl, 0, 1)
                     rgb = rgb * shade[:, None]
+                    if p.role == "hair" and "shell" not in p.name:      # soft sheen band (hair is glossy, skin is not)
+                        hv = R @ L + np.array([0, 0, 1.0]); hv /= np.linalg.norm(hv)
+                        sh = np.clip(n @ hv, 0, 1) ** 16 * 0.12
+                        rgb = rgb + sh[:, None] * (0.35 + 0.65 * rgb)
                 zb[yy, xx] = zz; col[yy, xx] = rgb; cov[yy, xx] = 1
     col = np.clip(col, 0, 1)
     im = np.dstack([col, cov])

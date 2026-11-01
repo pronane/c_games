@@ -145,6 +145,25 @@ def normals(V, F):
     return np.where(ln > 1e-12, N / np.maximum(ln, 1e-12), np.array([0, 1.0, 0]))
 
 
+def hair_normals(X, F, radius=0.025, k=32):
+    """smooth normals for card hair: each card's own normal is flat (faceted lighting, visible planes), so average the
+    normals of all cards within `radius` (metres, template space) and point them away from the local hair mass -
+    the hair is lit like one soft volume, as real hair reads"""
+    from scipy.spatial import cKDTree
+    N0 = normals(X, F)
+    tree = cKDTree(X)
+    d, idx = tree.query(X, k=min(k, len(X)))
+    w = np.clip(1 - d / radius, 0, 1)[..., None]
+    # big-scale outward direction: from the hair's own axis (vertical spread damped, so a hanging tail points out
+    # sideways, not down); every card normal is turned to agree with it before averaging - no flipped patches
+    big = X - X.mean(0); big[:, 1] *= 0.35
+    big /= np.linalg.norm(big, axis=1, keepdims=True) + 1e-12
+    N0 = np.where((N0 * big).sum(1, keepdims=True) < 0, -N0, N0)
+    N = (N0[idx] * w).sum(1)
+    N = N / (np.linalg.norm(N, axis=1, keepdims=True) + 1e-12) + 0.8 * big
+    return N / (np.linalg.norm(N, axis=1, keepdims=True) + 1e-12)
+
+
 def top4(Wd):
     idx = np.argsort(-Wd, axis=1)[:, :4]
     w = np.take_along_axis(Wd, idx, 1)
@@ -160,7 +179,7 @@ def _png(im):
 
 def _neutral_alpha_texture(path, size=512):
     """hair / brow / lash texture -> light grey detail + hard alpha (tinted per character by vertex colour;
-    hard alpha because the game draws with alpha-test, not blending)"""
+    soft alpha edge band; hard_alpha() makes the copy the game gets, which draws card hair alpha-tested)"""
     im = Image.open(path).convert("RGBA").resize((size, size), Image.LANCZOS)
     a = np.asarray(im).astype(np.float32) / 255
     rgb, al = a[..., :3], a[..., 3]
@@ -171,8 +190,21 @@ def _neutral_alpha_texture(path, size=512):
     from scipy.ndimage import distance_transform_edt
     _, (iy, ix) = distance_transform_edt(~m, return_indices=True)
     g = g[iy, ix]                                                      # bleed colour under transparent texels
-    out = np.dstack([g, g, g, (al > 0.3).astype(np.float32)])
+    out = np.dstack([g, g, g, _ss(0.12, 0.62, al)])                    # soft edge band (engines blend / dither it)
     return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8), "RGBA")
+
+
+def hard_alpha(png, cut=0.4):
+    """alpha-tested copy of a hair texture (for engines that draw card hair without sorting)"""
+    im = Image.open(io.BytesIO(png)).convert("RGBA")
+    a = np.asarray(im).copy()
+    a[..., 3] = np.where(a[..., 3] > cut * 255, 255, 0)
+    return _png(Image.fromarray(a, "RGBA"))
+
+
+def engine_images(images):
+    """images for a GLB: card hair textures alpha-tested, everything else as is"""
+    return {k: (hard_alpha(v) if k.startswith("hair_") else v) for k, v in images.items()}
 
 
 def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_res=1024):
@@ -191,8 +223,9 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
     covered = np.zeros(len(tm.F), bool)
     for gname, faces, thick in garment_faces(tm, Pb, kit_regions):
         sub = tm.F[faces]
-        rim = np.unique(boundary_edges(sub))
-        inner = ~np.isin(sub, rim).any(1)
+        wid = weld_ids(Pb)
+        rim = np.unique(wid[boundary_edges_welded(Pb, sub)])
+        inner = ~np.isin(wid[sub], rim).any(1)
         covered[faces[inner]] = True
     ch.parts.append(Part(name + "_body", "body", Pb, tm.F[~covered], tm.UV, Jb, Wb, normals(Pb, tm.F), image="skin"))
     # ---- skin texture (MakeHuman skin + facial hair / stubble / scalp paint)
@@ -202,7 +235,8 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
         V, F, UV, J, W = _solidify(Pb, tm.F[faces], tm.UV, Jb, Wb, thick)
         ch.parts.append(Part("%s_%s" % (name, gname), "kit", V, F, kit_uv(gname, UV), J, W, normals(V, F), image="kit"))
     # ---- fitted assets
-    def fitted(kind, aname, role, tint=None, image_key=None, keep=None, scale_about=None, hairline_scale=True, fade=None):
+    def fitted(kind, aname, role, tint=None, image_key=None, keep=None, scale_about=None, hairline_scale=True, fade=None,
+               inner=False):
         p = lib.proxy(kind, aname)
         Xb = p.fit(Vm)                                                  # base space (dm)
         r0 = p.ref[:, 0]
@@ -232,7 +266,15 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
         if key not in ch.images and p.tex:
             ch.images[key] = _png(_neutral_alpha_texture(p.tex) if role in ("hair", "brows", "lashes")
                                   else Image.open(p.tex).convert("RGB"))
-        ch.parts.append(Part("%s_%s" % (name, role), role, X, F, p.UV, J, W, normals(X, F), C, key))
+        if inner and role == "hair":                                     # inner layer: fills the gaps between cards
+            cb, _r = _head_frame(Vm)
+            Xi_b = cb + (Xb - cb) * 0.965
+            Xi = G[r0] + np.einsum("nij,nj->ni", tm.R[r0], Xi_b - Vm[r0])
+            Ci = C.copy() if C is not None else np.ones((len(Xi), 4), np.float32)
+            Ci[:, :3] *= 0.93
+            ch.parts.append(Part("%s_hairinner" % name, role, Xi, F, p.UV, J, W, hair_normals(Xi, F), Ci, key))
+        ch.parts.append(Part("%s_%s" % (name, role), role, X, F, p.UV, J, W,
+                             hair_normals(X, F) if role == "hair" else normals(X, F), C, key))
     eye_key = "eyes_" + ap.eye_colour
     if eye_key not in ch.images:
         ch.images[eye_key] = _png(Image.open(lib.eye_texture(ap.eye_colour)).convert("RGB").resize((512, 512)))
@@ -243,6 +285,16 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
     fitted("eyebrows", ap.brow_style, "brows", tint=ap.rgb("brow_colour"),
            scale_about=(lambda X: _bushy(X, bt)) if abs(bt) > 1e-3 else None)
     # ---- facial hair: strand cards on the face (moustache / goatee / beard), lit with the skin's normal
+    for k, (Xb, Fs, UVs, vb, al, Ns) in enumerate(facial_hair_shell(ap, lib, Vm)):
+        X = G[vb] + np.einsum("nij,nj->ni", tm.R[vb], Xb - Vm[vb])
+        Nx = np.einsum("nij,nj->ni", tm.R[vb], Ns); Nx /= np.linalg.norm(Nx, axis=1, keepdims=True) + 1e-12
+        J, W = top4(tm.Wd[vb])
+        C = np.tile(np.array(list(np.array(ap.rgb("facial_hair_colour")) * (0.85 if k == 0 else 1.0)) + [1.0], np.float32), (len(X), 1))
+        C[:, 3] = al
+        Fk = Fs[al[Fs].max(1) > 0.02]
+        if "beard_shell" not in ch.images:
+            ch.images["beard_shell"] = _png(shell_texture())
+        ch.parts.append(Part("%s_beardshell%d" % (name, k), "hair", X, Fk, UVs, J, W, Nx, C, "beard_shell"))
     fc = facial_hair_cards(ap, lib, Vm)
     if fc is not None:
         Xb, Fc, UVc, tri, bcc, Ns = fc
@@ -257,7 +309,7 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
     hs = ap.hair_style
     if hs not in ("bald", "buzz"):
         hl = float(ap.hairline)
-        fitted("hair", hs, "hair", tint=ap.rgb("hair_colour"), fade=hl if hl > 0.05 else None)
+        fitted("hair", hs, "hair", tint=ap.rgb("hair_colour"), fade=hl if hl > 0.05 else None, inner=True)
     return ch
 
 
@@ -337,7 +389,8 @@ def garment_faces(tm: Template, P, regions=None):
         ab = B - A
         return ((Fc - A) @ ab) / (ab @ ab)
     out = []
-    torso = np.isin(nm, ["spine_01", "spine_02", "spine_03", "clavicle_l", "clavicle_r"]) | ((nm == "pelvis") & (y > 0.86))
+    nms = nm.astype(str)
+    torso = np.char.startswith(nms, "spine_") | np.isin(nm, ["clavicle_l", "clavicle_r"]) | ((nm == "pelvis") & (y > 0.86))
     neck = (nm == "neck_01") & (y < 1.47)
     arm = np.zeros(len(Fc), bool)
     for s in "lr":
@@ -346,7 +399,7 @@ def garment_faces(tm: Template, P, regions=None):
     leg = np.zeros(len(Fc), bool)
     for s in "lr":
         leg |= (nm == "thigh_" + s) & (along("thigh_" + s, "calf_" + s) < 0.36)
-    shorts = ((nm == "pelvis") | leg | ((nm == "spine_01") & (y < 0.99))) & (y < 0.99)
+    shorts = ((nm == "pelvis") | np.char.startswith(nms, "hip_") | leg | ((nm == "spine_01") & (y < 0.99))) & (y < 0.99)
     out.append(("shorts", np.nonzero(shorts)[0], KIT["shorts"]))
     sock = np.zeros(len(Fc), bool)
     for s in "lr":
@@ -386,19 +439,38 @@ def _smooth_hem(V, bd, iters=6, lam=0.5):
     return V
 
 
+def weld_ids(P, tol=1e-5):
+    """vertex -> id shared by vertices at the same position (UV seams split the template's vertices)"""
+    _, inv = np.unique(np.round(P / tol).astype(np.int64), axis=0, return_inverse=True)
+    return inv.ravel()
+
+
+def boundary_edges_welded(P, F):
+    """real open edges of a face set (UV seams are not edges): (k,2) vertex indices of F"""
+    w = weld_ids(P)
+    E = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    key = np.sort(w[E], 1)
+    _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
+    return E[cnt[inv.ravel()] == 1]
+
+
 def _solidify(P, F, UV, J, W, t):
     """offset a face set along the vertex normals, straighten the hems and close them with a rim strip"""
     used = np.unique(F)
     remap = -np.ones(len(P), np.int64); remap[used] = np.arange(len(used))
     Fl = remap[F]
-    Pn = normals(P[used], Fl)
-    base = _smooth_hem(P[used], boundary_edges(Fl))
+    Pu = P[used]
+    w = weld_ids(Pu)
+    # normals and hems on the welded surface (seam vertices move together: no cracks, no false hems)
+    nw = w.max() + 1
+    Pw = np.zeros((nw, 3)); Pw[w] = Pu
+    Nw = normals(Pw, w[Fl])
+    Pn = Nw[w]
+    bdw = boundary_edges(w[Fl])
+    base = _smooth_hem(Pw, bdw)[w]
     V = base + Pn * t
     # boundary edges -> rim quads from the outer surface down to the body (hides the gap)
-    E = np.concatenate([Fl[:, [0, 1]], Fl[:, [1, 2]], Fl[:, [2, 0]]])
-    key = np.sort(E, 1)
-    u, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
-    bd = E[cnt[inv.ravel()] == 1]
+    bd = boundary_edges_welded(Pu, Fl)
     n0 = len(V)
     Vin = base - Pn * 0.002
     V = np.concatenate([V, Vin])
@@ -460,7 +532,13 @@ def facial_zones(P, L):
         _ss(1.25, 1.38, z) * (1 - lips * 0.85)
     chin = (1 - _ss(0.17, 0.25, ax)) * (1 - _ss(MOUTH_Y - 0.11, MOUTH_Y - 0.06, y)) * _ss(CHIN_Y - 0.25, CHIN_Y - 0.12, y) * \
         _ss(1.0, 1.15, z)
-    return {"face": face, "lips": lips, "mous": mous, "chin": chin}
+    # sideburns: a strip in front of the ear from the beard up to the hairline, so beard and hair join
+    side = _ss(ear_z - 0.02, ear_z + 0.08, z) * (1 - _ss(ear_z + 0.30, ear_z + 0.42, z)) * _ss(0.55, 0.65, ax) * \
+        (1 - _ss(7.52, 7.66, y)) * _ss(upper - 0.2, upper, y)
+    # neckline: the beard stops under the jaw instead of running down the neck
+    neck = _ss(ch_[1] - 0.62, ch_[1] - 0.40, y) + (1 - _ss(ch_[1] - 0.62, ch_[1] - 0.40, y)) * _ss(ch_[2] - 0.55, ch_[2] - 0.25, z)
+    face = np.maximum(face, side) * np.clip(neck, 0, 1)
+    return {"face": face, "lips": lips, "mous": mous, "chin": chin, "side": side}
 
 
 def strand_texture(size=256, strands=26, seed=3):
@@ -507,7 +585,8 @@ def facial_hair_cards(ap, lib, Vm, seed=5):
         dens = np.maximum(z["mous"], z["chin"] * (1 - z["lips"])); per = 0.028
     else:
         dens = np.maximum(z["face"] * (1 - z["lips"]), z["mous"]); per = 0.095
-    keep = rng.random(n_cand) < dens * per / max(dens.mean() + 1e-6, 0.02) * 0.35
+    dens = np.where(dens > 0.35, dens, 0.0)                     # strays outside the zone: the shell softens the edge
+    keep = rng.random(n_cand) < dens * per / max(dens.mean() + 1e-6, 0.02) * 0.30
     Pm, tri, bc, Pr, dens = Pm[keep], tri[keep], bc[keep], Pr[keep], dens[keep]
     fn = np.cross(Vm[tri[:, 1]] - Vm[tri[:, 0]], Vm[tri[:, 2]] - Vm[tri[:, 0]])
     n = fn / (np.linalg.norm(fn, axis=1, keepdims=True) + 1e-12)
@@ -518,10 +597,12 @@ def facial_hair_cards(ap, lib, Vm, seed=5):
     f0[on_lip] = np.stack([np.sign(Pr[on_lip, 0]) * 0.55, -np.ones(on_lip.sum()), 0.25 * np.ones(on_lip.sum())], 1)
     f = f0 - n * (f0 * n).sum(1, keepdims=True); f /= np.linalg.norm(f, axis=1, keepdims=True) + 1e-12
     b = np.cross(n, f)
-    Ln = np.where(on_lip, rng.uniform(0.07, 0.10, len(Pm)), rng.uniform(0.09, 0.15, len(Pm)) * (1.1 if kind == "beard" else 1.0))
-    Wd = (0.075 if kind == "beard" else 0.05) * (0.8 + 0.4 * rng.random(len(Pm)))
-    root = Pm + n * 0.006
-    tip = root + f * Ln[:, None] + n * (Ln * 0.22)[:, None]
+    edge = _ss(0.35, 0.8, dens)                                  # shorter towards the edge of the beard
+    Ln = np.where(on_lip, rng.uniform(0.07, 0.10, len(Pm)), rng.uniform(0.08, 0.13, len(Pm)) * (1.05 if kind == "beard" else 1.0))
+    Ln = Ln * (0.45 + 0.55 * edge)
+    Wd = (0.07 if kind == "beard" else 0.05) * (0.8 + 0.4 * rng.random(len(Pm)))
+    root = Pm + n * 0.004
+    tip = root + f * Ln[:, None] + n * (Ln * 0.12)[:, None]
     Nsurf = np.tile(n, (4, 1))
     X = np.concatenate([root - b * (Wd / 2)[:, None], root + b * (Wd / 2)[:, None],
                         tip + b * (Wd * 0.3)[:, None], tip - b * (Wd * 0.3)[:, None]])
@@ -533,6 +614,63 @@ def facial_hair_cards(ap, lib, Vm, seed=5):
     return X, F, UV, np.tile(tri, (4, 1)), np.tile(bc, (4, 1)), Nsurf
 
 
+def shell_texture(size=256, strands=420, seed=11):
+    """tileable fine-strand texture for the beard shell: alpha = strand strength (0.5..1), so lowering the vertex
+    alpha thins the beard strand by strand instead of cutting it off"""
+    rng = np.random.default_rng(seed)
+    a = np.zeros((size, size)); g = np.zeros((size, size))
+    yy, xx = np.mgrid[0:size, 0:size]
+    for _ in range(strands):
+        x0, y0 = rng.uniform(0, size, 2); ln = rng.uniform(0.18, 0.45) * size; w = rng.uniform(1.1, 2.2)
+        bend = rng.uniform(-0.12, 0.12); st = rng.uniform(0.5, 1.0)
+        t = np.mod(yy - y0, size) / ln                                    # 0 at the root, 1 at the tip (wraps)
+        xs = x0 + bend * ln * t ** 2
+        dx = np.mod(xx - xs + size / 2, size) - size / 2
+        prof = np.clip(1 - (dx / (w * (1 - 0.6 * t))) ** 2, 0, 1) * (t <= 1)
+        a = np.maximum(a, prof * st); g = np.maximum(g, prof * rng.uniform(0.7, 1.0))
+    al = np.where(a > 0.25, 0.15 + 0.85 * a, 0)
+    shade = 0.58 + 0.42 * g
+    out = np.dstack([shade, shade, shade, al])
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8), "RGBA")
+
+
+def facial_hair_shell(ap, lib, Vm, offsets=(0.018, 0.04)):
+    """beard / moustache / goatee base: copies of the face surface lifted off the skin, textured with fine strands,
+    alpha = growth density (soft edge).  -> list of (X (n,3) dm, F, UV, base vertex (n,), alpha (n,), N)"""
+    kind = ap.facial_hair
+    if kind not in ("moustache", "goatee", "beard"):
+        return []
+    Vb, Fb, _ = lib.base()
+    L = _landmarks(lib, Vb)
+    z = facial_zones(Vb, L)
+    if kind == "moustache":
+        dens = z["mous"]
+    elif kind == "goatee":
+        dens = np.maximum(z["mous"], z["chin"] * (1 - z["lips"]))
+    else:
+        dens = np.maximum(z["face"] * (1 - z["lips"]), z["mous"])
+    sel = (dens[Fb] > 0.02).any(1) & (Vb[Fb][:, :, 1].min(1) > 5.8)
+    F0 = Fb[sel]
+    used = np.unique(F0)
+    remap = -np.ones(len(Vb), np.int64); remap[used] = np.arange(len(used))
+    F = remap[F0]
+    N = normals(Vm, Fb)[used]
+    c = np.array([0.0, 6.9, 0.3])
+    flip = ((Vm[used] - c) * N).sum(1) < 0
+    N[flip] *= -1
+    P0 = Vb[used]
+    u = np.arctan2(P0[:, 0], P0[:, 2] - 0.3) * 0.9 * 4.0                # ~4 tiles per dm around the face
+    v = -P0[:, 1] * 4.0
+    UV = np.stack([u, v], 1)
+    out = []
+    for k, off in enumerate(offsets):
+        jit = np.random.default_rng(3 + k).uniform(0.8, 1.0, len(used))
+        a = np.clip(_ss(0.0, 0.9, dens[used]) ** 0.8 * jit, 0, 1) * (1.0 if k == 0 else 0.85)
+        X = Vm[used] + N * off * (0.55 + 0.45 * _ss(0.2, 0.9, dens[used]))[:, None]   # thinner at the edge
+        out.append((X, F, UV + k * 0.37, used, a, N))
+    return out
+
+
 def paint_skin(tm, ap, lib, Vm, res=1024):
     """MakeHuman skin texture + facial hair, stubble, buzz cut / receding scalp, optional tint"""
     im = Image.open(lib.skin(ap.skin)).convert("RGB").resize((res, res), Image.LANCZOS)
@@ -542,7 +680,7 @@ def paint_skin(tm, ap, lib, Vm, res=1024):
         img = img * (np.array(tint) / max(np.mean(tint), 1e-3) * 0.25 + 0.75)
     Vb = lib.base()[0]
     fh, hs, hl = ap.facial_hair, ap.hair_style, float(ap.hairline)
-    if fh == "none" and hs != "buzz" and hl < 0.05:
+    if fh == "none" and hs == "bald" and hl < 0.05:
         return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8), "RGB")
     tid, bc = raster_base_uv(tm, res)
     idx = np.nonzero(tid >= 0)
@@ -590,8 +728,14 @@ def paint_skin(tm, ap, lib, Vm, res=1024):
         sd = scalp * keep * (0.62 + 0.25 * dots + 0.08 * n)
         col = col * (1 - sd[:, None]) + hair_rgb * 0.9 * sd[:, None]
     elif hs != "bald":
-        under = scalp * keep * 0.8                                  # hair colour under the hair: no skin-coloured gaps
-        col = col * (1 - under[:, None]) + hair_rgb * 0.8 * under[:, None]
+        # hair colour under the hair: no skin-coloured gaps.  Scalp plus wherever the fitted hair lies close to the
+        # skin (long hair over the neck, a fringe over the forehead), thinned with the hairline like the hair itself
+        from scipy.spatial import cKDTree
+        Xh = lib.proxy("hair", hs).fit(Vb)
+        dist, _ = cKDTree(Xh).query(P, distance_upper_bound=0.4)
+        near = 1 - ss(0.07, 0.2, np.minimum(dist, 0.4))
+        under = np.clip(np.maximum(scalp, near * 0.85) * keep * 1.15, 0, 1)
+        col = col * (1 - under[:, None]) + hair_rgb * 0.85 * under[:, None]
         shadow = scalp * (1 - keep) * 0.18 * dots                   # receding: faint shaved shadow
         col = col * (1 - shadow[:, None]) + hair_rgb * shadow[:, None]
     out = img.copy(); out[idx] = np.clip(col, 0, 1)

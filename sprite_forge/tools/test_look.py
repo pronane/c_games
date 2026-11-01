@@ -126,6 +126,19 @@ def main():
         jl, _ = glbpack.read_glb(out)
         if len(jl["meshes"]) != len(ch2.parts) or len(jl["animations"]) != len(po.clips):
             fails.append("look GLB lost meshes or clips")
+        # built-in CC0 template (no game files): MakeHuman CC0 body + Sprite Forge's own clips
+        from sforge import mhtemplate
+        b0 = LK.Builder(None, lib)
+        if os.path.abspath(b0.template_path) != os.path.abspath(mhtemplate.path()):
+            fails.append("default template is not the built-in CC0 one: %s" % b0.template_path)
+        ch0 = b0.character(ap2, skin_res=256)
+        clips0 = LK.pick_clips(b0.poser.clips)
+        if not {"idle", "run", "kick"} <= set(clips0):
+            fails.append("built-in template clips missing: %s" % clips0)
+        c0 = np.asarray(b0.sprites(ch0, ["idle"], 1, None)["idle"][0])[..., 3]
+        ys = np.nonzero(c0.max(1) > 0)[0]
+        if not len(ys) or abs(ys.max() - 248) > 4 or ys.min() < 20:
+            fails.append("built-in template idle sprite not standing on the baseline")
         stats.update(parts=len(ch2.parts), max_morph_mm=round(float(d.max() * 1000), 1), glb_mb=round(n / 1e6, 1))
     else:
         print("SKIP full build: MakeHuman library not installed (forge.py human --setup --full)")

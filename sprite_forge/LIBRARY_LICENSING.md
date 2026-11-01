@@ -60,6 +60,8 @@ It is practical guidance, not legal advice.
   * MakeHuman's program code is AGPL. The Studio does not include or run it.
   * v10.2 also uses MakeHuman's CC0 system assets (hair, eyebrows, eyelashes, eyes, skins, all morph targets),
     downloaded by `forge.py human --setup --full`, so looks made with `forge.py look` can be packed too.
+  * The built-in look template (`assets/makehuman/template_cc0.glb`, made on your machine) is the CC0 MakeHuman
+    body plus Sprite Forge's own generated clips, so it and the characters built on it are CC0-clean.
   * MPFB2 (MakeHuman for Blender, GPL) is only used by the optional check `tools/mh_verify_blender.py`, run inside
     your own Blender. It is not shipped, and nothing it outputs goes into the characters.
 

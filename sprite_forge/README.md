@@ -5,6 +5,20 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v10.3: self-contained looks, better beards and long hair
+* **No other game or program needed.** `forge.py look` and the Appearance tab now use a built-in template: the CC0
+  MakeHuman body with a 26-bone skeleton and Sprite Forge's own clips (idle, walk, run, jump, kick, punch,
+  celebrate).  It is made once from the MakeHuman library (`sforge/mhtemplate.py`).  Your own rigged MakeHuman
+  model still works (`--template`, `$SFS_MH_TEMPLATE` or `assets/makehuman/template.glb`).
+* **Beards:** a soft base layer of fine strands follows the face (thinning out at the edges, with sideburns up to
+  the hair), and shorter strand clumps on top.  No more clumpy, scraggly edge.
+* **Ponytails and long hair:** an inner layer fills the gaps between hair cards, the skin under the hair is
+  hair-coloured wherever hair lies close, and the hair is lit as one smooth volume (no flat, faceted planes or dark
+  patches).  The preview and sprites use soft (dithered) hair edges.
+* **Blender check, now one command (optional):** `forge.py look --look my_look.txt --verify-blender OUT` rebuilds the
+  look with MakeHuman's own code in Blender (MPFB2) and compares it with Sprite Forge's build (verify.json + Cycles
+  portraits).  It needs Blender as a Python module with MPFB2; nothing else in Sprite Forge does.
+
 ## New in v10.2: change a character's features (Appearance tab, `forge.py look`)
 Realistic characters are built from the CC0 MakeHuman library: its base mesh, its own morph targets, and its fitted
 hair, eyebrows, eyelashes and eyes.  Every feature is one key, so the same look drives the Studio sliders, a text
@@ -33,8 +47,8 @@ y = 248, plus `meta.json`.
 MPFB2 (MakeHuman for Blender, MakeHuman's own code) and compares: body vertices 0.000 mm apart over 9 looks, fitted
 hair / brows / lashes / eyes 0.0 mm apart, plus a Cycles portrait of each.  `tools/test_look.py` runs in CI.
 
-Setup: `forge.py human --setup --full` (CC0 MakeHuman library, about 280 MB) and a rigged template GLB (default:
-Gaelic Football 3D's MakeHuman player; or `--template`, `$SFS_MH_TEMPLATE`, `assets/makehuman/template.glb`).
+Setup: `forge.py human --setup --full` (CC0 MakeHuman library, about 280 MB; one download).  The rigged template
+is built in (v10.3).
 Limits: one body type per template (the template's skeleton is kept, so very large height or proportion changes
 are not offered); hair is MakeHuman's card hair, which reads well at game distance and in sprites but is not
 strand-level; the preview renderer has no shadows.

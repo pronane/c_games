@@ -85,7 +85,8 @@ def main():
         im.save(os.path.join(a.out, "kit_%s.png" % k), optimize=True)
     bio = io.BytesIO(); kits["home"].save(bio, "PNG"); images["kit"] = bio.getvalue()
     glb = os.path.join(a.out, "gaelic_player.glb")
-    size = glbpack.pack_parts(a.template, glb, parts, images, alpha_keys=("hair_", "eyebrows_", "eyelashes_", "facial_hair"),
+    images = mhchar.engine_images(images)
+    size = glbpack.pack_parts(a.template, glb, parts, images, alpha_keys=("hair_", "eyebrows_", "eyelashes_", "facial_hair", "beard_shell"),
                               extras={"generator": "sprite_forge tools/gaelic_squad.py", "variants": len(looks)})
     with open(os.path.join(a.out, "gaelic_player.parts"), "w") as f:
         f.write("# mesh variant role  (Sprite Forge squad; roles: body kit hair brows lashes eyes)\n")
