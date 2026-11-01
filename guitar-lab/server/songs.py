@@ -119,7 +119,8 @@ async def fetch_url(url: str, dest: Path):
                 if r.status_code != 200:
                     raise HTTPException(422, f'The link returned HTTP {r.status_code}.')
                 kind = r.headers.get('content-type', '').split(';')[0].strip().lower()
-                if not (kind.startswith('audio/') or kind in ('application/octet-stream', 'video/mp4', 'application/ogg')):
+                if not (kind.startswith('audio/') or kind in ('application/octet-stream', 'application/ogg', 'video/mp4',
+                                                               'video/webm', 'video/x-matroska', 'video/quicktime')):
                     raise HTTPException(422, 'That link is a web page, not an audio file. Link directly to an MP3, WAV, FLAC, M4A or OGG file.')
                 total = 0
                 with dest.open('wb') as out:
@@ -148,13 +149,15 @@ async def save_upload(upload: UploadFile, dest: Path):
 
 
 def decode(path: Path, min_seconds=5):
-    """Decode with libsndfile (WAV/FLAC/OGG/MP3), falling back to ffmpeg for AAC/M4A and others."""
+    """Decode with libsndfile (WAV/FLAC/OGG/MP3), falling back to ffmpeg for WebM, M4A/AAC, MP4 and
+    other containers. Any video track is ignored."""
     try:
         audio, sr = sf.read(path, always_2d=True, dtype='float32')
     except Exception:
         if not shutil.which('ffmpeg'):
-            raise ValueError('This format needs ffmpeg on the server. Upload WAV, FLAC, OGG or MP3.')
-        proc = subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-i', str(path), '-t', str(MAX_SONG_SECONDS+1),
+            raise ValueError('This format (e.g. WebM, M4A, MP4) needs ffmpeg on the server. Upload WAV, FLAC, OGG or MP3, '
+                             'or run the installer again to add ffmpeg.')
+        proc = subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-i', str(path), '-vn', '-t', str(MAX_SONG_SECONDS+1),
                                '-f', 'f32le', '-ac', '2', '-ar', str(TARGET_SR), '-'], capture_output=True, timeout=300)
         if proc.returncode != 0 or not proc.stdout:
             raise ValueError('The file could not be decoded as audio.')
