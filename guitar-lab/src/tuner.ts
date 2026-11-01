@@ -48,12 +48,15 @@ export function detectPitch(
     }
   return null;
 }
+// referenceCents shifts A4 away from 440 Hz, e.g. +30 for a recording that sits sharp.
 export function tuningReading(
   hz: number,
   targets: number[],
   manual: number | null = null,
+  referenceCents = 0,
 ) {
-  const midi = 69 + 12 * Math.log2(hz / 440),
+  const a4 = 440 * 2 ** (referenceCents / 1200),
+    midi = 69 + 12 * Math.log2(hz / a4),
     target =
       manual ??
       (targets.length
@@ -63,7 +66,7 @@ export function tuningReading(
         : Math.round(midi));
   return {
     target,
-    cents: 1200 * Math.log2(hz / (440 * 2 ** ((target - 69) / 12))),
+    cents: 1200 * Math.log2(hz / (a4 * 2 ** ((target - 69) / 12))),
     hz,
   };
 }

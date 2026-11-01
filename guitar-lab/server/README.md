@@ -26,7 +26,7 @@ With these dependencies **isolated-reference sessions work**. Full-band sessions
 ### Enable genuine guitar separation
 
 1. Install matching **PyTorch and torchaudio** builds for your machine from their official distribution. Choose a CPU build for CPU machines or a CUDA-compatible build for NVIDIA. Do not mix torch and torchaudio versions. On modern PyTorch, older Demucs checkpoint loading may require compatibility review; use trusted official weights only. Demucs 4.0.1 was designed for older PyTorch, so validate your exact environment.
-2. Install `demucs==4.0.1` into the same environment.
+2. Install `demucs==4.1.0` into the same environment (4.0.1 cannot load checkpoints on PyTorch 2.6+).
 3. Run `.venv/bin/python -m server.model_store` to download and verify the pinned checkpoint, or `.venv/bin/python -m server.model_store --checkpoint /path/to/5c90dfd2-34c22ccb.th` for offline installation. The default cache is `.cache/models/demucs`; `FRETWORK_DEMUCS_REPO` overrides it. To use the development browser installer instead, start the API with `FRETWORK_ALLOW_MODEL_INSTALL=1` and use the studio's one-time model setup panel. This is disabled by default; production needs operator authentication and proxy upload-size limits. Both paths accept only the pinned 54,996,327-byte SHA-256-verified checkpoint and write a fixed model definition.
 
 Alternatively, obtain the official Demucs `htdemucs_6s` checkpoint and bag definition. This is the six-source model with a **dedicated guitar stem**, not the default four-source `htdemucs` model.
@@ -100,4 +100,12 @@ BROWSER_EXECUTABLE_PATH=/absolute/path/to/chromium npm run test:e2e
 
 This test uses the real ONNX model on the synthetic isolated-reference demo, approves the stem, edits a note, saves/recomputes, checks phone-width page overflow and deletes the session. It does not exercise microphone permission, actual mobile hardware, real-song separation or musical accuracy. `STUDIO_URL` can override the default local studio address. Browser binaries are not committed or downloaded automatically.
 
-Validation in this sandbox: 14 Python tests, 4 TypeScript tests, a production build, a real-model HTTP/proxy smoke test, and the Chromium isolated-reference end-to-end flow passed. Real full-band separation and physical GPU/MPS inference remain unvalidated.
+Validation (1 Nov 2026, CPU, Python 3.13, torch 2.15, Demucs 4.1.0): 48 Python tests including the real six-stem separation test, 35 TypeScript tests, a production build, and four Chromium flows (isolated-reference engine, USB inputs, instrument profiles, and learn-a-song on a three-guitar test song with fake microphone) passed. Physical GPU/MPS inference and real commercial recordings remain unvalidated.
+
+### Learn-a-song API
+
+- `POST /api/songs` multipart: `file` **or** `url` (https, direct audio file, public host), `consent=true`, `instrument`. Streaming-service hosts and private network addresses are refused. Up to 10 minutes / 120 MB.
+- `GET /api/songs/{id}`: status, then `result` with instruments, parts (position, per-bar role, bleed flags), tempo/bars, key, chords, tuning suggestion.
+- `GET /api/songs/{id}/tracks/{track}?format=mp3|flac`: `mix`, each stem, each guitar part.
+- `POST /api/songs/{id}/score` JSON `{part: id|"all", role: "any"|"lead"|"rhythm", tuning, capo}`: fingered notes and MusicXML.
+- `DELETE /api/songs/{id}`. Same one-hour expiry and consent model as practice jobs.

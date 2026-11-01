@@ -20,6 +20,8 @@ export type InstrumentSettings = {
   tuning: string;
   capo: number;
   notation: Notation;
+  /** Tune to a recording that is not at A4 = 440 Hz (cents, -50..50). */
+  referenceCents?: number;
 };
 export const instruments = catalogue as InstrumentProfile[];
 export function defaultSettings(

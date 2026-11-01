@@ -49,21 +49,21 @@ def separate_instrument(audio, sr, stem):
     return separate_guitar(audio, sr) if stem == 'guitar' else separate_stem(audio, sr, stem)
 
 
-def separate_stem(audio, sr, stem):
-    if stem not in ('guitar', 'bass', 'piano'):
-        raise ValueError('Unsupported separation stem.')
+def _load_six_stem_model():
+    from demucs.pretrained import get_model
+    return get_model('htdemucs_6s', repo=model_repo())
+
+
+def run_demucs(audio, sr):
+    """Run the pinned six-source model once. Returns ({source: (n, 2) float32}, samplerate, provenance)."""
     if not capabilities()['separation']['configured']:
         raise ModelUnavailable('Instrument separation is not configured. Install Demucs and provision the local htdemucs_6s weights; see server/README.md.')
     import torch
     import torchaudio
-    from demucs.pretrained import get_model
     from demucs.apply import apply_model
-    repo = model_repo()
-    model = get_model('htdemucs_6s', repo=repo)
-    if stem not in model.sources:
-        raise ModelUnavailable(f'Configured model has no dedicated {stem} output. An other stem is not accepted.')
+    model = _load_six_stem_model()
     model.eval()
-    x = torch.from_numpy(audio.T.copy()).float()
+    x = torch.from_numpy(np.asarray(audio, dtype=np.float32).T.copy()).float()
     if x.shape[0] == 1:
         x = x.repeat(2, 1)
     x = torchaudio.functional.resample(x, sr, model.samplerate)
@@ -77,13 +77,22 @@ def separate_stem(audio, sr, stem):
         with torch.inference_mode():
             stems = apply_model(model, normal[None].to(device), device=device,
                                 shifts=1, split=True, overlap=.25, progress=False)[0]
-        selected = stems[model.sources.index(stem)].detach().cpu() * std + mean
-        return selected.numpy().T
+        return {name: (stems[i].detach().cpu() * std + mean).numpy().T.astype(np.float32)
+                for i, name in enumerate(model.sources)}
 
     output, device, warning = run_with_fallback(infer, torch)
-    return output, model.samplerate, {'model': 'htdemucs_6s', 'stem': stem, 'device': device, 'warning': warning,
-                                      'sha256': EXPECTED_SHA256,
+    return output, model.samplerate, {'model': 'htdemucs_6s', 'sources': list(model.sources), 'device': device,
+                                      'warning': warning, 'sha256': EXPECTED_SHA256,
                                       'quality': 'Uncalibrated; human listening approval required.'}
+
+
+def separate_stem(audio, sr, stem):
+    if stem not in ('guitar', 'bass', 'piano'):
+        raise ValueError('Unsupported separation stem.')
+    stems, rate, provenance = run_demucs(audio, sr)
+    if stem not in stems:
+        raise ModelUnavailable(f'Configured model has no dedicated {stem} output. An other stem is not accepted.')
+    return stems[stem], rate, dict(provenance, stem=stem)
 
 
 # Basic Pitch's library defaults (0.5/0.3) roughly tripled the note count on plucked guitar

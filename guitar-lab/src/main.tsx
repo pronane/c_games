@@ -20,6 +20,8 @@ import EngineSession from "./EngineSession";
 import AudioInput from "./AudioInput";
 import MidiInput from "./MidiInput";
 import InstrumentSetup from "./InstrumentSetup";
+import SongLab from "./SongLab";
+import type { BarMark } from "./feedback";
 import {
   defaultSettings,
   resolveInstrument,
@@ -49,7 +51,8 @@ function App() {
     [error, setError] = useState(""),
     [recording, setRecording] = useState(false),
     [playing, setPlaying] = useState(""),
-    [demo, setDemo] = useState(false);
+    [demo, setDemo] = useState(false),
+    [bars, setBars] = useState<BarMark[] | undefined>(undefined);
   const ctx = useRef<AudioContext | null>(null),
     sources = useRef<AudioBufferSourceNode[]>([]);
 
@@ -68,6 +71,7 @@ function App() {
         name: file.name,
         buffer,
       });
+      setBars(undefined);
       setDemo(false);
       invalidate();
     } catch (e) {
@@ -218,6 +222,7 @@ function App() {
       return b;
     }
     setReference({ name: "Studio exercise · E–C–D–G", buffer: make(false) });
+    setBars(undefined);
     setTake({ name: "Practice take · a few rough edges", buffer: make(true) });
     setKind("isolated");
     setStart(0);
@@ -292,7 +297,28 @@ function App() {
             setView(next.notation === "tablature" ? "Tablature" : "Notes");
           }}
         />
-        <div className="step-line">
+        <SongLab
+          settings={settings}
+          onSettings={(next) => {
+            setSettings(next);
+            setView(next.notation === "tablature" ? "Tablature" : "Notes");
+          }}
+          onCompare={(ref, takeClip, at, seconds, barMarks) => {
+            stop();
+            setBars(barMarks);
+            setReference(ref);
+            setTake(takeClip);
+            setKind("isolated");
+            setStart(Number(at.toFixed(2)));
+            setLength(Number(seconds.toFixed(2)));
+            setDemo(false);
+            invalidate();
+            document
+              .getElementById("compare")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        />
+        <div className="step-line" id="compare">
           <span className="step selected">
             1 <b>Set up your session</b>
           </span>
@@ -387,6 +413,7 @@ function App() {
               }}
               onTake={(name, buffer) => {
                 setTake({ name, buffer });
+                setBars(undefined);
                 setDemo(false);
                 invalidate();
               }}
@@ -436,11 +463,13 @@ function App() {
                     invalidate();
                   }}
                 >
-                  {[10, 12, 20, 60].map((n) => (
-                    <option key={n} value={n}>
-                      {n} seconds
-                    </option>
-                  ))}
+                  {[...new Set([10, 12, 20, 60, length])]
+                    .sort((a, b) => a - b)
+                    .map((n) => (
+                      <option key={n} value={n}>
+                        {Number(n.toFixed(1))} seconds
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
@@ -480,6 +509,7 @@ function App() {
           start={start}
           length={length}
           recording={recording}
+          bars={bars}
         />
         <section className="results">
           <div className="results-heading">

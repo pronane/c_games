@@ -16,6 +16,7 @@ import {
 } from "./engineApi";
 import { fingering, note } from "./analysis";
 import ModelInstaller from "./ModelInstaller";
+import { summarise, type BarMark } from "./feedback";
 import { tabPosition, type ResolvedInstrument } from "./instruments";
 
 type Props = {
@@ -26,6 +27,8 @@ type Props = {
   length: number;
   recording: boolean;
   profile: ResolvedInstrument;
+  /** Bar starts within the compared passage, when it came from a song breakdown. */
+  bars?: BarMark[];
 };
 const pending = ["queued", "separating", "analysing"];
 function withTab(n: EngineNote, profile: ResolvedInstrument): EngineNote {
@@ -49,6 +52,7 @@ export default function EngineSession({
   length,
   recording,
   profile,
+  bars,
 }: Props) {
   const tuning = profile.openStrings,
     showTab = tuning.length > 0 && profile.settings.notation === "tablature";
@@ -429,6 +433,7 @@ export default function EngineSession({
           )}
           {result && (
             <>
+              <Summary result={result} duration={job?.duration ?? length} bars={bars} />
               <div className="metrics">
                 <div>
                   <label>Harmonic alignment</label>
@@ -791,5 +796,50 @@ export default function EngineSession({
         </p>
       )}
     </section>
+  );
+}
+
+function Summary({
+  result,
+  duration,
+  bars,
+}: {
+  result: NonNullable<Job["result"]>;
+  duration: number;
+  bars?: BarMark[];
+}) {
+  const s = summarise(result.comparison.findings, duration, bars);
+  return (
+    <div className="take-summary" aria-label="Summary of your take">
+      <div className="take-score">
+        <small>Estimated match</small>
+        <b>{s.overall === null ? "–" : `${s.overall}%`}</b>
+      </div>
+      <div className="take-points">
+        {s.points.length ? (
+          <ul>{s.points.map((p) => <li key={p}>{p[0].toUpperCase() + p.slice(1)}</li>)}</ul>
+        ) : (
+          <p>No clear mistakes found.</p>
+        )}
+        <p className="take-next"><b>Next:</b> {s.next}</p>
+      </div>
+      <div className="section-scores" role="list" aria-label="Score per section">
+        {s.sections.map((r) => (
+          <span
+            key={r.label}
+            role="listitem"
+            className={"section-score " + (r.score === null ? "none" : r.score >= 85 ? "good" : r.score >= 60 ? "fair" : "poor")}
+            title={`${r.label}: ${r.matched} matched, ${r.wrong} wrong, ${r.missed} missed, ${r.extra} extra, ${r.early + r.late} off the beat`}
+          >
+            <small>{r.label}</small>
+            {r.score === null ? "–" : r.score}
+          </span>
+        ))}
+      </div>
+      <p className="helper">
+        Scores come from automatic note detection on both recordings, so treat a single low bar with suspicion and
+        listen back before drilling it.
+      </p>
+    </div>
   );
 }
