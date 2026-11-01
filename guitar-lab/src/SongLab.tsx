@@ -848,7 +848,10 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
               </p>
               {score.unplayable_notes > 0 && (
                 <p className="notice-strong">
-                  {score.unplayable_notes} notes are too low for {tuningName(settings.tuning)}. Use the suggested tuning above.
+                  {score.unplayable_notes} {score.unplayable_notes === 1 ? "note is" : "notes are"} below the lowest string in{" "}
+                  {tuningName(settings.tuning)}, so {score.unplayable_notes === 1 ? "it is" : "they are"} left out of the tab and
+                  notation. Often that's bass bleeding into the guitar part; if the song really goes that low, use the
+                  suggested tuning above.
                 </p>
               )}
               <Suspense fallback={<p className="helper">Loading the notation view…</p>}>

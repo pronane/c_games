@@ -182,7 +182,7 @@ export default function HeardTake({
       {scored && (
         <>
           {scored.unplayable_notes > 0 && (
-            <p className="helper">{scored.unplayable_notes} notes are outside this tuning and have no tab position.</p>
+            <p className="helper">{scored.unplayable_notes} notes are outside this tuning, so they are left out of the tab and notation.</p>
           )}
           <Suspense fallback={<p className="helper">Loading the notation view…</p>}>
             <Notation musicxml={scored.musicxml} tab={profile.openStrings.length > 0} />
