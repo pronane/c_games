@@ -141,7 +141,8 @@ try {
   }
 
   Step 'Checking the engine starts'
-  Run 'Engine self-check' $Py @('-c', 'from server import app, models; c = models.capabilities(); assert c["transcription"]["configured"], "transcription"; assert c["separation"]["configured"], "separation"; print("    separation and transcription ready; GPU:", c["gpu"]["available"])')
+  # A module, not python -c: Windows PowerShell 5.1 strips inner quotes from native arguments.
+  Run 'Engine self-check' $Py @('-m', 'server.selfcheck')
 
   # ---------------------------------------------------------------- the studio (web page)
   Step 'Checking Node.js'
