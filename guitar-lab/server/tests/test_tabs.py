@@ -57,3 +57,16 @@ def test_text_tab_endpoint_returns_notation():
     assert body['key']['key'] in ('A minor', 'C major')
     assert client.post('/api/tabs/text', headers={'X-Fretwork-Client': 'studio'},
                        json={'text': TAB, 'instrument': 'piano', 'tuning': 'none'}).status_code == 422
+
+
+def test_notes_to_notation_fingers_a_take():
+    client = TestClient(module.app)
+    take = [{'time': i*.5, 'duration': .45, 'midi': m} for i, m in enumerate([45, 52, 57, 60, 64, 60, 57, 52])]
+    r = client.post('/api/tabs/notation', headers={'X-Fretwork-Client': 'studio'}, json={'notes': take, 'bpm': 120})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert all(n['string'] and n['fret'] is not None for n in body['notes'])
+    root = ET.fromstring(body['musicxml'].split('\n', 2)[2])
+    assert len(root.findall('.//measure')) >= 1
+    assert sum(1 for _ in root.iter('fret')) == 8
+    assert client.post('/api/tabs/notation', json={'notes': take}).status_code == 403

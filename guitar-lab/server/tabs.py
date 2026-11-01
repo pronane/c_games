@@ -175,3 +175,48 @@ def text_tab(body: TextTab, x_fretwork_client: str | None = Header(None)):
     xml = sa.musicxml(parsed['notes'], parsed['beats'], key, profile['open_strings'], title=body.title,
                       part_name=profile['name'], tab=True, clef=clef)
     return dict(parsed, key=key, musicxml=xml, instrument_profile=profile)
+
+
+class NoteIn(BaseModel):
+    time: float = Field(ge=0, le=900, allow_inf_nan=False)
+    duration: float = Field(gt=0, le=60, allow_inf_nan=False)
+    midi: int = Field(ge=21, le=108)
+    string: int | None = Field(default=None, ge=1, le=8)
+    fret: int | None = Field(default=None, ge=0, le=24)
+
+
+class NotesToScore(BaseModel):
+    notes: list[NoteIn] = Field(max_length=5000)
+    instrument: str = Field(default='guitar', max_length=20)
+    tuning: str = Field(default='standard', max_length=40)
+    capo: int = Field(default=0, ge=0, le=12)
+    bpm: float = Field(default=90, ge=20, le=320)
+    title: str = Field(default='My take', max_length=120)
+
+
+@router.post('/notation')
+def notes_to_notation(body: NotesToScore, x_fretwork_client: str | None = Header(None)):
+    """Any note list (e.g. a transcribed take) -> fingered tab + MusicXML for the instrument.
+    Notes keep their times; the bar grid comes from `bpm` starting at 0 s."""
+    if x_fretwork_client != 'studio':
+        raise HTTPException(403, 'Use the studio client header.')
+    try:
+        profile = resolve_profile(body.instrument, body.tuning if body.instrument != 'piano' else 'none', body.capo)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    notes = sorted((n.model_dump() for n in body.notes), key=lambda n: (n['time'], n['midi']))
+    strings = profile['open_strings']
+    if strings:
+        given = all(n['string'] and n['fret'] is not None and strings[n['string']-1]+n['fret'] == n['midi']
+                    for n in notes if n['string'] and n['string'] <= len(strings))
+        if not notes or not all(n['string'] for n in notes) or not given:
+            notes = sa.fingering([{k: n[k] for k in ('time', 'duration', 'midi')} for n in notes], strings, profile['max_fret'])
+    beat = 60/body.bpm
+    end = max((n['time']+n['duration'] for n in notes), default=0)
+    beats = [i*beat for i in range(int(end/beat)+5)]
+    key = key_from_notes(notes) if notes else None
+    clef = 'bass' if body.instrument == 'bass' else 'treble' if not strings else 'treble8vb'
+    xml = sa.musicxml(notes, beats, key, strings, title=body.title, part_name=profile['name'],
+                      tab=bool(strings), clef=clef)
+    return {'notes': notes, 'musicxml': xml, 'key': key, 'bpm': body.bpm,
+            'unplayable_notes': sum(1 for n in notes if strings and n.get('string') is None)}

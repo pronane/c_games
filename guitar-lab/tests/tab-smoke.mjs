@@ -8,7 +8,14 @@ const fixture = (n) => fileURLToPath(new URL(`./fixtures/${n}`, import.meta.url)
 const shots = process.env.SCREENSHOT_DIR;
 (async () => {
   const browser = await pw.launch({
-    args: ["--no-sandbox", "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--autoplay-policy=no-user-gesture-required"],
+    args: [
+      "--no-sandbox",
+      "--use-fake-ui-for-media-stream",
+      "--use-fake-device-for-media-stream",
+      "--autoplay-policy=no-user-gesture-required",
+      // FAKE_AUDIO: a WAV the fake microphone plays (e.g. a rendered take); default is a beep.
+      ...(process.env.FAKE_AUDIO ? [`--use-file-for-fake-audio-capture=${process.env.FAKE_AUDIO}`] : []),
+    ],
     executablePath: process.env.BROWSER_EXECUTABLE_PATH,
     headless: true,
   });
@@ -19,14 +26,16 @@ const shots = process.env.SCREENSHOT_DIR;
   const proc = page.getByRole("group", { name: "Processing" });
   console.log("Processing:", (await proc.innerText()).replace(/\s+/g, " "));
   const lab = page.locator("#tab-lesson");
-  await lab.locator("#tab-file").setInputFiles(fixture("drop-d-riff.gp"));
+  await lab.locator("#tab-file").setInputFiles(process.env.TAB_FILE ?? fixture("drop-d-riff.gp"));
   await lab.locator(".notation-host svg").first().waitFor({ timeout: 60000 });
   console.log("Facts:", (await lab.locator(".song-facts").innerText()).replace(/\s+/g, " "));
   const tuning = lab.locator(".tuning-card");
-  console.log("Tuning prompt:", (await tuning.innerText()).replace(/\s+/g, " ").slice(0, 120));
-  await tuning.getByRole("button", { name: /Tune to/ }).click();
-  await tuning.waitFor({ state: "detached" });
-  console.log("Tuned: prompt gone, tuner now", await page.locator("select").first().inputValue().catch(() => "?"));
+  if (await tuning.count()) {
+    console.log("Tuning prompt:", (await tuning.innerText()).replace(/\s+/g, " ").slice(0, 120));
+    await tuning.getByRole("button", { name: /Tune to/ }).click();
+    await tuning.waitFor({ state: "detached" });
+    console.log("Tuned: prompt gone");
+  } else console.log("Tuning: already matches the tab (no prompt)");
   if (shots) await lab.screenshot({ path: `${shots}/tab-lesson.png` });
   await lab.getByRole("button", { name: "Play the tab" }).click();
   await page.waitForTimeout(1500);
@@ -44,7 +53,16 @@ const shots = process.env.SCREENSHOT_DIR;
   await engine.getByRole("button", { name: /Upload/ }).click();
   await page.locator(".take-summary").waitFor({ timeout: 180000 });
   console.log("Summary:", (await page.locator(".take-summary").innerText()).replace(/\s+/g, " ").slice(0, 200));
-  console.log("Method:", (await engine.innerText()).includes("uploaded tab") ? "tab notes used as the reference" : "?");
+  const heard = page.locator(".heard-take");
+  await heard.waitFor();
+  await heard.getByRole("button", { name: "What the app heard" }).click();
+  await heard.locator("button.on").first().waitFor();
+  console.log("Playing back the take on the app's guitar:", await heard.locator("button.on").first().innerText());
+  await heard.getByRole("button", { name: /Both/ }).click();
+  await heard.getByRole("button", { name: "Show my take as notation and tab" }).click();
+  await heard.locator(".notation-host svg").first().waitFor({ timeout: 60000 });
+  console.log("Take as notation:", await heard.locator(".notation-host svg").count(), "SVG blocks;", await heard.getByText("Download my take as Guitar Pro").count() ? "Guitar Pro download offered" : "no download");
+  if (shots) await heard.screenshot({ path: `${shots}/heard-take.png` });
 
   // Pasted text tab
   await lab.getByRole("button", { name: /Or paste a text tab/ }).click();

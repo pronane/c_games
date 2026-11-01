@@ -85,7 +85,8 @@ def observations(reference_notes, take_notes, alignment):
 # ---------------------------------------------------------------- checking a take against known notes
 
 def score_informed(reference_notes, take_notes, post, onset_hit=.3, wrong_hit=.45, extra_amp=.5,
-                   early=.12, late=.25, near=.06, rival=.6, timing_tolerance=.12):
+                   early=.12, late=.25, near=.06, rival=.6, timing_tolerance=.12, merge_neighbours=True,
+                   weak_hit=.8):
     """Compare a take with notes known exactly (an uploaded tab), not with a transcription.
 
     For each written note, ask the transcription model's onset activations whether that pitch
@@ -194,6 +195,18 @@ def score_informed(reference_notes, take_notes, post, onset_hit=.3, wrong_hit=.4
             continue
         findings.append({'kind': 'unmatched_take', 'take_time': n['time'], 'take_midi': n['midi'],
                          'detail': 'A note we did not expect from the tab.'})
+
+    # A semitone or tone off is often heard as both: a weak "hit" on the written pitch (the
+    # neighbour bleeds into it) plus a confident note next to it. Report that as a wrong note.
+    if merge_neighbours:
+        for f in [f for f in findings if f['kind'] == 'unmatched_take']:
+            near = [g for g in findings if g['kind'] in ('matched', 'timing_difference')
+                    and abs(g['take_time']-f['take_time']) < .06 and abs(g['take_midi']-f['take_midi']) in (1, 2)
+                    and g.get('onset_strength', 1) < weak_hit]
+            if near:
+                g = min(near, key=lambda g: abs(g['take_time']-f['take_time']))
+                g.update(kind='pitch_difference', take_midi=f['take_midi'])
+                findings.remove(f)
 
     timed = [abs(f['latency_compensated_seconds']) for f in findings if f['kind'] in ('matched', 'timing_difference')]
     return {'findings': findings, 'mean_absolute_timing_seconds': float(np.mean(timed)) if timed else None,

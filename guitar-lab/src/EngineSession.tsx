@@ -17,6 +17,7 @@ import {
 import { fingering, note } from "./analysis";
 import ModelInstaller from "./ModelInstaller";
 import { summarise, type BarMark } from "./feedback";
+import HeardTake from "./HeardTake";
 import type { Processing } from "./ProcessingToggle";
 import { tabPosition, type ResolvedInstrument } from "./instruments";
 
@@ -450,6 +451,14 @@ export default function EngineSession({
           {result && (
             <>
               <Summary result={result} duration={job?.duration ?? length} bars={bars} />
+              <HeardTake
+                takeNotes={edits.length ? edits : result.take_notes}
+                referenceNotes={result.reference_notes}
+                recording={take?.buffer ?? null}
+                bars={bars}
+                profile={profile}
+                referenceLabel={referenceNotes ? "The tab" : "The original part"}
+              />
               <div className="metrics">
                 <div>
                   <label>Harmonic alignment</label>
