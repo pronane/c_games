@@ -506,6 +506,9 @@ def main(argv=None):
     if argv and argv[0] == "human":         # v7: MakeHuman mode (CC0 assets, own code) -> library rig
         from sforge import human
         return human.main(argv[1:])
+    if argv and argv[0] == "look":          # v10.2: realistic MakeHuman character from appearance keys
+        from sforge import look
+        return look.main(argv[1:])
     if argv and argv[0] == "autoskin":      # v7 experimental: bind a static mesh to a skeleton by bone distance
         from sforge import autoskin
         return autoskin.main(argv[1:])
@@ -681,6 +684,7 @@ v9:
     sub.add_parser("library", help="user library of FBX/GLB rigs, animations, kits + .sfpack packs (forge.py library -h)")
     sub.add_parser("retarget", help="apply clips from one library rig / FBX / GLB to another (forge.py retarget -h)")
     sub.add_parser("human", help="v7: MakeHuman mode - parametric human (gender/age/muscle/weight/height/proportions) from the CC0 MakeHuman assets -> library rig (forge.py human -h)")
+    sub.add_parser("look", help="v10.2: realistic MakeHuman character from appearance keys (muscles, hair, beard, brows, lips, nose, eyes...) -> preview / GLB / sprites (forge.py look -h)")
     sub.add_parser("autoskin", help="v7 EXPERIMENTAL: skin your own static mesh (OBJ/GLB/FBX) to a library skeleton by bone distance (forge.py autoskin -h)")
     sub.add_parser("anim-export", help="v7: separate animation files - character_base.glb + anim_<move>.glb (+ .fbx) + manifest.json (forge.py anim-export -h)")
     sub.add_parser("doctor", help="check installed pieces and what each missing one disables (forge.py doctor [--json])")

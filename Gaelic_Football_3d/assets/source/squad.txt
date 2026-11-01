@@ -1,0 +1,90 @@
+# Gaelic Football squad looks: one [variant] block per look, keys from sforge/appearance.py
+# (sliders -1..1, 0 = the template; hair_style / facial_hair / brow_style / eye_colour / skin are choices).
+# Build: python3 sprite_forge/tools/gaelic_squad.py --install      Players use the looks in turn (game: variantOf()).
+
+[0]   # the classic: short back and sides, clean shaven
+hair_style = short02
+hair_colour = #3b2614
+muscle_legs = 0.3
+eye_colour = brown
+
+[1]   # ginger, beard, broad
+skin = young_caucasian_male2
+hair_style = short04
+hair_colour = #9a4a1c
+facial_hair = beard
+brow_thickness = 0.4
+muscle_shoulders = 0.6
+muscle_chest = 0.4
+jaw = 0.4
+eye_colour = green
+
+[2]   # balding veteran with a moustache
+skin = middleage_caucasian_male
+hair_style = short01
+hair_colour = #5b4a3c
+hairline = 0.75
+facial_hair = moustache
+nose_size = 0.4
+cheeks = 0.3
+eye_colour = bluegreen
+
+[3]   # long hair tied back, light stubble
+hair_style = ponytail01
+hair_colour = #20160f
+facial_hair = stubble
+cheekbones = 0.6
+lips = 0.3
+eye_colour = brown
+
+[4]   # blond buzz cut, wiry
+skin = young_caucasian_male2
+hair_style = buzz
+hair_colour = #c9a25a
+muscle_arms = -0.3
+muscle_legs = 0.6
+muscle_calves = 0.6
+nose_size = -0.4
+eye_colour = blue
+
+[5]   # big man up front: goatee, strong chin
+skin = young_african_male
+hair_style = buzz
+hair_colour = #120d0a
+facial_hair = goatee
+muscle_arms = 0.7
+muscle_shoulders = 0.7
+muscle_chest = 0.6
+chin = 0.6
+lips = 0.6
+nose_width = 0.4
+eye_colour = brown
+
+[6]   # curly mop, bushy brows
+hair_style = afro01
+hair_colour = #2b1a10
+brow_thickness = 0.9
+brow_style = eyebrow009
+eye_size = 0.3
+mouth_width = 0.3
+eye_colour = brownlight
+
+[7]   # receding, stubble, lean
+skin = middleage_caucasian_male
+hair_style = short04
+hair_colour = #6a6a68
+hairline = 0.45
+facial_hair = stubble
+facial_hair_colour = #77736e
+muscle_chest = -0.3
+cheekbones = 0.5
+eye_colour = grey
+
+[8]   # young lad, light brown fringe
+skin = young_asian_male
+hair_style = short04
+hair_colour = #4a3324
+eye_size = 0.2
+ears = 0.3
+lips = -0.2
+eye_colour = brown

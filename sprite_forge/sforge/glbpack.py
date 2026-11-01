@@ -138,3 +138,80 @@ def pack(template, out_path, V, N, UV, F, joints, weights, png_bytes, name="play
         struct.pack("<II", len(b), 0x004E4942) + bytes(b)
     open(out_path, "wb").write(data)
     return len(data)
+
+
+def pack_parts(template, out_path, parts, images, alpha_keys=(), extras=None):
+    """several skinned meshes (sforge.mhchar.Part-like: name, V, N, UV, F, J, W, C, image) on the template's skeleton
+    and clips, one material per image key (alpha MASK for alpha_keys).  Mesh order = parts order."""
+    j, buf = read_glb(template)
+    drop = {i for i, nd in enumerate(j["nodes"]) if "mesh" in nd}
+    keep = [i for i in range(len(j["nodes"])) if i not in drop]
+    remap = {o: k for k, o in enumerate(keep)}
+    nodes = []
+    for o in keep:
+        nd = dict(j["nodes"][o])
+        if "children" in nd:
+            nd["children"] = [remap[c] for c in nd["children"] if c in remap]
+            if not nd["children"]:
+                nd.pop("children")
+        nd.pop("skin", None)
+        nodes.append(nd)
+    out = _Out()
+    sk = dict(j["skins"][0]); sk["joints"] = [remap[x] for x in sk["joints"]]
+    if "skeleton" in sk:
+        sk["skeleton"] = remap.get(sk["skeleton"], sk["joints"][0])
+    sk["inverseBindMatrices"] = out.copy_acc(j, buf, j["skins"][0]["inverseBindMatrices"])
+    anims = []
+    for an in j.get("animations", []):
+        sm = [{"input": out.copy_acc(j, buf, s["input"]), "output": out.copy_acc(j, buf, s["output"]),
+               "interpolation": s.get("interpolation", "LINEAR")} for s in an["samplers"]]
+        ch = [{"sampler": c["sampler"], "target": {"node": remap[c["target"]["node"]], "path": c["target"]["path"]}}
+              for c in an["channels"] if c["target"]["node"] in remap]
+        anims.append({"name": an.get("name", "anim"), "channels": ch, "samplers": sm})
+    keys = list(images.keys())
+    mats, texs, imgs = [], [], []
+    for k in keys:
+        imgs.append({"bufferView": out.view(images[k]), "mimeType": "image/png", "name": k})
+        texs.append({"source": len(imgs) - 1, "sampler": 0})
+        m = {"name": k, "pbrMetallicRoughness": {"baseColorTexture": {"index": len(texs) - 1}, "metallicFactor": 0.0,
+                                                  "roughnessFactor": 1.0}}
+        if k in alpha_keys or any(k.startswith(a) for a in alpha_keys):
+            m["alphaMode"] = "MASK"; m["alphaCutoff"] = 0.5; m["doubleSided"] = True
+        mats.append(m)
+    meshes = []
+    scene = dict(j["scenes"][j.get("scene", 0)])
+    scene["nodes"] = [remap[n] for n in scene["nodes"] if n in remap]
+    for p in parts:
+        V = np.asarray(p.V, np.float32); F = np.asarray(p.F)
+        N = np.asarray(p.N if p.N is not None else np.tile([0, 1.0, 0], (len(V), 1)), np.float64)
+        ln = np.linalg.norm(N, axis=1); N[ln < 1e-6] = (0, 1.0, 0); N = (N / np.linalg.norm(N, axis=1, keepdims=True)).astype(np.float32)
+        J = np.asarray(p.J); W = np.asarray(p.W, np.float32)
+        J = np.where(W > 0, J, 0)
+        jt = (np.uint8, 5121) if J.max() < 256 else (np.uint16, 5123)
+        idx_t = (np.uint16, 5123) if len(V) < 65535 else (np.uint32, 5125)
+        attrs = {"POSITION": out.add(V, 5126, "VEC3", 34962, True), "NORMAL": out.add(N, 5126, "VEC3", 34962),
+                 "TEXCOORD_0": out.add(np.asarray(p.UV, np.float32), 5126, "VEC2", 34962),
+                 "JOINTS_0": out.add(J.astype(jt[0]), jt[1], "VEC4", 34962), "WEIGHTS_0": out.add(W, 5126, "VEC4", 34962)}
+        if getattr(p, "C", None) is not None:
+            attrs["COLOR_0"] = out.add(np.asarray(p.C, np.float32), 5126, "VEC4", 34962)
+        ind = out.add(F.astype(idx_t[0]).reshape(-1), idx_t[1], "SCALAR", 34963)
+        meshes.append({"name": p.name, "primitives": [{"attributes": attrs, "indices": ind, "material": keys.index(p.image)}]})
+        nodes.append({"name": p.name, "mesh": len(meshes) - 1, "skin": 0})
+        scene["nodes"].append(len(nodes) - 1)
+    gl = {"asset": {"version": "2.0", "generator": "Sprite Forge glbpack.pack_parts (v10.2)"}, "scene": 0, "scenes": [scene],
+          "nodes": nodes, "skins": [sk], "animations": anims, "meshes": meshes, "materials": mats, "textures": texs,
+          "samplers": [{"magFilter": 9729, "minFilter": 9987}], "images": imgs,
+          "accessors": out.acc, "bufferViews": out.views, "buffers": [{"byteLength": 0}]}
+    if extras:
+        gl["asset"]["extras"] = extras
+    b = out.b
+    while len(b) % 4:
+        b.append(0)
+    gl["buffers"][0]["byteLength"] = len(b)
+    js = json.dumps(gl, separators=(",", ":")).encode()
+    while len(js) % 4:
+        js += b" "
+    data = struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(b)) + struct.pack("<II", len(js), 0x4E4F534A) + js + \
+        struct.pack("<II", len(b), 0x004E4942) + bytes(b)
+    open(out_path, "wb").write(data)
+    return len(data)
