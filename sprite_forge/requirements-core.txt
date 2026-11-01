@@ -6,3 +6,5 @@ scipy>=1.7                      # mocap skeleton fit, cut-out clean-up, scan mes
 opencv-python-headless>=4.8     # video cut-out speed, slow motion, scan stereo (bundles its own FFmpeg for decoding)
 scikit-image>=0.20              # scan: marching cubes
 imageio-ffmpeg>=0.4.9           # ships a static ffmpeg executable inside the wheel -> no ffmpeg install
+pyfqmr>=0.2                     # v10.1 game meshes: quadric decimation to a triangle budget
+xatlas>=0.0.9                   # v10.1 game meshes: UV charts + packing for baked textures
