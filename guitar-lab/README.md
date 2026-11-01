@@ -17,6 +17,14 @@ Text tab has no rhythm: notes are placed by where they sit between bar lines and
 
 The song breakdown links here too: **Practise from this tab** sends its generated tab to this mode. If the generated notes are wrong, download the MusicXML, fix it in MuseScore or Guitar Pro, and load the corrected file.
 
+### Hear what the app heard
+
+After any comparison, **Your take, as the app heard it** plays back the notes the app picked out of your recording on its own guitar sound. Next to it you can play the tab (or original part), both together (original in the left ear, you in the right), or your actual recording. A note you played but can't hear in the app's version wasn't picked up. **Show my take as notation and tab** writes your performance out, with a Guitar Pro download.
+
+### Practice piece
+
+`examples/night-watch-etude.gp` is an original 22-bar study in A minor at 104 BPM, written for this app and free to use. It goes in five steps: clean arpeggios, palm-muted chugs with power-chord accents, a gallop rhythm, double stops in thirds, and an ending. Load it under **Learn from a tab or score**. Its alphaTex source is next to it; rebuild with `npx tsx examples/make-practice-piece.mts`.
+
 ### How reliable is the tab check? (GuitarSet, 60 real performances, 13,807 notes)
 
 Each recording is checked against exactly what the player played, so anything flagged is a false alarm. Mistakes are then planted by editing the tab.
