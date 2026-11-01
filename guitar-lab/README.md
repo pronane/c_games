@@ -1,4 +1,34 @@
-# Fretwork — guitar comparison prototype v0.2
+# Fretwork — guitar comparison prototype v0.3
+
+## Learn a song (new in v0.3)
+
+Pick your instrument, then add a song (upload, or a direct https link to an audio file you have the right to use; YouTube, Spotify and other streaming links are refused because their terms forbid downloading and the audio is protected). The engine runs Demucs `htdemucs_6s` once and returns:
+
+- **Which instruments play** (energy share and active time per stem) with solo / mute for each.
+- **Guitar parts**: the guitar stem is split by stereo position (left / centre / right) and every bar is labelled lead, rhythm, mixed or rest. Bars where a part only carries leakage from another part are detected (quieter copy of the same pitches, or centre overlap of both sides) and left out of tab and roles.
+- **What I'll play**: one guitar, one guitar's lead or rhythm bars, *every lead passage whichever guitar plays it*, every rhythm passage, or all guitars. This choice drives the backing track, the guide, the recording, your mix, the comparison and the tab.
+- **Tuning**: a suggestion from the lowest notes played and the recording's offset from A440 (e.g. "half step down, A4 = 440"), one tap to retune the tuner. Drop D vs D standard and similar pairs are reported as ambiguous.
+- **Key, tempo, bars, chords**: key from pitch profile, resolved between relative major/minor by the tonic chord; steady-tempo beat grid with the downbeat at the strongest chord change; chords per beat with a key prior.
+- **Tab and notation** for the chosen part (alphaTab rendering, MusicXML download for MuseScore / Guitar Pro / Sibelius), fingered with a hand-position Viterbi pass for the selected tuning and capo.
+- **Practice**: loop a bar range, slow to 50–100% without changing pitch (WSOLA in the browser), play along and record with a count-in while the chosen music is muted, optional quiet guide.
+- **Your take in the song**: hear the band with your take in place of the part you replaced, download the mix, or send it to the comparison engine.
+- **Feedback**: the comparison now opens with an estimated match score, a score per bar, the top issues ("2 wrong notes in bar 6", "rushed bar 4 (about 120 ms early)") and one next step.
+
+### What it gets right and wrong
+
+Measured on original, synthetic test songs (FluidSynth General MIDI instruments), not commercial recordings:
+
+| Check | Result |
+| --- | --- |
+| Instruments present (5-instrument song) | all correct |
+| Three guitars (rhythm left, lead right bars 5–8, lead centre bars 11–14) | all three parts and their lead bars found exactly |
+| Lead transcription, centre lead | 32/32 notes |
+| Lead transcription, right lead | F1 0.74 (a few octave ghosts and misses) |
+| Strummed 6-string rhythm chords | ~25% of chord tones; chord symbols carry this part |
+| Key / tempo / chords (E minor, 110 BPM, Em–C–G–D) | correct |
+| E♭-tuned song | suggests half step down |
+
+It will not always be right. Expect errors with dense distorted mixes, doubled guitars panned together, two guitars at the same stereo position playing at once (cannot be separated by panning), bends, slides, harmonics, and tempo changes. Tab positions are suggestions. Check by ear and against a trusted source; use the note editor to correct.
 
 ## Instrument profiles and tuning
 

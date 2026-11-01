@@ -1,6 +1,5 @@
 """Single-user development service. Temporary audio, explicit consent, bounded queue."""
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import importlib.metadata
@@ -8,8 +7,6 @@ import math
 import os
 from pathlib import Path
 import shutil
-import tempfile
-import threading
 import time
 from uuid import uuid4
 
@@ -25,10 +22,8 @@ from .model_store import install_stream, InvalidCheckpoint
 from .instruments import resolve_profile, CATALOGUE
 
 MAX_BYTES = 40 * 1024 * 1024
-TTL_SECONDS = 3600
-ROOT = Path(tempfile.mkdtemp(prefix='fretwork-'))
-LOCK = threading.RLock()
-EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix='audio')
+from .runtime import ROOT, LOCK, EXECUTOR, TTL_SECONDS
+from . import songs
 JOBS = {}
 
 
@@ -66,17 +61,21 @@ async def lifespan(app):
         while True:
             await asyncio.sleep(30)
             cleanup()
+            songs.cleanup()
     task = asyncio.create_task(sweep())
     yield
     task.cancel()
     with LOCK:
         for job in JOBS.values():
             job.cancelled = True
+        for song in songs.SONGS.values():
+            song.cancelled = True
     EXECUTOR.shutdown(wait=True, cancel_futures=True)
     shutil.rmtree(ROOT, ignore_errors=True)
 
 
 app = FastAPI(title='Fretwork analysis engine', lifespan=lifespan)
+app.include_router(songs.router)
 
 
 def client(x_fretwork_client: str | None):

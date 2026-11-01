@@ -9,9 +9,11 @@
     "test": "tsx --test src/*.test.ts",
     "test:e2e": "node tests/browser-smoke.mjs",
     "test:inputs": "node tests/input-smoke.mjs",
-    "test:profiles": "node tests/profile-smoke.mjs"
+    "test:profiles": "node tests/profile-smoke.mjs",
+    "test:song": "node tests/song-smoke.mjs"
   },
   "dependencies": {
+    "@coderline/alphatab": "~1.8.4",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

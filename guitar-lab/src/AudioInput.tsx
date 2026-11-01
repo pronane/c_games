@@ -322,6 +322,7 @@ export default function AudioInput({
                   pitch.hz,
                   profile.openStrings,
                   tunerState.current.target,
+                  profile.settings.referenceCents ?? 0,
                 )
               : null,
           );
@@ -450,7 +451,9 @@ export default function AudioInput({
             }}
           />
           <span>
-            Optional: tune / check pitch before recording (A4 = 440 Hz)
+            Optional: tune / check pitch before recording (A4 ={" "}
+            {(440 * 2 ** ((profile.settings.referenceCents ?? 0) / 1200)).toFixed(1)}{" "}
+            Hz)
           </span>
         </label>
         {tunerOn && (
