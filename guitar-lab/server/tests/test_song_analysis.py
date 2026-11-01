@@ -235,3 +235,20 @@ def test_locate_tolerates_silent_stretches_in_the_reference():
     song = np.concatenate([np.zeros(len(lead), np.float32), lead, np.zeros(len(lead), np.float32)])
     found = sa.locate(song, lead*.7, sr, [i*2.0 for i in range(6)])
     assert found['candidates'][0]['bar'] == 3
+
+
+def test_webm_video_decodes_audio_only(tmp_path):
+    """A downloaded .webm video: the engine reads its audio track through ffmpeg."""
+    import shutil
+    from pathlib import Path
+    from server.songs import decode
+    if not shutil.which('ffmpeg'):
+        pytest.skip('ffmpeg not installed')
+    src = Path(__file__).resolve().parents[2]/'tests/fixtures/tone-video.webm'
+    copy = tmp_path/'source'
+    shutil.copy(src, copy)
+    audio, sr = decode(copy)
+    assert sr == 44100 and audio.shape[1] == 2
+    assert 5.5 < len(audio)/sr < 6.5
+    spectrum = np.abs(np.fft.rfft(audio[:sr, 0]))
+    assert abs(np.argmax(spectrum) - 220) < 3      # 1-second window: one bin per Hz

@@ -21,6 +21,7 @@ import AudioInput from "./AudioInput";
 import MidiInput from "./MidiInput";
 import InstrumentSetup from "./InstrumentSetup";
 import SongLab from "./SongLab";
+import { MEDIA_ACCEPT } from "./audioFiles";
 import TabLab, { type TabSource } from "./TabLab";
 import ProcessingToggle, { type Processing } from "./ProcessingToggle";
 import type { BarMark } from "./feedback";
@@ -379,7 +380,7 @@ function App() {
             <label className={"drop " + (reference ? "loaded" : "")}>
               <input
                 type="file"
-                accept="audio/*"
+                accept={MEDIA_ACCEPT}
                 onChange={(e) =>
                   e.target.files?.[0] && load(e.target.files[0], "reference")
                 }
@@ -396,7 +397,7 @@ function App() {
                   : "Choose an audio file from your device"}
               </span>
               <small>
-                MP3, WAV, M4A and browser-supported audio · up to 100 MB
+                MP3, WAV, M4A, WebM/MP4 video sound and other browser-supported audio · up to 100 MB
               </small>
             </label>
             <div className="field-label">
@@ -467,7 +468,7 @@ function App() {
               <Upload size={15} /> Or upload a recording
               <input
                 type="file"
-                accept="audio/*"
+                accept={MEDIA_ACCEPT}
                 onChange={(e) =>
                   e.target.files?.[0] && load(e.target.files[0], "take")
                 }

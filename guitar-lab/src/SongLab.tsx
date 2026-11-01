@@ -45,6 +45,7 @@ import LatencyCheck from "./LatencyCheck";
 import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
 import { captureError } from "./audioInputs";
+import { MEDIA_ACCEPT, needsBrowserDecode, toWav } from "./audioFiles";
 import { names } from "./analysis";
 import {
   resolveInstrument,
@@ -179,8 +180,14 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
       setBuffers({});
       setScore(null);
       setTake(null);
+      // WebM, MP4, M4A and similar: decode the sound here so the engine doesn't need ffmpeg.
+      let upload = file;
+      if (mode === "file" && file && needsBrowserDecode(file.name)) {
+        setSong({ id: "", name: file.name, instrument: settings.instrument, status: "queued", stage: "Reading the sound from your file", error: null, result: null, expires_at: 0 });
+        upload = await toWav(file, context()).catch(() => file);
+      }
       const created = await createSong(
-        mode === "file" ? { file: file! } : { url: url.trim() },
+        mode === "file" ? { file: upload! } : { url: url.trim() },
         settings.instrument,
         processing,
       );
@@ -589,13 +596,13 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
           <input
             id="song-file"
             type="file"
-            accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg"
+            accept={MEDIA_ACCEPT}
             disabled={busy}
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
           <span className="upload-icon"><Music2 size={22} /></span>
           <strong>{file ? file.name : "Choose the song"}</strong>
-          <span>MP3, WAV, FLAC, M4A or OGG · up to 10 minutes / 120 MB</span>
+          <span>MP3, WAV, FLAC, OGG, M4A, or the sound of a WebM/MP4 video · up to 10 minutes</span>
         </label>
       ) : (
         <div className="song-url">
@@ -903,7 +910,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             <input
               id="earlier-take"
               type="file"
-              accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg"
+              accept={MEDIA_ACCEPT}
               disabled={locating || recording}
               onChange={(e) => e.target.files?.[0] && findTake(e.target.files[0])}
             />

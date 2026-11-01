@@ -3,6 +3,10 @@
 **On Windows:** double-click `windows\install.bat`, then use the **Guitar Lab** shortcut. See [windows/README.md](windows/README.md).
 Everything runs on your PC: the engine also serves the studio at `http://localhost:8000`.
 
+## File types
+
+Songs and recordings can be MP3, WAV, FLAC, OGG, M4A/AAC, Opus, or the sound of a video file (WebM, MP4, MKV, MOV). Video and compressed formats are decoded in the browser and sent to the engine as WAV, so ffmpeg isn't required; if the browser can't decode a file, the engine tries ffmpeg. The video picture is ignored.
+
 ## Learn from a tab or score (new in v0.4)
 
 Separation can't guarantee a clean part from every recording, so this mode doesn't depend on it.
