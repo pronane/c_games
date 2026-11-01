@@ -1775,3 +1775,24 @@ footer span:first-child {
 @media (max-width: 520px) {
   .take-summary { grid-template-columns: 1fr; }
 }
+.latency {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed #ccd7be;
+  border-radius: 6px;
+}
+.drop.compact {
+  flex-direction: row;
+  gap: 8px;
+  padding: 10px 12px;
+  min-height: 0;
+  font-size: 13px;
+  justify-content: flex-start;
+}
+.located {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

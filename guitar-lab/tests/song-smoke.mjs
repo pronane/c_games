@@ -72,6 +72,24 @@ const shots = process.env.SCREENSHOT_DIR;
   await lab.getByRole("button", { name: "Pause" }).click();
   console.log("At 75% speed, position after 2 s:", slow);
 
+  // Click track on, then the one-time delay check. Chrome's fake microphone only beeps on
+  // its own schedule, so the check must refuse to trust the result rather than save it.
+  await lab.locator("#click-on").check();
+  await lab.getByRole("button", { name: "Play", exact: true }).click();
+  await lab.getByRole("button", { name: "Pause" }).waitFor({ timeout: 30000 });
+  await lab.getByRole("button", { name: "Pause" }).click();
+  await lab.locator("#click-on").uncheck();
+  await lab.getByRole("button", { name: "Measure with speakers" }).click();
+  await lab.getByRole("button", { name: "Measure with speakers" }).waitFor({ timeout: 30000 });
+  console.log("Delay check:", await lab.locator(".latency").innerText().then((t) => t.replace(/\s+/g, " ").slice(0, 220)));
+
+  if (process.env.EARLIER_TAKE) {
+    await lab.locator("#earlier-take").setInputFiles(process.env.EARLIER_TAKE);
+    await lab.locator(".located").waitFor({ timeout: 120000 });
+    console.log("Earlier recording placed:", (await lab.locator(".located").innerText()).replace(/\s+/g, " "));
+    console.log("Take:", await lab.locator(".take-card .helper").first().innerText());
+  }
+
   // Loop bars 3-4 and play along with the fake microphone.
   await lab.locator("#loop-on").check();
   await lab.getByLabel("Loop from bar").fill(process.env.LOOP_FROM ?? "3");

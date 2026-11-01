@@ -14,21 +14,34 @@ Pick your instrument, then add a song (upload, or a direct https link to an audi
 - **Your take in the song**: hear the band with your take in place of the part you replaced, download the mix, or send it to the comparison engine.
 - **Feedback**: the comparison now opens with an estimated match score, a score per bar, the top issues ("2 wrong notes in bar 6", "rushed bar 4 (about 120 ms early)") and one next step.
 
-### What it gets right and wrong
+### How accurate is it? (measured 1 Nov 2026)
 
-Measured on original, synthetic test songs (FluidSynth General MIDI instruments), not commercial recordings:
+**Real guitarists: [GuitarSet](https://zenodo.org/records/3371780)** (CC BY 4.0). 360 recordings by six players in five styles, every note's string and fret captured with a hexaphonic pickup. Guitar alone, no band. Run with `python -m benchmarks.guitarset`.
 
-| Check | Result |
+| What | Solos | Chord playing | All |
+| --- | --- | --- | --- |
+| Notes (onset ±50 ms, right pitch), F1 | 0.88 | 0.69 | 0.78 |
+| Tab: right string and fret, given the right notes | 0.44 | 0.79 | — |
+| Chords (major/minor, time-weighted) | — | 0.51 | — |
+| Key exactly right | 0.33 | 0.56 | 0.44 |
+| Tempo within 4% (allowing double/half) | 0.76 | 0.66 | 0.71 |
+
+**A real band: Nine Inch Nails, "1,000,000"** from *The Slip* (2008), using the band's own multitrack stems, released under CC BY-NC-SA 3.0 US ([archive](https://archive.org/details/NineInchNails-TheSlipMulti-trackStems)). The stems are summed into the mix, the mix goes through the app as a user's upload would, and the output is scored against the stems. Run with `python -m benchmarks.multitrack`.
+
+| What | Result |
 | --- | --- |
-| Instruments present (5-instrument song) | all correct |
-| Three guitars (rhythm left, lead right bars 5–8, lead centre bars 11–14) | all three parts and their lead bars found exactly |
-| Lead transcription, centre lead | 32/32 notes |
-| Lead transcription, right lead | F1 0.74 (a few octave ghosts and misses) |
-| Strummed 6-string rhythm chords | ~25% of chord tones; chord symbols carry this part |
-| Key / tempo / chords (E minor, 110 BPM, Em–C–G–D) | correct |
-| E♭-tuned song | suggests half step down |
+| Which instruments play (guitar, bass, drums, vocals, other; no piano) | all correct |
+| Tempo (band's figure 136 BPM) | 135.9 BPM |
+| Bass / drums / vocals separation (SI-SDR vs doing nothing) | +11.0 / +8.5 / +7.4 dB |
+| Guitar separation | failed: −2.3 dB vs −2.0 dB for the raw mix; most of the main guitar track lands outside the guitar stem |
+| Guitar notes vs the same transcriber on the band's isolated guitar tracks | F1 0.22 |
+| Tuning suggestion | D standard (likely wrong; low notes from the bass) |
 
-It will not always be right. Expect errors with dense distorted mixes, doubled guitars panned together, two guitars at the same stereo position playing at once (cannot be separated by panning), bends, slides, harmonics, and tempo changes. Tab positions are suggestions. Check by ear and against a trusted source; use the note editor to correct.
+**Could a newer separator fix that?** BS-RoFormer SW (a six-stem community model) on the same song: guitar −0.8 dB vs Demucs −2.4 dB. It keeps 86% of the second guitar in its guitar stem (Demucs 54%). Neither model finds the band's main, very low guitar track: Demucs puts most of it under "other", RoFormer under "bass". RoFormer also needed 48 minutes for this 4-minute song on a 2-core CPU (Demucs a few minutes), and its licence is unknown, so it is not used. On our synthetic songs it won on the acoustic one (13.3 vs 2.0 dB) and lost on the distorted one (1.6 vs 17.5 dB). A licensed RoFormer-class guitar model on a GPU is the most promising upgrade.
+
+**What that means.** On a clean guitar recording the notes are mostly right and good enough to learn from, with a note editor for the rest. Chords, key and tab positions are a starting point to check, not an answer. On a full commercial mix everything depends on getting a clean guitar out first. The open six-stem model does that well for clearly recorded guitars (17.5 dB on our distorted three-guitar test song) and badly for heavily processed ones like this NIN track. When it fails, every guitar-specific result after it fails too. It will not always be right, and the app says so on every result.
+
+Earlier synthetic checks (FluidSynth instruments): three guitars split into the right parts and lead bars; centre lead 32/32 notes; E minor, 110 BPM and Em–C–G–D found; an E♭-tuned song correctly suggests half step down.
 
 ## Instrument profiles and tuning
 

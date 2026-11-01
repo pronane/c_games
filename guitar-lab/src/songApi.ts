@@ -113,3 +113,18 @@ export function tuningName(id: string) {
   };
   return names[id] ?? id.replaceAll("_", " ");
 }
+
+export type LocateResult = {
+  candidates: { start: number; raw_start: number; bar: number | null; similarity: number }[];
+  confidence: "high" | "repeated" | "moderate" | "low";
+  note: string;
+  take_seconds: number;
+};
+/** Where in the song a recording belongs, matched against the chosen part(s). */
+export function locateTake(id: string, take: Blob, parts: string[], role: string) {
+  const body = new FormData();
+  body.set("take", take, "take.wav");
+  body.set("parts", parts.join(","));
+  body.set("role", role);
+  return api<LocateResult>(`/api/songs/${id}/locate`, { method: "POST", body });
+}

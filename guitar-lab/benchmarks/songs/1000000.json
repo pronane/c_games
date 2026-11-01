@@ -1,0 +1,4 @@
+{"title": "1,000,000", "artist": "Nine Inch Nails", "album": "The Slip (2008)", "licence": "CC BY-NC-SA 3.0 US",
+ "source": "https://archive.org/details/NineInchNails-TheSlipMulti-trackStems", "bpm": 136,
+ "groups": {"guitar": ["Gtr", "Gtr2"], "bass": ["Bass"], "drums": ["Drums", "Tamb"], "vocals": ["LV", "BV"],
+            "other": ["Rozz", "Rozz2", "expand"]}}

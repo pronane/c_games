@@ -145,7 +145,7 @@ async def save_upload(upload: UploadFile, dest: Path):
         raise HTTPException(422, 'The uploaded file is empty.')
 
 
-def decode(path: Path):
+def decode(path: Path, min_seconds=5):
     """Decode with libsndfile (WAV/FLAC/OGG/MP3), falling back to ffmpeg for AAC/M4A and others."""
     try:
         audio, sr = sf.read(path, always_2d=True, dtype='float32')
@@ -162,8 +162,8 @@ def decode(path: Path):
     if audio.shape[1] == 1:
         audio = np.repeat(audio, 2, axis=1)
     duration = len(audio)/sr
-    if duration < 5:
-        raise ValueError('The song is shorter than 5 seconds.')
+    if duration < min_seconds:
+        raise ValueError(f'The recording is shorter than {min_seconds} seconds.')
     if duration > MAX_SONG_SECONDS:
         raise ValueError('Songs up to 10 minutes are supported. Trim the file and try again.')
     if not np.isfinite(audio).all() or np.sqrt(np.mean(audio**2)) < 1e-4:
@@ -430,6 +430,62 @@ def score(key: str, body: ScoreRequest, x_fretwork_client: str | None = Header(N
     return {'part': body.part, 'role': body.role, 'label': label, 'instrument_profile': profile,
             'notes': tabbed, 'unplayable_notes': unplayable, 'musicxml': xml,
             'chords': song.result['chords'], 'key': key_info, 'tempo': {k: song.result['tempo'][k] for k in ('bpm', 'time_signature')}}
+
+
+MUTED_ROLES = {'any': None, 'lead': ('lead', 'mixed'), 'rhythm': ('rhythm',)}
+
+
+def target_audio(song: Song, parts: list[str], role: str, sr=22050):
+    """Mono sum of the chosen parts, silent outside their lead / rhythm bars when asked."""
+    import librosa
+    known = {p['id']: p for p in song.result['parts']}
+    total = None
+    for pid in parts:
+        if pid not in known:
+            raise HTTPException(404, 'Unknown part.')
+        y, rate = sf.read(song.folder/'tracks'/f'{pid}.flac', always_2d=True, dtype='float32')
+        y = librosa.resample(y.mean(axis=1), orig_sr=rate, target_sr=sr)
+        keep = MUTED_ROLES[role]
+        if keep:
+            gate = np.zeros_like(y)
+            for bar in known[pid]['roles']:
+                if bar['role'] in keep:
+                    gate[int(bar['start']*sr):int(bar['end']*sr)] = 1
+            y = y*gate
+        total = y if total is None else total[:len(y)]+y[:len(total)]
+    return total
+
+
+@router.post('/{key}/locate')
+async def locate_take(key: str, take: UploadFile = File(...), parts: str = Form(...),
+                      role: str = Form('any'), x_fretwork_client: str | None = Header(None)):
+    """Where in the song does this take belong? Matches against the part being learned."""
+    client(x_fretwork_client)
+    song = get_song(key)
+    if song.status != 'complete' or not song.result:
+        raise HTTPException(409, 'Wait for the breakdown to finish.')
+    if role not in MUTED_ROLES:
+        raise HTTPException(422, 'Unknown role.')
+    path = song.folder/f'locate-{uuid4().hex}'
+    try:
+        await save_upload(take, path)
+        try:
+            audio, sr = decode(path, min_seconds=2)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        import librosa
+        y = librosa.resample(audio.mean(axis=1), orig_sr=sr, target_sr=22050)
+        ids = [p for p in parts.split(',') if p][:6]
+        def work():
+            reference = target_audio(song, ids, role)
+            return sa.locate(reference, y, 22050, song.result['tempo']['bars'])
+        try:
+            found = await asyncio.to_thread(work)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return dict(found, take_seconds=len(y)/22050)
+    finally:
+        path.unlink(missing_ok=True)
 
 
 @router.delete('/{key}', status_code=204)
