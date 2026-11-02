@@ -1,6 +1,6 @@
 # USB / EasySMX pad support — implementation & test report
 
-Branch: `arena/39ababe0-c-games` (commit `78c8dd1`).
+Branch: `arena/39ababe0-c-games` (PR #33, base `main`).
 
 ## What changed
 
@@ -32,6 +32,33 @@ blocked here), so the full `Tools/build.py --check` could not be executed. Inste
 
 No physical EasySMX pad is available in the sandbox; the raw-layout behaviour was
 verified with simulated button/axis states.
+
+## Continuous integration (GitHub Actions, PR #33)
+
+`arena-fc-tests.yml` runs on every push / PR touching `arena-fc/**`:
+
+| Job | Result |
+|---|---|
+| `godot-gdscript` — real Godot 4.7.2 (mono editor used as a GDScript runner) executing `Tools/run-gd-tests.sh`: `test_modules.gd`, `test_game.gd`, `test_rules.gd` and the new `test_pads.gd` | **pass (23 s)** |
+| `node-hub` — `npm ci && npm test` plus the Arena FC WebSocket hub against the protocol suites | **pass (53 s)** |
+| `Determinism + netplay tests` (`netplay`, `sim-linux`, `sim-windows`, `sim-compare`) | **pass** |
+| GitGuardian security checks | **pass** |
+
+CI exposed two Godot-4.7-only compile issues that the local gdtoolkit parser could
+not see, both fixed on this branch:
+
+* `extends "res://Web/PadSupport.gd"` failed to resolve ("Could not resolve class"),
+  which made `BrowserBoot.gd` fail to compile. The pure + engine-backed pad logic is
+  now in the single `Web/Controllers.gd` script (the repo's existing convention);
+  `Web/PadSupport.gd` was removed.
+* `var x := min(...)` cannot be inferred because `min()` returns a Variant. Locals
+  in the pad code are now untyped, which is equivalent here.
+
+`Tools/run-gd-tests.sh` now wraps each SceneTree test in a `timeout` (180 s, override
+with `ARENA_FC_TEST_TIMEOUT`) and emits check-run annotations from the failing test's
+output, so a script error before `quit()` fails the job quickly instead of hanging it.
+`Tests/gd/test_pads.gd` also has a 90 s watchdog.  Two earlier CI runs hung for ~30 min
+before this was added; they are unrelated to the final state.
 
 ## Run the engine suites on your machine
 
