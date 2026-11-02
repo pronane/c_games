@@ -93,6 +93,25 @@ public partial class MatchView : Node3D
         float dt = (float)delta;
         _time += dt;
         var cmd = Input.Read(dt);
+        // WASD is camera-relative: W always means "towards the top of the screen",
+        // including the behind-the-player and top-down angles.  The pure-C# engine
+        // works in world X/Z, so rotate the stick here where the camera basis lives.
+        if (cmd.Move.LengthSquared() > 0.0001f)
+        {
+            var basis = Cam.GlobalTransform.Basis;
+            var right = new System.Numerics.Vector2(basis.X.X, basis.X.Z);
+            var up = new System.Numerics.Vector2(basis.Y.X, basis.Y.Z);
+            if (right.LengthSquared() < 1e-4f || up.LengthSquared() < 1e-4f)
+            {
+                right = new System.Numerics.Vector2(1f, 0f);
+                up = new System.Numerics.Vector2(0f, -1f);
+            }
+            right = System.Numerics.Vector2.Normalize(right);
+            up = System.Numerics.Vector2.Normalize(up);
+            var worldMove = right * cmd.Move.X + up * (-cmd.Move.Y);
+            cmd.Move = worldMove.LengthSquared() > 1f
+                ? System.Numerics.Vector2.Normalize(worldMove) : worldMove;
+        }
         if (Input.PausePressed) Hud.SetPaused(!Hud.Paused);
         if (Input.CameraPressed) Cam.Cycle();
         if (Hud.Paused) { Hud.Update(Engine, dt, Input.Charge, Cam.ModeName); return; }

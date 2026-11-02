@@ -21,6 +21,25 @@ jobs:
       - run: arena-fc/Tools/run-gd-tests.sh
 
   # The shared Node hub with the Arena FC WebSocket proxy, against a fake game server.
+  # The desktop game is C#.  Compile it with .NET 9 and run the pure-match-core
+  # regression suite (possession stability, set pieces, human shots).  Without
+  # this job a C# syntax/type error in Scripts/** only shows up on a Windows build.
+  dotnet-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '9.0.x' }
+      - name: Build the Godot C# assemblies with .NET 9
+        working-directory: arena-fc
+        run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Pure-C# match core regression tests
+        working-directory: arena-fc
+        run: dotnet run --project Tests/MatchCoreTests.csproj -c Release
+      - name: Portable pad / gameplay static checks
+        working-directory: arena-fc
+        run: python3 Tools/test_pads.py
+
   node-hub:
     runs-on: ubuntu-latest
     steps:

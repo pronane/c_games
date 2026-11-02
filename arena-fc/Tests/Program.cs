@@ -86,6 +86,41 @@ Check("AI produced football actions", engine.Events.Any(x => x.Kind is EventKind
 Check("players moved from formation", engine.State.Players.Any(p => Mx.FlatDist(p.Pos, p.Home) > 2f));
 Check("no NaN in scoreboard", engine.State.Score.All(s => s >= 0 && s < 100));
 
+Section("Possession stability (regression: ball dropped every tick)");
+// PossessionLock used to be checked on the *owner* in Tick(), so every pickup or
+// tackle (both set the lock) released the ball one tick later.  The result was an
+// endless midfield scrum: 653 ownership flips in 60 s, no real dribbling, 0 goals.
+var pos = new MatchEngine(new MatchOptions { Seed = 2026, TimeSpeed = 15f });
+int flips = 0, prevOwner = pos.State.Ball.Owner, longestHold = 0, hold = 0;
+for (int i = 0; i < 3600; i++)
+{
+    pos.Step(1f / 60f, PlayerCommand.None);
+    int o = pos.State.Ball.Owner;
+    if (o != prevOwner) { flips++; prevOwner = o; hold = 0; }
+    else if (o >= 0) { hold++; longestHold = Math.Max(longestHold, hold); }
+}
+Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
+Check("a carrier can dribble for several seconds", longestHold > 180, $"longest={longestHold} ticks");
+
+var stick = new MatchEngine(new MatchOptions { Seed = 7 });
+stick.State.Phase = Phase.Play;
+stick.State.PhaseTimer = 0f;
+stick.State.Ball.Owner = -1;
+stick.State.Ball.Vel = Vector3.Zero;
+stick.State.Ball.FreeTime = .2f;
+stick.State.Ball.NoPickup = 0f;
+var near = stick.State.Players[5];
+stick.State.Ball.Pos = new Vector3(near.Pos.X + .4f, Mx.BallRadius, near.Pos.Z);
+int firstOwner = -1, heldTicks = 0;
+for (int i = 0; i < 30; i++)
+{
+    stick.Step(1f / 60f, PlayerCommand.None);
+    if (i == 0) firstOwner = stick.State.Ball.Owner;
+    if (firstOwner >= 0 && stick.State.Ball.Owner == firstOwner) heldTicks++;
+}
+Check("a loose ball stays with the player who collected it", heldTicks >= 25,
+      $"owner={firstOwner} held={heldTicks}/30");
+
 Section("Deterministic simulation (replay)");
 var a = new MatchEngine(new MatchOptions { Seed = 777 });
 var b = new MatchEngine(new MatchOptions { Seed = 777 });

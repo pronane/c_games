@@ -302,6 +302,27 @@ def main() -> int:
     check("desktop presets export the DB",
           'include_filter="Data/input/*.txt"' in (ROOT / "export_presets.cfg").read_text())
 
+    section("Desktop gameplay / camera regressions")
+    match_cs = (ROOT / "Scripts" / "Core" / "Match.cs").read_text(encoding="utf-8")
+    game_app = (ROOT / "Scripts" / "Godot" / "GameApp.cs").read_text(encoding="utf-8")
+    match_view = (ROOT / "Scripts" / "Godot" / "MatchView.cs").read_text(encoding="utf-8")
+    world3d = (ROOT / "Scripts" / "Godot" / "World3D.cs").read_text(encoding="utf-8")
+    hud_cs = (ROOT / "Scripts" / "Godot" / "Hud.cs").read_text(encoding="utf-8")
+    workflow = (ROOT.parent / ".github" / "workflows" / "arena-fc-tests.yml").read_text(encoding="utf-8")
+    check("owner PossessionLock does NOT release the ball every tick",
+          "owner.PossessionLock > 0 ||" not in match_cs)
+    check("the main menu Button grabs GUI focus",
+          "GrabFocus()" in game_app and "menu.GetChild(0)" in game_app)
+    check("WASD is rotated into camera space",
+          "Cam.GlobalTransform.Basis" in match_view and "worldMove" in match_view)
+    check("tactical camera is stable and player cam has a zero-facing guard",
+          "Mode == 2 ? new Vector3(0f, 0f, -1f)" in world3d
+          and "fwd.LengthSquared() < 1e-6f" in world3d)
+    check("HUD hint advertises the pad camera button", "pad R3 camera" in hud_cs)
+    check("C# core regression suite is wired into CI",
+          (ROOT / "Tests" / "MatchCoreTests.cs").exists()
+          and "MatchCoreTests.csproj" in workflow and "ArenaFC.sln" in workflow)
+
     section("Optional syntax parsers")
     try:
         import gdtoolkit  # noqa: F401
