@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 status=0
 TIMEOUT=()
 if command -v timeout >/dev/null 2>&1; then TIMEOUT=(timeout "$LIMIT"); fi
-for t in Tests/gd/test_modules.gd Tests/gd/test_game.gd Tests/gd/test_rules.gd Tests/gd/test_pads.gd; do
+for t in Tests/gd/test_modules.gd Tests/gd/test_game.gd Tests/gd/test_rules.gd Tests/gd/test_pads.gd Tests/gd/test_input_camera.gd; do
   echo "=== $t"
   out=$("${TIMEOUT[@]}" "$GODOT" --headless --path . --script "res://$t" 2>&1); code=$?
   echo "$out" | grep -E "^(PASS|FAIL|RESULT)|SCRIPT ERROR|Parse Error" || true
