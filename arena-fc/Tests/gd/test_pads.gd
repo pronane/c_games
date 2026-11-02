@@ -11,6 +11,14 @@ func ok(c: bool, msg: String) -> void:
 
 func _init() -> void:
 	_run.call_deferred()
+	_watchdog.call_deferred()
+
+## A script error before quit() would leave the SceneTree running forever.  This
+## guarantees the process exits (and CI fails clearly) instead of hanging.
+func _watchdog() -> void:
+	await create_timer(90.0).timeout
+	print("FAIL pad test watchdog: test_pads.gd did not finish in 90s")
+	quit(1)
 
 func btns(pressed := []) -> Array:
 	var b := []
