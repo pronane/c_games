@@ -236,7 +236,7 @@ def build_cs() -> bool:
     dotnet = ensure_dotnet()
     os.environ["DOTNET_ROOT"] = str(Path(dotnet).parent)
     os.environ["PATH"] = str(Path(dotnet).parent) + os.pathsep + os.environ.get("PATH", "")
-    log("\n[1/5] Building C# assemblies with .NET 9 …")
+    log("\n[1/6] Building C# assemblies with .NET 9 …")
     rc = run([dotnet, "build", str(ROOT / "ArenaFC.sln"), "-c", "Release", "-v:q"])
     if rc != 0: die("C# build failed. See errors above.")
     return True
@@ -246,14 +246,19 @@ def run_checks():
     build_cs()
     dotnet = shutil.which("dotnet") or str(CACHE / "dotnet" / "dotnet")
     mono = ensure_editor(True, None)
-    log("\n[2/5] Pure-C# unit tests …")
+    log("\n[2/6] Pure-C# unit tests (incl. USB / EasySMX PadLayout) …")
     if run([dotnet, "run", "--project", str(ROOT / "Tests/CoreTests.csproj"), "-c", "Release"]) != 0:
         die("Core tests failed.")
-    log("\n[3/5] In-engine Godot self test …")
+    log("\n[3/6] GDScript headless tests (incl. USB / EasySMX pads) …")
+    std = ensure_editor(False, None)
+    gd_env = dict(os.environ, GODOT=str(std))
+    if run(["bash", str(ROOT / "Tools" / "run-gd-tests.sh")], cwd=ROOT, env=gd_env, timeout=300) != 0:
+        die("GDScript tests failed.")
+    log("\n[4/6] In-engine Godot self test …")
     if run([mono, "--headless", "--path", str(ROOT), "--rendering-driver", "dummy",
             "--audio-driver", "Dummy", "--", "--selftest"], timeout=300) != 0:
         die("Godot self test failed.")
-    log("\n[4/5] v2 network integration (reconnect / migration / rollback) …")
+    log("\n[5/6] v2 network integration (reconnect / migration / rollback) …")
     server_bin = ROOT / "Server/bin/Release/net9.0/ArenaFC.Server.dll"
     if not server_bin.exists():
         warn("Server not built; skipping network tests. Run: dotnet build Server/ArenaFC.Server.csproj -c Release")
@@ -277,7 +282,7 @@ def run_checks():
             for script in ("net_smoketest.py", "net_v2_smoketest.py"):
                 if run([py, str(ROOT / "Tools" / script), "--url", url, "--seconds", "2.5"], timeout=180) != 0:
                     die(f"{script} failed.")
-            log("\n[5/5] ALL CHECKS PASSED (88 core + 47 in-engine + 17 classic network + 36 v2 network assertions).")
+            log("\n[6/6] ALL CHECKS PASSED (core + GDScript USB/EasySMX + in-engine + network assertions).")
         finally:
             proc.terminate()
             try: proc.wait(timeout=5)

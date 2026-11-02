@@ -2,7 +2,9 @@
 using System.Numerics;
 using ArenaFC.Core.Net;
 using System.Reflection;
+using System.IO;
 using ArenaFC.Core;
+using ArenaFC.Core.Input;
 
 int passed = 0, failed = 0;
 void Check(string name, bool ok, string? detail = null)
@@ -378,6 +380,109 @@ rb3.Predict(new Dictionary<int, PlayerCommand>
 Check("local input moves the player on the next simulated frame (zero RTT)",
       rb3.Engine.State.Players[rb3Local].Pos.X > x0,
       $"{x0:F2} -> {rb3.Engine.State.Players[rb3Local].Pos.X:F2}");
+
+Section("USB / EasySMX gamepad support (PadLayout)");
+var noSaved = new Dictionary<string, Dictionary<string, int>>();
+var winDb = string.Join("\n", new[] {
+    "# Game Controller DB", "", PadLayout.Builtin[0], PadLayout.Builtin[3], PadLayout.Builtin[1],
+    "not a mapping", "badguid,a:b0,platform:Windows," });
+var winLines = PadLayout.ParseSdlDatabase(winDb, "Windows");
+var linLines = PadLayout.ParseSdlDatabase(winDb, "Linux");
+Check("comments, blanks and invalid GUIDs are skipped", winLines.Count == 2, $"got {winLines.Count}");
+Check("Windows DB keeps only Windows/agnostic lines", winLines.All(l => PadLayout.PlatformMatches(l, "Windows")));
+Check("Linux DB keeps only Linux/agnostic lines", linLines.Count == 1 && linLines.All(l => PadLayout.PlatformMatches(l, "Linux")));
+Check("Mac OS X / macOS platform names normalise", PadLayout.NormalizePlatform("Mac OS X") == "macos"
+      && PadLayout.NormalizePlatform("Windows") == "windows" && PadLayout.NormalizePlatform("X11") == "linux");
+Check("built-in Windows fallback includes EasySMX", PadLayout.BuiltinMappings("Windows").Any(l => l.Contains("EasySMX")));
+Check("built-in Linux fallback includes ESM-9101", PadLayout.BuiltinMappings("Linux").Any(l => l.Contains("ESM-9101")));
+Check("built-in fallbacks are platform-filtered", PadLayout.BuiltinMappings("Windows").All(l => !l.Contains("platform:Linux")));
+Check("Web keeps every built-in fallback (browser IDs have no OS tag)",
+      PadLayout.BuiltinMappings("Web").Count == PadLayout.Builtin.Length);
+
+string? dbText = null;
+foreach (var candidate in new[] { "Data/input/gamecontrollerdb.txt", "../Data/input/gamecontrollerdb.txt",
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Data", "input", "gamecontrollerdb.txt") })
+{
+    try { if (File.Exists(candidate)) { dbText = File.ReadAllText(candidate); break; } } catch (Exception) { }
+}
+if (dbText != null)
+{
+    var parsedWin = PadLayout.ParseSdlDatabase(dbText, "Windows");
+    var parsedLin = PadLayout.ParseSdlDatabase(dbText, "Linux");
+    Check("shipped SDL DB parses for Windows", parsedWin.Count > 800, $"{parsedWin.Count} lines");
+    Check("shipped SDL DB parses for Linux", parsedLin.Count > 700, $"{parsedLin.Count} lines");
+    Check("shipped Windows EasySMX mapping", parsedWin.Any(l => l.Contains("EasySMX Controller")));
+    Check("shipped Linux EasySMX mappings", parsedLin.Any(l => l.Contains("EasySMX")));
+    Check("shipped generic USB mappings", parsedWin.Any(l => l.Contains("USB Controller")));
+    Check("every built-in fallback line comes from the shipped DB", PadLayout.Builtin.All(l => dbText.Contains(l)));
+}
+else Check("shipped gamecontrollerdb.txt found", false, "searched cwd, parent and test bin");
+
+var raw = PadLayout.Bindings("EasySMX Controller (D-mode)", false, noSaved);
+var std = PadLayout.Bindings("Xbox Wireless Controller", true, noSaved);
+Check("EasySMX D-input uses the raw order Y B A X / LB / RB",
+      raw["pass"] == 2 && raw["through"] == 0 && raw["shoot"] == 3 && raw["tackle"] == 1
+      && raw["switch"] == 4 && raw["sprint"] == 5);
+Check("mapped pads use Godot's standard JoyButton order",
+      std["pass"] == 0 && std["through"] == 3 && std["shoot"] == 2 && std["tackle"] == 1
+      && std["switch"] == 9 && std["sprint"] == 10);
+var savedForPad = new Dictionary<string, Dictionary<string, int>>
+{
+    ["My USB pad"] = new Dictionary<string, int> { ["pass"] = 7, ["through"] = 8, ["shoot"] = 9,
+        ["tackle"] = 10, ["switch"] = 11, ["sprint"] = 12 }
+};
+Check("saved per-pad remap wins over the default", PadLayout.Bindings("My USB pad", false, savedForPad)["pass"] == 7);
+Check("incomplete remap falls back to the default", PadLayout.Bindings("Other pad", false,
+      new Dictionary<string, Dictionary<string, int>> { ["Other pad"] = new Dictionary<string, int> { ["pass"] = 7 } })["through"] == 0);
+Check("EasySMX / USB pad names are detected", PadLayout.IsEasySMX("EasySMX ESM-9101")
+      && PadLayout.IsGenericUsb("USB Controller") && !PadLayout.IsEasySMX("Xbox One S Controller"));
+Check("pad kinds mention the active mode", PadLayout.PadKind("EasySMX", false).Contains("D-input")
+      && PadLayout.PadKind("EasySMX", true).Contains("XInput"));
+
+var noButtons = new bool[21];
+var noAxes = new float[10];
+Check("stick drift inside dead zone is ignored", PadLayout.Stick(.1f, .1f, PadLayout.Deadzone).Length < 1e-5f);
+Check("full stick deflection reaches 1.0", PadLayout.Stick(1f, 0f, PadLayout.Deadzone).X > .99f);
+
+var rb = new bool[21]; rb[2] = true;
+var rh = PadLayout.Held(rb, noAxes, raw, false);
+Check("raw EasySMX b2 is PASS (not the standard b0)", rh["pass"] && !rh["shoot"] && !rh["through"]);
+rb = new bool[21]; rb[3] = true;
+Check("raw EasySMX b3 is SHOOT", PadLayout.Held(rb, noAxes, raw, false)["shoot"]);
+rb = new bool[21]; rb[0] = true;
+Check("raw EasySMX b0 is THROUGH", PadLayout.Held(rb, noAxes, raw, false)["through"]);
+rb = new bool[21]; rb[1] = true;
+Check("raw EasySMX b1 is TACKLE", PadLayout.Held(rb, noAxes, raw, false)["tackle"]);
+rb = new bool[21]; rb[4] = true;
+Check("raw EasySMX b4 switches player", PadLayout.Held(rb, noAxes, raw, false)["switch"]);
+rb = new bool[21]; rb[6] = true;
+Check("raw LT button also sprints", PadLayout.Held(rb, noAxes, raw, false)["sprint"]);
+rb = new bool[21]; rb[9] = true;
+Check("raw Start (b9) pauses", PadLayout.Held(rb, noAxes, raw, false)["pause"]);
+rb = new bool[21]; rb[0] = true;
+Check("standard A is PASS", PadLayout.Held(rb, noAxes, std, true)["pass"]);
+rb = new bool[21]; rb[6] = true;
+Check("standard Start (b6) pauses", PadLayout.Held(rb, noAxes, std, true)["pause"]);
+var trig = new float[10]; trig[4] = 1f;
+Check("analogue trigger sprints on a mapped pad", PadLayout.Held(noButtons, trig, std, true)["sprint"]);
+
+rb = new bool[21]; rb[12] = true;
+var dpadUp = PadLayout.Move(rb, noAxes, false);
+Check("raw hat button 12 moves up (no 11-14 conflict)", dpadUp.Y < -.9f && MathF.Abs(dpadUp.X) < .01f);
+rb = new bool[21]; rb[11] = true;
+Check("Godot hat button 11 works on an unmapped pad", PadLayout.Move(rb, noAxes, false).Y < -.9f);
+var hat = new float[10]; hat[6] = -1f;
+Check("hat-as-axis 6 moves left", PadLayout.Move(noButtons, hat, false).X < -.9f);
+rb = new bool[21]; rb[15] = true;
+Check("mapped pads use Godot d-pad indices (11-14), not raw 12-15",
+      PadLayout.Move(rb, noAxes, true).Length < .01f);
+rb = new bool[21]; rb[11] = true;
+Check("mapped pad d-pad up works", PadLayout.Move(rb, noAxes, true).Y < -.9f);
+
+Check("1P mode: every connected pad drives P1", PadLayout.DevicesFor(new[] { 0, 3, 7 }, false, 0).Length == 3);
+Check("2P mode: player 2 gets the second pad", PadLayout.DevicesFor(new[] { 0, 3, 7 }, true, 1).SequenceEqual(new[] { 3 }));
+Check("no pads -> no devices", PadLayout.DevicesFor(new int[0], false, 0).Length == 0
+      && PadLayout.DevicesFor(new[] { 0 }, true, 1).Length == 0);
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

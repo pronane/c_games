@@ -1,7 +1,18 @@
 // Arena FC - one input layer for keyboard, mouse, gamepad and touch.
 // Produces the same PlayerCommand on every platform.
+//
+// USB / EasySMX support (see Scripts/Core/Input/PadLayout.cs and Web/Controllers.gd):
+//   * the bundled SDL gamecontrollerdb.txt is actually loaded now, plus built-in
+//     EasySMX / generic-USB mappings so an export without the .txt still works;
+//   * every connected pad is discovered (not just device 0);
+//   * pads Godot cannot map are read raw with the EasySMX D-input button order;
+//   * buttons can be remapped per pad name and are saved to user://pads.json.
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
 using ArenaFC.Core;
+using ArenaFC.Core.Input;
 using Godot;
 
 namespace ArenaFC.GodotGame;
@@ -19,11 +30,136 @@ public sealed class InputHub
     public bool PausePressed { get; private set; }
     public bool CameraPressed { get; private set; }
 
+    private readonly int _playerIndex;
+    private readonly bool _twoPlayer;
+
+    public InputHub(int playerIndex = 0, bool twoPlayer = false)
+    {
+        _playerIndex = playerIndex;
+        _twoPlayer = twoPlayer;
+        EnsureMappings();
+        LoadBindings();
+    }
+
     private static bool Edge(bool now, ref bool prev)
     {
         bool r = now && !prev;
         prev = now;
         return r;
+    }
+
+    // ---- SDL mapping database + saved per-pad bindings -----------------------------------------
+
+    private static int _mappingsLoaded = -1;
+    private static Dictionary<string, Dictionary<string, int>> _saved = new();
+
+    public static int MappingsLoaded => _mappingsLoaded;
+
+    /// <summary>Load once, before any pad is polled. Built-ins cover EasySMX/generic USB even if the DB is absent.</summary>
+    public static void EnsureMappings()
+    {
+        if (_mappingsLoaded >= 0) return;
+        _mappingsLoaded = 0;
+        string platform = OS.GetName();
+        foreach (string line in PadLayout.BuiltinMappings(platform))
+            if (TryAddMapping(line)) _mappingsLoaded++;
+        try
+        {
+            foreach (string line in PadLayout.ParseSdlDatabase(FileAccess.GetFileAsString(PadLayout.DbPath), platform))
+                if (TryAddMapping(line)) _mappingsLoaded++;
+        }
+        catch (Exception) { /* built-ins above still cover EasySMX and generic USB pads */ }
+    }
+
+    private static bool TryAddMapping(string line)
+    {
+        try { Input.AddJoyMapping(line, true); return true; }
+        catch (Exception) { return false; }
+    }
+
+    public static void LoadBindings()
+    {
+        try
+        {
+            string text = FileAccess.GetFileAsString(PadLayout.SavePath);
+            if (string.IsNullOrEmpty(text)) return;
+            var d = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(text);
+            if (d != null) _saved = d;
+        }
+        catch (Exception) { /* corrupt/old pads.json: fall back to the default layouts */ }
+    }
+
+    public static void SaveBindings()
+    {
+        try
+        {
+            using var f = FileAccess.Open(PadLayout.SavePath, FileAccess.ModeFlags.Write);
+            f?.StoreString(JsonSerializer.Serialize(_saved));
+        }
+        catch (Exception) { }
+    }
+
+    public static void SetBinding(string padName, string action, int button)
+    {
+        if (string.IsNullOrEmpty(padName)) return;
+        if (!_saved.ContainsKey(padName)) _saved[padName] = new Dictionary<string, int>();
+        _saved[padName][action] = button;
+    }
+
+    public static void ResetBindings()
+    {
+        _saved.Clear();
+        SaveBindings();
+    }
+
+    /// <summary>Text for the CONTROLLER SETUP screen: connected pads, kind, layout and bindings.</summary>
+    public static string DescribePads()
+    {
+        EnsureMappings();
+        var lines = new List<string>();
+        int[] connected = ConnectedDevices();
+        lines.Add($"SDL mappings loaded: {_mappingsLoaded}   |   pads connected: {connected.Length}");
+        if (connected.Length == 0)
+        {
+            lines.Add("No gamepad detected. Plug in a USB / EasySMX pad and press any button once " +
+                      "(Windows needs the pad to be awake before Godot can see it).");
+            return string.Join("\n", lines);
+        }
+        foreach (int dev in connected)
+        {
+            string name = Input.GetJoyName(dev);
+            bool known = Input.IsJoyKnown(dev);
+            var b = PadLayout.Bindings(name, known, _saved);
+            lines.Add($"Pad {dev + 1}: {name}   [{PadLayout.PadKind(name, known)}]");
+            lines.Add($"   pass={b["pass"]}  through={b["through"]}  shoot={b["shoot"]}  " +
+                      $"tackle={b["tackle"]}  switch={b["switch"]}  sprint={b["sprint"]}");
+        }
+        lines.Add("Left stick / D-pad moves. Every connected pad drives player 1. " +
+                  "Use REMAP if a button is in the wrong place; bindings are saved per pad name.");
+        return string.Join("\n", lines);
+    }
+
+    // ---- Raw pad state -------------------------------------------------------------------------
+
+    private static bool[] ReadButtons(int dev)
+    {
+        var b = new bool[21];
+        for (int i = 0; i < b.Length; i++) b[i] = Input.IsJoyButtonPressed(dev, (JoyButton)i);
+        return b;
+    }
+
+    private static float[] ReadAxes(int dev)
+    {
+        var a = new float[10];
+        for (int i = 0; i < a.Length; i++) a[i] = Input.GetJoyAxis(dev, (JoyAxis)i);
+        return a;
+    }
+
+    /// <summary>Device ids, independent of whether Godot's binding returns int[] or Array&lt;int&gt;.</summary>
+    public static int[] ConnectedDevices()
+    {
+        var pads = Input.GetConnectedJoypads();
+        return pads == null ? new int[0] : pads.Select(x => (int)x).ToArray();
     }
 
     public PlayerCommand Read(float dt)
@@ -34,25 +170,48 @@ public sealed class InputHub
 
         // --- movement: WASD / arrows / left stick / D-pad / virtual stick ---
         Vector2 move = Vector2.Zero;
-        if (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) || Input.IsJoyButtonPressed(0, JoyButton.DpadLeft)) move.X -= 1;
-        if (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) || Input.IsJoyButtonPressed(0, JoyButton.DpadRight)) move.X += 1;
-        if (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) || Input.IsJoyButtonPressed(0, JoyButton.DpadUp)) move.Y -= 1;
-        if (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) || Input.IsJoyButtonPressed(0, JoyButton.DpadDown)) move.Y += 1;
-        float jx = Input.GetJoyAxis(0, JoyAxis.LeftX), jy = Input.GetJoyAxis(0, JoyAxis.LeftY);
-        if (MathF.Abs(jx) > .18f || MathF.Abs(jy) > .18f) move += new Vector2(jx, jy);
+        if (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left)) move.X -= 1;
+        if (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right)) move.X += 1;
+        if (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up)) move.Y -= 1;
+        if (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down)) move.Y += 1;
+
+        // Every connected pad (1P), or just this player's pad (2P), merged together.
+        int[] devices = PadLayout.DevicesFor(ConnectedDevices(), _twoPlayer, _playerIndex);
+        Vector2 padMove = Vector2.Zero;
+        bool padSprint = false, padPass = false, padThrough = false, padTackle = false,
+             padSwitch = false, padShoot = false, padPause = false, padCamera = false;
+        foreach (int dev in devices)
+        {
+            bool[] buttons = ReadButtons(dev);
+            float[] axes = ReadAxes(dev);
+            bool known = Input.IsJoyKnown(dev);
+            var binds = PadLayout.Bindings(Input.GetJoyName(dev), known, _saved);
+            PadVector m = PadLayout.Move(buttons, axes, known);
+            padMove += new Vector2(m.X, m.Y);
+            var h = PadLayout.Held(buttons, axes, binds, known);
+            padPass |= h["pass"];
+            padThrough |= h["through"];
+            padShoot |= h["shoot"];
+            padTackle |= h["tackle"];
+            padSwitch |= h["switch"];
+            padSprint |= h["sprint"];
+            padPause |= h["pause"];
+            padCamera |= h["camera"];
+        }
+        if (padMove.LengthSquared() > 1f) padMove = padMove.Normalized();
+        move += padMove;
         if (TouchEnabled) move += TouchMove;
         if (move.LengthSquared() > 1f) move = move.Normalized();
         cmd.Move = new System.Numerics.Vector2(move.X, move.Y);
 
-        bool sprint = Input.IsPhysicalKeyPressed(Key.Shift) || Input.IsJoyButtonPressed(0, JoyButton.RightShoulder)
-                      || Input.GetJoyAxis(0, JoyAxis.TriggerRight) > .5f || (TouchEnabled && TouchSprint);
-        bool pass = Input.IsPhysicalKeyPressed(Key.E) || Input.IsJoyButtonPressed(0, JoyButton.A) || (TouchEnabled && TouchPass);
-        bool through = Input.IsPhysicalKeyPressed(Key.Q) || Input.IsJoyButtonPressed(0, JoyButton.Y) || (TouchEnabled && TouchThrough);
-        bool tackle = Input.IsPhysicalKeyPressed(Key.F) || Input.IsJoyButtonPressed(0, JoyButton.B) || (TouchEnabled && TouchTackle);
-        bool sw = Input.IsPhysicalKeyPressed(Key.Tab) || Input.IsJoyButtonPressed(0, JoyButton.LeftShoulder) || (TouchEnabled && TouchSwitch);
-        bool shoot = Input.IsPhysicalKeyPressed(Key.Space) || Input.IsJoyButtonPressed(0, JoyButton.X) || (TouchEnabled && TouchShoot);
-        bool pause = Input.IsPhysicalKeyPressed(Key.Escape) || Input.IsJoyButtonPressed(0, JoyButton.Start);
-        bool camera = Input.IsPhysicalKeyPressed(Key.C) || Input.IsJoyButtonPressed(0, JoyButton.RightStick);
+        bool sprint = Input.IsPhysicalKeyPressed(Key.Shift) || padSprint || (TouchEnabled && TouchSprint);
+        bool pass = Input.IsPhysicalKeyPressed(Key.E) || padPass || (TouchEnabled && TouchPass);
+        bool through = Input.IsPhysicalKeyPressed(Key.Q) || padThrough || (TouchEnabled && TouchThrough);
+        bool tackle = Input.IsPhysicalKeyPressed(Key.F) || padTackle || (TouchEnabled && TouchTackle);
+        bool sw = Input.IsPhysicalKeyPressed(Key.Tab) || padSwitch || (TouchEnabled && TouchSwitch);
+        bool shoot = Input.IsPhysicalKeyPressed(Key.Space) || padShoot || (TouchEnabled && TouchShoot);
+        bool pause = Input.IsPhysicalKeyPressed(Key.Escape) || padPause;
+        bool camera = Input.IsPhysicalKeyPressed(Key.C) || padCamera;
         bool lob = Input.IsPhysicalKeyPressed(Key.R);
 
         cmd.Sprint = sprint;

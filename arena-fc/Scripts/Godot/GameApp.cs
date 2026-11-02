@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ArenaFC.Core;
+using ArenaFC.Core.Input;
 using Godot;
 
 namespace ArenaFC.GodotGame;
@@ -86,6 +87,7 @@ public partial class GameApp : Node3D
         menu.AddChild(Ui.Btn("CHARACTER EDITOR", ShowEditor));
         menu.AddChild(Ui.Btn("MATCH SETTINGS", ShowSettings));
         menu.AddChild(Ui.Btn("CONTROLS", ShowControls));
+        menu.AddChild(Ui.Btn("CONTROLLER SETUP", ShowPadSetup));
         menu.AddChild(Ui.Btn("QUIT", () => GetTree().Quit()));
         var panel = Ui.PanelC(menu, Ui.Panel);
         Place(panel, 0, .5f, 60, -190, 330, 300);
@@ -207,11 +209,73 @@ public partial class GameApp : Node3D
             "TAB / middle mouse — switch player", "C — change camera", "ESC — pause", "",
             "GAMEPAD", "Left stick / D-pad — move", "A — pass · X — shoot (hold) · Y — through ball",
             "B — tackle · RB — sprint · LB — switch · Start — pause", "",
+            "USB / EASYSMX PADS", "XInput mode uses the standard layout. D-input / PC mode uses the raw",
+            "EasySMX order (Y B A X, LB, RB, LT, RT) automatically. CONTROLLER SETUP lists",
+            "every connected pad and lets you remap any button per pad.", "",
             "TOUCH (Android / iOS / browser)", "Virtual stick on the left, six action buttons on the right.",
             "Hold SHOOT to charge; release to strike.", "",
             "All three input paths produce the same commands — the match simulation is platform independent."
-        }) v.AddChild(Ui.Lbl(line, line is "KEYBOARD" or "GAMEPAD" or "TOUCH (Android / iOS / browser)" ? 19 : 14,
-                               line is "KEYBOARD" or "GAMEPAD" or "TOUCH (Android / iOS / browser)" ? Ui.Accent : Ui.Sub));
+        }) v.AddChild(Ui.Lbl(line, line is "KEYBOARD" or "GAMEPAD" or "USB / EASYSMX PADS" or "TOUCH (Android / iOS / browser)" ? 19 : 14,
+                               line is "KEYBOARD" or "GAMEPAD" or "USB / EASYSMX PADS" or "TOUCH (Android / iOS / browser)" ? Ui.Accent : Ui.Sub));
         Overlay("CONTROLS", v, () => { });
+    }
+
+    // ---- Controller setup / USB & EasySMX remapping --------------------------------------------
+
+    private int _remapDevice = -1;
+    private int _remapStep = -1;
+    private Label? _remapLabel;
+
+    private void ShowPadSetup()
+    {
+        var v = Ui.VBox(8);
+        var info = Ui.Lbl(InputHub.DescribePads(), 14, Ui.Sub);
+        v.AddChild(info);
+        v.AddChild(Ui.Btn("REMAP PAD 1 (press each button when asked)", () => BeginRemap(0, info)));
+        v.AddChild(Ui.Btn("REMAP PAD 2", () => BeginRemap(1, info)));
+        v.AddChild(Ui.Btn("RESET PADS TO DEFAULT", () => { InputHub.ResetBindings(); info.Text = InputHub.DescribePads(); }));
+        v.AddChild(Ui.Lbl("Plug in a USB / EasySMX pad and press a button once so the OS exposes it. " +
+                          "Unmapped pads are read with the EasySMX D-input layout; remapping is saved per pad name.", 13, Ui.Sub));
+        Overlay("CONTROLLER SETUP", v, () => { _remapDevice = -1; _remapStep = -1; _remapLabel = null; });
+    }
+
+    private void BeginRemap(int slot, Label info)
+    {
+        int[] pads = InputHub.ConnectedDevices();
+        if (slot >= pads.Length)
+        {
+            info.Text = $"Pad {slot + 1} is not connected.\n\n" + InputHub.DescribePads();
+            return;
+        }
+        _remapDevice = pads[slot];
+        _remapStep = 0;
+        _remapLabel = info;
+        UpdateRemapLabel($"Press the button for {PadLayout.Actions[0].ToUpperInvariant()} (pad {slot + 1})");
+    }
+
+    private void UpdateRemapLabel(string prompt)
+    {
+        if (_remapLabel == null) return;
+        _remapLabel.Text = prompt + "\n\n" + InputHub.DescribePads();
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+        if (_remapStep < 0 || @event is not InputEventJoypadButton jb || !jb.Pressed) return;
+        if (jb.Device != _remapDevice) return;
+        InputHub.SetBinding(Input.GetJoyName(_remapDevice), PadLayout.Actions[_remapStep], (int)jb.ButtonIndex);
+        _remapStep++;
+        if (_remapStep >= PadLayout.Actions.Length)
+        {
+            _remapStep = -1;
+            _remapDevice = -1;
+            InputHub.SaveBindings();
+            UpdateRemapLabel("Saved. Bindings are remembered for this pad.");
+        }
+        else
+        {
+            UpdateRemapLabel($"Press the button for {PadLayout.Actions[_remapStep].ToUpperInvariant()}");
+        }
+        GetViewport().SetInputAsHandled();
     }
 }
