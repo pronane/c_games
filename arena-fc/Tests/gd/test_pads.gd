@@ -128,7 +128,9 @@ func _run() -> void:
 	ctl.load_saved()
 	ok(ctl.binds_for(0).size() == C.ACTIONS.size(), "binds_for works with no pad attached")
 	ok(ctl.describe().contains("mappings loaded"), "CONTROLLER SETUP text is available")
-	ok(ctl.load_mappings("Linux") >= 2, "SDL mappings load on Linux")
-	ok(ctl.load_mappings("Windows") >= 4, "SDL mappings load on Windows")
+	# Web registers all six built-ins and no OS-tagged DB lines: exercises the
+	# FileAccess / Input.add_joy_mapping path without replaying 1600 SDL lines
+	# into Godot (platform filtering itself is covered by the pure tests above).
+	ok(ctl.load_mappings("Web") >= 6, "SDL mappings load on Web (all built-in fallbacks)")
 	print("RESULT fails=", fails)
 	quit(1 if fails > 0 else 0)
