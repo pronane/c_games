@@ -74,3 +74,50 @@ test("the app's rendition plays the written pitch, slowed without changing pitch
   let first = late.findIndex((v) => Math.abs(v) > 1e-3);
   assert.ok(Math.abs(first / 8000 - 2) < 0.01);
 });
+
+test("repeats are played out in playing order, with bar numbers as played", () => {
+  const score = alphaTab.importer.ScoreLoader.loadAlphaTex(
+    `\\title "Repeat" \\tempo 120 . :4 0.6 2.6 3.6 5.6 | \\ro :4 0.5 2.5 3.5 5.5 | \\rc 2 :4 0.4 2.4 3.4 5.4 |`,
+    settings,
+  );
+  const piece = scoreToPiece(score, 0);
+  assert.deepEqual(piece.bars.map((b) => b.written), [1, 2, 3, 2, 3]);
+  assert.deepEqual(piece.bars.map((b) => +b.time.toFixed(3)), [0, 2, 4, 6, 8]);
+  assert.equal(piece.notes.length, 20);
+  assert.ok(Math.abs(piece.duration - 10) < 1e-6);
+  assert.ok(piece.warnings.some((w) => w.includes("5 bars in playing order")));
+});
+
+test("palm mutes are short and bends move the pitch", () => {
+  const score = alphaTab.importer.ScoreLoader.loadAlphaTex(
+    `\\title "Fx" \\tempo 60 . :2 0.6{pm} 7.3{b (0 4)} |`,
+    settings,
+  );
+  const piece = scoreToPiece(score, 0);
+  const [pm, bent] = piece.notes;
+  assert.equal(pm.palmMute, true);
+  assert.ok(bent.bend && bent.bend[bent.bend.length - 1][1] === 2, JSON.stringify(bent.bend));
+  const rate = 16000;
+  const audio = synthesize(piece.notes, rate, 4.5, 1, 1);
+  const energy = (a: number, b: number) => audio.subarray(a * rate, b * rate).reduce((s, v) => s + v * v, 0);
+  // The palm-muted note has died away well before its two beats are up.
+  assert.ok(energy(0.4, 1.9) < 0.02 * energy(0, 0.3));
+  // String 3 fret 7 is D4; the bend pushes it up a whole tone (to E4) over the note.
+  const semis = (t: number) => 12 * Math.log2((detectPitch(audio.subarray(Math.round(t * rate), Math.round(t * rate) + 2048), rate)?.hz ?? 1) / 293.66);
+  assert.ok(Math.abs(semis(2.02)) < 0.4, String(semis(2.02)));
+  assert.ok(Math.abs(semis(3.0) - 1) < 0.4, String(semis(3.0)));
+  assert.ok(semis(3.6) > semis(3.0) + 0.4, String(semis(3.6)));
+});
+
+test("the amp compresses like a driven amp without changing the note", async () => {
+  const { applySound } = await import("./guitarTone");
+  const rate = 16000,
+    clean = synthesize([{ time: 0, duration: 1, midi: 45 }], rate, 1.2),
+    driven = applySound(clean.slice(), rate, { drive: "distorted", chorus: false, delay: false, reverb: false });
+  // High gain compresses: a distorted note barely fades, a clean one dies away.
+  const rms = (a: Float32Array, t: number) => Math.sqrt(a.subarray(t * rate, t * rate + 1600).reduce((s, v) => s + v * v, 0) / 1600);
+  const fade = (a: Float32Array) => rms(a, 0.85) / rms(a, 0.05);
+  assert.ok(fade(driven) > 1.6 * fade(clean), `${fade(driven)} vs ${fade(clean)}`);
+  const hz = detectPitch(driven.subarray(2000, 2000 + 4096), rate)?.hz ?? 0;
+  assert.ok(Math.abs(12 * Math.log2(hz / 110)) < 0.5, String(hz));
+});

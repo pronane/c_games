@@ -1874,3 +1874,19 @@ footer span:first-child {
   margin: 0;
   font-size: 16px;
 }
+
+/* Guitar sound (amp + pedals) and playback source choices */
+.guitar-sound,
+.sound-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 8px 0;
+}
+.guitar-sound select {
+  margin-left: 4px;
+}
+.score-listen {
+  margin: 10px 0 14px;
+}

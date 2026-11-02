@@ -39,6 +39,9 @@ import {
   type Target,
 } from "./songAudio";
 import { encodeWav } from "./engineApi";
+import { synthesize } from "./tabScore";
+import { soundFromEstimate, useGuitarSound } from "./guitarTone";
+import GuitarSoundPicker from "./GuitarSoundPicker";
 import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
 import { Recorder } from "./recorder";
 import LatencyCheck from "./LatencyCheck";
@@ -105,7 +108,10 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [clickOn, setClickOn] = useState(false),
     [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
     [locating, setLocating] = useState(false),
-    [located, setLocated] = useState<(LocateResult & { buffer: AudioBuffer }) | null>(null);
+    [located, setLocated] = useState<(LocateResult & { buffer: AudioBuffer }) | null>(null),
+    [songTone, setSongTone] = useState<"auto" | "clean" | "crunch" | "distorted">("auto"),
+    [scorePlaying, setScorePlaying] = useState<"" | "part" | "written" | "both">(""),
+    [sound, setSound] = useGuitarSound();
   const ctx = useRef<AudioContext | null>(null),
     current = useRef<AudioBufferSourceNode | null>(null),
     clock = useRef({ context: 0, song: 0, speed: 1, loop: null as null | { start: number; end: number } }),
@@ -190,6 +196,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         mode === "file" ? { file: upload! } : { url: url.trim() },
         settings.instrument,
         processing,
+        profile.openStrings.length ? songTone : "auto",
       );
       songId.current = created.id;
       setSong(created);
@@ -204,6 +211,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         throw Error(latest.error ?? "The breakdown stopped.");
       const r = latest.result!;
       setTargetId(buildTargets(r.parts, profile.name)[0]?.id ?? "");
+      setSound(soundFromEstimate(r.tone, sound));
       setSolo(null);
       setMuted([]);
       setListen("mixer");
@@ -312,6 +320,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     current.current = null;
     cancelAnimationFrame(raf.current);
     setPlaying(false);
+    setScorePlaying("");
   }
 
   /** Start one rendered buffer at `when`; the clock maps context time back to song time. */
@@ -564,6 +573,44 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     if (xmlUrl) URL.revokeObjectURL(xmlUrl);
   }, [xmlUrl]);
 
+  /**
+   * Hear the written-out part: the separated audio the app transcribed, the notes as written
+   * (on the app's guitar, through the chosen amp), or both (separated left, written right).
+   */
+  async function playScore(which: "part" | "written" | "both") {
+    if (!score || !result) return;
+    if (scorePlaying === which) return stop();
+    stop();
+    const c = context();
+    await c.resume();
+    const rate = c.sampleRate,
+      from = position >= duration - 0.2 ? 0 : position,
+      frames = Math.max(1, Math.ceil((duration - from) * rate));
+    const ids = score.part === "all" ? (parts.length ? parts.map((p) => p.id) : [result.selected_stem]) : [score.part];
+    const separated: [Float32Array, Float32Array] = [new Float32Array(frames), new Float32Array(frames)];
+    for (const id of ids) {
+      const b = buffers[id] ?? buffers[result.selected_stem];
+      if (!b) continue;
+      const at = Math.round(from * b.sampleRate);
+      mixInto(separated, Array.from({ length: b.numberOfChannels }, (_, ch) => b.getChannelData(ch).subarray(at, at + frames)), 1);
+    }
+    const notes = score.notes
+      .filter((n) => n.string != null && n.time + n.duration > from)
+      .map((n) => ({ ...n, time: n.time - from }));
+    const written = synthesize(notes, rate, duration - from, 1, 0.3, sound);
+    const left = which === "written" ? written : separated[0],
+      right = which === "part" ? separated[1] : which === "written" ? written : written;
+    if (which === "both") {
+      // Separated part in the left ear, the notes as written in the right.
+      const mono = separated[0].map((v, i) => 0.5 * (v + separated[1][i]));
+      left.set(mono.subarray(0, left.length));
+    }
+    start(toBuffer([left, right], rate), c.currentTime + 0.05, from, 1, null);
+    setPlaying(true);
+    setScorePlaying(which);
+    tick();
+  }
+
   const tuning = result?.tuning;
   const songInstrumentMismatch = song && song.instrument !== settings.instrument;
   const fmt = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
@@ -620,6 +667,18 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             can't be used: their terms forbid downloading and the audio is protected.
           </small>
         </div>
+      )}
+      {profile.openStrings.length > 0 && (
+        <label className="speed song-tone">
+          Guitar sound in this song
+          <select id="song-tone" value={songTone} disabled={busy} onChange={(e) => setSongTone(e.target.value as typeof songTone)}>
+            <option value="auto">Work it out for me</option>
+            <option value="clean">Clean</option>
+            <option value="crunch">Crunch / light overdrive</option>
+            <option value="distorted">Distorted / high gain</option>
+          </select>
+          <small className="helper">Distortion hides note starts; telling us helps the transcription catch more notes.</small>
+        </label>
       )}
       <label className="consent">
         <input
@@ -854,6 +913,20 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                   suggested tuning above.
                 </p>
               )}
+              <div className="score-listen">
+                <p className="helper">
+                  Listen from {fmt(position >= duration - 0.2 ? 0 : position)}: compare what the app separated with what it wrote down.
+                </p>
+                <div className="presets">
+                  {(["part", "written", "both"] as const).map((w) => (
+                    <button key={w} className={scorePlaying === w ? "on" : ""} disabled={loading} onClick={() => playScore(w)}>
+                      {scorePlaying === w ? <Square size={13} /> : <Play size={13} />}{" "}
+                      {w === "part" ? "What it heard (separated part)" : w === "written" ? "The tab as written" : "Both (heard left, written right)"}
+                    </button>
+                  ))}
+                </div>
+                <GuitarSoundPicker sound={sound} onChange={setSound} detected={result.tone} />
+              </div>
               <Suspense fallback={<p className="helper">Loading the notation view…</p>}>
                 <Notation musicxml={score.musicxml} tab={profile.openStrings.length > 0} />
               </Suspense>
