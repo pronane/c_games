@@ -186,13 +186,19 @@ static func build(d: Dictionary, cols: Array) -> Node3D:
 # ---------------------------------------------------------------- Sprite Forge GLB
 ## Import a Sprite Forge (or any skinned) GLB at runtime. Returns null and warns on failure.
 static func load_glb(path: String) -> Node3D:
-	var doc := GLTFDocument.new()
-	var state := GLTFState.new()
-	var err := doc.append_from_file(path, state)
+	# Custom Web templates may be built without the glTF module.  Resolve the classes
+	# through ClassDB at runtime so this script still parses there: rig data / procedural
+	# players keep working, and only GLB import degrades to a warning.
+	if not ClassDB.class_exists("GLTFDocument") or not ClassDB.class_exists("GLTFState"):
+		push_warning("ProceduralRig3D: GLB import unavailable in this build (no glTF module)")
+		return null
+	var doc = ClassDB.instantiate("GLTFDocument")
+	var state = ClassDB.instantiate("GLTFState")
+	var err = doc.append_from_file(path, state)
 	if err != OK:
 		push_warning("ProceduralRig3D: cannot read GLB %s (error %d)" % [path, err])
 		return null
-	var scene := doc.generate_scene(state)
+	var scene = doc.generate_scene(state)
 	return scene as Node3D
 
 ## Sprite Forge's skeleton uses different bone names from Arena's. Both name sets map onto the same

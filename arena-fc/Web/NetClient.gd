@@ -23,7 +23,15 @@ const VERSION := 2
 const CAP_RECONNECT := 1       # browser capabilities bitmask
 const BOOKMARK := "user://arena_fc_resume.json"
 
-var ws: WebSocketPeer
+## Godot's WebSocketPeer.State values, looked up by name so this file has no
+## compile-time dependency on the (optional) WebSocket module.
+static func ws_state(name: String) -> int:
+	return int(ClassDB.class_get_integer_constant("WebSocketPeer", name))
+
+# Untyped: a custom Web template can be built without the WebSocket module, and a
+# hard `WebSocketPeer` type here would make the whole script (and everything that
+# preloads it) fail to parse.  The peer is resolved through ClassDB in _open().
+var ws = null
 var url := ""
 var player_name := "Web Player"
 var room := ""
@@ -141,12 +149,18 @@ func clear_bookmark() -> void:
 
 
 func _open() -> void:
-	ws = WebSocketPeer.new()
+	if not ClassDB.class_exists("WebSocketPeer"):
+		last_error = "Online play is unavailable in this Web build (no WebSocket module)."
+		error_raised.emit(last_error)
+		ws = null
+		_retry_at = -1.0
+		return
+	ws = ClassDB.instantiate("WebSocketPeer")
 	ws.inbound_buffer_size = 1 << 20
 	ws.max_queued_packets = 2048
 	_connected = false
 	_retry_at = -1.0
-	var err := ws.connect_to_url(url)
+	var err = ws.connect_to_url(url)
 	if err != OK:
 		last_error = "Cannot open %s (error %d)" % [url, err]
 		error_raised.emit(last_error)
@@ -155,7 +169,7 @@ func _open() -> void:
 
 
 func _send(pkt: Dictionary) -> void:
-	if ws == null or ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+	if ws == null or ws.get_ready_state() != ws_state("STATE_OPEN"):
 		return
 	ws.send_text(JSON.stringify(pkt))
 
@@ -188,8 +202,8 @@ func poll(delta: float) -> void:
 			_open()
 		return
 	ws.poll()
-	var state := ws.get_ready_state()
-	if state == WebSocketPeer.STATE_CLOSED:
+	var state = ws.get_ready_state()
+	if state == ws_state("STATE_CLOSED"):
 		var unexpected := _connected and not _explicit
 		ws = null
 		_connected = false
@@ -198,7 +212,7 @@ func poll(delta: float) -> void:
 			_schedule_retry()
 		return
 	if not _connected:
-		if state != WebSocketPeer.STATE_OPEN:
+		if state != ws_state("STATE_OPEN"):
 			return
 		_connected = true
 		_delay = 1.0
@@ -212,7 +226,7 @@ func poll(delta: float) -> void:
 	var guard := 0
 	while ws != null and ws.get_available_packet_count() > 0 and guard < 128:
 		guard += 1
-		var raw := ws.get_packet()
+		var raw = ws.get_packet()
 		if raw.is_empty():
 			continue
 		var parsed: Variant = JSON.parse_string(raw.get_string_from_utf8())

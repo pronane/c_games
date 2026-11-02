@@ -279,6 +279,21 @@ def main() -> int:
     check("browser loads SDL mappings at boot", "load_mappings(OS.get_name())" in boot)
     check("browser netplay uses the pad rules", "pad_ctl.move_of" in boot and "pad_ctl.held" in boot)
     check("browser remap uses device slots", "pads[slot]" in boot)
+    check("menu is controllable with a pad + keyboard",
+          "read_pad_menu" in boot and "menu_focus_step" in boot and "grab_focus" in boot)
+    check("camera angles respond to the pad", 'get("camera", false)' in boot and "cam_mode" in boot)
+    check("menu/camera input has a headless test",
+          "test_input_camera.gd" in (ROOT / "Tools" / "run-gd-tests.sh").read_text())
+    check("CAM buttons can be built in headless desktop tests",
+          "func build_touch(force := false)" in boot
+          and "build_touch(true)" in (ROOT / "Tests" / "gd" / "test_input_camera.gd").read_text())
+    rig = (ROOT / "Scripts" / "Godot" / "ProceduralRig3D.gd").read_text(encoding="utf-8")
+    net = (ROOT / "Web" / "NetClient.gd").read_text(encoding="utf-8")
+    check("rig data still parses on Web builds without a glTF module",
+          'ClassDB.class_exists("GLTFDocument")' in rig and "GLTFDocument.new()" not in rig)
+    check("netplay script still parses on Web builds without a WebSocket module",
+          'ClassDB.class_exists("WebSocketPeer")' in net and "WebSocketPeer.new()" not in net
+          and "var ws: WebSocketPeer" not in net)
     check("Controllers.gd owns the pad rules (no fragile path extends)",
           "extends RefCounted" in controllers_gd and "PURE START" in controllers_gd
           and "func load_mappings" in controllers_gd and 'extends "res://' not in controllers_gd)

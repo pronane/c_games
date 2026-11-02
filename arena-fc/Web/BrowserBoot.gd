@@ -35,6 +35,9 @@ var pad_ui: Control
 var pad_info: Label
 var pad_learn_idx := -1
 var pad_learn_dev := 0
+# Main-menu buttons and the index a pad / the keyboard arrows are pointing at.
+var menu_buttons: Array = []
+var menu_focus: int = 0
 var stadium: Node3D
 var menu: Control
 var editor: Control
@@ -175,6 +178,7 @@ func _physics_process(delta: float) -> void:
 	if phase == "menu":
 		cam.position = Vector3(sin(t * 0.12) * 2.0, 2.6, 8.0)
 		cam.look_at_from_position(cam.position, Vector3(0, 1.0, 0), Vector3.UP)
+		read_pad_menu()
 		return
 	if phase == "replay":
 		update_visuals(delta)
@@ -1396,7 +1400,14 @@ func read_human(k: int, delta: float) -> Dictionary:
 	return cmd
 
 func read_global_keys() -> void:
-	if edge("cam", Input.is_key_pressed(KEY_C)):
+	# The pad's "camera" button (R3 on a mapped pad, L3 on a raw EasySMX pad) used
+	# to be reported by Controllers.held() but never consumed.  Wire it up so
+	# camera angles can be changed without reaching for the keyboard.
+	var cam_pad := false
+	if pad_ctl != null:
+		for dev in Controllers.devices_for(pad_ctl.pads(), false, 0):
+			cam_pad = cam_pad or bool(pad_ctl.held(int(dev)).get("camera", false))
+	if edge("cam", Input.is_key_pressed(KEY_C) or cam_pad):
 		cam_mode = (cam_mode + 1) % cam_names.size()
 	for m in range(cam_names.size()):
 		if edge("mode%d" % m, Input.is_key_pressed(KEY_1 + m)):
@@ -1407,6 +1418,64 @@ func read_global_keys() -> void:
 		add_zoom(0.14)
 	if Input.is_key_pressed(KEY_ESCAPE) or (pad_ctl != null and _any_pad_start()):
 		show_menu()
+
+# ---------------------------------------------------------------- main menu control
+## Pure helper: where menu focus lands after one d-pad / stick step.  Kept static
+## and side-effect free so Tests/gd/test_input_camera.gd can exercise it headlessly.
+static func menu_focus_step(focus: int, count: int, up: bool, down: bool) -> int:
+	if count <= 0:
+		return 0
+	if up and not down:
+		return (focus - 1 + count) % count
+	if down and not up:
+		return (focus + 1) % count
+	return focus
+
+func collect_menu_buttons() -> void:
+	menu_buttons = []
+	if menu == null:
+		return
+	for node in menu.find_children("*", "Button", true, false):
+		if node is Button:
+			menu_buttons.append(node)
+
+func focus_menu_button(i: int) -> void:
+	if menu_buttons.is_empty():
+		return
+	var n: int = menu_buttons.size()
+	menu_focus = ((i % n) + n) % n
+	var b: Button = menu_buttons[menu_focus]
+	if is_instance_valid(b):
+		b.grab_focus()
+
+## The menu is a column of Buttons.  Godot's built-in focus navigation already
+## handles arrow keys / Enter / Space once one Button owns focus; this adds the
+## same thing for a USB / EasySMX pad (d-pad or stick to move, A or Start to
+## select).  Without it a pad can only leave the menu, never drive it.
+func read_pad_menu() -> void:
+	if menu_buttons.is_empty():
+		collect_menu_buttons()
+	if menu_buttons.is_empty():
+		return
+	var up := false
+	var down := false
+	var accept := false
+	if pad_ctl != null:
+		for dev in Controllers.devices_for(pad_ctl.pads(), false, 0):
+			var m: Vector2 = pad_ctl.move_of(int(dev))
+			up = up or m.y < -0.55
+			down = down or m.y > 0.55
+			var h: Dictionary = pad_ctl.held(int(dev))
+			accept = accept or bool(h.get("pass", false)) or bool(h.get("pause", false))
+	# edge() gives one step per press rather than scrolling on every frame.
+	var nf: int = menu_focus_step(menu_focus, menu_buttons.size(),
+		edge("menu_up", up), edge("menu_down", down))
+	if nf != menu_focus:
+		focus_menu_button(nf)
+	if edge("menu_accept", accept):
+		var b: Button = menu_buttons[menu_focus]
+		if is_instance_valid(b):
+			b.emit_signal("pressed")
 
 func _any_pad_start() -> bool:
 	if pad_ctl == null:
@@ -1447,11 +1516,11 @@ func build_ui() -> void:
 	replay_label.add_theme_color_override("font_color", Color("#ffd166"))
 	replay_label.visible = false
 	cam_lbl = mk_label("Broadcast  ·  zoom 147%", 14, Vector2(20, 84), Vector2(420, 28), hud)
-	var hint := mk_label("WASD / stick move · SHIFT sprint · E pass · Q through · SPACE shoot (hold) · F tackle · TAB switch · C / 1-4 camera · wheel or +/- zoom · V replay · M sound · ESC menu", 12, Vector2(20, -32), Vector2(1240, 26), hud)
+	var hint := mk_label("WASD / stick move · SHIFT sprint · E pass · Q through · SPACE shoot (hold) · F tackle · TAB switch · C / 1-4 / pad R3 camera · wheel or +/- zoom · V replay · M sound · ESC menu", 12, Vector2(20, -32), Vector2(1240, 26), hud)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.offset_top = -34
 	hint.offset_bottom = -8
-	build_touch(layer)
+	build_touch()
 	build_net_ui(layer)
 	build_pad_ui(layer)
 
@@ -1602,8 +1671,10 @@ func mk_button(text: String, cb: Callable) -> Button:
 	b.pressed.connect(cb)
 	return b
 
-func build_touch(layer: CanvasLayer) -> void:
-	if not (DisplayServer.is_touchscreen_available() or OS.has_feature("web")):
+func build_touch(force := false) -> void:
+	# `force` lets the headless desktop test exercise exactly the same on-screen
+	# camera buttons that Web/touch builds get, without changing their behaviour.
+	if not force and not (DisplayServer.is_touchscreen_available() or OS.has_feature("web")):
 		return
 	var keys := ["pass", "shoot", "sprint", "through", "tackle", "switch"]
 	var labels := ["PASS", "SHOOT", "SPRINT", "THRU", "TACKLE", "SWITCH"]
@@ -1799,6 +1870,10 @@ func show_menu() -> void:
 	for c in world.get_children():
 		c.queue_free()
 	preview = null
+	# Give the first menu Button focus so arrow keys / Enter work immediately,
+	# and so the pad helper has a known starting index.
+	collect_menu_buttons()
+	focus_menu_button(0)
 
 func build_pad_ui(layer: CanvasLayer) -> void:
 	pad_ui = Control.new()

@@ -43,6 +43,14 @@ is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the Pa
   the two index ranges overlap). Triggers work as buttons or analogue axes.
 * **XInput mode** (hold the mode button / use the 2.4G dongle) presents the pad as an Xbox controller and
   gets the standard layout automatically.
+* **The main menu is controllable without a mouse.** The first menu button takes GUI focus on boot, so
+  arrow keys + Enter/Space work immediately; a pad's d-pad or left stick moves the highlight and A or
+  Start selects. `BrowserBoot.menu_focus_step()` is a pure helper covered by
+  `Tests/gd/test_input_camera.gd`.
+* **Camera angles work from a pad.** `Controllers.held()` has always reported the `camera` system button
+  (R3 on a mapped pad, L3 on a raw EasySMX pad) but the browser edition ignored it. It now cycles the
+  broadcast / telephoto / player / tactical views just like `C` or `1`-`4`; the HUD `CAM` button and
+  wheel / `+` / `-` zoom are unchanged.
 * **Remap** from **CONTROLLER SETUP** in the main menu (desktop and browser): *Remap pad 1/2*, then press
   the button asked for each action. Bindings are saved per pad name in `user://pads.json` (IndexedDB in
   the browser) and restored next time. The screen also lists each pad's name, detected kind and current
@@ -79,3 +87,21 @@ Set `TRUST_PROXY=1` behind any of these, and `ARENA_ALLOWED_ORIGINS` to your sit
 (`ARENA_NATIVE=1`, `arena-fc/option-a/Dockerfile`). It speaks the same protocol, passes the existing protocol
 tests and serves the browser build, so you can deploy the whole thing on your existing Node service. The C#
 server stays blocked on the missing `Scripts/Core/Net/*.cs` and is only needed for the desktop 11-a-side game.
+
+## Browser preview without a Godot editor
+
+`python3 Tools/serve_wasm_preview.py --port 8080` builds the GDScript-only browser edition into
+`build/wasm_preview/` and serves it on `0.0.0.0:8080` using the Godot 4.7.2 WebAssembly runtime from
+npm (`@ringozz/godot-web-wasm32`). The first run needs `npm` on PATH to fetch the engine; later runs use
+the cache in `~/.cache/arena-fc/wasm`.
+
+**The canvas must have focus.** Godot's Web build attaches `keydown`/`keyup` to the canvas element, not to
+`window`, so the generated page uses `<canvas tabindex="0">` and focuses it on load and on pointer-down.
+An unfocused canvas silently swallows every WASD / `C` / `1`-`4` key, which looks like broken controls
+and broken camera angles. Click the game once if focus was lost (e.g. after using another iframe).
+
+This WASM runtime is a Web *template* build with no `WebSocketPeer` or glTF module. Online play and GLB
+import are therefore unavailable in the preview; use the native/editor builds for those. `Web/NetClient.gd`
+and `Scripts/Godot/ProceduralRig3D.gd` resolve those optional classes through `ClassDB` at runtime, so the
+scripts still parse there — player rigs load from `Data/rig_default.json` and all five GDScript suites pass
+in the WASM engine. The desktop C# game also cannot run in this runtime (Godot cannot export C# to Web).
