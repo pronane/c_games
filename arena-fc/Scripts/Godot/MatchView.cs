@@ -96,7 +96,7 @@ public partial class MatchView : Node3D
         // WASD is camera-relative: W always means "towards the top of the screen",
         // including the behind-the-player and top-down angles.  The pure-C# engine
         // works in world X/Z, so rotate the stick here where the camera basis lives.
-        if (Cam != null && cmd.Move.LengthSquared() > 0.0001f)
+        if (cmd.Move.LengthSquared() > 0.0001f)
         {
             var basis = Cam.GlobalTransform.Basis;
             var right = new System.Numerics.Vector2(basis.X.X, basis.X.Z);
