@@ -284,6 +284,13 @@ def main() -> int:
     check("camera angles respond to the pad", 'get("camera", false)' in boot and "cam_mode" in boot)
     check("menu/camera input has a headless test",
           "test_input_camera.gd" in (ROOT / "Tools" / "run-gd-tests.sh").read_text())
+    rig = (ROOT / "Scripts" / "Godot" / "ProceduralRig3D.gd").read_text(encoding="utf-8")
+    net = (ROOT / "Web" / "NetClient.gd").read_text(encoding="utf-8")
+    check("rig data still parses on Web builds without a glTF module",
+          'ClassDB.class_exists("GLTFDocument")' in rig and "GLTFDocument.new()" not in rig)
+    check("netplay script still parses on Web builds without a WebSocket module",
+          'ClassDB.class_exists("WebSocketPeer")' in net and "WebSocketPeer.new()" not in net
+          and "var ws: WebSocketPeer" not in net)
     check("Controllers.gd owns the pad rules (no fragile path extends)",
           "extends RefCounted" in controllers_gd and "PURE START" in controllers_gd
           and "func load_mappings" in controllers_gd and 'extends "res://' not in controllers_gd)

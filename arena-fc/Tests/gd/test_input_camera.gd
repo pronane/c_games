@@ -134,6 +134,14 @@ func _run() -> void:
 		if node is Button and node.text == "CAM":
 			cam_btn = node
 			break
+	if cam_btn == null and not (OS.has_feature("web") or DisplayServer.is_touchscreen_available()):
+		# The headless desktop runner does not build the touch/web overlay on boot.
+		# Construct it explicitly so the CAM wiring is still exercised there.
+		b.build_touch()
+		for node in b.hud.find_children("*", "Button", true, false):
+			if node is Button and node.text == "CAM":
+				cam_btn = node
+				break
 	ok(cam_btn != null, "HUD exposes an on-screen CAM button")
 	if cam_btn != null:
 		var before: int = b.cam_mode

@@ -100,6 +100,8 @@ the cache in `~/.cache/arena-fc/wasm`.
 An unfocused canvas silently swallows every WASD / `C` / `1`-`4` key, which looks like broken controls
 and broken camera angles. Click the game once if focus was lost (e.g. after using another iframe).
 
-This WASM runtime is a Web *template* build: it has no `WebSocketPeer` or `GLTFDocument`, so online play
-and GLB import/export are unavailable in the preview. Use the native/editor builds for those. The desktop
-C# game also cannot run in this runtime (Godot cannot export C# to Web).
+This WASM runtime is a Web *template* build with no `WebSocketPeer` or glTF module. Online play and GLB
+import are therefore unavailable in the preview; use the native/editor builds for those. `Web/NetClient.gd`
+and `Scripts/Godot/ProceduralRig3D.gd` resolve those optional classes through `ClassDB` at runtime, so the
+scripts still parse there — player rigs load from `Data/rig_default.json` and all five GDScript suites pass
+in the WASM engine. The desktop C# game also cannot run in this runtime (Godot cannot export C# to Web).

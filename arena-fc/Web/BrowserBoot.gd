@@ -1520,7 +1520,7 @@ func build_ui() -> void:
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.offset_top = -34
 	hint.offset_bottom = -8
-	build_touch(layer)
+	build_touch()
 	build_net_ui(layer)
 	build_pad_ui(layer)
 
@@ -1671,7 +1671,7 @@ func mk_button(text: String, cb: Callable) -> Button:
 	b.pressed.connect(cb)
 	return b
 
-func build_touch(layer: CanvasLayer) -> void:
+func build_touch() -> void:
 	if not (DisplayServer.is_touchscreen_available() or OS.has_feature("web")):
 		return
 	var keys := ["pass", "shoot", "sprint", "through", "tackle", "switch"]
