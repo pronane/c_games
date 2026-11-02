@@ -808,3 +808,53 @@ def locate(reference, take, sr, bars, hop=1024, top=3):
         confidence = 'moderate'
     return {'candidates': out, 'confidence': confidence,
             'note': 'Matched on harmony. Repeated sections (choruses) match equally well; pick the right one.'}
+
+
+# ---------------------------------------------------------------- guitar sound (clean / crunch / distorted)
+
+TONE_BANDS = ((80, 1500), (1500, 6000))
+
+
+def tone_estimate(audio, sr):
+    """A suggestion of clean / crunch / distorted for the guitar part, or 'uncertain'.
+
+    Two cues: brightness (energy above 1.5 kHz relative to 80-1500 Hz; overdrive adds upper
+    harmonics) and loudness spread (distortion compresses, so notes stop dying away). Checked
+    on 12 examples: real acoustic guitars (GuitarSet) bright 0.001-0.07 / spread 6-8.5 dB;
+    real distorted guitars (Nine Inch Nails stems) bright 0.09-0.12 but spread 1-3 dB; rendered
+    overdrive/distortion bright 1.1-3.6. Too few examples to be more than a hint; the player
+    can always choose the sound. Effects such as chorus, delay or reverb are not detected."""
+    import librosa
+    y = mono(audio)
+    if sr != 22050:
+        y = librosa.resample(y, orig_sr=sr, target_sr=22050)
+        sr = 22050
+    if len(y) < sr or np.sqrt(np.mean(y**2)) < 1e-4:
+        return {'tone': 'uncertain', 'brightness': None, 'loudness_spread_db': None, 'detail': 'Too short or quiet to judge.'}
+    S = np.abs(librosa.stft(y, n_fft=2048, hop_length=512))**2
+    f = librosa.fft_frequencies(sr=sr, n_fft=2048)
+    energy = S.sum(axis=0)
+    active = energy > np.percentile(energy, 40)
+    (l0, l1), (h0, h1) = TONE_BANDS
+    lo = S[(f >= l0) & (f < l1)][:, active].sum(axis=0)
+    hi = S[(f >= h0) & (f < h1)][:, active].sum(axis=0)
+    bright = float(np.median(hi/(lo+1e-12)))
+    w = int(.05*sr)
+    n = len(y)//w
+    rms = np.sqrt((y[:n*w].reshape(n, w)**2).mean(axis=1))
+    db = 20*np.log10(rms[rms > np.percentile(rms, 50)]+1e-9)
+    spread = float(np.percentile(db, 90)-np.percentile(db, 10))
+    if bright > .8 or spread < 4:
+        tone = 'distorted'
+    elif bright > .3:
+        tone = 'crunch'
+    elif spread > 5.5:
+        tone = 'clean'
+    else:
+        tone = 'uncertain'
+    detail = {'clean': 'Sounds clean (no obvious overdrive).',
+              'crunch': 'Sounds lightly overdriven (crunch).',
+              'distorted': 'Sounds distorted / high gain. Distortion adds harmonics, so notes and chords are less '
+                           'reliable than on clean guitar, and power chords may show extra octave notes.',
+              'uncertain': 'Not sure whether this guitar is clean or distorted.'}[tone]
+    return {'tone': tone, 'brightness': round(bright, 3), 'loudness_spread_db': round(spread, 1), 'detail': detail}

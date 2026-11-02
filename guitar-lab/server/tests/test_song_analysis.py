@@ -264,3 +264,26 @@ def test_musicxml_leaves_out_notes_with_no_tab_position():
     # Without tab (e.g. piano), every note stays.
     root = ET.fromstring(sa.musicxml(notes, [i*.6 for i in range(8)], None, [], tab=False).split('\n', 2)[2])
     assert sum(1 for n in root.iter('note') if n.find('pitch') is not None) == 5
+
+
+def test_tone_estimate_clean_vs_distorted():
+    sr = 22050
+    t = np.arange(int(sr*.5))/sr
+    # Plucked notes that die away (clean) vs the same notes hard-limited so they sustain (distorted).
+    pluck = (np.sin(2*np.pi*196*t)+.5*np.sin(2*np.pi*392*t))*np.exp(-t*8)
+    clean = np.tile(pluck, 8).astype(np.float32)*.3
+    distorted = np.clip(clean*40, -.3, .3).astype(np.float32)
+    assert sa.tone_estimate(clean, sr)['tone'] == 'clean'
+    assert sa.tone_estimate(distorted, sr)['tone'] == 'distorted'
+    assert sa.tone_estimate(np.zeros(sr, np.float32), sr)['tone'] == 'uncertain'
+
+
+def test_thresholds_follow_the_guitar_sound():
+    from server import models
+    clean = (models.ONSET_THRESHOLD, models.FRAME_THRESHOLD)
+    assert models.thresholds_for('clean', True) == clean
+    assert models.thresholds_for('uncertain', False) == clean
+    assert models.thresholds_for('distorted', True) == (0.5, 0.3)
+    # A guessed high-gain sound only moves halfway: the guess can be wrong.
+    assert models.thresholds_for('distorted', False) == (0.6, 0.4)
+    assert models.thresholds_for('crunch', False) == (0.6, 0.4)

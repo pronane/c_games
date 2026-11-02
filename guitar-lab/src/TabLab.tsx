@@ -11,7 +11,10 @@ import {
 } from "./tabScore";
 import { parseTextTab, tuningName } from "./songApi";
 import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
-import { estimateOffset, mixInto } from "./songAudio";
+import { estimateOffset, mixInto, timeStretch } from "./songAudio";
+import { renderFile, driveForProgram } from "./fileSound";
+import { applySound, useGuitarSound } from "./guitarTone";
+import GuitarSoundPicker from "./GuitarSoundPicker";
 import { encodeWav } from "./engineApi";
 import { captureError } from "./audioInputs";
 import { Recorder } from "./recorder";
@@ -64,7 +67,13 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     [recording, setRecording] = useState(false),
     [take, setTake] = useState<Take | null>(null),
     [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
-    [mixUrl, setMixUrl] = useState("");
+    [mixUrl, setMixUrl] = useState(""),
+    // Whose sound plays the tab: the instruments the file asks for, or the app's own guitar.
+    [voice, setVoice] = useState<"file" | "app">("file"),
+    [band, setBand] = useState(true),
+    [rendering, setRendering] = useState(false),
+    [textTab, setTextTab] = useState(false),
+    [sound, setSound] = useGuitarSound();
   const ctx = useRef<AudioContext | null>(null),
     rec = useRef<Recorder | null>(null),
     current = useRef<AudioBufferSourceNode | null>(null),
@@ -102,6 +111,10 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
       setTrack(t);
       const p = scoreToPiece(s, t);
       setPiece(p);
+      setVoice("file");
+      setTextTab(false);
+      const drive = driveForProgram(p.program);
+      if (drive) setSound({ ...sound, drive });
       setFromBar(1);
       setToBar(Math.min(4, p.bars.length));
     } catch (e) {
@@ -150,6 +163,8 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
         warnings: r.warnings,
       });
       setText(raw);
+      setVoice("app");
+      setTextTab(true);
       setFromBar(1);
       setToBar(Math.min(4, barTimes.length));
     } catch (e) {
@@ -170,6 +185,8 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     setTake(null);
     const p = scoreToPiece(score, t);
     setPiece(p);
+    const drive = driveForProgram(p.program);
+    if (drive) setSound({ ...sound, drive });
     setToBar(Math.min(toBar, p.bars.length));
   }
 
@@ -191,15 +208,61 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     return { start, end: Math.max(start + 0.5, end) };
   }, [piece, loopOn, fromBar, toBar, duration]);
 
-  /** The app's rendition of [from, to) at `atSpeed`, optionally quieter, with clicks. */
-  function render(from: number, to: number, opts: { level?: number; click?: boolean; atSpeed?: number } = {}) {
-    const c = context(),
-      rate = c.sampleRate,
+  /** The app's own guitar playing this track over [from, to) at `atSpeed`, with the chosen amp. */
+  function synthTrack(from: number, to: number, sp: number, level = 1, withSound = true) {
+    const rate = context().sampleRate,
+      part = excerpt(piece!, from, to, 1);
+    return synthesize(part.notes, rate, (to - from) / sp + 0.05, sp, 0.3 * level, withSound ? sound : undefined);
+  }
+  /**
+   * What "Play" sounds like over [from, to): the file's own instruments (this track at `level`,
+   * the rest of the band when chosen) or the app's guitar, then clicks. Stereo.
+   */
+  async function render(
+    from: number,
+    to: number,
+    opts: { level?: number; click?: boolean; atSpeed?: number; band?: boolean; voice?: "file" | "app" } = {},
+  ): Promise<[Float32Array, Float32Array]> {
+    const rate = context().sampleRate,
       sp = opts.atSpeed ?? speed,
-      part = excerpt(piece!, from, to, 1),
-      audio = synthesize(part.notes, rate, (to - from) / sp + 0.05, sp, 0.3 * (opts.level ?? 1));
-    if (opts.click) addClicks([audio], rate, clickTimes(piece!.beats, from, to), from, sp, 0.3);
-    return audio;
+      level = opts.level ?? 1,
+      withBand = opts.band ?? band,
+      how = opts.voice ?? (score && source && !textTab ? voice : "app");
+    let out: [Float32Array, Float32Array];
+    if (how === "file" && score) {
+      setRendering(true);
+      try {
+        const plain = sound.drive === "clean" && !sound.chorus && !sound.delay && !sound.reverb;
+        let audio: [Float32Array, Float32Array];
+        if (plain) audio = await renderFile(score, from, to, rate, (i) => (i === track ? level : withBand ? 1 : 0));
+        else {
+          // Many tabs ask for a clean electric even when the record is distorted: put this track
+          // through the chosen amp and pedals, and leave the rest of the band as the file has it.
+          const mine = await renderFile(score, from, to, rate, (i) => (i === track ? level : 0));
+          mine.forEach((ch) => applySound(ch, rate, sound));
+          audio = withBand ? await renderFile(score, from, to, rate, (i) => (i === track ? 0 : 1)) : [new Float32Array(mine[0].length), new Float32Array(mine[0].length)];
+          mixInto(audio, mine, 1);
+        }
+        out = sp === 1 ? audio : (timeStretch(audio, rate, sp) as [Float32Array, Float32Array]);
+      } finally {
+        setRendering(false);
+      }
+    } else {
+      const mono = synthTrack(from, to, sp, level);
+      out = [mono, mono.slice()];
+      if (withBand && score && source && !textTab) {
+        // The rest of the band from the file, under the app's guitar.
+        setRendering(true);
+        try {
+          const others = await renderFile(score, from, to, rate, (i) => (i === track ? 0 : 1));
+          mixInto(out, sp === 1 ? others : timeStretch(others, rate, sp), 1);
+        } finally {
+          setRendering(false);
+        }
+      }
+    }
+    if (opts.click) addClicks(out, rate, clickTimes(piece!.beats, from, to), from, sp, 0.3);
+    return out;
   }
   function toBuffer(channels: Float32Array[]) {
     const c = context(),
@@ -244,13 +307,14 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     await c.resume();
     const from = loopOn ? range.start : position >= duration - 0.2 ? 0 : position,
       to = loopOn ? range.end : duration;
-    start(toBuffer([render(from, to, { click: clickOn })]), c.currentTime + 0.05, from, speed, loopOn ? range : null);
+    const audio = await render(from, to, { click: clickOn });
+    start(toBuffer(audio), c.currentTime + 0.05, from, speed, loopOn ? range : null);
     setPlaying(true);
     tick();
   }
   useEffect(() => {
     if (playing && !recording) play();
-  }, [speed, clickOn, track]);
+  }, [speed, clickOn, track, voice, band, sound]);
 
   // ---------------------------------------------------------------- record along
   async function recordAlong() {
@@ -265,8 +329,9 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
       await recorder().ensure();
       const from = range.start,
         to = range.end,
-        backing = render(from, to, { level: guide ? 0.45 : 0, click: clickOn || !guide }),
-        reference = render(from, to),
+        backing = await render(from, to, { level: guide ? 0.45 : 0, click: clickOn || !(guide || band) }),
+        // Attacks to line the take up with: the plain notes of this track.
+        reference = synthTrack(from, to, speed, 1, false),
         beat = 60 / piece.bpm / speed,
         countIn = 4 * beat,
         now = c.currentTime + 0.15,
@@ -282,12 +347,12 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
         osc.start(now + i * beat);
         osc.stop(now + i * beat + 0.1);
       }
-      const band = toBuffer([backing]);
-      start(band, songStart, from, speed, null);
+      const backingBuffer = toBuffer(backing);
+      start(backingBuffer, songStart, from, speed, null);
       setPlaying(true);
       tick();
       const recordFrom = c.currentTime,
-        length = band.duration;
+        length = backingBuffer.duration;
       setRecording(true);
       const raw = await recorder().capture(Math.ceil((songStart - recordFrom + length + 0.6) * c.sampleRate), length + countIn + 10);
       setRecording(false);
@@ -317,9 +382,8 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     }
   }
 
-  function together(t: Take) {
-    const tab = render(t.from, t.to, { atSpeed: t.speed, level: 0.8 }),
-      out: [Float32Array, Float32Array] = [tab.slice(), tab.slice()];
+  async function together(t: Take) {
+    const out = await render(t.from, t.to, { atSpeed: t.speed, level: 0.8 });
     mixInto(out, [t.buffer.getChannelData(0)], 1);
     let peak = 0;
     for (const ch of out) for (const v of ch) peak = Math.max(peak, Math.abs(v));
@@ -331,14 +395,14 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     stop();
     const c = context();
     await c.resume();
-    start(toBuffer(together(take)), c.currentTime + 0.05, take.from, take.speed, null);
+    start(toBuffer(await together(take)), c.currentTime + 0.05, take.from, take.speed, null);
     setPlaying(true);
     tick();
   }
-  function compare() {
+  async function compare() {
     if (!take || !piece) return;
     const part = excerpt(piece, take.from, take.to, take.speed),
-      ref = toBuffer([render(take.from, take.to, { atSpeed: take.speed })]);
+      ref = toBuffer(await render(take.from, take.to, { atSpeed: take.speed, band: false }));
     onCompare(
       { name: `${piece.title} · the app's version of the tab`, buffer: ref },
       { name: "Your take from the tab", buffer: take.buffer },
@@ -467,9 +531,42 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
           )}
 
           <h3 className="section-title">Hear it and play along</h3>
+          <div className="sound-choice">
+            {score && source && !textTab && (
+              <div className="segmented" role="radiogroup" aria-label="Who plays the tab">
+                <button className={voice === "file" ? "chosen" : ""} onClick={() => setVoice("file")}>
+                  The file's instruments
+                </button>
+                <button className={voice === "app" ? "chosen" : ""} onClick={() => setVoice("app")}>
+                  The app's guitar
+                </button>
+              </div>
+            )}
+            {score && source && !textTab && piece.tracks.length > 1 && (
+              <label className="speed">
+                <input id="tab-band" type="checkbox" checked={band} onChange={(e) => setBand(e.target.checked)} />
+                Whole band (every track in the file)
+              </label>
+            )}
+            <GuitarSoundPicker
+              sound={sound}
+              onChange={setSound}
+              note={
+                driveForProgram(piece.program)
+                  ? `The file asks for a ${driveForProgram(piece.program)} guitar${voice === "file" && !textTab ? "; the amp setting goes on top of this track" : ""}.`
+                  : undefined
+              }
+            />
+            {voice === "file" && score && !textTab && (
+              <p className="helper">
+                Played with the instruments the file names (General MIDI sounds), with repeats played out. Set the amp
+                to match the record: many tabs ask for a clean guitar even when the record is distorted.
+              </p>
+            )}
+          </div>
           <div className="transport">
-            <button className="primary" disabled={recording || !piece.notes.length} onClick={() => (playing ? stop() : play())}>
-              {playing ? <Pause size={15} /> : <Play size={15} />} {playing ? "Pause" : "Play the tab"}
+            <button className="primary" disabled={recording || rendering || !piece.notes.length} onClick={() => (playing ? stop() : play())}>
+              {playing ? <Pause size={15} /> : <Play size={15} />} {playing ? "Pause" : rendering ? "Preparing the sound…" : "Play the tab"}
             </button>
             <input
               aria-label="Position"
@@ -509,7 +606,7 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
           <LatencyCheck recorder={recorder} latency={latency} disabled={recording} onBefore={stop} onMeasured={setLatency} />
           <label className="consent">
             <input id="tab-guide" type="checkbox" checked={guide} onChange={(e) => setGuide(e.target.checked)} />
-            <span>Play the tab quietly in my headphones while I record (otherwise just the click)</span>
+            <span>Play my track quietly in my headphones while I record (the rest of the band plays at full level when "Whole band" is on)</span>
           </label>
           <div className="record-row">
             {!recording ? (
@@ -527,8 +624,8 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
             <div className="take-card">
               <p className="helper">{take.detail}</p>
               <div className="presets">
-                <button onClick={hearTogether}><Headphones size={13} /> Hear me with the tab</button>
-                <button onClick={() => setMixUrl(URL.createObjectURL(encodeWav(together(take), context().sampleRate)))}>
+                <button onClick={hearTogether}><Headphones size={13} /> Hear me with the {band && score && !textTab ? "band" : "tab"}</button>
+                <button onClick={async () => setMixUrl(URL.createObjectURL(encodeWav(await together(take), context().sampleRate)))}>
                   <Download size={13} /> Make a mix to keep
                 </button>
                 <button className="primary" onClick={compare}>Check my take against the tab</button>

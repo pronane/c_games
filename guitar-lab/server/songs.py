@@ -54,6 +54,7 @@ class Song:
     active: bool = True
     notes: dict = field(default_factory=dict)     # part id -> transcribed notes (pre-fingering)
     policy: str = 'cpu'                           # separation device: 'cpu' or 'auto' (graphics card)
+    tone: str = 'auto'                            # guitar sound for transcription: auto, clean, crunch, distorted
 
 
 def client(x_fretwork_client):
@@ -262,6 +263,10 @@ def run_song(song: Song):
         key = sa.resolve_mode(key, chords)
         check(song)
 
+        # Clean, crunch or high gain: from the player's choice, else a guess from the stem.
+        tone = sa.tone_estimate(stems[stem_name], sr_s) if song.instrument != 'piano' else None
+        sound = song.tone if song.tone != 'auto' else (tone['tone'] if tone else 'clean')
+        thresholds = models.thresholds_for(sound, chosen_by_user=song.tone != 'auto')
         song.stage = f'Transcribing the {profile["name"].lower()} notes (Basic Pitch)'
         widest = min(min(t) for t in profile['tunings'].values()) if profile['tunings'] else profile['midi_min']
         for p in parts:
@@ -272,7 +277,7 @@ def run_song(song: Song):
                 y = librosa.effects.pitch_shift(y, sr=sr_s, n_steps=-cents/100)
             path = song.folder/f'transcribe-{p["id"]}.wav'
             sf.write(path, y, sr_s, subtype='PCM_16')
-            song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'])
+            song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
             path.unlink(missing_ok=True)
         # Panning masks leak; find bars where a part only carries another part's bleed and
         # drop those notes so they do not appear twice in tab or count as a second lead.
@@ -298,18 +303,21 @@ def run_song(song: Song):
         all_notes = [n for v in song.notes.values() for n in v]
         tuning = sa.suggest_tuning(all_notes, cents, profile['tunings'], flats=bool(key and key['fifths'] < 0)) if profile['tunings'] else None
 
+        if tone:
+            tone = dict(tone, chosen=song.tone, used=sound)
         song.result = {
             'duration': duration,
             'instruments': [dict(r, label=STEM_LABELS.get(r['stem'], r['stem'])) for r in found],
             'selected_stem': stem_name, 'parts': parts, 'tempo': grid, 'key': key, 'chords': chords,
-            'tuning': tuning, 'reference_cents': round(cents, 1),
-            'provenance': dict(provenance, transcription='Basic Pitch ONNX', onset_threshold=models.ONSET_THRESHOLD,
-                               frame_threshold=models.FRAME_THRESHOLD),
+            'tuning': tuning, 'reference_cents': round(cents, 1), 'tone': tone,
+            'provenance': dict(provenance, transcription='Basic Pitch ONNX', onset_threshold=thresholds[0],
+                               frame_threshold=thresholds[1]),
             'warnings': [
                 'Every result here is an automatic estimate. Check notes and chords by ear and correct them.',
                 'Parts panned to the same place and playing at the same time cannot be separated.',
                 'Tab positions are suggestions: the same note can be played on several strings.',
-            ],
+            ]+([tone['detail']] if tone and tone['tone'] == 'distorted' and song.tone == 'auto' else [])
+             + ([f'Transcribed for a {sound} guitar sound (onset {thresholds[0]}, note {thresholds[1]}).'] if sound != 'clean' else []),
         }
         song.status, song.stage = 'complete', 'Breakdown ready'
     except Exception as exc:
@@ -328,6 +336,7 @@ def run_song(song: Song):
 @router.post('', status_code=202)
 async def create_song(file: UploadFile | None = File(None), url: str | None = Form(None),
                       consent: bool = Form(False), instrument: str = Form('guitar'), processing: str = Form('cpu'),
+                      tone: str = Form('auto'),
                       x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
@@ -336,6 +345,8 @@ async def create_song(file: UploadFile | None = File(None), url: str | None = Fo
         policy = policy_for(processing)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    if tone not in ('auto', 'clean', 'crunch', 'distorted'):
+        raise HTTPException(422, 'Guitar sound must be auto, clean, crunch or distorted.')
     if (file is None) == (not url):
         raise HTTPException(422, 'Provide either a song file or a link, not both.')
     try:
@@ -355,7 +366,7 @@ async def create_song(file: UploadFile | None = File(None), url: str | None = Fo
         folder = ROOT/f'song-{key}'
         folder.mkdir(mode=0o700)
         song = Song(key, folder, instrument, (file.filename if file else '') or 'Uploaded song',
-                    stage='Receiving the song', policy=policy)
+                    stage='Receiving the song', policy=policy, tone=tone)
         SONGS[key] = song
     try:
         if file is not None:
