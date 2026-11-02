@@ -311,17 +311,38 @@ def main() -> int:
     workflow = (ROOT.parent / ".github" / "workflows" / "arena-fc-tests.yml").read_text(encoding="utf-8")
     check("owner PossessionLock does NOT release the ball every tick",
           "owner.PossessionLock > 0 ||" not in match_cs)
-    check("the main menu Button grabs GUI focus",
-          "GrabFocus()" in game_app and "menu.GetChild(0)" in game_app)
+    check("the main menu seeds GUI focus",
+          "Ui.FocusFirst(root)" in game_app and "Ui.FocusFirst(panel)" in game_app)
     check("WASD is rotated into camera space",
           "Cam.GlobalTransform.Basis" in match_view and "worldMove" in match_view)
     check("tactical camera is stable and player cam has a zero-facing guard",
-          "Mode == 2 ? new Vector3(0f, 0f, -1f)" in world3d
+          "Mode == 3 ? new Vector3(0f, 0f, -1f)" in world3d
           and "fwd.LengthSquared() < 1e-6f" in world3d)
+    check("a fourth mid-height camera exists between player cam and tactical",
+          "ModeCount = 4" in world3d and "Sideline" in world3d
+          and "case 2:" in world3d and "case 3:" in world3d)
     check("HUD hint advertises the pad camera button", "pad R3 camera" in hud_cs)
     check("C# core regression suite is wired into CI",
           (ROOT / "Tests" / "MatchCoreTests.cs").exists()
           and "MatchCoreTests.csproj" in workflow and "ArenaFC.sln" in workflow)
+    ui_cs = (ROOT / "Scripts" / "Godot" / "Ui.cs").read_text(encoding="utf-8")
+    nav_cs = (ROOT / "Scripts" / "Godot" / "PadMenuNavigator.cs").read_text(encoding="utf-8")
+    check("menu Buttons are focusable (no mouse required)",
+          "FocusMode = Control.FocusModeEnum.All" in ui_cs and "Ui.FocusFirst" in game_app)
+    check("a pad navigator drives menu focus and activation",
+          "ReadMenuPad" in nav_cs and "EmitSignal(BaseButton.SignalName.Pressed)" in nav_cs
+          and "PadMenuNavigator" in game_app)
+    check("opposition presses and tackles",
+          "p.Pressing" in match_cs and "chaser3" in match_cs and "1.12f" in match_cs)
+    rig_cs = (ROOT / "Scripts" / "Core" / "RigDefinition.cs").read_text(encoding="utf-8")
+    anim_cs = world3d
+    check("rig has visible hip/knee/ankle joints and shaped boots",
+          "knee cap" in rig_cs and "toe box" in rig_cs and "RigMat.Detail" in rig_cs)
+    check("gait uses smooth harmonics and poses feet + torso",
+          "MathF.Cos(phase + .55f)" in anim_cs and 'Set(rig, "LFoot"' in anim_cs
+          and 'Set(rig, "Hips"' in anim_cs)
+    check("browser edition uses the same smooth gait",
+          "cos(ph + 0.55)" in (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8"))
 
     section("Optional syntax parsers")
     try:

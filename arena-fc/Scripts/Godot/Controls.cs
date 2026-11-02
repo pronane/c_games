@@ -164,6 +164,50 @@ public sealed class InputHub
         return pads == null ? new int[0] : pads.Select(x => (int)x).ToArray();
     }
 
+    // ---- Menu navigation from any pad (mapped XInput or raw EasySMX D-input) -------------
+
+    private static bool _menuPadReady;
+
+    /// <summary>Godot's default ui_* actions also carry joypad events.  If we leave those
+    /// in place a pad A press would both activate the focused Button through Godot and
+    /// through PadMenuNavigator (double click).  We own menu pads, so strip only the
+    /// joypad events and keep keyboard Enter / arrows / Space working as before.</summary>
+    public static void EnsureMenuPadActions()
+    {
+        if (_menuPadReady) return;
+        _menuPadReady = true;
+        foreach (string action in new[] { "ui_accept", "ui_up", "ui_down", "ui_left", "ui_right", "ui_cancel" })
+        {
+            if (!InputMap.HasAction(action)) continue;
+            foreach (var e in InputMap.ActionGetEvents(action))
+                if (e is InputEventJoypadButton || e is InputEventJoypadMotion)
+                    InputMap.ActionEraseEvent(action, e);
+        }
+    }
+
+    /// <summary>Aggregated d-pad / stick direction and A / Start / B / back for menu use.
+    /// Uses the same PadLayout tables as gameplay, so unmapped EasySMX pads work too.</summary>
+    public static void ReadMenuPad(out bool up, out bool down, out bool left, out bool right,
+                                   out bool accept, out bool back)
+    {
+        up = down = left = right = accept = back = false;
+        foreach (int dev in PadLayout.DevicesFor(ConnectedDevices(), false, 0))
+        {
+            bool[] buttons = ReadButtons(dev);
+            float[] axes = ReadAxes(dev);
+            bool known = Input.IsJoyKnown(dev);
+            var binds = PadLayout.Bindings(Input.GetJoyName(dev), known, _saved);
+            PadVector m = PadLayout.Move(buttons, axes, known);
+            if (m.Y < -.45f) up = true;
+            if (m.Y > .45f) down = true;
+            if (m.X < -.45f) left = true;
+            if (m.X > .45f) right = true;
+            var h = PadLayout.Held(buttons, axes, binds, known);
+            if (h["pass"] || h["pause"]) accept = true;   // A / Start
+            if (h["tackle"] || h["camera"]) back = true;  // B / R3-L3 (cancel)
+        }
+    }
+
     public PlayerCommand Read(float dt)
     {
         var cmd = new PlayerCommand();

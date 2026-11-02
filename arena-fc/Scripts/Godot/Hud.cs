@@ -95,6 +95,7 @@ public partial class Hud : CanvasLayer
     private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!, _hint = null!, _cam = null!;
     private ProgressBar _power = null!, _stamina = null!;
     private PanelContainer _pauseMenu = null!;
+    private Control _pauseButtons = null!;
     private Minimap _minimap = null!;
     private Control _touchLayer = null!;
     private VirtualStick _stick = null!;
@@ -223,6 +224,8 @@ public partial class Hud : CanvasLayer
         Place(_pauseMenu, .5f, .5f, -180, -170, 360, 340);
         _pauseMenu.Visible = false;
         root.AddChild(_pauseMenu);
+        // Focus is seeded in SetPaused(true) when the panel actually becomes visible.
+        _pauseButtons = v;
     }
 
     public void SetTouch(bool on)
@@ -235,6 +238,10 @@ public partial class Hud : CanvasLayer
     {
         Paused = on;
         if (_pauseMenu != null) _pauseMenu.Visible = on;
+        // The pause menu is a menu: hand control to the pad navigator and focus
+        // "Resume" so A / d-pad / arrow keys work without a mouse.
+        PadMenuNavigator.Active = on;
+        if (on && _pauseButtons != null) Ui.FocusFirst(_pauseButtons);
     }
 
     public void ShowToast(string text, float seconds = 2.2f)

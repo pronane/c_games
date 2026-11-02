@@ -1,5 +1,6 @@
 // Arena FC - small in-code UI toolkit (no external fonts/images, works on every export).
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace ArenaFC.GodotGame;
@@ -38,9 +39,13 @@ public static class Ui
         b.AddThemeStyleboxOverride("disabled", Box(new Color(.10f, .12f, .13f)));
         b.AddThemeColorOverride("font_color", Text);
         b.AddThemeColorOverride("font_hover_color", Color.FromHsv(.41f, .1f, 1f));
+        b.AddThemeColorOverride("font_focus_color", Color.FromHsv(.41f, .05f, 1f));
         b.AddThemeFontSizeOverride("font_size", 17);
+        b.AddThemeStyleboxOverride("focus", Box(new Color(.10f, .40f, .30f, .98f), Accent, 8, 2));
         b.CustomMinimumSize = new Vector2(0, 40);
-        b.FocusMode = Control.FocusModeEnum.None;
+        // Buttons used to be FocusMode.None, which is why every menu needed a mouse:
+        // nothing could own GUI focus, so arrow keys / Enter / a gamepad had no target.
+        b.FocusMode = Control.FocusModeEnum.All;
     }
 
     public static Button Btn(string text, Action onClick, bool primary = false)
@@ -104,20 +109,49 @@ public static class Ui
         return row;
     }
 
+    /// <summary>Callbacks for pad-driven combo changes (OptionButton.Selected does not emit ItemSelected).</summary>
+    public static readonly Dictionary<OptionButton, Action<int>> ComboChanged = new();
+
     public static OptionButton Combo(string[] items, int selected, Action<int> changed)
     {
-        var o = new OptionButton { CustomMinimumSize = new Vector2(0, 36) };
+        var o = new OptionButton { CustomMinimumSize = new Vector2(0, 36), FocusMode = Control.FocusModeEnum.All };
         foreach (var i in items) o.AddItem(i);
         o.Selected = selected;
         o.ItemSelected += (long idx) => changed((int)idx);
+        ComboChanged[o] = changed;
         return o;
     }
 
     public static CheckBox Check(string text, bool value, Action<bool> changed)
     {
-        var c = new CheckBox { Text = text, ButtonPressed = value };
+        var c = new CheckBox { Text = text, ButtonPressed = value, FocusMode = Control.FocusModeEnum.All };
+        c.AddThemeStyleboxOverride("focus", Box(new Color(.10f, .40f, .30f, .35f), Accent, 4, 2));
         c.Toggled += (on) => changed(on);
         return c;
+    }
+
+    /// <summary>Give the first focusable control in a menu focus, so the pad has somewhere to start.</summary>
+    public static void FocusFirst(Node root)
+    {
+        foreach (Control c in Focusables(root)) { c.GrabFocus(); return; }
+    }
+
+    /// <summary>Focusable controls in visual (tree) order, skipping hidden/disabled ones.</summary>
+    public static List<Control> Focusables(Node root)
+    {
+        var list = new List<Control>();
+        Walk(root, list);
+        return list;
+    }
+
+    private static void Walk(Node n, List<Control> list)
+    {
+        if (n is Control c && c.FocusMode != Control.FocusModeEnum.None && c.IsVisibleInTree())
+        {
+            bool disabled = c is BaseButton bb && bb.Disabled;
+            if (!disabled) list.Add(c);
+        }
+        foreach (Node child in n.GetChildren()) Walk(child, list);
     }
 
     public static VBoxContainer VBox(int separation = 6)

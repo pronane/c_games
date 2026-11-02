@@ -236,8 +236,13 @@ public partial class BroadcastCamera : Camera3D
     private Vector3 _pos, _look;
     private bool _init;
 
-    public void Cycle() { Mode = (Mode + 1) % 3; _init = false; }
-    public string ModeName => Mode switch { 0 => "Broadcast", 1 => "Player cam", _ => "Tactical" };
+    public const int ModeCount = 4;
+    public void Cycle() { Mode = (Mode + 1) % ModeCount; _init = false; }
+    // 0 far broadcast, 1 on-pitch player cam, 2 mid-height sideline, 3 top-down tactical.
+    public string ModeName => Mode switch
+    {
+        0 => "Broadcast", 1 => "Player cam", 2 => "Sideline", _ => "Tactical"
+    };
 
     public void UpdateCamera(Vector3 ball, Vector3 player, Vector3 facing, float dt)
     {
@@ -255,6 +260,14 @@ public partial class BroadcastCamera : Camera3D
                 fov = 68f;
                 break;
             case 2:
+                // New mid camera: low, wide tracking shot between the on-pitch player
+                // cam (3 m / 7 m) and the high broadcast (28 m / 46 m).  Close enough
+                // to read player detail, far enough to see the shape of the move.
+                target = new Vector3(ball.X - 3f, 14f + Mathf.Abs(ball.Z) * .04f, ball.Z + 24f);
+                look = new Vector3(ball.X + 2f, 1.1f, ball.Z);
+                fov = 58f;
+                break;
+            case 3:
                 // Straight-down tactical view sized so the 105 x 68 m pitch fills the
                 // frame.  88 m / fov 58 used to show the stadium stands as a huge grey
                 // wedge and LookAt with Vector3.Up was degenerate (camera looked down
@@ -277,7 +290,7 @@ public partial class BroadcastCamera : Camera3D
         Position = _pos;
         // Looking straight down with Vector3.Up is degenerate; -Z gives a stable
         // "north is up" tactical view (and keeps WASD camera-relative movement sane).
-        LookAtFromPosition(_pos, _look, Mode == 2 ? new Vector3(0f, 0f, -1f) : Vector3.Up);
+        LookAtFromPosition(_pos, _look, Mode == 3 ? new Vector3(0f, 0f, -1f) : Vector3.Up);
         Fov = Mathf.Lerp(Fov, fov, k);
     }
 
@@ -291,26 +304,50 @@ public static class RigAnimator
     public static void Pose(CharacterRig rig, PlayerState p, float dt, float time, System.Numerics.Vector3 ballPos)
     {
         if (rig.Skeleton == null) return;
+        // Gait: smooth harmonic curves instead of half-wave-rectified sine (which
+        // made the legs snap between two straight angles).  Hips, knees, ankles,
+        // shoulders, elbows, spine and head all contribute, so the silhouette has
+        // real joints and weight transfer rather than two rigid sticks.
         float speed = Mx.Flat(p.Vel).Length();
         float amp = Math.Clamp(speed / 6f, 0f, 1f);
-        float phase = p.AnimPhase * 1.65f;
-        float swing = MathF.Sin(phase) * amp * .72f;
-        float swing2 = MathF.Sin(phase + MathF.PI) * amp * .72f;
-        float kneeL = MathF.Max(0f, -MathF.Sin(phase)) * amp * .85f;
-        float kneeR = MathF.Max(0f, -MathF.Sin(phase + MathF.PI)) * amp * .85f;
+        float run = Math.Clamp(speed / 5.5f, 0f, 1f);
+        float phase = p.AnimPhase;
+        float s = MathF.Sin(phase), s2 = MathF.Sin(phase * 2f);
+        float breathe = MathF.Sin(time * 1.6f) * .012f * (1f - amp);
 
-        Set(rig, "LThigh", swing, 0, 0);
-        Set(rig, "RThigh", swing2, 0, 0);
+        float hipL = (s * .66f + s2 * .10f) * amp;
+        float hipR = -hipL;
+        // Knees stay slightly bent and flex smoothly through the swing phase.
+        float kneeL = (.10f + (.5f - .5f * MathF.Cos(phase + .55f)) * .95f) * amp;
+        float kneeR = (.10f + (.5f - .5f * MathF.Cos(phase + MathF.PI + .55f)) * .95f) * amp;
+        float footL = (-hipL * .30f + s2 * .12f) * amp;
+        float footR = (-hipR * .30f - s2 * .12f) * amp;
+        float armL = -hipL * .62f - .10f * run;
+        float armR = -armL;
+        float elbowL = -.32f - .22f * run - .18f * MathF.Max(0f, -hipL);
+        float elbowR = -.32f - .22f * run - .18f * MathF.Max(0f, -hipR);
+        float armOut = .12f + .14f * run;
+        float lean = .04f + .10f * run + breathe;
+        float twist = s * .075f * amp;
+        float roll = s2 * .025f * amp;
+
+        Set(rig, "Hips", lean * .25f, twist * .5f, roll);
+        Set(rig, "Spine", lean * .35f, -twist * .6f, -roll * .5f);
+        Set(rig, "Chest", lean * .45f, twist, roll * .6f);
+        Set(rig, "Neck", -lean * .30f, -twist * .4f, 0);
+        Set(rig, "Head", -lean * .25f + breathe, -twist * .5f, 0);
+        Set(rig, "LThigh", hipL, 0, .02f);
+        Set(rig, "RThigh", hipR, 0, -.02f);
         Set(rig, "LShin", kneeL, 0, 0);
         Set(rig, "RShin", kneeR, 0, 0);
-        Set(rig, "LUpperArm", -swing * .65f, 0, -.16f - amp * .16f);
-        Set(rig, "RUpperArm", -swing2 * .65f, 0, .16f + amp * .16f);
-        Set(rig, "LForearm", -.25f - amp * .35f, 0, 0);
-        Set(rig, "RForearm", -.25f - amp * .35f, 0, 0);
-        Set(rig, "Chest", amp * .07f, MathF.Sin(phase) * amp * .06f, 0);
-        Set(rig, "Head", 0, 0, 0);
-        Set(rig, "LFoot", -swing * .25f, 0, 0);
-        Set(rig, "RFoot", -swing2 * .25f, 0, 0);
+        Set(rig, "LFoot", footL, 0, 0);
+        Set(rig, "RFoot", footR, 0, 0);
+        Set(rig, "LUpperArm", armL, 0, -armOut);
+        Set(rig, "RUpperArm", armR, 0, armOut);
+        Set(rig, "LForearm", elbowL, 0, -.05f);
+        Set(rig, "RForearm", elbowR, 0, .05f);
+        Set(rig, "LHand", 0, 0, 0);
+        Set(rig, "RHand", 0, 0, 0);
 
         if (p.IsKeeper)
         {
@@ -351,9 +388,10 @@ public static class RigAnimator
         }
         if (rig.EditorMode) return;
 
-        // small vertical bob so sprinting reads as weight-bearing
-        float bob = MathF.Abs(MathF.Sin(phase)) * amp * .035f;
-        rig.Skeleton.Position = new Vector3(0, bob, 0);
+        // Two weight-bearing bounces per stride plus a little lateral sway, so the
+        // pelvis transfers weight instead of gliding on rails.
+        float bob = (.5f - .5f * MathF.Cos(phase * 2f)) * amp * .055f;
+        rig.Skeleton.Position = new Vector3(MathF.Sin(phase) * amp * .018f, bob, 0);
     }
 
     private static void Set(CharacterRig rig, string bone, float x, float y, float z)

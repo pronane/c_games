@@ -54,6 +54,7 @@ public partial class CharacterEditor : Node3D
         RebuildRig();
         RefreshLists();
         SyncControls();
+        Ui.FocusFirst(this);
         Status("Ready. Select a player, then edit anything — the skinned mesh updates live.");
     }
 

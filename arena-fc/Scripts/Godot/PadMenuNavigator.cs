@@ -1,0 +1,107 @@
+// Gamepad navigation for every menu in the desktop build.
+//
+// Ui.Style() used to force FocusMode.None on every Button, so the main menu, pause
+// menu, settings, controls, controller setup and character editor could only be
+// driven with a mouse.  This node lives on the Window (outside GameApp.Clear()),
+// watches whichever Control currently owns GUI focus and drives it from any pad —
+// including unmapped EasySMX D-input pads, via the same PadLayout tables gameplay uses.
+using System;
+using System.Collections.Generic;
+using Godot;
+
+namespace ArenaFC.GodotGame;
+
+public partial class PadMenuNavigator : Node
+{
+    /// <summary>Only enabled while a menu is on screen (so A during play still shoots).</summary>
+    public static bool Active = true;
+
+    private bool _up, _down, _left, _right, _accept, _back;
+
+    public override void _Ready()
+    {
+        Name = "PadMenuNavigator";
+        ProcessMode = Node.ProcessModeEnum.Always;
+        InputHub.EnsureMenuPadActions();
+    }
+
+    public override void _Process(double delta)
+    {
+        InputHub.ReadMenuPad(out bool up, out bool down, out bool left, out bool right,
+                             out bool accept, out bool back);
+        bool eUp = up && !_up, eDown = down && !_down, eLeft = left && !_left,
+             eRight = right && !_right, eAccept = accept && !_accept, eBack = back && !_back;
+        _up = up; _down = down; _left = left; _right = right; _accept = accept; _back = back;
+        if (!Active || !(eUp || eDown || eLeft || eRight || eAccept || eBack)) return;
+
+        var root = GetTree().Root;
+        var focus = GetViewport().GuiGetFocusOwner();
+        if (focus == null)
+        {
+            // A pad was pressed but nothing owns focus yet (e.g. a freshly opened
+            // overlay): seed the first focusable control and let the next press act.
+            Ui.FocusFirst(root);
+            return;
+        }
+
+        var list = Ui.Focusables(root);
+        int idx = list.IndexOf(focus);
+        if (idx < 0) { Ui.FocusFirst(root); return; }
+
+        int dir = eRight ? 1 : eLeft ? -1 : 0;
+        if (focus is OptionButton combo && (dir != 0 || eAccept || eBack))
+        {
+            int step = eBack ? -1 : dir != 0 ? dir : 1;
+            StepCombo(combo, step);
+            return;
+        }
+        if (focus is Slider slider && (dir != 0 || eAccept || eBack))
+        {
+            float step = slider.Step > 0f ? (float)slider.Step
+                                          : (float)(slider.MaxValue - slider.MinValue) / 20f;
+            slider.Value = Math.Clamp(slider.Value + (eBack ? -step : dir != 0 ? dir * step : step),
+                                      slider.MinValue, slider.MaxValue);
+            return;
+        }
+        if (eDown || eUp || (dir != 0))
+        {
+            int step = eDown || eRight ? 1 : -1;
+            Control next = list[(idx + step + list.Count) % list.Count];
+            if (next != focus) next.GrabFocus();
+            return;
+        }
+        if (eAccept) Activate(focus);
+        if (eBack) GoBack(root);
+    }
+
+    private static void StepCombo(OptionButton combo, int step)
+    {
+        int count = combo.ItemCount;
+        if (count <= 0) return;
+        int next = (combo.Selected + step + count) % count;
+        combo.Selected = next;               // does not emit ItemSelected
+        if (Ui.ComboChanged.TryGetValue(combo, out var changed)) changed(next);
+    }
+
+    private static void Activate(Control focus)
+    {
+        if (focus is CheckBox check)
+        {
+            check.ButtonPressed = !check.ButtonPressed;
+            check.EmitSignal(BaseButton.SignalName.Toggled, check.ButtonPressed);
+        }
+        else if (focus is BaseButton btn) btn.EmitSignal(BaseButton.SignalName.Pressed);
+    }
+
+    private static void GoBack(Node root)
+    {
+        // Overlays always have a "Back" button; the pause menu has "Resume".
+        foreach (Control c in Ui.Focusables(root))
+            if (c is Button b && (b.Text == "Back" || b.Text == "Resume"))
+            {
+                b.GrabFocus();
+                b.EmitSignal(BaseButton.SignalName.Pressed);
+                return;
+            }
+    }
+}

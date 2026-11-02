@@ -53,6 +53,8 @@ public sealed class PlayerState
     public float Stamina = 1f, AnimPhase, ActionTimer, DecisionTimer, PossessionLock, TackleLock;
     public string Action = "idle";
     public bool IsKeeper;
+    /// <summary>Actively closing down an opponent who has the ball (extra pace + acceleration).</summary>
+    public bool Pressing;
     public int Cards;
     public float MaxSpeed => (3.6f + Spec.Pace * 3.5f) * (IsKeeper ? .94f : 1f);
 }
@@ -401,7 +403,14 @@ public sealed class MatchEngine
             return;
         }
 
+        // Three players press when the opposition has the ball (two for a loose ball).
+        // The old code sent only two, aimed them at the ball's projected position and
+        // gave them no pace advantage, so a carrier could stroll out of trouble while
+        // the other nine stood in formation: "the opposition never tries to win it back".
+        bool oppOwns = ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team;
         int chaser1 = ClosestToBall(p.Team, 0), chaser2 = ClosestToBall(p.Team, 1);
+        int chaser3 = oppOwns ? ClosestToBall(p.Team, 2) : -1;
+        p.Pressing = false;
         if (ourBall)
         {
             // Support the carrier.
@@ -414,10 +423,26 @@ public sealed class MatchEngine
         }
         else
         {
-            if (p.Index == chaser1 || p.Index == chaser2 || (ball.Owner < 0 && p.Index == chaser1))
+            bool isChaser = p.Index == chaser1 || p.Index == chaser2 || p.Index == chaser3;
+            if (isChaser)
             {
-                Vector3 intercept = ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
-                p.Target = intercept;
+                if (oppOwns)
+                {
+                    var carrier = S.Players[ball.Owner];
+                    Vector3 goalDir = Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team));
+                    // Lead the carrier, and put the second/third presser on the goal side
+                    // so they cut off the escape lane instead of all chasing the same spot.
+                    float lane = p.Index == chaser1 ? .55f : p.Index == chaser2 ? -1.1f : -2.4f;
+                    Vector3 side = new Vector3(0, 0, MathF.Sign(p.Pos.Z - carrier.Pos.Z) * .7f);
+                    p.Target = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f
+                               + (p.Index == chaser1 ? Vector3.Zero : side);
+                    p.Pressing = true;
+                }
+                else
+                {
+                    Vector3 intercept = ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
+                    p.Target = intercept;
+                }
                 p.Action = "run";
             }
             else
@@ -429,9 +454,8 @@ public sealed class MatchEngine
             {
                 var carrier = S.Players[ball.Owner];
                 float d = Mx.FlatDist(p.Pos, carrier.Pos);
-                float aggression = .10f + Options.Difficulty * .07f + (p.Spec.Defending - .5f) * .10f;
-                if (p.Team == carrier.Team) { /* teammate */ }
-                else if (d < 1.8f && p.TackleLock <= 0 && Rng.Next() < aggression)
+                float aggression = .30f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
+                if (p.Team != carrier.Team && d < 2.0f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
             }
         }
@@ -567,7 +591,7 @@ public sealed class MatchEngine
 
     private void AttemptTackle(PlayerState p)
     {
-        p.TackleLock = 1.1f;
+        p.TackleLock = .8f;
         p.Action = "tackle"; p.ActionTimer = .45f;
         var b = State.Ball;
         if (b.Owner < 0) return;
@@ -653,13 +677,13 @@ public sealed class MatchEngine
             if (d.Length() > .35f) wish = Mx.Norm(d);
             // Assisted dribble/positioning keeps the match flowing when the human lets
             // go of the stick; active stick input always overrides p.Target above.
-            sprint = !human && Mx.FlatDist(p.Pos, p.Target) > 5f && p.Stamina > .25f;
+            sprint = !human && (Mx.FlatDist(p.Pos, p.Target) > 5f || p.Pressing) && p.Stamina > .25f;
         }
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
-        float speed = p.MaxSpeed * fatigue * (sprint ? 1.24f : 1f);
+        float speed = p.MaxSpeed * fatigue * (sprint ? 1.24f : 1f) * (p.Pressing ? 1.12f : 1f);
         if (p.Action == "tackle") speed *= 1.35f;
         Vector3 targetVel = wish * speed;
-        float accel = (human ? 18f : 12f) * dt;
+        float accel = (human ? 18f : p.Pressing ? 16f : 12f) * dt;
         p.Vel = Mx.MoveTowards(p.Vel, targetVel, accel);
         p.Pos += p.Vel * dt;
         p.Pos.Y = 0;

@@ -110,11 +110,18 @@ public static class RigBuilder
 
         // Torso: overlapping primitives, each rigidly skinned to one bone with soft joints.
         g.Box("Hips", new Vector3(0, hipY + 0.035f * h, 0), new Vector3(.175f * xs * bulk, .105f * h, .115f * xs * bulk), RigMat.Shorts);
-        g.Cyl("Spine", 0f, 1f, .165f * xs * bulk, .185f * xs * bulk, RigMat.Shirt);
-        g.Cyl("Chest", 0f, 1f, .185f * xs * bulk, .205f * xs * bulk, RigMat.Shirt);
+        // Rounded pelvis / waist: stops the torso reading as a box bolted onto two sticks.
+        g.Sphere("Hips", new Vector3(0, hipY + .035f * h, 0), .185f * xs * bulk, RigMat.Shorts, 8, 12, false);
+        g.Cyl("Spine", 0f, 1f, .165f * xs * bulk, .185f * xs * bulk, RigMat.Shirt, 12);
+        g.Cyl("Chest", 0f, 1f, .185f * xs * bulk, .205f * xs * bulk, RigMat.Shirt, 12);
         g.Box("Chest", new Vector3(0, bones[Bone("Chest")].Tail.Y - .035f * h, 0),
               new Vector3(.205f * xs * bulk, .035f * h, .12f * xs * bulk), RigMat.ShirtTrim); // collar
-        g.Cyl("Neck", 0f, 1f, .062f * h, .062f * h, RigMat.Skin);
+        g.Cyl("Neck", 0f, 1f, .062f * h, .062f * h, RigMat.Skin, 12);
+        // Two thin kit stripes make the torso read as a shirt rather than a tube.
+        float chestY = (bones[Bone("Chest")].Head.Y + bones[Bone("Chest")].Tail.Y) * .5f;
+        foreach (float sx in new[] { -.075f, .075f })
+            g.Box("Chest", new Vector3(sx * xs, chestY, .196f * xs * bulk + .004f),
+                  new Vector3(.020f * xs, .082f * h, .006f), RigMat.ShirtTrim);
 
         // Head + hair + face details.
         var headB = bones[Bone("Head")];
@@ -132,31 +139,51 @@ public static class RigBuilder
         g.Sphere("Face", headC + new Vector3(.042f * h, .018f * h, hr * .90f), .012f * h, RigMat.Detail, 6, 8, false);
         g.Sphere("Face", headC + new Vector3(0, -.02f * h, hr * 1.02f), .013f * h, RigMat.Skin, 6, 8, false);
 
-        // Arms: sleeves -> bare arms -> gloves/hands.
+        // Arms: sleeves -> bare arms -> gloves/hands, with rounded shoulder, elbow
+        // and wrist joints so the limb is no longer one straight cylinder.
         foreach (string s in new[] { "L", "R" })
         {
             string up = s + "UpperArm", fo = s + "Forearm", ha = s + "Hand";
             float sleeveEnd = spec.LongSleeves ? .92f : .40f;
-            g.Cyl(up, 0f, sleeveEnd, .066f * xs * bulk, .058f * xs * bulk, RigMat.Shirt, 10);
-            g.Cyl(up, sleeveEnd, 1f, .051f * xs * bulk, .047f * xs * bulk, RigMat.Skin, 10);
-            g.Cyl(fo, 0f, 1f, .047f * xs * bulk, .038f * xs * bulk, RigMat.Skin, 10);
+            g.Cyl(up, 0f, sleeveEnd, .066f * xs * bulk, .058f * xs * bulk, RigMat.Shirt, 12);
+            g.Cyl(up, sleeveEnd, 1f, .051f * xs * bulk, .047f * xs * bulk, RigMat.Skin, 12);
+            g.Cyl(fo, 0f, 1f, .047f * xs * bulk, .038f * xs * bulk, RigMat.Skin, 12);
+            g.Sphere(up, bones[Bone(up)].Head, .072f * xs * bulk, RigMat.Shirt, 8, 10, false);
+            g.Sphere(fo, bones[Bone(fo)].Head, .052f * xs * bulk, RigMat.Skin, 8, 10, false);
             g.Sphere(ha, bones[Bone(ha)].Head + (bones[Bone(ha)].Tail - bones[Bone(ha)].Head) * .55f,
                      .052f * xs, spec.IsKeeper ? RigMat.Gloves : RigMat.Skin, 8, 10, false);
             // sleeve trim
-            g.Cyl(up, sleeveEnd - .06f, sleeveEnd, .070f * xs * bulk, .069f * xs * bulk, RigMat.ShirtTrim, 10);
+            g.Cyl(up, sleeveEnd - .06f, sleeveEnd, .070f * xs * bulk, .069f * xs * bulk, RigMat.ShirtTrim, 12);
         }
 
-        // Legs: shorts -> skin -> socks -> boots.
+        // Legs: shorts -> skin -> socks -> boots.  Round hip / knee / ankle joints
+        // plus a shaped boot with a visible toe and sole give the leg real segments.
         foreach (string s in new[] { "L", "R" })
         {
             string th = s + "Thigh", sh = s + "Shin", ft = s + "Foot";
-            g.Cyl(th, 0f, .55f, .092f * xs * bulk, .082f * xs * bulk, RigMat.Shorts, 10);
-            g.Cyl(th, .55f, 1f, .078f * xs * bulk, .068f * xs * bulk, RigMat.Skin, 10);
-            g.Cyl(sh, 0f, .62f, .068f * xs * bulk, .052f * xs * bulk, RigMat.Skin, 10);
-            g.Cyl(sh, .62f, 1f, .056f * xs * bulk, .050f * xs * bulk, RigMat.Socks, 10);
+            g.Cyl(th, 0f, .55f, .092f * xs * bulk, .082f * xs * bulk, RigMat.Shorts, 12);
+            g.Cyl(th, .55f, 1f, .078f * xs * bulk, .068f * xs * bulk, RigMat.Skin, 12);
+            g.Cyl(sh, 0f, .62f, .068f * xs * bulk, .052f * xs * bulk, RigMat.Skin, 12);
+            g.Cyl(sh, .62f, 1f, .056f * xs * bulk, .050f * xs * bulk, RigMat.Socks, 12);
+            // Kit bands make the thigh / knee / shin / sock boundaries legible at speed.
+            g.Cyl(th, .50f, .58f, .085f * xs * bulk, .083f * xs * bulk, RigMat.ShirtTrim, 12);
+            g.Cyl(sh, .62f, .70f, .058f * xs * bulk, .057f * xs * bulk, RigMat.ShirtTrim, 12);
+            g.Sphere(th, bones[Bone(th)].Head, .098f * xs * bulk, RigMat.Shorts, 8, 10, false);   // hip
+            g.Sphere(sh, bones[Bone(sh)].Head + new Vector3(0, 0, .012f * h), .074f * xs * bulk,
+                     RigMat.Skin, 8, 10, false);                                                  // knee cap
+            g.Sphere(sh, bones[Bone(sh)].Tail, .058f * xs * bulk, RigMat.Socks, 8, 10, false);    // ankle
+
             var foot = bones[Bone(ft)];
             Vector3 fc = (foot.Head + foot.Tail) * .5f + new Vector3(0, -.045f * h, .035f * h);
             g.Box(ft, fc, new Vector3(.058f * xs, .048f * h, .135f * h), RigMat.Boots);
+            // Raised toe box, dark sole and a coloured boot stripe: the foot now has
+            // a readable shape instead of a tiny featureless block.
+            g.Box(ft, fc + new Vector3(0, -.006f * h, .098f * h),
+                  new Vector3(.056f * xs, .036f * h, .052f * h), RigMat.Boots);
+            g.Box(ft, fc + new Vector3(0, -.048f * h, .012f * h),
+                  new Vector3(.061f * xs, .012f * h, .142f * h), RigMat.Detail);
+            g.Box(ft, fc + new Vector3(0, .046f * h, .010f * h),
+                  new Vector3(.032f * xs, .008f * h, .060f * h), RigMat.ShirtTrim);
         }
 
         var geo = g.Finish();
@@ -214,7 +241,7 @@ public static class RigBuilder
             Vector3 v = Vector3.Cross(ax, u);
             Vector3 p0 = head + (tail - head) * from, p1 = head + (tail - head) * to;
             int start = _p.Count;
-            int rings = 3;
+            int rings = 4;
             for (int j = 0; j <= rings; j++)
             {
                 float s = j / (float)rings;
