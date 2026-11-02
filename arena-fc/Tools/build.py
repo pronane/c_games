@@ -118,15 +118,25 @@ def ensure_editor(mono: bool, override: str | None) -> Path:
     return exe
 
 
+def _has_dotnet9(exe: str) -> bool:
+    try:
+        r = subprocess.run([exe, "--list-sdks"], capture_output=True, text=True, timeout=30)
+        return "9." in (r.stdout or "")
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def ensure_dotnet() -> str:
     found = shutil.which("dotnet")
-    if found:
-        r = subprocess.run([found, "--list-sdks"], capture_output=True, text=True)
-        if "9." in (r.stdout or ""): return found
-        warn("dotnet found but no .NET 9 SDK; Godot 4.7 C# Android export needs .NET 9.")
+    if found and _has_dotnet9(found):
+        return found
+    # A system dotnet without a .NET 9 SDK is fine: build.py installs its own SDK
+    # into CACHE/dotnet and uses that.  Only warn when neither has .NET 9.
     local = CACHE / "dotnet" / ("dotnet.exe" if system() == "windows" else "dotnet")
     if local.exists():
         os.environ["DOTNET_ROOT"] = str(local.parent)
+        if not _has_dotnet9(str(local)):
+            warn("no .NET 9 SDK found (system or cached); Godot 4.7 C# Android export needs .NET 9.")
         return str(local)
     script = CACHE / "dotnet-install.sh"
     if system() != "windows":
@@ -137,6 +147,8 @@ def ensure_dotnet() -> str:
         download("https://dot.net/v1/dotnet-install.ps1", ps)
         subprocess.run(["powershell", "-File", str(ps), "-Channel", "9.0", "-InstallDir", str(CACHE / "dotnet"), "-NoPath"], check=True)
     os.environ["DOTNET_ROOT"] = str(CACHE / "dotnet")
+    if not _has_dotnet9(str(local)):
+        warn("no .NET 9 SDK found after install; Godot 4.7 C# Android export needs .NET 9.")
     return str(local)
 
 
