@@ -1,7 +1,7 @@
 // Arena FC - one input layer for keyboard, mouse, gamepad and touch.
 // Produces the same PlayerCommand on every platform.
 //
-// USB / EasySMX support (see Scripts/Core/Input/PadLayout.cs and Web/PadSupport.gd):
+// USB / EasySMX support (see Scripts/Core/Input/PadLayout.cs and Web/Controllers.gd):
 //   * the bundled SDL gamecontrollerdb.txt is actually loaded now, plus built-in
 //     EasySMX / generic-USB mappings so an export without the .txt still works;
 //   * every connected pad is discovered (not just device 0);

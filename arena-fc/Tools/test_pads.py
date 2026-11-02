@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the USB / EasySMX pad tests without installing Godot or the .NET SDK.
 
-The browser edition's pad rules live in Web/PadSupport.gd.  The block between
+The browser edition's pad rules live in Web/Controllers.gd.  The block between
 PURE START / PURE END is deliberately written in a small side-effect-free subset
 of GDScript; this script translates that *exact shipped source* to Python and
 executes it, then checks it against:
@@ -50,7 +50,7 @@ def section(title: str) -> None:
 def translate_pure(gd: str) -> str:
     m = re.search(r"# ---- PURE START ----(.*?)# ---- PURE END ----", gd, re.S)
     if m is None:
-        raise RuntimeError("PURE START / PURE END markers missing from Web/PadSupport.gd")
+        raise RuntimeError("PURE START / PURE END markers missing from Web/Controllers.gd")
     src = m.group(1)
     out: list[str] = []
     assign = re.compile(r":=|(?<![=!<>])=(?!=)")
@@ -99,10 +99,13 @@ def translate_pure(gd: str) -> str:
 
 
 def load_pure() -> dict:
-    gd = (ROOT / "Web" / "PadSupport.gd").read_text(encoding="utf-8")
+    gd = (ROOT / "Web" / "Controllers.gd").read_text(encoding="utf-8")
     py = translate_pure(gd)
     namespace: dict = {"_sqrt": math.sqrt}
-    exec(compile(py, "Web/PadSupport.gd:PURE", "exec"), namespace)
+    # Godot keycodes in the keyboard schemes are only data here; give them dummy values.
+    for key in set(re.findall(r"\bKEY_[A-Z0-9_]+\b", gd)):
+        namespace[key] = key
+    exec(compile(py, "Web/Controllers.gd:PURE", "exec"), namespace)
     return namespace
 
 
@@ -264,9 +267,11 @@ def main() -> int:
     check("desktop no longer hard-codes device 0", "IsJoyButtonPressed(0," not in controls)
     check("desktop has a CONTROLLER SETUP screen", "CONTROLLER SETUP" in gameapp and "SetBinding" in gameapp)
     check("browser loads SDL mappings at boot", "load_mappings(OS.get_name())" in boot)
-    check("browser netplay uses PadSupport", "pad_ctl.move_of" in boot and "pad_ctl.held" in boot)
+    check("browser netplay uses the pad rules", "pad_ctl.move_of" in boot and "pad_ctl.held" in boot)
     check("browser remap uses device slots", "pads[slot]" in boot)
-    check("Controllers.gd extends PadSupport.gd", 'extends "res://Web/PadSupport.gd"' in controllers_gd)
+    check("Controllers.gd owns the pad rules (no fragile path extends)",
+          "extends RefCounted" in controllers_gd and "PURE START" in controllers_gd
+          and "func load_mappings" in controllers_gd and 'extends "res://' not in controllers_gd)
     check("web preset exports the DB",
           'include_filter="Data/input/*.txt"' in (ROOT / "Web" / "export_presets_web.cfg").read_text())
     check("desktop presets export the DB",
@@ -276,7 +281,7 @@ def main() -> int:
     try:
         import gdtoolkit  # noqa: F401
         gdparse = Path(sys.executable).parent / "gdparse"
-        files = ["Web/PadSupport.gd", "Web/Controllers.gd", "Web/BrowserBoot.gd", "Tests/gd/test_pads.gd"]
+        files = ["Web/Controllers.gd", "Web/BrowserBoot.gd", "Tests/gd/test_pads.gd"]
         bad = []
         for f in files:
             r = subprocess.run([str(gdparse), str(ROOT / f)], capture_output=True, text=True)

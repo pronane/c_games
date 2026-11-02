@@ -10,10 +10,10 @@ Branch: `arena/39ababe0-c-games` (commit `78c8dd1`).
 | Device selection | Hard-coded device `0` | `Input.GetConnectedJoypads()` / `get_connected_joypads()` every frame; all pads drive P1 in 1P, pad 1/2 split in the browser's 2P mode. |
 | Unmapped pads | Standard A/B/X/Y order (wrong for EasySMX D-input) | EasySMX D-input order `b0=Y b1=B b2=A b3=X b4=LB b5=RB b6=LT b7=RT b8=Back b9=Start b10=L3 b11=R3`; d-pad as hat buttons (one table chosen to avoid the 11-14 / 12-15 overlap), hat axes 6/7, triggers as buttons or axes. |
 | Remapping | Browser only | **CONTROLLER SETUP** on desktop (C#) and browser; per-pad-name bindings in `user://pads.json`. |
-| Browser netplay input | Hard-coded pad 0 + standard buttons | Goes through `PadSupport` like local play. |
+| Browser netplay input | Hard-coded pad 0 + standard buttons | Goes through `Controllers.gd`'s pad rules like local play. |
 
 New/changed code: `Scripts/Core/Input/PadLayout.cs` (pure C#, shared by CoreTests),
-`Web/PadSupport.gd` (pure + Godot-backed GDScript), `Web/Controllers.gd` (thin wrapper),
+`Web/Controllers.gd` (pure + Godot-backed GDScript, including the keyboard schemes),
 `Scripts/Godot/Controls.cs`, `Scripts/Godot/GameApp.cs`, `Web/BrowserBoot.gd`,
 export presets, `CONTROLS_AND_DEPLOY.md`, `README.md`.
 
@@ -24,10 +24,10 @@ blocked here), so the full `Tools/build.py --check` could not be executed. Inste
 
 | Suite | Command | Result |
 |---|---|---|
-| Portable pad harness — executes the **shipped** `Web/PadSupport.gd` pure block (translated to Python), cross-checks C#/GDScript constants, validates the real SDL DB, static-checks wiring, parses all changed GDScript (gdtoolkit) and C# (tree-sitter) | `python3 Tools/test_pads.py` | **78 passed, 0 failed** |
+| Portable pad harness — executes the **shipped** `Web/Controllers.gd` pure block (translated to Python), cross-checks C#/GDScript constants, validates the real SDL DB, static-checks wiring, parses all changed GDScript (gdtoolkit) and C# (tree-sitter) | `python3 Tools/test_pads.py` | **78 passed, 0 failed** |
 | `Scripts/Core/Input/PadLayout.cs` compiled with Roslyn on .NET Core 3.1 and the **shipped PadLayout test section** from `Tests/Program.cs` executed | local csc + `dotnet exec` | **40 passed, 0 failed** |
 | `Scripts/Godot/Controls.cs` and the new `GameApp.cs` controller-setup methods type-checked against Godot API stubs | local csc | **compiled, no errors** |
-| GDScript syntax | `gdparse Web/PadSupport.gd Web/Controllers.gd Tests/gd/test_pads.gd Web/BrowserBoot.gd` | **OK** |
+| GDScript syntax | `gdparse Web/Controllers.gd Tests/gd/test_pads.gd Web/BrowserBoot.gd` | **OK** |
 | `git diff --check` | — | **OK** |
 
 No physical EasySMX pad is available in the sandbox; the raw-layout behaviour was

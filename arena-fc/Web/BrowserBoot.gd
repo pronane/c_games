@@ -917,7 +917,7 @@ func net_send_input(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): move.x += 1
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): move.y -= 1
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): move.y += 1
-	# All pads, including unmapped USB / EasySMX D-input ones, go through PadSupport.
+	# All pads, including unmapped USB / EasySMX D-input ones, go through Controllers.gd.
 	# The old code hard-coded device 0 and Godot's standard JoyButton indices.
 	var pad_move := Vector2.ZERO
 	var pad_held := {}

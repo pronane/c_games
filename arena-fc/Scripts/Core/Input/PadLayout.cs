@@ -3,7 +3,7 @@
 // This file deliberately has NO Godot dependency: the headless CoreTests project
 // compiles it (Tests/CoreTests.csproj globs ../Scripts/Core/**/*.cs).  The Godot
 // facing adapter is Scripts/Godot/Controls.cs; the browser edition mirrors these
-// rules in Web/PadSupport.gd.  Keep the constants in all three places in sync --
+// rules in Web/Controllers.gd.  Keep the constants in both places in sync --
 // Tools/test_pads.py asserts that they agree.
 //
 // Why this exists: the desktop build used to read only device 0 through Godot's

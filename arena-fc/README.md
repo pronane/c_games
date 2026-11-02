@@ -151,7 +151,7 @@ assets. This is an honest, working, extensible 3D football game, not a commercia
 EasySMX and generic-USB fallback mappings), every connected pad is discovered, and pads Windows/Godot
 cannot map are read with the EasySMX D-input button order. **CONTROLLER SETUP** in the main menu lists
 the connected pads and remaps buttons per pad. Plug the pad in and press a button once so the OS
-exposes it. See `CONTROLS_AND_DEPLOY.md`, `Scripts/Core/Input/PadLayout.cs` and `Web/PadSupport.gd`.
+exposes it. See `CONTROLS_AND_DEPLOY.md`, `Scripts/Core/Input/PadLayout.cs` and `Web/Controllers.gd`.
 
 ---
 

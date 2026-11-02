@@ -21,8 +21,9 @@ With two pads, pad 1 drives P1 and pad 2 drives P2; with one player, every pad d
 ## USB pads and EasySMX controllers
 
 Both builds now share the same pad logic: `Scripts/Core/Input/PadLayout.cs` (desktop, C#) and
-`Web/PadSupport.gd` (browser, GDScript). `Web/Controllers.gd` and `Scripts/Godot/Controls.cs` are the
-thin adapters; `Tests/gd/test_pads.gd` and the PadLayout section of `Tests/Program.cs` test both.
+`Web/Controllers.gd` (browser, GDScript, pure rules + Godot-backed polling). `Scripts/Godot/Controls.cs`
+is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the PadLayout section of
+`Tests/Program.cs` test both.
 
 * **The bundled SDL database is loaded at boot.** `Data/input/gamecontrollerdb.txt` is fed to
   `Input.add_joy_mapping()` / `Input.AddJoyMapping()` before the first poll, filtered to the current OS
