@@ -284,6 +284,9 @@ def main() -> int:
     check("camera angles respond to the pad", 'get("camera", false)' in boot and "cam_mode" in boot)
     check("menu/camera input has a headless test",
           "test_input_camera.gd" in (ROOT / "Tools" / "run-gd-tests.sh").read_text())
+    check("CAM buttons can be built in headless desktop tests",
+          "func build_touch(force := false)" in boot
+          and "build_touch(true)" in (ROOT / "Tests" / "gd" / "test_input_camera.gd").read_text())
     rig = (ROOT / "Scripts" / "Godot" / "ProceduralRig3D.gd").read_text(encoding="utf-8")
     net = (ROOT / "Web" / "NetClient.gd").read_text(encoding="utf-8")
     check("rig data still parses on Web builds without a glTF module",

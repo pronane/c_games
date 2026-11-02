@@ -1671,8 +1671,10 @@ func mk_button(text: String, cb: Callable) -> Button:
 	b.pressed.connect(cb)
 	return b
 
-func build_touch() -> void:
-	if not (DisplayServer.is_touchscreen_available() or OS.has_feature("web")):
+func build_touch(force := false) -> void:
+	# `force` lets the headless desktop test exercise exactly the same on-screen
+	# camera buttons that Web/touch builds get, without changing their behaviour.
+	if not force and not (DisplayServer.is_touchscreen_available() or OS.has_feature("web")):
 		return
 	var keys := ["pass", "shoot", "sprint", "through", "tackle", "switch"]
 	var labels := ["PASS", "SHOOT", "SPRINT", "THRU", "TACKLE", "SWITCH"]
