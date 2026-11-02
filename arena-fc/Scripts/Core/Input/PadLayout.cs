@@ -195,12 +195,16 @@ namespace ArenaFC.Core.Input
         {
             if (!string.IsNullOrEmpty(name) && saved != null && saved.ContainsKey(name))
             {
-                Dictionary<string, int> b = saved[name];
-                bool complete = b != null;
-                if (complete)
+                Dictionary<string, int>? b = saved[name];
+                // Keep the null check as a real branch so nullable flow analysis knows
+                // b is non-null before ContainsKey / the copy constructor.
+                if (b != null)
+                {
+                    bool complete = true;
                     foreach (string a in Actions)
                         if (!b.ContainsKey(a)) { complete = false; break; }
-                if (complete) return new Dictionary<string, int>(b);
+                    if (complete) return new Dictionary<string, int>(b);
+                }
             }
             return new Dictionary<string, int>(known ? Standard : Raw);
         }

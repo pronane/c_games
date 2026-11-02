@@ -265,6 +265,16 @@ def main() -> int:
     check("desktop discovers pads", "GetConnectedJoypads" in controls)
     check("desktop uses the shared pure logic", "PadLayout.Move" in controls and "PadLayout.Held" in controls)
     check("desktop no longer hard-codes device 0", "IsJoyButtonPressed(0," not in controls)
+    # The project enables ImplicitUsings, so System.IO.FileAccess is in scope and
+    # an unqualified FileAccess is ambiguous with Godot.FileAccess under .NET 9.
+    bare = []
+    for f in (ROOT / "Scripts").rglob("*.cs"):
+        code = re.sub(r"//[^\n]*", "", f.read_text(encoding="utf-8"))
+        # Only a bare *usage* is ambiguous: FileAccess.Open / FileAccess.GetFileAsString.
+        # "Godot FileAccess" in a string and the qualified Godot.FileAccess are fine.
+        if re.search(r"(?<![.\w])FileAccess\s*\.", code):
+            bare.append(f.relative_to(ROOT).as_posix())
+    check("C# always qualifies Godot.FileAccess (System.IO clash)", not bare, str(bare))
     check("desktop has a CONTROLLER SETUP screen", "CONTROLLER SETUP" in gameapp and "SetBinding" in gameapp)
     check("browser loads SDL mappings at boot", "load_mappings(OS.get_name())" in boot)
     check("browser netplay uses the pad rules", "pad_ctl.move_of" in boot and "pad_ctl.held" in boot)

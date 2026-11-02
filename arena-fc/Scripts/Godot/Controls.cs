@@ -63,9 +63,11 @@ public sealed class InputHub
         string platform = OS.GetName();
         foreach (string line in PadLayout.BuiltinMappings(platform))
             if (TryAddMapping(line)) _mappingsLoaded++;
+        // ArenaFC.csproj enables ImplicitUsings, which also imports System.IO.FileAccess.
+        // Always qualify Godot.FileAccess here or .NET 9 reports CS0104.
         try
         {
-            foreach (string line in PadLayout.ParseSdlDatabase(FileAccess.GetFileAsString(PadLayout.DbPath), platform))
+            foreach (string line in PadLayout.ParseSdlDatabase(Godot.FileAccess.GetFileAsString(PadLayout.DbPath), platform))
                 if (TryAddMapping(line)) _mappingsLoaded++;
         }
         catch (Exception) { /* built-ins above still cover EasySMX and generic USB pads */ }
@@ -81,7 +83,7 @@ public sealed class InputHub
     {
         try
         {
-            string text = FileAccess.GetFileAsString(PadLayout.SavePath);
+            string text = Godot.FileAccess.GetFileAsString(PadLayout.SavePath);
             if (string.IsNullOrEmpty(text)) return;
             var d = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(text);
             if (d != null) _saved = d;
@@ -93,7 +95,7 @@ public sealed class InputHub
     {
         try
         {
-            using var f = FileAccess.Open(PadLayout.SavePath, FileAccess.ModeFlags.Write);
+            using var f = Godot.FileAccess.Open(PadLayout.SavePath, Godot.FileAccess.ModeFlags.Write);
             f?.StoreString(JsonSerializer.Serialize(_saved));
         }
         catch (Exception) { }
