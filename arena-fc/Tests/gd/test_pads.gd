@@ -2,7 +2,7 @@ extends SceneTree
 # Headless tests for USB / EasySMX gamepad support (Web/Controllers.gd).
 # Run with: GODOT=/path/to/godot Tools/run-gd-tests.sh
 const C = preload("res://Web/Controllers.gd")
-var fails := 0
+var fails = 0
 
 func ok(c: bool, msg: String) -> void:
 	print(("PASS " if c else "FAIL ") + msg)
@@ -20,7 +20,7 @@ func _watchdog() -> void:
 	quit(1)
 
 func btns(pressed := []) -> Array:
-	var b := []
+	var b = []
 	for i in range(21):
 		b.append(false)
 	for i in pressed:
@@ -28,7 +28,7 @@ func btns(pressed := []) -> Array:
 	return b
 
 func axs(changes := {}) -> Array:
-	var a := []
+	var a = []
 	for i in range(10):
 		a.append(0.0)
 	for k in changes:
@@ -37,13 +37,13 @@ func axs(changes := {}) -> Array:
 
 func _run() -> void:
 	# ---- SDL mapping database ----
-	var sample := "\n".join(PackedStringArray([
+	var sample = "\n".join(PackedStringArray([
 		"# Game Controller DB", "", C.BUILTIN[0], C.BUILTIN[3], C.BUILTIN[1],
 		"not a mapping", "badguid,a:b0,platform:Windows,"]))
-	var win := C.parse_db(sample, "Windows")
-	var lin := C.parse_db(sample, "Linux")
+	var win = C.parse_db(sample, "Windows")
+	var lin = C.parse_db(sample, "Linux")
 	ok(win.size() == 2, "comments, blanks and invalid GUIDs are skipped (%d kept)" % win.size())
-	var only_win := true
+	var only_win = true
 	for l in win:
 		if not C.platform_matches(str(l), "Windows"): only_win = false
 	ok(only_win, "Windows DB keeps only Windows / platform-agnostic lines")
@@ -54,30 +54,30 @@ func _run() -> void:
 		"built-in fallback lines are platform-filtered")
 	ok(C.builtin_mappings("Web").size() == C.BUILTIN.size(),
 		"Web keeps every built-in fallback (browser IDs have no OS tag)")
-	var win_easy := false
+	var win_easy = false
 	for l in C.builtin_mappings("Windows"):
 		if str(l).contains("EasySMX"): win_easy = true
 	ok(win_easy, "built-in Windows fallback includes EasySMX")
-	var lin_esm := false
+	var lin_esm = false
 	for l in C.builtin_mappings("Linux"):
 		if str(l).contains("ESM-9101"): lin_esm = true
 	ok(lin_esm, "built-in Linux fallback includes ESM-9101")
 	if FileAccess.file_exists(C.DB_PATH):
-		var f := FileAccess.open(C.DB_PATH, FileAccess.READ)
-		var text := f.get_as_text()
-		var pw := C.parse_db(text, "Windows")
-		var pl := C.parse_db(text, "Linux")
+		var f = FileAccess.open(C.DB_PATH, FileAccess.READ)
+		var text = f.get_as_text()
+		var pw = C.parse_db(text, "Windows")
+		var pl = C.parse_db(text, "Linux")
 		ok(pw.size() > 800 and pl.size() > 700, "shipped SDL DB parses (%d Windows / %d Linux)" % [pw.size(), pl.size()])
-		var has_win_easy := false
-		var has_usb := false
+		var has_win_easy = false
+		var has_usb = false
 		for l in pw:
 			if str(l).contains("EasySMX Controller"): has_win_easy = true
 			if str(l).contains("USB Controller"): has_usb = true
-		var has_lin_easy := false
+		var has_lin_easy = false
 		for l in pl:
 			if str(l).contains("EasySMX"): has_lin_easy = true
 		ok(has_win_easy and has_lin_easy and has_usb, "EasySMX and generic USB mappings are present")
-		var all_builtin := true
+		var all_builtin = true
 		for l in C.BUILTIN:
 			if not text.contains(str(l)): all_builtin = false
 		ok(all_builtin, "every built-in fallback line comes from the shipped DB")
@@ -96,7 +96,7 @@ func _run() -> void:
 		and not C.is_easysmx("Xbox One S Controller"), "EasySMX / USB names detected")
 	ok(C.pad_kind("EasySMX", false).contains("D-input") and C.pad_kind("EasySMX", true).contains("XInput"),
 		"pad kind reports the active mode")
-	var saved := {"My USB pad": {"pass": 7, "through": 8, "shoot": 9, "tackle": 10, "switch": 11, "sprint": 12}}
+	var saved = {"My USB pad": {"pass": 7, "through": 8, "shoot": 9, "tackle": 10, "switch": 11, "sprint": 12}}
 	ok(C.binds_for_name("My USB pad", false, saved)["pass"] == 7, "saved per-pad remap wins")
 	ok(C.binds_for_name("Other", false, {"Other": {"pass": 7}})["through"] == 0,
 		"incomplete remap falls back to the default")
@@ -104,10 +104,10 @@ func _run() -> void:
 	# ---- pure input processing ----
 	ok(C.stick(0.1, 0.1) == Vector2.ZERO, "stick drift inside dead zone is ignored")
 	ok(C.stick(1.0, 0.0).x > 0.99, "full stick deflection reaches 1.0")
-	var raw := C.binds_for_name("EasySMX (D-mode)", false, {})
-	var std := C.binds_for_name("Xbox Wireless Controller", true, {})
-	var empty := axs()
-	var h := C.held_from(btns([2]), empty, raw, false)
+	var raw = C.binds_for_name("EasySMX (D-mode)", false, {})
+	var std = C.binds_for_name("Xbox Wireless Controller", true, {})
+	var empty = axs()
+	var h = C.held_from(btns([2]), empty, raw, false)
 	ok(h["pass"] and not h["shoot"] and not h["through"], "raw EasySMX b2 is PASS")
 	ok(C.held_from(btns([3]), empty, raw, false)["shoot"], "raw EasySMX b3 is SHOOT")
 	ok(C.held_from(btns([0]), empty, raw, false)["through"], "raw EasySMX b0 is THROUGH")

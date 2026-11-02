@@ -54,7 +54,7 @@ var binds_by_name: Dictionary = {}
 var mappings_loaded: int = -1
 
 static func normalize_platform(p: String) -> String:
-	var q := p.to_lower().strip_edges()
+	var q = p.to_lower().strip_edges()
 	if q == "mac os x" or q == "macos" or q == "osx" or q == "darwin" or q == "mac":
 		return "macos"
 	if q == "windows" or q == "win32" or q == "win64" or q == "win":
@@ -66,30 +66,30 @@ static func normalize_platform(p: String) -> String:
 	return q
 
 static func mapping_platform(line: String) -> String:
-	var tag := ""
+	var tag = ""
 	for part in line.split(",", false):
-		var s := str(part).strip_edges()
+		var s = str(part).strip_edges()
 		if s.begins_with("platform:"):
 			tag = s.replace("platform:", "")
 	return normalize_platform(tag)
 
 static func platform_matches(line: String, platform: String) -> bool:
-	var tag := mapping_platform(line)
+	var tag = mapping_platform(line)
 	if tag == "":
 		return true
 	return tag == normalize_platform(platform)
 
 static func valid_mapping(line: String) -> bool:
-	var parts := line.split(",", false)
+	var parts = line.split(",", false)
 	if parts.size() < 4:
 		return false
-	var guid := str(parts[0]).strip_edges()
+	var guid = str(parts[0]).strip_edges()
 	return guid.length() == 32
 
 static func parse_db(text: String, platform: String) -> Array:
-	var out := []
+	var out = []
 	for raw in text.split("\n"):
-		var line := str(raw).strip_edges()
+		var line = str(raw).strip_edges()
 		if line == "" or line.begins_with("#"):
 			continue
 		if not valid_mapping(line):
@@ -100,17 +100,17 @@ static func parse_db(text: String, platform: String) -> Array:
 	return out
 
 static func builtin_mappings(platform: String) -> Array:
-	var out := []
+	var out = []
 	# Browser Gamepad API IDs do not carry an OS tag: keep every built-in line
 	# on Web so EasySMX / USB fallbacks are always registered there.
-	var web := normalize_platform(platform) == "web"
+	var web = normalize_platform(platform) == "web"
 	for line in BUILTIN:
 		if web or platform_matches(str(line), platform):
 			out.append(str(line))
 	return out
 
 static func has_token(name: String, tokens: Array) -> bool:
-	var low := name.to_lower()
+	var low = name.to_lower()
 	for t in tokens:
 		if low.find(str(t)) >= 0:
 			return true
@@ -132,7 +132,7 @@ static func pad_kind(name: String, known: bool) -> String:
 static func binds_for_name(name: String, known: bool, saved: Dictionary) -> Dictionary:
 	if name in saved:
 		var b: Dictionary = saved[name]
-		var complete := true
+		var complete = true
 		for a in ACTIONS:
 			if not (a in b):
 				complete = false
@@ -156,10 +156,10 @@ static func vec_len(x: float, y: float) -> float:
 	return sqrt(x * x + y * y)
 
 static func stick_xy(x: float, y: float, dz: float) -> Array:
-	var l := vec_len(x, y)
+	var l = vec_len(x, y)
 	if l < dz:
 		return [0.0, 0.0]
-	var scale := min(1.0, (l - dz) / (1.0 - dz)) / l
+	var scale = min(1.0, (l - dz) / (1.0 - dz)) / l
 	return [x * scale, y * scale]
 
 static func gd_sign(v: float) -> float:
@@ -170,44 +170,44 @@ static func gd_sign(v: float) -> float:
 	return 0.0
 
 static func move_xy(buttons: Array, axes: Array, known: bool, dz: float) -> Array:
-	var s := stick_xy(axis_of(axes, STICK_AXES[0]), axis_of(axes, STICK_AXES[1]), dz)
+	var s = stick_xy(axis_of(axes, STICK_AXES[0]), axis_of(axes, STICK_AXES[1]), dz)
 	# Godot desktop drivers expose a hat as DPAD_* (11-14); the browser Gamepad
 	# API exposes it as raw buttons 12-15.  Those ranges overlap, so pick ONE
 	# table - OR-ing both would make button 12 mean up AND down.
-	var dpad := DPAD_STANDARD
+	var dpad = DPAD_STANDARD
 	if not known:
-		var raw_hat := false
+		var raw_hat = false
 		for k in DPAD_RAW:
 			if button_of(buttons, int(DPAD_RAW[k])):
 				raw_hat = true
 		if raw_hat:
 			dpad = DPAD_RAW
-	var dx := 0.0
-	var dy := 0.0
+	var dx = 0.0
+	var dy = 0.0
 	if button_of(buttons, dpad["left"]): dx -= 1.0
 	if button_of(buttons, dpad["right"]): dx += 1.0
 	if button_of(buttons, dpad["up"]): dy -= 1.0
 	if button_of(buttons, dpad["down"]): dy += 1.0
 	if not known:
-		var hx := axis_of(axes, HAT_AXES[0])
-		var hy := axis_of(axes, HAT_AXES[1])
+		var hx = axis_of(axes, HAT_AXES[0])
+		var hy = axis_of(axes, HAT_AXES[1])
 		if abs(hx) > 0.5: dx += gd_sign(hx)
 		if abs(hy) > 0.5: dy += gd_sign(hy)
-	var ox := float(s[0]) + dx
-	var oy := float(s[1]) + dy
-	var l := vec_len(ox, oy)
+	var ox = float(s[0]) + dx
+	var oy = float(s[1]) + dy
+	var l = vec_len(ox, oy)
 	if l > 1.0:
 		return [ox / l, oy / l]
 	return [ox, oy]
 
 static func held_from(buttons: Array, axes: Array, binds: Dictionary, known: bool) -> Dictionary:
-	var out := {}
+	var out = {}
 	for a in ACTIONS:
 		out[a] = button_of(buttons, int(binds.get(a, -1)))
-	var sys := SYSTEM_STANDARD if known else SYSTEM_RAW
+	var sys = SYSTEM_STANDARD if known else SYSTEM_RAW
 	out["pause"] = button_of(buttons, int(sys["pause"]))
 	out["camera"] = button_of(buttons, int(sys["camera"]))
-	var sprint := bool(out["sprint"])
+	var sprint = bool(out["sprint"])
 	if axis_of(axes, TRIGGER_AXES[0]) > 0.5 or axis_of(axes, TRIGGER_AXES[1]) > 0.5:
 		sprint = true
 	if not known:
@@ -229,11 +229,11 @@ static func devices_for(connected: Array, two_player: bool, player: int) -> Arra
 
 ## Dead-zone helper kept for Tests/gd/test_rules.gd and any older callers.
 static func stick(x: float, y: float) -> Vector2:
-	var s := stick_xy(x, y, DEADZONE)
+	var s = stick_xy(x, y, DEADZONE)
 	return Vector2(float(s[0]), float(s[1]))
 
 static func kb_move(scheme: Dictionary, include_arrows: bool) -> Vector2:
-	var m := Vector2.ZERO
+	var m = Vector2.ZERO
 	if Input.is_key_pressed(scheme["left"]) or (include_arrows and Input.is_key_pressed(KEY_LEFT)): m.x -= 1
 	if Input.is_key_pressed(scheme["right"]) or (include_arrows and Input.is_key_pressed(KEY_RIGHT)): m.x += 1
 	if Input.is_key_pressed(scheme["up"]) or (include_arrows and Input.is_key_pressed(KEY_UP)): m.y -= 1
@@ -241,7 +241,7 @@ static func kb_move(scheme: Dictionary, include_arrows: bool) -> Vector2:
 	return m
 
 static func kb_held(scheme: Dictionary) -> Dictionary:
-	var out := {}
+	var out = {}
 	for a in ACTIONS:
 		out[a] = Input.is_key_pressed(scheme[a])
 	return out
@@ -250,14 +250,14 @@ static func kb_held(scheme: Dictionary) -> Dictionary:
 func load_saved() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f = FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if f == null:
 		return
 	var parsed = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary:
 		for k in parsed:
 			if parsed[k] is Dictionary:
-				var b := {}
+				var b = {}
 				for a in ACTIONS:
 					if parsed[k].has(a):
 						b[a] = int(parsed[k][a])
@@ -265,19 +265,19 @@ func load_saved() -> void:
 					binds_by_name[str(k)] = b
 
 func save() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(binds_by_name))
 
 ## Feed the SDL database (plus the built-in EasySMX/USB fallbacks) to Godot.
 ## Call once at boot, BEFORE the first pad is polled.  Returns the number added.
 func load_mappings(platform: String) -> int:
-	var count := 0
+	var count = 0
 	for line in builtin_mappings(platform):
 		Input.add_joy_mapping(str(line), true)
 		count += 1
 	if FileAccess.file_exists(DB_PATH):
-		var f := FileAccess.open(DB_PATH, FileAccess.READ)
+		var f = FileAccess.open(DB_PATH, FileAccess.READ)
 		if f != null:
 			for line in parse_db(f.get_as_text(), platform):
 				Input.add_joy_mapping(str(line), true)
@@ -298,8 +298,8 @@ func binds_for(dev: int) -> Dictionary:
 	return binds_for_name(pad_name(dev), is_known(dev), binds_by_name)
 
 func set_bind(dev: int, action: String, button: int) -> void:
-	var n := pad_name(dev)
-	var b := binds_for(dev).duplicate()
+	var n = pad_name(dev)
+	var b = binds_for(dev).duplicate()
 	b[action] = button
 	binds_by_name[n] = b
 
@@ -308,35 +308,34 @@ func reset_binds(dev: int) -> void:
 
 ## Raw snapshot of one pad; the pure functions above turn it into commands.
 func snapshot(dev: int) -> Dictionary:
-	var buttons := []
+	var buttons = []
 	for i in range(21):
 		buttons.append(Input.is_joy_button_pressed(dev, i))
-	var axes := []
+	var axes = []
 	for i in range(10):
 		axes.append(Input.get_joy_axis(dev, i))
 	return {"buttons": buttons, "axes": axes}
 
 func move_of(dev: int) -> Vector2:
-	var s := snapshot(dev)
-	var m := move_xy(s["buttons"], s["axes"], is_known(dev), DEADZONE)
+	var s = snapshot(dev)
+	var m = move_xy(s["buttons"], s["axes"], is_known(dev), DEADZONE)
 	return Vector2(float(m[0]), float(m[1]))
 
 func held(dev: int) -> Dictionary:
-	var s := snapshot(dev)
+	var s = snapshot(dev)
 	return held_from(s["buttons"], s["axes"], binds_for(dev), is_known(dev))
 
 func start_pressed(dev: int) -> bool:
 	return bool(held(dev)["pause"])
 
 func pad_info(dev: int) -> String:
-	var b := binds_for(dev)
-	var head := "Pad %d: %s  [%s]" % [dev + 1, pad_name(dev), pad_kind(pad_name(dev), is_known(dev))]
-	var binds := "   pass=%d  through=%d  shoot=%d  tackle=%d  switch=%d  sprint=%d" \
-		% [b["pass"], b["through"], b["shoot"], b["tackle"], b["switch"], b["sprint"]]
+	var b = binds_for(dev)
+	var head = "Pad %d: %s  [%s]" % [dev + 1, pad_name(dev), pad_kind(pad_name(dev), is_known(dev))]
+	var binds = "   pass=%d  through=%d  shoot=%d  tackle=%d  switch=%d  sprint=%d" % [b["pass"], b["through"], b["shoot"], b["tackle"], b["switch"], b["sprint"]]
 	return head + "\n" + binds
 
 func describe() -> String:
-	var lines := []
+	var lines = []
 	lines.append("SDL mappings loaded: %d  |  pads connected: %d" % [mappings_loaded, pads().size()])
 	if pads().is_empty():
 		lines.append("No gamepad detected. Plug in a USB pad and press any button on it (browsers hide a pad until it is used).")
