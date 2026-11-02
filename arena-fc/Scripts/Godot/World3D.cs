@@ -247,13 +247,20 @@ public partial class BroadcastCamera : Camera3D
         {
             case 1:
                 var fwd = MxToG(Mx.Norm(Gx(facing)));
+                // A stationary player has no facing yet; without a fallback the camera
+                // sits directly overhead and LookAt degenerates (the view flips).
+                if (fwd.LengthSquared() < 1e-6f) fwd = new Vector3(1f, 0f, 0f);
                 target = player - fwd * 7.5f + new Vector3(0, 3.1f, 0);
                 look = player + fwd * 9f + new Vector3(0, 1.2f, 0);
                 fov = 68f;
                 break;
             case 2:
-                target = new Vector3(ball.X * .45f, 88f, ball.Z * .25f + .01f);
-                look = new Vector3(ball.X * .6f, 0, ball.Z * .5f);
+                // Straight-down tactical view sized so the 105 x 68 m pitch fills the
+                // frame.  88 m / fov 58 used to show the stadium stands as a huge grey
+                // wedge and LookAt with Vector3.Up was degenerate (camera looked down
+                // its own up axis), so the whole view could spin.
+                target = new Vector3(ball.X * .35f, 62f, ball.Z * .2f + .001f);
+                look = new Vector3(ball.X * .35f, 0, ball.Z * .2f);
                 fov = 58f;
                 break;
             default:
@@ -264,11 +271,13 @@ public partial class BroadcastCamera : Camera3D
                 break;
         }
         if (!_init) { _pos = target; _look = look; _init = true; }
-        float k = 1f - Mathf.Exp(-dt * (Mode == 1 ? 6f : 3.2f));
+        float k = 1f - Mathf.Exp(-dt * (Mode == 1 ? 7f : 5f));
         _pos = _pos.Lerp(target, k);
         _look = _look.Lerp(look, k);
         Position = _pos;
-        LookAtFromPosition(_pos, _look, Vector3.Up);
+        // Looking straight down with Vector3.Up is degenerate; -Z gives a stable
+        // "north is up" tactical view (and keeps WASD camera-relative movement sane).
+        LookAtFromPosition(_pos, _look, Mode == 2 ? new Vector3(0f, 0f, -1f) : Vector3.Up);
         Fov = Mathf.Lerp(Fov, fov, k);
     }
 

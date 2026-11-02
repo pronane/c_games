@@ -284,7 +284,13 @@ public sealed class MatchEngine
         if (S.Ball.Owner >= 0 && S.Ball.Owner < S.Players.Length)
         {
             var owner = S.Players[S.Ball.Owner];
-            if (owner.PossessionLock > 0 || Mx.FlatDist(owner.Pos, S.Ball.Pos) > 2.2f)
+            // PossessionLock means "this player may not pick the ball up again for a moment"
+            // (see TryPossession / AttemptTackle / PassTo / Shoot).  It must NOT release the
+            // ball: TryPossession and AttemptTackle both set it when possession is *gained*,
+            // so the old `owner.PossessionLock > 0` check dropped the ball on the very next
+            // tick and produced an endless "X wins the ball!" scrum with no dribbling,
+            // shots or goals.
+            if (Mx.FlatDist(owner.Pos, S.Ball.Pos) > 2.2f)
             {
                 S.Ball.Owner = -1;
             }
@@ -645,6 +651,8 @@ public sealed class MatchEngine
         {
             Vector3 d = Mx.Flat(p.Target - p.Pos);
             if (d.Length() > .35f) wish = Mx.Norm(d);
+            // Assisted dribble/positioning keeps the match flowing when the human lets
+            // go of the stick; active stick input always overrides p.Target above.
             sprint = !human && Mx.FlatDist(p.Pos, p.Target) > 5f && p.Stamina > .25f;
         }
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);

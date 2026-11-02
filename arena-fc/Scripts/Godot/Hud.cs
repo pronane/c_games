@@ -142,7 +142,7 @@ public partial class Hud : CanvasLayer
         Place(_stamina, .5f, 1f, -130, -32, 260, 10);
         root.AddChild(_stamina);
 
-        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E pass  ·  SPACE shoot (hold)  ·  Q through  ·  F tackle  ·  TAB switch  ·  C camera  ·  ESC pause",
+        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E pass  ·  SPACE shoot (hold)  ·  Q through  ·  F tackle  ·  TAB switch  ·  C / pad R3 camera  ·  ESC pause",
                       12, Ui.Sub);
         Place(_hint, .5f, 1f, -470, -14, 940, 18);
         root.AddChild(_hint);

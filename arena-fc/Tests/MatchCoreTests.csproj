@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Self-contained regression suite for the pure-C# match core.
+       Deliberately does NOT include Tests/Program.cs (that file needs the
+       missing Scripts/Core/Net/*.cs sources, see MISSING_NET_SOURCES.md). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="MatchCoreTests.cs" />
+    <Compile Include="../Scripts/Core/MathX.cs" />
+    <Compile Include="../Scripts/Core/Teams.cs" />
+    <Compile Include="../Scripts/Core/CharacterSpec.cs" />
+    <Compile Include="../Scripts/Core/Match.cs" />
+  </ItemGroup>
+</Project>

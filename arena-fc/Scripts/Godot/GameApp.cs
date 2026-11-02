@@ -92,6 +92,9 @@ public partial class GameApp : Node3D
         var panel = Ui.PanelC(menu, Ui.Panel);
         Place(panel, 0, .5f, 60, -190, 330, 300);
         root.AddChild(panel);
+        // Without GUI focus the main menu ignores arrow keys / Enter and the gamepad
+        // d-pad (Godot routes ui_up / ui_down / ui_accept to the focused Control).
+        (menu.GetChild(0) as Button)?.GrabFocus();
 
         string custom = CustomHome == null ? "default" : "CUSTOM SQUAD";
         var info = Ui.Lbl(
