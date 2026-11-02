@@ -917,26 +917,33 @@ func net_send_input(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): move.x += 1
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): move.y -= 1
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): move.y += 1
-	var jx := Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
-	var jy := Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
-	if abs(jx) > 0.2 or abs(jy) > 0.2:
-		move += Vector2(jx, jy)
+	# All pads, including unmapped USB / EasySMX D-input ones, go through PadSupport.
+	# The old code hard-coded device 0 and Godot's standard JoyButton indices.
+	var pad_move := Vector2.ZERO
+	var pad_held := {}
+	if pad_ctl != null:
+		for dev in Controllers.devices_for(pad_ctl.pads(), false, 0):
+			pad_move += pad_ctl.move_of(int(dev))
+			var ph: Dictionary = pad_ctl.held(int(dev))
+			for a in Controllers.ACTIONS:
+				pad_held[a] = bool(pad_held.get(a, false)) or bool(ph.get(a, false))
+	move += pad_move
 	move += touch_move
 	if move.length() > 1:
 		move = move.normalized()
-	var shoot_now: bool = Input.is_key_pressed(KEY_SPACE) or Input.is_joy_button_pressed(0, JOY_BUTTON_X) or touch_down.get("shoot", false)
+	var shoot_now: bool = Input.is_key_pressed(KEY_SPACE) or bool(pad_held.get("shoot", false)) or touch_down.get("shoot", false)
 	var cmd := {}
 	if abs(move.x) > 0.01: cmd["mx"] = snappedf(move.x, 0.001)
 	if abs(move.y) > 0.01: cmd["my"] = snappedf(move.y, 0.001)
-	if Input.is_key_pressed(KEY_SHIFT) or Input.is_joy_button_pressed(0, JOY_BUTTON_RIGHT_SHOULDER) or touch_down.get("sprint", false):
+	if Input.is_key_pressed(KEY_SHIFT) or bool(pad_held.get("sprint", false)) or touch_down.get("sprint", false):
 		cmd["sp"] = true
-	if edge("npass", Input.is_key_pressed(KEY_E) or Input.is_joy_button_pressed(0, JOY_BUTTON_A) or touch_down.get("pass", false)):
+	if edge("npass", Input.is_key_pressed(KEY_E) or bool(pad_held.get("pass", false)) or touch_down.get("pass", false)):
 		cmd["pa"] = true
-	if edge("nthrough", Input.is_key_pressed(KEY_Q) or Input.is_joy_button_pressed(0, JOY_BUTTON_Y) or touch_down.get("through", false)):
+	if edge("nthrough", Input.is_key_pressed(KEY_Q) or bool(pad_held.get("through", false)) or touch_down.get("through", false)):
 		cmd["th"] = true
-	if edge("ntackle", Input.is_key_pressed(KEY_F) or Input.is_joy_button_pressed(0, JOY_BUTTON_B) or touch_down.get("tackle", false)):
+	if edge("ntackle", Input.is_key_pressed(KEY_F) or bool(pad_held.get("tackle", false)) or touch_down.get("tackle", false)):
 		cmd["ta"] = true
-	if edge("nswitch", Input.is_key_pressed(KEY_TAB) or Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER) or touch_down.get("switch", false)):
+	if edge("nswitch", Input.is_key_pressed(KEY_TAB) or bool(pad_held.get("switch", false)) or touch_down.get("switch", false)):
 		cmd["sw"] = true
 	if edge("nlob", Input.is_key_pressed(KEY_R)):
 		cmd["lo"] = true
@@ -1402,8 +1409,10 @@ func read_global_keys() -> void:
 		show_menu()
 
 func _any_pad_start() -> bool:
+	if pad_ctl == null:
+		return false
 	for dev in pad_ctl.pads():
-		if Input.is_joy_button_pressed(int(dev), JOY_BUTTON_START):
+		if pad_ctl.start_pressed(int(dev)):
 			return true
 	return false
 
@@ -1636,6 +1645,9 @@ func setup_modules() -> void:
 		add_child(audio)
 	pad_ctl = Controllers.new()
 	pad_ctl.load_saved()
+	# Feed the SDL mapping database to Godot BEFORE the first pad is polled.
+	# Built-in EasySMX / generic USB lines are included even if the .txt is absent.
+	pad_ctl.load_mappings(OS.get_name())
 	Input.joy_connection_changed.connect(_on_joy_changed)
 	recorder = RecorderScript.new()
 	add_child(recorder)
@@ -1701,8 +1713,16 @@ func end_goal_break() -> void:
 	phase_timer = 1.0
 
 func _on_joy_changed(device: int, connected: bool) -> void:
+	if connected and pad_ctl != null:
+		pad_ctl.load_mappings(OS.get_name())
 	var n := Input.get_joy_name(device)
-	say("Controller %s: %s%s" % ["connected" if connected else "removed", n, "" if (not connected or Input.is_joy_known(device)) else "  (generic pad: use CONTROLLER SETUP to remap)"])
+	if pad_ctl != null:
+		say("Controller %s: %s  [%s]%s" % ["connected" if connected else "removed", n,
+			Controllers.pad_kind(n, Input.is_joy_known(device)),
+			"" if (not connected or Input.is_joy_known(device)) else "  (raw layout - CONTROLLER SETUP to remap)"])
+	else:
+		say("Controller %s: %s" % ["connected" if connected else "removed", n])
+	refresh_pad_info()
 
 func start_practice() -> void:
 	two_player_mode = false
@@ -1820,15 +1840,12 @@ func hide_pad_ui() -> void:
 	menu.visible = true
 
 func refresh_pad_info(prompt := "") -> void:
+	if pad_info == null or pad_ctl == null:
+		return
 	var lines: Array = []
-	var pads: Array = pad_ctl.pads()
-	if pads.is_empty():
-		lines.append("No gamepad detected. Plug in a USB pad and press any button on it (browsers only expose a pad after a button press).")
-	for dev in pads:
-		var d := int(dev)
-		var b: Dictionary = pad_ctl.binds_for(d)
-		lines.append("Pad %d: %s   [%s layout]   P%d" % [d + 1, Input.get_joy_name(d), "standard" if Input.is_joy_known(d) else "generic / adapter", d + 1])
-		lines.append("   pass=%d  through=%d  shoot=%d  tackle=%d  switch=%d  sprint=%d" % [b["pass"], b["through"], b["shoot"], b["tackle"], b["switch"], b["sprint"]])
+	lines.append(pad_ctl.describe())
+	for dev in pad_ctl.pads():
+		lines.append(pad_ctl.pad_info(int(dev)))
 	lines.append("")
 	lines.append("Left stick or D-pad moves. Pad 1 plays P1, pad 2 plays P2 in 2-player mode; with one player every pad controls P1.")
 	if prompt != "":
@@ -1836,13 +1853,16 @@ func refresh_pad_info(prompt := "") -> void:
 		lines.append(prompt)
 	pad_info.text = "\n".join(PackedStringArray(lines))
 
-func pad_learn_start(dev: int) -> void:
-	if not pad_ctl.pads().has(dev):
-		refresh_pad_info("Pad %d is not connected." % (dev + 1))
+## `slot` is 0/1 (the REMAP PAD 1 / REMAP PAD 2 buttons), not necessarily the
+## Godot device id - USB pads can be enumerated at 2, 5, ... after reconnects.
+func pad_learn_start(slot: int) -> void:
+	var pads: Array = pad_ctl.pads()
+	if slot >= pads.size():
+		refresh_pad_info("Pad %d is not connected." % (slot + 1))
 		return
-	pad_learn_dev = dev
+	pad_learn_dev = int(pads[slot])
 	pad_learn_idx = 0
-	refresh_pad_info("Press the button for  %s  (pad %d)" % [Controllers.ACTIONS[0].to_upper(), dev + 1])
+	refresh_pad_info("Press the button for  %s  (pad %d)" % [Controllers.ACTIONS[0].to_upper(), slot + 1])
 
 func pad_learn_button(dev: int, button: int) -> void:
 	if dev != pad_learn_dev:
