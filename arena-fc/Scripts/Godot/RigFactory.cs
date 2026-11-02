@@ -134,8 +134,14 @@ public partial class CharacterRig : Node3D
         return new StandardMaterial3D
         {
             AlbedoColor = C(hex),
-            Roughness = mat is RigMat.Boots or RigMat.Hair ? .35f : .72f,
+            Roughness = mat is RigMat.Boots or RigMat.Hair ? .34f : .68f,
             Metallic = mat == RigMat.Boots ? .18f : 0f,
+            // A little specular + rim separates the rounded joints from the flat
+            // cylinders they sit on; without it everything reads as one flat tube.
+            MetallicSpecular = mat == RigMat.Boots ? .62f : .38f,
+            RimEnabled = mat is RigMat.Skin or RigMat.Shirt or RigMat.Shorts or RigMat.Socks,
+            Rim = .22f,
+            RimTint = .30f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
     }

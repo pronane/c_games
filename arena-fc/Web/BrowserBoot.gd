@@ -1182,26 +1182,41 @@ func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw 
 	var sk := r.get_meta("sk") as Skeleton3D
 	if sk == null:
 		return
+	# Smooth harmonic gait: half-wave-rectified sine used to snap the legs between
+	# two straight angles.  Hips / knees / ankles / spine / head all participate so
+	# the silhouette has real joints and weight transfer.
 	var amp: float = clamp(speed / 6.0, 0.0, 1.0)
+	var run: float = clamp(speed / 5.5, 0.0, 1.0)
 	var ph: float = time * 1.05                                    # `time` is the player's accumulated stride phase
-	var s: float = sin(ph) * amp * 0.9
-	var lk: float = max(0.0, sin(ph + 1.3)) * amp * 1.25        # knee flexes as the leg swings through
-	var rk: float = max(0.0, sin(ph + 1.3 + PI)) * amp * 1.25
-	var breathe: float = sin(time * 1.9) * 0.025
+	var s: float = sin(ph)
+	var s2: float = sin(ph * 2.0)
+	var breathe: float = sin(time * 1.9) * 0.012 * (1.0 - amp)
+	var hip_l: float = (s * 0.66 + s2 * 0.10) * amp
+	var hip_r: float = -hip_l
+	var lk: float = (0.10 + (0.5 - 0.5 * cos(ph + 0.55)) * 0.95) * amp
+	var rk: float = (0.10 + (0.5 - 0.5 * cos(ph + PI + 0.55)) * 0.95) * amp
+	var foot_l: float = (-hip_l * 0.30 + s2 * 0.12) * amp
+	var foot_r: float = (-hip_r * 0.30 - s2 * 0.12) * amp
+	var lean: float = 0.04 + 0.10 * run + breathe
+	var twist: float = s * 0.075 * amp
+	var roll: float = s2 * 0.025 * amp
+	var arm_out: float = 0.12 + 0.14 * run
 	# defaults: running / idle
-	var hips := Vector3(0, 0, 0)
-	var chest := Vector3(amp * 0.16 + breathe, s * 0.22, 0)
-	var spine := Vector3(amp * 0.08, -s * 0.12, 0)
-	var lth := Vector3(s, 0, 0.03)
-	var rth := Vector3(-s, 0, -0.03)
+	var hips := Vector3(lean * 0.25, twist * 0.5, roll)
+	var chest := Vector3(lean * 0.45, twist, roll * 0.6)
+	var spine := Vector3(lean * 0.35, -twist * 0.6, -roll * 0.5)
+	var neck := Vector3(-lean * 0.30 + look_yaw * 0.3, -twist * 0.4, 0)
+	var head := Vector3(-lean * 0.25 + breathe, look_yaw * 0.65 - twist * 0.5, 0)
+	var lth := Vector3(hip_l, 0, 0.02)
+	var rth := Vector3(hip_r, 0, -0.02)
 	var lsh := Vector3(lk, 0, 0)
 	var rsh := Vector3(rk, 0, 0)
-	var lua := Vector3(-s * 0.9, 0, -0.14 - amp * 0.1)
-	var rua := Vector3(s * 0.9, 0, 0.14 + amp * 0.1)
-	var lfa := Vector3(-0.35 - amp * 0.9, 0, 0)
-	var rfa := Vector3(-0.35 - amp * 0.9, 0, 0)
-	var head := Vector3(0, look_yaw * 0.65, 0)
-	var neck := Vector3(0, look_yaw * 0.3, 0)
+	var lft := Vector3(foot_l, 0, 0)
+	var rft := Vector3(foot_r, 0, 0)
+	var lua := Vector3(-hip_l * 0.62 - 0.10 * run, 0, -arm_out)
+	var rua := Vector3(hip_l * 0.62 + 0.10 * run, 0, arm_out)
+	var lfa := Vector3(-0.32 - 0.22 * run - 0.18 * max(0.0, -hip_l), 0, -0.05)
+	var rfa := Vector3(-0.32 - 0.22 * run - 0.18 * max(0.0, -hip_r), 0, 0.05)
 	match action:
 		"kick":
 			rth = Vector3(-1.25, 0, 0); rsh = Vector3(0.1, 0, 0)
@@ -1235,6 +1250,8 @@ func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw 
 	pose_bone(sk, "RThigh", rth)
 	pose_bone(sk, "LShin", lsh)
 	pose_bone(sk, "RShin", rsh)
+	pose_bone(sk, "LFoot", lft)
+	pose_bone(sk, "RFoot", rft)
 	pose_bone(sk, "LUpperArm", lua)
 	pose_bone(sk, "RUpperArm", rua)
 	pose_bone(sk, "LForearm", lfa)

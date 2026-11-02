@@ -31,6 +31,9 @@ public partial class GameApp : Node3D
     private void Boot()
     {
         Instance = this;
+        // Lives on the Window, outside Clear(), so it survives every menu/match swap.
+        if (GetTree().Root.GetNodeOrNull<PadMenuNavigator>("PadMenuNavigator") == null)
+            GetTree().Root.AddChild(new PadMenuNavigator());
         ShowMenu();
     }
 
@@ -50,6 +53,7 @@ public partial class GameApp : Node3D
     {
         Clear();
         _menu = true;
+        PadMenuNavigator.Active = true;
         _menuWorld = new Node3D { Name = "MenuWorld" };
         AddChild(_menuWorld);
         var stadium = new Stadium();
@@ -92,9 +96,8 @@ public partial class GameApp : Node3D
         var panel = Ui.PanelC(menu, Ui.Panel);
         Place(panel, 0, .5f, 60, -190, 330, 300);
         root.AddChild(panel);
-        // Without GUI focus the main menu ignores arrow keys / Enter and the gamepad
-        // d-pad (Godot routes ui_up / ui_down / ui_accept to the focused Control).
-        (menu.GetChild(0) as Button)?.GrabFocus();
+        // Seed GUI focus: arrow keys / Enter / the pad d-pad all act on the focused Control.
+        Ui.FocusFirst(root);
 
         string custom = CustomHome == null ? "default" : "CUSTOM SQUAD";
         var info = Ui.Lbl(
@@ -129,6 +132,7 @@ public partial class GameApp : Node3D
     public void StartMatch()
     {
         Clear();
+        PadMenuNavigator.Active = false;
         var view = new MatchView();
         var opts = new MatchOptions
         {
@@ -145,6 +149,7 @@ public partial class GameApp : Node3D
     public void ShowEditor()
     {
         Clear();
+        PadMenuNavigator.Active = true;
         var ed = new CharacterEditor();
         var roster = CustomHome?.Select(x => x.Clone()).ToList() ?? Clubs.CreateRoster(Options.HomeClub, Options.TeamSize);
         ed.Init(roster);
@@ -174,10 +179,18 @@ public partial class GameApp : Node3D
         body.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scroll.AddChild(body);
         v.AddChild(scroll);
-        v.AddChild(Ui.Btn("Back", () => { layer.QueueFree(); onBack?.Invoke(); }, true));
+        v.AddChild(Ui.Btn("Back", () =>
+        {
+            layer.QueueFree();
+            onBack?.Invoke();
+            PadMenuNavigator.Active = _menu;
+            Callable.From(() => Ui.FocusFirst(this)).CallDeferred();
+        }, true));
         var panel = Ui.PanelC(v, Ui.Panel);
         Place(panel, .5f, .5f, -300, -260, 600, 520);
         layer.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(panel);
     }
 
     public void ShowSettings()
@@ -209,9 +222,12 @@ public partial class GameApp : Node3D
         {
             "KEYBOARD", "WASD / Arrows — move", "SHIFT — sprint", "E — pass", "Q — through ball",
             "R — lofted chip pass", "SPACE (hold then release) — charged shot", "F — tackle / press",
-            "TAB / middle mouse — switch player", "C — change camera", "ESC — pause", "",
+            "TAB / middle mouse — switch player", "C — cycle camera (Broadcast · Player cam · Sideline · Tactical)",
+            "ESC — pause", "",
             "GAMEPAD", "Left stick / D-pad — move", "A — pass · X — shoot (hold) · Y — through ball",
-            "B — tackle · RB — sprint · LB — switch · Start — pause", "",
+            "B — tackle · RB — sprint · LB — switch · Start — pause", "R3 / L3 — camera", "",
+            "GAMEPAD MENUS", "D-pad / left stick — move the highlighted item",
+            "A / Start — select · B — back · left/right on a setting changes its value", "",
             "USB / EASYSMX PADS", "XInput mode uses the standard layout. D-input / PC mode uses the raw",
             "EasySMX order (Y B A X, LB, RB, LT, RT) automatically. CONTROLLER SETUP lists",
             "every connected pad and lets you remap any button per pad.", "",

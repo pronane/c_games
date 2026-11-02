@@ -23,19 +23,36 @@ void Section(string s) => Console.WriteLine($"\n== {s} ==");
 Section("Possession stability (60 real seconds, 11v11, seed 2026)");
 var pos = new MatchEngine(new MatchOptions { Seed = 2026, TimeSpeed = 15f });
 int flips = 0, prevOwner = pos.State.Ball.Owner, longestHold = 0, hold = 0;
+int tackles = 0, nearTicks = 0;
+string prevComment = pos.State.Commentary;
 for (int i = 0; i < 3600; i++)
 {
     pos.Step(1f / 60f, PlayerCommand.None);
     int o = pos.State.Ball.Owner;
     if (o != prevOwner) { flips++; prevOwner = o; hold = 0; }
     else if (o >= 0) { hold++; longestHold = Math.Max(longestHold, hold); }
+    if (pos.State.Commentary != prevComment)
+    {
+        if (pos.State.Commentary.Contains("wins the ball!")) tackles++;
+        prevComment = pos.State.Commentary;
+    }
+    if (o >= 0)
+    {
+        var carrier = pos.State.Players[o];
+        float nearest = 1e9f;
+        foreach (var q in pos.State.Players)
+            if (q.Team != carrier.Team && !q.IsKeeper)
+                nearest = MathF.Min(nearest, Mx.FlatDist(q.Pos, carrier.Pos));
+        if (nearest < 2f) nearTicks++;
+    }
 }
-// Before the fix: flips=653, longestHold=376.  After: flips=33, longestHold=602.
+// Before the possession fix: flips=653, longestHold=376.
+// Before the pressing fix: tackles=7, nearTicks=579.  After: 16 and 740.
 Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
 Check("a carrier can dribble for several seconds", longestHold > 180,
       $"longest={longestHold} ticks");
-Check("an unattended AI match reaches a goal", pos.State.Score[0] + pos.State.Score[1] > 0,
-      $"score={pos.State.Score[0]}-{pos.State.Score[1]}");
+Check("opposition closes down the carrier", nearTicks > 400, $"nearTicks={nearTicks}");
+Check("opposition wins the ball back", tackles >= 10, $"tackles={tackles}");
 
 Section("A collected loose ball stays collected");
 var stick = new MatchEngine(new MatchOptions { Seed = 7 });

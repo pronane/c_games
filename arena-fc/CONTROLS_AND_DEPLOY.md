@@ -51,6 +51,15 @@ is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the Pa
   (R3 on a mapped pad, L3 on a raw EasySMX pad) but the browser edition ignored it. It now cycles the
   broadcast / telephoto / player / tactical views just like `C` or `1`-`4`; the HUD `CAM` button and
   wheel / `+` / `-` zoom are unchanged.
+* **Every desktop menu is playable without a mouse.** `Ui.Style()` used to force `FocusMode.None` on
+  every Button, so the main menu, pause menu, settings, controls, controller setup and character editor
+  ignored arrow keys, Enter and the pad. Buttons are now focusable, each menu seeds focus on its first
+  item, and `PadMenuNavigator` (on the Window, outside the menu/match swaps) walks focus with the d-pad /
+  left stick, activates with A / Start and goes back with B. It uses the same `PadLayout` tables as
+  gameplay, so unmapped EasySMX D-input pads work too. A / left-right also cycle combos and sliders.
+* **Four camera angles.** `C` (or pad R3/L3) cycles Broadcast → Player cam → **Sideline** (new low,
+  wide 14 m tracking shot) → Tactical. Sideline fills the gap between the near on-pitch view and the
+  high views; WASD is camera-relative in all four.
 * **Remap** from **CONTROLLER SETUP** in the main menu (desktop and browser): *Remap pad 1/2*, then press
   the button asked for each action. Bindings are saved per pad name in `user://pads.json` (IndexedDB in
   the browser) and restored next time. The screen also lists each pad's name, detected kind and current
@@ -105,3 +114,19 @@ import are therefore unavailable in the preview; use the native/editor builds fo
 and `Scripts/Godot/ProceduralRig3D.gd` resolve those optional classes through `ClassDB` at runtime, so the
 scripts still parse there — player rigs load from `Data/rig_default.json` and all five GDScript suites pass
 in the WASM engine. The desktop C# game also cannot run in this runtime (Godot cannot export C# to Web).
+
+## Match feel (desktop C#)
+
+* **Opposition presses and tackles.** When the other team has the ball, three players (not two) close
+  down the carrier: the nearest leads him, the other two cut the lane to goal. Pressing defenders get a
+  12% pace / acceleration boost, tackle attempts are more frequent, and the tackle cooldown is shorter.
+  In a deterministic 60 s 11v11 sim (seed 2026) successful tackles went from 7 to 16 and the number of
+  ticks with a defender within 2 m of the carrier from 579 to 740.
+* **Rounded joints and shaped boots.** The procedural 18-bone rig now has hip, knee, ankle, shoulder,
+  elbow and wrist spheres, shorts/sock kit bands, a boot toe box, a dark sole and a coloured stripe, plus
+  rim/specular materials so the joints read as separate volumes instead of one straight cylinder.
+* **Smoother gait.** `RigAnimator.Pose` (C#) and `BrowserBoot.animate_rig` (GDScript) replaced the
+  half-wave-rectified sine — which snapped legs between two straight angles — with harmonic hip swing,
+  a continuously flexing knee, ankle toe-off, counter-swinging arms with elbow flex, spine/hip twist,
+  forward lean, head stabilisation and a two-bounce-per-stride weight shift. Both editions pose `LFoot` /
+  `RFoot` now too. Same 18 bones, same 9 material slots, so overrides and exports are unaffected.
