@@ -316,11 +316,11 @@ def main() -> int:
     check("WASD is rotated into camera space",
           "Cam.GlobalTransform.Basis" in match_view and "worldMove" in match_view)
     check("tactical camera is stable and player cam has a zero-facing guard",
-          "Mode == 3 ? new Vector3(0f, 0f, -1f)" in world3d
+          "Mode == 4 ? new Vector3(0f, 0f, -1f)" in world3d
           and "fwd.LengthSquared() < 1e-6f" in world3d)
-    check("a fourth mid-height camera exists between player cam and tactical",
-          "ModeCount = 4" in world3d and "Sideline" in world3d
-          and "case 2:" in world3d and "case 3:" in world3d)
+    check("five cameras incl. a shoulder view between player cam and sideline",
+          "ModeCount = 5" in world3d and "Shoulder" in world3d and "Sideline" in world3d
+          and "case 2:" in world3d and "case 3:" in world3d and "case 4:" in world3d)
     check("HUD hint advertises the pad camera button", "pad R3 camera" in hud_cs)
     check("C# core regression suite is wired into CI",
           (ROOT / "Tests" / "MatchCoreTests.cs").exists()
@@ -329,20 +329,36 @@ def main() -> int:
     nav_cs = (ROOT / "Scripts" / "Godot" / "PadMenuNavigator.cs").read_text(encoding="utf-8")
     check("menu Buttons are focusable (no mouse required)",
           "FocusMode = Control.FocusModeEnum.All" in ui_cs and "Ui.FocusFirst" in game_app)
+    controls_cs = (ROOT / "Scripts" / "Godot" / "Controls.cs").read_text(encoding="utf-8")
     check("a pad navigator drives menu focus and activation",
-          "ReadMenuPad" in nav_cs and "EmitSignal(BaseButton.SignalName.Pressed)" in nav_cs
+          "ReadMenuPad" in nav_cs and "ButtonClicked" in nav_cs
           and "PadMenuNavigator" in game_app)
+    check("menu accept is layout-independent (any face button)",
+          "PadLayout.Button(buttons, i)" in controls_cs and "for (int i = 0; i <= 3; i++)" in controls_cs)
     check("opposition presses and tackles",
           "p.Pressing" in match_cs and "chaser3" in match_cs and "1.12f" in match_cs)
+    check("slide tackle, shield and strength contest exist",
+          "bool Slide" in match_cs and "bool Shield" in match_cs
+          and "AttemptSlide" in match_cs and "between * .20f" in match_cs
+          and "cmd.Slide" in controls_cs and "cmd.Shield" in controls_cs)
+    check("auto-select keeps the controlled player near the ball",
+          "ControlLock" in match_cs and "FindNearestHome(S.Ball.Pos, true)" in match_cs)
+    check("fouls are rarer and now visible",
+          "carrier.Action = \"foul\"" in match_cs and "FOUL · FREE KICK" in hud_cs
+          and 'p.Action == "slide"' in world3d)
+    check("player spacing avoids scrums",
+          "1.05f - dd) * .60f" in match_cs and "State.Ball.Owner >= 0 && p.Index != State.Ball.Owner" in match_cs)
     rig_cs = (ROOT / "Scripts" / "Core" / "RigDefinition.cs").read_text(encoding="utf-8")
-    anim_cs = world3d
+    gait_cs = (ROOT / "Scripts" / "Core" / "Gait.cs").read_text(encoding="utf-8")
     check("rig has visible hip/knee/ankle joints and shaped boots",
           "knee cap" in rig_cs and "toe box" in rig_cs and "RigMat.Detail" in rig_cs)
-    check("gait uses smooth harmonics and poses feet + torso",
-          "MathF.Cos(phase + .55f)" in anim_cs and 'Set(rig, "LFoot"' in anim_cs
-          and 'Set(rig, "Hips"' in anim_cs)
-    check("browser edition uses the same smooth gait",
-          "cos(ph + 0.55)" in (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8"))
+    check("gait is a shared pure-C# curve with forward thighs and bending knees",
+          "Gait.Compute" in world3d and "float hipL = -(s * .66f" in gait_cs
+          and "float kneeL = (.14f" in gait_cs and 'Set(rig, "LFoot"' in world3d
+          and (ROOT / "Tests" / "MatchCoreTests.csproj").read_text(encoding="utf-8").find("Gait.cs") >= 0)
+    browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
+    check("browser edition mirrors the corrected gait signs",
+          "var hip_l: float = -(s * 0.66" in browser and "sin(ph + 0.40)" in browser)
 
     section("Optional syntax parsers")
     try:

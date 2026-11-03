@@ -24,7 +24,7 @@ public sealed class InputHub
     public bool TouchSprint, TouchPass, TouchThrough, TouchTackle, TouchSwitch, TouchShoot;
     public bool TouchEnabled;
 
-    private bool _pShoot, _pPass, _pThrough, _pTackle, _pSwitch, _pPause, _pCamera, _pLob;
+    private bool _pShoot, _pPass, _pThrough, _pTackle, _pSlide, _pSwitch, _pPause, _pCamera, _pLob;
     private float _charge;
     public float Charge => _charge;
     public bool PausePressed { get; private set; }
@@ -203,8 +203,16 @@ public sealed class InputHub
             if (m.X < -.45f) left = true;
             if (m.X > .45f) right = true;
             var h = PadLayout.Held(buttons, axes, binds, known);
-            if (h["pass"] || h["pause"]) accept = true;   // A / Start
-            if (h["tackle"] || h["camera"]) back = true;  // B / R3-L3 (cancel)
+            // Layout-independent: in a menu ANY face button (A/B/X/Y, i.e. 0..3 on
+            // both standard and raw pads) or Start selects the highlighted item.
+            // A pad that Godot reports as "known" but which actually sends raw D-input
+            // button indices used to mean h["pass"] never fired, so nothing could be
+            // selected.  Back/cancel stays on the system buttons (R3/L3/Back).
+            bool face = false;
+            for (int i = 0; i <= 3; i++) if (PadLayout.Button(buttons, i)) { face = true; break; }
+            if (face || h["pass"] || h["pause"] || PadLayout.Button(buttons, 8)
+                || PadLayout.Button(buttons, 9)) accept = true;
+            if (h["camera"]) back = true;
         }
     }
 
@@ -225,7 +233,8 @@ public sealed class InputHub
         int[] devices = PadLayout.DevicesFor(ConnectedDevices(), _twoPlayer, _playerIndex);
         Vector2 padMove = Vector2.Zero;
         bool padSprint = false, padPass = false, padThrough = false, padTackle = false,
-             padSwitch = false, padShoot = false, padPause = false, padCamera = false;
+             padSwitch = false, padShoot = false, padPause = false, padCamera = false,
+             padShield = false;
         foreach (int dev in devices)
         {
             bool[] buttons = ReadButtons(dev);
@@ -243,6 +252,9 @@ public sealed class InputHub
             padSprint |= h["sprint"];
             padPause |= h["pause"];
             padCamera |= h["camera"];
+            // Shield sits on LB on a mapped pad, Back on a raw/D-input pad
+            // (raw button 4 is already "switch").  Independent of the action table.
+            padShield |= PadLayout.Button(buttons, known ? 4 : 8);
         }
         if (padMove.LengthSquared() > 1f) padMove = padMove.Normalized();
         move += padMove;
@@ -259,11 +271,18 @@ public sealed class InputHub
         bool pause = Input.IsPhysicalKeyPressed(Key.Escape) || padPause;
         bool camera = Input.IsPhysicalKeyPressed(Key.C) || padCamera;
         bool lob = Input.IsPhysicalKeyPressed(Key.R);
+        // SHIFT+F (or sprint+tackle on a pad) is a committed slide; X / pad LB / raw Back
+        // is shield.  Keeping slide out of Tackle stops a single press doing both.
+        bool slide = (Input.IsPhysicalKeyPressed(Key.Shift) && Input.IsPhysicalKeyPressed(Key.F))
+                     || (padSprint && padTackle);
+        bool shield = Input.IsPhysicalKeyPressed(Key.X) || padShield;
 
         cmd.Sprint = sprint;
         cmd.Pass = Edge(pass, ref _pPass);
         cmd.Through = Edge(through, ref _pThrough);
-        cmd.Tackle = Edge(tackle, ref _pTackle);
+        cmd.Tackle = Edge(tackle && !slide, ref _pTackle);
+        cmd.Slide = Edge(slide, ref _pSlide);
+        cmd.Shield = shield;
         cmd.Switch = Edge(sw, ref _pSwitch) || Input.IsMouseButtonPressed(MouseButton.Middle);
         cmd.Lob = Edge(lob, ref _pLob);
         PausePressed = Edge(pause, ref _pPause);
@@ -279,6 +298,6 @@ public sealed class InputHub
     public void Reset()
     {
         _charge = 0;
-        _pShoot = _pPass = _pThrough = _pTackle = _pSwitch = _pPause = _pCamera = _pLob = false;
+        _pShoot = _pPass = _pThrough = _pTackle = _pSlide = _pSwitch = _pPause = _pCamera = _pLob = false;
     }
 }

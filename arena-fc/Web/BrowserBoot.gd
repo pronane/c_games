@@ -1182,21 +1182,23 @@ func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw 
 	var sk := r.get_meta("sk") as Skeleton3D
 	if sk == null:
 		return
-	# Smooth harmonic gait: half-wave-rectified sine used to snap the legs between
-	# two straight angles.  Hips / knees / ankles / spine / head all participate so
-	# the silhouette has real joints and weight transfer.
+	# Smooth harmonic gait shared with the C# Gait.cs.  NEGATIVE thigh angles swing
+	# the leg FORWARD (a positive X rotation sends a downward bone behind the player),
+	# POSITIVE knee angles fold the shin back.  The old positive thigh angles made the
+	# legs kick out behind and the knees look locked.
 	var amp: float = clamp(speed / 6.0, 0.0, 1.0)
 	var run: float = clamp(speed / 5.5, 0.0, 1.0)
 	var ph: float = time * 1.05                                    # `time` is the player's accumulated stride phase
 	var s: float = sin(ph)
 	var s2: float = sin(ph * 2.0)
 	var breathe: float = sin(time * 1.9) * 0.012 * (1.0 - amp)
-	var hip_l: float = (s * 0.66 + s2 * 0.10) * amp
+	var hip_l: float = -(s * 0.66 + s2 * 0.10) * amp
 	var hip_r: float = -hip_l
-	var lk: float = (0.10 + (0.5 - 0.5 * cos(ph + 0.55)) * 0.95) * amp
-	var rk: float = (0.10 + (0.5 - 0.5 * cos(ph + PI + 0.55)) * 0.95) * amp
-	var foot_l: float = (-hip_l * 0.30 + s2 * 0.12) * amp
-	var foot_r: float = (-hip_r * 0.30 - s2 * 0.12) * amp
+	var flex: float = 0.35 + 0.65 * amp
+	var lk: float = max(0.05, (0.14 + 0.80 * (0.5 + 0.5 * sin(ph + 0.40)) + 0.10 * s2) * flex)
+	var rk: float = max(0.05, (0.14 + 0.80 * (0.5 + 0.5 * sin(ph + PI + 0.40)) - 0.10 * s2) * flex)
+	var foot_l: float = -lk * 0.32 + hip_l * 0.10
+	var foot_r: float = -rk * 0.32 + hip_r * 0.10
 	var lean: float = 0.04 + 0.10 * run + breathe
 	var twist: float = s * 0.075 * amp
 	var roll: float = s2 * 0.025 * amp

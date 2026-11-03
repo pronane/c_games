@@ -23,7 +23,7 @@ void Section(string s) => Console.WriteLine($"\n== {s} ==");
 Section("Possession stability (60 real seconds, 11v11, seed 2026)");
 var pos = new MatchEngine(new MatchOptions { Seed = 2026, TimeSpeed = 15f });
 int flips = 0, prevOwner = pos.State.Ball.Owner, longestHold = 0, hold = 0;
-int tackles = 0, nearTicks = 0;
+int tackles = 0, nearTicks = 0, fouls = 0, nearBallTotal = 0;
 string prevComment = pos.State.Commentary;
 for (int i = 0; i < 3600; i++)
 {
@@ -34,6 +34,7 @@ for (int i = 0; i < 3600; i++)
     if (pos.State.Commentary != prevComment)
     {
         if (pos.State.Commentary.Contains("wins the ball!")) tackles++;
+        if (pos.State.Commentary.StartsWith("Foul!")) fouls++;
         prevComment = pos.State.Commentary;
     }
     if (o >= 0)
@@ -45,14 +46,36 @@ for (int i = 0; i < 3600; i++)
                 nearest = MathF.Min(nearest, Mx.FlatDist(q.Pos, carrier.Pos));
         if (nearest < 2f) nearTicks++;
     }
+    foreach (var p in pos.State.Players)
+        if (Mx.FlatDist(p.Pos, pos.State.Ball.Pos) < 4f) nearBallTotal++;
 }
+float avgNearBall = nearBallTotal / 3600f;
 // Before the possession fix: flips=653, longestHold=376.
-// Before the pressing fix: tackles=7, nearTicks=579.  After: 16 and 740.
+// Before the pressing fix: tackles=7, nearTicks=579.
+// Before the spacing/foul fix: avgNearBall=2.62, fouls=4 with no visible contact.
 Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
 Check("a carrier can dribble for several seconds", longestHold > 180,
       $"longest={longestHold} ticks");
 Check("opposition closes down the carrier", nearTicks > 400, $"nearTicks={nearTicks}");
 Check("opposition wins the ball back", tackles >= 10, $"tackles={tackles}");
+Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={fouls}");
+Check("players keep personal space around the ball", avgNearBall < 2.55f,
+      $"avgWithin4m={avgNearBall:F3}");
+
+Section("Gait joint sign convention");
+// A leg bone points down; +X rotation sends it BEHIND the player (-Z).  Forward
+// thigh swing must be negative, knee flexion positive.  See Scripts/Core/Gait.cs.
+var runPose = Gait.Compute(6f, MathF.PI * .5f, 0f);
+var idlePose = Gait.Compute(0f, 1f, 0f);
+Check("the leading thigh swings forward (negative X)", runPose.HipL < -.3f,
+      $"hipL={runPose.HipL:F3}");
+Check("the trailing thigh swings back", runPose.HipR > .3f, $"hipR={runPose.HipR:F3}");
+Check("both knees bend (positive X)", runPose.KneeL > .3f && runPose.KneeR > .05f,
+      $"knees={runPose.KneeL:F3}/{runPose.KneeR:F3}");
+Check("ankles counter-rotate so boots stay flat", runPose.FootL < 0f,
+      $"footL={runPose.FootL:F3}");
+Check("knees remain slightly bent when walking/standing", idlePose.KneeL > .05f,
+      $"idleKnee={idlePose.KneeL:F3}");
 
 Section("A collected loose ball stays collected");
 var stick = new MatchEngine(new MatchOptions { Seed = 7 });
@@ -107,6 +130,27 @@ for (int i = 0; i < 3600; i++)
 }
 Check("controlled player produces shots", human.State.Shots[0] + human.State.Shots[1] > 0,
       $"shots={human.State.Shots[0] + human.State.Shots[1]}");
+
+Section("New defensive actions (slide / shield / first-touch pass)");
+var actions = new MatchEngine(new MatchOptions { Seed = 33, TimeSpeed = 15f });
+for (int i = 0; i < 600; i++)
+{
+    var c = new PlayerCommand
+    {
+        Move = new Vector2(MathF.Sin(i * .05f), MathF.Cos(i * .05f)),
+        Slide = i % 90 == 0,
+        Shield = i % 3 == 0,
+        Pass = i % 120 == 0,
+        Tackle = i % 150 == 0,
+        Sprint = i % 4 == 0,
+    };
+    actions.Step(1f / 60f, c);
+}
+Check("slide/shield/tackle commands keep the match finite",
+      Mx.IsFinite(actions.State.Ball.Pos) && Mx.IsFinite(actions.State.Ball.Vel)
+      && actions.State.Players.All(p => Mx.IsFinite(p.Pos)));
+Check("new commands do not corrupt the scoreboard",
+      actions.State.Score.All(s => s >= 0 && s < 100));
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

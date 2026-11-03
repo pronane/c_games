@@ -48,11 +48,18 @@ public static class Ui
         b.FocusMode = Control.FocusModeEnum.All;
     }
 
+    /// <summary>Direct click callbacks for pad activation.  EmitSignal("pressed") from another
+    /// node turned out not to be reliable for C# event subscriptions, so the navigator calls
+    /// these instead of synthesising a signal.  Keyboard/mouse still go through b.Pressed.</summary>
+    public static readonly Dictionary<Button, Action> ButtonClicked = new();
+    public static readonly Dictionary<CheckBox, Action<bool>> CheckChanged = new();
+
     public static Button Btn(string text, Action onClick, bool primary = false)
     {
         var b = new Button { Text = text };
         Style(b, primary);
         b.Pressed += onClick;
+        ButtonClicked[b] = onClick;
         return b;
     }
 
@@ -127,6 +134,7 @@ public static class Ui
         var c = new CheckBox { Text = text, ButtonPressed = value, FocusMode = Control.FocusModeEnum.All };
         c.AddThemeStyleboxOverride("focus", Box(new Color(.10f, .40f, .30f, .35f), Accent, 4, 2));
         c.Toggled += (on) => changed(on);
+        CheckChanged[c] = changed;
         return c;
     }
 
