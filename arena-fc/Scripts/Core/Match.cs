@@ -31,6 +31,10 @@ public struct PlayerCommand
 {
     public Vector2 Move;
     public bool Sprint, Pass, Shoot, Through, Tackle, Switch, Lob;
+    /// <summary>Sprint + tackle = committed slide tackle (longer reach, higher foul risk).</summary>
+    public bool Slide;
+    /// <summary>Hold to shield the ball / use strength to hold off a challenger.</summary>
+    public bool Shield;
     public float Charge;
     public static PlayerCommand None => default;
 }
@@ -55,6 +59,8 @@ public sealed class PlayerState
     public bool IsKeeper;
     /// <summary>Actively closing down an opponent who has the ball (extra pace + acceleration).</summary>
     public bool Pressing;
+    /// <summary>Holding off a challenger: reduces their tackle success, costs stamina.</summary>
+    public bool Shielding;
     public int Cards;
     public float MaxSpeed => (3.6f + Spec.Pace * 3.5f) * (IsKeeper ? .94f : 1f);
 }
@@ -79,6 +85,8 @@ public sealed class MatchState
     public PlayerState[] Players = Array.Empty<PlayerState>();
     public BallState Ball = new();
     public int Controlled = -1, KickoffSide = 0, RestartSide = 0, AttackSign = 1;
+    /// <summary>Grace period after TAB switching before auto-select may move control again.</summary>
+    public float ControlLock;
     public Vector3 RestartPos;
     public string Commentary = "Kick off!";
     public int GoalScorer = -1;
@@ -260,7 +268,28 @@ public sealed class MatchEngine
         }
 
         // ---- Human control ----
-        if (cmd.Switch && S.Controlled >= 0) S.Controlled = FindNearestHome(S.Ball.Pos, true);
+        S.ControlLock = MathF.Max(0f, S.ControlLock - dt);
+        if (cmd.Switch && S.Controlled >= 0)
+        {
+            S.Controlled = FindNearestHome(S.Ball.Pos, true);
+            S.ControlLock = 1.2f;                 // respect a manual switch briefly
+        }
+        // Auto-select: the ring must be on a player who can actually affect the ball.
+        // Without this, the controlled player stayed on whoever last touched it while
+        // the opposition walked past, so pass/tackle buttons appeared dead.
+        if (S.ControlLock <= 0f && S.Controlled >= 0 && S.Controlled < S.Players.Length)
+        {
+            int best = S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0
+                ? S.Ball.Owner                                    // attacking: control the carrier
+                : FindNearestHome(S.Ball.Pos, true);             // defending/loose: closest outfielder
+            if (best >= 0 && best != S.Controlled)
+            {
+                float dCur = Mx.FlatDist(S.Players[S.Controlled].Pos, S.Ball.Pos);
+                float dBest = Mx.FlatDist(S.Players[best].Pos, S.Ball.Pos);
+                if (S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0) S.Controlled = best;
+                else if (dBest + 1.6f < dCur) S.Controlled = best;   // hysteresis: no flicker
+            }
+        }
         var humans = new HashSet<int>();
         if (S.Controlled >= 0 && S.Controlled < S.Players.Length) humans.Add(S.Controlled);
 
@@ -343,21 +372,29 @@ public sealed class MatchEngine
         Vector3 goal = GoalPos(p.Team);
         bool keeper = p.IsKeeper;
 
+        p.Shielding = false;
         // --- Human actions ---
         if (human)
         {
             if (cmd.Switch) { /* handled in Tick */ }
             if (ball.Owner == p.Index)
             {
+                // Hold SHIELD to use body strength to keep a challenger off the ball.
+                p.Shielding = cmd.Shield && p.Stamina > .12f;
                 if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge)); return; }
                 if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 14f, false); return; }
                 if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
                 if (cmd.Lob) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 15f, true, true); return; }
             }
+            else if (cmd.Slide && p.TackleLock <= 0) { AttemptSlide(p); return; }
             else if (cmd.Tackle && p.TackleLock <= 0) { AttemptTackle(p); return; }
-            if (cmd.Shoot && ball.Owner < 0 && Mx.FlatDist(p.Pos, ball.Pos) < 1.4f && ball.Pos.Y < 1.6f)
+            // First-touch actions on a loose ball, so pass/shoot keys are never dead
+            // just because the controlled player is not the registered owner yet.
+            if (ball.Owner < 0 && Mx.FlatDist(p.Pos, ball.Pos) < 1.6f && ball.Pos.Y < 1.6f)
             {
-                Shoot(p, MathF.Max(.25f, cmd.Charge), true); return;
+                if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge), true); return; }
+                if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 14f, false); return; }
+                if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
             }
         }
 
@@ -433,9 +470,11 @@ public sealed class MatchEngine
                     // Lead the carrier, and put the second/third presser on the goal side
                     // so they cut off the escape lane instead of all chasing the same spot.
                     float lane = p.Index == chaser1 ? .55f : p.Index == chaser2 ? -1.1f : -2.4f;
-                    Vector3 side = new Vector3(0, 0, MathF.Sign(p.Pos.Z - carrier.Pos.Z) * .7f);
-                    p.Target = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f
-                               + (p.Index == chaser1 ? Vector3.Zero : side);
+                    // Distinct wings for the supporting pressers, so three defenders
+                    // do not converge on the exact same pixel and form a scrum.
+                    Vector3 side = p.Index == chaser1 ? Vector3.Zero
+                                 : new Vector3(0, 0, p.Index == chaser2 ? 2.4f : -2.4f);
+                    p.Target = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f + side;
                     p.Pressing = true;
                 }
                 else
@@ -589,17 +628,30 @@ public sealed class MatchEngine
         Add(EventKind.Shot, $"{p.Spec.DisplayName} shoots!");
     }
 
-    private void AttemptTackle(PlayerState p)
+    /// <summary>Standing tackle, or a committed slide with more reach and more foul risk.</summary>
+    private void AttemptTackle(PlayerState p, bool slide = false)
     {
-        p.TackleLock = .8f;
-        p.Action = "tackle"; p.ActionTimer = .45f;
+        p.TackleLock = slide ? 1.35f : .8f;
+        p.Action = slide ? "slide" : "tackle";
+        p.ActionTimer = slide ? .60f : .45f;
         var b = State.Ball;
         if (b.Owner < 0) return;
         var carrier = State.Players[b.Owner];
         if (carrier.Team == p.Team) return;
         float d = Mx.FlatDist(p.Pos, carrier.Pos);
-        if (d > 2.0f) return;
-        float chance = .35f + p.Spec.Defending * .40f - carrier.Spec.Pace * .18f - (d - 1f) * .15f;
+        float reach = slide ? 3.2f : 2.4f;
+        if (d > reach) return;
+
+        // "Use your power to get between the player and the ball": a defender on the
+        // goal side / in front of the carrier wins the strength contest more often,
+        // while a shielding carrier makes himself harder to dispossess.
+        Vector3 f = Mx.Norm(Mx.Flat(carrier.Facing));
+        float between = Mx.Clamp(Vector3.Dot(Mx.Flat(p.Pos - carrier.Pos), f) / MathF.Max(.4f, d), -1f, 1f);
+        float strength = (p.Spec.Bulk - 1f) * .35f + p.Spec.Defending * .22f;
+        float shield = carrier.Shielding ? .22f + (carrier.Spec.Bulk - 1f) * .12f : 0f;
+        float chance = .34f + p.Spec.Defending * .34f + strength + between * .20f - shield
+                       - carrier.Spec.Pace * .12f - (d - 1f) * .10f + (slide ? .12f : 0f);
+        chance = Mx.Clamp(chance, .08f, .88f);
         if (Rng.Next() < chance)
         {
             b.Owner = p.Index;
@@ -608,10 +660,16 @@ public sealed class MatchEngine
             b.Vel = Vector3.Zero;
             Add(EventKind.Tackle, $"{p.Spec.DisplayName} wins the ball!");
         }
-        else if (Options.Fouls && Rng.Next() < .18f + (d - 1f) * .12f)
+        else if (Options.Fouls && d < (slide ? 2.6f : 1.7f)
+                 && Rng.Next() < (slide ? .30f : .12f))
         {
+            // Only a genuinely close, failed challenge can be a foul now: previously
+            // every miss at 2 m had an ~18% chance of a free kick that looked like
+            // nothing happened.  Give the victim a visible stumble too.
             State.Fouls[p.Team]++;
-            p.Cards += Rng.Next() < .18f ? 1 : 0;
+            p.Cards += Rng.Next() < .12f ? 1 : 0;
+            carrier.Action = "foul"; carrier.ActionTimer = 1.1f;
+            carrier.Vel *= .2f;
             float ownGoalX = OwnGoalPos(p.Team).X;
             bool inBox = MathF.Abs(b.Pos.X - ownGoalX) < 16.5f && MathF.Abs(b.Pos.Z) < 20.16f;
             Add(EventKind.Foul, p.Cards > 0 ? "Foul! Yellow card." : "Foul! Free kick.");
@@ -619,6 +677,8 @@ public sealed class MatchEngine
             else AwardFreeKick(1 - p.Team, b.Pos, false);
         }
     }
+
+    private void AttemptSlide(PlayerState p) => AttemptTackle(p, true);
 
     private void AwardFreeKick(int side, Vector3 pos, bool penalty)
     {
@@ -687,20 +747,32 @@ public sealed class MatchEngine
         p.Vel = Mx.MoveTowards(p.Vel, targetVel, accel);
         p.Pos += p.Vel * dt;
         p.Pos.Y = 0;
-        if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f);
+        if (p.Shielding) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .12f);
+        else if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f);
         else p.Stamina = MathF.Min(1f, p.Stamina + dt * .022f);
         float planar = Mx.Flat(p.Vel).Length();
         if (planar > .15f) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.Flat(p.Vel), MathF.Min(1f, dt * 9f)));
         else if (State.Ball.Owner == p.Index || p.IsKeeper) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.FlatDir(p.Pos, GoalPos(p.Team)), MathF.Min(1f, dt * 5f)));
         p.AnimPhase += dt * (2.2f + planar * 1.5f);
         if (p.ActionTimer <= 0) p.Action = planar > 1.2f ? "run" : "idle";
-        // Simple separation so players don't stack.
+        // Personal space.  The old .62 m / .38 push was far too weak: with three
+        // pressers and a carrier all aiming at the same point, players visibly
+        // stacked into one scrum.  Keep a 1 m bubble and push harder.
         foreach (var q in State.Players)
         {
             if (q.Index == p.Index) continue;
             Vector3 diff = Mx.Flat(p.Pos - q.Pos);
             float dd = diff.Length();
-            if (dd > .001f && dd < .62f) p.Pos += Mx.Norm(diff) * (.62f - dd) * .38f;
+            if (dd > .001f && dd < 1.05f) p.Pos += Mx.Norm(diff) * (1.05f - dd) * .60f;
+        }
+        // Only the carrier and the nearest presser should be right on top of the ball.
+        // IMPORTANT: only while the ball is OWNED.  Around a loose ball everybody
+        // must be allowed to converge, or nobody ever reaches pickup range.
+        if (State.Ball.Owner >= 0 && p.Index != State.Ball.Owner && !p.Pressing)
+        {
+            Vector3 away = Mx.Flat(p.Pos - State.Ball.Pos);
+            float bd = away.Length();
+            if (bd > .001f && bd < 1.45f) p.Pos += Mx.Norm(away) * (1.45f - bd) * .35f;
         }
         p.Pos.X = Mx.Clamp(p.Pos.X, -Mx.HalfLength - 2.5f, Mx.HalfLength + 2.5f);
         p.Pos.Z = Mx.Clamp(p.Pos.Z, -Mx.HalfWidth - 2.5f, Mx.HalfWidth + 2.5f);

@@ -15,5 +15,6 @@
     <Compile Include="../Scripts/Core/Teams.cs" />
     <Compile Include="../Scripts/Core/CharacterSpec.cs" />
     <Compile Include="../Scripts/Core/Match.cs" />
+    <Compile Include="../Scripts/Core/Gait.cs" />
   </ItemGroup>
 </Project>

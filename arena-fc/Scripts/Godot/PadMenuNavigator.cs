@@ -87,10 +87,19 @@ public partial class PadMenuNavigator : Node
     {
         if (focus is CheckBox check)
         {
-            check.ButtonPressed = !check.ButtonPressed;
-            check.EmitSignal(BaseButton.SignalName.Toggled, check.ButtonPressed);
+            bool on = !check.ButtonPressed;
+            check.ButtonPressed = on;                    // visual state
+            if (Ui.CheckChanged.TryGetValue(check, out var toggled)) toggled(on);
+            else check.EmitSignal(BaseButton.SignalName.Toggled, on);
         }
-        else if (focus is BaseButton btn) btn.EmitSignal(BaseButton.SignalName.Pressed);
+        else if (focus is Button btn)
+        {
+            // Call the same Action that a mouse click uses.  EmitSignal("pressed")
+            // alone proved unreliable for C# event subscriptions from another node.
+            if (Ui.ButtonClicked.TryGetValue(btn, out var click)) click();
+            else btn.EmitSignal(BaseButton.SignalName.Pressed);
+        }
+        else if (focus is BaseButton other) other.EmitSignal(BaseButton.SignalName.Pressed);
     }
 
     private static void GoBack(Node root)
@@ -100,7 +109,8 @@ public partial class PadMenuNavigator : Node
             if (c is Button b && (b.Text == "Back" || b.Text == "Resume"))
             {
                 b.GrabFocus();
-                b.EmitSignal(BaseButton.SignalName.Pressed);
+                if (Ui.ButtonClicked.TryGetValue(b, out var click)) click();
+                else b.EmitSignal(BaseButton.SignalName.Pressed);
                 return;
             }
     }

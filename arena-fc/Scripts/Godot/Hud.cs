@@ -143,7 +143,7 @@ public partial class Hud : CanvasLayer
         Place(_stamina, .5f, 1f, -130, -32, 260, 10);
         root.AddChild(_stamina);
 
-        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E pass  ·  SPACE shoot (hold)  ·  Q through  ·  F tackle  ·  TAB switch  ·  C / pad R3 camera  ·  ESC pause",
+        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E pass  ·  SPACE shoot  ·  F tackle  ·  SHIFT+F slide  ·  X shield  ·  Q through  ·  TAB switch  ·  C / pad R3 camera  ·  ESC pause",
                       12, Ui.Sub);
         Place(_hint, .5f, 1f, -470, -14, 940, 18);
         root.AddChild(_hint);
@@ -272,6 +272,9 @@ public partial class Hud : CanvasLayer
         if (s.Phase == Phase.Goal && _toastTimer <= 0) ShowToast("GOAL!", 2.8f);
         else if (s.Phase == Phase.HalfTime && _toastTimer <= 0) ShowToast("HALF TIME", 2.8f);
         else if (s.Phase == Phase.FullTime) ShowToast($"FULL TIME   {s.Score[0]} - {s.Score[1]}", 99f);
+        // A free kick used to appear from nowhere: make the whistle decision visible.
+        else if (s.Phase == Phase.Penalty && _toastTimer <= 0) ShowToast("FOUL · PENALTY!", 2.2f);
+        else if (s.Phase == Phase.FreeKick && _toastTimer <= 0) ShowToast("FOUL · FREE KICK", 1.8f);
         if (_toastTimer > 0)
         {
             _toastTimer -= dt;

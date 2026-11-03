@@ -57,9 +57,18 @@ is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the Pa
   item, and `PadMenuNavigator` (on the Window, outside the menu/match swaps) walks focus with the d-pad /
   left stick, activates with A / Start and goes back with B. It uses the same `PadLayout` tables as
   gameplay, so unmapped EasySMX D-input pads work too. A / left-right also cycle combos and sliders.
-* **Four camera angles.** `C` (or pad R3/L3) cycles Broadcast → Player cam → **Sideline** (new low,
-  wide 14 m tracking shot) → Tactical. Sideline fills the gap between the near on-pitch view and the
-  high views; WASD is camera-relative in all four.
+* **Five camera angles.** `C` (or pad R3/L3) cycles Broadcast → Player cam → **Shoulder** (8.5 m high,
+  13 m behind the controlled player, slightly off-axis) → **Sideline** (14 m / 24 m wide tracking) →
+  Tactical (62 m top-down). Shoulder is the missing step between "right on top of the players" and the
+  next view out; WASD is camera-relative in all five.
+* **Pad menus select with any face button.** A pad reported as "known" but actually sending raw D-input
+  indices used to leave `A` unmapped, so up/down worked while nothing could be selected. Menus now
+  accept **any** A/B/X/Y, Start or Back for select, use the direct click callback rather than a
+  synthesised signal, and go back on R3/L3.
+* **Full action set (desktop):** `E`/A pass, `SPACE`/X shoot (hold), `Q`/Y through ball, `R` chip,
+  `F`/B standing tackle, **`SHIFT+F` / sprint+B slide tackle** (3.2 m reach, bigger foul risk),
+  **`X` / pad LB (raw Back) held = shield** (strength contest, drains stamina), `TAB` switch,
+  `C` camera, `ESC` pause. First-touch pass/shoot also work within 1.6 m of a loose ball.
 * **Remap** from **CONTROLLER SETUP** in the main menu (desktop and browser): *Remap pad 1/2*, then press
   the button asked for each action. Bindings are saved per pad name in `user://pads.json` (IndexedDB in
   the browser) and restored next time. The screen also lists each pad's name, detected kind and current
@@ -125,8 +134,20 @@ in the WASM engine. The desktop C# game also cannot run in this runtime (Godot c
 * **Rounded joints and shaped boots.** The procedural 18-bone rig now has hip, knee, ankle, shoulder,
   elbow and wrist spheres, shorts/sock kit bands, a boot toe box, a dark sole and a coloured stripe, plus
   rim/specular materials so the joints read as separate volumes instead of one straight cylinder.
-* **Smoother gait.** `RigAnimator.Pose` (C#) and `BrowserBoot.animate_rig` (GDScript) replaced the
-  half-wave-rectified sine — which snapped legs between two straight angles — with harmonic hip swing,
-  a continuously flexing knee, ankle toe-off, counter-swinging arms with elbow flex, spine/hip twist,
-  forward lean, head stabilisation and a two-bounce-per-stride weight shift. Both editions pose `LFoot` /
-  `RFoot` now too. Same 18 bones, same 9 material slots, so overrides and exports are unaffected.
+* **Smoother gait, correct direction.** `Scripts/Core/Gait.cs` is now the single, pure-C# gait curve
+  used by `RigAnimator.Pose` (and mirrored in `BrowserBoot.animate_rig`). A leg bone points down, so a
+  **negative** X rotation swings it forward and a **positive** knee angle folds the shin back — the old
+  positive thigh angles kicked the legs out behind the player and made knees look locked. Knees now bend
+  even while walking, ankles counter-rotate, and the stride has harmonic hip swing, torso twist, lean,
+  head stabilisation and a two-bounce weight shift. `Tests/MatchCoreTests.cs` asserts the sign convention.
+* **Fewer phantom free kicks.** Failed tackles only become fouls within 1.7 m (2.6 m for a slide) and at
+  12% / 30% instead of every miss at 2 m at ~18%. The fouled player now visibly stumbles (`foul` pose),
+  the slider has its own low `slide` pose, and the HUD shows `FOUL · FREE KICK` / `FOUL · PENALTY!`.
+  In the deterministic 60 s sim, free kicks dropped from 4 invisible ones to 1.
+* **Less bunching.** Personal space went from 0.62 m to 1.05 m with a stronger push, non-carriers are
+  nudged out of the carrier's immediate space (but **never** away from a loose ball — otherwise nobody
+  can pick it up), and the two supporting pressers now take opposite wings instead of the same point.
+  Average players within 4 m of the ball: 2.62 → 2.24.
+* **Auto-selected controlled player.** When the home side has the ball the ring goes to the carrier;
+  otherwise it moves to the nearest outfielder if that player is ≥1.6 m closer. TAB switching gets a
+  1.2 s lock so auto-select does not fight you. This is why pass/tackle previously felt dead.
