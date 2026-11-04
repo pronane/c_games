@@ -104,7 +104,8 @@ Set `TRUST_PROXY=1` behind any of these, and `ARENA_ALLOWED_ORIGINS` to your sit
 **No .NET needed any more:** `arena-fc/ARENA_NODE.md` describes a Node port of the match that runs inside the same hub
 (`ARENA_NATIVE=1`, `arena-fc/option-a/Dockerfile`). It speaks the same protocol, passes the existing protocol
 tests and serves the browser build, so you can deploy the whole thing on your existing Node service. The C#
-server stays blocked on the missing `Scripts/Core/Net/*.cs` and is only needed for the desktop 11-a-side game.
+`.NET` server is now restored too: `Scripts/Core/Net/*.cs` was rebuilt from the checked-in wire format
+(see `MISSING_NET_SOURCES.md`); it builds on .NET 9 and is used by the desktop C# clients.
 
 ## Browser preview without a Godot editor
 

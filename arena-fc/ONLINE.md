@@ -152,9 +152,12 @@ amber. Touch controls and the browser build use the on-screen buttons.
   `ping`/`pong` measures RTT; `chat` relays lobby messages. Protocol version
   is checked on connect; mismatches get a clear error.
 
-Message DTOs, quantization, snapshot build/apply, state hashing and replay
-live in `Scripts/Core/Net/NetProtocol.cs` — Godot-free, so they are unit
-tested by `Tests/CoreTests.csproj` and shared by the server and both clients.
+Message DTOs, quantization, snapshot build/apply, state hashing, replay,
+rollback and the Godot-free desktop client live in `Scripts/Core/Net/`
+(`NetProtocol.cs`, `Packet.cs`, `Snapshot.cs`, `StateCodec.cs`, `Replay.cs`,
+`RollbackPredictor.cs`, `OnlineClient.cs`, `OnlineMatch.cs`) — Godot-free, so
+they are unit tested by `Tests/CoreTests.csproj` and shared by the server and
+both clients.
 
 ---
 
