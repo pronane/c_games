@@ -25,6 +25,10 @@ public sealed class MatchOptions
     public string HomeFormation = "4-4-2";
     public string AwayFormation = "4-3-3";
     public List<CharacterSpec>? CustomHome;
+    /// <summary>True when a remote human controls the away side (2-player online).</summary>
+    public bool AwayHuman;
+    public int CameraMode;
+    public float CameraZoom = .68f;
 }
 
 public struct PlayerCommand
@@ -84,7 +88,7 @@ public sealed class MatchState
     public float[] PossessionTime = new float[2];
     public PlayerState[] Players = Array.Empty<PlayerState>();
     public BallState Ball = new();
-    public int Controlled = -1, KickoffSide = 0, RestartSide = 0, AttackSign = 1;
+    public int Controlled = -1, ControlledAway = -1, KickoffSide = 0, RestartSide = 0, AttackSign = 1;
     /// <summary>Grace period after TAB switching before auto-select may move control again.</summary>
     public float ControlLock;
     public Vector3 RestartPos;
@@ -92,7 +96,7 @@ public sealed class MatchState
     public int GoalScorer = -1;
 }
 
-public sealed class MatchEngine
+public sealed partial class MatchEngine
 {
     public const float Dt = 1f / 60f;
     public readonly MatchOptions Options;
@@ -183,6 +187,8 @@ public sealed class MatchEngine
             int second = State.KickoffSide * Options.TeamSize + Math.Min(Options.TeamSize - 1, 4);
             if (second != taker) State.Players[second].Pos = new Vector3(-SideSign(State.KickoffSide) * 2.4f, 0, 2.2f);
             State.Controlled = FindNearestHome(State.Ball.Pos, true);
+            State.ControlledAway = Options.AwayHuman && Options.TeamSize > 1
+                ? Options.TeamSize + 1 : -1;
         }
     }
 
@@ -212,7 +218,10 @@ public sealed class MatchEngine
         }
     }
 
-    private void Tick(float dt, PlayerCommand cmd)
+    /// <summary>netCmds is non-null for authoritative/networked ticks: every key is a
+    /// human-controlled player with its own command.  Offline play keeps the single
+    /// cmd + State.Controlled behaviour unchanged.</summary>
+    private void Tick(float dt, PlayerCommand cmd, Dictionary<int, PlayerCommand>? netCmds = null)
     {
         _tick++;
         _globalTime += dt;
@@ -269,29 +278,56 @@ public sealed class MatchEngine
 
         // ---- Human control ----
         S.ControlLock = MathF.Max(0f, S.ControlLock - dt);
-        if (cmd.Switch && S.Controlled >= 0)
+        if (netCmds == null)
         {
-            S.Controlled = FindNearestHome(S.Ball.Pos, true);
-            S.ControlLock = 1.2f;                 // respect a manual switch briefly
-        }
-        // Auto-select: the ring must be on a player who can actually affect the ball.
-        // Without this, the controlled player stayed on whoever last touched it while
-        // the opposition walked past, so pass/tackle buttons appeared dead.
-        if (S.ControlLock <= 0f && S.Controlled >= 0 && S.Controlled < S.Players.Length)
-        {
-            int best = S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0
-                ? S.Ball.Owner                                    // attacking: control the carrier
-                : FindNearestHome(S.Ball.Pos, true);             // defending/loose: closest outfielder
-            if (best >= 0 && best != S.Controlled)
+            if (cmd.Switch && S.Controlled >= 0)
             {
-                float dCur = Mx.FlatDist(S.Players[S.Controlled].Pos, S.Ball.Pos);
-                float dBest = Mx.FlatDist(S.Players[best].Pos, S.Ball.Pos);
-                if (S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0) S.Controlled = best;
-                else if (dBest + 1.6f < dCur) S.Controlled = best;   // hysteresis: no flicker
+                S.Controlled = FindNearestHome(S.Ball.Pos, true);
+                S.ControlLock = 1.2f;                 // respect a manual switch briefly
+            }
+            // Auto-select: the ring must be on a player who can actually affect the ball.
+            // Without this, the controlled player stayed on whoever last touched it while
+            // the opposition walked past, so pass/tackle buttons appeared dead.
+            if (S.ControlLock <= 0f && S.Controlled >= 0 && S.Controlled < S.Players.Length)
+            {
+                int best = S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0
+                    ? S.Ball.Owner                                    // attacking: control the carrier
+                    : FindNearestHome(S.Ball.Pos, true);             // defending/loose: closest outfielder
+                if (best >= 0 && best != S.Controlled)
+                {
+                    float dCur = Mx.FlatDist(S.Players[S.Controlled].Pos, S.Ball.Pos);
+                    float dBest = Mx.FlatDist(S.Players[best].Pos, S.Ball.Pos);
+                    if (S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0) S.Controlled = best;
+                    else if (dBest + 1.6f < dCur) S.Controlled = best;   // hysteresis: no flicker
+                }
             }
         }
+        else
+        {
+            // Each networked human may request a player switch on its own team.
+            foreach (var kv in netCmds)
+                if (kv.Value.Switch && kv.Key >= 0 && kv.Key < S.Players.Length)
+                {
+                    int next = FindNearestForTeam(S.Players[kv.Key].Team, S.Ball.Pos, true);
+                    if (next < 0) continue;
+                    if (S.Players[kv.Key].Team == 0) S.Controlled = next;
+                    else S.ControlledAway = next;
+                }
+        }
         var humans = new HashSet<int>();
-        if (S.Controlled >= 0 && S.Controlled < S.Players.Length) humans.Add(S.Controlled);
+        if (netCmds != null)
+        {
+            foreach (int idx in netCmds.Keys)
+                if (idx >= 0 && idx < S.Players.Length) humans.Add(idx);
+        }
+        else if (S.Controlled >= 0 && S.Controlled < S.Players.Length) humans.Add(S.Controlled);
+
+        PlayerCommand For(int idx)
+        {
+            if (!humans.Contains(idx)) return PlayerCommand.None;
+            if (netCmds != null) return netCmds.TryGetValue(idx, out var c) ? c : PlayerCommand.None;
+            return cmd;
+        }
 
         // ---- AI decisions ----
         foreach (var p in S.Players)
@@ -303,12 +339,12 @@ public sealed class MatchEngine
             if (p.DecisionTimer <= 0)
             {
                 p.DecisionTimer = Rng.Range(.08f, .18f);
-                Decide(p, humans.Contains(p.Index) ? cmd : PlayerCommand.None, humans.Contains(p.Index));
+                Decide(p, For(p.Index), humans.Contains(p.Index));
             }
         }
 
         // ---- Movement ----
-        foreach (var p in S.Players) MovePlayer(p, dt, humans.Contains(p.Index) ? cmd : PlayerCommand.None, humans.Contains(p.Index));
+        foreach (var p in S.Players) MovePlayer(p, dt, For(p.Index), humans.Contains(p.Index));
 
         // ---- Ball ----
         S.Ball.NoPickup = MathF.Max(0, S.Ball.NoPickup - dt);

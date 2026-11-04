@@ -236,8 +236,10 @@ phone browser can play against a desktop C# client. Full setup, architecture,
 protocol, verification commands and honest limits: **`ONLINE.md`**.
 
 The server source is `Server/` (no NuGet dependencies), the shared wire
-protocol + full-state codec + rollback predictor are `Scripts/Core/Net/`, the
-client is `Scripts/Godot/Net/`, and `Tools/net_smoketest.py`,
+protocol + full-state codec + rollback predictor + Godot-free client are
+`Scripts/Core/Net/`, and the desktop **PLAY WITH FRIENDS** lobby lives in
+`Scripts/Godot/GameApp.cs` (driving `Scripts/Godot/MatchView.cs`).
+`Tools/net_smoketest.py`,
 `Tools/net_v2_smoketest.py`, `Tools/net_reconnect_e2e.py` and
 `Tools/net_hostmigration_e2e.py` are dependency-free end-to-end tests. `media/videos/06_friends.mp4`, `07_online_v2.mp4` and
 screenshots `27`–`32` are real captures of online play.

@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using ArenaFC.Core;
+using ArenaFC.Core.Net;
 using Godot;
 
 namespace ArenaFC.GodotGame;
@@ -15,6 +16,8 @@ public partial class MatchView : Node3D
     public BroadcastCamera Cam = null!;
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
     public MeshInstance3D Ball = null!, Cursor = null!;
+    /// <summary>When set, the authoritative server drives the sim instead of the local engine.</summary>
+    public OnlineMatch? Online;
 
     private MatchOptions _opts = new();
     private Action? _onExit;
@@ -45,7 +48,9 @@ public partial class MatchView : Node3D
         stadium.Build(true);
         AddChild(stadium);
 
-        Engine = new MatchEngine(_opts);
+        // Online: the mirror/predictor engine is authoritative for rendering, but
+        // it is still a plain MatchEngine so every HUD/camera/rig path is reused.
+        Engine = Online != null ? Online.Engine : new MatchEngine(_opts);
         Rigs = new CharacterRig[Engine.State.Players.Length];
         for (int i = 0; i < Rigs.Length; i++)
         {
@@ -114,8 +119,15 @@ public partial class MatchView : Node3D
         }
         if (Input.PausePressed) Hud.SetPaused(!Hud.Paused);
         if (Input.CameraPressed) Cam.Cycle();
-        if (Hud.Paused) { Hud.Update(Engine, dt, Input.Charge, Cam.ModeName); return; }
-        Engine.Step(dt, cmd);
+        if (Hud.Paused)
+        {
+            // Keep draining authoritative packets even while the local UI is paused.
+            Online?.Client.Poll();
+            Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
+            return;
+        }
+        if (Online != null) Online.Step(dt, cmd);   // send input + predict/reconcile
+        else Engine.Step(dt, cmd);                  // offline single-player
         PlayEventSounds();
         Sync(dt);
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);

@@ -95,9 +95,9 @@ int flips = 0, prevOwner = pos.State.Ball.Owner, longestHold = 0, hold = 0;
 for (int i = 0; i < 3600; i++)
 {
     pos.Step(1f / 60f, PlayerCommand.None);
-    int o = pos.State.Ball.Owner;
-    if (o != prevOwner) { flips++; prevOwner = o; hold = 0; }
-    else if (o >= 0) { hold++; longestHold = Math.Max(longestHold, hold); }
+    int curOwner = pos.State.Ball.Owner;
+    if (curOwner != prevOwner) { flips++; prevOwner = curOwner; hold = 0; }
+    else if (curOwner >= 0) { hold++; longestHold = Math.Max(longestHold, hold); }
 }
 Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
 Check("a carrier can dribble for several seconds", longestHold > 180, $"longest={longestHold} ticks");
@@ -415,6 +415,101 @@ rb3.Predict(new Dictionary<int, PlayerCommand>
 Check("local input moves the player on the next simulated frame (zero RTT)",
       rb3.Engine.State.Players[rb3Local].Pos.X > x0,
       $"{x0:F2} -> {rb3.Engine.State.Players[rb3Local].Pos.X:F2}");
+
+Section("Desktop C# online client (protocol v2 loopback)");
+var loop = new LoopbackTransport();
+var oc = new OnlineClient();
+bool ocOk = oc.Connect("192.168.1.5:7777/", " ab-12 cd ", "Ada", null, true, loop);
+Check("connect normalises URL, room and name",
+      ocOk && loop.Url == "ws://192.168.1.5:7777" && oc.Room == "AB12CD" && oc.Name == "Ada" && oc.Connected);
+var helloPkt = loop.LastSent();
+Check("hello advertises protocol v2, desktop caps and create",
+      helloPkt != null && helloPkt.T == NetProtocol.Hello && helloPkt.Ver == NetProtocol.Version &&
+      helloPkt.Caps == NetProtocol.CapFullDesktop && helloPkt.Create == true);
+loop.Push(new Packet { T = NetProtocol.Welcome, Room = "AB12CD", Slot = 0, Team = 0, Size = 5,
+                       Seed = 909, Host = 0, Authority = 0, Grace = 180, Started = false,
+                       Token = new string('x', 43) });
+oc.Poll();
+Check("welcome assigns slot, team, host and a resume token",
+      oc.Slot == 0 && oc.Team == 0 && oc.IsHost && oc.Token.Length == 43 && oc.TeamSize == 5 && oc.Seed == 909);
+loop.Push(new Packet { T = NetProtocol.Lobby, Room = "AB12CD", Host = 0,
+                       Names = new[] { "Ada", "Bo" }, Slots = new[] { 0, 1 }, Teams = new[] { 0, 1 },
+                       Onlines = new[] { true, true }, Readys = new[] { false, true } });
+oc.Poll();
+Check("lobby updates names, slots, teams and readiness",
+      oc.Names.Length == 2 && oc.Slots[1] == 1 && oc.Teams[1] == 1 && oc.Readys[1]);
+loop.Push(new Packet { T = NetProtocol.Ping, Ms = 123 });
+oc.Poll();
+Check("server ping is answered with a pong carrying the same timestamp",
+      loop.LastSent()?.T == NetProtocol.Pong && loop.LastSent()?.Ms == 123);
+oc.SendInput(new PlayerCommand { Move = new Vector2(.5f, .25f), Pass = true });
+var inputPkt = loop.LastSent();
+Check("input is quantised, sequenced and omits default fields",
+      inputPkt?.T == NetProtocol.Input && inputPkt.Seq == 1 &&
+      inputPkt.Cmd != null && inputPkt.Cmd.Mx == .5f && inputPkt.Cmd.My == .25f && inputPkt.Cmd.Pa);
+oc.SendStart(); oc.SendReady(true); oc.SendChat("gg");
+Check("start / ready / chat use the checked-in message names",
+      loop.Sent[^3].Contains("\"t\":\"start\"") && loop.Sent[^2].Contains("\"t\":\"ready\"") &&
+      loop.Sent[^1].Contains("\"t\":\"chat\""));
+loop.Push(new Packet { T = NetProtocol.Error, Reason = "Room full" });
+oc.Poll();
+Check("server errors are surfaced", oc.LastError == "Room full" && oc.Status.Contains("Room full"));
+Check("local controlled index falls back when no ctrls arrived", oc.LocalPlayerIndex(99) == 99);
+oc.Ctrls = new[] { 4, -1, -1, -1 };
+Check("ctrls maps the local slot to its player", oc.LocalPlayerIndex(0) == 4);
+oc.Close();
+Check("close releases the transport and clears match flags", !oc.Connected && !oc.InMatch && !oc.Started);
+
+Section("Online match driver (deterministic loopback, rollback reconciliation)");
+var l2 = new LoopbackTransport();
+var om = new OnlineMatch(new MatchOptions { Seed = 909, TeamSize = 5, AwayHuman = false });
+om.Connect("ws://127.0.0.1:7777", "TEST77", "Ada", null, true, l2);
+l2.Push(new Packet { T = NetProtocol.Welcome, Room = "TEST77", Slot = 0, Team = 0,
+                     Size = 5, Seed = 909, Host = 0 });
+om.Client.Poll();
+var auth = new MatchEngine(new MatchOptions { Seed = 909, TeamSize = 5, AwayHuman = false });
+int localIdx = auth.State.Controlled;
+l2.Push(new Packet { T = NetProtocol.Begin, Room = "TEST77", Seed = 909, Size = 5, Tick = 0,
+                     Host = 0, Authority = 0, TimeSpeed = 15f, HalfMinutes = 45f,
+                     AwayHuman = false, Ctrls = new[] { localIdx, -1, -1, -1 } });
+om.Client.Poll();
+Check("begin builds a mirror engine and a zero-RTT predictor",
+      om.Started && om.Predictor != null && om.Engine.State.Players.Length == 10 &&
+      om.LocalIndex == localIdx);
+var snaps = new List<Packet>();
+var frameLog = new List<InputFrameDto>();
+for (int i = 1; i <= 30; i++)
+{
+    var rawCmd = new PlayerCommand
+    {
+        Move = new Vector2((float)Math.Sin(i * .17f), (float)Math.Cos(i * .13f)),
+        Sprint = i % 4 == 0, Pass = i % 11 == 0,
+    };
+    var netCmd = CommandDto.From(rawCmd).To();       // exactly what goes over the wire
+    auth.StepOneTick(new Dictionary<int, PlayerCommand> { [localIdx] = netCmd });
+    frameLog.Add(new InputFrameDto
+    {
+        T = i, C = new Dictionary<int, CommandDto> { [localIdx] = CommandDto.From(netCmd) },
+    });
+    snaps.Add(Snapshot.Build(auth, i, new[] { localIdx, -1, -1, -1 }, null, null, frameLog.ToArray()));
+    if (i > 3) l2.Push(snaps[i - 4]);          // 3-tick snapshot delay
+    om.Step(1f / 60f, netCmd);
+}
+Check("client streamed one input packet per predicted tick",
+      l2.Sent.Count(s => s.Contains("\"t\":\"input\"")) == 30, $"n={l2.Sent.Count(s => s.Contains("\"t\":\"input\""))}");
+Check("snapshots triggered bounded rollback corrections",
+      om.Corrections >= 8 && om.LastReplayed <= NetProtocol.MaxRollbackTicks && om.LastReplayed > 0,
+      $"corrections={om.Corrections} lastReplay={om.LastReplayed}");
+Check("predicted desktop state matches the authoritative engine",
+      NetProtocol.Hash(om.Engine.State) == NetProtocol.Hash(auth.State),
+      $"client={NetProtocol.Hash(om.Engine.State):X8} server={NetProtocol.Hash(auth.State):X8}");
+Check("input history stays bounded", om.BufferedFrames <= om.Predictor!.MaxHistory + 1,
+      $"frames={om.BufferedFrames}");
+var interpEng = new MatchEngine(new MatchOptions { Seed = 909, TeamSize = 5, AwayHuman = false });
+OnlineMatch.Interpolate(interpEng, snaps[^1], snaps[^1], .5f);
+Check("interpolation of identical frames reproduces the authoritative hash",
+      NetProtocol.Hash(interpEng.State) == NetProtocol.Hash(auth.State));
+om.Close();
 
 Section("USB / EasySMX gamepad support (PadLayout)");
 var noSaved = new Dictionary<string, Dictionary<string, int>>();

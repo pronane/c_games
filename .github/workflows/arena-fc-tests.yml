@@ -33,6 +33,12 @@ jobs:
       - name: Build the Godot C# assemblies with .NET 9
         working-directory: arena-fc
         run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Build the authoritative .NET server (v2 protocol)
+        working-directory: arena-fc
+        run: dotnet build Server/ArenaFC.Server.csproj -c Release -v:q
+      - name: Full C# core + protocol + rollback + online-client suite
+        working-directory: arena-fc
+        run: dotnet run --project Tests/CoreTests.csproj -c Release
       - name: Pure-C# match core regression tests
         working-directory: arena-fc
         run: dotnet run --project Tests/MatchCoreTests.csproj -c Release

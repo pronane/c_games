@@ -355,7 +355,8 @@ def main() -> int:
     check("gait is a shared pure-C# curve with forward thighs and bending knees",
           "Gait.Compute" in world3d and "float hipL = -(s * .66f" in gait_cs
           and "float kneeL = (.14f" in gait_cs and 'Set(rig, "LFoot"' in world3d
-          and (ROOT / "Tests" / "MatchCoreTests.csproj").read_text(encoding="utf-8").find("Gait.cs") >= 0)
+          and any(k in (ROOT / "Tests" / "MatchCoreTests.csproj").read_text(encoding="utf-8")
+                  for k in ("Gait.cs", "Scripts/Core/**/*.cs")))
     browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
     check("browser edition mirrors the corrected gait signs",
           "var hip_l: float = -(s * 0.66" in browser and "sin(ph + 0.40)" in browser)

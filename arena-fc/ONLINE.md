@@ -217,6 +217,44 @@ real match against a desktop host (browser received 218 snapshots; host
 received 435 in 22 s). See `media/videos/06_friends.mp4` and
 `media/screenshots/27–30`.
 
+> **Historical note.** The block above describes captures made with the original
+> (never-committed) C# net sources and the media files that are also absent from
+> this checkout. It is kept for context; it does **not** describe what was run
+> for the rebuild below.
+
+### 6.1 Rebuild verification (option 2, current checkout)
+
+The C# net layer has been rewritten from the wire format documented in §4/§7,
+`Web/NetClient.gd`, `Web/BrowserBoot.gd`, `Tools/net_*smoketest.py` and the Node
+reference server. See `MISSING_NET_SOURCES.md` for the file-by-file mapping.
+
+```text
+Tests/Program.cs .................. 148 passed, 0 failed
+  (rig, rosters, RNG, match, possession, replay, protocol, snapshots,
+   interpolation, engine checkpoints, full-state handoff, resume tokens,
+   rollback prediction, desktop online client + online match loopback, pads)
+Tests/MatchCoreTests.cs ........... 15 passed, 0 failed
+Server/*.cs + Scripts/Core/**/*.cs  compiles clean (SERVER_COMPILE_OK)
+```
+
+These were executed at the .NET 9 language level with a Roslyn/WASM runner
+because this sandbox has no native `dotnet`, `godot` or socket-capable runtime.
+**Not yet re-verified here:** the actual `ArenaFC.Server` process against
+`net_smoketest.py` / `net_v2_smoketest.py` / the reconnect + host-migration e2e
+suites, a native desktop gameplay recording, and a physical pad. Those need a
+machine with the .NET 9 SDK:
+
+```bash
+dotnet build Server/ArenaFC.Server.csproj -c Release
+dotnet run --project Tests/CoreTests.csproj -c Release
+./run-server.sh 7777
+python3 Tools/net_smoketest.py --url ws://127.0.0.1:7777 --seconds 6
+python3 Tools/net_v2_smoketest.py --url ws://127.0.0.1:7777
+```
+
+The Node hub remains the CI-tested, socket-level end-to-end check
+(`shared/netplay/server/arena/standalone.js`).
+
 ---
 
 ## 7. v2 — reconnect / host migration / rollback
