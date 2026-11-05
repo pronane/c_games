@@ -189,7 +189,13 @@ def _predict_file(path, midi_min, midi_max, thresholds):
     duration = sf.info(path).duration
     notes = [{'id': i, 'time': float(max(onset, 0)), 'duration': float(min(end, duration)-max(onset, 0)), 'midi': int(pitch),
               'amplitude': float(amplitude)} for i, (onset, end, pitch, amplitude, _) in enumerate(events) if midi_min <= int(pitch) <= midi_max and min(end, duration) > max(onset, 0)]
-    return sorted(notes, key=lambda n: (n['time'], n['midi'])), output
+    notes = sorted(notes, key=lambda n: (n['time'], n['midi']))
+    from .song_analysis import resegment_dense_onsets, resegment_enabled
+    if resegment_enabled() and isinstance(output, dict) and 'onset' in output:
+        from basic_pitch.constants import ANNOTATION_HOP
+        notes = resegment_dense_onsets(notes, output['onset'], ANNOTATION_HOP,
+                                       note_activation=output.get('note'), midi_min=midi_min, midi_max=midi_max)
+    return notes, output
 
 
 def transcribe(path, midi_min=40, midi_max=88, posteriors=False, thresholds=None):

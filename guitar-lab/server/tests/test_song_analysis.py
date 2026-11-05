@@ -559,3 +559,70 @@ def test_prior_fingering_is_opt_in_and_pitch_exact(monkeypatch):
     assert sa.fingering(notes, HALF_DOWN) == sa.fingering(notes, HALF_DOWN)
     monkeypatch.delenv('FRETWORK_FINGERING')
     assert sa.fingering(notes, STANDARD) == classic
+
+
+def _onset_matrix(hits, n_frames=400, n_pitch=88, amp=0.8):
+    """hits: list of (frame, midi) with a one-frame onset peak."""
+    onset = np.zeros((n_frames, n_pitch))
+    note = np.zeros((n_frames, n_pitch))
+    for frame, midi in hits:
+        onset[frame, midi - 21] = amp
+        note[frame:frame + 3, midi - 21] = amp
+    return onset, note
+
+
+def test_resegment_fills_every_other_pick_and_leaves_a_slow_line():
+    hop = 0.01
+    # 70 ms chug, decoder kept every other attack. Column peaks are isolated frames.
+    hits = [(20 + i * 7, 40) for i in range(10)]
+    onset, note = _onset_matrix(hits)
+    # A slow melody pitch every 500 ms must not sprout extra notes.
+    slow = [(30 + i * 50, 64) for i in range(6)]
+    for frame, midi in slow:
+        onset[frame, midi - 21] = 0.9
+        note[frame:frame + 3, midi - 21] = 0.9
+    decoded = [{'time': (20 + i * 14) * hop, 'duration': 0.12, 'midi': 40, 'amplitude': 0.8} for i in range(5)]
+    decoded += [{'time': (30 + i * 50) * hop, 'duration': 0.4, 'midi': 64, 'amplitude': 0.8} for i in range(6)]
+    out = sa.resegment_dense_onsets(decoded, onset, hop, note_activation=note)
+    chug = sorted(n['time'] for n in out if n['midi'] == 40)
+    assert len(chug) == 10
+    assert all(n.get('resegmented') for n in out if n['midi'] == 40 and n['time'] not in {d['time'] for d in decoded})
+    assert sum(n['midi'] == 64 for n in out) == 6
+    # Irregular spikes are not a run, so nothing is added.
+    noise = np.zeros_like(onset)
+    for frame in (5, 12, 40, 55, 90, 200):
+        noise[frame, 45 - 21] = 0.9
+    only = [{'time': 0.05, 'duration': .2, 'midi': 45, 'amplitude': .8}]
+    assert len(sa.resegment_dense_onsets(only, noise, hop)) == 1
+    # A harmonic can peak on every pick. With no decoded notes of that pitch, do not invent a line.
+    harmonic = np.zeros_like(onset)
+    for frame, _midi in hits:
+        harmonic[frame, 52 - 21] = 0.9
+    assert not any(n['midi'] == 52 for n in sa.resegment_dense_onsets(decoded, harmonic, hop))
+    # Two decoded octave ghosts are enough to "commit", but not when the fundamental is there too.
+    ghosts = list(decoded) + [
+        {'time': decoded[0]['time'], 'duration': .05, 'midi': 52, 'amplitude': .7},
+        {'time': decoded[2]['time'], 'duration': .05, 'midi': 52, 'amplitude': .7},
+    ]
+    both = np.array(onset)
+    for frame, _midi in hits:
+        both[frame, 52 - 21] = 0.85
+    filled = sa.resegment_dense_onsets(ghosts, both, hop, note_activation=None)
+    assert any(n.get('resegmented') and n['midi'] == 40 for n in filled)
+    assert not any(n.get('resegmented') and n['midi'] == 52 for n in filled)
+
+
+def test_resegment_is_on_by_default_and_reverb_keeps_recovered_picks(monkeypatch):
+    monkeypatch.delenv('FRETWORK_RESEGMENT', raising=False)
+    assert sa.resegment_enabled()
+    monkeypatch.setenv('FRETWORK_RESEGMENT', '0')
+    assert not sa.resegment_enabled()
+    notes = [
+        {'time': 0.00, 'duration': .05, 'midi': 40, 'amplitude': .8, 'resegmented': True},
+        {'time': 0.06, 'duration': .05, 'midi': 40, 'amplitude': .75, 'resegmented': True},
+        {'time': 0.12, 'duration': .05, 'midi': 40, 'amplitude': .7, 'resegmented': True},
+        {'time': 1.00, 'duration': .4, 'midi': 52, 'amplitude': .9},
+        {'time': 1.05, 'duration': .3, 'midi': 52, 'amplitude': .4},  # tail
+    ]
+    kept = sa.suppress_reverb_retriggers(notes)
+    assert [round(n['time'], 2) for n in kept] == [0.0, 0.06, 0.12, 1.0]
