@@ -16,6 +16,7 @@ import {
   Search,
 } from "lucide-react";
 import {
+  compareSongTake,
   createSong,
   deleteSong,
   getSong,
@@ -47,6 +48,8 @@ import { Recorder } from "./recorder";
 import LatencyCheck from "./LatencyCheck";
 import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
+import TakeReport from "./TakeReport";
+import { rememberTake, shownReport, type Comparison } from "./compare";
 import { captureError } from "./audioInputs";
 import { MEDIA_ACCEPT, needsBrowserDecode, toWav } from "./audioFiles";
 import { names } from "./analysis";
@@ -69,6 +72,7 @@ type Props = {
 type Track = { id: string; label: string; verdict: string; isPart: boolean };
 /** A recorded take; `speed` is the playback speed it was played along to. */
 type Take = { buffer: AudioBuffer; start: number; end: number; speed: number; target: string; detail: string };
+type TakeCheck = { id: string; label: string; part: string; role: string; comparison: Comparison };
 /** What the speakers play: the mixer as set, only the chosen part, or the band without it. */
 type Listen = "mixer" | "only" | "without";
 
@@ -104,6 +108,9 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [scoreBusy, setScoreBusy] = useState(false),
     [recording, setRecording] = useState(false),
     [take, setTake] = useState<Take | null>(null),
+    [checks, setChecks] = useState<TakeCheck[]>([]),
+    [checkAt, setCheckAt] = useState(0),
+    [checking, setChecking] = useState(false),
     [mixUrl, setMixUrl] = useState(""),
     [clickOn, setClickOn] = useState(false),
     [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
@@ -186,6 +193,8 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
       setBuffers({});
       setScore(null);
       setTake(null);
+      setChecks([]);
+      setCheckAt(0);
       // WebM, MP4, M4A and similar: decode the sound here so the engine doesn't need ffmpeg.
       let upload = file;
       if (mode === "file" && file && needsBrowserDecode(file.name)) {
@@ -522,6 +531,39 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     if (!take) return;
     const sr = context().sampleRate;
     setMixUrl(URL.createObjectURL(encodeWav(bandWithTake(take), sr)));
+  }
+
+  async function checkTake() {
+    if (!take || !song || song.instrument !== "guitar") return;
+    const learned = targets.find((t) => t.id === take.target) ?? target;
+    if (!learned) return;
+    setChecking(true);
+    setError("");
+    try {
+      const wav = encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate);
+      const comparison = await compareSongTake(song.id, wav, {
+        parts: learned.parts,
+        role: learned.role,
+        tuning: settings.tuning,
+        capo: settings.capo,
+        start: take.start,
+        end: take.end,
+        speed: take.speed,
+      });
+      const entry: TakeCheck = {
+        id: comparison.take_id,
+        label: comparison.history.at(-1)?.label ?? "Take",
+        part: learned.parts.length === 1 ? learned.parts[0] : "all",
+        role: learned.role,
+        comparison,
+      };
+      setChecks((prev) => rememberTake(prev, entry));
+      setCheckAt(Math.min(checks.length, 4));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setChecking(false);
+    }
   }
 
   function compareTake() {
@@ -928,7 +970,17 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                 <GuitarSoundPicker sound={sound} onChange={setSound} detected={result.tone} />
               </div>
               <Suspense fallback={<p className="helper">Loading the notation view…</p>}>
-                <Notation musicxml={score.musicxml} tab={profile.openStrings.length > 0} />
+                <Notation
+                  musicxml={score.musicxml}
+                  tab={profile.openStrings.length > 0}
+                  marks={
+                    checks[checkAt] &&
+                    checks[checkAt].part === score.part &&
+                    checks[checkAt].role === score.role
+                      ? shownReport(checks[checkAt].comparison)?.notes
+                      : undefined
+                  }
+                />
               </Suspense>
               <a className="download" href={xmlUrl} download={`${song!.name.replace(/\.[^.]+$/, "")} - ${score.label}.musicxml`}>
                 <Download size={14} /> Download MusicXML (opens in MuseScore, Guitar Pro, Sibelius)
@@ -1024,7 +1076,22 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                 </button>
                 <button onClick={exportMix}><Download size={13} /> Make a mix to keep</button>
                 <button onClick={compareTake}>Compare with the original part</button>
+                {song?.instrument === "guitar" && (
+                  <button className="primary" disabled={checking} onClick={checkTake}>
+                    {checking ? "Checking the take…" : "What I played wrong"}
+                  </button>
+                )}
               </div>
+              {checks.length > 1 && (
+                <div className="presets" role="tablist" aria-label="Recent takes">
+                  {checks.map((item, i) => (
+                    <button key={item.id} className={i === checkAt ? "on" : ""} onClick={() => setCheckAt(i)}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {checks[checkAt] && <TakeReport comparison={checks[checkAt].comparison} />}
               {mixUrl && (
                 <a className="download" href={mixUrl} download={`${song!.name.replace(/\.[^.]+$/, "")} - with me.wav`}>
                   <Download size={14} /> Download your version (WAV)

@@ -398,6 +398,89 @@ def delete_job(key: str, x_fretwork_client: str | None = Header(None)):
     # Session is immediately inaccessible; files removed when current stage exits.
 
 
+@app.post('/api/compare')
+async def compare_performance(take: UploadFile | None = File(None), take_notes: str | None = Form(None),
+                              targets: str | None = Form(None), score_file: UploadFile | None = File(None),
+                              bpm: float | None = Form(None), x_fretwork_client: str | None = Header(None)):
+    """Score a take against one or more note-list targets (stem, notation, uploaded chart).
+
+    Audio is transcribed on the clean-guitar path. ``take_notes`` skips that when the notes
+    are already known (tests, or a chart rendered to MIDI). Stem and notation together add
+    a combined score. The older ``/api/jobs`` comparison is unchanged.
+    """
+    client(x_fretwork_client)
+    import json
+    from . import compare as take_diff
+    parsed = []
+    if targets:
+        try:
+            raw = json.loads(targets)
+            if not isinstance(raw, list) or not raw or len(raw) > 6:
+                raise ValueError
+            for item in raw:
+                if not isinstance(item, dict) or item.get('source') not in take_diff.SOURCES:
+                    raise ValueError
+                if not isinstance(item.get('notes'), list) or len(item['notes']) > 5000:
+                    raise ValueError
+                parsed.append(item)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(422, 'Targets must be a list of {source, notes} where source is stem, notation, or file.') from exc
+    if score_file is not None:
+        data = await score_file.read()
+        await score_file.close()
+        if len(data) > 8 * 1024 * 1024:
+            raise HTTPException(413, 'The chart must be under 8 MB.')
+        try:
+            parsed.append(take_diff.target_from_upload(score_file.filename or '', data, bpm))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    if not parsed:
+        raise HTTPException(422, 'Provide a target note list, or upload MusicXML, MIDI, or a text tab.')
+    notes = None
+    transcription = 'notes supplied'
+    if take is not None:
+        path = ROOT / f'compare-{uuid4().hex}.wav'
+        try:
+            total = 0
+            with path.open('wb') as out:
+                while block := await take.read(1024 * 1024):
+                    total += len(block)
+                    if total > MAX_BYTES:
+                        raise HTTPException(413, 'The take must be under 40 MB.')
+                    out.write(block)
+            if total == 0:
+                raise HTTPException(422, 'The take is empty.')
+            try:
+                info = sf.info(path)
+            except Exception as exc:
+                raise HTTPException(422, 'The take must be a WAV recording.') from exc
+            if not 0.4 <= info.duration <= 600:
+                raise HTTPException(422, 'The take must be between 0.4 seconds and 10 minutes.')
+            try:
+                notes = await asyncio.to_thread(take_diff.transcribe_take, path)
+            except models.ModelUnavailable as exc:
+                raise HTTPException(503, str(exc)) from exc
+            transcription = 'clean-guitar Basic Pitch'
+        finally:
+            await take.close()
+            path.unlink(missing_ok=True)
+    elif take_notes:
+        try:
+            notes = json.loads(take_notes)
+            if not isinstance(notes, list) or len(notes) > 5000:
+                raise ValueError
+        except Exception as exc:
+            raise HTTPException(422, 'take_notes must be a list of {time, duration, midi}.') from exc
+    else:
+        raise HTTPException(422, 'Provide the take as audio or as take_notes.')
+    try:
+        return take_diff.compare_take(notes, parsed, transcription=transcription)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @app.post('/api/shutdown', status_code=202)
 def shutdown(request: Request, x_fretwork_client: str | None = Header(None)):
     """Let the Windows uninstaller/updater stop a running app. Only enabled by the local
