@@ -1,6 +1,6 @@
 import type { ToneEstimate } from "./guitarTone";
 import { api } from "./engineApi";
-import type { InstrumentSnapshot, EngineNote } from "./engineApi";
+import type { InstrumentSnapshot, EngineNote, Refinement } from "./engineApi";
 import type { BarRole } from "./songAudio";
 import type { Comparison } from "./compare";
 
@@ -51,6 +51,7 @@ export type SongBreakdown = {
   /** Clean / crunch / distorted, judged from the separated guitar. */
   tone?: ToneEstimate | null;
   warnings: string[];
+  refinement?: Refinement | null;
 };
 export type Song = {
   id: string;
@@ -81,6 +82,7 @@ export function createSong(
   instrument: string,
   processing: "cpu" | "gpu" = "cpu",
   tone: "auto" | "clean" | "crunch" | "distorted" = "auto",
+  refine = false,
 ) {
   const body = new FormData();
   if ("file" in source) body.set("file", source.file);
@@ -89,6 +91,7 @@ export function createSong(
   body.set("instrument", instrument);
   body.set("processing", processing);
   body.set("tone", tone);
+  if (refine) body.set("refine", "true");
   return api<Song>("/api/songs", { method: "POST", body });
 }
 export const getSong = (id: string) => api<Song>(`/api/songs/${id}`);

@@ -28,6 +28,7 @@ from . import compare as take_diff
 from . import models
 from . import song_analysis as sa
 from .instruments import CATALOGUE, resolve_profile
+from .refine import combine_refinements, refine_transcription, refinement_gate, skipped_refinement
 from .runtime import EXECUTOR, LOCK, ROOT, TTL_SECONDS
 from .devices import policy_for
 
@@ -58,6 +59,7 @@ class Song:
     tone: str = 'auto'                            # guitar sound for transcription: auto, clean, crunch, distorted
     comparisons: list = field(default_factory=list)  # last few take-vs-target results (no audio)
     reference: str | None = None                  # optional recording/MIDI for the advisory fingerprint check
+    refine: bool = False                          # opt-in render-and-revise loop (also needs FRETWORK_REFINE=1)
 
 
 def client(x_fretwork_client):
@@ -296,6 +298,9 @@ def run_song(song: Song):
         thresholds = models.thresholds_for(sound, chosen_by_user=song.tone != 'auto')
         song.stage = f'Transcribing the {profile["name"].lower()} notes (Basic Pitch)'
         widest = min(min(t) for t in profile['tunings'].values()) if profile['tunings'] else profile['midi_min']
+        # Notation never reaches this path. Audio targets can opt into the loop.
+        refine_gate = refinement_gate(song.instrument, song.refine)
+        refine_logs = []
         for p in parts:
             check(song)
             # Keep stereo so models.transcribe can run L/R channel merge on the stem.
@@ -309,19 +314,35 @@ def run_song(song: Song):
                     y = librosa.effects.pitch_shift(sa.mono(y), sr=sr_s, n_steps=-cents/100)
             path = song.folder/f'transcribe-{p["id"]}.wav'
             sf.write(path, y, sr_s, subtype='PCM_16')
-            from . import clean_model
-            if clean_model.active_for(sound):
-                # Opt-in (FRETWORK_CLEAN_MODEL=1) second-stage filter for processed guitar only.
-                cand, post = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
-                                               posteriors=True, thresholds=clean_model.CANDIDATE_THRESHOLDS)
-                song.notes[p['id']], _info = clean_model.refine(cand, post, effects_detected)
-            else:
-                song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
-                if sa.promote_enabled():
-                    # Low-threshold pool for evidence-gated promotion of missed notes.
-                    p['candidates'] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
-                                                        thresholds=sa.PROMOTE_THRESHOLDS)
-            path.unlink(missing_ok=True)
+            try:
+                from . import clean_model
+                if clean_model.active_for(sound):
+                    # Opt-in (FRETWORK_CLEAN_MODEL=1) second-stage filter for processed guitar only.
+                    cand, post = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
+                                                   posteriors=True, thresholds=clean_model.CANDIDATE_THRESHOLDS)
+                    song.notes[p['id']], _info = clean_model.refine(cand, post, effects_detected)
+                else:
+                    song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
+                    if sa.promote_enabled():
+                        # Low-threshold pool for evidence-gated promotion of missed notes.
+                        p['candidates'] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
+                                                            thresholds=sa.PROMOTE_THRESHOLDS)
+                if refine_gate is None:
+                    song.stage = f'Refining the {p["label"]} transcription until it matches'
+                    def progress(msg):
+                        check(song)
+                        song.stage = msg
+                    try:
+                        refined = refine_transcription(
+                            path, notes=song.notes[p['id']], midi_min=widest, midi_max=profile['midi_max'],
+                            tone=sound, on_progress=progress)
+                        song.notes[p['id']] = refined['notes']
+                        refine_logs.append(dict(refined['refinement'], part=p['id']))
+                    except Exception as exc:  # noqa: BLE001 — keep pass 1 if the loop itself breaks
+                        refine_logs.append(dict(
+                            skipped_refinement(f'refinement failed: {exc}', requested=True), part=p['id']))
+            finally:
+                path.unlink(missing_ok=True)
         # Lock the beat grid to the transcribed onsets so notes quantise to exact positions.
         onsets = [n['time'] for v in song.notes.values() for n in v]
         grid['beats'] = sa.refine_beats(grid['beats'], onsets)
@@ -378,6 +399,8 @@ def run_song(song: Song):
                 'Tab positions are suggestions: the same note can be played on several strings.',
             ]+([tone['detail']] if tone and tone['tone'] == 'distorted' and song.tone == 'auto' else [])
              + ([f'Transcribed for a {sound} guitar sound (onset {thresholds[0]}, note {thresholds[1]}).'] if sound != 'clean' else []),
+            'refinement': combine_refinements(refine_logs) if refine_logs else skipped_refinement(
+                refine_gate or 'no guitar part to refine', requested=bool(song.refine)),
         }
         # Advisory fingerprint side check: computed after every output is final.
         # No reference returns None and the result dict is left untouched, so the
@@ -402,7 +425,7 @@ def run_song(song: Song):
 @router.post('', status_code=202)
 async def create_song(file: UploadFile | None = File(None), url: str | None = Form(None),
                       consent: bool = Form(False), instrument: str = Form('guitar'), processing: str = Form('cpu'),
-                      tone: str = Form('auto'),
+                      tone: str = Form('auto'), refine: bool = Form(False),
                       x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
@@ -432,7 +455,7 @@ async def create_song(file: UploadFile | None = File(None), url: str | None = Fo
         folder = ROOT/f'song-{key}'
         folder.mkdir(mode=0o700)
         song = Song(key, folder, instrument, (file.filename if file else '') or 'Uploaded song',
-                    stage='Receiving the song', policy=policy, tone=tone)
+                    stage='Receiving the song', policy=policy, tone=tone, refine=refine)
         SONGS[key] = song
     try:
         if file is not None:

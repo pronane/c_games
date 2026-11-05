@@ -32,3 +32,18 @@ extract it, start the engine on :8000, then:
 `1000000.report.json` is the result of that run. Any song you have real stems for works the same
 way: write a JSON naming which stems are guitar, bass, drums, vocals and other, plus the tempo.
 The stems and the derived mix are not committed (licence: non-commercial, share-alike).
+
+## Transcription refinement (synthetic until real takes are scored)
+
+`benchmarks/refine_eval.py` scores note F1 (±50 ms onset, offsets ignored) for a guitar
+stem against a MIDI key, first pass and after the render-and-revise loop:
+
+    python -m benchmarks.refine_eval stem.wav notes.mid
+    python -m benchmarks.refine_eval --self-check
+
+The self-check does not use a recording. It renders eight notes with the Karplus–Strong
+voice, drops two, adds one, and shifts one. Measured here: first-pass note F1
+0.67, refined note F1 1.00, match score 0.69 → 0.90, about 0.4 s. Real MIDI-keyed amp takes
+are not in this number. Run the same script on those files when they are available; pass
+the guitar stem, not the full mix. The loop is off unless `FRETWORK_REFINE=1` and the
+request asks for it. See `server/refine.py`.

@@ -39,10 +39,11 @@ import {
   timeStretch,
   type Target,
 } from "./songAudio";
-import { encodeWav } from "./engineApi";
+import { encodeWav, api, type Health } from "./engineApi";
 import { synthesize } from "./tabScore";
 import { soundFromEstimate, useGuitarSound } from "./guitarTone";
 import GuitarSoundPicker from "./GuitarSoundPicker";
+import RefinementReport from "./RefinementReport";
 import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
 import { Recorder } from "./recorder";
 import LatencyCheck from "./LatencyCheck";
@@ -117,6 +118,8 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [locating, setLocating] = useState(false),
     [located, setLocated] = useState<(LocateResult & { buffer: AudioBuffer }) | null>(null),
     [songTone, setSongTone] = useState<"auto" | "clean" | "crunch" | "distorted">("auto"),
+    [refine, setRefine] = useState(false),
+    [refineAvailable, setRefineAvailable] = useState(false),
     [scorePlaying, setScorePlaying] = useState<"" | "part" | "written" | "both">(""),
     [sound, setSound] = useGuitarSound();
   const ctx = useRef<AudioContext | null>(null),
@@ -172,6 +175,11 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     },
     [],
   );
+  useEffect(() => {
+    api<Health>("/api/health")
+      .then((health) => setRefineAvailable(!!health.refinement?.available))
+      .catch(() => setRefineAvailable(false));
+  }, []);
   useEffect(() => () => {
     if (mixUrl) URL.revokeObjectURL(mixUrl);
   }, [mixUrl]);
@@ -206,6 +214,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         settings.instrument,
         processing,
         profile.openStrings.length ? songTone : "auto",
+        refine && profile.id === "guitar" && refineAvailable,
       );
       songId.current = created.id;
       setSong(created);
@@ -722,6 +731,26 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
           <small className="helper">Distortion hides note starts; telling us helps the transcription catch more notes.</small>
         </label>
       )}
+      {profile.id === "guitar" && (
+        <label className="consent">
+          <input
+            id="song-refine"
+            type="checkbox"
+            checked={refine && refineAvailable}
+            disabled={busy || !refineAvailable}
+            onChange={(e) => setRefine(e.target.checked)}
+          />
+          <span>
+            Refine until it matches
+            <br />
+            <small>
+              {refineAvailable
+                ? "After the guitar is transcribed, play it back and revise the notes until they stop getting closer to the original. A file or a direct audio link can be refined. Written notation is already exact, so that path is left alone."
+                : "Available once the server is started with FRETWORK_REFINE=1. The switch stays off until then."}
+            </small>
+          </span>
+        </label>
+      )}
       <label className="consent">
         <input
           id="song-consent"
@@ -763,6 +792,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             <div><small>Tempo</small><b>{result.tempo.bpm} BPM</b><span className="chip">{result.tempo.time_signature}</span></div>
             <div><small>Length</small><b>{fmt(duration)}</b><span className="chip">{bars.length} bars</span></div>
           </div>
+          <RefinementReport refinement={result.refinement} />
           {result.key && result.key.confidence !== "high" && (
             <p className="helper">Could also be {result.key.alternatives.join(" or ")}.</p>
           )}

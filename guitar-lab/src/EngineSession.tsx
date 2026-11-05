@@ -18,6 +18,7 @@ import { fingering, note } from "./analysis";
 import ModelInstaller from "./ModelInstaller";
 import { summarise, type BarMark } from "./feedback";
 import HeardTake from "./HeardTake";
+import RefinementReport from "./RefinementReport";
 import type { Processing } from "./ProcessingToggle";
 import { tabPosition, type ResolvedInstrument } from "./instruments";
 
@@ -72,7 +73,8 @@ export default function EngineSession({
     [error, setError] = useState(""),
     [edits, setEdits] = useState<EngineNote[]>([]),
     [dirty, setDirty] = useState(false),
-    [display, setDisplay] = useState("Notes & tab");
+    [display, setDisplay] = useState("Notes & tab"),
+    [refine, setRefine] = useState(false);
   const jobRef = useRef<string | null>(null),
     generation = useRef(0),
     mounted = useRef(true),
@@ -190,6 +192,12 @@ export default function EngineSession({
       body.set("tuning", profile.settings.tuning);
       body.set("capo", String(profile.settings.capo));
       body.set("notation", profile.settings.notation);
+      const refineOn =
+        refine &&
+        profile.id === "guitar" &&
+        !referenceNotes?.length &&
+        !!health?.refinement?.available;
+      if (refineOn) body.set("refine", "true");
       const next = await api<Job>("/api/jobs", { method: "POST", body });
       const accepted = next.instrument_profile;
       if (
@@ -356,6 +364,32 @@ export default function EngineSession({
               interrupted connection may leave files until expiry.
             </span>
           </label>
+          {profile.id === "guitar" && (
+            <label className="consent">
+              <input
+                id="refine-until-match"
+                type="checkbox"
+                checked={refine && !referenceNotes?.length && !!health?.refinement?.available}
+                disabled={
+                  busy ||
+                  !!referenceNotes?.length ||
+                  !health?.refinement?.available
+                }
+                onChange={(e) => setRefine(e.target.checked)}
+              />
+              <span>
+                Refine until it matches
+                <br />
+                <small>
+                  {referenceNotes?.length
+                    ? "This reference is written notation, so the notes are already exact."
+                    : health?.refinement?.available
+                      ? "Transcribe the original guitar, play that transcription back, and revise the notes until they stop getting closer. A later pass is kept only when it scores higher than the first."
+                      : "Available once the server is started with FRETWORK_REFINE=1. The switch stays off until then."}
+                </small>
+              </span>
+            </label>
+          )}
           <button
             className="primary"
             disabled={
@@ -493,6 +527,7 @@ export default function EngineSession({
                   </p>
                 </div>
               </div>
+              <RefinementReport refinement={result.refinement} />
               <p className="caution">
                 {result.alignment.warning} {result.comparison.uncertainty}
               </p>

@@ -119,4 +119,5 @@ Validation (1 Nov 2026, CPU, Python 3.13, torch 2.15, Demucs 4.1.0): 48 Python t
 ### Tabs
 
 - `POST /api/tabs/text` JSON `{text, instrument, tuning, capo, bpm, title}`: plain-text tab to timed notes, key and MusicXML.
-- `POST /api/jobs` accepts `reference_notes` (JSON list of `{time, duration, midi, string?, fret?}`) with `kind=isolated`: the reference audio is the app's rendering of a tab, review is skipped, and the take is checked note by note against these notes (score-informed) instead of transcribing the reference.
+- `POST /api/jobs` accepts `reference_notes` (JSON list of `{time, duration, midi, string?, fret?}`) with `kind=isolated`: the reference audio is the app's rendering of a tab, review is skipped, and the take is checked note by note against these notes (score-informed) instead of transcribing the reference. `refine=true` asks the server to revise a guitar transcription until the Karplus–Strong rendering stops getting closer to the reference audio. It runs only when `FRETWORK_REFINE=1` and the reference is audio, not notation. The result gains a `refinement` key (scores and the iteration log). Bass and piano are not revised.
+- `POST /api/songs` accepts the same `refine` flag for a guitar breakdown of an uploaded file or a direct audio link.
