@@ -39,6 +39,11 @@ The official Demucs package's `demucs/remote/files.txt` identifies the checkpoin
 
 **Sandbox limitation:** this workspace permits only selected network hosts. Both the official checkpoint host and the GitHub release-asset redirect are outside that list. The runtime is installed, but the checkpoint has not been downloaded or inference-tested here. Git LFS pointers are explicitly rejected. The one-time browser upload or CLI import can complete installation without outbound server access. No filter, `other` stem, mock or synthetic output is substituted for guitar separation.
 
+### Separation quality knobs
+
+Full-band Demucs defaults favour quality: `FRETWORK_DEMUCS_SHIFTS=2` and `FRETWORK_DEMUCS_OVERLAP=0.5` (about 80 s of CPU per minute of audio vs ~15 s/min at shifts=1 / overlap=0.25). Stereo guitar stems are transcribed per channel and merged (`FRETWORK_LR_TRANSCRIBE=1`); set that env to `0` to force a single mono pass. See `SEPARATION_FIXES.md` for measured F1 / SI-SDR.
+
+
 ### GPU/CPU policy
 
 - `FRETWORK_DEVICE=cpu` (default). Each request can choose `processing=cpu|gpu`; `gpu` is accepted only when a CUDA or MPS device is usable and behaves like `auto` below.
