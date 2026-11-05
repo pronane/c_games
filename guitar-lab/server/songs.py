@@ -266,6 +266,16 @@ def run_song(song: Song):
         # Clean, crunch or high gain: from the player's choice, else a guess from the stem.
         tone = sa.tone_estimate(stems[stem_name], sr_s) if song.instrument != 'piano' else None
         sound = song.tone if song.tone != 'auto' else (tone['tone'] if tone else 'clean')
+        # Effect-chain estimate (library templates). Informational only: a failure
+        # or a hit must not change tone, thresholds, or the stem sent to transcription.
+        effects_detected = None
+        if song.instrument != 'piano':
+            try:
+                from .fx.classify import match_effects
+                stem_mono = np.array(sa.mono(stems[stem_name]), dtype=np.float64, copy=True)
+                effects_detected = match_effects(stem_mono, sr_s)
+            except Exception as exc:  # noqa: BLE001 — prototype path
+                effects_detected = {'effects': [], 'error': str(exc)}
         thresholds = models.thresholds_for(sound, chosen_by_user=song.tone != 'auto')
         song.stage = f'Transcribing the {profile["name"].lower()} notes (Basic Pitch)'
         widest = min(min(t) for t in profile['tunings'].values()) if profile['tunings'] else profile['midi_min']
@@ -319,6 +329,7 @@ def run_song(song: Song):
             'instruments': [dict(r, label=STEM_LABELS.get(r['stem'], r['stem'])) for r in found],
             'selected_stem': stem_name, 'parts': parts, 'tempo': grid, 'key': key, 'chords': chords,
             'tuning': tuning, 'reference_cents': round(cents, 1), 'tone': tone,
+            'effects_detected': effects_detected,
             'provenance': dict(provenance, transcription='Basic Pitch ONNX', onset_threshold=thresholds[0],
                                frame_threshold=thresholds[1]),
             'warnings': [
