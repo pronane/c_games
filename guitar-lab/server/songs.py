@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 import numpy as np
 import soundfile as sf
 
+from . import compare as take_diff
 from . import models
 from . import song_analysis as sa
 from .instruments import CATALOGUE, resolve_profile
@@ -55,6 +56,7 @@ class Song:
     notes: dict = field(default_factory=dict)     # part id -> transcribed notes (pre-fingering)
     policy: str = 'cpu'                           # separation device: 'cpu' or 'auto' (graphics card)
     tone: str = 'auto'                            # guitar sound for transcription: auto, clean, crunch, distorted
+    comparisons: list = field(default_factory=list)  # last few take-vs-target results (no audio)
 
 
 def client(x_fretwork_client):
@@ -531,6 +533,120 @@ async def locate_take(key: str, take: UploadFile = File(...), parts: str = Form(
         return dict(found, take_seconds=len(y)/22050)
     finally:
         path.unlink(missing_ok=True)
+
+
+def _selected_notes(song: Song, parts: str, role: str):
+    """Same part/role selection the score endpoint writes notation from, without fingering."""
+    known = {p['id']: p for p in song.result['parts']}
+    ids = list(known) if parts in ('', 'all') else [p for p in parts.split(',') if p]
+    if any(p not in known for p in ids):
+        raise KeyError(parts)
+    notes = []
+    for pid in ids:
+        roles = known[pid]['roles']
+        for n in song.notes.get(pid, []):
+            if role != 'any':
+                bar = next((r for r in roles if r['start'] <= n['time'] < r['end']), None)
+                if not bar or bar['role'] != role:
+                    continue
+            notes.append(dict(n))
+    notes.sort(key=lambda n: (n['time'], n['midi']))
+    deduped = []
+    for n in notes:
+        if deduped and n['midi'] == deduped[-1]['midi'] and abs(n['time'] - deduped[-1]['time']) < .05:
+            continue
+        deduped.append(n)
+    return deduped
+
+
+def _beats_per_bar(tempo):
+    sig = str((tempo or {}).get('time_signature') or '4/4')
+    try:
+        return max(1, int(sig.split('/')[0]))
+    except ValueError:
+        return 4
+
+
+def _score_recorded_take(path, targets):
+    notes = take_diff.transcribe_take(path)
+    return take_diff.compare_take(notes, targets, transcription='clean-guitar Basic Pitch')
+
+
+@router.post('/{key}/compare')
+async def compare_song_take(key: str, take: UploadFile = File(...), parts: str = Form('all'),
+                            role: str = Form('any'), tuning: str = Form('standard'), capo: int = Form(0),
+                            start: float = Form(0), end: float = Form(0), speed: float = Form(1),
+                            x_fretwork_client: str | None = Header(None)):
+    """Transcribe this take (clean guitar) and score it against the stem and the written notation.
+
+    When both targets exist the response has each score plus their average. The last few
+    takes are kept on the session so a player can look back without us storing audio.
+    """
+    client(x_fretwork_client)
+    song = get_song(key)
+    if song.instrument != 'guitar':
+        raise HTTPException(422, 'This comparison is for guitar. Other instruments keep the existing check.')
+    if song.status != 'complete' or not song.result:
+        raise HTTPException(409, 'Wait for the breakdown to finish.')
+    if role not in ('any', 'lead', 'rhythm'):
+        raise HTTPException(422, 'Unknown role.')
+    if not 0.25 <= speed <= 1.25:
+        raise HTTPException(422, 'Speed must be between 25% and 125%.')
+    duration = float(song.result.get('duration') or 0)
+    if end <= 0:
+        end = duration or start + 1
+    if start < 0 or end <= start:
+        raise HTTPException(422, 'The excerpt end must be after its start.')
+    try:
+        profile = resolve_profile('guitar', tuning, capo)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    try:
+        stem = _selected_notes(song, parts, role)
+    except KeyError as exc:
+        raise HTTPException(404, 'Unknown part.') from exc
+    tempo = song.result['tempo']
+    beats = tempo.get('beats') or []
+    bpm = float(tempo.get('bpm') or 120)
+    per_bar = _beats_per_bar(tempo)
+    written = take_diff.notation_notes(stem, beats, profile['open_strings'], profile['max_fret']) if len(beats) > 1 else []
+    stem_plain = [{'time': n['time'], 'duration': n['duration'], 'midi': n['midi']} for n in stem]
+    stem_w, bars_w, bpm_w, bpb = take_diff.place_in_take_time(
+        stem_plain, tempo.get('bars'), start, end, speed, bpm, per_bar)
+    note_w, _, _, _ = take_diff.place_in_take_time(written, tempo.get('bars'), start, end, speed, bpm, per_bar)
+    targets = [
+        {'source': 'stem', 'label': 'Guitar stem', 'notes': stem_w, 'bars': bars_w, 'bpm': bpm_w, 'beats_per_bar': bpb},
+        {'source': 'notation', 'label': 'Written notation', 'notes': note_w, 'bars': bars_w, 'bpm': bpm_w, 'beats_per_bar': bpb},
+    ]
+    path = song.folder / f'take-{uuid4().hex}.wav'
+    try:
+        await save_upload(take, path)
+        try:
+            info = sf.info(path)
+        except Exception as exc:
+            raise HTTPException(422, 'The take must be a WAV recording.') from exc
+        if info.duration < 0.4:
+            raise HTTPException(422, 'The take is shorter than 0.4 seconds.')
+        try:
+            result = await asyncio.to_thread(_score_recorded_take, path, targets)
+        except models.ModelUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    finally:
+        path.unlink(missing_ok=True)
+    overall = None
+    if result.get('combined') and result['combined'].get('overall') is not None:
+        overall = result['combined']['overall']
+    elif result['reports']:
+        overall = result['reports'][0]['summary']['overall']
+    entry = {'id': uuid4().hex[:8], 'created': time.time(), 'label': f'Take {len(song.comparisons) + 1}',
+             'overall': overall, 'comparison': result}
+    with LOCK:
+        song.comparisons = take_diff.remember_take(song.comparisons, entry)
+    return dict(result, take_id=entry['id'],
+                history=[{'id': h['id'], 'created': h['created'], 'label': h['label'], 'overall': h['overall']}
+                         for h in song.comparisons])
 
 
 @router.delete('/{key}', status_code=204)
