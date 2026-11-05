@@ -3,7 +3,9 @@
 Strategy (honest limits documented in EFFECTS_RESEARCH.md / DESIGN.md):
 - Reverb: single-channel spectral subtraction guided by a crude RT60 estimate.
 - Distortion/OD/fuzz: inverse soft-clip only for mild OD; otherwise rely on
-  note list → Karplus–Strong acoustic playback (player damping via decay flag).
+  note list → acoustic playback (server/fx/playback.py: tuned Karplus–Strong, player
+  damping / let-ring / bends kept). The same notes can be played through a distorted-amp
+  approximation with playback.render_distorted.
 """
 from __future__ import annotations
 
@@ -134,18 +136,26 @@ def _karplus_strong(freq, duration, sr, velocity=0.7, damp=0.995):
     return out
 
 
-def acoustic_playback(notes, sr=44100, length_s=None):
+def acoustic_playback(notes, sr=44100, length_s=None, voice='tuned', **kwargs):
     """Render an acoustic-style version from transcribed notes.
 
-    Each note dict supports: midi|pitch, start, end|duration, velocity|amplitude,
-    damping (bool) or decay (float). Player articulation kept via duration/damping/
-    velocity; bends/vibrato require pitch contour (optional 'pitch_hz' series).
+    Each note dict supports: midi|pitch, start|onset|time, end|duration, velocity|amplitude,
+    damping|palm_mute|palmMute, let_ring|letRing, bend, string/track. Player articulation is
+    kept via duration, damping, let-ring and bends.
+
+    voice='tuned' (default) uses :func:`server.fx.playback.render_acoustic` (pitch-exact
+    Karplus-Strong, guitar-like sustain by pitch, re-pick stops the string). voice='legacy'
+    is the old per-sample loop, kept for comparison.
     """
+    if voice != 'legacy':
+        from .playback import render_acoustic
+        return render_acoustic(notes, sr=sr, length_s=length_s, **kwargs)
+    from .playback import note_start
     if not notes:
         return np.zeros(int(sr * (length_s or 1.0)))
     ends = []
     for n in notes:
-        start = float(n.get('start', n.get('onset', 0.0)))
+        start = note_start(n)
         if 'end' in n:
             end = float(n['end'])
         else:
@@ -158,7 +168,7 @@ def acoustic_playback(notes, sr=44100, length_s=None):
         if midi is None:
             continue
         freq = 440.0 * (2 ** ((float(midi) - 69) / 12))
-        start = float(n.get('start', n.get('onset', 0.0)))
+        start = note_start(n)
         if 'end' in n:
             dur = max(0.04, float(n['end']) - start)
         else:
@@ -167,7 +177,7 @@ def acoustic_playback(notes, sr=44100, length_s=None):
         if vel > 1.5:  # amplitude-like
             vel = min(1.0, vel / 5.0)
         vel = float(np.clip(vel, 0.05, 1.0))
-        damp_flag = bool(n.get('damping', n.get('palm_mute', False)))
+        damp_flag = bool(n.get('damping', n.get('palm_mute', n.get('palmMute', False))))
         decay = float(n.get('decay', 0.992 if damp_flag else 0.9975))
         if damp_flag:
             dur = min(dur, 0.18)
