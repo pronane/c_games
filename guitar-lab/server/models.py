@@ -125,6 +125,10 @@ FRAME_THRESHOLD = float(os.getenv('FRETWORK_FRAME_THRESHOLD', '0.4'))
 # solo .56 -> .67 and rhythm .45 -> .58 at 0.5/0.3; crunch solo .61 -> .68 at 0.6/0.4 with
 # rhythm unchanged. 'auto' trusts the tone guess less (it is a heuristic), so it only moves
 # halfway. Clean stays at the GuitarSet-tuned defaults.
+# Re-checked on real recordings (FX_RESULTS.md), and the halfway choice stays: Guitar-TECHS
+# P3 (12 songs, real MIDI) scores F1@50 .663/.672 (DI/amp) at 0.6/0.4 vs .593/.617 at 0.5/0.3.
+# Hollow Ground high-gain amp tracks (scored against the engine on their own DI, no MIDI)
+# went the other way (.460 -> .519), so truly high-gain takes may still want 'distorted'.
 TONE_THRESHOLDS = {'clean': None, 'crunch': (0.6, 0.4), 'distorted': (0.5, 0.3), 'auto-distorted': (0.6, 0.4)}
 
 
