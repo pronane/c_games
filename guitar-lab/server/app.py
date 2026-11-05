@@ -19,6 +19,7 @@ import soundfile as sf
 
 from . import models
 from .analysis import align, observations, score_informed
+from .refine import refine_transcription, refinement_gate, skipped_refinement
 from .model_store import install_stream, InvalidCheckpoint
 from .instruments import resolve_profile, CATALOGUE
 from .devices import policy_for
@@ -49,6 +50,7 @@ class Job:
     policy: str = 'cpu'
     # Notes from an uploaded tab/score: the exact reference, so it is not transcribed.
     reference_notes: list | None = None
+    refine: bool = False
 
 
 def cleanup():
@@ -149,6 +151,23 @@ def run_job(job, phase):
                 job.stage = f"Transcribing reference {job.profile['name']} with Basic Pitch"
                 reference_notes = models.transcribe_profile(job.folder/'guitar.wav', job.profile)
             cancelled(job)
+            gate = refinement_gate(job.profile['id'], job.refine, notation=job.reference_notes is not None)
+            if gate is None:
+                def progress(msg):
+                    cancelled(job)
+                    job.stage = msg
+                try:
+                    refined = refine_transcription(
+                        job.folder/'guitar.wav', notes=reference_notes,
+                        midi_min=job.profile['midi_min'], midi_max=job.profile['midi_max'],
+                        on_progress=progress)
+                    reference_notes = refined['notes']
+                    refinement = refined['refinement']
+                except Exception as exc:  # noqa: BLE001 — pass 1 is still a complete comparison
+                    refinement = skipped_refinement(f'refinement failed: {exc}', requested=True)
+            else:
+                refinement = skipped_refinement(gate, requested=bool(job.refine))
+            cancelled(job)
             job.stage = 'Transcribing your take with Basic Pitch'
             if job.reference_notes is not None:
                 take_notes, post = models.transcribe_profile(job.folder/'take.wav', job.profile, posteriors=True)
@@ -172,7 +191,8 @@ def run_job(job, phase):
                                        ['Reference notes come from the uploaded tab; only your take is estimated.']
                                        if job.reference_notes is not None else
                                        ['Reference may contain overlapping parts and separation artefacts.',
-                                        'Manual song position is assumed; this is not whole-song recognition.'])}
+                                        'Manual song position is assumed; this is not whole-song recognition.']),
+                          'refinement': refinement}
             job.status, job.stage = 'complete', 'Comparison ready — review uncertainty and correct notes if needed'
     except Exception as exc:
         job.status, job.stage = 'failed', 'Processing stopped; no substitute algorithm was used'
@@ -192,6 +212,7 @@ def health():
     cleanup()
     return {'service': 'Fretwork Python engine', 'models': models.capabilities(), 'instruments': CATALOGUE,
             'retention_seconds': TTL_SECONDS, 'max_passage_seconds': 60,
+            'refinement': {'available': refinement_gate('guitar', True) is None},
             'privacy': 'Selected excerpts uploaded only after consent. Temporary files deleted on deletion, expiry or clean shutdown.'}
 
 
@@ -244,7 +265,8 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
                      consent: bool = Form(False), kind: str = Form(...),
                      original_offset: float = Form(0), instrument: str = Form('guitar'), tuning: str = Form('standard'),
                      capo: int = Form(0), notation: str | None = Form(None), processing: str = Form('cpu'),
-                     reference_notes: str | None = Form(None), x_fretwork_client: str | None = Header(None)):
+                     reference_notes: str | None = Form(None), refine: bool = Form(False),
+                     x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
         raise HTTPException(422, 'Explicit upload consent is required.')
@@ -275,7 +297,7 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
         folder.mkdir(mode=0o700)
         # Reserve capacity before streaming uploads.
         job = Job(key, folder, kind, original_offset, 0, profile=profile, stage='Receiving consented excerpts',
-                  policy=policy, reference_notes=tab_notes)
+                  policy=policy, reference_notes=tab_notes, refine=refine)
         JOBS[key] = job
     try:
         rd = await save_audio(reference, folder/'reference.wav')

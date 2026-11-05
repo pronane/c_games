@@ -49,6 +49,8 @@ export type EngineResult = {
     instrument_profile: InstrumentSnapshot;
   };
   warnings: string[];
+  /** Present on engine results. Omitted by older servers. */
+  refinement?: Refinement | null;
 };
 export type Job = {
   id: string;
@@ -62,6 +64,26 @@ export type Job = {
   instrument_profile: InstrumentSnapshot;
   expires_at: number;
   result: EngineResult | null;
+};
+export type RefinementStep = {
+  iteration: number;
+  score: number;
+  changes: number;
+  changed: string[];
+  action: string;
+  part?: string;
+};
+/** Render-and-revise log. Existing result objects gain this and nothing else. */
+export type Refinement = {
+  enabled: boolean;
+  requested?: boolean;
+  skipped: string | null;
+  original_score: number | null;
+  final_score: number | null;
+  best_score: number | null;
+  stopped: string;
+  elapsed_seconds: number;
+  iterations: RefinementStep[];
 };
 export type Health = {
   models: {
@@ -77,6 +99,8 @@ export type Health = {
     transcription: { configured: boolean; model: string };
     device_policy: string;
   };
+  /** Server opt-in. The studio toggle does nothing until this is true. */
+  refinement?: { available: boolean };
   retention_seconds: number;
 };
 export async function api<T>(

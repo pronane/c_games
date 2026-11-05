@@ -157,3 +157,69 @@ def test_tab_reference_notes_skip_review_and_reference_transcription(monkeypatch
     assert upload(kind='mix', reference_notes=json.dumps(tab)).status_code == 422
     assert upload(kind='isolated', reference_notes='not json').status_code == 422
     client.delete('/api/jobs/'+r.json()['id'], headers=HEADERS)
+
+
+def _wait_isolated(monkeypatch, **extra):
+    monkeypatch.setattr(module.models, 'transcribe', lambda *args, **kwargs: [
+        {'id': 0, 'time': .3, 'duration': .4, 'midi': 57, 'amplitude': .7}])
+    response = upload(kind='isolated', **extra)
+    assert response.status_code == 202, response.text
+    key = response.json()['id']
+    review = wait_job(key, 'review')
+    assert client.post(f'/api/jobs/{key}/approve', headers=HEADERS, json={'approved': True}).status_code == 202
+    return wait_job(key, 'complete'), key
+
+
+def test_refinement_is_gated_and_keeps_existing_result_keys(monkeypatch):
+    configured(monkeypatch)
+    calls = []
+
+    def fake_refine(path, options=None, **kwargs):
+        calls.append(str(path))
+        return {'notes': [{'id': 0, 'time': .3, 'duration': .4, 'midi': 60, 'amplitude': .7}],
+                'refinement': {'enabled': True, 'requested': True, 'skipped': None,
+                               'original_score': 0.5, 'final_score': 0.9, 'best_score': 0.9,
+                               'stopped': 'no improvement', 'elapsed_seconds': 0.2,
+                               'iterations': [{'iteration': 0, 'score': 0.5, 'changes': 0, 'changed': [], 'action': 'first pass'},
+                                              {'iteration': 1, 'score': 0.9, 'changes': 1, 'changed': ['changed A3 to C4 at 0.30s'], 'action': 'revise mismatches'}]}}
+
+    monkeypatch.setattr(module, 'refine_transcription', fake_refine)
+    monkeypatch.delenv('FRETWORK_REFINE', raising=False)
+    health = client.get('/api/health').json()
+    assert health['refinement']['available'] is False
+    off, key = _wait_isolated(monkeypatch, refine='true')
+    assert calls == []
+    assert off['result']['refinement']['enabled'] is False
+    assert off['result']['refinement']['skipped'] == 'FRETWORK_REFINE is not set'
+    assert off['result']['reference_notes'][0]['midi'] == 57
+    for name in ('alignment', 'reference_notes', 'take_notes', 'comparison', 'provenance', 'warnings'):
+        assert name in off['result']
+    client.delete('/api/jobs/'+key, headers=HEADERS)
+
+    monkeypatch.setenv('FRETWORK_REFINE', '1')
+    assert client.get('/api/health').json()['refinement']['available'] is True
+    on, key = _wait_isolated(monkeypatch, refine='true')
+    assert calls and calls[0].endswith('guitar.wav')
+    assert on['result']['reference_notes'][0]['midi'] == 60
+    assert on['result']['refinement']['original_score'] == 0.5
+    assert on['result']['refinement']['final_score'] == 0.9
+    assert on['result']['comparison']['pitch_difference_candidates'] == 1
+    client.delete('/api/jobs/'+key, headers=HEADERS)
+
+    calls.clear()
+    import json
+    tab = [{'time': .5, 'duration': .4, 'midi': 57, 'string': 3, 'fret': 2}]
+    # The take-transcription mock has no posteriors; give score-informed a flat onset map.
+    def transcribe(path, posteriors=False, **kw):
+        notes = [{'id': 0, 'time': .5, 'duration': .4, 'midi': 57, 'amplitude': .7}]
+        if not posteriors:
+            return notes
+        onset = np.zeros((200, 88))
+        onset[50, 57-21] = .9
+        return notes, {'onset': onset, 'note': onset, 'hop': .01}
+    monkeypatch.setattr(module.models, 'transcribe', transcribe)
+    done = wait_job(upload(kind='isolated', refine='true', reference_notes=json.dumps(tab)).json()['id'], 'complete')
+    assert calls == []
+    assert done['result']['refinement']['skipped'] == 'notation reference is exact'
+    assert [n['midi'] for n in done['result']['reference_notes']] == [57]
+    client.delete('/api/jobs/'+done['id'], headers=HEADERS)

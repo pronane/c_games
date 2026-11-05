@@ -622,6 +622,43 @@ footer span:first-child {
   line-height: 1.6;
   color: #8d9781;
 }
+.refinement {
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  background: #f7faf4;
+  border: 1px solid #dfe5d7;
+  border-radius: 8px;
+  color: #3e5734;
+}
+.refinement-score {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: baseline;
+}
+.refinement-score span,
+.refinement em {
+  font-size: 10px;
+  font-style: normal;
+  color: #839075;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.refinement-score strong {
+  font-size: 22px;
+  font-weight: 500;
+}
+.refinement-score strong small {
+  font-size: 14px;
+  color: #9ba58f;
+}
+.refinement ol {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #5c6b52;
+}
 .playback {
   display: flex;
   align-items: center;
