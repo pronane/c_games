@@ -296,6 +296,7 @@ def run_song(song: Song):
             except Exception as exc:  # noqa: BLE001 — prototype path
                 effects_detected = {'effects': [], 'error': str(exc)}
         thresholds = models.thresholds_for(sound, chosen_by_user=song.tone != 'auto')
+        from .transcribers import backend_name, transcription_label as _tx_label
         song.stage = f'Transcribing the {profile["name"].lower()} notes (Basic Pitch)'
         widest = min(min(t) for t in profile['tunings'].values()) if profile['tunings'] else profile['midi_min']
         # Notation never reaches this path. Audio targets can opt into the loop.
@@ -323,10 +324,11 @@ def run_song(song: Song):
                     song.notes[p['id']], _info = clean_model.refine(cand, post, effects_detected)
                 else:
                     song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
-                    if sa.promote_enabled():
+                    if sa.promote_enabled() and backend_name() == 'basic_pitch':
                         # Low-threshold pool for evidence-gated promotion of missed notes.
+                        # An optional backend does not get a Basic Pitch note mixed in.
                         p['candidates'] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
-                                                            thresholds=sa.PROMOTE_THRESHOLDS)
+                                                            thresholds=sa.PROMOTE_THRESHOLDS, backend='basic_pitch')
                 if refine_gate is None:
                     song.stage = f'Refining the {p["label"]} transcription until it matches'
                     def progress(msg):
@@ -391,7 +393,9 @@ def run_song(song: Song):
             'selected_stem': stem_name, 'parts': parts, 'tempo': grid, 'key': key, 'chords': chords,
             'tuning': tuning, 'reference_cents': round(cents, 1), 'tone': tone,
             'effects_detected': effects_detected,
-            'provenance': dict(provenance, transcription='Basic Pitch ONNX', onset_threshold=thresholds[0],
+            'provenance': dict(provenance,
+                               transcription='Basic Pitch ONNX' if backend_name() == 'basic_pitch' else _tx_label(),
+                               onset_threshold=thresholds[0],
                                frame_threshold=thresholds[1]),
             'warnings': [
                 'Every result here is an automatic estimate. Check notes and chords by ear and correct them.',
@@ -631,7 +635,8 @@ def _beats_per_bar(tempo):
 
 def _score_recorded_take(path, targets):
     notes = take_diff.transcribe_take(path)
-    return take_diff.compare_take(notes, targets, transcription='clean-guitar Basic Pitch')
+    from .transcribers import clean_take_label
+    return take_diff.compare_take(notes, targets, transcription=clean_take_label())
 
 
 @router.post('/{key}/compare')

@@ -1,0 +1,21 @@
+# Optional guitar transcription backends. Not required for the app or for pytest.
+# Basic Pitch stays the default. Install from guitar-lab/:
+#
+#   pip install -r server/requirements-transcription.txt
+#   pip install --no-deps basic-pitch==0.4.0
+#   pip install -r server/requirements-transcription-extras.txt
+#
+# CPU is enough. The first Riley/GAPS run downloads about 100 MB from
+# huggingface.co/xavriley/midi-transcription-models.
+#
+# YourMT3+ is intentionally absent. Its inference code is GPL-3.0
+# (https://github.com/mimbres/YourMT3). Checkpoints are Apache-2.0 and about
+# 2.8 GB (https://huggingface.co/mimbres/YourMT3). Clone that repo separately
+# if you accept GPL; this project does not vendor it.
+#
+# Torch 2.6+ defaults to a safer unpickler that rejects these checkpoints.
+torch>=2.2,<2.6
+audioread>=3,<4
+huggingface-hub>=0.16
+safetensors>=0.3
+hf-midi-transcription @ git+https://github.com/xavriley/hf_midi_transcription.git

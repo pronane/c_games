@@ -1,0 +1,51 @@
+[
+  {
+    "time": 0.1,
+    "duration": 0.45,
+    "midi": 64,
+    "velocity": 0.8,
+    "string": 1,
+    "track": 0
+  },
+  {
+    "time": 0.55,
+    "duration": 0.4,
+    "midi": 67,
+    "velocity": 0.75,
+    "string": 1,
+    "track": 0
+  },
+  {
+    "time": 0.2,
+    "duration": 0.7,
+    "midi": 40,
+    "palmMute": true,
+    "string": 6,
+    "track": 0
+  },
+  {
+    "time": 1.05,
+    "duration": 0.35,
+    "midi": 59,
+    "bend": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    "string": 2,
+    "track": 1
+  },
+  {
+    "time": 1.4,
+    "duration": 0.5,
+    "midi": 52,
+    "letRing": true,
+    "string": 3,
+    "track": 1
+  }
+]

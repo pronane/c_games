@@ -35,7 +35,10 @@ def capabilities():
                        'download_url': DOWNLOAD_URL,
                        'installation_supported': os.getenv('FRETWORK_ALLOW_MODEL_INSTALL') == '1'},
         'transcription': {'configured': basic and importlib.util.find_spec('onnxruntime') is not None and transcription.is_file(), 'model': 'Basic Pitch ONNX',
-                          'detail': 'Requires Basic Pitch and ONNX Runtime; uses bundled nmp.onnx or FRETWORK_BASIC_PITCH_MODEL.'},
+                          'backend': _selected_backend_name(),
+                          'alternatives': _transcription_alternatives(),
+                          'detail': 'Requires Basic Pitch and ONNX Runtime; uses bundled nmp.onnx or FRETWORK_BASIC_PITCH_MODEL. '
+                                    'Optional guitar backends (riley, gaps) stay off unless FRETWORK_TRANSCRIBER is set.'},
         'device_policy': default_policy(),
         'gpu': gpu_info(),
     }
@@ -198,13 +201,31 @@ def _predict_file(path, midi_min, midi_max, thresholds):
     return notes, output
 
 
-def transcribe(path, midi_min=40, midi_max=88, posteriors=False, thresholds=None):
+def _selected_backend_name():
+    from .transcribers import backend_name
+    return backend_name()
+
+
+def _transcription_alternatives():
+    from .transcribers import availability
+    return availability()
+
+
+def transcribe(path, midi_min=40, midi_max=88, posteriors=False, thresholds=None, backend=None):
     """Note events; with posteriors=True also Basic Pitch's per-frame onset/note activations
     ({'onset', 'note': (frames, 88) arrays, pitch index = MIDI-21, 'hop': seconds per frame}).
 
     Stereo files with both channels active are transcribed per channel and merged (disable
     with FRETWORK_LR_TRANSCRIBE=0). Posteriors still come from a mono downmix pass.
+
+    ``backend`` / ``FRETWORK_TRANSCRIBER`` selects the note-list model. The default
+    is Basic Pitch. Posterior maps are Basic Pitch only, including when another
+    backend is selected for ordinary note lists.
     """
+    from .transcribers import normalize_backend, transcribe_file
+    chosen = normalize_backend(backend)
+    if chosen != 'basic_pitch' and not posteriors:
+        return transcribe_file(chosen, path, midi_min=midi_min, midi_max=midi_max)
     if not capabilities()['transcription']['configured']:
         raise ModelUnavailable('Specialist transcription is not configured. Install Basic Pitch ONNX and provision nmp.onnx; see server/README.md.')
     import soundfile as sf

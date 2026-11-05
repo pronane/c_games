@@ -1,5 +1,11 @@
 # Accuracy benchmarks
 
+Note-level regression across acoustic, clean electric, reverb, rendered, and full-band
+intro clips is `benchmarks/regression/` (`python -m benchmarks.regression`). The committed
+Basic Pitch numbers are the reference. See [regression/README.md](regression/README.md).
+
+
+
 Both scripts score what the app actually produces. Results from 5 Nov 2026 are in the main README.
 
 ## Error taxonomy
