@@ -271,10 +271,15 @@ def run_song(song: Song):
         widest = min(min(t) for t in profile['tunings'].values()) if profile['tunings'] else profile['midi_min']
         for p in parts:
             check(song)
-            y = sa.mono(p['audio'])
+            # Keep stereo so models.transcribe can run L/R channel merge on the stem.
+            y = np.asarray(p['audio'], dtype=np.float32)
             if abs(cents) >= 20:
                 # Re-centre an off-A440 recording so notes round to the right semitone.
-                y = librosa.effects.pitch_shift(y, sr=sr_s, n_steps=-cents/100)
+                if y.ndim == 2 and y.shape[1] >= 2:
+                    y = np.stack([librosa.effects.pitch_shift(y[:, c], sr=sr_s, n_steps=-cents/100)
+                                  for c in range(y.shape[1])], axis=1)
+                else:
+                    y = librosa.effects.pitch_shift(sa.mono(y), sr=sr_s, n_steps=-cents/100)
             path = song.folder/f'transcribe-{p["id"]}.wav'
             sf.write(path, y, sr_s, subtype='PCM_16')
             song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
