@@ -177,7 +177,9 @@ def beat_grid(rhythm_audio, sr, bass_audio=None, harmonic_audio=None):
     period = float(np.median(np.diff(beats))) if len(beats) > 1 else 60/tempo
     beats = beats[phase:] if phase else beats
     # Prepend whole bars until the grid starts at or before 0 s (a pickup bar may start < 0).
-    while beats[0] > .05:
+    # Only when the first beat is clearly after the start (more than half a beat); otherwise an
+    # entire empty bar was prepended before a piece that simply starts on beat one.
+    while beats[0] > .5*period:
         beats = np.concatenate([beats[0]-period*np.arange(4, 0, -1), beats])
     bars = beats[::4]
     return {'bpm': round(60/period, 1), 'beats': [float(b) for b in beats], 'bars': [float(b) for b in bars],
@@ -432,7 +434,7 @@ def bar_roles(notes, bars, end_time, bleed=None):
     return out
 
 
-def drop_overtones(notes, roles, window=.05):
+def drop_overtones(notes, roles, window=.05, tone='distorted'):
     """Remove octave / octave-and-fifth ghosts in lead bars.
 
     Overdriven single-note lines produce strong 2nd/3rd harmonics that the transcriber
@@ -440,6 +442,10 @@ def drop_overtones(notes, roles, window=.05):
     12, 19 or 24 semitones above another note at the same moment is treated as a ghost.
     Chords in rhythm bars are left alone (octave doublings there are real).
     """
+    if tone == 'clean':
+        # Clean/nylon guitar has weak harmonics; octaves struck together are real notes
+        # (e.g. bass + melody in classical pieces). Basic Pitch is already tuned for clean tone.
+        return list(notes)
     lead = [(r['start'], r['end']) for r in roles if r['role'] == 'lead']
     def in_lead(t):
         return any(a <= t < b for a, b in lead)
@@ -497,7 +503,7 @@ def _assignments(pitches, strings, max_fret, limit=24):
 # of hand movement between notes, and a penalty for leaps of more than four frets.
 # Tuned on GuitarSet (360 real performances): exact string+fret 38.5% -> 43.8% on solos,
 # 74.0% -> 79.1% on chord playing, versus the original hand-set weights (.12, .25, .8, 2).
-FRET_COST, HIGH_FRET_COST, MOVE_COST, LEAP_COST = 0.0, .2, .4, 0.0
+FRET_COST, HIGH_FRET_COST, MOVE_COST, LEAP_COST = 0.05, .2, .4, 0.0
 
 
 def fingering(notes, open_strings, max_fret=24):
@@ -641,7 +647,9 @@ def musicxml(notes, beats, key, tuning, title='Transcription', part_name='Guitar
         nxt = starts[i+1] if i+1 < len(starts) else None
         end = max(e for _, e in events[s])
         if nxt is not None:
-            end = min(end, nxt)
+            # Plucked strings ring; transcribed offsets are early. Fill short gaps (<= one beat)
+            # instead of writing a 16th note plus a 16th rest for every eighth note.
+            end = nxt if nxt-end <= 4 else min(end, nxt)
         timeline.append((s, max(1, end-s), [n for n, _ in events[s]]))
 
     out = ['<?xml version="1.0" encoding="UTF-8"?>',

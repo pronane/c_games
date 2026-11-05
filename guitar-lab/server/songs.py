@@ -294,7 +294,7 @@ def run_song(song: Song):
                 song.notes[p['id']] = [n for n in song.notes[p['id']]
                                        if not flags[min(len(flags)-1, max(0, int(np.searchsorted(edges, n['time'], 'right'))-1))]]
             p['roles'] = sa.bar_roles(song.notes[p['id']], grid['bars'], duration, bleed=flags)
-            song.notes[p['id']] = sa.drop_overtones(song.notes[p['id']], p['roles'], window=.15)
+            song.notes[p['id']] = sa.drop_overtones(song.notes[p['id']], p['roles'], window=.15, tone=sound)
             p['role'] = sa.summarise_roles(p['roles'])
             p['notes'] = len(song.notes[p['id']])
             del p['audio']
