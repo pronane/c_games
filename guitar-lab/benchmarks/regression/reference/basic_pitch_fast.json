@@ -1,0 +1,126 @@
+{
+  "tier": "fast",
+  "coverage": {
+    "guitarset": true,
+    "idmt": true,
+    "user_reverb_pair": true,
+    "metallica": true,
+    "carcassi_audio": false,
+    "egdb": false
+  },
+  "backends": {
+    "basic_pitch": {
+      "error": null,
+      "rows": [
+        {
+          "id": "gs_rock_solo",
+          "category": "solo_acoustic",
+          "style": "rock solo",
+          "status": "ok",
+          "sha256": "2e969753898c731a7e4e46935ff5f315d31acdaddf0a4ab9afa855a96307a9d8",
+          "sha256_ok": true,
+          "window_s": [
+            0.0,
+            8.0
+          ],
+          "note_f1": 0.8936,
+          "note_precision": 0.913,
+          "note_recall": 0.875,
+          "onset_f1": 0.9362,
+          "pitch_recall_300ms": 0.875,
+          "n_ref": 24,
+          "n_est": 23,
+          "n_pitch_match_300ms": 21,
+          "onset_tol_s": 0.05,
+          "loose_s": 0.3,
+          "audio_s": 8.0,
+          "seconds": 1.402,
+          "seconds_per_audio_minute": 10.51
+        },
+        {
+          "id": "ks_clean_scale",
+          "category": "rendered",
+          "voice": "clean",
+          "status": "ok",
+          "audio_s": 4.6,
+          "seconds": 0.063,
+          "seconds_per_audio_minute": 0.83,
+          "note_f1": 0.9412,
+          "note_precision": 0.8889,
+          "note_recall": 1.0,
+          "onset_f1": 0.9412,
+          "pitch_recall_300ms": 1.0,
+          "n_ref": 8,
+          "n_est": 9,
+          "n_pitch_match_300ms": 8,
+          "onset_tol_s": 0.05,
+          "loose_s": 0.3
+        },
+        {
+          "id": "ks_dist_chug",
+          "category": "rendered",
+          "voice": "distorted",
+          "status": "ok",
+          "audio_s": 2.031,
+          "seconds": 0.054,
+          "seconds_per_audio_minute": 1.59,
+          "note_f1": 1.0,
+          "note_precision": 1.0,
+          "note_recall": 1.0,
+          "onset_f1": 1.0,
+          "pitch_recall_300ms": 1.0,
+          "n_ref": 12,
+          "n_est": 12,
+          "n_pitch_match_300ms": 12,
+          "onset_tol_s": 0.05,
+          "loose_s": 0.3
+        },
+        {
+          "id": "ks_clear",
+          "category": "reverb_clear",
+          "voice": "clean",
+          "status": "ok",
+          "audio_s": 3.7,
+          "seconds": 0.075,
+          "seconds_per_audio_minute": 1.22,
+          "note_f1": 1.0,
+          "note_precision": 1.0,
+          "note_recall": 1.0,
+          "onset_f1": 1.0,
+          "pitch_recall_300ms": 1.0,
+          "n_ref": 6,
+          "n_est": 6,
+          "n_pitch_match_300ms": 6,
+          "onset_tol_s": 0.05,
+          "loose_s": 0.3
+        },
+        {
+          "id": "ks_reverb",
+          "category": "reverb_clear",
+          "voice": "reverb",
+          "status": "ok",
+          "audio_s": 3.7,
+          "seconds": 0.061,
+          "seconds_per_audio_minute": 0.99,
+          "note_f1": 1.0,
+          "note_precision": 1.0,
+          "note_recall": 1.0,
+          "onset_f1": 1.0,
+          "pitch_recall_300ms": 1.0,
+          "n_ref": 6,
+          "n_est": 6,
+          "n_pitch_match_300ms": 6,
+          "onset_tol_s": 0.05,
+          "loose_s": 0.3,
+          "cross_f1": 1.0
+        }
+      ],
+      "categories": {
+        "rendered": 0.9706,
+        "reverb_clear": 1.0,
+        "solo_acoustic": 0.8936
+      }
+    }
+  },
+  "decision": []
+}

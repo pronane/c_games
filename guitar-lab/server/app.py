@@ -180,12 +180,19 @@ def run_job(job, phase):
                     versions[name] = importlib.metadata.version(name)
                 except importlib.metadata.PackageNotFoundError:
                     pass
+            from .transcribers import backend_name, transcription_label
+            if job.reference_notes is not None:
+                # This branch asked for posteriors, which stay on Basic Pitch.
+                tx_label = 'Reference: notes from the uploaded tab/score. Take: Basic Pitch ONNX (CPU).'
+            elif backend_name() == 'basic_pitch':
+                tx_label = 'Basic Pitch ONNX (CPU provider by default)'
+            else:
+                tx_label = transcription_label() + ' (CPU)'
             job.result = {'alignment': alignment, 'reference_notes': reference_notes, 'take_notes': take_notes,
                           'comparison': score_informed(reference_notes, take_notes, post) if job.reference_notes is not None
                           else observations(reference_notes, take_notes, alignment),
                           'provenance': {'separation': job.device,
-                                         'transcription': 'Reference: notes from the uploaded tab/score. Take: Basic Pitch ONNX (CPU).'
-                                         if job.reference_notes is not None else 'Basic Pitch ONNX (CPU provider by default)',
+                                         'transcription': tx_label,
                                          'versions': versions, 'instrument_profile': job.profile, 'edited': False},
                           'warnings': [job.profile['status'], 'Basic Pitch estimates can miss or invent notes.']+(
                                        ['Reference notes come from the uploaded tab; only your take is estimated.']
@@ -484,7 +491,8 @@ async def compare_performance(take: UploadFile | None = File(None), take_notes: 
                 notes = await asyncio.to_thread(take_diff.transcribe_take, path)
             except models.ModelUnavailable as exc:
                 raise HTTPException(503, str(exc)) from exc
-            transcription = 'clean-guitar Basic Pitch'
+            from .transcribers import clean_take_label
+            transcription = clean_take_label()
         finally:
             await take.close()
             path.unlink(missing_ok=True)
