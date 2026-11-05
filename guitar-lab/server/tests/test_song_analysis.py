@@ -506,3 +506,56 @@ def test_bar_roles_low_register_mono_is_lead():
     low = notes_from([38, 40, 41, 40, 38, 40], step=.3, start=0.)
     roles = sa.bar_roles(low, bars, 4.)
     assert roles[0]['role'] == 'lead'
+
+
+def _pluck_audio(events, sr=22050, total=3.0):
+    y = np.zeros(int(total*sr), dtype=np.float32)
+    for t, midi in events:
+        f0 = 440*2**((midi-69)/12)
+        tt = np.arange(int(1.0*sr))/sr
+        tone = sum(np.sin(2*np.pi*f0*h*tt)/h for h in range(1, 6))*np.exp(-tt*3)
+        i = int(t*sr)
+        y[i:i+len(tone)] += tone[:len(y)-i].astype(np.float32)
+    return y*.2
+
+
+def test_promote_candidates_adds_only_corroborated_notes():
+    sr = 22050
+    audio = _pluck_audio([(.2, 57), (1.0, 57), (2.0, 60)], sr)
+    base = [{'time': .2, 'duration': .5, 'midi': 57, 'amplitude': .8},
+            {'time': 2.0, 'duration': .5, 'midi': 60, 'amplitude': .8}]
+    cands = [{'time': 1.0, 'duration': .5, 'midi': 57, 'amplitude': .5},    # real, missed
+             {'time': 1.5, 'duration': .3, 'midi': 57, 'amplitude': .5},    # no onset there
+             {'time': 2.0, 'duration': .3, 'midi': 72, 'amplitude': .5},    # octave partial
+             {'time': 1.0, 'duration': .3, 'midi': 64, 'amplitude': .5}]    # pitch not in part
+    out = sa.promote_candidates(base, cands, audio, sr)
+    added = [(round(n['time'], 2), n['midi']) for n in out if n.get('promoted')]
+    assert added == [(1.0, 57)]
+    weak = [dict(cands[0], amplitude=.2)]
+    assert len(sa.promote_candidates(base, weak, audio, sr)) == 2
+
+
+def test_drop_sub_partials_only_on_distorted_and_off_by_default(monkeypatch):
+    sr = 22050
+    audio = _pluck_audio([(.5, 57)], sr)
+    notes = [{'time': .5, 'duration': .5, 'midi': 50, 'amplitude': .5},   # fifth below, no energy
+             {'time': .5, 'duration': .5, 'midi': 57, 'amplitude': .8}]
+    assert [n['midi'] for n in sa.drop_sub_partials(notes, audio, sr, tone='distorted')] == [57]
+    assert len(sa.drop_sub_partials(notes, audio, sr, tone='clean')) == 2
+    monkeypatch.delenv('FRETWORK_SUBPARTIAL_DROP', raising=False)
+    assert not sa.subpartial_enabled()
+
+
+def test_prior_fingering_is_opt_in_and_pitch_exact(monkeypatch):
+    notes = notes_from([45, 52, 57, 60, 64, 60, 57, 52])
+    monkeypatch.delenv('FRETWORK_FINGERING', raising=False)
+    classic = sa.fingering(notes, STANDARD)
+    monkeypatch.setenv('FRETWORK_FINGERING', 'prior')
+    tab = sa.fingering(notes, STANDARD)
+    for n in tab:
+        assert STANDARD[n['string']-1]+n['fret'] == n['midi']
+    assert max(n['fret'] for n in tab) - min(n['fret'] for n in tab if n['fret'] > 0) <= 3
+    # Other tunings ignore the standard-tuning prior.
+    assert sa.fingering(notes, HALF_DOWN) == sa.fingering(notes, HALF_DOWN)
+    monkeypatch.delenv('FRETWORK_FINGERING')
+    assert sa.fingering(notes, STANDARD) == classic
