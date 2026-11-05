@@ -551,13 +551,18 @@ def suppress_reverb_retriggers(notes, same_pitch_window=.09, amp_ratio=.9):
     Basic Pitch often re-triggers on a ringing distorted note or reverb tail. A second onset
     of the same pitch within `same_pitch_window` that is not louder than the previous one is
     treated as a tail, not a new attack.
+
+    Notes marked ``resegmented`` are picks recovered from a dense same-pitch onset run
+    (palm-muted 16ths faster than Basic Pitch's minimum length). They are real attacks
+    spaced under `same_pitch_window`, so the tail rule must not delete them.
     """
     notes = sorted(notes, key=lambda n: (n['time'], n['midi']))
     keep = []
     last_by_pitch = {}
     for n in notes:
         prev = last_by_pitch.get(n['midi'])
-        if prev is not None and n['time'] - prev['time'] < same_pitch_window and _amp(n) <= amp_ratio * _amp(prev):
+        if prev is not None and not n.get('resegmented') and n['time'] - prev['time'] < same_pitch_window \
+                and _amp(n) <= amp_ratio * _amp(prev):
             continue
         keep.append(n)
         last_by_pitch[n['midi']] = n
@@ -631,6 +636,137 @@ def summarise_roles(roles):
     top = max(counts, key=counts.get)
     total = sum(counts.values())
     return top if counts[top]/total >= .65 else 'lead and rhythm'
+
+
+# ---------------------------------------------------------------- dense repeated-note onsets
+
+# Basic Pitch's decoder will not end a note until frame energy stays under the threshold for
+# ~11 frames (~130 ms), and it then drops anything shorter than minimum_note_length (100 ms).
+# Palm-muted 16ths faster than that still light up the onset posterior at every pick — the
+# decoded list just keeps every other attack. Filling those gaps from the posterior (same
+# pitch, regular IOI, no chart) is the whole fix. FRETWORK_RESEGMENT=0 disables it.
+# Measured on Karplus-Strong renders with known MIDI, then the same ghost cleanup the
+# song path runs (benchmarks/repeated_onset_eval.py, onset/frame 0.6/0.4). Heard-only
+# F1 at ±50 ms, before -> after: distorted 16ths at 160 BPM 0.667 -> 0.980, at 216 BPM
+# 0.545 -> 0.935, at 108 BPM 0.870 -> 0.939; the same 160 BPM line played clean
+# 0.471 -> 0.939. A slow scale and a changing-pitch 16th line stayed at 1.000. Power
+# chords were unchanged (0.537). The chart is not consulted.
+
+
+def resegment_enabled():
+    import os
+    return os.getenv('FRETWORK_RESEGMENT', '1') != '0'
+
+
+def resegment_dense_onsets(notes, onset, hop, note_activation=None, midi_min=40, midi_max=88,
+                           onset_thresh=0.40, min_ioi=0.045, max_ioi=0.16, min_run=4,
+                           regularity=0.35, min_median_amp=0.55):
+    """Add same-pitch attacks the decoder merged, using Basic Pitch's onset posterior.
+
+    A run qualifies only when several onset peaks of one MIDI pitch are evenly spaced
+    between `min_ioi` and `max_ioi`. Peaks that already have a decoded note are left
+    alone. Slow lines (onsets further apart than `max_ioi`) and irregular noise do not
+    qualify, so a scale or a melody is not chopped up.
+    """
+    notes = [dict(n) for n in notes]
+    onset = np.asarray(onset, dtype=float)
+    if onset.ndim != 2 or onset.shape[1] < 1 or hop <= 0:
+        return notes
+    frames = note_activation
+    if frames is not None:
+        frames = np.asarray(frames, dtype=float)
+        if frames.shape != onset.shape:
+            frames = None
+    hop = float(hop)
+    added = []
+    for col_i in range(onset.shape[1]):
+        midi = 21 + col_i
+        if midi < midi_min or midi > midi_max:
+            continue
+        col = onset[:, col_i]
+        if len(col) < 3:
+            continue
+        peaks = np.where((col[1:-1] >= col[:-2]) & (col[1:-1] >= col[2:]) & (col[1:-1] >= onset_thresh))[0] + 1
+        if len(peaks) < min_run:
+            continue
+        kept = []
+        for i in peaks:
+            t = float(i) * hop
+            amp = float(col[i])
+            if kept and t - kept[-1][0] < 0.04:
+                if amp > kept[-1][1]:
+                    kept[-1] = (t, amp, int(i))
+                continue
+            kept.append((t, amp, int(i)))
+        run = [kept[0]]
+        runs = []
+        for p in kept[1:]:
+            if p[0] - run[-1][0] <= max_ioi * 1.5:
+                run.append(p)
+            else:
+                runs.append(run)
+                run = [p]
+        runs.append(run)
+        for run in runs:
+            if len(run) < min_run:
+                continue
+            dts = np.diff([p[0] for p in run])
+            ioi = float(np.median(dts))
+            if not (min_ioi <= ioi <= max_ioi):
+                continue
+            if float(np.std(dts)) > regularity * max(ioi, 1e-6):
+                continue
+            if float(np.median([p[1] for p in run])) < min_median_amp:
+                continue
+            # Only fill a pitch the decoder already committed to. A harmonic can have a
+            # regular onset peak under every pick; without a couple of decoded notes of
+            # that pitch, those peaks are partials, not a second line.
+            span = [n for n in notes if n['midi'] == midi and run[0][0] - ioi <= n['time'] <= run[-1][0] + ioi]
+            if len(span) < 2:
+                continue
+            for t, amp, frame in run:
+                if any(n['midi'] == midi and abs(n['time'] - t) < 0.45 * ioi for n in notes):
+                    continue
+                if any(abs(n['time'] - t) < 0.45 * ioi and n['midi'] == midi for n in added):
+                    continue
+                if frames is not None and float(frames[frame, col_i]) < 0.20:
+                    continue
+                added.append({'time': t, 'duration': max(0.04, min(0.12, ioi * 0.85)),
+                              'midi': midi, 'amplitude': amp, 'resegmented': True})
+    if not added:
+        return notes
+    # A peak an octave / fifth / twelfth above a note already at that instant is the
+    # partial of the lower pitch, which distortion makes look like its own onset train.
+    # Dropping it here does not remove notes the decoder already kept.
+    partials = {7, 12, 19, 24, 28, 31}
+    pool = notes + added
+    kept_added = []
+    for n in added:
+        if any(abs(o['time'] - n['time']) < 0.04 and (n['midi'] - o['midi']) in partials
+               and o['midi'] < n['midi'] for o in pool if o is not n):
+            continue
+        kept_added.append(n)
+    added = kept_added
+    if not added:
+        return notes
+    # A safety valve: a pathological posterior must not multiply the part several times over.
+    cap = max(8, 3 * max(len(notes), 1))
+    if len(added) > cap:
+        added = sorted(added, key=lambda n: -n['amplitude'])[:cap]
+    out = notes + added
+    by_pitch = {}
+    for n in out:
+        by_pitch.setdefault(n['midi'], []).append(n)
+    for group in by_pitch.values():
+        group.sort(key=lambda n: n['time'])
+        for a, b in zip(group, group[1:]):
+            gap = b['time'] - a['time']
+            if (a.get('resegmented') or b.get('resegmented')) and 0 < gap < a.get('duration', 0):
+                a['duration'] = max(0.03, gap * 0.92)
+    out.sort(key=lambda n: (n['time'], n['midi']))
+    for i, n in enumerate(out):
+        n['id'] = i
+    return out
 
 
 # ---------------------------------------------------------------- candidate promotion

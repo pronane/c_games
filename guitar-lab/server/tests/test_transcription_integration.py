@@ -15,6 +15,13 @@ def test_actual_basic_pitch_detects_a3(tmp_path):
     assert all(0 <= n['time'] < 2 and n['time']+n['duration'] <= 2.001 for n in notes)
 
 
+@pytest.mark.skipif(not capabilities()['transcription']['configured'], reason='Install optional ONNX transcription runtime')
+def test_dense_repeated_notes_improve_heard_only_f1():
+    """Fast same-pitch picks are recovered from the onset posterior. Known MIDI, no chart."""
+    from benchmarks.repeated_onset_eval import self_check
+    self_check()
+
+
 def test_actual_separation_when_explicitly_enabled():
     """No synthetic substitute: requires real checkpoint and opt-in CPU/GPU time."""
     import os
