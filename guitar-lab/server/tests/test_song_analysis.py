@@ -432,13 +432,35 @@ def test_suppress_harmonic_ghosts_on_distorted_mono_line():
            {'time': 1.6, 'duration': .3, 'midi': 52, 'amplitude': .62}]
     # Real power chord elsewhere must survive (similar amplitudes, root+fifth+octave).
     power = [{'time': 3.0, 'duration': .4, 'midi': m, 'amplitude': .85} for m in (40, 47, 52)]
-    cleaned = sa.suppress_harmonic_ghosts(line+ghosts+sub+power, tone='distorted', window=.05)
+    cleaned = sa.suppress_harmonic_ghosts(line+ghosts+sub+power, tone='distorted', window=.05,
+                                        max_drop_frac=None)  # ungated: synthetic 3× ghost load
     mel_midis = sorted(n['midi'] for n in cleaned if n['time'] < 2.5)
     assert mel_midis == [50, 52, 52, 52, 53], mel_midis  # subharmonic 40 dropped, 52 kept
     chord_midis = sorted(n['midi'] for n in cleaned if n['time'] >= 2.9)
     assert chord_midis == [40, 47, 52], chord_midis
     # Clean tone leaves ghosts alone (classical octaves are real).
     assert len(sa.suppress_harmonic_ghosts(line+ghosts, tone='clean')) == len(line)+len(ghosts)
+
+
+def test_suppress_harmonic_ghosts_reverts_when_drop_fraction_is_high():
+    """If cleanup would delete most of the notes, keep the original list.
+
+    Guitar-TECHS P3_08 amp lost ~24% of real notes under full suppress; gating at 15%
+    recovers that clip without raising NIN false-chord rate.
+    """
+    # Dense partial stacks: each real note + quieter octave/fifth/3rd-harmonic ghosts.
+    notes = []
+    for i, midi in enumerate(range(50, 62)):
+        t = i * 0.3
+        notes.append({'time': t, 'duration': .25, 'midi': midi, 'amplitude': .9})
+        notes.append({'time': t + 0.01, 'duration': .2, 'midi': midi + 12, 'amplitude': .4})
+        notes.append({'time': t + 0.01, 'duration': .2, 'midi': midi + 19, 'amplitude': .3})
+        notes.append({'time': t + 0.01, 'duration': .2, 'midi': midi + 7, 'amplitude': .35})
+    cleaned = sa.suppress_harmonic_ghosts(notes, tone='distorted', window=.05, max_drop_frac=.15)
+    # 75% of events are ghosts → drop frac ≫ 15% → revert to the original list.
+    assert cleaned == notes
+    forced = sa.suppress_harmonic_ghosts(notes, tone='distorted', window=.05, max_drop_frac=None)
+    assert len(forced) < len(notes) * 0.5
 
 
 def test_classify_onset_single_vs_chord():

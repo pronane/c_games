@@ -2,6 +2,12 @@
 
 Both scripts score what the app actually produces. Results from 5 Nov 2026 are in the main README.
 
+## Error taxonomy
+
+`accuracy_errors.py` classifies unmatched notes against MIDI (wrong octave, semitone, other pitch, extra ghost, missed onset, merges, splits, timing-only). The write-up is [ACCURACY_ERRORS.md](ACCURACY_ERRORS.md).
+
+Ghost suppression reverts when it would drop more than 15% of the notes (`suppress_harmonic_ghosts(..., max_drop_frac=0.15)`). Held-out Guitar-TECHS P3 amp F1 at ±50 ms went from 0.661 to 0.677. Carcassi, the GuitarSet sample, the DI take, Hollow Ground and the NIN false-chord test did not move (false-chord fraction stayed 0.0). The opt-in `clean_model` filter from PR #46 is unchanged and stays off.
+
 ## Real guitarists: GuitarSet
 
 CC BY 4.0, Xi et al., ISMIR 2018. Download `annotation.zip` and `audio_mono-mic.zip` from
