@@ -317,6 +317,10 @@ def run_song(song: Song):
                 song.notes[p['id']], _info = clean_model.refine(cand, post, effects_detected)
             else:
                 song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
+                if sa.promote_enabled():
+                    # Low-threshold pool for evidence-gated promotion of missed notes.
+                    p['candidates'] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
+                                                        thresholds=sa.PROMOTE_THRESHOLDS)
             path.unlink(missing_ok=True)
         # Lock the beat grid to the transcribed onsets so notes quantise to exact positions.
         onsets = [n['time'] for v in song.notes.values() for n in v]
@@ -343,6 +347,13 @@ def run_song(song: Song):
                 song.notes[p['id']], tone=sound, window=.15)
             p['roles'] = sa.bar_roles(song.notes[p['id']], grid['bars'], duration, bleed=flags)
             song.notes[p['id']] = sa.drop_overtones(song.notes[p['id']], p['roles'], window=.15, tone=sound)
+            cands = p.pop('candidates', None)
+            if cands:
+                song.notes[p['id']] = sa.promote_candidates(song.notes[p['id']], cands, p['audio'], sr_s)
+            if sa.subpartial_enabled():
+                song.notes[p['id']] = sa.drop_sub_partials(song.notes[p['id']], p['audio'], sr_s, tone=sound)
+            for i, n in enumerate(song.notes[p['id']]):
+                n['id'] = i
             p['role'] = sa.summarise_roles(p['roles'])
             p['notes'] = len(song.notes[p['id']])
             del p['audio']

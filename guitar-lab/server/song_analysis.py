@@ -564,7 +564,8 @@ def suppress_reverb_retriggers(notes, same_pitch_window=.09, amp_ratio=.9):
     return keep
 
 
-def suppress_harmonic_ghosts(notes, tone='distorted', window=.05, amp_ratio=.75):
+def suppress_harmonic_ghosts(notes, tone='distorted', window=.05, amp_ratio=.75,
+                             max_drop_frac=.15):
     """Onset-level single-note vs chord cleanup for distorted / reverberant guitar.
 
     Runs on every bar (not only lead): industrial mono riffs are often labelled rhythm
@@ -573,6 +574,11 @@ def suppress_harmonic_ghosts(notes, tone='distorted', window=.05, amp_ratio=.75)
 
     Per onset: drop notes explained as harmonics of a louder lower pitch; keep a chord only
     when two+ independent fundamentals remain. Then suppress reverb-tail re-triggers.
+
+    If cleaning would drop more than `max_drop_frac` of the input notes, the raw list is
+    kept instead. Measured on Guitar-TECHS P3 amp (real MIDI): default suppress F1@50 0.661
+    held-out → 0.677 with max_drop_frac=0.15 (one clip over-suppressed); NIN false-chord
+    rate stayed 0.0; GuitarSet / Carcassi unchanged. Set max_drop_frac=None to disable.
     """
     if tone == 'clean' or not notes:
         return list(notes)
@@ -580,7 +586,10 @@ def suppress_harmonic_ghosts(notes, tone='distorted', window=.05, amp_ratio=.75)
     for group in onset_groups(notes, window=window):
         _label, kept = classify_onset(group, amp_ratio=amp_ratio)
         cleaned.extend(kept)
-    return suppress_reverb_retriggers(cleaned)
+    cleaned = suppress_reverb_retriggers(cleaned)
+    if max_drop_frac is not None and (len(notes) - len(cleaned)) / len(notes) > max_drop_frac:
+        return list(notes)
+    return cleaned
 
 
 def drop_overtones(notes, roles, window=.05, tone='distorted'):
@@ -624,6 +633,133 @@ def summarise_roles(roles):
     return top if counts[top]/total >= .65 else 'lead and rhythm'
 
 
+# ---------------------------------------------------------------- candidate promotion
+
+# Basic Pitch at the app thresholds misses real notes (43% of the F1 loss on Guitar-TECHS).
+# A second pass at low thresholds finds many of them, but adding them blindly drowns the
+# part in ghosts. A candidate is promoted only with independent evidence: an audio onset
+# peak at its time, its harmonic series rising at that moment, its pitch already used
+# elsewhere in the part, not a partial / neighbour of a kept note, not a re-trigger of a
+# sustaining note, and Basic Pitch amplitude >= PROMOTE_MIN_AMP. Measured (ACCURACY_ERRORS_2.md,
+# F1@50): Guitar-TECHS amp held-out .677 -> .691, DI .660 -> .666, GuitarSet .821 -> .829,
+# Carcassi .645 -> .644 (flat). FRETWORK_PROMOTE=0 disables it.
+PROMOTE_THRESHOLDS = (0.3, 0.2)
+PROMOTE_MIN_AMP, PROMOTE_MIN_RISE, PROMOTE_ONSET_WINDOW, PROMOTE_MAX_FRAC = .35, 1.5, .05, .3
+_PARTIAL_INTERVALS = {7, 12, 19, 24, 28, 31}
+
+
+def promote_enabled():
+    import os
+    return os.getenv('FRETWORK_PROMOTE', '1') != '0'
+
+
+def _spectral_view(audio, sr, hop):
+    import librosa
+    y = np.asarray(mono(audio), dtype=np.float32)
+    S = np.abs(librosa.stft(y, n_fft=4096, hop_length=hop))
+    freqs = librosa.fft_frequencies(sr=sr, n_fft=4096)
+    return y, S, freqs
+
+
+def _band(S, freqs, f, j0, j1):
+    if j1 <= j0 or f > freqs[-1]:
+        return 0.0
+    b = int(np.argmin(np.abs(freqs-f)))
+    return float(S[max(b-1, 0):b+2, j0:min(j1, S.shape[1])].max()) if j0 < S.shape[1] else 0.0
+
+
+def _harmonic_salience(S, freqs, midi, j0, j1, n_harm=5):
+    f0 = 440.0*2**((midi-69)/12)
+    return sum(_band(S, freqs, f0*h, j0, j1) for h in range(1, n_harm+1) if f0*h <= freqs[-1])
+
+
+def promote_candidates(notes, candidates, audio, sr, min_amp=None, min_rise=None,
+                       onset_window=None, max_frac=None):
+    """Add low-threshold candidates that independent audio evidence corroborates."""
+    import librosa
+    min_amp = PROMOTE_MIN_AMP if min_amp is None else min_amp
+    min_rise = PROMOTE_MIN_RISE if min_rise is None else min_rise
+    onset_window = PROMOTE_ONSET_WINDOW if onset_window is None else onset_window
+    max_frac = PROMOTE_MAX_FRAC if max_frac is None else max_frac
+    notes = list(notes)
+    if not notes or not candidates or audio is None:
+        return notes
+    hop = max(1, int(round(256*sr/44100)))
+    y, S, freqs = _spectral_view(audio, sr, hop)
+    if not len(y):
+        return notes
+    oenv = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+    peaks = librosa.onset.onset_detect(onset_envelope=oenv, sr=sr, hop_length=hop, units='time')
+    if len(peaks) == 0:
+        return notes
+    vocab = {n['midi'] for n in notes}
+    w8 = max(1, int(round(.046*sr/hop)))
+    added = []
+    for c in candidates:
+        t, m = float(c['time']), int(c['midi'])
+        if float(c.get('amplitude') or 0) < min_amp or m not in vocab:
+            continue
+        if any(abs(n['time']-t) < .05 and n['midi'] == m for n in notes):
+            continue
+        if any(n['midi'] == m and n['time']-.02 < t < n['time']+n['duration'] for n in notes):
+            continue
+        if any(0 <= t-n['time'] < .08 and (m-n['midi']) in _PARTIAL_INTERVALS for n in notes):
+            continue
+        if any(abs(n['time']-t) < .05 and abs(m-n['midi']) in (1, 2) for n in notes):
+            continue
+        if float(np.min(np.abs(peaks-t))) > onset_window:
+            continue
+        j = int(t*sr/hop)
+        before = _harmonic_salience(S, freqs, m, max(j-w8, 0), max(j-1, 1))
+        after = _harmonic_salience(S, freqs, m, j+1, j+w8)
+        if after < min_rise*(before+1e-6):
+            continue
+        added.append(dict(c, promoted=True))
+    cap = max(1, int(max_frac*len(notes)))
+    if len(added) > cap:
+        added = sorted(added, key=lambda n: -float(n.get('amplitude') or 0))[:cap]
+    out = sorted(notes+added, key=lambda n: (n['time'], n['midi']))
+    return out
+
+
+# Distorted guitar: a note a fifth / octave / fourth / twelfth below a simultaneous note,
+# whose own fundamental is weaker than the upper note's, is usually an intermodulation or
+# sub-partial ghost (most 'other pitch' errors on Guitar-TECHS were these, with the true
+# note already present). Gains on the tuning half (+.016 F1@50 amp) did not carry to the
+# held-out half (-.0004), DI +.005, NIN Gtr_Riff false chords .134 -> .093. Borderline, so
+# opt-in: FRETWORK_SUBPARTIAL_DROP=1.
+SUBPARTIAL_RATIO, SUBPARTIAL_INTERVALS = 1.0, (7, 12, 5, 19)
+
+
+def subpartial_enabled():
+    import os
+    return os.getenv('FRETWORK_SUBPARTIAL_DROP', '0') == '1'
+
+
+def drop_sub_partials(notes, audio, sr, tone='distorted', ratio=None, intervals=None, window=.05):
+    if tone != 'distorted' or not notes or audio is None:
+        return list(notes)
+    ratio = SUBPARTIAL_RATIO if ratio is None else ratio
+    intervals = SUBPARTIAL_INTERVALS if intervals is None else intervals
+    hop = max(1, int(round(256*sr/44100)))
+    _, S, freqs = _spectral_view(audio, sr, hop)
+    w = max(1, int(round(.058*sr/hop)))
+    out = []
+    for n in notes:
+        m, t = n['midi'], n['time']
+        j0 = int((t+.01)*sr/hop)
+        e0 = _band(S, freqs, 440.0*2**((m-69)/12), j0, j0+w)
+        drop = False
+        for a in intervals:
+            if any(abs(o['time']-t) < window and o['midi'] == m+a for o in notes):
+                if e0 < ratio*_band(S, freqs, 440.0*2**((m+a-69)/12), j0, j0+w):
+                    drop = True
+                    break
+        if not drop:
+            out.append(n)
+    return out
+
+
 # ---------------------------------------------------------------- fingering
 
 def _assignments(pitches, strings, max_fret, limit=24):
@@ -662,6 +798,46 @@ def _assignments(pitches, strings, max_fret, limit=24):
 # (CARRY_HAND) is the change that raised that score from 0.589 to 0.600.
 FRET_COST, HIGH_FRET_COST, MOVE_COST, LEAP_COST = 0.0, .2, .4, 0.0
 CARRY_HAND = True
+# Hand window + string prior (ACCURACY_ERRORS_2.md). The fretting hand covers four frets
+# (index at `lo`, pinky at lo+3); a note inside that window costs no movement, and the hand
+# only shifts by as much as it must. A per-pitch string prior, counted from GuitarSet
+# players 00-02 only (CC BY 4.0), says which string players actually use for each pitch in
+# standard tuning. Exact string+fret given the true notes, held-out GuitarSet players 03-05:
+# 0.575 -> 0.714 (players 00-02, used for tuning: 0.625 -> 0.745); end to end on 20 GuitarSet
+# mic files, exact string+fret on matched notes .556 -> .674. But GuitarSet players (jazz,
+# funk, bossa) avoid open strings, and the prior moves open-position parts up the neck
+# (open E -> B string fret 5; the Carcassi and A-minor-arpeggio regression tests fail), which
+# is wrong for classical/folk tab a learner expects. Opt-in until it is style-aware:
+# FRETWORK_FINGERING=prior. Other tunings always use the classic costs.
+HAND_SPAN = 3
+STRING_PRIOR_WEIGHT = .5
+STANDARD_TUNING = [64, 59, 55, 50, 45, 40]
+_STRING_PRIOR = None
+
+
+def _string_prior():
+    """-log P(string | pitch) with add-one smoothing, keyed (midi, string index 0 = high E)."""
+    global _STRING_PRIOR
+    if _STRING_PRIOR is None:
+        import json
+        from pathlib import Path
+        _STRING_PRIOR = {}
+        try:
+            counts = json.loads((Path(__file__).with_name('string_prior.json')).read_text())['counts']
+        except (OSError, ValueError, KeyError):
+            counts = {}
+        for m in range(STANDARD_TUNING[-1], STANDARD_TUNING[0]+25):
+            opts = [s for s, o in enumerate(STANDARD_TUNING) if 0 <= m-o <= 24]
+            row = counts.get(str(m), {})
+            total = sum(row.values())
+            for s in opts:
+                _STRING_PRIOR[(m, s)] = -math.log((row.get(str(s+1), 0)+1)/(total+len(opts)))
+    return _STRING_PRIOR
+
+
+def _prior_fingering():
+    import os
+    return os.getenv('FRETWORK_FINGERING', 'classic').lower() == 'prior'
 
 
 def fingering(notes, open_strings, max_fret=24):
@@ -672,6 +848,10 @@ def fingering(notes, open_strings, max_fret=24):
     """
     if not open_strings:
         return [dict(n, string=None, fret=None) for n in notes]
+    prior = _string_prior() if (_prior_fingering() and list(open_strings) == STANDARD_TUNING) else None
+    # The hand window alone (no prior) lost tab accuracy end to end on GuitarSet (.556 -> .534),
+    # so other tunings and instruments keep the classic costs.
+    classic = prior is None
     groups = onset_groups(notes)
     states = []
     for g in groups:
@@ -683,36 +863,68 @@ def fingering(notes, open_strings, max_fret=24):
         frets = [f for _, f in c if f > 0] if c else []
         return float(np.mean(frets)) if frets else None
 
-    def local_cost(c):
+    def window(c):
+        frets = [f for _, f in c if f > 0] if c else []
+        return (min(frets), max(frets)) if frets else None
+
+    def local_cost(c, g):
         if c is None:
             return 50.0
         frets = [f for _, f in c if f > 0]
         span = (max(frets)-min(frets)) if frets else 0
         # Prefer lower positions (most tab is written there) and avoid the top of the neck.
-        return .4*span+FRET_COST*sum(f for _, f in c)/len(c)+HIGH_FRET_COST*sum(max(0, f-12) for _, f in c)/len(c) \
+        v = .4*span+FRET_COST*sum(f for _, f in c)/len(c)+HIGH_FRET_COST*sum(max(0, f-12) for _, f in c)/len(c) \
             + (1.5*span if span > 4 else 0)
+        if prior is not None:
+            v += STRING_PRIOR_WEIGHT*sum(prior.get((n['midi'], s), 5.) for n, (s, _) in zip(g, c))/len(c)
+        return v
 
-    cost = [local_cost(c) for c in states[0][1]] if states else []
+    def move(c, hand_state, prev):
+        if classic:
+            pc = position(c)
+            pp = hand_state if CARRY_HAND else position(prev)
+            return abs(pc-pp) if pc is not None and pp is not None else 0
+        w = window(c)
+        if w is None or hand_state is None:
+            return 0
+        lo = hand_state[0]
+        return max(0, lo-w[0], w[1]-(lo+HAND_SPAN))
+
+    def next_hand(c, hand_state):
+        if classic:
+            pc = position(c)
+            return pc if pc is not None else hand_state
+        w = window(c)
+        if w is None:
+            return hand_state
+        if hand_state is None:
+            return w
+        lo = hand_state[0]
+        if w[0] < lo:
+            lo = w[0]
+        elif w[1] > lo+HAND_SPAN:
+            lo = w[1]-HAND_SPAN
+        return (lo, lo+HAND_SPAN)
+
+    cost = [local_cost(c, states[0][0]) for c in states[0][1]] if states else []
     # Hand position carried through open-string notes: playing an open string does not move
     # the fretting hand, so the next fretted note is measured from where the hand last was.
-    hand = [position(c) for c in states[0][1]] if states else []
+    hand = [(position(c) if classic else window(c)) for c in states[0][1]] if states else []
     back = []
     for k in range(1, len(states)):
-        prev_opts, opts = states[k-1][1], states[k][1]
+        prev_opts, (g, opts) = states[k-1][1], states[k]
         new_cost, ptr, new_hand = [], [], []
         for c in opts:
-            pc = position(c)
             best, arg = math.inf, 0
             for j, p in enumerate(prev_opts):
-                pp = hand[j] if CARRY_HAND else position(p)
-                move = abs(pc-pp) if pc is not None and pp is not None else 0
+                mv = move(c, hand[j], p) if c is not None else 0
                 # Capped so one stray high note cannot drag a whole phrase up the neck.
-                v = cost[j]+MOVE_COST*min(move, 7)+(LEAP_COST if move > 4 else 0)
+                v = cost[j]+MOVE_COST*min(mv, 7)+(LEAP_COST if mv > 4 else 0)
                 if v < best:
                     best, arg = v, j
-            new_cost.append(best+local_cost(c))
+            new_cost.append(best+local_cost(c, g))
             ptr.append(arg)
-            new_hand.append(pc if pc is not None else hand[arg])
+            new_hand.append(next_hand(c, hand[arg]))
         cost, hand = new_cost, new_hand
         back.append(ptr)
     choice = [0]*len(states)
