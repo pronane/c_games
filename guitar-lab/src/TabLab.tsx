@@ -9,7 +9,7 @@ import {
   synthesize,
   type TabPiece,
 } from "./tabScore";
-import { parseTextTab, tuningName } from "./songApi";
+import { compareTake, parseTextTab, tuningName } from "./songApi";
 import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
 import { estimateOffset, mixInto, timeStretch } from "./songAudio";
 import { renderFile, driveForProgram } from "./fileSound";
@@ -20,6 +20,8 @@ import { captureError } from "./audioInputs";
 import { Recorder } from "./recorder";
 import LatencyCheck from "./LatencyCheck";
 import type { BarMark } from "./feedback";
+import TakeReport from "./TakeReport";
+import { rememberTake, shownReport, type Comparison } from "./compare";
 import { resolveInstrument, instruments, type InstrumentSettings } from "./instruments";
 import { names } from "./analysis";
 const Notation = lazy(() => import("./Notation"));
@@ -41,6 +43,7 @@ type Props = {
   ) => void;
 };
 type Take = { buffer: AudioBuffer; from: number; to: number; speed: number; detail: string };
+type TakeCheck = { id: string; label: string; comparison: Comparison };
 
 const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
 const GP = ".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml,.mxl,.txt,.tab";
@@ -66,6 +69,9 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     [position, setPosition] = useState(0),
     [recording, setRecording] = useState(false),
     [take, setTake] = useState<Take | null>(null),
+    [checks, setChecks] = useState<TakeCheck[]>([]),
+    [checkAt, setCheckAt] = useState(0),
+    [checking, setChecking] = useState(false),
     [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
     [mixUrl, setMixUrl] = useState(""),
     // Whose sound plays the tab: the instruments the file asks for, or the app's own guitar.
@@ -101,6 +107,7 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
   async function load(src: TabSource) {
     setError("");
     setTake(null);
+    setChecks([]);
     stop();
     try {
       const bytes = src.bytes ?? new TextEncoder().encode(src.musicxml ?? "");
@@ -128,6 +135,7 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
   async function loadText(raw: string, name: string) {
     setError("");
     setTake(null);
+    setChecks([]);
     stop();
     setBusy(true);
     try {
@@ -183,6 +191,7 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     if (!score) return;
     setTrack(t);
     setTake(null);
+    setChecks([]);
     const p = scoreToPiece(score, t);
     setPiece(p);
     const drive = driveForProgram(p.program);
@@ -399,6 +408,34 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
     setPlaying(true);
     tick();
   }
+  async function checkChart() {
+    if (!take || !piece || settings.instrument !== "guitar") return;
+    setChecking(true);
+    setError("");
+    try {
+      const part = excerpt(piece, take.from, take.to, take.speed);
+      const wav = encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate);
+      const comparison = await compareTake({
+        take: wav,
+        targets: [
+          {
+            source: "file",
+            label: piece.title || "Uploaded chart",
+            notes: part.notes.map(({ time, duration, midi, string, fret }) => ({ time, duration, midi, string, fret })),
+            bars: part.bars,
+            bpm: piece.bpm * take.speed,
+          },
+        ],
+      });
+      const entry = { id: `${Date.now()}`, label: `Take ${checks.length + 1}`, comparison };
+      setChecks((prev) => rememberTake(prev, entry));
+      setCheckAt(Math.min(checks.length, 4));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setChecking(false);
+    }
+  }
   async function compare() {
     if (!take || !piece) return;
     const part = excerpt(piece, take.from, take.to, take.speed),
@@ -522,7 +559,14 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
           {piece.warnings.length > 0 && <ul className="helper">{piece.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
           <Suspense fallback={<p className="helper">Loading the notation view…</p>}>
-            {source?.bytes && <Notation bytes={source.bytes} track={track} tab={profile.openStrings.length > 0} />}
+            {source?.bytes && (
+              <Notation
+                bytes={source.bytes}
+                track={track}
+                tab={profile.openStrings.length > 0}
+                marks={checks[checkAt] ? shownReport(checks[checkAt].comparison)?.notes : undefined}
+              />
+            )}
           </Suspense>
           {gpUrl && (
             <a className="download" href={gpUrl} download={`${piece.title}.gp`}>
@@ -629,7 +673,22 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
                   <Download size={13} /> Make a mix to keep
                 </button>
                 <button className="primary" onClick={compare}>Check my take against the tab</button>
+                {settings.instrument === "guitar" && (
+                  <button disabled={checking} onClick={checkChart}>
+                    {checking ? "Checking the take…" : "What I played wrong"}
+                  </button>
+                )}
               </div>
+              {checks.length > 1 && (
+                <div className="presets" role="tablist" aria-label="Recent takes">
+                  {checks.map((item, i) => (
+                    <button key={item.id} className={i === checkAt ? "on" : ""} onClick={() => setCheckAt(i)}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {checks[checkAt] && <TakeReport comparison={checks[checkAt].comparison} />}
               {mixUrl && (
                 <a className="download" href={mixUrl} download={`${piece.title} - with me.wav`}>
                   <Download size={14} /> Download (WAV)
