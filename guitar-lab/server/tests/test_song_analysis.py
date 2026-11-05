@@ -87,8 +87,12 @@ def test_musicxml_is_valid_and_every_bar_is_full():
     measures = root.findall('.//measure')
     assert len(measures) >= 3
     for m in measures:
-        total = sum(int(n.find('duration').text) for n in m.findall('note') if n.find('chord') is None)
-        assert total == 16, f'bar {m.get("number")} has {total} sixteenths'
+        per_voice = {}
+        for n in m.findall('note'):
+            if n.find('chord') is None:
+                v = n.findtext('voice', '1')
+                per_voice[v] = per_voice.get(v, 0)+int(n.find('duration').text)
+        assert all(t == 16 for t in per_voice.values()), f'bar {m.get("number")} has {per_voice} sixteenths'
     struck = [n for n in root.findall('.//note') if n.find('pitch') is not None
               and not any(t.get('type') == 'stop' for t in n.findall('tie'))]
     assert len(struck) == len(notes)
@@ -328,13 +332,16 @@ def test_drop_overtones_keeps_an_octave_pair_when_the_tone_is_clean():
     assert 'tone=sound' in inspect.getsource(run_song)
 
 
-def test_fret_cost_is_a_small_lower_position_bias(monkeypatch):
-    """0.05 is enough to leave a fret-6 camp for the open-position fingering of F then C#."""
-    assert sa.FRET_COST == 0.05
+def test_fret_cost_stays_zero_after_the_guitarset_regression(monkeypatch):
+    """0.05 pulls F then C# into open position, but on GuitarSet that bias dropped exact
+    string+fret from 0.589 to 0.554. Carrying the hand through open strings scored 0.600,
+    so the fret-height weight stays at 0."""
+    assert sa.FRET_COST == 0.0
+    assert sa.CARRY_HAND is True
     notes = notes_from([65, 61], step=.25)
-    assert [(n['string'], n['fret']) for n in sa.fingering(notes, STANDARD)] == [(1, 1), (2, 2)]
-    monkeypatch.setattr(sa, 'FRET_COST', 0.0)
     assert [(n['string'], n['fret']) for n in sa.fingering(notes, STANDARD)] == [(2, 6), (3, 6)]
+    monkeypatch.setattr(sa, 'FRET_COST', 0.05)
+    assert [(n['string'], n['fret']) for n in sa.fingering(notes, STANDARD)] == [(1, 1), (2, 2)]
 
 
 def test_musicxml_eighth_notes_at_120_bpm_have_no_rests_between_them():
@@ -353,3 +360,59 @@ def test_musicxml_eighth_notes_at_120_bpm_have_no_rests_between_them():
     assert all(n.find('rest') is None for n in attacks[first:last+1])
     assert [n.find('type').text for n in pitched[:-1]] == ['eighth']*7
     assert [int(n.find('duration').text) for n in pitched[:-1]] == [2]*7
+
+
+def test_fingering_does_not_jump_up_the_neck_after_an_open_string():
+    # Bars 2-3 of Carcassi Op.60 No.1 as transcribed; before the carried hand position the open
+    # G let F3/E3 jump to the 6th string at frets 13/12.
+    notes = notes_from([48, 64, 62, 60, 59, 57, 55, 53, 52, 67, 65, 64, 62])
+    tab = sa.fingering(notes, STANDARD)
+    f3 = next(n for n in tab if n['midi'] == 53)
+    assert (f3['string'], f3['fret']) == (4, 3)
+    assert max(n['fret'] for n in tab) <= 5
+
+
+def test_refine_beats_locks_grid_onto_onsets():
+    true = np.arange(0, 20, .5)
+    lagged = true+.04+0.01*np.sin(np.arange(len(true)))           # tracker lag + jitter
+    onsets = np.sort(np.concatenate([true, true[:-1]+.25]))         # 8th notes
+    out = np.array(sa.refine_beats(lagged, onsets))
+    assert np.max(np.abs(out-true)) < .005
+    assert np.all(np.diff(out) > 0)
+
+
+def test_refine_beats_keeps_grid_where_no_onsets():
+    beats = np.arange(0, 10, .5)
+    assert np.allclose(sa.refine_beats(beats, []), beats)
+
+
+def test_split_voices_puts_sustained_bass_in_voice_two():
+    beats = [i*.5 for i in range(20)]
+    bass = [{'time': 0., 'duration': 2.0, 'midi': 45, 'amplitude': .8}]
+    melody = notes_from([69, 72, 76, 72, 69, 72, 76, 72], step=.25, start=0., dur=.2)
+    notes = sa.fingering(bass+melody, STANDARD)
+    mel, bas = sa.split_voices(notes, beats, min_share=.05)
+    assert [n['midi'] for n in bas] == [45] and len(mel) == 8
+    xml = sa.musicxml(notes, beats, {'fifths': 0, 'mode': 'minor'}, STANDARD)
+    root = ET.fromstring(xml.split('\n', 2)[2])
+    a2 = [n for n in root.findall('.//note') if n.findtext('voice') == '2' and n.find('pitch') is not None]
+    assert a2[0].findtext('pitch/step') == 'A' and a2[0].findtext('type') == 'whole'   # sustains the whole bar
+
+
+def test_musicxml_single_voice_fallback():
+    beats = [i*.5 for i in range(20)]
+    notes = sa.fingering(notes_from([60, 62, 64, 65, 67, 69, 71, 72]), STANDARD)
+    for voices in (1, 2):                                            # a scale has no bass line
+        xml = sa.musicxml(notes, beats, {'fifths': 0}, STANDARD, voices=voices)
+        assert '<voice>' not in xml and '<backup>' not in xml
+
+
+def test_clean_thresholds_are_the_guitarset_tuned_values(monkeypatch):
+    import importlib
+    from server import models
+    monkeypatch.delenv('FRETWORK_ONSET_THRESHOLD', raising=False)
+    monkeypatch.delenv('FRETWORK_FRAME_THRESHOLD', raising=False)
+    m = importlib.reload(models)
+    assert (m.ONSET_THRESHOLD, m.FRAME_THRESHOLD) == (0.6, 0.4)
+    assert m.thresholds_for('clean', True) == (0.6, 0.4)
+    assert m.thresholds_for('distorted', True) == (0.5, 0.3)      # high-gain handling unchanged

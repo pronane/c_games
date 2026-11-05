@@ -90,6 +90,7 @@ def evaluate(jams_path, wav_path):
     out = {'file': Path(wav_path).name, 'style': Path(wav_path).name.split('_')[1].split('-')[0],
            'kind': 'comp' if '_comp' in Path(wav_path).name else 'solo', 'truth_notes': len(ref)}
     # Notes at the app's thresholds and at the library default.
+    saved = (models.ONSET_THRESHOLD, models.FRAME_THRESHOLD)
     for label, (onset, frame) in (('app', (models.ONSET_THRESHOLD, models.FRAME_THRESHOLD)), ('default', (.5, .3))):
         models.ONSET_THRESHOLD, models.FRAME_THRESHOLD = onset, frame
         est = models.transcribe(wav_path, midi_min=36, midi_max=88)
@@ -99,7 +100,7 @@ def evaluate(jams_path, wav_path):
             tabbed = sa.fingering(est, STANDARD, 24)
             # fingering() keeps order by (time, midi) like est; map pairs through identity of order
             out['tab_on_detected'] = tab_agreement(tabbed, ref, pairs)
-    models.ONSET_THRESHOLD, models.FRAME_THRESHOLD = .7, .5
+    models.ONSET_THRESHOLD, models.FRAME_THRESHOLD = saved
     # Fingering alone, on the true notes: did we pick the player's string and fret?
     oracle = sa.fingering([{k: n[k] for k in ('time', 'duration', 'midi')} for n in ref], STANDARD, 24)
     same = sum(1 for a, b in zip(oracle, ref) if a['string'] == b['string'] and a['fret'] == b['fret'])

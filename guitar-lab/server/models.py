@@ -98,9 +98,11 @@ def separate_stem(audio, sr, stem, policy=None):
 
 # Basic Pitch's library defaults (0.5/0.3) roughly tripled the note count on plucked guitar
 # (harmonics, ringing notes re-triggered). 0.7/0.5 raised onset+pitch F1 from 0.48 to 0.86
-# on an isolated test part and 0.50 to 0.72 on a separated stem. Validate on real recordings.
-ONSET_THRESHOLD = float(os.getenv('FRETWORK_ONSET_THRESHOLD', '0.7'))
-FRAME_THRESHOLD = float(os.getenv('FRETWORK_FRAME_THRESHOLD', '0.5'))
+# on an isolated test part and 0.50 to 0.72 on a separated stem. A 4x3 grid on all 360
+# GuitarSet recordings (clean acoustic, 50 ms onsets) then put 0.6/0.4 best: F1 .784 -> .803
+# (comp .692 -> .736, solo .876 -> .869); Carcassi Op.60/1 (nylon): 46 -> 45 sequence edits.
+ONSET_THRESHOLD = float(os.getenv('FRETWORK_ONSET_THRESHOLD', '0.6'))
+FRAME_THRESHOLD = float(os.getenv('FRETWORK_FRAME_THRESHOLD', '0.4'))
 
 
 # Overdrive smears onsets and spreads energy into harmonics, so Basic Pitch's onset confidence
