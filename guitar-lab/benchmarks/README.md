@@ -1,6 +1,6 @@
 # Accuracy benchmarks
 
-Both scripts score what the app actually produces. Results from 1 Nov 2026 are in the main README.
+Both scripts score what the app actually produces. Results from 5 Nov 2026 are in the main README.
 
 ## Real guitarists: GuitarSet
 

@@ -65,17 +65,19 @@ Pick your instrument, then add a song (upload, or a direct https link to an audi
 - **Your take in the song**: hear the band with your take in place of the part you replaced, download the mix, or send it to the comparison engine.
 - **Feedback**: the comparison now opens with an estimated match score, a score per bar, the top issues ("2 wrong notes in bar 6", "rushed bar 4 (about 120 ms early)") and one next step.
 
-### How accurate is it? (measured 1 Nov 2026)
+### How accurate is it? (measured 5 Nov 2026)
 
 **Real guitarists: [GuitarSet](https://zenodo.org/records/3371780)** (CC BY 4.0). 360 recordings by six players in five styles, every note's string and fret captured with a hexaphonic pickup. Guitar alone, no band. Run with `python -m benchmarks.guitarset`.
 
 | What | Solos | Chord playing | All |
 | --- | --- | --- | --- |
-| Notes (onset ±50 ms, right pitch), F1 | 0.88 | 0.69 | 0.78 |
-| Tab: right string and fret, given the right notes | 0.44 | 0.79 | — |
+| Notes (onset ±50 ms, right pitch), F1 | 0.87 | 0.74 | 0.80 |
+| Tab: right string and fret, given the right notes | 0.437 | 0.763 | 0.600 |
 | Chords (major/minor, time-weighted) | — | 0.51 | — |
 | Key exactly right | 0.33 | 0.56 | 0.44 |
 | Tempo within 4% (allowing double/half) | 0.76 | 0.66 | 0.71 |
+
+Note F1 is at onset/frame thresholds 0.6/0.4, up from 0.78 overall at 0.7/0.5 (chord playing 0.69 to 0.74, solos 0.88 to 0.87). Exact string and fret given the true notes is 0.600, up from 0.589, from carrying the fretting hand through open strings. A 0.05 fret-height cost regressed that score to 0.554, so the fret-height weight stays 0.0.
 
 **A real band: Nine Inch Nails, "1,000,000"** from *The Slip* (2008), using the band's own multitrack stems, released under CC BY-NC-SA 3.0 US ([archive](https://archive.org/details/NineInchNails-TheSlipMulti-trackStems)). The stems are summed into the mix, the mix goes through the app as a user's upload would, and the output is scored against the stems. Run with `python -m benchmarks.multitrack`.
 

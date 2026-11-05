@@ -186,6 +186,42 @@ def beat_grid(rhythm_audio, sr, bass_audio=None, harmonic_audio=None):
             'time_signature': '4/4', 'note': 'Beat and bar grid estimated; 4/4 assumed.'}
 
 
+def refine_beats(beats, onsets, window=.25, smooth=5):
+    """Pull a tracked beat grid onto the transcribed note onsets.
+
+    Beat trackers report beats from a smoothed onset envelope, typically a few tens of ms
+    late, and drift slightly over a performance; quantising notes against that grid puts
+    them a 16th early or late. Each beat moves to the nearest note onset within `window`
+    of the local beat period; beats with no onset nearby take the median-smoothed shift of
+    their neighbours, so the grid follows tempo changes without jittering note to note.
+    """
+    beats = np.asarray(beats, dtype=float)
+    onsets = np.sort(np.asarray(onsets, dtype=float))
+    if len(beats) < 3 or len(onsets) < 4:
+        return [float(b) for b in beats]
+    period = np.gradient(beats)
+    shift = np.full(len(beats), np.nan)
+    for i, b in enumerate(beats):
+        j = np.searchsorted(onsets, b)
+        near = [onsets[k] for k in (j-1, j) if 0 <= k < len(onsets)]
+        d = min((o-b for o in near), key=abs)
+        if abs(d) <= window*period[i]:
+            shift[i] = d
+    ok = ~np.isnan(shift)
+    if ok.sum() < 3:
+        return [float(b) for b in beats]
+    shift = np.interp(np.arange(len(beats)), np.flatnonzero(ok), shift[ok])
+    half = smooth//2
+    smoothed = np.array([np.median(shift[max(0, i-half):i+half+1]) for i in range(len(shift))])
+    # Use each beat's own onset when it agrees with its neighbours (performer timing is real);
+    # fall back to the smoothed shift for outliers (a wrong onset grabbed by the window).
+    shift = np.where(ok & (np.abs(shift-smoothed) < .1*period), shift, smoothed)
+    out = beats+shift
+    # keep the grid strictly increasing
+    out = np.maximum.accumulate(out+np.arange(len(out))*1e-6)
+    return [float(b) for b in out]
+
+
 def downbeat_phase(beats, sr, bass_audio=None, harmonic_audio=None):
     """Which of the four beat phases is beat one: harmonic change + bass attack evidence."""
     import librosa
@@ -503,7 +539,11 @@ def _assignments(pitches, strings, max_fret, limit=24):
 # of hand movement between notes, and a penalty for leaps of more than four frets.
 # Tuned on GuitarSet (360 real performances): exact string+fret 38.5% -> 43.8% on solos,
 # 74.0% -> 79.1% on chord playing, versus the original hand-set weights (.12, .25, .8, 2).
-FRET_COST, HIGH_FRET_COST, MOVE_COST, LEAP_COST = 0.05, .2, .4, 0.0
+# A later fret-height weight of 0.05 regressed exact string+fret given the true notes from
+# 0.589 to 0.554, so FRET_COST stays 0.0. Carrying the fretting hand through open strings
+# (CARRY_HAND) is the change that raised that score from 0.589 to 0.600.
+FRET_COST, HIGH_FRET_COST, MOVE_COST, LEAP_COST = 0.0, .2, .4, 0.0
+CARRY_HAND = True
 
 
 def fingering(notes, open_strings, max_fret=24):
@@ -535,15 +575,18 @@ def fingering(notes, open_strings, max_fret=24):
             + (1.5*span if span > 4 else 0)
 
     cost = [local_cost(c) for c in states[0][1]] if states else []
+    # Hand position carried through open-string notes: playing an open string does not move
+    # the fretting hand, so the next fretted note is measured from where the hand last was.
+    hand = [position(c) for c in states[0][1]] if states else []
     back = []
     for k in range(1, len(states)):
         prev_opts, opts = states[k-1][1], states[k][1]
-        new_cost, ptr = [], []
+        new_cost, ptr, new_hand = [], [], []
         for c in opts:
             pc = position(c)
             best, arg = math.inf, 0
             for j, p in enumerate(prev_opts):
-                pp = position(p)
+                pp = hand[j] if CARRY_HAND else position(p)
                 move = abs(pc-pp) if pc is not None and pp is not None else 0
                 # Capped so one stray high note cannot drag a whole phrase up the neck.
                 v = cost[j]+MOVE_COST*min(move, 7)+(LEAP_COST if move > 4 else 0)
@@ -551,7 +594,8 @@ def fingering(notes, open_strings, max_fret=24):
                     best, arg = v, j
             new_cost.append(best+local_cost(c))
             ptr.append(arg)
-        cost = new_cost
+            new_hand.append(pc if pc is not None else hand[arg])
+        cost, hand = new_cost, new_hand
         back.append(ptr)
     choice = [0]*len(states)
     if states:
@@ -612,11 +656,12 @@ def spell(midi, flats):
 
 
 def musicxml(notes, beats, key, tuning, title='Transcription', part_name='Guitar', chords=None,
-             tab=True, clef='treble8vb', max_bars=400):
+             tab=True, clef='treble8vb', max_bars=400, voices=2):
     """Single-staff MusicXML with optional string/fret technical marks for a TAB view.
 
     Notes are quantised to a 16th grid that follows the estimated beat times, merged into
-    chords by onset and written in one voice. Expressive detail (bends, slides, dynamics,
+    chords by onset and written in two voices (melody = voice 1, sustained bass = voice 2,
+    see split_voices) or one voice when voices=1 or no clear bass line exists. Expressive detail (bends, slides, dynamics,
     tuplets) is not transcribed.
     """
     fifths = (key or {}).get('fifths', 0)
@@ -625,32 +670,36 @@ def musicxml(notes, beats, key, tuning, title='Transcription', part_name='Guitar
         # A note with no string/fret can't sit on a tab staff, and notation viewers (alphaTab)
         # fail to draw the score when given one. Callers report how many were left out.
         notes = [n for n in notes if n.get('string') and n.get('fret') is not None]
-    events = {}
-    for n in notes:
-        s = max(0, time_to_sixteenths(n['time'], beats))
-        e = max(s+1, time_to_sixteenths(n['time']+n['duration'], beats))
-        events.setdefault(s, []).append((n, e))
-    starts = sorted(events)
-    if not starts:
-        total = 16
-    else:
-        total = max(e for evs in events.values() for _, e in evs)
+
+    def build_timeline(vnotes):
+        events = {}
+        for n in vnotes:
+            s = max(0, time_to_sixteenths(n['time'], beats))
+            e = max(s+1, time_to_sixteenths(n['time']+n['duration'], beats))
+            events.setdefault(s, []).append((n, e))
+        starts = sorted(events)
+        # (start, length, [notes]); a note lasts to its end or the voice's next onset.
+        timeline = []
+        for i, s in enumerate(starts):
+            nxt = starts[i+1] if i+1 < len(starts) else None
+            end = max(e for _, e in events[s])
+            if nxt is not None:
+                # Plucked strings ring; transcribed offsets are early. Fill short gaps (<= one beat)
+                # instead of writing a 16th note plus a 16th rest for every eighth note.
+                end = nxt if nxt-end <= 4 else min(end, nxt)
+            timeline.append((s, max(1, end-s), [n for n, _ in events[s]]))
+        return timeline
+
+    melody, bass = split_voices(notes, beats) if voices == 2 else (list(notes), [])
+    if not bass:
+        melody = list(notes)
+    timelines = [build_timeline(melody)]+([build_timeline(bass)] if bass else [])
+    total = max([s+l for tl in timelines for s, l, _ in tl] or [16])
     bars = min(max_bars, max(1, math.ceil(total/16)))
     harmony = {}
     for c in chords or []:
         if c['chord'] != 'N':
             harmony.setdefault(max(0, time_to_sixteenths(c['start'], beats)), c['chord'])
-
-    # Timeline of (start, length, [notes]) where length runs to the next onset or note end.
-    timeline = []
-    for i, s in enumerate(starts):
-        nxt = starts[i+1] if i+1 < len(starts) else None
-        end = max(e for _, e in events[s])
-        if nxt is not None:
-            # Plucked strings ring; transcribed offsets are early. Fill short gaps (<= one beat)
-            # instead of writing a 16th note plus a 16th rest for every eighth note.
-            end = nxt if nxt-end <= 4 else min(end, nxt)
-        timeline.append((s, max(1, end-s), [n for n, _ in events[s]]))
 
     out = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" '
@@ -664,7 +713,8 @@ def musicxml(notes, beats, key, tuning, title='Transcription', part_name='Guitar
            '<part id="P1">']
     bpm = 60/float(np.median(np.diff(beats))) if len(beats) > 1 else 120
     emitted = set()
-    ti = 0
+    cursor = [0]*len(timelines)
+    two = len(timelines) == 2
     for bar in range(bars):
         bar_start, bar_end = bar*16, bar*16+16
         out.append(f'<measure number="{bar+1}">')
@@ -690,39 +740,78 @@ def musicxml(notes, beats, key, tuning, title='Transcription', part_name='Guitar
             out.append(f'<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit>'
                        f'<per-minute>{round(bpm)}</per-minute></metronome></direction-type>'
                        f'<sound tempo="{round(bpm)}"/></direction>')
-        pos = bar_start
-        while pos < bar_end:
-            # Chord symbols attach to the next written note or rest; one per position.
-            due = [h for h in harmony if h not in emitted and h < pos+1]
-            if due:
-                out.append(_harmony_xml(harmony[max(due)]))
-                emitted.update(due)
-            # carry-over of a note tied from the previous bar
-            if ti < len(timeline) and timeline[ti][0] < pos < timeline[ti][0]+timeline[ti][1]:
-                s, length, group = timeline[ti]
-                seg = min(s+length, bar_end)-pos
-                out += _note_group(group, seg, flats, tie_start=s+length > bar_end, tie_stop=True, tab=tab)
-                pos += seg
-                if s+length <= pos:
-                    ti += 1
-                continue
-            if ti < len(timeline) and timeline[ti][0] == pos:
-                s, length, group = timeline[ti]
-                seg = min(length, bar_end-pos)
-                out += _note_group(group, seg, flats, tie_start=s+length > bar_end, tie_stop=False, tab=tab)
-                pos += seg
-                if s+length <= pos:
-                    ti += 1
-                continue
-            nxt = timeline[ti][0] if ti < len(timeline) else bar_end
-            nxt_h = min([h for h in harmony if pos < h < bar_end and h not in emitted], default=bar_end)
-            rest = min(nxt, bar_end, nxt_h)-pos
-            for d, name, dots in split_duration(rest):
-                out.append(f'<note><rest/><duration>{d}</duration><type>{name}</type>{"<dot/>"*dots}</note>')
-            pos += rest
+        for vi, timeline in enumerate(timelines):
+            if vi:
+                out.append('<backup><duration>16</duration></backup>')
+            voice = (vi+1) if two else None
+            ti = cursor[vi]
+            pos = bar_start
+            while pos < bar_end:
+                if vi == 0:
+                    # Chord symbols attach to the next written note or rest; one per position.
+                    due = [h for h in harmony if h not in emitted and h < pos+1]
+                    if due:
+                        out.append(_harmony_xml(harmony[max(due)]))
+                        emitted.update(due)
+                # carry-over of a note tied from the previous bar
+                if ti < len(timeline) and timeline[ti][0] < pos < timeline[ti][0]+timeline[ti][1]:
+                    s, length, group = timeline[ti]
+                    seg = min(s+length, bar_end)-pos
+                    out += _note_group(group, seg, flats, tie_start=s+length > bar_end, tie_stop=True, tab=tab, voice=voice)
+                    pos += seg
+                    if s+length <= pos:
+                        ti += 1
+                    continue
+                if ti < len(timeline) and timeline[ti][0] == pos:
+                    s, length, group = timeline[ti]
+                    seg = min(length, bar_end-pos)
+                    out += _note_group(group, seg, flats, tie_start=s+length > bar_end, tie_stop=False, tab=tab, voice=voice)
+                    pos += seg
+                    if s+length <= pos:
+                        ti += 1
+                    continue
+                if ti < len(timeline) and timeline[ti][0] < pos:
+                    ti += 1          # overlapping onset inside a held note: already sounding
+                    continue
+                nxt = timeline[ti][0] if ti < len(timeline) else bar_end
+                nxt_h = min([h for h in harmony if pos < h < bar_end and h not in emitted], default=bar_end) if vi == 0 else bar_end
+                rest = min(nxt, bar_end, nxt_h)-pos
+                v = f'<voice>{voice}</voice>' if voice else ''
+                for d, name, dots in split_duration(rest):
+                    out.append(f'<note><rest/><duration>{d}</duration>{v}<type>{name}</type>{"<dot/>"*dots}</note>')
+                pos += rest
+            cursor[vi] = ti
         out.append('</measure>')
     out.append('</part></score-partwise>')
     return '\n'.join(out)
+
+
+def split_voices(notes, beats, max_bass=59, min_share=.1):
+    """Split notes into (melody, bass) for two-voice classical-guitar notation.
+
+    A note joins the bass voice when it is the lowest of its onset group, at or below
+    `max_bass` (B3), and either sounds together with a higher note or keeps ringing past the
+    next onset (a sustained bass under a moving melody). Returns (notes, []) - the single
+    voice fallback - when that would leave the bass voice nearly empty (<10% of notes) or
+    the result is not a clean split (bass notes overlapping each other heavily).
+    """
+    groups = [sorted(g, key=lambda n: n['midi']) for g in onset_groups(notes)]
+    bass, melody = [], []
+    for k, g in enumerate(groups):
+        low = g[0]
+        prev_low = groups[k-1][0]['midi'] if k else math.inf
+        nxt = groups[k+1] if k+1 < len(groups) else None
+        sustains = nxt is not None and low['time']+low['duration'] > nxt[0]['time']+.05
+        # a bass note is a local low point that the melody leaves by at least a fourth
+        leaps_up = nxt is not None and nxt[0]['midi']-low['midi'] >= 5
+        if low['midi'] <= max_bass and (len(g) > 1 or (sustains and leaps_up and low['midi'] < prev_low)):
+            bass.append(low)
+            melody += g[1:]
+        else:
+            melody += g
+    if len(bass) < min_share*len(notes) or not melody:
+        return list(notes), []
+    return melody, bass
 
 
 def _harmony_xml(name):
@@ -736,7 +825,7 @@ def _harmony_xml(name):
             f'<kind text="{escape(quality)}">{kind}</kind></harmony>')
 
 
-def _note_group(group, length, flats, tie_start, tie_stop, tab):
+def _note_group(group, length, flats, tie_start, tie_stop, tab, voice=None):
     xml = []
     pieces = split_duration(length)
     for pi, (d, name, dots) in enumerate(pieces):
@@ -752,7 +841,7 @@ def _note_group(group, length, flats, tie_start, tie_stop, tab):
             notations = f'<notations>{tied}{tech}</notations>' if (tied or tech) else ''
             alt = f'<alter>{alter}</alter>' if alter else ''
             xml.append(f'<note>{"<chord/>" if ni else ""}<pitch><step>{step}</step>{alt}<octave>{octave}</octave></pitch>'
-                       f'<duration>{d}</duration>{ties}<type>{name}</type>{"<dot/>"*dots}{notations}</note>')
+                       f'<duration>{d}</duration>{ties}{f"<voice>{voice}</voice>" if voice else ""}<type>{name}</type>{"<dot/>"*dots}{notations}</note>')
     return xml
 
 

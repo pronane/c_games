@@ -279,6 +279,11 @@ def run_song(song: Song):
             sf.write(path, y, sr_s, subtype='PCM_16')
             song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
             path.unlink(missing_ok=True)
+        # Lock the beat grid to the transcribed onsets so notes quantise to exact positions.
+        onsets = [n['time'] for v in song.notes.values() for n in v]
+        grid['beats'] = sa.refine_beats(grid['beats'], onsets)
+        grid['bars'] = grid['beats'][::4]
+        grid['bpm'] = round(60/float(np.median(np.diff(grid['beats']))), 1)
         # Panning masks leak; find bars where a part only carries another part's bleed and
         # drop those notes so they do not appear twice in tab or count as a second lead.
         edges = sa.bar_edges(grid['bars'], duration)
