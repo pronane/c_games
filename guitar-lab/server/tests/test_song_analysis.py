@@ -416,3 +416,71 @@ def test_clean_thresholds_are_the_guitarset_tuned_values(monkeypatch):
     assert (m.ONSET_THRESHOLD, m.FRAME_THRESHOLD) == (0.6, 0.4)
     assert m.thresholds_for('clean', True) == (0.6, 0.4)
     assert m.thresholds_for('distorted', True) == (0.5, 0.3)      # high-gain handling unchanged
+
+
+def test_suppress_harmonic_ghosts_on_distorted_mono_line():
+    """Distorted single-note lines must not become chords (octave/fifth ghosts)."""
+    # Melody with typical high-gain ghosts: +12 and +19 at lower amplitude, plus a fifth.
+    line = notes_from([50, 52, 53, 52], step=.4, start=0.)
+    ghosts = []
+    for n in line:
+        ghosts.append(dict(n, midi=n['midi']+12, amplitude=.45))  # octave
+        ghosts.append(dict(n, midi=n['midi']+19, amplitude=.35))  # 3rd harmonic
+        ghosts.append(dict(n, midi=n['midi']+7, amplitude=.4))    # fifth partial
+    # Subharmonic: BP often emits a phantom octave BELOW a strong pitch at similar amp.
+    sub = [{'time': 1.6, 'duration': .3, 'midi': 40, 'amplitude': .6},
+           {'time': 1.6, 'duration': .3, 'midi': 52, 'amplitude': .62}]
+    # Real power chord elsewhere must survive (similar amplitudes, root+fifth+octave).
+    power = [{'time': 3.0, 'duration': .4, 'midi': m, 'amplitude': .85} for m in (40, 47, 52)]
+    cleaned = sa.suppress_harmonic_ghosts(line+ghosts+sub+power, tone='distorted', window=.05)
+    mel_midis = sorted(n['midi'] for n in cleaned if n['time'] < 2.5)
+    assert mel_midis == [50, 52, 52, 52, 53], mel_midis  # subharmonic 40 dropped, 52 kept
+    chord_midis = sorted(n['midi'] for n in cleaned if n['time'] >= 2.9)
+    assert chord_midis == [40, 47, 52], chord_midis
+    # Clean tone leaves ghosts alone (classical octaves are real).
+    assert len(sa.suppress_harmonic_ghosts(line+ghosts, tone='clean')) == len(line)+len(ghosts)
+
+
+def test_classify_onset_single_vs_chord():
+    single = [{'time': 0, 'duration': .2, 'midi': 50, 'amplitude': .9},
+              {'time': 0.01, 'duration': .2, 'midi': 62, 'amplitude': .4},
+              {'time': 0.01, 'duration': .2, 'midi': 69, 'amplitude': .3}]
+    label, kept = sa.classify_onset(single)
+    assert label == 'single' and [n['midi'] for n in kept] == [50]
+    chord = [{'time': 0, 'duration': .3, 'midi': m, 'amplitude': .8} for m in (40, 47, 52)]
+    label, kept = sa.classify_onset(chord)
+    assert label == 'chord' and sorted(n['midi'] for n in kept) == [40, 47, 52]
+
+
+def test_reverb_tail_retriggers_suppressed():
+    notes = [
+        {'time': 0.0, 'duration': .8, 'midi': 60, 'amplitude': .9},
+        {'time': 0.05, 'duration': .5, 'midi': 60, 'amplitude': .5},  # tail
+        {'time': 0.5, 'duration': .3, 'midi': 60, 'amplitude': .85},  # real re-attack later
+    ]
+    kept = sa.suppress_reverb_retriggers(notes, same_pitch_window=.09)
+    assert [round(n['time'], 2) for n in kept] == [0.0, 0.5]
+
+
+def test_tone_estimate_dark_compressed_is_distorted_or_crunch():
+    """Industrial distortion can be dark; crest/spread still mark it driven."""
+    sr = 22050
+    t = np.arange(int(sr*2))/sr
+    # Dark-ish clipped saw bursts (low crest, modest brightness).
+    bursts = []
+    for k in range(8):
+        seg = t[: int(sr*.2)]
+        wave = np.clip(np.sin(2*np.pi*110*seg) + .5*np.sin(2*np.pi*220*seg), -.2, .2)
+        bursts.append(wave.astype(np.float32))
+        bursts.append(np.zeros(int(sr*.05), np.float32))
+    y = np.concatenate(bursts)
+    tone = sa.tone_estimate(y, sr)['tone']
+    assert tone in ('distorted', 'crunch'), tone
+
+
+def test_bar_roles_low_register_mono_is_lead():
+    """Drop-tuned mono riffs are lead lines so ghost cleanup and lead UI apply."""
+    bars = [0., 2.]
+    low = notes_from([38, 40, 41, 40, 38, 40], step=.3, start=0.)
+    roles = sa.bar_roles(low, bars, 4.)
+    assert roles[0]['role'] == 'lead'

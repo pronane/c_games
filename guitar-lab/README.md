@@ -94,6 +94,8 @@ Note F1 is at onset/frame thresholds 0.6/0.4, up from 0.78 overall at 0.7/0.5 (c
 
 **What that means.** On a clean guitar recording the notes are mostly right and good enough to learn from, with a note editor for the rest. Chords, key and tab positions are a starting point to check, not an answer. On a full commercial mix everything depends on getting a clean guitar out first. The open six-stem model does that well for clearly recorded guitars (17.5 dB on our distorted three-guitar test song) and badly for heavily processed ones like this NIN track. When it fails, every guitar-specific result after it fails too. It will not always be right, and the app says so on every result.
 
+**Harmonic ghosts on distorted guitar.** On overdriven guitar, Basic Pitch often writes octave and fifth partials as extra notes, so a single-note line is counted as chords. Ghost suppression runs before bar-role labelling and is a no-op on clean tone. On the Nine Inch Nails "Head Down" excerpt at the distorted thresholds (onset 0.5 / frame 0.3), the chord fraction fell from 0.139 to 0.071 and note F1 rose from 0.355 to 0.374. Clean-tone guitar and GuitarSet are unchanged. On full-band songs the main bottleneck is guitar separation, not transcription: note F1 is 0.40 on the separated guitar versus 0.75 on the true guitar stem for Head Down.
+
 Earlier synthetic checks (FluidSynth instruments): three guitars split into the right parts and lead bars; centre lead 32/32 notes; E minor, 110 BPM and Em–C–G–D found; an E♭-tuned song correctly suggests half step down.
 
 ## Instrument profiles and tuning

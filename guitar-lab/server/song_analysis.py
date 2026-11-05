@@ -459,15 +459,128 @@ def bar_roles(notes, bars, end_time, bleed=None):
         groups = onset_groups(inside)
         if len(groups) < 2:
             # A lone single note is usually a tail ringing over from the previous bar.
+            # Three+ notes at one onset with no other attacks still look like a held chord.
             role = 'rhythm' if groups and len(groups[0]) >= 3 else 'rest'
         else:
             chordal = sum(len(g) >= 2 for g in groups)/len(groups)
             single = sum(len(g) == 1 for g in groups)/len(groups)
-            high = np.median([n['midi'] for n in inside]) >= 59
-            role = 'rhythm' if chordal >= .5 else ('lead' if single >= .7 and high else
-                                                   'rhythm' if single >= .7 and not high else 'mixed')
+            # Low-register mono riffs (drop-tuned industrial, bass-y palm mutes) are lead
+            # lines, not rhythm: register used to force them to 'rhythm' and that skipped
+            # overtone cleanup, leaving harmonic ghosts labelled as chords.
+            role = 'rhythm' if chordal >= .5 else ('lead' if single >= .7 else
+                                                   'rhythm' if chordal >= .35 else 'mixed')
         out.append({'bar': i+1, 'start': float(a), 'end': float(b), 'role': role, 'notes': len(inside)})
     return out
+
+
+# Partials commonly hallucinated on overdriven guitar (semitones above a fundamental).
+# Perfect fifth (+7) is a 3:2 partial too, but real power chords use it — gated more tightly.
+PARTIAL_INTERVALS = (12, 19, 24, 28, 31)
+FIFTH_INTERVAL = 7
+HARMONIC_INTERVALS = PARTIAL_INTERVALS + (FIFTH_INTERVAL,)  # used by diagnostics / callers
+
+
+def _amp(n):
+    return float(n.get('amplitude') or 0.5)
+
+
+def is_harmonic_ghost(note, group, overtone_ratio=.85, fifth_ratio=.65):
+    """True when `note` is an overtone, quiet fifth, or subharmonic of another onset peer.
+
+    - Overtone: +12/+19/+24/+28/+31 above a lower note and not louder than overtone_ratio×that note.
+    - Quiet fifth: +7 and clearly quieter (keeps equal-amp power chords).
+    - Subharmonic: an octave (or two) below a louder/equal peer in a pure partial stack
+      (no non-partial companions). Distortion + Basic Pitch often emit a strong upper pitch
+      plus a quieter phantom octave below; the lower one is dropped.
+    """
+    for lower in group:
+        if lower is note or lower['midi'] >= note['midi']:
+            continue
+        iv = note['midi'] - lower['midi']
+        if iv in PARTIAL_INTERVALS and _amp(note) <= overtone_ratio * _amp(lower):
+            return True
+        if iv == FIFTH_INTERVAL and _amp(note) <= fifth_ratio * _amp(lower):
+            return True
+    # Subharmonic octave below a stronger/equal peer, only in pure partial stacks.
+    highers = [h for h in group
+               if h is not note and h['midi'] - note['midi'] in (12, 24) and _amp(h) >= _amp(note)]
+    if highers:
+        # Pure partial/octave stack (no fifth or unrelated pitch) ⇒ lower note is subharmonic.
+        pure = True
+        for p in group:
+            if p is note:
+                continue
+            iv = abs(p['midi'] - note['midi'])
+            if iv not in PARTIAL_INTERVALS + (12, 24):
+                pure = False
+                break
+        if pure:
+            return True
+    return False
+
+
+def classify_onset(group, amp_ratio=.85):
+    """Decide single-note vs chord for one simultaneous onset group.
+
+    Returns (label, kept_notes). Harmonics / subharmonics are dropped. A chord requires at
+    least two notes that survive as independent fundamentals.
+    """
+    if not group:
+        return 'single', []
+    if len(group) == 1:
+        return 'single', list(group)
+    # Pure octave/double-octave pair: always monophonic. Keep the lower note only when it is
+    # clearly louder (true fundamental + quieter overtone); otherwise keep the upper (the
+    # lower is a distortion/BP subharmonic at similar amplitude).
+    if len(group) == 2:
+        lo, hi = sorted(group, key=lambda n: n['midi'])
+        if hi['midi'] - lo['midi'] in (12, 24):
+            fund = lo if _amp(lo) > _amp(hi) * 1.05 else hi
+            return 'single', [fund]
+    independent = [n for n in group if not is_harmonic_ghost(n, group, overtone_ratio=amp_ratio)]
+    if len(independent) <= 1:
+        fund = max(group, key=lambda n: (_amp(n), -n['midi']))
+        kept = independent or [fund]
+        return 'single', kept
+    return 'chord', independent
+
+
+def suppress_reverb_retriggers(notes, same_pitch_window=.09, amp_ratio=.9):
+    """Drop notes that re-fire the same MIDI shortly after a louder onset (reverb/sustain smear).
+
+    Basic Pitch often re-triggers on a ringing distorted note or reverb tail. A second onset
+    of the same pitch within `same_pitch_window` that is not louder than the previous one is
+    treated as a tail, not a new attack.
+    """
+    notes = sorted(notes, key=lambda n: (n['time'], n['midi']))
+    keep = []
+    last_by_pitch = {}
+    for n in notes:
+        prev = last_by_pitch.get(n['midi'])
+        if prev is not None and n['time'] - prev['time'] < same_pitch_window and _amp(n) <= amp_ratio * _amp(prev):
+            continue
+        keep.append(n)
+        last_by_pitch[n['midi']] = n
+    return keep
+
+
+def suppress_harmonic_ghosts(notes, tone='distorted', window=.05, amp_ratio=.75):
+    """Onset-level single-note vs chord cleanup for distorted / reverberant guitar.
+
+    Runs on every bar (not only lead): industrial mono riffs are often labelled rhythm
+    because harmonic ghosts look like chords, which previously skipped cleanup and left the
+    ghosts in the tab. Clean tone is left alone (octaves in classical/nylon are real).
+
+    Per onset: drop notes explained as harmonics of a louder lower pitch; keep a chord only
+    when two+ independent fundamentals remain. Then suppress reverb-tail re-triggers.
+    """
+    if tone == 'clean' or not notes:
+        return list(notes)
+    cleaned = []
+    for group in onset_groups(notes, window=window):
+        _label, kept = classify_onset(group, amp_ratio=amp_ratio)
+        cleaned.extend(kept)
+    return suppress_reverb_retriggers(cleaned)
 
 
 def drop_overtones(notes, roles, window=.05, tone='distorted'):
@@ -477,6 +590,9 @@ def drop_overtones(notes, roles, window=.05, tone='distorted'):
     reports as extra notes struck together with the real one. In lead bars a note exactly
     12, 19 or 24 semitones above another note at the same moment is treated as a ghost.
     Chords in rhythm bars are left alone (octave doublings there are real).
+
+    Prefer `suppress_harmonic_ghosts` before role labelling; this function remains as a
+    second, lead-only pass and for callers/tests that only have roles.
     """
     if tone == 'clean':
         # Clean/nylon guitar has weak harmonics; octaves struck together are real notes
@@ -485,12 +601,14 @@ def drop_overtones(notes, roles, window=.05, tone='distorted'):
     lead = [(r['start'], r['end']) for r in roles if r['role'] == 'lead']
     def in_lead(t):
         return any(a <= t < b for a, b in lead)
+    # Lead bars: full onset classifier. Non-lead: unchanged (rhythm chords preserved).
     keep = []
-    for n in notes:
-        if in_lead(n['time']) and any(m is not n and abs(m['time']-n['time']) < window and n['midi']-m['midi'] in (12, 19, 24)
-                                      for m in notes):
-            continue
-        keep.append(n)
+    for group in onset_groups(notes, window=window):
+        if in_lead(group[0]['time']):
+            _label, kept = classify_onset(group)
+            keep.extend(kept)
+        else:
+            keep.extend(group)
     return keep
 
 
@@ -941,9 +1059,17 @@ def tone_estimate(audio, sr):
     rms = np.sqrt((y[:n*w].reshape(n, w)**2).mean(axis=1))
     db = 20*np.log10(rms[rms > np.percentile(rms, 50)]+1e-9)
     spread = float(np.percentile(db, 90)-np.percentile(db, 10))
-    if bright > .8 or spread < 4:
+    # Crest factor on active audio: hard clipping / high gain flattens peaks (low crest).
+    # Sparse clean plucks keep a high crest even when the note dies away.
+    peak = float(np.max(np.abs(y)) or 1e-9)
+    rms = float(np.sqrt(np.mean(y**2)) + 1e-9)
+    crest = peak / rms
+    # Industrial / fuzz (e.g. NIN stems) can be dark (brightness ~0.05-0.12) yet clearly
+    # compressed. Treat low spread or low crest with any HF as distorted/crunch so
+    # transcription uses the looser onset thresholds and ghost suppression runs.
+    if bright > .8 or spread < 4 or (bright > .05 and crest < 4.5):
         tone = 'distorted'
-    elif bright > .3:
+    elif bright > .3 or (bright > .03 and spread <= 5.5):
         tone = 'crunch'
     elif spread > 5.5:
         tone = 'clean'
@@ -954,4 +1080,5 @@ def tone_estimate(audio, sr):
               'distorted': 'Sounds distorted / high gain. Distortion adds harmonics, so notes and chords are less '
                            'reliable than on clean guitar, and power chords may show extra octave notes.',
               'uncertain': 'Not sure whether this guitar is clean or distorted.'}[tone]
-    return {'tone': tone, 'brightness': round(bright, 3), 'loudness_spread_db': round(spread, 1), 'detail': detail}
+    return {'tone': tone, 'brightness': round(bright, 3), 'loudness_spread_db': round(spread, 1),
+            'crest_factor': round(crest, 2), 'detail': detail}
