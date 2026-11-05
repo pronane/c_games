@@ -55,6 +55,7 @@ class Song:
     notes: dict = field(default_factory=dict)     # part id -> transcribed notes (pre-fingering)
     policy: str = 'cpu'                           # separation device: 'cpu' or 'auto' (graphics card)
     tone: str = 'auto'                            # guitar sound for transcription: auto, clean, crunch, distorted
+    reference: str | None = None                  # optional recording/MIDI for the advisory fingerprint check
 
 
 def client(x_fretwork_client):
@@ -201,6 +202,20 @@ def check(song):
         raise RuntimeError('Session cancelled')
 
 
+def reference_check(audio, sr, reference):
+    """Shazam-style advisory check against an optional reference; never raises, never gates."""
+    if not reference:
+        return None
+    try:
+        from . import fingerprint
+        ref, ref_sr = fingerprint._load(reference)
+        out = fingerprint.match(audio, sr, ref, ref_sr)
+        out['reference'] = Path(reference).name
+        return out
+    except Exception as exc:  # noqa: BLE001 - advisory only
+        return {'matched': False, 'status': 'error', 'advisory': True, 'detail': f'check skipped: {exc}'}
+
+
 def run_song(song: Song):
     import librosa
     try:
@@ -292,7 +307,14 @@ def run_song(song: Song):
                     y = librosa.effects.pitch_shift(sa.mono(y), sr=sr_s, n_steps=-cents/100)
             path = song.folder/f'transcribe-{p["id"]}.wav'
             sf.write(path, y, sr_s, subtype='PCM_16')
-            song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
+            from . import clean_model
+            if clean_model.active_for(sound):
+                # Opt-in (FRETWORK_CLEAN_MODEL=1) second-stage filter for processed guitar only.
+                cand, post = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
+                                               posteriors=True, thresholds=clean_model.CANDIDATE_THRESHOLDS)
+                song.notes[p['id']], _info = clean_model.refine(cand, post, effects_detected)
+            else:
+                song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
             path.unlink(missing_ok=True)
         # Lock the beat grid to the transcribed onsets so notes quantise to exact positions.
         onsets = [n['time'] for v in song.notes.values() for n in v]
@@ -344,6 +366,12 @@ def run_song(song: Song):
             ]+([tone['detail']] if tone and tone['tone'] == 'distorted' and song.tone == 'auto' else [])
              + ([f'Transcribed for a {sound} guitar sound (onset {thresholds[0]}, note {thresholds[1]}).'] if sound != 'clean' else []),
         }
+        # Advisory fingerprint side check: computed after every output is final.
+        # No reference returns None and the result dict is left untouched, so the
+        # breakdown stays byte-identical. A non-match is not an error and only adds this key.
+        checked = reference_check(audio, sr, song.reference)
+        if checked is not None:
+            song.result['reference_check'] = checked
         song.status, song.stage = 'complete', 'Breakdown ready'
     except Exception as exc:
         song.status, song.stage = 'failed', 'Processing stopped; no substitute was used'
