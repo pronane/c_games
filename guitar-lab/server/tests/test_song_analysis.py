@@ -287,3 +287,69 @@ def test_thresholds_follow_the_guitar_sound():
     # A guessed high-gain sound only moves halfway: the guess can be wrong.
     assert models.thresholds_for('distorted', False) == (0.6, 0.4)
     assert models.thresholds_for('crunch', False) == (0.6, 0.4)
+
+
+def test_beat_grid_does_not_prepend_a_bar_when_the_downbeat_is_only_slightly_late(monkeypatch):
+    """0.23 s at 117 bpm is under half a beat, so the piece starts on beat one."""
+    import librosa
+    period = 60/117
+    detected = 0.23+np.arange(16)*period
+
+    def fake_track(y, sr, units='time', trim=False):
+        return np.array([117.0]), detected.copy()
+
+    monkeypatch.setattr(librosa.beat, 'beat_track', fake_track)
+    grid = sa.beat_grid(np.zeros(int(22050*12), np.float32), 22050)
+    assert grid['bpm'] == pytest.approx(117.0, abs=.05)
+    assert grid['beats'][0] == pytest.approx(0.23, abs=1e-6)
+    assert grid['bars'][0] == pytest.approx(0.23, abs=1e-6)
+
+    # More than half a beat in still gains one empty bar, so a real pickup is kept.
+    late = 0.40+np.arange(16)*period
+
+    def fake_late(y, sr, units='time', trim=False):
+        return np.array([117.0]), late.copy()
+
+    monkeypatch.setattr(librosa.beat, 'beat_track', fake_late)
+    grid = sa.beat_grid(np.zeros(int(22050*12), np.float32), 22050)
+    assert grid['beats'][0] == pytest.approx(0.40-4*period, abs=1e-6)
+    assert grid['beats'][4] == pytest.approx(0.40, abs=1e-6)
+
+
+def test_drop_overtones_keeps_an_octave_pair_when_the_tone_is_clean():
+    import inspect
+    from server.songs import run_song
+    pair = [{'time': .2, 'duration': .3, 'midi': 52, 'amplitude': .8},
+            {'time': .2, 'duration': .3, 'midi': 64, 'amplitude': .7}]
+    roles = [{'start': 0., 'end': 2., 'role': 'lead'}]
+    assert [n['midi'] for n in sa.drop_overtones(pair, roles, tone='clean')] == [52, 64]
+    assert [n['midi'] for n in sa.drop_overtones(pair, roles, tone='distorted')] == [52]
+    assert [n['midi'] for n in sa.drop_overtones(pair, roles)] == [52]
+    assert 'tone=sound' in inspect.getsource(run_song)
+
+
+def test_fret_cost_is_a_small_lower_position_bias(monkeypatch):
+    """0.05 is enough to leave a fret-6 camp for the open-position fingering of F then C#."""
+    assert sa.FRET_COST == 0.05
+    notes = notes_from([65, 61], step=.25)
+    assert [(n['string'], n['fret']) for n in sa.fingering(notes, STANDARD)] == [(1, 1), (2, 2)]
+    monkeypatch.setattr(sa, 'FRET_COST', 0.0)
+    assert [(n['string'], n['fret']) for n in sa.fingering(notes, STANDARD)] == [(2, 6), (3, 6)]
+
+
+def test_musicxml_eighth_notes_at_120_bpm_have_no_rests_between_them():
+    """A short transcribed offset must not turn each eighth into a 16th plus a 16th rest."""
+    period = 60/120
+    beats = [i*period for i in range(8)]
+    eighth = period/2
+    notes = [{'time': i*eighth, 'duration': .1, 'midi': 64+fret, 'string': 1, 'fret': fret}
+             for i, fret in enumerate([0, 1, 3, 5, 7, 8, 10, 12])]
+    root = ET.fromstring(sa.musicxml(notes, beats, {'fifths': 0, 'mode': 'major'}, STANDARD).split('\n', 2)[2])
+    attacks = [n for n in root.findall('.//note')
+               if n.find('chord') is None and not any(t.get('type') == 'stop' for t in n.findall('tie'))]
+    pitched = [n for n in attacks if n.find('pitch') is not None]
+    assert len(pitched) == 8
+    first, last = attacks.index(pitched[0]), attacks.index(pitched[-1])
+    assert all(n.find('rest') is None for n in attacks[first:last+1])
+    assert [n.find('type').text for n in pitched[:-1]] == ['eighth']*7
+    assert [int(n.find('duration').text) for n in pitched[:-1]] == [2]*7
