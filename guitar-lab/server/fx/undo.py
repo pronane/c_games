@@ -67,15 +67,35 @@ def inverse_soft_clip(audio, drive=3.0):
     return np.arctanh(z) / drive
 
 
+# Measured on real recordings (FX_RESULTS.md): de-reverb triggered by a low-confidence
+# 'feedback_delay' guess on CLEAN amp takes (Guitar-TECHS) shortened sustained notes and cost
+# note F1 (vibrato clip .706 -> .638). Delay/reverb undo now needs a confident detection.
+TIME_FX_MIN_CONFIDENCE = 0.6
+
+
 def undo_effects(audio, sr=44100, effects=None, features=None):
-    """Apply best-effort undo. `effects` = list of names from matcher."""
-    effects = [e.lower() for e in (effects or [])]
+    """Apply best-effort undo for playback.
+
+    `effects` = names, or the matcher's [{'name', 'confidence'}] list (confidence-gated for
+    reverb/delay). Not used in the transcription path: on real amp recordings de-FX audio did
+    not raise note F1 (FX_RESULTS.md), so it only feeds the 'clean version' playback.
+    """
+    raw = list(effects or [])
+    effects = []
+    for e in raw:
+        if isinstance(e, dict):
+            name, conf = str(e.get('name', '')).lower(), float(e.get('confidence', 1.0))
+            if ('delay' in name or name == 'reverb') and conf < TIME_FX_MIN_CONFIDENCE:
+                continue
+            effects.append(name)
+        else:
+            effects.append(str(e).lower())
     features = features or extract_features(audio, sr)
     y = np.asarray(audio, dtype=np.float64)
     if y.ndim > 1:
         y = y.mean(axis=-1)
 
-    if any(e in effects for e in ('reverb', 'delay')) or features.get('rt60_est_s', 0) > 0.7:
+    if any(e == 'reverb' or 'delay' in e for e in effects) or features.get('rt60_est_s', 0) > 1.5:
         y = dereverb_spectral(y, sr, rt60=features.get('rt60_est_s'))
 
     # Mild OD inverse only; hard distortion left for acoustic_playback path.

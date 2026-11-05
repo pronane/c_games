@@ -8,14 +8,14 @@ from pathlib import Path
 
 import numpy as np
 
-# Allow running as script from anywhere
-ROOT = Path(__file__).resolve().parents[1]
+# guitar-lab root, so `server.fx` resolves when this file is run as a script.
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from fx.features import extract_features, features_vector, FEATURE_NAMES
-from fx.renderers import EFFECT_NAMES, apply_effect
-from fx.classify import EffectMatcher
-from fx.undo import undo_effects, acoustic_playback, damping_from_decay
+from server.fx.features import extract_features, features_vector, FEATURE_NAMES
+from server.fx.renderers import EFFECT_NAMES, apply_effect
+from server.fx.classify import EffectMatcher
+from server.fx.undo import undo_effects, acoustic_playback, damping_from_decay
 
 try:
     import soundfile as sf
@@ -154,7 +154,7 @@ def per_class_acc(confusion):
 def eval_undo_on_rendered(clean, sr=44100):
     """Measure simple pitch-track F1 proxy before/after undo on distorted+reverb render."""
     import librosa
-    from fx.undo import dereverb_spectral
+    from server.fx.undo import dereverb_spectral
 
     def notes_pyin(y):
         f0, voiced_flag, _ = librosa.pyin(
@@ -285,7 +285,7 @@ def main():
         audio = load_wav(hd_path, max_s=20.0)
         hd = matcher.predict(audio, sr=44100)
         # undo + pyin F1 vs pyin on raw (self-consistency, not true MIDI)
-        from fx.undo import undo_effects as _u
+        from server.fx.undo import undo_effects as _u
         import librosa
         cleaned = _u(audio, sr=44100, effects=[e['name'] for e in hd['effects']])
         def count_voiced(y):

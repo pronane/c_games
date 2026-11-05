@@ -102,3 +102,62 @@ def test_damping_heuristic():
     t = np.arange(int(0.25 * SR)) / SR
     x = 0.5 * np.exp(-25 * t) * np.sin(2 * np.pi * 220 * t)
     assert damping_from_decay(x, 0.0, 0.25, SR) is True
+
+
+# --- IDMT-trained library (derived features only) ---------------------------------------
+
+def test_templates_json_is_small_and_has_the_trained_forest():
+    import json
+    from server.fx.classify import DEFAULT_TEMPLATES
+    assert DEFAULT_TEMPLATES.stat().st_size < 5 * 1024 * 1024
+    data = json.loads(DEFAULT_TEMPLATES.read_text())
+    assert data['feature_names'] == list(FEATURE_NAMES)
+    assert len(data['forest']['labels']) == 12 and 'clean' in data['forest']['labels']
+    assert data['eval']['top1'] >= 0.85  # guitar-held-out IDMT score recorded at export time
+    assert len(data['mean']) == len(FEATURE_NAMES)
+
+
+def test_forest_probabilities_are_a_distribution():
+    m = EffectMatcher()
+    p = m.forest_proba(features_vector(extract_features(_pluck(), SR)))
+    assert p.shape == (12,) and abs(p.sum() - 1) < 1e-6 and (p >= 0).all()
+
+
+def test_hard_clipping_raises_the_distortion_score():
+    # Synthetic sine plucks are out of the IDMT training domain (their top label is often
+    # feedback_delay), so only the direction of the distortion score is asserted here.
+    m = EffectMatcher()
+    dry = _pluck(196.0, dur=2.0)
+    wet = np.tanh(25 * dry) * 0.5
+    assert m.predict(wet, SR)['scores']['distortion'] > m.predict(dry, SR)['scores']['distortion']
+
+
+def test_exported_tree_matches_sklearn():
+    pytest.importorskip('sklearn')
+    from server.fx.train_idmt import export_tree, fit_forest
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(300, len(FEATURE_NAMES)))
+    y = (X[:, 0] > 0).astype(int) + 2 * (X[:, 3] > 0.5)
+    rf = fit_forest(X, y, n_trees=5, leaves=16)
+    m = EffectMatcher()
+    m.mean, m.std = np.zeros(len(FEATURE_NAMES)), np.ones(len(FEATURE_NAMES))
+    m.forest = {'labels': list('abcd') + ['x'] * 8, 'trees': [export_tree(e, 12) for e in rf.estimators_]}
+    ok = np.mean([np.argmax(m.forest_proba(v)) == p for v, p in zip(X[:50], rf.predict(X[:50]))])
+    assert ok >= 0.95
+
+
+def test_long_audio_is_classified_in_windows():
+    m = EffectMatcher()
+    x = np.concatenate([_pluck(220.0, dur=2.0) for _ in range(5)])
+    out = m.predict(x, SR)
+    assert out['model'] == 'forest' and out['windows'] >= 3
+
+
+def test_low_confidence_delay_guess_does_not_dereverb():
+    # Real clean amp takes were mislabelled feedback_delay at low confidence; de-reverb then
+    # shortened sustained notes. Undo is now gated on confidence.
+    x = _pluck(220.0, dur=1.5)
+    y = undo_effects(x, SR, effects=[{'name': 'feedback_delay', 'confidence': 0.3}], features={'rt60_est_s': 0.3})
+    assert np.allclose(y, x)
+    z = undo_effects(x, SR, effects=[{'name': 'reverb', 'confidence': 0.9}], features={'rt60_est_s': 0.3})
+    assert not np.allclose(z, x)

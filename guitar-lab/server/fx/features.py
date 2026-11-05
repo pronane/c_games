@@ -194,3 +194,126 @@ def extract_features(audio, sr=44100) -> dict:
 
 def features_vector(feats: dict) -> np.ndarray:
     return np.array([float(feats[k]) for k in FEATURE_NAMES], dtype=np.float64)
+
+
+# --- Extended descriptors (added after training on real IDMT-SMT-Audio-Effects clips) ---
+# The 18 hand features above separate gain effects well but cannot tell the modulation
+# effects apart. These add: timbre (MFCC mean/std), spectral contrast, amplitude-modulation
+# rate/depth (tremolo), pitch-modulation depth (vibrato), notch-motion (phaser/flanger/
+# chorus comb sweep) and tail/echo shape (reverb vs delay).
+EXT_FEATURE_NAMES = tuple(
+    [f'mfcc{i}_mean' for i in range(13)] + [f'mfcc{i}_std' for i in range(13)]
+    + [f'contrast{i}' for i in range(7)]
+    + ['am_peak', 'am_rate_hz', 'am_depth', 'pm_cents_std', 'pm_peak', 'pm_rate_hz',
+       'notch_motion', 'notch_motion_lo', 'spec_var_sustain', 'tail_ratio', 'tail_slope_db',
+       'echo_peak', 'echo_lag_s', 'decay_rate_db', 'attack_s', 'centroid_slope']
+)
+FEATURE_NAMES = FEATURE_NAMES + EXT_FEATURE_NAMES
+_BASE_EXTRACT = extract_features
+
+
+def _mod_peak(sig, fs, lo, hi):
+    """Peak of the normalised magnitude spectrum of a detrended contour within [lo, hi] Hz."""
+    if len(sig) < 16:
+        return 0.0, 0.0
+    t = np.arange(len(sig))
+    s = sig - np.polyval(np.polyfit(t, sig, 2), t)
+    s = s * np.hanning(len(s))
+    spec = np.abs(np.fft.rfft(s, n=max(256, 2 * len(s))))
+    fr = np.fft.rfftfreq(max(256, 2 * len(s)), 1 / fs)
+    band = (fr >= lo) & (fr <= hi)
+    if not band.any() or spec.sum() < 1e-12:
+        return 0.0, 0.0
+    k = np.argmax(spec[band])
+    return float(spec[band][k] / (spec[1:].sum() + 1e-12) * band.sum() ** 0 * 10), float(fr[band][k])
+
+
+def _extended(x, sr):
+    import librosa
+    out = {}
+    y = x.astype(np.float32)
+    if sr != 22050:
+        y = librosa.resample(y, orig_sr=sr, target_sr=22050)
+    sr2 = 22050
+    hop = 256
+    S = np.abs(librosa.stft(y, n_fft=2048, hop_length=hop)) + 1e-10
+    mf = librosa.feature.mfcc(S=librosa.power_to_db(librosa.feature.melspectrogram(S=S ** 2, sr=sr2)), n_mfcc=13)
+    for i in range(13):
+        out[f'mfcc{i}_mean'] = float(mf[i].mean())
+        out[f'mfcc{i}_std'] = float(mf[i].std())
+    con = librosa.feature.spectral_contrast(S=S, sr=sr2)
+    for i in range(7):
+        out[f'contrast{i}'] = float(con[i].mean())
+    rms = np.sqrt((S ** 2).mean(axis=0))
+    rdb = 20 * np.log10(rms + 1e-10)
+    fps = sr2 / hop
+    # sustain region: frames from peak to where level falls 40 dB below peak
+    pk = int(np.argmax(rdb))
+    after = np.where(rdb[pk:] < rdb[pk] - 40)[0]
+    end = pk + (after[0] if len(after) else len(rdb) - pk)
+    sus = slice(pk + 2, max(pk + 3, end))
+    seg = rdb[sus]
+    out['am_peak'], out['am_rate_hz'] = _mod_peak(seg, fps, 1.5, 15)
+    out['am_depth'] = float(np.std(seg - np.polyval(np.polyfit(np.arange(len(seg)), seg, 2), np.arange(len(seg))))) if len(seg) > 4 else 0.0
+    # pitch contour of the strongest partial (parabolic interpolation)
+    fr = librosa.fft_frequencies(sr=sr2, n_fft=2048)
+    lo_b, hi_b = np.searchsorted(fr, 70), np.searchsorted(fr, 1400)
+    sub = S[lo_b:hi_b, sus]
+    if sub.shape[1] > 8:
+        k = np.argmax(sub.mean(axis=1))
+        k = np.clip(k, 1, sub.shape[0] - 2)
+        a, b, c = np.log(sub[k - 1]), np.log(sub[k]), np.log(sub[k + 1])
+        off = 0.5 * (a - c) / (a - 2 * b + c + 1e-12)
+        f0 = fr[lo_b + k] + np.clip(off, -1, 1) * (fr[1] - fr[0])
+        cents = 1200 * np.log2(np.maximum(f0, 1) / max(np.median(f0), 1))
+        out['pm_cents_std'] = float(np.std(cents))
+        out['pm_peak'], out['pm_rate_hz'] = _mod_peak(cents, fps, 1.5, 12)
+    else:
+        out['pm_cents_std'] = out['pm_peak'] = out['pm_rate_hz'] = 0.0
+    # notch motion: frame-to-frame change of the level-normalised log spectrum in sustain
+    L = np.log(S[:, sus])
+    L = L - L.mean(axis=0, keepdims=True)
+    if L.shape[1] > 3:
+        d = np.abs(np.diff(L, axis=1))
+        out['notch_motion'] = float(d[np.searchsorted(fr, 1000):np.searchsorted(fr, 8000)].mean())
+        out['notch_motion_lo'] = float(d[np.searchsorted(fr, 100):np.searchsorted(fr, 1000)].mean())
+        out['spec_var_sustain'] = float(L.std(axis=1).mean())
+    else:
+        out['notch_motion'] = out['notch_motion_lo'] = out['spec_var_sustain'] = 0.0
+    # tail: energy after the -40 dB point relative to total; slope of the last 30% of frames
+    e = rms ** 2
+    out['tail_ratio'] = float(e[end:].sum() / (e.sum() + 1e-12))
+    n3 = max(4, int(0.3 * len(rdb)))
+    out['tail_slope_db'] = float(np.polyfit(np.arange(n3) / fps, rdb[-n3:], 1)[0])
+    on = np.maximum(np.diff(rdb), 0)
+    on = on - on.mean()
+    ac = np.correlate(on, on, mode='full')[len(on) - 1:]
+    ac = ac / (ac[0] + 1e-12)
+    lo_i, hi_i = int(0.06 * fps), min(len(ac) - 1, int(0.9 * fps))
+    if hi_i > lo_i:
+        k = lo_i + int(np.argmax(ac[lo_i:hi_i]))
+        out['echo_peak'], out['echo_lag_s'] = float(ac[k]), float(k / fps)
+    else:
+        out['echo_peak'] = out['echo_lag_s'] = 0.0
+    out['decay_rate_db'] = float(np.polyfit(np.arange(len(seg)) / fps, seg, 1)[0]) if len(seg) > 4 else 0.0
+    above = np.where(rdb > rdb[pk] - 20)[0]
+    out['attack_s'] = float((pk - above[0]) / fps) if len(above) else 0.0
+    cen = (fr[:, None] * S).sum(axis=0) / S.sum(axis=0)
+    out['centroid_slope'] = float(np.polyfit(np.arange(len(seg)), cen[sus], 1)[0]) if len(seg) > 4 else 0.0
+    return out
+
+
+def extract_features(audio, sr=44100) -> dict:  # noqa: F811 — extended version
+    feats = _BASE_EXTRACT(audio, sr)
+    x, _ = _mono(audio)
+    if len(x) < 4096:
+        feats.update({k: 0.0 for k in EXT_FEATURE_NAMES})
+        return feats
+    try:
+        ext = _extended(x, sr)
+    except Exception:  # noqa: BLE001
+        ext = {}
+    for k in EXT_FEATURE_NAMES:
+        v = float(ext.get(k, 0.0))
+        feats[k] = v if np.isfinite(v) else 0.0
+    return feats

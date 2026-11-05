@@ -35,6 +35,9 @@ class EffectMatcher:
         self.std = np.ones(len(FEATURE_NAMES))
         self.threshold = 0.55  # cosine similarity
         self.rf = None  # optional sklearn model
+        self.forest = None  # numpy-only random forest exported to JSON (trained on IDMT)
+        self.forest_threshold = 0.3
+        self.window_s = 2.0
         if path.is_file():
             self.load(path)
 
@@ -47,6 +50,9 @@ class EffectMatcher:
         self.centroids = {k: np.array(v, dtype=np.float64) for k, v in data['centroids'].items()}
         # optional joblib-less: store RF as None; training script may attach .rf externally
         self._data = data
+        self.forest = data.get('forest')
+        self.forest_threshold = float(data.get('forest_threshold', 0.3))
+        self.window_s = float(data.get('window_s', 2.0))
 
     def save(self, path: str | Path, extra=None):
         path = Path(path)
@@ -76,8 +82,23 @@ class EffectMatcher:
     def _cosine(self, a, b):
         return float(np.dot(a, b) / ((np.linalg.norm(a) + 1e-12) * (np.linalg.norm(b) + 1e-12)))
 
+    def forest_proba(self, v: np.ndarray) -> np.ndarray:
+        """Average leaf class distribution over the exported trees (numpy only)."""
+        f = self.forest
+        vn = (v - self.mean) / np.where(self.std < 1e-8, 1.0, self.std)
+        acc = np.zeros(len(f['labels']))
+        for t in f['trees']:
+            feat, thr, left, right, leaf = t['f'], t['t'], t['l'], t['r'], t['v']
+            i = 0
+            while left[i] >= 0:
+                i = left[i] if vn[feat[i]] <= thr[i] else right[i]
+            acc += np.asarray(leaf[i], dtype=np.float64)
+        return acc / (acc.sum() + 1e-12)
+
     def predict_scores(self, feats: dict) -> dict[str, float]:
         v = features_vector(feats)
+        if self.forest:
+            return dict(zip(self.forest['labels'], self.forest_proba(v).tolist()))
         vn = (v - self.mean) / np.where(self.std < 1e-8, 1.0, self.std)
         scores = {}
         for lab, c in self.centroids.items():
@@ -91,7 +112,34 @@ class EffectMatcher:
                         scores[lab] = max(scores.get(lab, 0.0), float(proba[i][0, 1]))
         return scores
 
+    def _windows(self, audio, sr):
+        """Loudest ~window_s chunks (the forest was trained on ~2 s single-note clips)."""
+        x = np.asarray(audio, dtype=np.float64)
+        n = int(self.window_s * sr)
+        if len(x) <= int(1.5 * n):
+            return [x]
+        chunks = [x[i:i + n] for i in range(0, len(x) - n + 1, n)]
+        rms = np.array([np.sqrt(np.mean(c ** 2)) for c in chunks])
+        keep = np.argsort(-rms)[:12]
+        return [chunks[i] for i in sorted(keep) if rms[i] > 0.1 * rms.max()]
+
     def predict(self, audio, sr=44100, top_k=3) -> dict:
+        if self.forest:
+            wins = self._windows(audio, sr)
+            per = [self.predict_scores(extract_features(w, sr)) for w in wins]
+            scores = {k: float(np.mean([p[k] for p in per])) for k in per[0]}
+            feats = extract_features(wins[0], sr)
+            ranked = sorted(scores.items(), key=lambda kv: -kv[1])
+            active = [(lab, sc) for lab, sc in ranked if sc >= self.forest_threshold and lab != 'clean']
+            if not active:
+                active = [ranked[0]]
+            return {
+                'effects': [{'name': n, 'confidence': round(float(c), 3)} for n, c in active[:top_k]],
+                'scores': {k: round(float(v), 3) for k, v in ranked},
+                'windows': len(wins),
+                'model': 'forest',
+                'features': {k: round(float(feats[k]), 4) for k in FEATURE_NAMES[:18]},
+            }
         feats = extract_features(audio, sr)
         scores = self.predict_scores(feats)
         ranked = sorted(scores.items(), key=lambda kv: -kv[1])
