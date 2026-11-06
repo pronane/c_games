@@ -212,11 +212,12 @@ Check("room code is 6 unambiguous uppercase chars", room.Length == 6 && room.All
 Check("room normalisation strips spaces and dashes", NetProtocol.NormalizeRoom(" ab-12 cd ") == "AB12CD");
 Check("url normalisation adds ws:// and strips trailing slash",
       NetProtocol.NormalizeUrl("192.168.1.5:7777/") == "ws://192.168.1.5:7777");
-var src = new PlayerCommand { Move = new Vector2(.375f, -.625f), Sprint = true, Pass = true, Shoot = true, Charge = .8125f, Through = true, Tackle = true, Switch = true, Lob = true };
+var src = new PlayerCommand { Move = new Vector2(.375f, -.625f), Sprint = true, Pass = true, Shoot = true, Charge = .8125f, Through = true, Tackle = true, Switch = true, Lob = true, Slide = true, Shield = true, Dribble = true };
 var back = CommandDto.From(src).To();
 Check("CommandDto round-trips every field",
       back.Move == src.Move && back.Sprint && back.Pass && back.Shoot && back.Through &&
-      back.Tackle && back.Switch && back.Lob && MathF.Abs(back.Charge - src.Charge) < .001f);
+      back.Tackle && back.Switch && back.Lob && back.Slide && back.Shield && back.Dribble &&
+      MathF.Abs(back.Charge - src.Charge) < .001f);
 var pkt = new Packet { T = NetProtocol.Input, Seq = 42, Cmd = CommandDto.From(src), Room = "ABC123" };
 string wire = NetProtocol.Encode(pkt);
 var decoded = NetProtocol.Decode(wire);

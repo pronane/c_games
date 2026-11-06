@@ -62,7 +62,8 @@ namespace ArenaFC.Core.Input
         };
         public static readonly Dictionary<string, int> SystemRaw = new Dictionary<string, int>
         {
-            { "pause", 9 }, { "camera", 10 }
+            // Raw b10 is L3 (close control); b11 is R3 (camera).
+            { "pause", 9 }, { "camera", 11 }
         };
 
         public static readonly Dictionary<string, int> DpadStandard = new Dictionary<string, int>
@@ -268,11 +269,19 @@ namespace ArenaFC.Core.Input
             Dictionary<string, int> sys = known ? SystemStandard : SystemRaw;
             result["pause"] = Button(buttons, sys["pause"]);
             result["camera"] = Button(buttons, sys["camera"]);
+            // Back/Select is a dedicated long ball / cross; LT or L3 is close
+            // control.  RT / RB stays sprint.  Previously BOTH analogue triggers
+            // meant sprint, so there was no reachable dribble button at all.
+            result["lob"] = Button(buttons, known ? 4 : 8);
+            result["dribble"] = Axis(axes, TriggerAxes[0]) > 0.5f
+                                || Button(buttons, known ? 7 : 10);
             bool sprint = result["sprint"];
-            if (Axis(axes, TriggerAxes[0]) > 0.5f || Axis(axes, TriggerAxes[1]) > 0.5f) sprint = true;
+            if (Axis(axes, TriggerAxes[1]) > 0.5f) sprint = true;
             if (!known)
-                foreach (int b in TriggerButtons)
-                    if (Button(buttons, b)) { sprint = true; break; }
+            {
+                if (Button(buttons, TriggerButtons[0])) result["dribble"] = true;
+                if (Button(buttons, TriggerButtons[1])) sprint = true;
+            }
             result["sprint"] = sprint;
             return result;
         }

@@ -32,13 +32,14 @@ public sealed class CommandDto
     {
         Mx = Q(c.Move.X), My = Q(c.Move.Y), Sp = c.Sprint, Pa = c.Pass, Sh = c.Shoot,
         Ch = Q(c.Charge), Th = c.Through, Ta = c.Tackle, Sw = c.Switch, Lo = c.Lob,
-        Sl = c.Slide, Sd = c.Shield,
+        Sl = c.Slide, Sd = c.Shield || c.Dribble,
     };
 
     public PlayerCommand To() => new()
     {
         Move = new Vector2(Mx, My), Sprint = Sp, Pass = Pa, Shoot = Sh, Charge = Ch,
-        Through = Th, Tackle = Ta, Switch = Sw, Lob = Lo, Slide = Sl, Shield = Sd,
+        Through = Th, Tackle = Ta, Switch = Sw, Lob = Lo, Slide = Sl,
+        Shield = Sd, Dribble = Sd,
     };
 }
 

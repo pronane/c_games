@@ -25,12 +25,22 @@ public partial class Minimap : Control
         foreach (var p in Engine.State.Players)
             DrawCircle(new Vector2(Px(p.Pos.X), Py(p.Pos.Z)), p.IsKeeper ? 2.6f : 2.2f,
                 p.Team == 0 ? new Color(.95f, .25f, .3f) : new Color(.35f, .6f, 1f));
+        var bp = new Vector2(Px(Engine.State.Ball.Pos.X), Py(Engine.State.Ball.Pos.Z));
         if (Engine.State.Controlled >= 0 && Engine.State.Controlled < Engine.State.Players.Length)
         {
             var c = Engine.State.Players[Engine.State.Controlled];
-            DrawCircle(new Vector2(Px(c.Pos.X), Py(c.Pos.Z)), 4.2f, new Color(.2f, 1f, .55f), false, 1.4f);
+            var cp = new Vector2(Px(c.Pos.X), Py(c.Pos.Z));
+            DrawLine(cp, bp, new Color(.2f, 1f, .55f, .55f), 1.2f);
+            DrawCircle(cp, 4.2f, new Color(.2f, 1f, .55f), false, 1.4f);
         }
-        DrawCircle(new Vector2(Px(Engine.State.Ball.Pos.X), Py(Engine.State.Ball.Pos.Z)), 2.2f, new Color(1f, .95f, .65f));
+        int owner = Engine.State.Ball.Owner;
+        if (owner >= 0 && owner < Engine.State.Players.Length)
+        {
+            var o = Engine.State.Players[owner];
+            DrawCircle(new Vector2(Px(o.Pos.X), Py(o.Pos.Z)), 5.2f,
+                new Color(1f, .72f, .18f), false, 2f);
+        }
+        DrawCircle(bp, 2.6f, new Color(1f, .95f, .65f));
     }
 }
 
@@ -92,7 +102,8 @@ public partial class Hud : CanvasLayer
     public Action? OnQuit, OnResume, OnCamera, OnTouchToggle;
     public bool Paused;
 
-    private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!, _hint = null!, _cam = null!;
+    private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!,
+                  _hint = null!, _cam = null!, _possession = null!;
     private ProgressBar _power = null!, _stamina = null!;
     private PanelContainer _pauseMenu = null!;
     private Control _pauseButtons = null!;
@@ -143,14 +154,17 @@ public partial class Hud : CanvasLayer
         Place(_stamina, .5f, 1f, -130, -32, 260, 10);
         root.AddChild(_stamina);
 
-        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E pass  ·  SPACE shoot  ·  F tackle  ·  SHIFT+F slide  ·  X shield  ·  Q through  ·  TAB switch  ·  C / pad R3 camera  ·  ESC pause",
+        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E / pad A short pass  ·  R / pad Back long ball  ·  SPACE / pad X shoot (hold)  ·  F / pad B tackle  ·  SHIFT+F or pad RB+B slide  ·  X / pad LT close control  ·  Q / pad Y through  ·  TAB / pad LB switch  ·  C / pad R3 camera  ·  ESC pause",
                       12, Ui.Sub);
-        Place(_hint, .5f, 1f, -470, -14, 940, 18);
+        Place(_hint, .5f, 1f, -470, -30, 940, 34);
         root.AddChild(_hint);
 
         _cam = Ui.Lbl("Broadcast", 13, Ui.Accent);
         Place(_cam, 0f, 0f, 330, 22, 200, 24);
         root.AddChild(_cam);
+        _possession = Ui.Lbl("BALL · LOOSE", 14, new Color(1f, .92f, .45f));
+        Place(_possession, 0f, 0f, 330, 48, 320, 24);
+        root.AddChild(_possession);
 
         _toast = Ui.Lbl("", 46, Ui.Accent);
         _toast.HorizontalAlignment = HorizontalAlignment.Center;
@@ -195,6 +209,8 @@ public partial class Hud : CanvasLayer
         TouchBtn(_touchLayer, "THROUGH", 1f, 1f, bx, by + 60, 84, 52, () => Input.TouchThrough = true, () => Input.TouchThrough = false);
         TouchBtn(_touchLayer, "TACKLE", 1f, 1f, bx + 92, by + 60, 84, 52, () => Input.TouchTackle = true, () => Input.TouchTackle = false);
         TouchBtn(_touchLayer, "SWITCH", 1f, 1f, bx + 184, by + 60, 84, 52, () => Input.TouchSwitch = true, () => Input.TouchSwitch = false);
+        TouchBtn(_touchLayer, "LONG", 1f, 1f, bx, by + 120, 84, 52, () => Input.TouchLob = true, () => Input.TouchLob = false);
+        TouchBtn(_touchLayer, "DRIBBLE", 1f, 1f, bx + 92, by + 120, 84, 52, () => Input.TouchDribble = true, () => Input.TouchDribble = false);
     }
 
     private static void TouchBtn(Control parent, string text, float ax, float ay, float x, float y, float w, float h, Action down, Action up)
@@ -262,6 +278,20 @@ public partial class Hud : CanvasLayer
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
         _cam.Text = cameraName;
+        int owner = s.Ball.Owner;
+        if (owner < 0 || owner >= s.Players.Length)
+        {
+            _possession.Text = "BALL · LOOSE";
+            _possession.AddThemeColorOverride("font_color", new Color(1f, .92f, .45f));
+        }
+        else
+        {
+            var carrier = s.Players[owner];
+            string side = carrier.Team == 0 ? "YOU" : "AWAY";
+            _possession.Text = $"BALL · {side} · {carrier.Spec.DisplayName.ToUpperInvariant()}";
+            _possession.AddThemeColorOverride("font_color",
+                carrier.Team == 0 ? Ui.Accent : new Color(1f, .55f, .25f));
+        }
         _power.Value = charge * 100f;
         if (s.Controlled >= 0 && s.Controlled < s.Players.Length)
             _stamina.Value = s.Players[s.Controlled].Stamina * 100f;

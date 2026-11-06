@@ -534,7 +534,9 @@ func step_offline(delta: float) -> void:
 		elif human_of(i) >= 0:
 			var cmd: Dictionary = cmds[human_of(i)]
 			wish = Vector3(cmd["move"].x, 0, cmd["move"].y)
-			speed *= 1.0 + 0.3 * float(cmd["move"].length() > 0.1 and cmd["sprint"])
+			speed *= 1.0 + 0.45 * float(cmd["move"].length() > 0.1 and cmd["sprint"])
+			if bool(cmd.get("dribble", false)):
+				speed *= 0.88
 		elif ball["owner"] == i:
 			wish = ai_carrier(i, p, goal_pos, delta)
 			speed = 5.6
@@ -931,6 +933,8 @@ func net_send_input(delta: float) -> void:
 			var ph: Dictionary = pad_ctl.held(int(dev))
 			for a in Controllers.ACTIONS:
 				pad_held[a] = bool(pad_held.get(a, false)) or bool(ph.get(a, false))
+			for a in ["lob", "dribble"]:
+				pad_held[a] = bool(pad_held.get(a, false)) or bool(ph.get(a, false))
 	move += pad_move
 	move += touch_move
 	if move.length() > 1:
@@ -949,8 +953,13 @@ func net_send_input(delta: float) -> void:
 		cmd["ta"] = true
 	if edge("nswitch", Input.is_key_pressed(KEY_TAB) or bool(pad_held.get("switch", false)) or touch_down.get("switch", false)):
 		cmd["sw"] = true
-	if edge("nlob", Input.is_key_pressed(KEY_R)):
+	if edge("nlob", Input.is_key_pressed(KEY_R) or bool(pad_held.get("lob", false)) or touch_down.get("lob", false)):
 		cmd["lo"] = true
+	if bool(pad_held.get("dribble", false)) or touch_down.get("dribble", false):
+		cmd["sd"] = true
+	if edge("nslide", bool(pad_held.get("sprint", false)) and bool(pad_held.get("tackle", false))):
+		cmd["sl"] = true
+		cmd.erase("ta")
 	if shoot_now:
 		charge = min(1.0, charge + delta / 0.9)
 	elif charge > 0:
@@ -971,7 +980,7 @@ func net_send_input(delta: float) -> void:
 		leave_net()
 		return
 	net_seq_acc += delta
-	var one_shot: bool = cmd.has("pa") or cmd.has("sh") or cmd.has("th") or cmd.has("ta") or cmd.has("sw") or cmd.has("lo")
+	var one_shot: bool = cmd.has("pa") or cmd.has("sh") or cmd.has("th") or cmd.has("ta") or cmd.has("sw") or cmd.has("lo") or cmd.has("sd") or cmd.has("sl")
 	if one_shot or net_seq_acc >= 1.0 / 30.0:
 		net_seq_acc = 0.0
 		net.send_input(cmd)
@@ -1263,7 +1272,7 @@ func pose_bone(sk: Skeleton3D, name: String, euler: Vector3) -> void:
 	if bone_index.has(name):
 		sk.set_bone_pose_rotation(int(bone_index[name]), Quaternion.from_euler(euler))
 
-func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO) -> void:
+func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := false) -> void:
 	if ball["owner"] != from:
 		return
 	var p: Dictionary = players[from]
@@ -1296,6 +1305,8 @@ func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO) -> void:
 	dir.y = 0
 	dir = dir.normalized().rotated(Vector3.UP, rng.randf_range(-0.04, 0.04))
 	var lob: float = 0.4 + (1.2 if through else 0.0) + p["pos"].distance_to(r["pos"]) * 0.03
+	if aerial:
+		lob += 4.5
 	ball["vel"] = dir * spd + Vector3(0, lob, 0)
 	ball["pos"] += dir * 0.5 + Vector3(0, 0.03, 0)
 	ball["free"] = 0
@@ -1303,7 +1314,12 @@ func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO) -> void:
 	if hk >= 0 and not players[best]["keeper"]:
 		humans[hk]["ctrl"] = best
 		controlled = humans[0]["ctrl"]
-	say("Through ball." if through else "Pass.")
+	var label := "Pass."
+	if aerial:
+		label = "Long ball."
+	elif through:
+		label = "Through ball."
+	say(label)
 	audio.play_pass()
 
 func shoot(from: int, power: float, aim_z := 0.0) -> void:
@@ -1380,6 +1396,8 @@ func read_human(k: int, delta: float) -> Dictionary:
 	var held: Dictionary = Controllers.kb_held(scheme)
 	# pads: in one-player mode every pad drives P1; in two-player mode pad 0 -> P1, pad 1 -> P2
 	var pads: Array = pad_ctl.pads()
+	var pad_lob := false
+	var pad_dribble := false
 	for dev in pads:
 		if two_player_mode and int(dev) != k:
 			continue
@@ -1387,13 +1405,17 @@ func read_human(k: int, delta: float) -> Dictionary:
 		var ph: Dictionary = pad_ctl.held(int(dev))
 		for a in Controllers.ACTIONS:
 			held[a] = held[a] or ph[a]
+		pad_lob = pad_lob or bool(ph.get("lob", false))
+		pad_dribble = pad_dribble or bool(ph.get("dribble", false))
 	if k == 0:
 		move += touch_move
 		for a in Controllers.ACTIONS:
 			held[a] = held[a] or bool(touch_down.get(a, false))
+	held["lob"] = bool(held.get("lob", false)) or pad_lob or Input.is_key_pressed(KEY_R)
+	held["dribble"] = bool(held.get("dribble", false)) or pad_dribble or Input.is_key_pressed(KEY_X)
 	if move.length() > 1.0:
 		move = move.normalized()
-	var cmd := {"move": move, "sprint": held["sprint"]}
+	var cmd := {"move": move, "sprint": held["sprint"], "dribble": held["dribble"]}
 	var me: int = h["ctrl"]
 	if move.length() > 0.2:
 		h["last_move"] = Vector3(move.x, 0, move.y)
@@ -1410,16 +1432,18 @@ func read_human(k: int, delta: float) -> Dictionary:
 		pass_ball(me, false, h["last_move"])
 	if edge(key + "through", held["through"]):
 		pass_ball(me, true, h["last_move"])
+	if edge(key + "lob", held["lob"]):
+		pass_ball(me, true, h["last_move"], true)
 	if edge(key + "switch", held["switch"]):
 		switch_player(k)
 	if edge(key + "tackle", held["tackle"]):
 		var o: int = ball["owner"]
 		if o >= 0 and players[o]["team"] != h["team"] and players[me]["pos"].distance_to(players[o]["pos"]) < 2.2:
-			try_tackle(me, o, players[me]["vel"].length() > 4.5)
+			try_tackle(me, o, held["sprint"] or players[me]["vel"].length() > 4.5)
 	return cmd
 
 func read_global_keys() -> void:
-	# The pad's "camera" button (R3 on a mapped pad, L3 on a raw EasySMX pad) used
+	# The pad's "camera" button (R3 on mapped AND raw EasySMX pads) used
 	# to be reported by Controllers.held() but never consumed.  Wire it up so
 	# camera angles can be changed without reaching for the keyboard.
 	var cam_pad := false

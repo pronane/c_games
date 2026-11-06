@@ -105,3 +105,55 @@ Sample values at sprint, left leg leading: `hipL = -0.660`, `hipR = +0.660`, `kn
   its own auto-switch; its action set and mesh remain separate (`Web/Controllers.gd`,
   `Tools/gen_rig.py`). Porting these is the natural next step if both editions should match.
 * The `foul` / `slide` poses are in `RigAnimator` (C#); the browser edition has its own action poses.
+
+
+## 7. 06.11.2026 recordings — camera, EasySMX controls and readable possession
+
+Two clips in `arena-fc/screenshots/` were decoded frame-by-frame:
+`06.11.2026_19.36.34_REC (1).mp4` (current build, 51.9 s) and
+`06.11.2026_19.40.33_REC.mp4` (target, 64.5 s). The current clip shows the camera
+swinging between centre-circle, goal-line, corner/stand and midfield viewpoints within
+seconds; the only possession cue is a thin green ring under one player, while the ball
+and ball owner are easy to lose. The target clip uses a stable elevated ball-following
+camera, a clear controlled-player marker, readable short/long passing, dribbling and
+shielding, and fluid player animation.
+
+### Root causes found
+
+1. **Human button edges were sampled only on AI decision ticks.** `Tick()` called
+   `Decide()` every 0.08–0.18 s, and all pass / shoot / tackle / slide handling lived
+   inside `Decide()`. A one-frame controller press was normally gone before the next
+   decision tick. Fix: a new `HumanActions()` runs for every human on every fixed tick;
+   `MatchView` also buffers one-shot edges across accumulator frames that produce no tick.
+2. **The HUD owned a different `InputHub` from `MatchView`.** Touch/pad state written by
+   the HUD never reached `MatchView.Read()`. Fix: one shared instance.
+3. **Menu accept and back collided.** Button 8 was both `accept` and `back`, and a
+   first A/START press only seeded GUI focus without activating. Fix: separate
+   accept/back tables, first-press activation, actionable-only focus list.
+4. **The camera was built from instantaneous player facing.** Player/shoulder modes
+   rotated the whole view with every stick change and could leave the pitch near a
+   corner. Fix: `Scripts/Core/CameraPlan.cs` uses a fixed sideline orientation for
+   ball-following modes, a damped heading for the shoulder mode, a stable `-Z` tactical
+   up vector and pitch-bowl clamping. Mode changes are smoothed instead of snapped.
+5. **Possession was ambiguous.** Fix: separate yellow ball ring, amber ball-owner ring
+   and floating owner arrow, larger green controlled ring + arrow, HUD
+   `BALL · YOU/AWAY · NAME` label, and a minimap line from controlled player to ball.
+6. **Players were still wooden.** Fix: `Gait` now has hip yaw/roll, foot roll, shoulder
+   counter-rotation, sprint/dribble lean, a `Lerp()` easing helper and eased action clips.
+
+### Gameplay additions
+
+* Short pass (`E`/A), through ball (`Q`/Y), long aerial ball (`R`/pad Back), charged shot,
+  standing tackle (`F`/B), committed slide (sprint+tackle), shoulder-charge dispossession,
+  close-control dribble (`X`/LT/L3) with tighter alternating ball touches and reduced tackle
+  success, and a clearly faster 1.42× sprint.
+* `PlayerCommand.Dribble` is carried by the existing v2 `sd` wire field, so online clients
+  and the server keep the same protocol.
+* The web edition mirrors the new long-ball / close-control / sprint separation in
+  `Web/Controllers.gd` and `Web/BrowserBoot.gd`.
+
+### Verification
+
+See `GAMEPLAY_CAMERA_FIX_REPORT.md` for the final CI/test table. Physical EasySMX pad,
+Windows rebuild, native `.NET` server E2E and a new gameplay recording remain user-side
+checks; this sandbox has no native `dotnet`, `godot` or controller hardware.

@@ -15,7 +15,8 @@ public partial class MatchView : Node3D
     public Hud Hud = null!;
     public BroadcastCamera Cam = null!;
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
-    public MeshInstance3D Ball = null!, Cursor = null!;
+    public MeshInstance3D Ball = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
+                          ControlArrow = null!, OwnerArrow = null!;
     /// <summary>When set, the authoritative server drives the sim instead of the local engine.</summary>
     public OnlineMatch? Online;
 
@@ -23,6 +24,9 @@ public partial class MatchView : Node3D
     private Action? _onExit;
     private float _time;
     private bool _built;
+    /// <summary>One-shot button edges survive physics frames that produce no fixed
+    /// engine tick, instead of being silently dropped by the accumulator.</summary>
+    private PlayerCommand _pending;
 
     public void Init(MatchOptions opts, List<CharacterSpec>? customHome, Action onExit)
     {
@@ -37,6 +41,35 @@ public partial class MatchView : Node3D
     }
 
     private static Vector3 G(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);
+
+    private static StandardMaterial3D MarkerMaterial(Color c) => new()
+    {
+        AlbedoColor = c,
+        EmissionEnabled = true,
+        Emission = c,
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+    };
+
+    private static MeshInstance3D Marker(string name, Mesh mesh, StandardMaterial3D mat) => new()
+    {
+        Name = name, Mesh = mesh, MaterialOverride = mat,
+    };
+
+    private void MergePending(PlayerCommand cmd)
+    {
+        _pending.Move = cmd.Move;
+        _pending.Sprint = cmd.Sprint;
+        _pending.Shield = cmd.Shield;
+        _pending.Dribble = cmd.Dribble;
+        _pending.Pass |= cmd.Pass;
+        _pending.Shoot |= cmd.Shoot;
+        _pending.Through |= cmd.Through;
+        _pending.Tackle |= cmd.Tackle;
+        _pending.Slide |= cmd.Slide;
+        _pending.Switch |= cmd.Switch;
+        _pending.Lob |= cmd.Lob;
+        if (cmd.Charge > _pending.Charge) _pending.Charge = cmd.Charge;
+    }
 
     private void Build()
     {
@@ -62,26 +95,34 @@ public partial class MatchView : Node3D
         Ball = BallFactory.Create();
         AddChild(Ball);
 
-        var cursorMat = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(.2f, 1f, .55f),
-            EmissionEnabled = true,
-            Emission = new Color(.2f, 1f, .55f),
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        };
-        Cursor = new MeshInstance3D
-        {
-            Name = "ControlledRing",
-            Mesh = new TorusMesh { InnerRadius = .52f, OuterRadius = .68f, RingSegments = 24, Rings = 6 },
-            MaterialOverride = cursorMat,
-        };
+        var green = MarkerMaterial(new Color(.2f, 1f, .55f));
+        var amber = MarkerMaterial(new Color(1f, .72f, .18f));
+        var yellow = MarkerMaterial(new Color(1f, .95f, .55f));
+        Cursor = Marker("ControlledRing",
+            new TorusMesh { InnerRadius = .62f, OuterRadius = .82f, RingSegments = 32, Rings = 8 }, green);
         AddChild(Cursor);
+        BallRing = Marker("BallRing",
+            new TorusMesh { InnerRadius = .30f, OuterRadius = .44f, RingSegments = 24, Rings = 6 }, yellow);
+        AddChild(BallRing);
+        OwnerRing = Marker("BallOwnerRing",
+            new TorusMesh { InnerRadius = .78f, OuterRadius = .94f, RingSegments = 32, Rings = 8 }, amber);
+        AddChild(OwnerRing);
+        ControlArrow = Marker("ControlledArrow",
+            new CylinderMesh { TopRadius = 0f, BottomRadius = .24f, Height = .42f, RadialSegments = 8, Rings = 1 }, green);
+        ControlArrow.RotationDegrees = new Vector3(180f, 0f, 0f);
+        AddChild(ControlArrow);
+        OwnerArrow = Marker("BallOwnerArrow",
+            new CylinderMesh { TopRadius = 0f, BottomRadius = .24f, Height = .42f, RadialSegments = 8, Rings = 1 }, amber);
+        OwnerArrow.RotationDegrees = new Vector3(180f, 0f, 0f);
+        AddChild(OwnerArrow);
 
         Cam = new BroadcastCamera { Name = "BroadcastCamera", Fov = 55, Far = 600f };
         AddChild(Cam);
         Cam.MakeCurrent();
 
-        Hud = new Hud();
+        // One shared InputHub: the HUD touch buttons used to drive a different
+        // instance from the one MatchView.Read() polls, so touch/pad edges died.
+        Hud = new Hud { Input = Input };
         AddChild(Hud);
         Hud.OnQuit = () => _onExit?.Invoke();
         Hud.OnResume = () => Hud.SetPaused(false);
@@ -117,7 +158,12 @@ public partial class MatchView : Node3D
             cmd.Move = worldMove.LengthSquared() > 1f
                 ? System.Numerics.Vector2.Normalize(worldMove) : worldMove;
         }
-        if (Input.PausePressed) Hud.SetPaused(!Hud.Paused);
+        if (Input.PausePressed)
+        {
+            Hud.SetPaused(!Hud.Paused);
+            _pending = PlayerCommand.None;
+            Input.Reset();
+        }
         if (Input.CameraPressed) Cam.Cycle();
         if (Hud.Paused)
         {
@@ -127,7 +173,15 @@ public partial class MatchView : Node3D
             return;
         }
         if (Online != null) Online.Step(dt, cmd);   // send input + predict/reconcile
-        else Engine.Step(dt, cmd);                  // offline single-player
+        else
+        {
+            // Engine.Step() uses a fixed-tick accumulator.  When a physics frame
+            // produces no tick, buffer the one-shot edges until one does.
+            MergePending(cmd);
+            int before = Engine.CurrentTick;
+            Engine.Step(dt, _pending);
+            if (Engine.CurrentTick != before) _pending = PlayerCommand.None;
+        }
         PlayEventSounds();
         Sync(dt);
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
@@ -171,15 +225,40 @@ public partial class MatchView : Node3D
         Ball.Position = G(b.Pos);
         var v = Mx.Flat(b.Vel);
         Ball.RotationDegrees += new Vector3(v.Z, 0, -v.X) * (dt * 190f);
-        if (Engine.State.Controlled >= 0 && Engine.State.Controlled < Rigs.Length)
+
+        // Ball, ball owner and controlled player each get a distinct, always-on
+        // marker.  The old thin green ring alone did not show WHO had the ball.
+        BallRing.Visible = true;
+        BallRing.Position = new Vector3(b.Pos.X, .05f, b.Pos.Z);
+        BallRing.RotationDegrees = new Vector3(0, _time * -55f, 0);
+        int owner = Engine.State.Ball.Owner;
+        int ctrl = Engine.State.Controlled;
+        bool hasOwner = owner >= 0 && owner < Rigs.Length;
+        OwnerRing.Visible = hasOwner && owner != ctrl;
+        OwnerArrow.Visible = hasOwner;
+        if (hasOwner)
         {
-            var c = Engine.State.Players[Engine.State.Controlled];
+            var o = Engine.State.Players[owner];
+            OwnerRing.Position = new Vector3(o.Pos.X, .055f, o.Pos.Z);
+            OwnerRing.RotationDegrees = new Vector3(0, _time * 35f, 0);
+            OwnerArrow.Position = new Vector3(o.Pos.X, 2.35f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
+        }
+        if (ctrl >= 0 && ctrl < Rigs.Length)
+        {
+            var c = Engine.State.Players[ctrl];
             Cursor.Visible = true;
             Cursor.Position = new Vector3(c.Pos.X, .045f, c.Pos.Z);
             Cursor.RotationDegrees = new Vector3(0, _time * 40f, 0);
+            ControlArrow.Visible = true;
+            ControlArrow.Position = new Vector3(c.Pos.X, 2.45f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
             Cam.UpdateCamera(G(b.Pos), new Vector3(c.Pos.X, 0, c.Pos.Z), G(c.Facing), dt);
         }
-        else { Cursor.Visible = false; Cam.UpdateCamera(G(b.Pos), G(b.Pos), new Vector3(1, 0, 0), dt); }
+        else
+        {
+            Cursor.Visible = false;
+            ControlArrow.Visible = false;
+            Cam.UpdateCamera(G(b.Pos), G(b.Pos), new Vector3(1, 0, 0), dt);
+        }
     }
 
     /// <summary>Used by the headless self-test to drive the whole 3D match pipeline without a render loop.</summary>

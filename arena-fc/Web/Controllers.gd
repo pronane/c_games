@@ -21,7 +21,7 @@ const STANDARD := {"pass": 0, "through": 3, "shoot": 2, "tackle": 1, "switch": 9
 # EasySMX D-input / PC mode and most cheap USB pads (b0=Y b1=B b2=A b3=X ...).
 const RAW := {"pass": 2, "through": 0, "shoot": 3, "tackle": 1, "switch": 4, "sprint": 5}
 const SYSTEM_STANDARD := {"pause": 6, "camera": 8}
-const SYSTEM_RAW := {"pause": 9, "camera": 10}
+const SYSTEM_RAW := {"pause": 9, "camera": 11}
 const DPAD_STANDARD := {"up": 11, "down": 12, "left": 13, "right": 14}
 const DPAD_RAW := {"up": 12, "down": 13, "left": 14, "right": 15}
 const HAT_AXES := [6, 7]
@@ -207,13 +207,17 @@ static func held_from(buttons: Array, axes: Array, binds: Dictionary, known: boo
 	var sys = SYSTEM_STANDARD if known else SYSTEM_RAW
 	out["pause"] = button_of(buttons, int(sys["pause"]))
 	out["camera"] = button_of(buttons, int(sys["camera"]))
+	# Back/Select = long ball; LT/L3 = close control; RT/RB = sprint.
+	out["lob"] = button_of(buttons, 4 if known else 8)
+	out["dribble"] = axis_of(axes, TRIGGER_AXES[0]) > 0.5 or button_of(buttons, 7 if known else 10)
 	var sprint = bool(out["sprint"])
-	if axis_of(axes, TRIGGER_AXES[0]) > 0.5 or axis_of(axes, TRIGGER_AXES[1]) > 0.5:
+	if axis_of(axes, TRIGGER_AXES[1]) > 0.5:
 		sprint = true
 	if not known:
-		for b in TRIGGER_BUTTONS:
-			if button_of(buttons, int(b)):
-				sprint = true
+		if button_of(buttons, int(TRIGGER_BUTTONS[0])):
+			out["dribble"] = true
+		if button_of(buttons, int(TRIGGER_BUTTONS[1])):
+			sprint = true
 	out["sprint"] = sprint
 	return out
 

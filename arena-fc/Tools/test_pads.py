@@ -237,12 +237,20 @@ def main() -> int:
     check("raw b0 = THROUGH", held(btns(0), empty, raw, False)["through"])
     check("raw b1 = TACKLE", held(btns(1), empty, raw, False)["tackle"])
     check("raw b4 = SWITCH", held(btns(4), empty, raw, False)["switch"])
-    check("raw LT (b6) sprints", held(btns(6), empty, raw, False)["sprint"])
+    check("raw LT (b6) is close-control DRIBBLE",
+          held(btns(6), empty, raw, False)["dribble"]
+          and not held(btns(6), empty, raw, False)["sprint"])
+    check("raw RT (b7) sprints", held(btns(7), empty, raw, False)["sprint"])
+    check("raw Back (b8) is LONG BALL", held(btns(8), empty, raw, False)["lob"])
+    check("raw L3 (b10) is DRIBBLE", held(btns(10), empty, raw, False)["dribble"])
     check("raw Start (b9) pauses", held(btns(9), empty, raw, False)["pause"])
-    check("raw R3 (b10) changes camera", held(btns(10), empty, raw, False)["camera"])
+    check("raw R3 (b11) changes camera", held(btns(11), empty, raw, False)["camera"])
     check("standard A = PASS", held(btns(0), empty, std, True)["pass"])
     check("standard Start (b6) pauses", held(btns(6), empty, std, True)["pause"])
-    check("analogue trigger sprints", held(btns(), axs(**{"4": 1.0}), std, True)["sprint"])
+    check("standard Back (b4) is LONG BALL", held(btns(4), empty, std, True)["lob"])
+    check("standard L3 (b7) is DRIBBLE", held(btns(7), empty, std, True)["dribble"])
+    check("analogue LT is DRIBBLE", held(btns(), axs(**{"4": 1.0}), std, True)["dribble"])
+    check("analogue RT sprints", held(btns(), axs(**{"5": 1.0}), std, True)["sprint"])
     check("raw hat button 12 moves up (no 11-14 conflict)", move(btns(12), empty, False, 0.25)[1] < -0.9)
     check("raw hat button 15 moves right", move(btns(15), empty, False, 0.25)[0] > 0.9)
     check("Godot hat button 11 works on an unmapped pad", move(btns(11), empty, False, 0.25)[1] < -0.9)
@@ -315,12 +323,15 @@ def main() -> int:
           "Ui.FocusFirst(root)" in game_app and "Ui.FocusFirst(panel)" in game_app)
     check("WASD is rotated into camera space",
           "Cam.GlobalTransform.Basis" in match_view and "worldMove" in match_view)
-    check("tactical camera is stable and player cam has a zero-facing guard",
-          "Mode == 4 ? new Vector3(0f, 0f, -1f)" in world3d
-          and "fwd.LengthSquared() < 1e-6f" in world3d)
-    check("five cameras incl. a shoulder view between player cam and sideline",
-          "ModeCount = 5" in world3d and "Shoulder" in world3d and "Sideline" in world3d
-          and "case 2:" in world3d and "case 3:" in world3d and "case 4:" in world3d)
+    camera_plan = (ROOT / "Scripts" / "Core" / "CameraPlan.cs").read_text(encoding="utf-8")
+    check("tactical camera is stable and the camera heading is damped",
+          "new Vector3(0f, 0f, -1f)" in camera_plan
+          and "f.LengthSquared() < 1e-6f" in world3d
+          and "Mathf.Exp(-dt * 1.4f)" in world3d)
+    check("five stable cameras incl. ball follow, shoulder and sideline",
+          "ModeCount = 5" in camera_plan and "Shoulder" in camera_plan and "Sideline" in camera_plan
+          and "case 2:" in camera_plan and "case 3:" in camera_plan and "case 4:" in camera_plan
+          and "BroadcastPlan.Compute" in world3d)
     check("HUD hint advertises the pad camera button", "pad R3 camera" in hud_cs)
     check("C# core regression suite is wired into CI",
           (ROOT / "Tests" / "MatchCoreTests.cs").exists()
@@ -360,6 +371,52 @@ def main() -> int:
     browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
     check("browser edition mirrors the corrected gait signs",
           "var hip_l: float = -(s * 0.66" in browser and "sin(ph + 0.40)" in browser)
+
+    section("06.11.2026 camera / pad / gameplay fixes")
+    match_core = (ROOT / "Scripts" / "Core" / "Match.cs").read_text(encoding="utf-8")
+    packet = (ROOT / "Scripts" / "Core" / "Net" / "Packet.cs").read_text(encoding="utf-8")
+    controls = (ROOT / "Scripts" / "Godot" / "Controls.cs").read_text(encoding="utf-8")
+    pad_nav = (ROOT / "Scripts" / "Godot" / "PadMenuNavigator.cs").read_text(encoding="utf-8")
+    ui = (ROOT / "Scripts" / "Godot" / "Ui.cs").read_text(encoding="utf-8")
+    gait = (ROOT / "Scripts" / "Core" / "Gait.cs").read_text(encoding="utf-8")
+    rig_factory = (ROOT / "Scripts" / "Godot" / "RigFactory.cs").read_text(encoding="utf-8")
+    match_view = (ROOT / "Scripts" / "Godot" / "MatchView.cs").read_text(encoding="utf-8")
+    hud = (ROOT / "Scripts" / "Godot" / "Hud.cs").read_text(encoding="utf-8")
+    controllers_gd = (ROOT / "Web" / "Controllers.gd").read_text(encoding="utf-8")
+    browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
+    check("human one-shot actions are consumed every fixed tick",
+          "private void HumanActions" in match_core and "if (human) HumanActions(p, pc);" in match_core)
+    check("released stick no longer auto-runs the human",
+          "p.Target = p.Pos;" in match_core and "Human movement is driven entirely" in match_core)
+    check("short pass, long ball, dribble and stronger sprint exist",
+          "FindBestPassTarget(p, true, true)" in match_core and "bool Dribble" in match_core
+          and "1.42f" in match_core and "owner.Dribbling" in match_core)
+    check("dribble survives the v2 wire format",
+          "Sd = c.Shield || c.Dribble" in packet and "Shield = Sd, Dribble = Sd" in packet)
+    check("one-shot pad edges are buffered across accumulator frames",
+          "MergePending(cmd)" in match_view and "Engine.CurrentTick != before" in match_view)
+    check("HUD and MatchView share one InputHub",
+          "Hud = new Hud { Input = Input }" in match_view)
+    check("ball, owner and controlled player are separately marked",
+          "BallRing" in match_view and "OwnerArrow" in match_view
+          and "_possession" in hud and "BALL · LOOSE" in hud)
+    check("menu START activates on the first press and focus is actionable",
+          "if (eAccept && seeded != null) Activate(seeded);" in pad_nav
+          and "c is BaseButton || c is Slider" in ui)
+    check("menu accept and back no longer collide on R3",
+          "PadLayout.Button(buttons, known ? 4 : 8)) back = true" in controls
+          and 'PadLayout.Button(buttons, 8)' not in controls)
+    check("camera button has an accidental-stick-click debounce",
+          "_cameraHold > .12f" in controls)
+    check("gait is smoothed and has out-of-plane joints",
+          "Gait.Lerp" in world3d and "HipYawL" in gait
+          and "SmoothPose" in rig_factory and "ActionEnvelope" in world3d)
+    check("browser edition mirrors lob / dribble / long ball",
+          'out["lob"]' in controllers_gd and 'out["dribble"]' in controllers_gd
+          and 'cmd["sd"]' in browser and "Long ball." in browser)
+    check("camera plan keeps a fixed sideline orientation",
+          "fixed world orientation, never spins with facing" in camera_plan
+          and "ClampPitch" in camera_plan)
 
     section("Optional syntax parsers")
     try:

@@ -14,10 +14,11 @@ generated at runtime.
 **v2 online (27 Oct 2026):** mid‑match **reconnect** with a 256‑bit secure resume
 token, **host migration** that keeps the match running (optional live simulation
 handoff with `--peer-host`), and **rollback prediction** so your own player
-responds on the next frame instead of after a round trip. Six broadcast camera
-views with continuous 0.55×–2.4× dolly zoom, a pulsing selection ring + head
-arrow, and local 2‑player are also in. See `ONLINE.md` §7 for the protocol,
-tests and honest limits.
+responds on the next frame instead of after a round trip. Five stable broadcast
+camera views, distinct ball / ball-owner / controlled-player markers, pad-selectable
+menus, short/long passing, close-control dribbling, shoulder-charge tackling and a
+clearly faster sprint are also in. See `ONLINE.md` §7 for the protocol, tests and
+honest limits; `GAMEPLAY_CAMERA_FIX_REPORT.md` covers the 06.11.2026 gameplay fixes.
 
 ---
 

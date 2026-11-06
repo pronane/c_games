@@ -157,6 +157,7 @@ public sealed partial class MatchEngine
             p.DecisionTimer = d.Dt; p.PossessionLock = d.Pl; p.TackleLock = d.Tl;
             p.Action = d.A; p.IsKeeper = d.Ik; p.Cards = d.C;
             p.Pressing = d.Pr; p.Shielding = d.Sh;
+            p.Dribbling = d.Sh; p.Sprinting = false;
             p.Team = d.Team; p.Slot = d.Slot; p.Role = (Role)d.Role;
         }
         var b = f.Ball;
@@ -201,6 +202,7 @@ public sealed partial class MatchEngine
         DecisionTimer = p.DecisionTimer, PossessionLock = p.PossessionLock,
         TackleLock = p.TackleLock, Action = p.Action, IsKeeper = p.IsKeeper,
         Cards = p.Cards, Pressing = p.Pressing, Shielding = p.Shielding,
+        Dribbling = p.Dribbling, Sprinting = p.Sprinting,
     };
 
     private static BallState CloneBall(BallState b) => new()

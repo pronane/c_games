@@ -39,6 +39,8 @@ public struct PlayerCommand
     public bool Slide;
     /// <summary>Hold to shield the ball / use strength to hold off a challenger.</summary>
     public bool Shield;
+    /// <summary>Hold for close-control dribbling: quicker touches, tighter ball, more evade.</summary>
+    public bool Dribble;
     public float Charge;
     public static PlayerCommand None => default;
 }
@@ -65,6 +67,8 @@ public sealed class PlayerState
     public bool Pressing;
     /// <summary>Holding off a challenger: reduces their tackle success, costs stamina.</summary>
     public bool Shielding;
+    /// <summary>Close-control dribbling: ball stays at the feet and is harder to tackle.</summary>
+    public bool Dribbling, Sprinting;
     public int Cards;
     public float MaxSpeed => (3.6f + Spec.Pace * 3.5f) * (IsKeeper ? .94f : 1f);
 }
@@ -329,17 +333,25 @@ public sealed partial class MatchEngine
             return cmd;
         }
 
-        // ---- AI decisions ----
+        // ---- Human intent + AI decisions ----
         foreach (var p in S.Players)
         {
             p.DecisionTimer -= dt;
             p.ActionTimer = MathF.Max(0, p.ActionTimer - dt);
             p.PossessionLock = MathF.Max(0, p.PossessionLock - dt);
             p.TackleLock = MathF.Max(0, p.TackleLock - dt);
+            p.Dribbling = false;
+            p.Sprinting = false;
+            PlayerCommand pc = For(p.Index);
+            bool human = humans.Contains(p.Index);
+            // A pad / key press lasts one fixed tick.  It must NOT wait for the
+            // 0.08-0.18 s AI decision timer: that used to silently discard most
+            // pass / shoot / tackle presses and made the controller look dead.
+            if (human) HumanActions(p, pc);
             if (p.DecisionTimer <= 0)
             {
                 p.DecisionTimer = Rng.Range(.08f, .18f);
-                Decide(p, For(p.Index), humans.Contains(p.Index));
+                Decide(p, pc, human);
             }
         }
 
@@ -366,7 +378,13 @@ public sealed partial class MatchEngine
                 Vector3 f = Mx.Norm(Mx.Flat(owner.Facing));
                 if (f.LengthSquared() < .1f) f = new Vector3(1, 0, 0);
                 float bob = MathF.Sin(_globalTime * 13f) * .012f;
-                S.Ball.Pos = owner.Pos + f * .46f + new Vector3(0, Mx.BallRadius + bob, 0);
+                // Close control keeps the ball under the boot and adds alternating
+                // inside/outside touches; normal dribbling pushes it further ahead.
+                float lead = owner.Dribbling ? .30f + MathF.Sin(owner.AnimPhase * 2f) * .06f : .46f;
+                Vector3 side = owner.Dribbling
+                    ? new Vector3(-f.Z, 0, f.X) * MathF.Sin(owner.AnimPhase) * .14f
+                    : Vector3.Zero;
+                S.Ball.Pos = owner.Pos + f * lead + side + new Vector3(0, Mx.BallRadius + bob, 0);
                 S.Ball.Vel = owner.Vel;
                 S.Ball.Spin = Vector3.Zero;
                 S.Ball.LastTouch = owner.Index;
@@ -399,6 +417,48 @@ public sealed partial class MatchEngine
         PassTo(State.Players[from], State.Players[mate], 10f, false);
     }
 
+    /// <summary>One-shot human actions, evaluated EVERY fixed tick.  Keeping these
+    /// inside Decide() meant they were sampled only every 0.08-0.18 s, so a normal
+    /// button tap was usually lost.  Continuous states live here too so shield /
+    /// dribble do not flicker with the AI decision clock.</summary>
+    private void HumanActions(PlayerState p, PlayerCommand cmd)
+    {
+        var S = State;
+        var ball = S.Ball;
+        bool owner = ball.Owner == p.Index;
+        p.Shielding = owner && (cmd.Shield || cmd.Dribble) && p.Stamina > .12f;
+        p.Dribbling = owner && cmd.Dribble && p.Stamina > .08f;
+        if (owner)
+        {
+            if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge)); return; }
+            if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
+            if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
+            if (cmd.Lob) { int t = FindBestPassTarget(p, true, true); if (t >= 0) PassTo(p, S.Players[t], 20f, true, true); return; }
+        }
+        else
+        {
+            if (cmd.Slide && p.TackleLock <= 0f) { AttemptSlide(p); return; }
+            if (cmd.Tackle && p.TackleLock <= 0f) { AttemptTackle(p, false, cmd.Sprint); return; }
+        }
+        // First touch: pass / shoot a loose ball before possession is registered.
+        if (ball.Owner < 0 && Mx.FlatDist(p.Pos, ball.Pos) < 1.6f && ball.Pos.Y < 1.6f)
+        {
+            if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge), true); return; }
+            if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
+            if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
+            if (cmd.Lob) { int t = FindBestPassTarget(p, true, true); if (t >= 0) PassTo(p, S.Players[t], 20f, true, true); return; }
+        }
+        // Shoulder charge: sprinting into a carrier without pressing tackle still
+        // contests possession, so "use your power to dispossess" has an effect.
+        if (cmd.Sprint && !cmd.Tackle && !cmd.Slide && ball.Owner >= 0
+            && ball.Owner < S.Players.Length && p.TackleLock <= 0f && p.Stamina > .2f)
+        {
+            var carrier = S.Players[ball.Owner];
+            if (carrier.Team != p.Team && Mx.FlatDist(p.Pos, carrier.Pos) < 1.7f)
+                AttemptTackle(p, false, true);
+        }
+    }
+
     private void Decide(PlayerState p, PlayerCommand cmd, bool human)
     {
         var S = State;
@@ -408,33 +468,26 @@ public sealed partial class MatchEngine
         Vector3 goal = GoalPos(p.Team);
         bool keeper = p.IsKeeper;
 
-        p.Shielding = false;
-        // --- Human actions ---
         if (human)
         {
-            if (cmd.Switch) { /* handled in Tick */ }
-            if (ball.Owner == p.Index)
+            // Human movement is driven entirely by the stick in MovePlayer.  The old
+            // AI positional block below kept auto-running the human toward goal or
+            // formation whenever the stick was released, which felt uncontrolled.
+            if (cmd.Move.LengthSquared() > .01f)
             {
-                // Hold SHIELD to use body strength to keep a challenger off the ball.
-                p.Shielding = cmd.Shield && p.Stamina > .12f;
-                if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge)); return; }
-                if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 14f, false); return; }
-                if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
-                if (cmd.Lob) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 15f, true, true); return; }
+                p.Target = p.Pos + new Vector3(cmd.Move.X, 0, cmd.Move.Y) * 3f;
+                if (p.ActionTimer <= 0f) p.Action = "run";
             }
-            else if (cmd.Slide && p.TackleLock <= 0) { AttemptSlide(p); return; }
-            else if (cmd.Tackle && p.TackleLock <= 0) { AttemptTackle(p); return; }
-            // First-touch actions on a loose ball, so pass/shoot keys are never dead
-            // just because the controlled player is not the registered owner yet.
-            if (ball.Owner < 0 && Mx.FlatDist(p.Pos, ball.Pos) < 1.6f && ball.Pos.Y < 1.6f)
+            else
             {
-                if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge), true); return; }
-                if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 14f, false); return; }
-                if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
+                p.Target = p.Pos;
+                if (p.ActionTimer <= 0f) p.Action = "idle";
             }
+            return;
         }
+        p.Shielding = false;
 
-        // --- Positional target ---
+        // --- Positional target (AI only) ---
         Vector3 slotPos = FormationPosition(p, attack, ball.Pos);
         if (keeper)
         {
@@ -567,7 +620,7 @@ public sealed partial class MatchEngine
         return rank < list.Length ? list[rank].Index : (list.Length > 0 ? list[0].Index : -1);
     }
 
-    private int FindBestPassTarget(PlayerState from, bool through)
+    private int FindBestPassTarget(PlayerState from, bool through, bool longPass = false)
     {
         int best = -1; float bestScore = float.MinValue;
         int attack = SideSign(from.Team);
@@ -576,6 +629,7 @@ public sealed partial class MatchEngine
             if (q.Team != from.Team || q.Index == from.Index || q.IsKeeper) continue;
             float d = Mx.FlatDist(from.Pos, q.Pos);
             if (d < 2.5f || d > 42f) continue;
+            if (longPass && d < 12f) continue;
             float forward = (q.Pos.X - from.Pos.X) * attack;
             float openness = NearestOpponent(q, out float od) is null ? 8f : MathF.Min(od, 8f);
             bool laneBlocked = false;
@@ -586,6 +640,10 @@ public sealed partial class MatchEngine
                 if (Mx.FlatDist(o.Pos, Mx.Lerp(from.Pos, q.Pos, proj)) < 1.5f && proj > .1f && proj < .9f) { laneBlocked = true; break; }
             }
             float score = forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? 6f : 0f);
+            // A long pass wants a distant, advanced target; a short pass prefers
+            // the safe nearby option instead of always hitting the furthest man.
+            if (longPass) score += MathF.Min(d, 38f) * .16f + forward * .18f;
+            else if (d > 18f) score -= 4f;
             if (Options.Offside && IsOffside(q, from)) score -= 30f;
             score += Rng.Range(-1.2f, 1.2f);
             if (score > bestScore) { bestScore = score; best = q.Index; }
@@ -665,7 +723,7 @@ public sealed partial class MatchEngine
     }
 
     /// <summary>Standing tackle, or a committed slide with more reach and more foul risk.</summary>
-    private void AttemptTackle(PlayerState p, bool slide = false)
+    private void AttemptTackle(PlayerState p, bool slide = false, bool powered = false)
     {
         p.TackleLock = slide ? 1.35f : .8f;
         p.Action = slide ? "slide" : "tackle";
@@ -675,7 +733,7 @@ public sealed partial class MatchEngine
         var carrier = State.Players[b.Owner];
         if (carrier.Team == p.Team) return;
         float d = Mx.FlatDist(p.Pos, carrier.Pos);
-        float reach = slide ? 3.2f : 2.4f;
+        float reach = slide ? 3.8f : 2.9f;
         if (d > reach) return;
 
         // "Use your power to get between the player and the ball": a defender on the
@@ -685,8 +743,10 @@ public sealed partial class MatchEngine
         float between = Mx.Clamp(Vector3.Dot(Mx.Flat(p.Pos - carrier.Pos), f) / MathF.Max(.4f, d), -1f, 1f);
         float strength = (p.Spec.Bulk - 1f) * .35f + p.Spec.Defending * .22f;
         float shield = carrier.Shielding ? .22f + (carrier.Spec.Bulk - 1f) * .12f : 0f;
-        float chance = .34f + p.Spec.Defending * .34f + strength + between * .20f - shield
-                       - carrier.Spec.Pace * .12f - (d - 1f) * .10f + (slide ? .12f : 0f);
+        float dribble = carrier.Dribbling ? .16f : 0f;
+        float chance = .42f + p.Spec.Defending * .34f + strength + between * .20f - shield - dribble
+                       - carrier.Spec.Pace * .12f - (d - 1f) * .10f
+                       + (slide ? .16f : 0f) + (powered ? .12f : 0f);
         chance = Mx.Clamp(chance, .08f, .88f);
         if (Rng.Next() < chance)
         {
@@ -775,11 +835,15 @@ public sealed partial class MatchEngine
             // go of the stick; active stick input always overrides p.Target above.
             sprint = !human && (Mx.FlatDist(p.Pos, p.Target) > 5f || p.Pressing) && p.Stamina > .25f;
         }
+        p.Sprinting = sprint;
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
-        float speed = p.MaxSpeed * fatigue * (sprint ? 1.24f : 1f) * (p.Pressing ? 1.12f : 1f);
+        float speed = p.MaxSpeed * fatigue * (sprint ? 1.42f : 1f) * (p.Pressing ? 1.12f : 1f);
         if (p.Action == "tackle") speed *= 1.35f;
+        if (p.Dribbling) speed *= .88f;
         Vector3 targetVel = wish * speed;
         float accel = (human ? 18f : p.Pressing ? 16f : 12f) * dt;
+        if (sprint) accel *= 1.25f;
+        if (p.Dribbling) accel *= 1.35f;
         p.Vel = Mx.MoveTowards(p.Vel, targetVel, accel);
         p.Pos += p.Vel * dt;
         p.Pos.Y = 0;
@@ -787,9 +851,9 @@ public sealed partial class MatchEngine
         else if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f);
         else p.Stamina = MathF.Min(1f, p.Stamina + dt * .022f);
         float planar = Mx.Flat(p.Vel).Length();
-        if (planar > .15f) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.Flat(p.Vel), MathF.Min(1f, dt * 9f)));
+        if (planar > .15f) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.Flat(p.Vel), MathF.Min(1f, dt * 7f)));
         else if (State.Ball.Owner == p.Index || p.IsKeeper) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.FlatDir(p.Pos, GoalPos(p.Team)), MathF.Min(1f, dt * 5f)));
-        p.AnimPhase += dt * (2.2f + planar * 1.5f);
+        p.AnimPhase += dt * (2.2f + planar * (p.Sprinting ? 1.9f : 1.5f) + (p.Dribbling ? 3.2f : 0f));
         if (p.ActionTimer <= 0) p.Action = planar > 1.2f ? "run" : "idle";
         // Personal space.  The old .62 m / .38 push was far too weak: with three
         // pressers and a carrier all aiming at the same point, players visibly

@@ -38,9 +38,12 @@ public partial class PadMenuNavigator : Node
         var focus = GetViewport().GuiGetFocusOwner();
         if (focus == null)
         {
-            // A pad was pressed but nothing owns focus yet (e.g. a freshly opened
-            // overlay): seed the first focusable control and let the next press act.
+            // Seed focus AND activate on the same press.  Requiring a second press
+            // made A / START look dead whenever a freshly opened overlay had no
+            // GUI focus owner yet.
             Ui.FocusFirst(root);
+            var seeded = GetViewport().GuiGetFocusOwner();
+            if (eAccept && seeded != null) Activate(seeded);
             return;
         }
 
@@ -83,7 +86,7 @@ public partial class PadMenuNavigator : Node
         if (Ui.ComboChanged.TryGetValue(combo, out var changed)) changed(next);
     }
 
-    private static void Activate(Control focus)
+    private void Activate(Control focus)
     {
         if (focus is CheckBox check)
         {
@@ -100,6 +103,13 @@ public partial class PadMenuNavigator : Node
             else btn.EmitSignal(BaseButton.SignalName.Pressed);
         }
         else if (focus is BaseButton other) other.EmitSignal(BaseButton.SignalName.Pressed);
+        else
+        {
+            // A non-button Control somehow owns focus: fall back to the first
+            // actionable Button instead of silently swallowing START.
+            foreach (Control c in Ui.Focusables(GetTree().Root))
+                if (c is Button b) { Activate(b); return; }
+        }
     }
 
     private static void GoBack(Node root)
