@@ -98,18 +98,37 @@ Tests: `Tests/Program.cs`, `Tests/MatchCoreTests.cs`, `Tools/test_pads.py`,
 
 ## Verification
 
-_Update after CI_: see the final table below. Local portable checks currently pass
-(`python3 Tools/test_pads.py`). Native `dotnet`/`godot`, a physical EasySMX pad,
-a Windows rebuild and a new gameplay recording are **not** available in this
-sandbox; those remain user-side validation.
+Final head: `5b71c4e`. PR #53 is **MERGEABLE / CLEAN**, with every check green.
+The .NET job now uploads its test logs as a CI artifact and surfaces any failing
+test case as a GitHub annotation, which made the two remaining regressions
+readable from the checks API.
 
 | Check | Result |
 | --- | --- |
-| `python3 Tools/test_pads.py` | 120 passed, 0 failed |
-| `dotnet build ArenaFC.sln -c Release` | pending CI |
-| `dotnet run --project Tests/CoreTests.csproj -c Release` | pending CI |
-| `dotnet run --project Tests/MatchCoreTests.csproj -c Release` | pending CI |
-| `Tools/run-gd-tests.sh` (Godot headless) | pending CI |
-| Node hub + Python netplay smoke tests | pending CI |
-| Determinism / sim Linux + Windows | pending CI |
-| Physical EasySMX / Windows build / new recording | user-side |
+| `python3 Tools/test_pads.py` | **120 passed, 0 failed**; **122 passed, 0 failed** with optional `gdtoolkit` + `tree-sitter-c-sharp` parsers |
+| `dotnet build ArenaFC.sln -c Release` | **pass** (CI run `42291984663`, `dotnet-core`) |
+| `dotnet build Server/ArenaFC.Server.csproj -c Release` | **pass** |
+| `dotnet run --project Tests/CoreTests.csproj -c Release` | **pass** |
+| `dotnet run --project Tests/MatchCoreTests.csproj -c Release` | **pass** |
+| `Tools/run-gd-tests.sh` (headless Godot 4.7.2) | **pass** (`godot-gdscript`) |
+| Node hub + `net_smoketest.py` / `net_v2_smoketest.py` | **pass** (`node-hub`) |
+| Determinism / sim Linux + Windows + compare + netplay | **pass** (CI run `42291984682`) |
+| GitGuardian security check | **pass** |
+| Physical EasySMX / Windows rebuild / new gameplay recording | **user-side** |
+
+### CI regressions found and fixed during this round
+
+* `CS0117 MathF.Clamp` in the eased action envelope → `Math.Clamp`.
+* Stale core-suite assertions that still expected LT to sprint → updated to
+  LT=dribble / RT=sprint and added long-ball / R3 checks.
+* `CS0136` duplicate `oppOwns` local in `Decide()` → renamed the human flag.
+* `MatchCoreTests` gait assertion used phase 0, where hip yaw is legitimately 0 →
+  split hip-yaw and foot-roll probes across two phases.
+* Removing all human auto-movement cut opposition tackles from 30 to 7 → the
+  selected player now auto-presses **only while the opposition has the ball**;
+  AI closing was nudged up and foul odds slightly down. The 60 s / 11v11
+  regression thresholds pass again.
+
+Native `dotnet`/`godot` binaries, a physical EasySMX pad, a Windows rebuild and a
+new gameplay recording remain **not available in this sandbox**; those are the
+remaining user-side checks.
