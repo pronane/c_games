@@ -25,8 +25,19 @@ function say(msg) {
   process.stdout.write(`${msg}\n`);
 }
 
+const BASE_PYTHON = process.platform === 'win32' ? 'python' : 'python3';
+
 function run(cmd, args, opts = {}) {
-  const res = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
+  // shell:true lets Windows resolve .cmd/.exe shims (e.g. python from the Store).
+  const res = spawnSync(cmd, args, {
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+    ...opts,
+  });
+  if (res.error) {
+    say(`Could not launch \`${cmd}\`: ${res.error.message}`);
+    return false;
+  }
   return res.status === 0;
 }
 
@@ -34,10 +45,10 @@ say('Aussie Rules 3D — 3D asset pipeline (Blender / bpy)');
 say('===================================================');
 
 // 1. python
-const python = existsSync(VENV_PY) ? VENV_PY : 'python3';
+const python = existsSync(VENV_PY) ? VENV_PY : BASE_PYTHON;
 if (!existsSync(VENV_PY)) {
   say('→ creating a private Python environment in tools/blender/.venv');
-  if (!run('python3', ['-m', 'venv', VENV], { cwd: BLENDER_DIR })) {
+  if (!run(BASE_PYTHON, ['-m', 'venv', VENV], { cwd: BLENDER_DIR })) {
     say('Could not create the Python venv — install Python 3.10+ and re-run.');
     process.exit(1);
   }

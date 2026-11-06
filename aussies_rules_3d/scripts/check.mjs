@@ -27,7 +27,17 @@ function check(name, fn) {
 }
 
 function run(cmd, args) {
-  return spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8' });
+  // On Windows, npx is a .cmd shim that cannot be spawned directly
+  // (Node refuses to launch it without a shell), so go through the shell.
+  const res = spawnSync(cmd, args, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
+  if (res.error) {
+    return { status: null, stdout: '', stderr: String(res.error) };
+  }
+  return res;
 }
 
 console.log('Aussie Rules 3D — verification');

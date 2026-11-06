@@ -23,8 +23,23 @@ function say(msg) {
 }
 
 function run(cmd, cmdArgs, opts = {}) {
-  const res = spawnSync(cmd, cmdArgs, { stdio: 'inherit', cwd: ROOT, ...opts });
-  return res.status === 0;
+  // On Windows, npm/npx are .cmd shims that cannot be spawned directly
+  // (Node refuses to launch them without a shell), so go through the shell.
+  const res = spawnSync(cmd, cmdArgs, {
+    stdio: 'inherit',
+    cwd: ROOT,
+    shell: process.platform === 'win32',
+    ...opts,
+  });
+  if (res.error) {
+    say(`✖ could not launch \`${cmd}\`: ${res.error.message}`);
+    return false;
+  }
+  if (res.status !== 0) {
+    say(`✖ \`${cmd}\` exited with code ${res.status ?? 'unknown'}.`);
+    return false;
+  }
+  return true;
 }
 
 say('Aussie Rules 3D — installer');
@@ -48,7 +63,11 @@ if (CHECK_ONLY) {
 } else {
   say('→ installing npm dependencies (three, vite, vitest, typescript)…');
   if (!run('npm', ['install', '--no-audit', '--no-fund'])) {
-    say('npm install failed — check your network connection and try again.');
+    say('');
+    say('npm install failed. The npm output above shows the actual error.');
+    say('Common causes: no access to registry.npmjs.org (proxy/VPN/firewall),');
+    say('a corporate registry that is down, or corrupted npm cache (try: npm cache verify).');
+    say('Then run this installer again.');
     process.exit(1);
   }
   say('✓ dependencies installed');

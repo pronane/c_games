@@ -21,8 +21,15 @@ const PORT = Number(
   portArg >= 0 ? args[portArg + 1] : process.env.PORT || 8080
 );
 
+const IS_WIN = process.platform === 'win32';
+// On Windows, npm/npx are .cmd shims that cannot be spawned directly
+// (Node refuses to launch them without a shell), so go through the shell.
 function run(cmd, cmdArgs) {
-  const res = spawnSync(cmd, cmdArgs, { stdio: 'inherit', cwd: ROOT });
+  const res = spawnSync(cmd, cmdArgs, { stdio: 'inherit', cwd: ROOT, shell: IS_WIN });
+  if (res.error) {
+    console.error(`Could not launch \`${cmd}\`: ${res.error.message}`);
+    process.exit(1);
+  }
   if (res.status !== 0) process.exit(res.status ?? 1);
 }
 
@@ -30,11 +37,16 @@ if (DEV) {
   const child = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(PORT)], {
     stdio: 'inherit',
     cwd: ROOT,
+    shell: IS_WIN,
+  });
+  child.on('error', (err) => {
+    console.error(`Could not launch vite: ${err.message}`);
+    process.exit(1);
   });
   child.on('exit', (code) => process.exit(code ?? 0));
 } else {
   if (!existsSync(path.join(ROOT, 'node_modules', 'three'))) {
-    console.log('Dependencies are missing — running ./install.sh logic first…');
+    console.log('Dependencies are missing — running the installer first…');
     run(process.execPath, [path.join(ROOT, 'scripts', 'install.mjs')]);
   }
   console.log('Building Aussie Rules 3D…');
@@ -87,10 +99,15 @@ if (DEV) {
     console.log('     (open it in any browser — desktop, phone, tablet, TV)');
     console.log('');
     if (!NO_OPEN) {
-      const opener =
-        process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+      // 'start' is a cmd.exe builtin, not an executable — it must go through the shell.
+      const [opener, openerArgs] =
+        process.platform === 'darwin'
+          ? ['open', [url]]
+          : process.platform === 'win32'
+            ? ['cmd.exe', ['/c', 'start', '', url]]
+            : ['xdg-open', [url]];
       try {
-        spawn(opener, [url], { stdio: 'ignore', detached: true }).on('error', () => {});
+        spawn(opener, openerArgs, { stdio: 'ignore', detached: true, shell: false }).on('error', () => {});
       } catch {
         /* ignore */
       }
