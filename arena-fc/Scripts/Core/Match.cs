@@ -474,15 +474,15 @@ public sealed partial class MatchEngine
             // auto-run toward goal / formation, BUT when the opposition has the ball
             // the selected defender still shadows the carrier so the game keeps its
             // defensive pressure instead of leaving one player frozen.
-            bool oppOwns = ball.Owner >= 0 && ball.Owner < S.Players.Length
-                           && S.Players[ball.Owner].Team != p.Team;
+            bool humanDefending = ball.Owner >= 0 && ball.Owner < S.Players.Length
+                                  && S.Players[ball.Owner].Team != p.Team;
             if (cmd.Move.LengthSquared() > .01f)
             {
                 p.Target = p.Pos + new Vector3(cmd.Move.X, 0, cmd.Move.Y) * 3f;
-                p.Pressing = oppOwns;
+                p.Pressing = humanDefending;
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
-            else if (oppOwns && S.ControlLock <= 0f)
+            else if (humanDefending && S.ControlLock <= 0f)
             {
                 var carrier = S.Players[ball.Owner];
                 p.Target = carrier.Pos + Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team)) * 1.1f;
