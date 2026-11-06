@@ -1,0 +1,5 @@
+# Blender (as a Python module) — the modelling, rigging and animation toolchain
+# used to generate the game's 3D assets (players, ball, stadium).
+# Install inside tools/blender/.venv and run build_assets.py.
+bpy==4.5.15
+numpy>=1.26

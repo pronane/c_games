@@ -1,0 +1,13 @@
+# dependencies & build output
+node_modules/
+dist/
+
+# Blender pipeline (private venv + generated stubs)
+tools/blender/.venv/
+tools/blender/stubs/
+tools/blender/**/__pycache__/
+
+# logs & OS noise
+*.log
+.DS_Store
+npm-debug.log*
