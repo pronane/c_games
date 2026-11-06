@@ -386,8 +386,9 @@ def main() -> int:
     browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
     check("human one-shot actions are consumed every fixed tick",
           "private void HumanActions" in match_core and "if (human) HumanActions(p, pc);" in match_core)
-    check("released stick no longer auto-runs the human",
-          "p.Target = p.Pos;" in match_core and "Human movement is driven entirely" in match_core)
+    check("released stick only auto-presses while defending",
+          "p.Target = p.Pos;" in match_core and "Active stick input always wins" in match_core
+          and "oppOwns && S.ControlLock <= 0f" in match_core)
     check("short pass, long ball, dribble and stronger sprint exist",
           "FindBestPassTarget(p, true, true)" in match_core and "bool Dribble" in match_core
           and "1.42f" in match_core and "owner.Dribbling" in match_core)
