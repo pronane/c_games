@@ -587,15 +587,30 @@ Check("raw EasySMX b1 is TACKLE", PadLayout.Held(rb, noAxes, raw, false)["tackle
 rb = new bool[21]; rb[4] = true;
 Check("raw EasySMX b4 switches player", PadLayout.Held(rb, noAxes, raw, false)["switch"]);
 rb = new bool[21]; rb[6] = true;
-Check("raw LT button also sprints", PadLayout.Held(rb, noAxes, raw, false)["sprint"]);
+Check("raw LT button is close-control DRIBBLE",
+      PadLayout.Held(rb, noAxes, raw, false)["dribble"] && !PadLayout.Held(rb, noAxes, raw, false)["sprint"]);
+rb = new bool[21]; rb[7] = true;
+Check("raw RT button sprints", PadLayout.Held(rb, noAxes, raw, false)["sprint"]);
+rb = new bool[21]; rb[8] = true;
+Check("raw Back (b8) is LONG BALL", PadLayout.Held(rb, noAxes, raw, false)["lob"]);
+rb = new bool[21]; rb[10] = true;
+Check("raw L3 (b10) is DRIBBLE", PadLayout.Held(rb, noAxes, raw, false)["dribble"]);
+rb = new bool[21]; rb[11] = true;
+Check("raw R3 (b11) changes camera", PadLayout.Held(rb, noAxes, raw, false)["camera"]);
 rb = new bool[21]; rb[9] = true;
 Check("raw Start (b9) pauses", PadLayout.Held(rb, noAxes, raw, false)["pause"]);
 rb = new bool[21]; rb[0] = true;
 Check("standard A is PASS", PadLayout.Held(rb, noAxes, std, true)["pass"]);
 rb = new bool[21]; rb[6] = true;
 Check("standard Start (b6) pauses", PadLayout.Held(rb, noAxes, std, true)["pause"]);
+rb = new bool[21]; rb[4] = true;
+Check("standard Back is LONG BALL", PadLayout.Held(rb, noAxes, std, true)["lob"]);
+rb = new bool[21]; rb[7] = true;
+Check("standard L3 is DRIBBLE", PadLayout.Held(rb, noAxes, std, true)["dribble"]);
 var trig = new float[10]; trig[4] = 1f;
-Check("analogue trigger sprints on a mapped pad", PadLayout.Held(noButtons, trig, std, true)["sprint"]);
+Check("analogue LT is DRIBBLE on a mapped pad", PadLayout.Held(noButtons, trig, std, true)["dribble"]);
+var trigRt = new float[10]; trigRt[5] = 1f;
+Check("analogue RT sprints on a mapped pad", PadLayout.Held(noButtons, trigRt, std, true)["sprint"]);
 
 rb = new bool[21]; rb[12] = true;
 var dpadUp = PadLayout.Move(rb, noAxes, false);
