@@ -470,17 +470,29 @@ public sealed partial class MatchEngine
 
         if (human)
         {
-            // Human movement is driven entirely by the stick in MovePlayer.  The old
-            // AI positional block below kept auto-running the human toward goal or
-            // formation whenever the stick was released, which felt uncontrolled.
+            // Active stick input always wins.  With the stick released we no longer
+            // auto-run toward goal / formation, BUT when the opposition has the ball
+            // the selected defender still shadows the carrier so the game keeps its
+            // defensive pressure instead of leaving one player frozen.
+            bool oppOwns = ball.Owner >= 0 && ball.Owner < S.Players.Length
+                           && S.Players[ball.Owner].Team != p.Team;
             if (cmd.Move.LengthSquared() > .01f)
             {
                 p.Target = p.Pos + new Vector3(cmd.Move.X, 0, cmd.Move.Y) * 3f;
+                p.Pressing = oppOwns;
+                if (p.ActionTimer <= 0f) p.Action = "run";
+            }
+            else if (oppOwns && S.ControlLock <= 0f)
+            {
+                var carrier = S.Players[ball.Owner];
+                p.Target = carrier.Pos + Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team)) * 1.1f;
+                p.Pressing = true;
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
             else
             {
                 p.Target = p.Pos;
+                p.Pressing = false;
                 if (p.ActionTimer <= 0f) p.Action = "idle";
             }
             return;
@@ -582,8 +594,8 @@ public sealed partial class MatchEngine
             {
                 var carrier = S.Players[ball.Owner];
                 float d = Mx.FlatDist(p.Pos, carrier.Pos);
-                float aggression = .30f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
-                if (p.Team != carrier.Team && d < 2.0f && p.TackleLock <= 0 && Rng.Next() < aggression)
+                float aggression = .38f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
+                if (p.Team != carrier.Team && d < 2.2f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
             }
         }
@@ -757,7 +769,7 @@ public sealed partial class MatchEngine
             Add(EventKind.Tackle, $"{p.Spec.DisplayName} wins the ball!");
         }
         else if (Options.Fouls && d < (slide ? 2.6f : 1.7f)
-                 && Rng.Next() < (slide ? .30f : .12f))
+                 && Rng.Next() < (slide ? .26f : .10f))
         {
             // Only a genuinely close, failed challenge can be a foul now: previously
             // every miss at 2 m had an ~18% chance of a free kick that looked like

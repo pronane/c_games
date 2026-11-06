@@ -47,7 +47,7 @@ Two independent causes, both fixed:
 
 ## 3. "Opposition keeps giving away frees that don't look like fouls"
 
-* Failed tackles only become fouls within 1.7 m (2.6 m for a slide) at **12% / 30%**, instead of
+* Failed tackles only become fouls within 1.7 m (2.6 m for a slide) at **10% / 26% (after the 06.11.2026 pressing rebalance)**, instead of
   every miss within 2 m at ~18%. Deterministic 60 s sim: **4 invisible free kicks → 1**.
 * The fouled player now visibly stumbles (`foul` pose with chest/hip/leg/arm fall over 1.1 s), the
   slider has a low `slide` pose, and the HUD shows `FOUL · FREE KICK` / `FOUL · PENALTY!` toasts.

@@ -292,12 +292,13 @@ for (int m = 0; m < BroadcastPlan.ModeCount; m++)
 Check("all camera modes stay inside the stadium bowl with sane FOV", bounded);
 
 Section("Smoother gait");
-var rolled = Gait.Compute(6f, 0f, 0f);
+var hipPose = Gait.Compute(6f, MathF.PI * .5f, 0f);
+var footPose = Gait.Compute(6f, 0f, 0f);
 var mixed = Gait.Lerp(Gait.Compute(0f, 0f, 0f), Gait.Compute(6f, 1f, 0f), .5f);
 var dribblePose = Gait.Compute(1f, 1f, 0f, false, true);
 Check("gait adds out-of-plane hip and foot rotation",
-      MathF.Abs(rolled.HipYawL) > 0f && MathF.Abs(rolled.FootRollL) > .05f,
-      $"hipYaw={rolled.HipYawL:F3} footRoll={rolled.FootRollL:F3}");
+      MathF.Abs(hipPose.HipYawL) > 0f && MathF.Abs(footPose.FootRollL) > .05f,
+      $"hipYaw={hipPose.HipYawL:F3} footRoll={footPose.FootRollL:F3}");
 Check("gait poses can be eased instead of snapping",
       MathF.Abs(mixed.HipL) > 0f && MathF.Abs(mixed.KneeL) > 0f);
 Check("dribble lean and stride are stronger than a plain walk",
