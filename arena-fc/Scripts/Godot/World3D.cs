@@ -284,7 +284,7 @@ public static class RigAnimator
         GaitPose g = raw;
 
         float ActionEnvelope(float total) =>
-            MathF.Sin(MathF.Clamp(1f - p.ActionTimer / total, 0f, 1f) * MathF.PI);
+            MathF.Sin(Math.Clamp(1f - p.ActionTimer / total, 0f, 1f) * MathF.PI);
 
         Set(rig, "Hips", g.Lean * .25f, g.HipYawL * .5f, g.Roll + g.TurnLean);
         Set(rig, "Spine", g.Lean * .35f, -g.Twist * .6f + g.ShoulderYaw * .3f, -g.Roll * .5f);
