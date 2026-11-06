@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="92" fill="#0b1420"/>
+  <ellipse cx="256" cy="270" rx="196" ry="128" fill="#2e7d32"/>
+  <ellipse cx="256" cy="270" rx="196" ry="128" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="8"/>
+  <line x1="256" y1="142" x2="256" y2="398" stroke="#ffffff" stroke-opacity="0.35" stroke-width="6"/>
+  <rect x="206" y="106" width="16" height="120" rx="8" fill="#f4f4f4"/>
+  <rect x="290" y="106" width="16" height="120" rx="8" fill="#f4f4f4"/>
+  <rect x="146" y="132" width="12" height="94" rx="6" fill="#e8e8e8" opacity="0.9"/>
+  <rect x="354" y="132" width="12" height="94" rx="6" fill="#e8e8e8" opacity="0.9"/>
+  <ellipse cx="256" cy="252" rx="74" ry="42" fill="#7a2b18"/>
+  <ellipse cx="256" cy="252" rx="74" ry="42" fill="none" stroke="#d8b9a0" stroke-width="5"/>
+  <rect x="230" y="236" width="52" height="9" rx="4.5" fill="#e8d8c4"/>
+  <text x="256" y="470" font-family="system-ui, sans-serif" font-size="52" font-weight="800" fill="#ffd23f" text-anchor="middle" letter-spacing="4">AUS RULES 3D</text>
+</svg>

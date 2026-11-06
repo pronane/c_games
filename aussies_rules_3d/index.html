@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1420" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Aussie Rules 3D — a full 3D Australian rules football game that plays on any device in the browser. AFL 2026 laws, rigged players, a Melbourne arena, keyboard, gamepad and touch." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <title>Aussie Rules 3D</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <!-- ============================ HUD ============================ -->
+    <div id="hud" class="hidden">
+      <div id="scorebar">
+        <div class="team home">
+          <span class="tname" id="homeName">MELBOURNE</span>
+          <span class="tscore" id="homeScore">0.0 (0)</span>
+        </div>
+        <div class="matchclock">
+          <div id="quarter">Q1</div>
+          <div id="clock">20:00</div>
+          <div id="timeon" title="Time on"></div>
+        </div>
+        <div class="team away">
+          <span class="tname" id="awayName">COLLINGWOOD</span>
+          <span class="tscore" id="awayScore">0.0 (0)</span>
+        </div>
+      </div>
+
+      <div id="callout"></div>
+      <div id="subcallout"></div>
+
+      <div id="playerTag">
+        <span id="playerNum">#1</span>
+        <span id="playerName">Player</span>
+        <div id="charge"><div id="chargeFill"></div></div>
+      </div>
+
+      <canvas id="radar" width="220" height="170"></canvas>
+
+      <div id="hint"></div>
+    </div>
+
+    <!-- ========================== TOUCH ============================ -->
+    <div id="touch-ui" class="hidden">
+      <div id="stick-zone">
+        <div id="stick-base"><div id="stick-knob"></div></div>
+      </div>
+    </div>
+
+    <!-- ========================== SCREENS ========================== -->
+    <div id="screen-title" class="screen">
+      <div class="panel">
+        <h1>AUSSIE RULES <span>3D</span></h1>
+        <p class="tagline">Real footy. Real 3D. Any device.</p>
+        <div class="menu-buttons">
+          <button id="btn-play" class="primary">▶ &nbsp;Play Match</button>
+          <button id="btn-controls">🎮 &nbsp;Controls</button>
+          <button id="btn-settings">⚙ &nbsp;Match Settings</button>
+        </div>
+        <p class="fineprint">
+          AFL 2026 laws · 18-a-side · Melbourne arena · Keyboard / Gamepad / Touch
+        </p>
+      </div>
+    </div>
+
+    <div id="screen-settings" class="screen hidden">
+      <div class="panel">
+        <h2>Match Settings</h2>
+        <label>Home team
+          <select id="sel-home"></select>
+        </label>
+        <label>Away team
+          <select id="sel-away"></select>
+        </label>
+        <label>Difficulty
+          <select id="sel-difficulty">
+            <option value="rookie">Rookie</option>
+            <option value="club">Club</option>
+            <option value="afl" selected>AFL</option>
+          </select>
+        </label>
+        <label>Quarter length
+          <select id="sel-quarters">
+            <option value="180">Quick — 3 min quarters</option>
+            <option value="300" selected>Standard — 5 min quarters</option>
+            <option value="1200">AFL — 20 min quarters</option>
+          </select>
+        </label>
+        <label class="row"><input type="checkbox" id="chk-sound" checked /> Sound</label>
+        <div class="menu-buttons">
+          <button id="btn-settings-back" class="primary">Back</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-controls" class="screen hidden">
+      <div class="panel wide">
+        <h2>Controls</h2>
+        <div class="controls-grid">
+          <div>
+            <h3>Keyboard</h3>
+            <ul>
+              <li><b>WASD / Arrows</b> — move</li>
+              <li><b>Space</b> (hold) — kick / set shot</li>
+              <li><b>E</b> — handball</li>
+              <li><b>F</b> — tackle / contest</li>
+              <li><b>Shift</b> — sprint</li>
+              <li><b>Q / Tab</b> — switch player</li>
+              <li><b>B</b> — bounce</li>
+              <li><b>Esc</b> — pause</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Gamepad</h3>
+            <ul>
+              <li><b>Left stick / D-pad</b> — move</li>
+              <li><b>A / Cross</b> — kick (hold to charge)</li>
+              <li><b>B / Circle</b> — handball</li>
+              <li><b>X / Square</b> — tackle</li>
+              <li><b>Y / Triangle</b> — switch</li>
+              <li><b>RT / RB</b> — sprint</li>
+              <li><b>LB</b> — bounce</li>
+              <li><b>Start</b> — pause</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Touch</h3>
+            <ul>
+              <li><b>Left side</b> — virtual stick</li>
+              <li><b>KICK</b> — hold &amp; release</li>
+              <li><b>HAND</b> — handball</li>
+              <li><b>TACKLE</b> — contest</li>
+              <li><b>SPRINT</b> — sprint</li>
+              <li><b>SWITCH</b> — switch player</li>
+            </ul>
+          </div>
+        </div>
+        <div class="menu-buttons">
+          <button id="btn-controls-back" class="primary">Back</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-pause" class="screen hidden">
+      <div class="panel">
+        <h2>Paused</h2>
+        <div class="menu-buttons">
+          <button id="btn-resume" class="primary">▶ Resume</button>
+          <button id="btn-pause-controls">🎮 Controls</button>
+          <button id="btn-quit">⏏ Quit to Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-end" class="screen hidden">
+      <div class="panel">
+        <h2 id="end-title">Full Time</h2>
+        <div id="end-score"></div>
+        <div id="end-stats"></div>
+        <div class="menu-buttons">
+          <button id="btn-rematch" class="primary">↻ Rematch</button>
+          <button id="btn-end-menu">Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-loading" class="screen">
+      <div class="panel">
+        <h2>AUSSIE RULES <span>3D</span></h2>
+        <div id="loadbar"><div id="loadfill"></div></div>
+        <p id="loadtext">Loading the arena…</p>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
