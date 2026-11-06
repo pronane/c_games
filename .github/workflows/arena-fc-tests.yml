@@ -38,10 +38,22 @@ jobs:
         run: dotnet build Server/ArenaFC.Server.csproj -c Release -v:q
       - name: Full C# core + protocol + rollback + online-client suite
         working-directory: arena-fc
-        run: dotnet run --project Tests/CoreTests.csproj -c Release
+        run: |
+          set -o pipefail
+          dotnet run --project Tests/CoreTests.csproj -c Release 2>&1 | tee coretests.log
       - name: Pure-C# match core regression tests
         working-directory: arena-fc
-        run: dotnet run --project Tests/MatchCoreTests.csproj -c Release
+        run: |
+          set -o pipefail
+          dotnet run --project Tests/MatchCoreTests.csproj -c Release 2>&1 | tee matchcoretests.log
+      - name: Upload .NET test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-dotnet-test-logs
+          path: |
+            arena-fc/coretests.log
+            arena-fc/matchcoretests.log
       - name: Portable pad / gameplay static checks
         working-directory: arena-fc
         run: python3 Tools/test_pads.py
