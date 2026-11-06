@@ -54,6 +54,16 @@ jobs:
           path: |
             arena-fc/coretests.log
             arena-fc/matchcoretests.log
+      - name: Surface failed .NET tests as annotations
+        if: always()
+        working-directory: arena-fc
+        run: |
+          for f in coretests.log matchcoretests.log; do
+            [ -f "$f" ] || continue
+            grep -E '^  FAIL' "$f" | while IFS= read -r line; do
+              echo "::error file=$f::$line"
+            done || true
+          done
       - name: Portable pad / gameplay static checks
         working-directory: arena-fc
         run: python3 Tools/test_pads.py
