@@ -31,7 +31,10 @@ can play on the same device (keyboard + gamepad, or two gamepads).
 | **LB / L1** | Bounce |
 | **RB / R1** or **RT / R2** | Sprint |
 | **Start / Options** | Pause |
-| **Back / Select** | Quit to menu (in pause) |
+| **Back / Select** | Menu navigation: back (in a menu, quits to menu from pause) |
+| **Left stick (Y)** / **D-pad** (in menus) | Move focus between buttons |
+| **A / Cross** (in menus) | Select the focused menu button |
+| **B / Circle** (in menus) | Back to the previous screen |
 
 Rumble is supported on controllers that expose the standard vibration actuator
 (tackles, goals). Any browser-standard gamepad works — no setup needed.

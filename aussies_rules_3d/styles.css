@@ -467,3 +467,24 @@ select {
     display: none;
   }
 }
+
+/* gamepad focus ring for menus (A = activate, B = back) */
+.screen button.focused {
+  outline: 3px solid #ffd23f;
+  outline-offset: 2px;
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+}
+.screen button.primary.focused {
+  background: linear-gradient(135deg, #ffae45, #ff7d2e);
+}
+
+.pad-status {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  opacity: 0.85;
+}
+.pad-status.ok {
+  color: #7de08a;
+}

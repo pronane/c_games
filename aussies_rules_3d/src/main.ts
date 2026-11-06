@@ -77,6 +77,11 @@ class Game {
   private menuAngle = 0;
   private touchButtons = new Map<string, HTMLElement>();
   private playerGltf: Awaited<ReturnType<GLTFLoader['loadAsync']>> | null = null;
+  private menuFocusIndex = 0;
+  private menuFocusedScreen = '';
+  private menuNavDir = 0;
+  private menuConfirmDown = false;
+  private menuBackDown = false;
 
   async boot(): Promise<void> {
     this.menus.setLoading(0.1, 'Building the Melbourne arena…');
@@ -106,6 +111,13 @@ class Game {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => undefined);
     }
+
+    // Live gamepad status in the Controls screen
+    const refreshPadStatus = () => this.updateGamepadStatus();
+    window.addEventListener('gamepadconnected', refreshPadStatus);
+    window.addEventListener('gamepaddisconnected', refreshPadStatus);
+    window.setInterval(refreshPadStatus, 1500);
+    refreshPadStatus();
 
     this.lastTime = performance.now();
     requestAnimationFrame((t) => this.frame(t));
@@ -184,6 +196,87 @@ class Game {
     this.redrawScoreboards();
   }
 
+  // ------------------------------------------------------- gamepad in menus
+
+  /** A line in the Controls screen showing whether a pad is seen (Windows often needs one button press first). */
+  private updateGamepadStatus(): void {
+    const el = document.getElementById('gamepad-status');
+    if (!el) return;
+    const pads = this.input.connectedPads();
+    if (pads.length > 0) {
+      el.textContent = `● Controller detected: ${pads[0].id}`;
+      el.classList.add('ok');
+    } else {
+      el.textContent = 'No controller detected — press any button on your gamepad, then re-open this screen';
+      el.classList.remove('ok');
+    }
+  }
+
+  private menuButtons(screen: HTMLElement): HTMLButtonElement[] {
+    return Array.from(screen.querySelectorAll('button')).filter((b) => !b.disabled);
+  }
+
+  /** Activate the focused menu button, or A=select / B=back / Start=resume semantics for gamepads. */
+  private updateMenuInput(frame: InputFrame): void {
+    const cur = this.menus.current;
+    if (cur === 'loading') return;
+    const screen = document.getElementById(`screen-${cur}`);
+    if (!screen || screen.classList.contains('hidden')) return;
+
+    if (this.menuFocusedScreen !== cur) {
+      this.menuFocusedScreen = cur;
+      this.menuNavDir = 0;
+      // drop focus rings left behind on previously-shown screens
+      document.querySelectorAll('.screen button.focused').forEach((el) => el.classList.remove('focused'));
+      const buttons = this.menuButtons(screen);
+      const primary = buttons.findIndex((b) => b.classList.contains('primary'));
+      this.menuFocusIndex = primary >= 0 ? primary : 0;
+    }
+
+    const buttons = this.menuButtons(screen);
+    if (buttons.length === 0) return;
+    this.menuFocusIndex = Math.min(this.menuFocusIndex, buttons.length - 1);
+
+    // vertical navigation (arrows / W,S / d-pad / left stick), edge-triggered
+    const nav = Math.abs(frame.moveZ) > 0.5 ? Math.sign(frame.moveZ) : 0;
+    if (nav !== 0 && this.menuNavDir === 0) {
+      this.menuFocusIndex = (this.menuFocusIndex + nav + buttons.length) % buttons.length;
+    }
+    this.menuNavDir = nav;
+
+    for (let i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle('focused', i === this.menuFocusIndex);
+    }
+
+    // A / Cross is the 'kick' action and B / Circle is 'handball' — inside a
+    // menu they mean select / back instead. Both rising edges (plus Enter and
+    // Back/Select) activate accordingly.
+    const confirmNow = frame.confirm || frame.kickHeld;
+    const confirmEdge = confirmNow && !this.menuConfirmDown;
+    this.menuConfirmDown = confirmNow;
+    const backNow = frame.back || frame.handball;
+    const backEdge = backNow && !this.menuBackDown;
+    this.menuBackDown = backNow;
+
+    if (confirmEdge) {
+      buttons[this.menuFocusIndex]?.click();
+      return;
+    }
+    if (frame.pause && cur === 'pause') {
+      this.resume();
+      return;
+    }
+    if (backEdge) {
+      const back =
+        cur === 'settings' ? 'btn-settings-back'
+        : cur === 'controls' ? 'btn-controls-back'
+        : cur === 'pause' ? 'btn-quit'
+        : cur === 'end' ? 'btn-end-menu'
+        : null;
+      if (back) document.getElementById(back)?.click();
+    }
+  }
+
   pause(): void {
     if (this.phase !== 'playing') return;
     this.phase = 'paused';
@@ -215,7 +308,11 @@ class Game {
 
     if (this.phase === 'playing' && this.sim) {
       this.stepMatch(dt);
-    } else if (this.phase === 'menu') {
+    } else {
+      // menu-like phase: controller/keyboard navigation for the visible screen
+      this.updateMenuInput(this.input.poll(0));
+    }
+    if (this.phase === 'menu') {
       this.menuAngle += dt * 0.06;
       const r = 130;
       this.world.camera.position.set(

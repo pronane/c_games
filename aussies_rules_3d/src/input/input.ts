@@ -33,6 +33,7 @@ export class InputManager {
   private touchKickHeld = false;
   private padButtonsPrev: boolean[][] = [[], []];
   private padKickHeld: boolean[] = [false, false];
+  private warnedNonStandard = new Set<string>();
   isTouchDevice = false;
   /** Slot 0 = keyboard/gamepad0/touch; slot 1 = gamepad 1. */
   slots = 2;
@@ -177,8 +178,17 @@ export class InputManager {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads
       ? navigator.getGamepads()
       : [];
+    // Pick the Nth *connected* pad. The raw getGamepads() array routinely has
+    // holes / null entries (e.g. phantom slots on Windows), so indexing it by
+    // slot directly can pick nothing even with a controller attached.
+    const connected = Array.from(pads).filter((p): p is Gamepad => !!p && p.connected);
     const padIndex = slot;
-    const pad = pads[padIndex];
+    const pad = connected[slot];
+    if (pad && pad.mapping && pad.mapping !== 'standard' && !this.warnedNonStandard.has(pad.id)) {
+      this.warnedNonStandard.add(pad.id);
+      // eslint-disable-next-line no-console
+      console.warn(`[input] gamepad "${pad.id}" reports mapping="${pad.mapping}" — button indices may not match the standard layout`);
+    }
     if (pad && pad.connected) {
       const stick = applyDeadZone(pad.axes[GAMEPAD_AXES.moveX] ?? 0, pad.axes[GAMEPAD_AXES.moveY] ?? 0);
       frame.moveX += stick.x;
