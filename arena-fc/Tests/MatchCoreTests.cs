@@ -10,6 +10,7 @@
 //
 // Run: dotnet run --project Tests/MatchCoreTests.csproj -c Release
 using System.Numerics;
+using System.Reflection;
 using ArenaFC.Core;
 
 int passed = 0, failed = 0;
@@ -303,6 +304,65 @@ Check("gait poses can be eased instead of snapping",
       MathF.Abs(mixed.HipL) > 0f && MathF.Abs(mixed.KneeL) > 0f);
 Check("dribble lean and stride are stronger than a plain walk",
       dribblePose.TurnLean > 0f && dribblePose.Stride > Gait.Compute(1f, 1f, 0f).Stride);
+
+Section("06.11.2026 second pass: safe passes, close control and camera dead zone");
+var passPlan = Playable();
+var passer = passPlan.State.Players[0];
+MethodInfo? bestPass = typeof(MatchEngine).GetMethod("FindBestPassTarget",
+    BindingFlags.Instance | BindingFlags.NonPublic);
+Check("pass-target helper is available to the regression suite", bestPass != null);
+if (bestPass != null)
+{
+    int shortIdx = (int)bestPass.Invoke(passPlan, new object[] { passer, false, false })!;
+    int longIdx = (int)bestPass.Invoke(passPlan, new object[] { passer, true, true })!;
+    float shortD = shortIdx >= 0 ? Mx.FlatDist(passer.Pos, passPlan.State.Players[shortIdx].Pos) : 999f;
+    float longD = longIdx >= 0 ? Mx.FlatDist(passer.Pos, passPlan.State.Players[longIdx].Pos) : 0f;
+    Check("short pass prefers a nearer safe receiver than the long ball",
+          shortIdx >= 0 && longIdx >= 0 && shortD < longD,
+          $"short={shortD:F1} long={longD:F1}");
+}
+var autoDribble = Playable();
+autoDribble.Step(1f / 60f, new PlayerCommand { Move = new Vector2(.2f, 0f) });
+Check("a gently moved stick enters close control automatically",
+      autoDribble.State.Players[0].Dribbling && autoDribble.State.Players[0].Shielding,
+      $"dribble={autoDribble.State.Players[0].Dribbling}");
+
+var focus0 = BroadcastPlan.Focus(ballPos, playerPos);
+var jitter = BroadcastPlan.Focus(ballPos + new Vector3(1f, 0f, 0f), playerPos);
+var focus1 = BroadcastPlan.AdvanceFocus(focus0, jitter, 1f / 60f, 0);
+Check("small ball jitter does not drag the camera", (focus1 - focus0).Length() < 1e-4f,
+      $"delta={(focus1 - focus0).Length():F5}");
+var breakaway = BroadcastPlan.Focus(ballPos + new Vector3(30f, 0f, 0f), playerPos);
+var focus2 = BroadcastPlan.AdvanceFocus(focus0, breakaway, .5f, 0);
+Check("a breakaway eases the camera but keeps a framing margin",
+      (focus2 - focus0).Length() > 1f
+      && (breakaway - focus2).Length() > BroadcastPlan.FocusDeadzone(0) - .1f,
+      $"moved={(focus2 - focus0).Length():F2} margin={(breakaway - focus2).Length():F2}");
+bool fixedModes = true;
+foreach (int mode in new[] { 0, 1, 3, 4 })
+{
+    var a = BroadcastPlan.Compute(mode, ballPos, playerPos, new Vector3(1f, 0f, 0f));
+    var b = BroadcastPlan.Compute(mode, ballPos, playerPos, new Vector3(-1f, 0f, 0f));
+    if (a.Target != b.Target || a.Look != b.Look) fixedModes = false;
+}
+Check("broadcast / ball-follow / sideline / tactical ignore instant facing", fixedModes);
+var focusOverride = BroadcastPlan.Compute(0, ballPos, playerPos, new Vector3(1f, 0f, 0f), focus0);
+Check("renderer can supply its held focus point", focusOverride.Target == camA.Target
+      && focusOverride.Look == camA.Look);
+
+Section("06.11.2026 second pass: desynchronised, ball-aware animation");
+var phaseEngine = new MatchEngine(new MatchOptions { Seed = 5 });
+Check("match players do not all start on the same stride phase",
+      MathF.Abs(phaseEngine.State.Players[0].AnimPhase - phaseEngine.State.Players[1].AnimPhase) > .1f,
+      $"p0={phaseEngine.State.Players[0].AnimPhase:F2} p1={phaseEngine.State.Players[1].AnimPhase:F2}");
+Check("Gait.InitialPhase separates adjacent players",
+      MathF.Abs(Gait.InitialPhase(0) - Gait.InitialPhase(1)) > .1f);
+Check("player head turns toward the ball",
+      MathF.Abs(Gait.LookYaw(new Vector3(1f, 0f, 0f), new Vector3(0f, 0f, 1f))) > .2f);
+var lookPose = Gait.Compute(5f, 1f, 0f, false, false, .4f);
+var easedLook = Gait.Lerp(Gait.Compute(0f, 0f, 0f), lookPose, .5f);
+Check("head tracking survives pose easing", MathF.Abs(easedLook.HeadYaw) > .1f,
+      $"headYaw={easedLook.HeadYaw:F3}");
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

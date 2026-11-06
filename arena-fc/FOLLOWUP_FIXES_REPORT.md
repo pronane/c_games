@@ -157,3 +157,37 @@ shielding, and fluid player animation.
 See `GAMEPLAY_CAMERA_FIX_REPORT.md` for the final CI/test table. Physical EasySMX pad,
 Windows rebuild, native `.NET` server E2E and a new gameplay recording remain user-side
 checks; this sandbox has no native `dotnet`, `godot` or controller hardware.
+
+## 8. 06.11.2026 recordings — second pass after the remaining complaints
+
+The first camera/control round was merged into PR #53 and passed CI, but the follow-up said the
+camera still moved constantly, possession was unreadable, the EasySMX pad still only navigated
+menus, and short/long pass, dribble, sprint, kick, slide tackle and dispossession still felt absent.
+Both MP4s were decoded again: the current clip's viewpoint swings between centre-circle, goal-line
+and stand views while the target keeps a stable elevated broadcast shot with a clear carrier marker
+and close-control / shielding / passing demonstration.
+
+### What the second pass adds
+
+* **Event-latched pad buttons**: every joypad press is captured in `_Input()` and replayed to the
+  next `InputHub.Read()`; a tap shorter than one physics frame can no longer disappear.  Both
+  `PadMenuNavigator` (all menus) and `MatchView` (direct `--match` boots) feed the latch.
+* **Select/Back is no longer dead**: it activates on the main menu and still goes back in overlays;
+  any face button, START or SELECT activates; quick taps are latched.
+* **Dead-zone camera**: `BroadcastPlan.AdvanceFocus()` holds the shot until ball/player leave a
+  5.5 m inner frame, then eases; fixed per-mode height removes the continuous zoom/height pumping.
+* **Readable possession / pressure**: billboarded `YOU`, `BALL`, `OPP`, `LOOSE BALL` nameplates,
+  larger rings/arrows, nearest-opponent ring, larger minimap and a contextual top-centre HUD with
+  the exact buttons for the current phase.
+* **Reachable actions**: gentle stick automatically enters close control, short pass prefers a near
+  open receiver, long ball stays distant/lofted, and a human tackle/slide lunges into range while AI
+  pressers keep their spacing.
+* **Less wooden animation**: deterministic per-player stride phases, ball-aware head/chest yaw,
+  shield arm/lean pose and eased `HeadYaw`.
+
+### Verification
+
+`Tools/test_pads.py` with optional parsers: **130 passed, 0 failed**. `Tests/MatchCoreTests.cs`
+compiled and run in Roslyn/WASM: **42 passed, 0 failed**, including the new camera, pass, close
+control and gait assertions. CI results are attached to PR #53. Native Windows rebuild, physical
+EasySMX pad and a new gameplay recording remain user-side checks.

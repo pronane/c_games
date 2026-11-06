@@ -134,6 +134,7 @@ public sealed partial class MatchEngine
                     Spec = spec, Index = idx, Team = s, Slot = i,
                     Role = i == 0 ? Role.Goalkeeper : _slots[Math.Min(i, _slots.Length - 1)].role,
                     IsKeeper = i == 0, Stamina = 1f, Facing = new Vector3(s == 0 ? 1 : -1, 0, 0),
+                    AnimPhase = Gait.InitialPhase(idx),
                 };
                 if (i == 0) State.Players[idx].Spec.Role = Role.Goalkeeper;
             }
@@ -426,8 +427,15 @@ public sealed partial class MatchEngine
         var S = State;
         var ball = S.Ball;
         bool owner = ball.Owner == p.Index;
-        p.Shielding = owner && (cmd.Shield || cmd.Dribble) && p.Stamina > .12f;
-        p.Dribbling = owner && cmd.Dribble && p.Stamina > .08f;
+        // Close control must be reachable even if the pad's LT/L3 is awkward:
+        // a carrier moving the stick gently is automatically in close control,
+        // while an explicit dribble/shield button still forces it at any speed.
+        // This is the "safety / protect the ball" behaviour in the target clip.
+        float moveMag = MathF.Sqrt(cmd.Move.X * cmd.Move.X + cmd.Move.Y * cmd.Move.Y);
+        bool assistedCloseControl = owner && moveMag > .05f && moveMag < .60f && p.Stamina > .12f;
+        bool closeControl = cmd.Dribble || cmd.Shield || assistedCloseControl;
+        p.Shielding = owner && closeControl && p.Stamina > .12f;
+        p.Dribbling = owner && closeControl && p.Stamina > .08f;
         if (owner)
         {
             if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge)); return; }
@@ -481,6 +489,13 @@ public sealed partial class MatchEngine
                 p.Target = p.Pos + new Vector3(cmd.Move.X, 0, cmd.Move.Y) * 3f;
                 p.Pressing = humanDefending;
                 if (p.ActionTimer <= 0f) p.Action = "run";
+            }
+            else if (p.ActionTimer > 0f && (p.Action == "tackle" || p.Action == "slide"))
+            {
+                // A standing/slide challenge sets a short lunge target in
+                // AttemptTackle().  Do not immediately cancel it with an idle
+                // target: that made B / RB+B look like it did nothing.
+                p.Pressing = true;
             }
             else if (humanDefending && S.ControlLock <= 0f)
             {
@@ -655,7 +670,15 @@ public sealed partial class MatchEngine
             // A long pass wants a distant, advanced target; a short pass prefers
             // the safe nearby option instead of always hitting the furthest man.
             if (longPass) score += MathF.Min(d, 38f) * .16f + forward * .18f;
-            else if (d > 18f) score -= 4f;
+            else if (through) score += forward * .10f;
+            else
+            {
+                // A genuine SHORT pass keeps the ball with the nearest safe man.
+                // The old scoring still picked an advanced receiver 20+ m away,
+                // which made E / pad A feel like an uncontrolled long clearance.
+                if (d > 18f) score -= 4f + (d - 18f) * .60f;
+                else score += MathF.Max(0f, 12f - d) * .35f;
+            }
             if (Options.Offside && IsOffside(q, from)) score -= 30f;
             score += Rng.Range(-1.2f, 1.2f);
             if (score > bestScore) { bestScore = score; best = q.Index; }
@@ -745,19 +768,33 @@ public sealed partial class MatchEngine
         var carrier = State.Players[b.Owner];
         if (carrier.Team == p.Team) return;
         float d = Mx.FlatDist(p.Pos, carrier.Pos);
-        float reach = slide ? 3.8f : 2.9f;
+        float reach = slide ? 4.6f : 3.6f;
+        // A HUMAN challenge button should visibly close the last couple of
+        // metres.  AI already has three pressers, so lunging every AI tackle
+        // would drag the whole defence into the carrier and re-create the
+        // "players bunched together" scrum from the recording.
+        bool humanChallenge = p.Index == State.Controlled
+                              || (Options.AwayHuman && p.Index == State.ControlledAway);
+        if (humanChallenge && d > 2.2f && d < 5.2f)
+        {
+            Vector3 lungeDir = Mx.FlatDir(p.Pos, carrier.Pos);
+            p.Target = carrier.Pos - lungeDir * 1.5f;
+            p.Vel += lungeDir * 1.6f;
+            p.Pressing = true;
+        }
         if (d > reach) return;
 
         // "Use your power to get between the player and the ball": a defender on the
         // goal side / in front of the carrier wins the strength contest more often,
         // while a shielding carrier makes himself harder to dispossess.
         Vector3 f = Mx.Norm(Mx.Flat(carrier.Facing));
-        float between = Mx.Clamp(Vector3.Dot(Mx.Flat(p.Pos - carrier.Pos), f) / MathF.Max(.4f, d), -1f, 1f);
+        float contestD = MathF.Max(1f, d - 1.0f);
+        float between = Mx.Clamp(Vector3.Dot(Mx.Flat(p.Pos - carrier.Pos), f) / MathF.Max(.4f, contestD), -1f, 1f);
         float strength = (p.Spec.Bulk - 1f) * .35f + p.Spec.Defending * .22f;
         float shield = carrier.Shielding ? .22f + (carrier.Spec.Bulk - 1f) * .12f : 0f;
         float dribble = carrier.Dribbling ? .16f : 0f;
         float chance = .42f + p.Spec.Defending * .34f + strength + between * .20f - shield - dribble
-                       - carrier.Spec.Pace * .12f - (d - 1f) * .10f
+                       - carrier.Spec.Pace * .12f - (contestD - 1f) * .10f
                        + (slide ? .16f : 0f) + (powered ? .12f : 0f);
         chance = Mx.Clamp(chance, .08f, .88f);
         if (Rng.Next() < chance)
@@ -768,7 +805,7 @@ public sealed partial class MatchEngine
             b.Vel = Vector3.Zero;
             Add(EventKind.Tackle, $"{p.Spec.DisplayName} wins the ball!");
         }
-        else if (Options.Fouls && d < (slide ? 2.6f : 1.7f)
+        else if (Options.Fouls && contestD < (slide ? 2.6f : 1.7f)
                  && Rng.Next() < (slide ? .26f : .10f))
         {
             // Only a genuinely close, failed challenge can be a foul now: previously

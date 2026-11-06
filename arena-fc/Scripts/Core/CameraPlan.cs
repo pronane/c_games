@@ -3,10 +3,11 @@
 // The 06.11.2026 recording showed the old camera whipping around the pitch: the
 // player/shoulder modes were built from the player's INSTANT facing, so every
 // stick direction change spun the camera, and near a corner it ended up outside
-// the pitch looking at the stands.  This plan keeps a fixed sideline orientation
-// for the ball-following modes, smooths the one behind-the-player mode in
-// World3D.cs, and clamps the camera to the stadium bowl.  It is Godot-free so
-// the headless core suite can assert the framing never degenerates.
+// the pitch looking at the stands.  The first fix gave the ball-following modes a
+// fixed sideline orientation.  The SECOND pass removes the remaining continuous
+// drift: a dead-zone focus point only recentres after the ball/player leave the
+// inner frame, and camera height no longer breathes with ball-player separation.
+// The plan stays Godot-free so the headless core suite can assert the framing.
 using System;
 using System.Numerics;
 
@@ -37,13 +38,40 @@ public static class BroadcastPlan
             Mx.Clamp(v.Z, -Mx.HalfWidth - marginZ, Mx.HalfWidth + marginZ));
     }
 
+    /// <summary>Weighted midpoint of the ball and the controlled player.  The
+    /// renderer keeps this in a dead zone instead of chasing it every frame.</summary>
+    public static Vector3 Focus(Vector3 ball, Vector3 player)
+    {
+        Vector3 focus = Vector3.Lerp(new Vector3(ball.X, 0f, ball.Z),
+                                     new Vector3(player.X, 0f, player.Z), .45f);
+        return ClampPitch(focus, 4f, 4f);
+    }
+
+    public static float FocusDeadzone(int mode) => mode == 4 ? 14f : 5.5f;
+
+    /// <summary>Advance the held camera focus.  Small ball/player movement does not
+    /// move the camera at all; a breakaway eases toward the desired focus but keeps
+    /// it one dead-zone radius behind so the shot never snaps.</summary>
+    public static Vector3 AdvanceFocus(Vector3 previous, Vector3 desired, float dt, int mode)
+    {
+        float dead = FocusDeadzone(mode);
+        Vector3 delta = desired - previous;
+        float d = delta.Length();
+        if (d <= dead || d < 1e-5f) return previous;
+        Vector3 destination = previous + delta * ((d - dead) / d);
+        float rate = mode == 4 ? 1.1f : 1.8f;
+        float k = 1f - MathF.Exp(-dt * rate);
+        return Vector3.Lerp(previous, destination, k);
+    }
+
     /// <summary>Stable camera framing for one render frame.  `heading` is the
     /// SMOOTHED player direction supplied by BroadcastCamera, never the raw
     /// per-tick facing.  Ball and controlled player are both kept in view.</summary>
     public static CameraPlan Compute(int mode, Vector3 ball, Vector3 player, Vector3 heading)
+        => Compute(mode, ball, player, heading, Focus(ball, player));
+
+    public static CameraPlan Compute(int mode, Vector3 ball, Vector3 player, Vector3 heading, Vector3 focus)
     {
-        Vector3 focus = Vector3.Lerp(new Vector3(ball.X, 0f, ball.Z),
-                                     new Vector3(player.X, 0f, player.Z), .35f);
         focus = ClampPitch(focus, 4f, 4f);
         float separation = Vector2.Distance(new Vector2(ball.X, ball.Z),
                                            new Vector2(player.X, player.Z));
@@ -57,9 +85,9 @@ public static class BroadcastPlan
         switch (mode)
         {
             case 1: // closer ball-following sideline shot, like the reference clip
-                target = ClampPitch(new Vector3(focus.X - 4f, 19f + separation * .10f, focus.Z + 28f), 12f, 20f);
+                target = ClampPitch(new Vector3(focus.X - 4f, 20f, focus.Z + 30f), 12f, 20f);
                 look = ClampPitch(new Vector3(focus.X, 1.1f, focus.Z), 2f, 2f);
-                fov = 58f + widen;
+                fov = 56f + widen;
                 break;
             case 2: // behind the player, but using a damped heading
                 target = ClampPitch(player - h * 12f + new Vector3(0f, 7.5f, 0f) + side * 2.2f, 14f, 20f);
@@ -67,9 +95,9 @@ public static class BroadcastPlan
                 fov = 62f + widen * .5f;
                 break;
             case 3: // low, wide sideline
-                target = ClampPitch(new Vector3(focus.X - 2f, 12f, focus.Z + 22f), 12f, 18f);
+                target = ClampPitch(new Vector3(focus.X - 2f, 13f, focus.Z + 24f), 12f, 18f);
                 look = ClampPitch(new Vector3(focus.X, 1.1f, focus.Z), 2f, 2f);
-                fov = 60f + widen;
+                fov = 58f + widen;
                 break;
             case 4: // straight-down tactical: -Z is the stable screen-up vector
                 target = new Vector3(focus.X * .35f, 62f, focus.Z * .2f + .001f);
@@ -78,9 +106,9 @@ public static class BroadcastPlan
                 fov = 58f;
                 break;
             default: // high broadcast: fixed world orientation, never spins with facing
-                target = ClampPitch(new Vector3(focus.X - 8f, 30f + separation * .08f, focus.Z + 46f), 14f, 22f);
+                target = ClampPitch(new Vector3(focus.X - 8f, 32f, focus.Z + 48f), 14f, 22f);
                 look = ClampPitch(new Vector3(focus.X, 1.2f, focus.Z), 2f, 2f);
-                fov = 50f + widen;
+                fov = 48f + widen;
                 break;
         }
         // Looking straight down its own up axis is degenerate; the tactical mode

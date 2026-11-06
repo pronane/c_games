@@ -233,7 +233,7 @@ public static class BallFactory
 public partial class BroadcastCamera : Camera3D
 {
     public int Mode;
-    private Vector3 _pos, _look, _heading = new(1f, 0f, 0f);
+    private Vector3 _pos, _look, _heading = new(1f, 0f, 0f), _focus;
     private bool _init;
 
     public const int ModeCount = BroadcastPlan.ModeCount;
@@ -252,11 +252,18 @@ public partial class BroadcastCamera : Camera3D
         if (blended.LengthSquared() > 1e-6f)
             _heading = MxToG(System.Numerics.Vector3.Normalize(blended));
 
-        var plan = BroadcastPlan.Compute(Mode, Gx(ball), Gx(player), Gx(_heading));
+        // Hold a dead-zone focus point: tiny ball/player jitter no longer drags
+        // the whole stadium around every frame.  A genuine breakaway still eases
+        // the camera across the pitch.
+        var desiredFocus = BroadcastPlan.Focus(Gx(ball), Gx(player));
+        if (!_init) _focus = MxToG(desiredFocus);
+        else _focus = MxToG(BroadcastPlan.AdvanceFocus(Gx(_focus), desiredFocus, dt, Mode));
+
+        var plan = BroadcastPlan.Compute(Mode, Gx(ball), Gx(player), Gx(_heading), Gx(_focus));
         Vector3 target = MxToG(plan.Target), look = MxToG(plan.Look), up = MxToG(plan.Up);
         if (!_init) { _pos = target; _look = look; _init = true; }
         // Smooth mode changes too: the old Cycle() snapped to a new position.
-        float k = 1f - Mathf.Exp(-dt * 3.2f);
+        float k = 1f - Mathf.Exp(-dt * 2.0f);
         _pos = _pos.Lerp(target, k);
         _look = _look.Lerp(look, k);
         Position = _pos;
@@ -277,7 +284,12 @@ public static class RigAnimator
         float speed = Mx.Flat(p.Vel).Length();
         // Close control has visible quick feet even when the player is standing.
         if (p.Dribbling) speed = MathF.Max(speed, 2.4f);
-        GaitPose raw = Gait.Compute(speed, p.AnimPhase, time, p.Sprinting, p.Dribbling);
+        // Per-player phase offset plus ball-aware head tracking: the squad no
+        // longer marches in lockstep and players look toward the play.
+        float phase = p.AnimPhase + p.Index * .013f;
+        float lookYaw = Gait.LookYaw(p.Facing, ballPos - p.Pos);
+        GaitPose raw = Gait.Compute(speed, phase, time + p.Index * .11f,
+                                    p.Sprinting, p.Dribbling, lookYaw);
         if (rig.PoseReady) raw = Gait.Lerp(rig.SmoothPose, raw, 1f - Mathf.Exp(-dt * 14f));
         rig.SmoothPose = raw;
         rig.PoseReady = true;
@@ -288,9 +300,9 @@ public static class RigAnimator
 
         Set(rig, "Hips", g.Lean * .25f, g.HipYawL * .5f, g.Roll + g.TurnLean);
         Set(rig, "Spine", g.Lean * .35f, -g.Twist * .6f + g.ShoulderYaw * .3f, -g.Roll * .5f);
-        Set(rig, "Chest", g.Lean * .45f, g.Twist + g.ShoulderYaw, g.Roll * .6f + g.ShoulderRoll);
+        Set(rig, "Chest", g.Lean * .45f, g.Twist + g.ShoulderYaw + g.HeadYaw * .20f, g.Roll * .6f + g.ShoulderRoll);
         Set(rig, "Neck", -g.Lean * .30f, -g.Twist * .4f, 0);
-        Set(rig, "Head", -g.Lean * .25f + g.Breathe, -g.Twist * .5f, 0);
+        Set(rig, "Head", -g.Lean * .25f + g.Breathe, -g.Twist * .5f + g.HeadYaw, 0);
         Set(rig, "LThigh", g.HipL, g.HipYawL, .02f + g.HipRollL);
         Set(rig, "RThigh", g.HipR, g.HipYawR, -.02f + g.HipRollR);
         Set(rig, "LShin", g.KneeL, 0, 0);
@@ -310,6 +322,14 @@ public static class RigAnimator
             Set(rig, "Chest", g.Lean * .45f + .10f, g.ShoulderYaw, g.ShoulderRoll);
             Set(rig, "LUpperArm", g.ArmL, 0, -g.ArmOut - .25f);
             Set(rig, "RUpperArm", g.ArmR, 0, g.ArmOut + .25f);
+        }
+        if (p.Shielding)
+        {
+            // Strength between challenger and ball: arms spread, shoulders turn
+            // and the carrier leans back instead of standing like a mannequin.
+            Set(rig, "Chest", g.Lean * .45f - .12f, g.ShoulderYaw + g.HeadYaw * .20f, g.ShoulderRoll);
+            Set(rig, "LUpperArm", g.ArmL - .15f, 0, -g.ArmOut - .45f);
+            Set(rig, "RUpperArm", g.ArmR - .15f, 0, g.ArmOut + .45f);
         }
         if (p.IsKeeper)
         {

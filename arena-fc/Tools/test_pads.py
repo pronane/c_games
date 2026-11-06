@@ -419,6 +419,44 @@ def main() -> int:
           "fixed world orientation, never spins with facing" in camera_plan
           and "ClampPitch" in camera_plan)
 
+    section("06.11.2026 second pass — latched taps, dead-zone camera, tracking")
+    controls = (ROOT / "Scripts" / "Godot" / "Controls.cs").read_text(encoding="utf-8")
+    pad_nav = (ROOT / "Scripts" / "Godot" / "PadMenuNavigator.cs").read_text(encoding="utf-8")
+    camera_plan = (ROOT / "Scripts" / "Core" / "CameraPlan.cs").read_text(encoding="utf-8")
+    world3d = (ROOT / "Scripts" / "Godot" / "World3D.cs").read_text(encoding="utf-8")
+    match_core = (ROOT / "Scripts" / "Core" / "Match.cs").read_text(encoding="utf-8")
+    gait = (ROOT / "Scripts" / "Core" / "Gait.cs").read_text(encoding="utf-8")
+    match_view = (ROOT / "Scripts" / "Godot" / "MatchView.cs").read_text(encoding="utf-8")
+    hud = (ROOT / "Scripts" / "Godot" / "Hud.cs").read_text(encoding="utf-8")
+    check("quick joypad taps are event-latched",
+          "PushJoyButton" in controls and "_pendingJoyPress" in controls
+          and "InputEventJoypadButton" in pad_nav and "SetProcessInput(true)" in pad_nav
+          and "PushJoyButton" in match_view)
+    check("SELECT/Back activates on the main menu",
+          "TryGoBack" in pad_nav and "eBack && seeded != null" in pad_nav
+          and 'h["lob"]' in controls)
+    check("camera holds a dead-zone focus instead of drifting",
+          "AdvanceFocus" in camera_plan and "FocusDeadzone" in camera_plan
+          and "BroadcastPlan.AdvanceFocus" in world3d and "_focus" in world3d)
+    check("billboarded possession / pressure nameplates",
+          "ControlName" in match_view and "OwnerName" in match_view
+          and "BallName" in match_view and "PressureRing" in match_view
+          and '"billboard"' in match_view)
+    check("contextual HUD shows the actions that matter",
+          "_actions" in hud and "CLOSE CONTROL" in hud and "pad R3 camera" in hud)
+    check("gentle stick enters close control and short pass prefers a nearby man",
+          "assistedCloseControl" in match_core and "moveMag < .60f" in match_core
+          and "MathF.Max(0f, 12f - d)" in match_core)
+    check("tackle / slide visibly lunges into range",
+          "lungeDir" in match_core and "p.Target = carrier.Pos" in match_core
+          and "p.Action == \"tackle\" || p.Action == \"slide\"" in match_core)
+    check("players desynchronise and track the ball",
+          "InitialPhase" in gait and "LookYaw" in gait and "HeadYaw" in gait
+          and "Gait.InitialPhase(idx)" in match_core and "Gait.LookYaw" in world3d)
+    browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
+    check("browser keeps per-player phase and ball-aware head yaw",
+          "look_yaw" in browser and 'p["phase"]' in browser)
+
     section("Optional syntax parsers")
     try:
         import gdtoolkit  # noqa: F401
@@ -438,8 +476,12 @@ def main() -> int:
         lang = Language(tree_sitter_c_sharp.language())
         parser = Parser(lang)
         bad = []
-        for f in ["Scripts/Core/Input/PadLayout.cs", "Scripts/Godot/Controls.cs",
-                  "Scripts/Godot/GameApp.cs", "Tests/Program.cs"]:
+        for f in ["Scripts/Core/Input/PadLayout.cs", "Scripts/Core/CameraPlan.cs",
+                  "Scripts/Core/Gait.cs", "Scripts/Core/Match.cs",
+                  "Scripts/Godot/Controls.cs", "Scripts/Godot/GameApp.cs",
+                  "Scripts/Godot/PadMenuNavigator.cs", "Scripts/Godot/MatchView.cs",
+                  "Scripts/Godot/Hud.cs", "Scripts/Godot/World3D.cs",
+                  "Tests/Program.cs", "Tests/MatchCoreTests.cs"]:
             tree = parser.parse((ROOT / f).read_bytes())
             if tree.root_node.has_error:
                 bad.append(f)

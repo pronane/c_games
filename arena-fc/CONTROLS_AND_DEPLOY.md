@@ -55,7 +55,7 @@ is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the Pa
   every Button, so the main menu, pause menu, settings, controls, controller setup and character editor
   ignored arrow keys, Enter and the pad. Buttons are now focusable, each menu seeds focus on its first
   item, and `PadMenuNavigator` (on the Window, outside the menu/match swaps) walks focus with the d-pad /
-  left stick, activates with A / Start and goes back with B. It uses the same `PadLayout` tables as
+  left stick, activates with A / Start / Select and goes back with Back/Select in overlays. It uses the same `PadLayout` tables as
   gameplay, so unmapped EasySMX D-input pads work too. A / left-right also cycle combos and sliders.
 * **Five camera angles.** `C` (or pad R3/L3) cycles Broadcast → Player cam → **Shoulder** (8.5 m high,
   13 m behind the controlled player, slightly off-axis) → **Sideline** (14 m / 24 m wide tracking) →
@@ -63,13 +63,34 @@ is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the Pa
   next view out; WASD is camera-relative in all five.
 * **Pad menus select on the FIRST press.** A pad reported as "known" but actually sending raw
   D-input indices used to leave `A` unmapped; later, button 8 was both ACCEPT and BACK, so START
-  appeared to do nothing. Menus now accept **any A/B/X/Y or START**, activate even when focus has
-  just been seeded, focus only actionable widgets, and use the direct click callback. Back/Select
-  alone goes back; R3 is gameplay camera only.
+  appeared to do nothing. Menus now accept **any A/B/X/Y, START or SELECT**, activate even when
+  focus has just been seeded, focus only actionable widgets, and use the direct click callback.
+  Back/Select goes back in overlays; on the main menu (where there is no Back target) it also
+  activates. R3 is gameplay camera only.
 * **Button presses are no longer dropped.** Human one-shot actions used to be read only on the
   0.08–0.18 s AI decision clock, so a normal tap was usually discarded. They are now consumed on
   every fixed tick and buffered across physics frames that produce no tick. The human also no longer
   auto-runs toward goal when the stick is released.
+* **Quick taps survive the poll interval (second pass).** `PadMenuNavigator` and `MatchView` now
+  feed every `InputEventJoypadButton` to `InputHub.PushJoyButton()`. A press+release shorter than one
+  physics frame is latched for the next `Read()`, so A / START / SELECT / kick / tackle cannot vanish
+  between polls. Duplicate events from the two nodes are deduplicated.
+* **The camera no longer drifts with every touch (second pass).** `BroadcastPlan.AdvanceFocus()`
+  holds a 5.5 m (14 m tactical) dead-zone focus point; only a genuine breakaway eases the camera
+  across the pitch. Camera height is fixed per mode, so ball-player separation no longer pumps the
+  view up and down. All ball-following modes keep a fixed sideline orientation.
+* **Possession and pressure are readable (second pass).** Billboarded `YOU`, `BALL`, `OPP` and
+  `LOOSE BALL` nameplates sit above the relevant player/marker, rings and arrows are larger, a blue
+  ring marks the nearest opponent, the minimap draws the same pressure outline, and a large top-centre
+  HUD panel shows the carrier plus the exact buttons that matter in the current phase.
+* **Close control, safe passes and reachable challenges (second pass).** A carrier moving the stick
+  gently enters CLOSE CONTROL automatically (LT/L3 still forces it). Short pass now heavily prefers
+  a near open teammate, while long ball still requires a distant advanced target. A human B / RB+B
+  challenge makes a short lunge and keeps its target through `Decide()`, so dispossession is visible
+  without dragging every AI presser into a scrum.
+* **Less lockstep animation (second pass).** Every player starts with a deterministic stride phase
+  offset, heads/chests track the ball, shield spreads the arms and leans the carrier back, and
+  `GaitPose.HeadYaw` is eased with the rest of the pose.
 * **Full action set (desktop):** `E`/A **short pass**, `R`/pad Back **long ball / cross**,
   `SPACE`/pad X **shoot (hold to charge)**, `Q`/pad Y **through ball**, `F`/pad B **standing
   tackle**, `SHIFT+F` / pad RB+B **slide tackle**, `X` / pad LT or L3 **close-control dribble +

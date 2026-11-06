@@ -132,3 +132,57 @@ readable from the checks API.
 Native `dotnet`/`godot` binaries, a physical EasySMX pad, a Windows rebuild and a
 new gameplay recording remain **not available in this sandbox**; those are the
 remaining user-side checks.
+
+## Second pass — remaining 06.11.2026 issues
+
+The first-pass fixes were CI-green, but the follow-up reported that the camera still "keeps moving
+all the time", the ball carrier / controlled player / opposition were hard to track, EasySMX
+select/start and gameplay buttons still looked dead, and there was no convincing short pass, long
+pass, dribble or dispossession.  The two recordings were decoded again frame-by-frame (16-frame
+contact sheets plus full-resolution crops of the HUD and controller overlay).  The target clip is a
+commercial-football tutorial: the useful targets are its **stable elevated camera, immediate player
+identification, safe close control, short/long passing and shielding**, not its art assets.
+
+### Additional root causes
+
+1. **Polling alone can miss a short press.** `Input.IsJoyButtonPressed()` only reports the state at
+   the instant of the poll.  `PadMenuNavigator._Input()` and `MatchView._Input()` now latch every
+   joypad button event in `InputHub`; `ReadButtons()` ORs the polled state, the held event state and
+   one pending-press edge.  This is the missing link between "navigation works" and "select/start/
+   kick/tackle does nothing".
+2. **Select/Back had no action on the main menu.** It was mapped only to `back`, and the main menu
+   has no Back/Resume button.  `TryGoBack()` now returns false on screens with no back target, and
+   the same press falls through to activation.  Overlays still go back.
+3. **The fixed-orientation camera still panned continuously.** `BroadcastPlan` recomputed its focus
+   from the ball and player every frame, and camera height breathed with their separation.  The new
+   `Focus()` / `AdvanceFocus()` helpers hold a dead-zone focus and ease only on a real breakaway.
+4. **Possession cues were too small / hidden.** The old labels sat under the webcam overlay and a
+   thin ring did not distinguish ball, owner, controlled player and nearest opponent.  The second
+   pass adds always-on billboarded nameplates, larger rings/arrows, a pressure ring, a larger
+   minimap with the same pressure outline, and a contextual top-centre action bar.
+5. **Actions existed but had weak feedback / awkward reachability.** Gentle stick movement now
+   enters close control, short pass prefers a near safe man, long ball stays distant and lofted,
+   and a human tackle/slide lunges into range.  AI pressers do **not** lunge, preserving spacing.
+6. **The squad still marched in lockstep.** `MatchEngine` seeds `AnimPhase` with
+   `Gait.InitialPhase(index)`; `Gait.LookYaw()` turns heads/chests toward the ball; shield gets its
+   own upper-body pose; `HeadYaw` is part of the eased `GaitPose`.
+
+### Files changed in the second pass
+
+Core: `Scripts/Core/CameraPlan.cs`, `Gait.cs`, `Match.cs`. Desktop: `Scripts/Godot/Controls.cs`,
+`PadMenuNavigator.cs`, `MatchView.cs`, `Hud.cs`, `World3D.cs`, `GameApp.cs`. Tests:
+`Tests/MatchCoreTests.cs`, `Tools/test_pads.py`. Docs: this report,
+`FOLLOWUP_FIXES_REPORT.md`, `CONTROLS_AND_DEPLOY.md`. The web pad constants are unchanged, so the
+browser edition stays wire-compatible; its gait already has per-player phase and ball-aware head yaw.
+
+### Local verification
+
+| Check | Result |
+| --- | --- |
+| `python3 Tools/test_pads.py` with `gdtoolkit` + `tree-sitter-c-sharp` | **130 passed, 0 failed** |
+| `Tests/MatchCoreTests.cs` compiled and executed with Roslyn/WASM (`@live-codes/blazor-wasm`) | **42 passed, 0 failed** |
+| 60 s / 11v11 / seed 2026 regression | possession, tackles, fouls and spacing thresholds all pass |
+| New pure-C# assertions | short-vs-long pass distance, auto close control, camera dead zone / breakaway / fixed modes, held-focus override, distinct gait phases, ball-aware head yaw and eased head yaw |
+
+GitHub Actions results for the pushed head are recorded in the PR checks; the sandbox still has no
+native `dotnet`, `godot`, Windows build, physical EasySMX pad or new gameplay recording.

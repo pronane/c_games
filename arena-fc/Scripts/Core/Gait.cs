@@ -8,11 +8,12 @@
 //     angle.  The old code used positive thigh angles, which is why the legs came
 //     out behind the player and the knees looked locked.
 //
-// The 06.11.2026 recording still looked "wooden": the old curve only moved thighs,
-// knees and feet on one axis and the renderer wrote those angles straight into the
-// skeleton every frame.  Added hip yaw/roll, shoulder counter-rotation, foot roll,
-// sprint/dribble lean and a Lerp() so the rig can ease between poses.
+// The 06.11.2026 recording still looked "wooden": the first-pass curve only moved
+// thighs, knees and feet on one axis and every desktop player started at phase 0,
+// so the whole team marched in lockstep.  The second pass adds a deterministic
+// per-player phase offset, ball-aware head tracking and a dedicated head channel.
 using System;
+using System.Numerics;
 
 namespace ArenaFC.Core;
 
@@ -24,13 +25,34 @@ public struct GaitPose
     public float ArmL, ArmR, ElbowL, ElbowR, ArmOut;
     public float ShoulderYaw, ShoulderRoll;
     public float Lean, Twist, Roll, Breathe, TurnLean, Stride;
+    public float HeadYaw;
     public float BobX, BobY;
 }
 
 public static class Gait
 {
+    /// <summary>Desynchronise the squad: every player gets a stable stride offset
+    /// without adding another field that the network snapshot has to carry.</summary>
+    public static float InitialPhase(int index) => index * .73f + (index % 3) * .19f;
+
+    /// <summary>Clamped yaw toward the ball, in the player's local space.  Used for
+    /// head/chest tracking so players look at play instead of staring straight
+    /// ahead while they run.</summary>
+    public static float LookYaw(Vector3 facing, Vector3 toBall)
+    {
+        var f = new Vector3(facing.X, 0f, facing.Z);
+        var t = new Vector3(toBall.X, 0f, toBall.Z);
+        if (f.LengthSquared() < 1e-6f || t.LengthSquared() < 1e-6f) return 0f;
+        f = Vector3.Normalize(f);
+        t = Vector3.Normalize(t);
+        float cross = f.Z * t.X - f.X * t.Z;
+        float dot = Math.Clamp(Vector3.Dot(f, t), -1f, 1f);
+        return Math.Clamp(MathF.Atan2(cross, dot) * .55f, -.55f, .55f);
+    }
+
     public static GaitPose Compute(float speed, float phase, float time,
-                                   bool sprint = false, bool dribble = false)
+                                   bool sprint = false, bool dribble = false,
+                                   float lookYaw = 0f)
     {
         float amp = Math.Clamp(speed / 6f, 0f, 1f);
         float run = Math.Clamp(speed / 5.5f, 0f, 1f);
@@ -91,7 +113,7 @@ public static class Gait
             ArmL = armL, ArmR = armR, ElbowL = elbowL, ElbowR = elbowR, ArmOut = armOut,
             ShoulderYaw = shoulderYaw, ShoulderRoll = shoulderRoll,
             Lean = lean, Twist = twist, Roll = roll, Breathe = breathe,
-            TurnLean = turnLean, Stride = amp,
+            TurnLean = turnLean, Stride = amp, HeadYaw = lookYaw,
             BobX = bobX, BobY = bobY,
         };
     }
@@ -116,6 +138,7 @@ public static class Gait
         Lean = L(a.Lean, b.Lean, t), Twist = L(a.Twist, b.Twist, t),
         Roll = L(a.Roll, b.Roll, t), Breathe = L(a.Breathe, b.Breathe, t),
         TurnLean = L(a.TurnLean, b.TurnLean, t), Stride = L(a.Stride, b.Stride, t),
+        HeadYaw = L(a.HeadYaw, b.HeadYaw, t),
         BobX = L(a.BobX, b.BobX, t), BobY = L(a.BobY, b.BobY, t),
     };
 }

@@ -16,7 +16,10 @@ public partial class MatchView : Node3D
     public BroadcastCamera Cam = null!;
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
     public MeshInstance3D Ball = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
-                          ControlArrow = null!, OwnerArrow = null!;
+                          ControlArrow = null!, OwnerArrow = null!, PressureRing = null!;
+    /// <summary>Billboarded, always-visible nameplates for the controlled player,
+    /// the ball carrier, a loose ball and the nearest opponent.</summary>
+    public Label3D ControlName = null!, OwnerName = null!, BallName = null!, PressureName = null!;
     /// <summary>When set, the authoritative server drives the sim instead of the local engine.</summary>
     public OnlineMatch? Online;
 
@@ -37,7 +40,17 @@ public partial class MatchView : Node3D
 
     public override void _Ready()
     {
+        SetProcessInput(true);
         Build();
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+        // Direct --match boots have no PadMenuNavigator on the Window, so latch
+        // quick controller taps here as well.  Duplicate events are deduplicated
+        // by InputHub's pending-press set.
+        if (@event is InputEventJoypadButton jb)
+            InputHub.PushJoyButton(jb.Device, (int)jb.ButtonIndex, jb.Pressed);
     }
 
     private static Vector3 G(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);
@@ -54,6 +67,32 @@ public partial class MatchView : Node3D
     {
         Name = name, Mesh = mesh, MaterialOverride = mat,
     };
+
+    private static Label3D TrackerLabel(string name, Color color, string text) 
+    {
+        var l = new Label3D
+        {
+            Name = name,
+            Text = text,
+            FontSize = 44,
+            PixelSize = .010f,
+            OutlineSize = 10,
+            Modulate = color,
+            DoubleSided = true,
+        };
+        // String property names avoid depending on generated C# enum spellings
+        // for billboard / draw flags, while keeping the labels readable and on top.
+        l.Set("billboard", 1);
+        l.Set("no_depth_test", true);
+        l.Set("fixed_size", true);
+        l.Set("outline_modulate", new Color(0f, 0f, 0f, .92f));
+        return l;
+    }
+
+    private static void SetText(Label3D label, string text)
+    {
+        if (label.Text != text) label.Text = text;
+    }
 
     private void MergePending(PlayerCommand cmd)
     {
@@ -98,23 +137,35 @@ public partial class MatchView : Node3D
         var green = MarkerMaterial(new Color(.2f, 1f, .55f));
         var amber = MarkerMaterial(new Color(1f, .72f, .18f));
         var yellow = MarkerMaterial(new Color(1f, .95f, .55f));
+        var blue = MarkerMaterial(new Color(.35f, .65f, 1f));
         Cursor = Marker("ControlledRing",
-            new TorusMesh { InnerRadius = .62f, OuterRadius = .82f, RingSegments = 32, Rings = 8 }, green);
+            new TorusMesh { InnerRadius = .72f, OuterRadius = .95f, RingSegments = 32, Rings = 8 }, green);
         AddChild(Cursor);
         BallRing = Marker("BallRing",
-            new TorusMesh { InnerRadius = .30f, OuterRadius = .44f, RingSegments = 24, Rings = 6 }, yellow);
+            new TorusMesh { InnerRadius = .36f, OuterRadius = .52f, RingSegments = 24, Rings = 6 }, yellow);
         AddChild(BallRing);
         OwnerRing = Marker("BallOwnerRing",
-            new TorusMesh { InnerRadius = .78f, OuterRadius = .94f, RingSegments = 32, Rings = 8 }, amber);
+            new TorusMesh { InnerRadius = .90f, OuterRadius = 1.08f, RingSegments = 32, Rings = 8 }, amber);
         AddChild(OwnerRing);
+        PressureRing = Marker("PressureRing",
+            new TorusMesh { InnerRadius = .90f, OuterRadius = 1.06f, RingSegments = 32, Rings = 8 }, blue);
+        AddChild(PressureRing);
         ControlArrow = Marker("ControlledArrow",
             new CylinderMesh { TopRadius = 0f, BottomRadius = .24f, Height = .42f, RadialSegments = 8, Rings = 1 }, green);
         ControlArrow.RotationDegrees = new Vector3(180f, 0f, 0f);
+        ControlArrow.Scale = new Vector3(1.25f, 1.25f, 1.25f);
         AddChild(ControlArrow);
         OwnerArrow = Marker("BallOwnerArrow",
             new CylinderMesh { TopRadius = 0f, BottomRadius = .24f, Height = .42f, RadialSegments = 8, Rings = 1 }, amber);
         OwnerArrow.RotationDegrees = new Vector3(180f, 0f, 0f);
+        OwnerArrow.Scale = new Vector3(1.25f, 1.25f, 1.25f);
         AddChild(OwnerArrow);
+
+        ControlName = TrackerLabel("ControlledName", new Color(.2f, 1f, .55f), "YOU");
+        OwnerName = TrackerLabel("BallOwnerName", new Color(1f, .72f, .18f), "BALL");
+        BallName = TrackerLabel("BallName", new Color(1f, .95f, .55f), "LOOSE BALL");
+        PressureName = TrackerLabel("PressureName", new Color(.55f, .8f, 1f), "OPP");
+        AddChild(ControlName); AddChild(OwnerName); AddChild(BallName); AddChild(PressureName);
 
         Cam = new BroadcastCamera { Name = "BroadcastCamera", Fov = 55, Far = 600f };
         AddChild(Cam);
@@ -212,6 +263,10 @@ public partial class MatchView : Node3D
 
     private void Sync(float dt)
     {
+        var b = Engine.State.Ball;
+        int owner = b.Owner;
+        int ctrl = Engine.State.Controlled;
+        bool hasOwner = owner >= 0 && owner < Rigs.Length;
         for (int i = 0; i < Rigs.Length; i++)
         {
             var p = Engine.State.Players[i];
@@ -219,21 +274,21 @@ public partial class MatchView : Node3D
             rig.Position = new Vector3(p.Pos.X, 0, p.Pos.Z);
             float yaw = MathF.Atan2(p.Facing.X, p.Facing.Z);
             rig.Rotation = new Vector3(0, yaw, 0);
-            RigAnimator.Pose(rig, p, dt, _time, Engine.State.Ball.Pos);
+            RigAnimator.Pose(rig, p, dt, _time, b.Pos);
+            // Shirt names used to clutter every player.  Keep only the two names
+            // that matter: the controlled player and whoever owns the ball.
+            rig.NameLabel.Visible = i == ctrl || i == owner;
         }
-        var b = Engine.State.Ball;
         Ball.Position = G(b.Pos);
         var v = Mx.Flat(b.Vel);
         Ball.RotationDegrees += new Vector3(v.Z, 0, -v.X) * (dt * 190f);
 
-        // Ball, ball owner and controlled player each get a distinct, always-on
-        // marker.  The old thin green ring alone did not show WHO had the ball.
+        // Ball, ball owner, controlled player and nearest opponent each get a
+        // distinct, always-on marker.  The thin single ring was unreadable in
+        // the recording; billboarded nameplates make possession obvious.
         BallRing.Visible = true;
         BallRing.Position = new Vector3(b.Pos.X, .05f, b.Pos.Z);
         BallRing.RotationDegrees = new Vector3(0, _time * -55f, 0);
-        int owner = Engine.State.Ball.Owner;
-        int ctrl = Engine.State.Controlled;
-        bool hasOwner = owner >= 0 && owner < Rigs.Length;
         OwnerRing.Visible = hasOwner && owner != ctrl;
         OwnerArrow.Visible = hasOwner;
         if (hasOwner)
@@ -242,6 +297,18 @@ public partial class MatchView : Node3D
             OwnerRing.Position = new Vector3(o.Pos.X, .055f, o.Pos.Z);
             OwnerRing.RotationDegrees = new Vector3(0, _time * 35f, 0);
             OwnerArrow.Position = new Vector3(o.Pos.X, 2.35f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
+            SetText(OwnerName, owner == ctrl
+                ? $"YOU · BALL · {o.Spec.DisplayName}"
+                : $"BALL · {o.Spec.DisplayName}");
+            OwnerName.Modulate = owner == ctrl ? new Color(.2f, 1f, .55f) : new Color(1f, .72f, .18f);
+            OwnerName.Position = new Vector3(o.Pos.X, 3.15f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
+        }
+        OwnerName.Visible = hasOwner;
+        BallName.Visible = !hasOwner;
+        if (BallName.Visible)
+        {
+            SetText(BallName, "LOOSE BALL");
+            BallName.Position = new Vector3(b.Pos.X, 1.05f, b.Pos.Z);
         }
         if (ctrl >= 0 && ctrl < Rigs.Length)
         {
@@ -251,12 +318,42 @@ public partial class MatchView : Node3D
             Cursor.RotationDegrees = new Vector3(0, _time * 40f, 0);
             ControlArrow.Visible = true;
             ControlArrow.Position = new Vector3(c.Pos.X, 2.45f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
+            ControlName.Visible = !hasOwner || owner != ctrl;
+            if (ControlName.Visible)
+            {
+                SetText(ControlName, $"YOU · {c.Spec.DisplayName}");
+                ControlName.Position = new Vector3(c.Pos.X, 3.15f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
+            }
+
+            // Nearest opponent to the ball: a blue ring + OPP tag makes the
+            // pressing player readable without marking all eleven opponents.
+            int pressure = -1; float bd = float.MaxValue;
+            foreach (var q in Engine.State.Players)
+            {
+                if (q.Team == c.Team || q.IsKeeper) continue;
+                float d = Mx.FlatDist(q.Pos, b.Pos);
+                if (d < bd) { bd = d; pressure = q.Index; }
+            }
+            bool showPressure = pressure >= 0 && pressure < Rigs.Length && bd < 12f;
+            PressureRing.Visible = showPressure;
+            PressureName.Visible = showPressure;
+            if (showPressure)
+            {
+                var q = Engine.State.Players[pressure];
+                PressureRing.Position = new Vector3(q.Pos.X, .05f, q.Pos.Z);
+                PressureRing.RotationDegrees = new Vector3(0, _time * -30f, 0);
+                SetText(PressureName, "OPP");
+                PressureName.Position = new Vector3(q.Pos.X, 2.85f, q.Pos.Z);
+            }
             Cam.UpdateCamera(G(b.Pos), new Vector3(c.Pos.X, 0, c.Pos.Z), G(c.Facing), dt);
         }
         else
         {
             Cursor.Visible = false;
             ControlArrow.Visible = false;
+            ControlName.Visible = false;
+            PressureRing.Visible = false;
+            PressureName.Visible = false;
             Cam.UpdateCamera(G(b.Pos), G(b.Pos), new Vector3(1, 0, 0), dt);
         }
     }
