@@ -95,3 +95,29 @@ def test_fast_public_clips_match_basic_pitch_reference():
             assert abs(row[key] - ref_row[key]) <= 0.02, (clip_id, key, row[key], ref_row[key])
         if 'cross_f1' in ref_row:
             assert abs(row['cross_f1'] - ref_row['cross_f1']) <= 0.02
+
+
+def test_yourmt3_notes_drop_drums_dedupe_and_filter_programs():
+    from server.transcribers import yourmt3_notes
+    raw = [
+        {'time': 0.0, 'duration': 0.5, 'midi': 52, 'program': 29, 'drum': False},
+        {'time': 0.01, 'duration': 0.5, 'midi': 52, 'program': 30, 'drum': False},  # same note, other channel
+        {'time': 0.0, 'duration': 0.1, 'midi': 36, 'program': 128, 'drum': True},
+        {'time': 0.5, 'duration': 0.5, 'midi': 40, 'program': 33, 'drum': False},  # bass
+        {'time': 1.0, 'duration': 0.002, 'midi': 64, 'program': 0, 'drum': False},  # labelled piano
+    ]
+    every = yourmt3_notes(raw, 28, 88)
+    assert [(n['time'], n['midi']) for n in every] == [(0.0, 52), (0.5, 40), (1.0, 64)]
+    assert every[2]['duration'] == 0.03
+    assert [n['midi'] for n in yourmt3_notes(raw, 28, 88, 'guitar')] == [52]
+
+
+def test_yourmt3_is_never_imported_and_needs_its_own_interpreter(monkeypatch):
+    from server import transcribers
+    from server.models import ModelUnavailable
+    import pytest
+    monkeypatch.delenv('FRETWORK_YOURMT3_PYTHON', raising=False)
+    monkeypatch.setenv('FRETWORK_YOURMT3_ROOT', '/nonexistent')
+    with pytest.raises(ModelUnavailable):
+        transcribers._transcribe_yourmt3_path(transcribers.Path('x.wav'), 40, 88)
+    assert 'GPL-3.0' in transcribers.YOURMT3_RUNNER.read_text().splitlines()[0]

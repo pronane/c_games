@@ -9,9 +9,11 @@ backends are off unless ``FRETWORK_TRANSCRIBER`` names one.
   (upstream Apache-2.0).
 * ``gaps`` — the same authors' later GAPS guitar checkpoint (``guitar-gaps.pth``,
   MIT), same wrapper.
-* ``yourmt3`` — not vendored. Inference code is GPL-3.0; checkpoints on
-  Hugging Face are Apache-2.0. Set ``FRETWORK_YOURMT3_ROOT`` to a separate
-  checkout. This tree does not copy that code.
+* ``yourmt3`` — YourMT3+ (YPTF.MoE+Multi, noPS). Not vendored: its inference
+  code is GPL-3.0, its checkpoints Apache-2.0. ``tools/yourmt3/setup.sh`` clones
+  it and the weights elsewhere; the GPL runner in ``tools/yourmt3`` is started
+  as a separate program, never imported. ``FRETWORK_YOURMT3_PROGRAMS=guitar``
+  keeps only notes it labels as guitar.
 
 Install the Riley/GAPS stack from ``server/requirements-transcription-extras.txt``.
 Neither backend is imported unless it is selected. Posterior maps stay on
@@ -117,7 +119,8 @@ def availability() -> dict:
             'detail': None if riley else RILEY_NOTE,
         },
         'yourmt3': {
-            'installed': bool(yourmt3_root and Path(yourmt3_root).is_dir()),
+            'installed': bool(yourmt3_root and Path(yourmt3_root).is_dir()
+                              and Path(os.environ.get('FRETWORK_YOURMT3_PYTHON', '/nonexistent')).exists()),
             'license': 'code GPL-3.0 (not vendored); checkpoints Apache-2.0',
             'detail': YOURMT3_NOTE,
         },
@@ -192,16 +195,53 @@ def _transcribe_riley_path(which: str, path: Path, midi_min: int, midi_max: int)
     return _notes_from_midi_bytes(data, midi_min, midi_max)
 
 
+YOURMT3_RUNNER = Path(__file__).resolve().parent.parent / 'tools' / 'yourmt3' / 'run_yourmt3.py'
+GUITAR_PROGRAMS = range(24, 32)  # General MIDI guitars, nylon to harmonics
+
+
+def yourmt3_notes(raw: list, midi_min: int, midi_max: int, programs: str = 'all'):
+    """YourMT3+ notes -> engine notes. Drums are dropped. ``programs='guitar'`` keeps only
+    notes it labelled as a guitar (it also writes bass, piano, strings...)."""
+    keep = []
+    for n in raw:
+        if n.get('drum'):
+            continue
+        if programs == 'guitar' and int(n.get('program', -1)) not in GUITAR_PROGRAMS:
+            continue
+        midi = int(n['midi'])
+        if not midi_min <= midi <= midi_max:
+            continue
+        keep.append({'time': float(n['time']), 'duration': max(0.03, float(n['duration'])), 'midi': midi,
+                     'amplitude': float(n.get('amplitude') or 0.7)})
+    keep.sort(key=lambda n: (n['time'], n['midi']))
+    # Several decoder channels can write the same note: one event per pitch within 30 ms.
+    out = []
+    for n in keep:
+        if any(o['midi'] == n['midi'] and abs(o['time'] - n['time']) < 0.03 for o in out[-8:]):
+            continue
+        out.append(n)
+    for i, n in enumerate(out):
+        n['id'] = i
+    return out
+
+
 def _transcribe_yourmt3_path(path: Path, midi_min: int, midi_max: int):
+    """Runs the GPL-3.0 YourMT3+ runner as a separate program (never imported here)."""
+    import json
+    import subprocess
     root = os.environ.get('FRETWORK_YOURMT3_ROOT', '')
-    if not root or not Path(root).is_dir():
-        raise ModelUnavailable(YOURMT3_NOTE)
-    # A checkout is present, but there is no stable one-command API that we
-    # have executed. Refuse rather than guess a command line.
-    raise ModelUnavailable(
-        YOURMT3_NOTE + ' A checkout was found at FRETWORK_YOURMT3_ROOT, but this '
-        'build does not call into it: the research entry point was not run here.'
-    )
+    python = os.environ.get('FRETWORK_YOURMT3_PYTHON', '')
+    if not root or not Path(root).is_dir() or not python or not Path(python).exists():
+        raise ModelUnavailable(YOURMT3_NOTE + ' Run tools/yourmt3/setup.sh and set FRETWORK_YOURMT3_ROOT '
+                               'and FRETWORK_YOURMT3_PYTHON.')
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / 'notes.json'
+        proc = subprocess.run([python, str(YOURMT3_RUNNER), str(Path(path).resolve()), str(out)],
+                              env={**os.environ, 'FRETWORK_YOURMT3_ROOT': root}, capture_output=True, text=True)
+        if proc.returncode != 0 or not out.exists():
+            raise ModelUnavailable('YourMT3+ failed: ' + (proc.stderr or '').strip()[-600:])
+        raw = json.loads(out.read_text())['notes']
+    return yourmt3_notes(raw, midi_min, midi_max, os.environ.get('FRETWORK_YOURMT3_PROGRAMS', 'all'))
 
 
 def _run_one(name: str, path: Path, midi_min: int, midi_max: int):
