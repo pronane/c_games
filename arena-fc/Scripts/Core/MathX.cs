@@ -75,6 +75,12 @@ public sealed class Rng
 {
     private uint _s;
     public Rng(int seed) { _s = seed == 0 ? 0x9E3779B9u : (uint)seed; }
+    /// <summary>Checkpoint / rollback: the whole deterministic stream is this one word.</summary>
+    public uint State
+    {
+        get => _s;
+        set => _s = value == 0 ? 0x9E3779B9u : value;
+    }
     public uint NextUInt() { uint x = _s; x ^= x << 13; x ^= x >> 17; x ^= x << 5; _s = x; return x; }
     public float Next() => (NextUInt() & 0xFFFFFF) / (float)0x1000000;
     public float Range(float a, float b) => a + (b - a) * Next();

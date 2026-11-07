@@ -154,7 +154,10 @@ public static class Ui
 
     private static void Walk(Node n, List<Control> list)
     {
-        if (n is Control c && c.FocusMode != Control.FocusModeEnum.None && c.IsVisibleInTree())
+        // Only actionable widgets may own menu focus.  Panels / containers with
+        // FocusMode.All used to swallow A / START and do nothing.
+        if (n is Control c && c.FocusMode != Control.FocusModeEnum.None && c.IsVisibleInTree()
+            && (c is BaseButton || c is Slider))
         {
             bool disabled = c is BaseButton bb && bb.Disabled;
             if (!disabled) list.Add(c);

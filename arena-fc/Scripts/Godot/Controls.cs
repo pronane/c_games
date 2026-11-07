@@ -21,11 +21,12 @@ public sealed class InputHub
 {
     // Set by the on-screen touch controls.
     public Vector2 TouchMove;
-    public bool TouchSprint, TouchPass, TouchThrough, TouchTackle, TouchSwitch, TouchShoot;
+    public bool TouchSprint, TouchPass, TouchThrough, TouchTackle, TouchSwitch, TouchShoot,
+               TouchLob, TouchDribble;
     public bool TouchEnabled;
 
     private bool _pShoot, _pPass, _pThrough, _pTackle, _pSlide, _pSwitch, _pPause, _pCamera, _pLob;
-    private float _charge;
+    private float _charge, _cameraHold;
     public float Charge => _charge;
     public bool PausePressed { get; private set; }
     public bool CameraPressed { get; private set; }
@@ -53,6 +54,12 @@ public sealed class InputHub
     private static int _mappingsLoaded = -1;
     private static Dictionary<string, Dictionary<string, int>> _saved = new();
 
+    // Godot's polled IsJoyButtonPressed() can miss a press+release that happens
+    // between two physics frames.  _Input() latches every pad button event so a
+    // quick A / START / SELECT / kick tap survives until the next Read().
+    private static readonly HashSet<(int Device, int Button)> _pendingJoyPress = new();
+    private static readonly Dictionary<(int Device, int Button), bool> _joyHeld = new();
+
     public static int MappingsLoaded => _mappingsLoaded;
 
     /// <summary>Load once, before any pad is polled. Built-ins cover EasySMX/generic USB even if the DB is absent.</summary>
@@ -77,6 +84,29 @@ public sealed class InputHub
     {
         try { Input.AddJoyMapping(line, true); return true; }
         catch (Exception) { return false; }
+    }
+
+    /// <summary>Called from Node._Input() for every joypad button event.  A tap
+    /// shorter than one physics frame is held here for exactly one Read().</summary>
+    public static void PushJoyButton(int device, int button, bool pressed)
+    {
+        if (button < 0 || button > 20) return;
+        var key = (device, button);
+        if (pressed)
+        {
+            _pendingJoyPress.Add(key);
+            _joyHeld[key] = true;
+        }
+        else
+        {
+            _joyHeld[key] = false;
+        }
+    }
+
+    public static void ClearJoyLatches()
+    {
+        _pendingJoyPress.Clear();
+        _joyHeld.Clear();
     }
 
     public static void LoadBindings()
@@ -138,6 +168,8 @@ public sealed class InputHub
         }
         lines.Add("Left stick / D-pad moves. Every connected pad drives player 1. " +
                   "Use REMAP if a button is in the wrong place; bindings are saved per pad name.");
+        lines.Add("Back/Select = long ball  ·  LT/L3 = close-control dribble + shield  ·  R3 = camera");
+        lines.Add("Menu: A / B / X / Y / START / SELECT activates; BACK goes back in overlays. Quick taps are event-latched.");
         return string.Join("\n", lines);
     }
 
@@ -146,7 +178,13 @@ public sealed class InputHub
     private static bool[] ReadButtons(int dev)
     {
         var b = new bool[21];
-        for (int i = 0; i < b.Length; i++) b[i] = Input.IsJoyButtonPressed(dev, (JoyButton)i);
+        for (int i = 0; i < b.Length; i++)
+        {
+            var key = (dev, i);
+            bool held = _joyHeld.TryGetValue(key, out bool h) && h;
+            bool pending = _pendingJoyPress.Remove(key);
+            b[i] = Input.IsJoyButtonPressed(dev, (JoyButton)i) || held || pending;
+        }
         return b;
     }
 
@@ -190,6 +228,8 @@ public sealed class InputHub
     public static void ReadMenuPad(out bool up, out bool down, out bool left, out bool right,
                                    out bool accept, out bool back)
     {
+        // The menu can be the first code to poll a pad; load SDL mappings now.
+        EnsureMappings();
         up = down = left = right = accept = back = false;
         foreach (int dev in PadLayout.DevicesFor(ConnectedDevices(), false, 0))
         {
@@ -203,16 +243,17 @@ public sealed class InputHub
             if (m.X < -.45f) left = true;
             if (m.X > .45f) right = true;
             var h = PadLayout.Held(buttons, axes, binds, known);
-            // Layout-independent: in a menu ANY face button (A/B/X/Y, i.e. 0..3 on
-            // both standard and raw pads) or Start selects the highlighted item.
-            // A pad that Godot reports as "known" but which actually sends raw D-input
-            // button indices used to mean h["pass"] never fired, so nothing could be
-            // selected.  Back/cancel stays on the system buttons (R3/L3/Back).
+            // Layout-independent: ANY face button (A/B/X/Y, 0..3) or Start selects.
+            // The old code also made button 8 both ACCEPT and BACK, so a single
+            // press fired both handlers and START appeared to do nothing.
             bool face = false;
             for (int i = 0; i <= 3; i++) if (PadLayout.Button(buttons, i)) { face = true; break; }
-            if (face || h["pass"] || h["pause"] || PadLayout.Button(buttons, 8)
+            if (face || h["pass"] || h["pause"] || PadLayout.Button(buttons, 6)
                 || PadLayout.Button(buttons, 9)) accept = true;
-            if (h["camera"]) back = true;
+            // Back/Select is the only pad cancel; R3 remains the gameplay camera.
+            // h["lob"] carries the raw b8 variant too, so a pad falsely reported
+            // as "known" still has a working Select/Back button.
+            if (h["lob"] || PadLayout.Button(buttons, known ? 4 : 8)) back = true;
         }
     }
 
@@ -234,7 +275,7 @@ public sealed class InputHub
         Vector2 padMove = Vector2.Zero;
         bool padSprint = false, padPass = false, padThrough = false, padTackle = false,
              padSwitch = false, padShoot = false, padPause = false, padCamera = false,
-             padShield = false;
+             padShield = false, padLob = false, padDribble = false;
         foreach (int dev in devices)
         {
             bool[] buttons = ReadButtons(dev);
@@ -252,9 +293,11 @@ public sealed class InputHub
             padSprint |= h["sprint"];
             padPause |= h["pause"];
             padCamera |= h["camera"];
-            // Shield sits on LB on a mapped pad, Back on a raw/D-input pad
-            // (raw button 4 is already "switch").  Independent of the action table.
-            padShield |= PadLayout.Button(buttons, known ? 4 : 8);
+            padLob |= h["lob"];
+            padDribble |= h["dribble"];
+            // LT / L3 is close control + shielding.  The old Back-button shield
+            // clashed with the menu Back button and left no long-pass button.
+            padShield |= h["dribble"];
         }
         if (padMove.LengthSquared() > 1f) padMove = padMove.Normalized();
         move += padMove;
@@ -270,12 +313,13 @@ public sealed class InputHub
         bool shoot = Input.IsPhysicalKeyPressed(Key.Space) || padShoot || (TouchEnabled && TouchShoot);
         bool pause = Input.IsPhysicalKeyPressed(Key.Escape) || padPause;
         bool camera = Input.IsPhysicalKeyPressed(Key.C) || padCamera;
-        bool lob = Input.IsPhysicalKeyPressed(Key.R);
+        bool lob = Input.IsPhysicalKeyPressed(Key.R) || padLob || (TouchEnabled && TouchLob);
         // SHIFT+F (or sprint+tackle on a pad) is a committed slide; X / pad LB / raw Back
         // is shield.  Keeping slide out of Tackle stops a single press doing both.
         bool slide = (Input.IsPhysicalKeyPressed(Key.Shift) && Input.IsPhysicalKeyPressed(Key.F))
                      || (padSprint && padTackle);
-        bool shield = Input.IsPhysicalKeyPressed(Key.X) || padShield;
+        bool shield = Input.IsPhysicalKeyPressed(Key.X) || padShield || (TouchEnabled && TouchDribble);
+        bool dribble = shield;
 
         cmd.Sprint = sprint;
         cmd.Pass = Edge(pass, ref _pPass);
@@ -283,10 +327,14 @@ public sealed class InputHub
         cmd.Tackle = Edge(tackle && !slide, ref _pTackle);
         cmd.Slide = Edge(slide, ref _pSlide);
         cmd.Shield = shield;
+        cmd.Dribble = dribble;
         cmd.Switch = Edge(sw, ref _pSwitch) || Input.IsMouseButtonPressed(MouseButton.Middle);
         cmd.Lob = Edge(lob, ref _pLob);
         PausePressed = Edge(pause, ref _pPause);
-        CameraPressed = Edge(camera, ref _pCamera);
+        // A stick click while steering must not cycle the camera repeatedly.
+        if (camera) _cameraHold += dt; else _cameraHold = 0f;
+        bool cameraFire = Input.IsPhysicalKeyPressed(Key.C) || _cameraHold > .12f;
+        CameraPressed = Edge(cameraFire, ref _pCamera);
 
         // Hold to charge a shot; release to shoot. Also works on touch & gamepad.
         if (shoot) _charge = MathF.Min(1f, _charge + dt / .95f);
@@ -298,6 +346,7 @@ public sealed class InputHub
     public void Reset()
     {
         _charge = 0;
+        _cameraHold = 0f;
         _pShoot = _pPass = _pThrough = _pTackle = _pSlide = _pSwitch = _pPause = _pCamera = _pLob = false;
     }
 }

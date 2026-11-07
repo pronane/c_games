@@ -47,7 +47,7 @@ Two independent causes, both fixed:
 
 ## 3. "Opposition keeps giving away frees that don't look like fouls"
 
-* Failed tackles only become fouls within 1.7 m (2.6 m for a slide) at **12% / 30%**, instead of
+* Failed tackles only become fouls within 1.7 m (2.6 m for a slide) at **10% / 26% (after the 06.11.2026 pressing rebalance)**, instead of
   every miss within 2 m at ~18%. Deterministic 60 s sim: **4 invisible free kicks → 1**.
 * The fouled player now visibly stumbles (`foul` pose with chest/hip/leg/arm fall over 1.1 s), the
   slider has a low `slide` pose, and the HUD shows `FOUL · FREE KICK` / `FOUL · PENALTY!` toasts.
@@ -105,3 +105,89 @@ Sample values at sprint, left leg leading: `hipL = -0.660`, `hipR = +0.660`, `kn
   its own auto-switch; its action set and mesh remain separate (`Web/Controllers.gd`,
   `Tools/gen_rig.py`). Porting these is the natural next step if both editions should match.
 * The `foul` / `slide` poses are in `RigAnimator` (C#); the browser edition has its own action poses.
+
+
+## 7. 06.11.2026 recordings — camera, EasySMX controls and readable possession
+
+Two clips in `arena-fc/screenshots/` were decoded frame-by-frame:
+`06.11.2026_19.36.34_REC (1).mp4` (current build, 51.9 s) and
+`06.11.2026_19.40.33_REC.mp4` (target, 64.5 s). The current clip shows the camera
+swinging between centre-circle, goal-line, corner/stand and midfield viewpoints within
+seconds; the only possession cue is a thin green ring under one player, while the ball
+and ball owner are easy to lose. The target clip uses a stable elevated ball-following
+camera, a clear controlled-player marker, readable short/long passing, dribbling and
+shielding, and fluid player animation.
+
+### Root causes found
+
+1. **Human button edges were sampled only on AI decision ticks.** `Tick()` called
+   `Decide()` every 0.08–0.18 s, and all pass / shoot / tackle / slide handling lived
+   inside `Decide()`. A one-frame controller press was normally gone before the next
+   decision tick. Fix: a new `HumanActions()` runs for every human on every fixed tick;
+   `MatchView` also buffers one-shot edges across accumulator frames that produce no tick.
+2. **The HUD owned a different `InputHub` from `MatchView`.** Touch/pad state written by
+   the HUD never reached `MatchView.Read()`. Fix: one shared instance.
+3. **Menu accept and back collided.** Button 8 was both `accept` and `back`, and a
+   first A/START press only seeded GUI focus without activating. Fix: separate
+   accept/back tables, first-press activation, actionable-only focus list.
+4. **The camera was built from instantaneous player facing.** Player/shoulder modes
+   rotated the whole view with every stick change and could leave the pitch near a
+   corner. Fix: `Scripts/Core/CameraPlan.cs` uses a fixed sideline orientation for
+   ball-following modes, a damped heading for the shoulder mode, a stable `-Z` tactical
+   up vector and pitch-bowl clamping. Mode changes are smoothed instead of snapped.
+5. **Possession was ambiguous.** Fix: separate yellow ball ring, amber ball-owner ring
+   and floating owner arrow, larger green controlled ring + arrow, HUD
+   `BALL · YOU/AWAY · NAME` label, and a minimap line from controlled player to ball.
+6. **Players were still wooden.** Fix: `Gait` now has hip yaw/roll, foot roll, shoulder
+   counter-rotation, sprint/dribble lean, a `Lerp()` easing helper and eased action clips.
+
+### Gameplay additions
+
+* Short pass (`E`/A), through ball (`Q`/Y), long aerial ball (`R`/pad Back), charged shot,
+  standing tackle (`F`/B), committed slide (sprint+tackle), shoulder-charge dispossession,
+  close-control dribble (`X`/LT/L3) with tighter alternating ball touches and reduced tackle
+  success, and a clearly faster 1.42× sprint.
+* `PlayerCommand.Dribble` is carried by the existing v2 `sd` wire field, so online clients
+  and the server keep the same protocol.
+* The web edition mirrors the new long-ball / close-control / sprint separation in
+  `Web/Controllers.gd` and `Web/BrowserBoot.gd`.
+
+### Verification
+
+See `GAMEPLAY_CAMERA_FIX_REPORT.md` for the final CI/test table. Physical EasySMX pad,
+Windows rebuild, native `.NET` server E2E and a new gameplay recording remain user-side
+checks; this sandbox has no native `dotnet`, `godot` or controller hardware.
+
+## 8. 06.11.2026 recordings — second pass after the remaining complaints
+
+The first camera/control round was merged into PR #53 and passed CI, but the follow-up said the
+camera still moved constantly, possession was unreadable, the EasySMX pad still only navigated
+menus, and short/long pass, dribble, sprint, kick, slide tackle and dispossession still felt absent.
+Both MP4s were decoded again: the current clip's viewpoint swings between centre-circle, goal-line
+and stand views while the target keeps a stable elevated broadcast shot with a clear carrier marker
+and close-control / shielding / passing demonstration.
+
+### What the second pass adds
+
+* **Event-latched pad buttons**: every joypad press is captured in `_Input()` and replayed to the
+  next `InputHub.Read()`; a tap shorter than one physics frame can no longer disappear.  Both
+  `PadMenuNavigator` (all menus) and `MatchView` (direct `--match` boots) feed the latch.
+* **Select/Back is no longer dead**: it activates on the main menu and still goes back in overlays;
+  any face button, START or SELECT activates; quick taps are latched.
+* **Dead-zone camera**: `BroadcastPlan.AdvanceFocus()` holds the shot until ball/player leave a
+  5.5 m inner frame, then eases; fixed per-mode height removes the continuous zoom/height pumping.
+* **Readable possession / pressure**: billboarded `YOU`, `BALL`, `OPP`, `LOOSE BALL` nameplates,
+  larger rings/arrows, nearest-opponent ring, larger minimap and a contextual top-centre HUD with
+  the exact buttons for the current phase.
+* **Reachable actions**: gentle stick automatically enters close control, short pass prefers a near
+  open receiver, long ball stays distant/lofted, and a human tackle/slide lunges into range while AI
+  pressers keep their spacing.
+* **Less wooden animation**: deterministic per-player stride phases, ball-aware head/chest yaw,
+  shield arm/lean pose and eased `HeadYaw`.
+
+### Verification
+
+`Tools/test_pads.py` with optional parsers: **130 passed, 0 failed**. `Tests/MatchCoreTests.cs`
+compiled and run in Roslyn/WASM: **42 passed, 0 failed**, including the new camera, pass, close
+control and gait assertions. CI results are attached to PR #53. Native Windows rebuild, physical
+EasySMX pad and a new gameplay recording remain user-side checks.

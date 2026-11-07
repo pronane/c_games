@@ -19,6 +19,9 @@ public partial class CharacterRig : Node3D
     public Label3D NameLabel = null!;
     public StandardMaterial3D[] Materials = new StandardMaterial3D[9];
     public bool EditorMode;
+    /// <summary>Smoothed gait pose, so direction/action changes do not snap joints.</summary>
+    public GaitPose SmoothPose;
+    public bool PoseReady;
     public readonly Dictionary<string, int> BoneIndex = new();
 
     public void Rebuild(CharacterSpec spec)

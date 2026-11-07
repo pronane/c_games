@@ -233,75 +233,42 @@ public static class BallFactory
 public partial class BroadcastCamera : Camera3D
 {
     public int Mode;
-    private Vector3 _pos, _look;
+    private Vector3 _pos, _look, _heading = new(1f, 0f, 0f), _focus;
     private bool _init;
 
-    public const int ModeCount = 5;
-    public void Cycle() { Mode = (Mode + 1) % ModeCount; _init = false; }
-    // 0 far broadcast, 1 on-pitch player cam, 2 shoulder, 3 sideline, 4 top-down tactical.
-    public string ModeName => Mode switch
-    {
-        0 => "Broadcast", 1 => "Player cam", 2 => "Shoulder", 3 => "Sideline", _ => "Tactical"
-    };
+    public const int ModeCount = BroadcastPlan.ModeCount;
+    public void Cycle() { Mode = (Mode + 1) % ModeCount; }
+    public string ModeName => BroadcastPlan.ModeName(Mode);
 
     public void UpdateCamera(Vector3 ball, Vector3 player, Vector3 facing, float dt)
     {
-        Vector3 target, look;
-        float fov = 55f;
-        switch (Mode)
-        {
-            case 1:
-                var fwd = MxToG(Mx.Norm(Gx(facing)));
-                // A stationary player has no facing yet; without a fallback the camera
-                // sits directly overhead and LookAt degenerates (the view flips).
-                if (fwd.LengthSquared() < 1e-6f) fwd = new Vector3(1f, 0f, 0f);
-                target = player - fwd * 7.5f + new Vector3(0, 3.1f, 0);
-                look = player + fwd * 9f + new Vector3(0, 1.2f, 0);
-                fov = 68f;
-                break;
-            case 2:
-                // Shoulder cam: above and just off the controlled player's shoulder.
-                // Fills the gap between the near on-pitch player cam (3 m / 7 m) and
-                // the wider sideline view, so it is not right on top of the players.
-                var sf = MxToG(Mx.Norm(Gx(facing)));
-                if (sf.LengthSquared() < 1e-6f) sf = new Vector3(1f, 0f, 0f);
-                Vector3 shoulder = new Vector3(-sf.Z, 0, sf.X) * 2.2f;
-                target = player - sf * 13f + new Vector3(0, 8.5f, 0) + shoulder;
-                look = player + sf * 7f + new Vector3(0, 1.2f, 0);
-                fov = 62f;
-                break;
-            case 3:
-                // Mid camera: low, wide tracking shot between the shoulder cam and
-                // the high broadcast (28 m / 46 m).
-                target = new Vector3(ball.X - 3f, 14f + Mathf.Abs(ball.Z) * .04f, ball.Z + 24f);
-                look = new Vector3(ball.X + 2f, 1.1f, ball.Z);
-                fov = 58f;
-                break;
-            case 4:
-                // Straight-down tactical view sized so the 105 x 68 m pitch fills the
-                // frame.  88 m / fov 58 used to show the stadium stands as a huge grey
-                // wedge and LookAt with Vector3.Up was degenerate (camera looked down
-                // its own up axis), so the whole view could spin.
-                target = new Vector3(ball.X * .35f, 62f, ball.Z * .2f + .001f);
-                look = new Vector3(ball.X * .35f, 0, ball.Z * .2f);
-                fov = 58f;
-                break;
-            default:
-                // Classic broadcast angle: ~50 m of pitch in frame at 720p.
-                target = new Vector3(ball.X - 6f, 28f + Mathf.Abs(ball.Z) * .05f, ball.Z + 46f);
-                look = new Vector3(ball.X, 1.2f, ball.Z);
-                fov = 50f + Mathf.Clamp(Mathf.Abs(ball.Z) * .05f, 0f, 5f);
-                break;
-        }
+        // The recording showed a camera that spun with every stick direction.
+        // Damp the heading over ~0.7 s before it is allowed to place the camera.
+        var f = Gx(facing);
+        if (f.LengthSquared() < 1e-6f) f = Gx(_heading);
+        else f = System.Numerics.Vector3.Normalize(f);
+        float hk = 1f - Mathf.Exp(-dt * 1.4f);
+        var blended = System.Numerics.Vector3.Lerp(Gx(_heading), f, hk);
+        if (blended.LengthSquared() > 1e-6f)
+            _heading = MxToG(System.Numerics.Vector3.Normalize(blended));
+
+        // Hold a dead-zone focus point: tiny ball/player jitter no longer drags
+        // the whole stadium around every frame.  A genuine breakaway still eases
+        // the camera across the pitch.
+        var desiredFocus = BroadcastPlan.Focus(Gx(ball), Gx(player));
+        if (!_init) _focus = MxToG(desiredFocus);
+        else _focus = MxToG(BroadcastPlan.AdvanceFocus(Gx(_focus), desiredFocus, dt, Mode));
+
+        var plan = BroadcastPlan.Compute(Mode, Gx(ball), Gx(player), Gx(_heading), Gx(_focus));
+        Vector3 target = MxToG(plan.Target), look = MxToG(plan.Look), up = MxToG(plan.Up);
         if (!_init) { _pos = target; _look = look; _init = true; }
-        float k = 1f - Mathf.Exp(-dt * (Mode == 1 ? 7f : 5f));
+        // Smooth mode changes too: the old Cycle() snapped to a new position.
+        float k = 1f - Mathf.Exp(-dt * 2.0f);
         _pos = _pos.Lerp(target, k);
         _look = _look.Lerp(look, k);
         Position = _pos;
-        // Looking straight down with Vector3.Up is degenerate; -Z gives a stable
-        // "north is up" tactical view (and keeps WASD camera-relative movement sane).
-        LookAtFromPosition(_pos, _look, Mode == 4 ? new Vector3(0f, 0f, -1f) : Vector3.Up);
-        Fov = Mathf.Lerp(Fov, fov, k);
+        LookAtFromPosition(_pos, _look, up);
+        Fov = Mathf.Lerp(Fov, plan.Fov, k);
     }
 
     private static Vector3 MxToG(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);
@@ -314,23 +281,34 @@ public static class RigAnimator
     public static void Pose(CharacterRig rig, PlayerState p, float dt, float time, System.Numerics.Vector3 ballPos)
     {
         if (rig.Skeleton == null) return;
-        // Shared, Godot-free gait curve (see Scripts/Core/Gait.cs).  Negative thigh
-        // angles swing the leg FORWARD; positive knee angles fold the shin back.
         float speed = Mx.Flat(p.Vel).Length();
-        float phase = p.AnimPhase;
-        GaitPose g = Gait.Compute(speed, phase, time);
+        // Close control has visible quick feet even when the player is standing.
+        if (p.Dribbling) speed = MathF.Max(speed, 2.4f);
+        // Per-player phase offset plus ball-aware head tracking: the squad no
+        // longer marches in lockstep and players look toward the play.
+        float phase = p.AnimPhase + p.Index * .013f;
+        float lookYaw = Gait.LookYaw(p.Facing, ballPos - p.Pos);
+        GaitPose raw = Gait.Compute(speed, phase, time + p.Index * .11f,
+                                    p.Sprinting, p.Dribbling, lookYaw);
+        if (rig.PoseReady) raw = Gait.Lerp(rig.SmoothPose, raw, 1f - Mathf.Exp(-dt * 14f));
+        rig.SmoothPose = raw;
+        rig.PoseReady = true;
+        GaitPose g = raw;
 
-        Set(rig, "Hips", g.Lean * .25f, g.Twist * .5f, g.Roll);
-        Set(rig, "Spine", g.Lean * .35f, -g.Twist * .6f, -g.Roll * .5f);
-        Set(rig, "Chest", g.Lean * .45f, g.Twist, g.Roll * .6f);
+        float ActionEnvelope(float total) =>
+            MathF.Sin(Math.Clamp(1f - p.ActionTimer / total, 0f, 1f) * MathF.PI);
+
+        Set(rig, "Hips", g.Lean * .25f, g.HipYawL * .5f, g.Roll + g.TurnLean);
+        Set(rig, "Spine", g.Lean * .35f, -g.Twist * .6f + g.ShoulderYaw * .3f, -g.Roll * .5f);
+        Set(rig, "Chest", g.Lean * .45f, g.Twist + g.ShoulderYaw + g.HeadYaw * .20f, g.Roll * .6f + g.ShoulderRoll);
         Set(rig, "Neck", -g.Lean * .30f, -g.Twist * .4f, 0);
-        Set(rig, "Head", -g.Lean * .25f + g.Breathe, -g.Twist * .5f, 0);
-        Set(rig, "LThigh", g.HipL, 0, .02f);
-        Set(rig, "RThigh", g.HipR, 0, -.02f);
+        Set(rig, "Head", -g.Lean * .25f + g.Breathe, -g.Twist * .5f + g.HeadYaw, 0);
+        Set(rig, "LThigh", g.HipL, g.HipYawL, .02f + g.HipRollL);
+        Set(rig, "RThigh", g.HipR, g.HipYawR, -.02f + g.HipRollR);
         Set(rig, "LShin", g.KneeL, 0, 0);
         Set(rig, "RShin", g.KneeR, 0, 0);
-        Set(rig, "LFoot", g.FootL, 0, 0);
-        Set(rig, "RFoot", g.FootR, 0, 0);
+        Set(rig, "LFoot", g.FootL, 0, g.FootRollL);
+        Set(rig, "RFoot", g.FootR, 0, g.FootRollR);
         Set(rig, "LUpperArm", g.ArmL, 0, -g.ArmOut);
         Set(rig, "RUpperArm", g.ArmR, 0, g.ArmOut);
         Set(rig, "LForearm", g.ElbowL, 0, -.05f);
@@ -338,6 +316,21 @@ public static class RigAnimator
         Set(rig, "LHand", 0, 0, 0);
         Set(rig, "RHand", 0, 0, 0);
 
+        if (p.Dribbling)
+        {
+            Set(rig, "Hips", g.Lean * .25f - .10f, 0, g.Roll);
+            Set(rig, "Chest", g.Lean * .45f + .10f, g.ShoulderYaw, g.ShoulderRoll);
+            Set(rig, "LUpperArm", g.ArmL, 0, -g.ArmOut - .25f);
+            Set(rig, "RUpperArm", g.ArmR, 0, g.ArmOut + .25f);
+        }
+        if (p.Shielding)
+        {
+            // Strength between challenger and ball: arms spread, shoulders turn
+            // and the carrier leans back instead of standing like a mannequin.
+            Set(rig, "Chest", g.Lean * .45f - .12f, g.ShoulderYaw + g.HeadYaw * .20f, g.ShoulderRoll);
+            Set(rig, "LUpperArm", g.ArmL - .15f, 0, -g.ArmOut - .45f);
+            Set(rig, "RUpperArm", g.ArmR - .15f, 0, g.ArmOut + .45f);
+        }
         if (p.IsKeeper)
         {
             Set(rig, "LUpperArm", -.25f, 0, -1.15f);
@@ -345,49 +338,48 @@ public static class RigAnimator
             Set(rig, "LForearm", -.3f, 0, -.2f);
             Set(rig, "RForearm", -.3f, 0, .2f);
         }
+        // Action clips are added to the smoothed gait and eased in/out, instead
+        // of overwriting every joint with a constant pose for N frames.
         if (p.Action == "kick" && p.ActionTimer > 0f)
         {
-            float k = 1f - p.ActionTimer / .4f;
-            float kick = MathF.Sin(k * MathF.PI) * 1.25f;
-            Set(rig, "RThigh", -kick, 0, 0);
-            Set(rig, "RShin", MathF.Max(0f, .4f - kick) * .8f, 0, 0);
-            Set(rig, "Chest", -kick * .12f, 0, 0);
+            float env = ActionEnvelope(.4f);
+            float kick = env * 1.25f;
+            Set(rig, "RThigh", g.HipR - kick, 0, 0);
+            Set(rig, "RShin", g.KneeR + MathF.Max(0f, .4f - kick) * .8f, 0, 0);
+            Set(rig, "Chest", g.Lean * .45f - kick * .12f, g.Twist, g.Roll);
         }
         else if (p.Action == "tackle" && p.ActionTimer > 0f)
         {
-            float k = 1f - p.ActionTimer / .45f;
-            Set(rig, "Chest", 0, 0, MathF.Sin(k * MathF.PI) * .85f);
-            Set(rig, "LThigh", -1.1f, 0, 0);
-            Set(rig, "RThigh", .5f, 0, 0);
+            float env = ActionEnvelope(.45f);
+            Set(rig, "Chest", g.Lean * .45f, 0, g.Roll + env * .85f);
+            Set(rig, "LThigh", g.HipL - env * 1.1f, 0, 0);
+            Set(rig, "RThigh", g.HipR + env * .5f, 0, 0);
         }
         else if (p.Action == "slide" && p.ActionTimer > 0f)
         {
-            // Committed slide: body low and leaning back, one leg extended into the
-            // challenge, the other folded underneath, arms thrown out for balance.
-            Set(rig, "Hips", -.35f, 0, .35f);
-            Set(rig, "Chest", -.55f, 0, .25f);
-            Set(rig, "LThigh", -1.25f, 0, 0);
-            Set(rig, "LShin", .12f, 0, 0);
-            Set(rig, "LFoot", -.35f, 0, 0);
-            Set(rig, "RThigh", .55f, 0, 0);
-            Set(rig, "RShin", 1.25f, 0, 0);
-            Set(rig, "LUpperArm", -.5f, 0, -1.1f);
-            Set(rig, "RUpperArm", -.5f, 0, 1.1f);
+            float env = ActionEnvelope(.60f);
+            Set(rig, "Hips", g.Lean * .25f - env * .35f, 0, g.Roll + env * .35f);
+            Set(rig, "Chest", g.Lean * .45f - env * .55f, 0, g.Roll + env * .25f);
+            Set(rig, "LThigh", g.HipL - env * 1.25f, 0, 0);
+            Set(rig, "LShin", g.KneeL + env * .12f, 0, 0);
+            Set(rig, "LFoot", g.FootL - env * .35f, 0, 0);
+            Set(rig, "RThigh", g.HipR + env * .55f, 0, 0);
+            Set(rig, "RShin", g.KneeR + env * 1.25f, 0, 0);
+            Set(rig, "LUpperArm", g.ArmL - env * .5f, 0, -g.ArmOut - env * 1.1f);
+            Set(rig, "RUpperArm", g.ArmR - env * .5f, 0, g.ArmOut + env * 1.1f);
         }
         else if (p.Action == "foul" && p.ActionTimer > 0f)
         {
-            // Fouled player stumbles: makes a free kick look like a foul rather than
-            // an invisible referee decision.
-            float k = 1f - p.ActionTimer / 1.1f;
-            float fall = MathF.Sin(MathF.Min(1f, k * 1.6f) * MathF.PI * .5f);
-            Set(rig, "Hips", 0, 0, fall * .55f);
-            Set(rig, "Chest", fall * .65f, 0, fall * .35f);
-            Set(rig, "Head", -fall * .35f, 0, 0);
-            Set(rig, "LThigh", -fall * .8f, 0, 0);
-            Set(rig, "RThigh", fall * .45f, 0, 0);
-            Set(rig, "LShin", fall * .9f, 0, 0);
-            Set(rig, "LUpperArm", -.8f, 0, -1.4f * fall);
-            Set(rig, "RUpperArm", -.6f, 0, 1.2f * fall);
+            float env = ActionEnvelope(1.1f);
+            float fall = MathF.Sin(MathF.Min(1f, env * 1.6f) * MathF.PI * .5f);
+            Set(rig, "Hips", g.Lean * .25f, 0, g.Roll + fall * .55f);
+            Set(rig, "Chest", g.Lean * .45f + fall * .65f, 0, g.Roll + fall * .35f);
+            Set(rig, "Head", -g.Lean * .25f - fall * .35f, 0, 0);
+            Set(rig, "LThigh", g.HipL - fall * .8f, 0, 0);
+            Set(rig, "RThigh", g.HipR + fall * .45f, 0, 0);
+            Set(rig, "LShin", g.KneeL + fall * .9f, 0, 0);
+            Set(rig, "LUpperArm", g.ArmL - .8f, 0, -g.ArmOut - 1.4f * fall);
+            Set(rig, "RUpperArm", g.ArmR - .6f, 0, g.ArmOut + 1.2f * fall);
         }
         else if (p.Action == "celebrate")
         {
@@ -399,15 +391,14 @@ public static class RigAnimator
         }
         else if (p.Action == "dive" && p.ActionTimer > 0f)
         {
-            float k = 1f - p.ActionTimer / .65f;
-            Set(rig, "Chest", 0, 0, MathF.Sin(k * MathF.PI) * 1.2f);
-            Set(rig, "LThigh", -.7f, 0, 0);
-            Set(rig, "RThigh", .4f, 0, 0);
+            float env = ActionEnvelope(.65f);
+            Set(rig, "Chest", g.Lean * .45f, 0, g.Roll + env * 1.2f);
+            Set(rig, "LThigh", g.HipL - env * .7f, 0, 0);
+            Set(rig, "RThigh", g.HipR + env * .4f, 0, 0);
         }
         if (rig.EditorMode) return;
 
-        // Two weight-bearing bounces per stride plus a little lateral sway, so the
-        // pelvis transfers weight instead of gliding on rails.
+        // Two weight-bearing bounces per stride plus a little lateral sway.
         rig.Skeleton.Position = new Vector3(g.BobX, g.BobY, 0);
     }
 

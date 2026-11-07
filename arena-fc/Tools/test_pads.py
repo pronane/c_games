@@ -237,12 +237,20 @@ def main() -> int:
     check("raw b0 = THROUGH", held(btns(0), empty, raw, False)["through"])
     check("raw b1 = TACKLE", held(btns(1), empty, raw, False)["tackle"])
     check("raw b4 = SWITCH", held(btns(4), empty, raw, False)["switch"])
-    check("raw LT (b6) sprints", held(btns(6), empty, raw, False)["sprint"])
+    check("raw LT (b6) is close-control DRIBBLE",
+          held(btns(6), empty, raw, False)["dribble"]
+          and not held(btns(6), empty, raw, False)["sprint"])
+    check("raw RT (b7) sprints", held(btns(7), empty, raw, False)["sprint"])
+    check("raw Back (b8) is LONG BALL", held(btns(8), empty, raw, False)["lob"])
+    check("raw L3 (b10) is DRIBBLE", held(btns(10), empty, raw, False)["dribble"])
     check("raw Start (b9) pauses", held(btns(9), empty, raw, False)["pause"])
-    check("raw R3 (b10) changes camera", held(btns(10), empty, raw, False)["camera"])
+    check("raw R3 (b11) changes camera", held(btns(11), empty, raw, False)["camera"])
     check("standard A = PASS", held(btns(0), empty, std, True)["pass"])
     check("standard Start (b6) pauses", held(btns(6), empty, std, True)["pause"])
-    check("analogue trigger sprints", held(btns(), axs(**{"4": 1.0}), std, True)["sprint"])
+    check("standard Back (b4) is LONG BALL", held(btns(4), empty, std, True)["lob"])
+    check("standard L3 (b7) is DRIBBLE", held(btns(7), empty, std, True)["dribble"])
+    check("analogue LT is DRIBBLE", held(btns(), axs(**{"4": 1.0}), std, True)["dribble"])
+    check("analogue RT sprints", held(btns(), axs(**{"5": 1.0}), std, True)["sprint"])
     check("raw hat button 12 moves up (no 11-14 conflict)", move(btns(12), empty, False, 0.25)[1] < -0.9)
     check("raw hat button 15 moves right", move(btns(15), empty, False, 0.25)[0] > 0.9)
     check("Godot hat button 11 works on an unmapped pad", move(btns(11), empty, False, 0.25)[1] < -0.9)
@@ -315,12 +323,15 @@ def main() -> int:
           "Ui.FocusFirst(root)" in game_app and "Ui.FocusFirst(panel)" in game_app)
     check("WASD is rotated into camera space",
           "Cam.GlobalTransform.Basis" in match_view and "worldMove" in match_view)
-    check("tactical camera is stable and player cam has a zero-facing guard",
-          "Mode == 4 ? new Vector3(0f, 0f, -1f)" in world3d
-          and "fwd.LengthSquared() < 1e-6f" in world3d)
-    check("five cameras incl. a shoulder view between player cam and sideline",
-          "ModeCount = 5" in world3d and "Shoulder" in world3d and "Sideline" in world3d
-          and "case 2:" in world3d and "case 3:" in world3d and "case 4:" in world3d)
+    camera_plan = (ROOT / "Scripts" / "Core" / "CameraPlan.cs").read_text(encoding="utf-8")
+    check("tactical camera is stable and the camera heading is damped",
+          "new Vector3(0f, 0f, -1f)" in camera_plan
+          and "f.LengthSquared() < 1e-6f" in world3d
+          and "Mathf.Exp(-dt * 1.4f)" in world3d)
+    check("five stable cameras incl. ball follow, shoulder and sideline",
+          "ModeCount = 5" in camera_plan and "Shoulder" in camera_plan and "Sideline" in camera_plan
+          and "case 2:" in camera_plan and "case 3:" in camera_plan and "case 4:" in camera_plan
+          and "BroadcastPlan.Compute" in world3d)
     check("HUD hint advertises the pad camera button", "pad R3 camera" in hud_cs)
     check("C# core regression suite is wired into CI",
           (ROOT / "Tests" / "MatchCoreTests.cs").exists()
@@ -355,10 +366,96 @@ def main() -> int:
     check("gait is a shared pure-C# curve with forward thighs and bending knees",
           "Gait.Compute" in world3d and "float hipL = -(s * .66f" in gait_cs
           and "float kneeL = (.14f" in gait_cs and 'Set(rig, "LFoot"' in world3d
-          and (ROOT / "Tests" / "MatchCoreTests.csproj").read_text(encoding="utf-8").find("Gait.cs") >= 0)
+          and any(k in (ROOT / "Tests" / "MatchCoreTests.csproj").read_text(encoding="utf-8")
+                  for k in ("Gait.cs", "Scripts/Core/**/*.cs")))
     browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
     check("browser edition mirrors the corrected gait signs",
           "var hip_l: float = -(s * 0.66" in browser and "sin(ph + 0.40)" in browser)
+
+    section("06.11.2026 camera / pad / gameplay fixes")
+    match_core = (ROOT / "Scripts" / "Core" / "Match.cs").read_text(encoding="utf-8")
+    packet = (ROOT / "Scripts" / "Core" / "Net" / "Packet.cs").read_text(encoding="utf-8")
+    controls = (ROOT / "Scripts" / "Godot" / "Controls.cs").read_text(encoding="utf-8")
+    pad_nav = (ROOT / "Scripts" / "Godot" / "PadMenuNavigator.cs").read_text(encoding="utf-8")
+    ui = (ROOT / "Scripts" / "Godot" / "Ui.cs").read_text(encoding="utf-8")
+    gait = (ROOT / "Scripts" / "Core" / "Gait.cs").read_text(encoding="utf-8")
+    rig_factory = (ROOT / "Scripts" / "Godot" / "RigFactory.cs").read_text(encoding="utf-8")
+    match_view = (ROOT / "Scripts" / "Godot" / "MatchView.cs").read_text(encoding="utf-8")
+    hud = (ROOT / "Scripts" / "Godot" / "Hud.cs").read_text(encoding="utf-8")
+    controllers_gd = (ROOT / "Web" / "Controllers.gd").read_text(encoding="utf-8")
+    browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
+    check("human one-shot actions are consumed every fixed tick",
+          "private void HumanActions" in match_core and "if (human) HumanActions(p, pc);" in match_core)
+    check("released stick only auto-presses while defending",
+          "p.Target = p.Pos;" in match_core and "Active stick input always wins" in match_core
+          and "humanDefending && S.ControlLock <= 0f" in match_core)
+    check("short pass, long ball, dribble and stronger sprint exist",
+          "FindBestPassTarget(p, true, true)" in match_core and "bool Dribble" in match_core
+          and "1.42f" in match_core and "owner.Dribbling" in match_core)
+    check("dribble survives the v2 wire format",
+          "Sd = c.Shield || c.Dribble" in packet and "Shield = Sd, Dribble = Sd" in packet)
+    check("one-shot pad edges are buffered across accumulator frames",
+          "MergePending(cmd)" in match_view and "Engine.CurrentTick != before" in match_view)
+    check("HUD and MatchView share one InputHub",
+          "Hud = new Hud { Input = Input }" in match_view)
+    check("ball, owner and controlled player are separately marked",
+          "BallRing" in match_view and "OwnerArrow" in match_view
+          and "_possession" in hud and "BALL · LOOSE" in hud)
+    check("menu START activates on the first press and focus is actionable",
+          "if (eAccept && seeded != null) Activate(seeded);" in pad_nav
+          and "c is BaseButton || c is Slider" in ui)
+    check("menu accept and back no longer collide on R3",
+          "PadLayout.Button(buttons, known ? 4 : 8)) back = true" in controls
+          and 'PadLayout.Button(buttons, 8)' not in controls)
+    check("camera button has an accidental-stick-click debounce",
+          "_cameraHold > .12f" in controls)
+    check("gait is smoothed and has out-of-plane joints",
+          "Gait.Lerp" in world3d and "HipYawL" in gait
+          and "SmoothPose" in rig_factory and "ActionEnvelope" in world3d)
+    check("browser edition mirrors lob / dribble / long ball",
+          'out["lob"]' in controllers_gd and 'out["dribble"]' in controllers_gd
+          and 'cmd["sd"]' in browser and "Long ball." in browser)
+    check("camera plan keeps a fixed sideline orientation",
+          "fixed world orientation, never spins with facing" in camera_plan
+          and "ClampPitch" in camera_plan)
+
+    section("06.11.2026 second pass — latched taps, dead-zone camera, tracking")
+    controls = (ROOT / "Scripts" / "Godot" / "Controls.cs").read_text(encoding="utf-8")
+    pad_nav = (ROOT / "Scripts" / "Godot" / "PadMenuNavigator.cs").read_text(encoding="utf-8")
+    camera_plan = (ROOT / "Scripts" / "Core" / "CameraPlan.cs").read_text(encoding="utf-8")
+    world3d = (ROOT / "Scripts" / "Godot" / "World3D.cs").read_text(encoding="utf-8")
+    match_core = (ROOT / "Scripts" / "Core" / "Match.cs").read_text(encoding="utf-8")
+    gait = (ROOT / "Scripts" / "Core" / "Gait.cs").read_text(encoding="utf-8")
+    match_view = (ROOT / "Scripts" / "Godot" / "MatchView.cs").read_text(encoding="utf-8")
+    hud = (ROOT / "Scripts" / "Godot" / "Hud.cs").read_text(encoding="utf-8")
+    check("quick joypad taps are event-latched",
+          "PushJoyButton" in controls and "_pendingJoyPress" in controls
+          and "InputEventJoypadButton" in pad_nav and "SetProcessInput(true)" in pad_nav
+          and "PushJoyButton" in match_view)
+    check("SELECT/Back activates on the main menu",
+          "TryGoBack" in pad_nav and "eBack && seeded != null" in pad_nav
+          and 'h["lob"]' in controls)
+    check("camera holds a dead-zone focus instead of drifting",
+          "AdvanceFocus" in camera_plan and "FocusDeadzone" in camera_plan
+          and "BroadcastPlan.AdvanceFocus" in world3d and "_focus" in world3d)
+    check("billboarded possession / pressure nameplates",
+          "ControlName" in match_view and "OwnerName" in match_view
+          and "BallName" in match_view and "PressureRing" in match_view
+          and '"billboard"' in match_view)
+    check("contextual HUD shows the actions that matter",
+          "_actions" in hud and "CLOSE CONTROL" in hud and "pad R3 camera" in hud)
+    check("gentle stick enters close control and short pass prefers a nearby man",
+          "assistedCloseControl" in match_core and "moveMag < .60f" in match_core
+          and "MathF.Max(0f, 12f - d)" in match_core)
+    check("tackle / slide visibly lunges into range",
+          "lungeDir" in match_core and "p.Target = carrier.Pos" in match_core
+          and "p.Action == \"tackle\" || p.Action == \"slide\"" in match_core)
+    check("players desynchronise and track the ball",
+          "InitialPhase" in gait and "LookYaw" in gait and "HeadYaw" in gait
+          and "Gait.InitialPhase(idx)" in match_core and "Gait.LookYaw" in world3d)
+    browser = (ROOT / "Web" / "BrowserBoot.gd").read_text(encoding="utf-8")
+    check("browser keeps per-player phase and ball-aware head yaw",
+          "look_yaw" in browser and 'p["phase"]' in browser)
 
     section("Optional syntax parsers")
     try:
@@ -379,8 +476,12 @@ def main() -> int:
         lang = Language(tree_sitter_c_sharp.language())
         parser = Parser(lang)
         bad = []
-        for f in ["Scripts/Core/Input/PadLayout.cs", "Scripts/Godot/Controls.cs",
-                  "Scripts/Godot/GameApp.cs", "Tests/Program.cs"]:
+        for f in ["Scripts/Core/Input/PadLayout.cs", "Scripts/Core/CameraPlan.cs",
+                  "Scripts/Core/Gait.cs", "Scripts/Core/Match.cs",
+                  "Scripts/Godot/Controls.cs", "Scripts/Godot/GameApp.cs",
+                  "Scripts/Godot/PadMenuNavigator.cs", "Scripts/Godot/MatchView.cs",
+                  "Scripts/Godot/Hud.cs", "Scripts/Godot/World3D.cs",
+                  "Tests/Program.cs", "Tests/MatchCoreTests.cs"]:
             tree = parser.parse((ROOT / f).read_bytes())
             if tree.root_node.has_error:
                 bad.append(f)

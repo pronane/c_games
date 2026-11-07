@@ -55,20 +55,49 @@ is the desktop adapter; `Tests/gd/test_pads.gd`, `Tools/test_pads.py` and the Pa
   every Button, so the main menu, pause menu, settings, controls, controller setup and character editor
   ignored arrow keys, Enter and the pad. Buttons are now focusable, each menu seeds focus on its first
   item, and `PadMenuNavigator` (on the Window, outside the menu/match swaps) walks focus with the d-pad /
-  left stick, activates with A / Start and goes back with B. It uses the same `PadLayout` tables as
+  left stick, activates with A / Start / Select and goes back with Back/Select in overlays. It uses the same `PadLayout` tables as
   gameplay, so unmapped EasySMX D-input pads work too. A / left-right also cycle combos and sliders.
 * **Five camera angles.** `C` (or pad R3/L3) cycles Broadcast → Player cam → **Shoulder** (8.5 m high,
   13 m behind the controlled player, slightly off-axis) → **Sideline** (14 m / 24 m wide tracking) →
   Tactical (62 m top-down). Shoulder is the missing step between "right on top of the players" and the
   next view out; WASD is camera-relative in all five.
-* **Pad menus select with any face button.** A pad reported as "known" but actually sending raw D-input
-  indices used to leave `A` unmapped, so up/down worked while nothing could be selected. Menus now
-  accept **any** A/B/X/Y, Start or Back for select, use the direct click callback rather than a
-  synthesised signal, and go back on R3/L3.
-* **Full action set (desktop):** `E`/A pass, `SPACE`/X shoot (hold), `Q`/Y through ball, `R` chip,
-  `F`/B standing tackle, **`SHIFT+F` / sprint+B slide tackle** (3.2 m reach, bigger foul risk),
-  **`X` / pad LB (raw Back) held = shield** (strength contest, drains stamina), `TAB` switch,
-  `C` camera, `ESC` pause. First-touch pass/shoot also work within 1.6 m of a loose ball.
+* **Pad menus select on the FIRST press.** A pad reported as "known" but actually sending raw
+  D-input indices used to leave `A` unmapped; later, button 8 was both ACCEPT and BACK, so START
+  appeared to do nothing. Menus now accept **any A/B/X/Y, START or SELECT**, activate even when
+  focus has just been seeded, focus only actionable widgets, and use the direct click callback.
+  Back/Select goes back in overlays; on the main menu (where there is no Back target) it also
+  activates. R3 is gameplay camera only.
+* **Button presses are no longer dropped.** Human one-shot actions used to be read only on the
+  0.08–0.18 s AI decision clock, so a normal tap was usually discarded. They are now consumed on
+  every fixed tick and buffered across physics frames that produce no tick. The human also no longer
+  auto-runs toward goal when the stick is released.
+* **Quick taps survive the poll interval (second pass).** `PadMenuNavigator` and `MatchView` now
+  feed every `InputEventJoypadButton` to `InputHub.PushJoyButton()`. A press+release shorter than one
+  physics frame is latched for the next `Read()`, so A / START / SELECT / kick / tackle cannot vanish
+  between polls. Duplicate events from the two nodes are deduplicated.
+* **The camera no longer drifts with every touch (second pass).** `BroadcastPlan.AdvanceFocus()`
+  holds a 5.5 m (14 m tactical) dead-zone focus point; only a genuine breakaway eases the camera
+  across the pitch. Camera height is fixed per mode, so ball-player separation no longer pumps the
+  view up and down. All ball-following modes keep a fixed sideline orientation.
+* **Possession and pressure are readable (second pass).** Billboarded `YOU`, `BALL`, `OPP` and
+  `LOOSE BALL` nameplates sit above the relevant player/marker, rings and arrows are larger, a blue
+  ring marks the nearest opponent, the minimap draws the same pressure outline, and a large top-centre
+  HUD panel shows the carrier plus the exact buttons that matter in the current phase.
+* **Close control, safe passes and reachable challenges (second pass).** A carrier moving the stick
+  gently enters CLOSE CONTROL automatically (LT/L3 still forces it). Short pass now heavily prefers
+  a near open teammate, while long ball still requires a distant advanced target. A human B / RB+B
+  challenge makes a short lunge and keeps its target through `Decide()`, so dispossession is visible
+  without dragging every AI presser into a scrum.
+* **Less lockstep animation (second pass).** Every player starts with a deterministic stride phase
+  offset, heads/chests track the ball, shield spreads the arms and leans the carrier back, and
+  `GaitPose.HeadYaw` is eased with the rest of the pose.
+* **Full action set (desktop):** `E`/A **short pass**, `R`/pad Back **long ball / cross**,
+  `SPACE`/pad X **shoot (hold to charge)**, `Q`/pad Y **through ball**, `F`/pad B **standing
+  tackle**, `SHIFT+F` / pad RB+B **slide tackle**, `X` / pad LT or L3 **close-control dribble +
+  shield**, `TAB` / pad LB **switch**, `C` / pad R3 **camera**, `ESC` / Start **pause**.
+  `SHIFT` / RB / RT **sprint** is now 1.42× with stronger acceleration; sprinting into a carrier
+  also triggers a **shoulder-charge strength contest**. First-touch pass / shoot / long ball work
+  within 1.6 m of a loose ball. LT and RT are now separate actions instead of both meaning sprint.
 * **Remap** from **CONTROLLER SETUP** in the main menu (desktop and browser): *Remap pad 1/2*, then press
   the button asked for each action. Bindings are saved per pad name in `user://pads.json` (IndexedDB in
   the browser) and restored next time. The screen also lists each pad's name, detected kind and current
@@ -104,7 +133,8 @@ Set `TRUST_PROXY=1` behind any of these, and `ARENA_ALLOWED_ORIGINS` to your sit
 **No .NET needed any more:** `arena-fc/ARENA_NODE.md` describes a Node port of the match that runs inside the same hub
 (`ARENA_NATIVE=1`, `arena-fc/option-a/Dockerfile`). It speaks the same protocol, passes the existing protocol
 tests and serves the browser build, so you can deploy the whole thing on your existing Node service. The C#
-server stays blocked on the missing `Scripts/Core/Net/*.cs` and is only needed for the desktop 11-a-side game.
+`.NET` server is now restored too: `Scripts/Core/Net/*.cs` was rebuilt from the checked-in wire format
+(see `MISSING_NET_SOURCES.md`); it builds on .NET 9 and is used by the desktop C# clients.
 
 ## Browser preview without a Godot editor
 

@@ -5,6 +5,10 @@
 // driven with a mouse.  This node lives on the Window (outside GameApp.Clear()),
 // watches whichever Control currently owns GUI focus and drives it from any pad —
 // including unmapped EasySMX D-input pads, via the same PadLayout tables gameplay uses.
+//
+// Second pass: this node also latches joypad button events, so a Select/Start/A
+// tap shorter than the poll interval still activates a menu item.  On the main
+// menu there is no "Back" target, so Select/Back falls through to activation too.
 using System;
 using System.Collections.Generic;
 using Godot;
@@ -22,7 +26,14 @@ public partial class PadMenuNavigator : Node
     {
         Name = "PadMenuNavigator";
         ProcessMode = Node.ProcessModeEnum.Always;
+        SetProcessInput(true);
         InputHub.EnsureMenuPadActions();
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+        if (@event is InputEventJoypadButton jb)
+            InputHub.PushJoyButton(jb.Device, (int)jb.ButtonIndex, jb.Pressed);
     }
 
     public override void _Process(double delta)
@@ -38,9 +49,13 @@ public partial class PadMenuNavigator : Node
         var focus = GetViewport().GuiGetFocusOwner();
         if (focus == null)
         {
-            // A pad was pressed but nothing owns focus yet (e.g. a freshly opened
-            // overlay): seed the first focusable control and let the next press act.
+            // Seed focus AND activate on the same press.  Requiring a second press
+            // made A / START look dead whenever a freshly opened overlay had no
+            // GUI focus owner yet.
             Ui.FocusFirst(root);
+            var seeded = GetViewport().GuiGetFocusOwner();
+            if (eAccept && seeded != null) Activate(seeded);
+            else if (eBack && seeded != null) Activate(seeded);
             return;
         }
 
@@ -71,7 +86,7 @@ public partial class PadMenuNavigator : Node
             return;
         }
         if (eAccept) Activate(focus);
-        if (eBack) GoBack(root);
+        if (eBack && !TryGoBack(root)) Activate(focus);
     }
 
     private static void StepCombo(OptionButton combo, int step)
@@ -83,7 +98,7 @@ public partial class PadMenuNavigator : Node
         if (Ui.ComboChanged.TryGetValue(combo, out var changed)) changed(next);
     }
 
-    private static void Activate(Control focus)
+    private void Activate(Control focus)
     {
         if (focus is CheckBox check)
         {
@@ -100,9 +115,18 @@ public partial class PadMenuNavigator : Node
             else btn.EmitSignal(BaseButton.SignalName.Pressed);
         }
         else if (focus is BaseButton other) other.EmitSignal(BaseButton.SignalName.Pressed);
+        else
+        {
+            // A non-button Control somehow owns focus: fall back to the first
+            // actionable Button instead of silently swallowing START.
+            foreach (Control c in Ui.Focusables(GetTree().Root))
+                if (c is Button b) { Activate(b); return; }
+        }
     }
 
-    private static void GoBack(Node root)
+    /// <summary>Returns false on screens with no Back/Resume target (the main menu),
+    /// so Select/Back can act as a second accept button instead of doing nothing.</summary>
+    private static bool TryGoBack(Node root)
     {
         // Overlays always have a "Back" button; the pause menu has "Resume".
         foreach (Control c in Ui.Focusables(root))
@@ -111,7 +135,8 @@ public partial class PadMenuNavigator : Node
                 b.GrabFocus();
                 if (Ui.ButtonClicked.TryGetValue(b, out var click)) click();
                 else b.EmitSignal(BaseButton.SignalName.Pressed);
-                return;
+                return true;
             }
+        return false;
     }
 }

@@ -28,6 +28,7 @@ class FakePads extends RefCounted:
 			"switch": false, "sprint": false,
 			"pause": bool(buttons.get("pause", false)),
 			"camera": bool(buttons.get("camera", false)),
+			"lob": false, "dribble": false,
 		}
 	func start_pressed(_dev: int) -> bool:
 		return bool(buttons.get("pause", false))

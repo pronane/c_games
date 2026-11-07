@@ -504,7 +504,7 @@ public static class Program
                           $"reconnect grace {NetProtocol.ReconnectGraceSeconds}s · " +
                           $"migration {(_hub.PeerHost ? "peer simulation handoff" : "host role")}</p>");
             sb.AppendLine("<div class='box'><b>How to play</b><br>1. In the game, open <b>PLAY WITH FRIENDS</b>.<br>" +
-                          $$"2. Set the server address to <code>wss://YOUR-PUBLIC-HOST/ws</code>.<br>" +
+                          "2. Set the server address to <code>wss://YOUR-PUBLIC-HOST/ws</code>.<br>" +
                           "3. One friend clicks <b>CREATE MATCH</b> and shares the 6-letter room code.<br>" +
                           "4. Everyone else enters that code and clicks <b>JOIN</b>.<br>" +
                           "5. The host clicks <b>START MATCH</b>. Play!<br>" +

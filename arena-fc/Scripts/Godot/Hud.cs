@@ -23,14 +23,40 @@ public partial class Minimap : Control
         float Px(float x) => pad + (x / Mx.PitchLength + .5f) * w;
         float Py(float z) => pad + (z / Mx.PitchWidth + .5f) * h;
         foreach (var p in Engine.State.Players)
-            DrawCircle(new Vector2(Px(p.Pos.X), Py(p.Pos.Z)), p.IsKeeper ? 2.6f : 2.2f,
+            DrawCircle(new Vector2(Px(p.Pos.X), Py(p.Pos.Z)), p.IsKeeper ? 3.2f : 2.8f,
                 p.Team == 0 ? new Color(.95f, .25f, .3f) : new Color(.35f, .6f, 1f));
-        if (Engine.State.Controlled >= 0 && Engine.State.Controlled < Engine.State.Players.Length)
+        var bp = new Vector2(Px(Engine.State.Ball.Pos.X), Py(Engine.State.Ball.Pos.Z));
+        int ctrl = Engine.State.Controlled;
+        if (ctrl >= 0 && ctrl < Engine.State.Players.Length)
         {
-            var c = Engine.State.Players[Engine.State.Controlled];
-            DrawCircle(new Vector2(Px(c.Pos.X), Py(c.Pos.Z)), 4.2f, new Color(.2f, 1f, .55f), false, 1.4f);
+            var c = Engine.State.Players[ctrl];
+            var cp = new Vector2(Px(c.Pos.X), Py(c.Pos.Z));
+            DrawLine(cp, bp, new Color(.2f, 1f, .55f, .75f), 1.8f);
+            DrawCircle(cp, 5.2f, new Color(.2f, 1f, .55f), false, 2f);
+            // Nearest opposition presser gets a blue outline, matching the 3D
+            // PressureRing so the minimap and the pitch tell the same story.
+            int press = -1; float pd = float.MaxValue;
+            foreach (var q in Engine.State.Players)
+            {
+                if (q.Team == c.Team || q.IsKeeper) continue;
+                float d = Mx.FlatDist(q.Pos, Engine.State.Ball.Pos);
+                if (d < pd) { pd = d; press = q.Index; }
+            }
+            if (press >= 0)
+            {
+                var q = Engine.State.Players[press];
+                DrawCircle(new Vector2(Px(q.Pos.X), Py(q.Pos.Z)), 5.0f,
+                    new Color(.35f, .65f, 1f), false, 1.8f);
+            }
         }
-        DrawCircle(new Vector2(Px(Engine.State.Ball.Pos.X), Py(Engine.State.Ball.Pos.Z)), 2.2f, new Color(1f, .95f, .65f));
+        int owner = Engine.State.Ball.Owner;
+        if (owner >= 0 && owner < Engine.State.Players.Length)
+        {
+            var o = Engine.State.Players[owner];
+            DrawCircle(new Vector2(Px(o.Pos.X), Py(o.Pos.Z)), 6.2f,
+                new Color(1f, .72f, .18f), false, 2.2f);
+        }
+        DrawCircle(bp, 3.4f, new Color(1f, .95f, .65f));
     }
 }
 
@@ -92,7 +118,8 @@ public partial class Hud : CanvasLayer
     public Action? OnQuit, OnResume, OnCamera, OnTouchToggle;
     public bool Paused;
 
-    private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!, _hint = null!, _cam = null!;
+    private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!,
+                  _hint = null!, _cam = null!, _possession = null!, _focus = null!, _actions = null!;
     private ProgressBar _power = null!, _stamina = null!;
     private PanelContainer _pauseMenu = null!;
     private Control _pauseButtons = null!;
@@ -123,34 +150,49 @@ public partial class Hud : CanvasLayer
         Place(statsPanel, 1f, 0f, -340, 14, 324, 44);
         root.AddChild(statsPanel);
 
+        // Big top-centre focus panel: camera, ball carrier, controlled player and
+        // the buttons that matter right now.  The old left-edge labels sat under
+        // the webcam overlay in the recording.
+        var focusBox = Ui.VBox(2);
+        _cam = Ui.Lbl("Broadcast", 13, Ui.Accent);
+        _possession = Ui.Lbl("BALL · LOOSE", 18, new Color(1f, .92f, .45f));
+        _focus = Ui.Lbl("YOU · —", 14, Ui.Sub);
+        _actions = Ui.Lbl("A PASS · X SHOOT · LT DRIBBLE · RT SPRINT", 13, Ui.Text);
+        focusBox.AddChild(_cam); focusBox.AddChild(_possession);
+        focusBox.AddChild(_focus); focusBox.AddChild(_actions);
+        var focusPanel = Ui.PanelC(focusBox, Ui.Panel);
+        Place(focusPanel, .5f, 0f, -230, 12, 460, 118);
+        root.AddChild(focusPanel);
+
         // Commentary feed (bottom left)
         _feed = Ui.Lbl("", 14, Ui.Sub);
         var feedPanel = Ui.PanelC(_feed);
         Place(feedPanel, 0f, 1f, 16, -152, 430, 96);
         root.AddChild(feedPanel);
 
-        // Minimap (bottom right)
-        _minimap = new Minimap { CustomMinimumSize = new Vector2(210, 136) };
+        // Minimap (bottom right) - larger and higher contrast than the tiny 210px map.
+        _minimap = new Minimap { CustomMinimumSize = new Vector2(250, 164) };
         var mapPanel = Ui.PanelC(_minimap);
-        Place(mapPanel, 1f, 1f, -242, -178, 226, 162);
+        Place(mapPanel, 1f, 1f, -292, -214, 276, 196);
         root.AddChild(mapPanel);
 
-        // Bars
+        // Bars sit above the action legend instead of obscuring it.
         _power = Bar(new Color(1f, .72f, .18f));
-        Place(_power, .5f, 1f, -130, -52, 260, 14);
+        Place(_power, .5f, 1f, -130, -112, 260, 14);
         root.AddChild(_power);
         _stamina = Bar(new Color(.18f, .9f, .55f));
-        Place(_stamina, .5f, 1f, -130, -32, 260, 10);
+        Place(_stamina, .5f, 1f, -130, -94, 260, 10);
         root.AddChild(_stamina);
 
-        _hint = Ui.Lbl("WASD move  ·  SHIFT sprint  ·  E pass  ·  SPACE shoot  ·  F tackle  ·  SHIFT+F slide  ·  X shield  ·  Q through  ·  TAB switch  ·  C / pad R3 camera  ·  ESC pause",
-                      12, Ui.Sub);
-        Place(_hint, .5f, 1f, -470, -14, 940, 18);
-        root.AddChild(_hint);
-
-        _cam = Ui.Lbl("Broadcast", 13, Ui.Accent);
-        Place(_cam, 0f, 0f, 330, 22, 200, 24);
-        root.AddChild(_cam);
+        // Compact two-line legend.  "pad R3 camera" stays advertised, but the
+        // actions the player complained about are now impossible to miss.
+        _hint = Ui.Lbl("E / A SHORT PASS  ·  R / SELECT LONG BALL  ·  SPACE / X SHOOT (hold)  ·  X / LT CLOSE CONTROL  ·  SHIFT / RT SPRINT\n" +
+                       "F / B TACKLE  ·  SHIFT+F / RB+B SLIDE  ·  Q / Y THROUGH  ·  TAB / LB SWITCH  ·  C / pad R3 camera  ·  ESC / START pause",
+                       13, Ui.Sub);
+        _hint.HorizontalAlignment = HorizontalAlignment.Center;
+        var hintPanel = Ui.PanelC(_hint);
+        Place(hintPanel, .5f, 1f, -430, -78, 860, 58);
+        root.AddChild(hintPanel);
 
         _toast = Ui.Lbl("", 46, Ui.Accent);
         _toast.HorizontalAlignment = HorizontalAlignment.Center;
@@ -195,6 +237,8 @@ public partial class Hud : CanvasLayer
         TouchBtn(_touchLayer, "THROUGH", 1f, 1f, bx, by + 60, 84, 52, () => Input.TouchThrough = true, () => Input.TouchThrough = false);
         TouchBtn(_touchLayer, "TACKLE", 1f, 1f, bx + 92, by + 60, 84, 52, () => Input.TouchTackle = true, () => Input.TouchTackle = false);
         TouchBtn(_touchLayer, "SWITCH", 1f, 1f, bx + 184, by + 60, 84, 52, () => Input.TouchSwitch = true, () => Input.TouchSwitch = false);
+        TouchBtn(_touchLayer, "LONG", 1f, 1f, bx, by + 120, 84, 52, () => Input.TouchLob = true, () => Input.TouchLob = false);
+        TouchBtn(_touchLayer, "DRIBBLE", 1f, 1f, bx + 92, by + 120, 84, 52, () => Input.TouchDribble = true, () => Input.TouchDribble = false);
     }
 
     private static void TouchBtn(Control parent, string text, float ax, float ay, float x, float y, float w, float h, Action down, Action up)
@@ -262,9 +306,37 @@ public partial class Hud : CanvasLayer
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
         _cam.Text = cameraName;
+        int owner = s.Ball.Owner;
+        int ctrl = s.Controlled;
+        bool validCtrl = ctrl >= 0 && ctrl < s.Players.Length;
+        if (owner < 0 || owner >= s.Players.Length)
+        {
+            _possession.Text = "BALL · LOOSE";
+            _possession.AddThemeColorOverride("font_color", new Color(1f, .92f, .45f));
+        }
+        else
+        {
+            var carrier = s.Players[owner];
+            string side = carrier.Team == 0 ? "YOU" : "AWAY";
+            _possession.Text = $"BALL · {side} · {carrier.Spec.DisplayName.ToUpperInvariant()}";
+            _possession.AddThemeColorOverride("font_color",
+                carrier.Team == 0 ? Ui.Accent : new Color(1f, .55f, .25f));
+        }
+        if (validCtrl)
+        {
+            var c = s.Players[ctrl];
+            string state = c.Dribbling ? "CLOSE CONTROL" : c.Sprinting ? "SPRINT" : c.Pressing ? "PRESS" : "READY";
+            _focus.Text = $"YOU · {c.Spec.DisplayName.ToUpperInvariant()}   ·   {state}";
+        }
+        else _focus.Text = "YOU · AUTO";
+        if (owner >= 0 && owner == ctrl)
+            _actions.Text = "A SHORT PASS · X SHOOT (hold) · LT CLOSE CONTROL · BACK LONG BALL · RT SPRINT";
+        else if (owner < 0)
+            _actions.Text = "RT CHASE · B PRESS · A FIRST-TOUCH PASS · X CLEARANCE";
+        else
+            _actions.Text = "RT SPRINT · B TACKLE · RB+B SLIDE · LB SWITCH · R3 CAMERA";
         _power.Value = charge * 100f;
-        if (s.Controlled >= 0 && s.Controlled < s.Players.Length)
-            _stamina.Value = s.Players[s.Controlled].Stamina * 100f;
+        if (validCtrl) _stamina.Value = s.Players[ctrl].Stamina * 100f;
         if (Input.TouchEnabled) Input.TouchMove = _stick.Value;
         _minimap.Engine = e;
         _minimap.QueueRedraw();

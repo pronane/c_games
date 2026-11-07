@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ArenaFC.Core;
 using ArenaFC.Core.Input;
+using ArenaFC.Core.Net;
 using Godot;
 
 namespace ArenaFC.GodotGame;
@@ -20,6 +21,15 @@ public partial class GameApp : Node3D
     private CharacterRig _menuRig = null!;
     private float _t;
     private bool _menu;
+
+    // ---- PLAY WITH FRIENDS (protocol v2 desktop client) ----
+    private OnlineMatch? _online;
+    private CanvasLayer? _onlineLayer;
+    private Label? _onlineStatus;
+    private LineEdit? _urlEdit, _roomEdit, _nameEdit;
+    private Button? _createBtn, _joinBtn, _readyBtn, _startBtn;
+    private bool _onlineReady;
+    private string _resumeToken = "";
 
     public static void Create(Node3D root)
     {
@@ -51,6 +61,11 @@ public partial class GameApp : Node3D
 
     public void ShowMenu()
     {
+        // Leaving a match (or the lobby) always disconnects cleanly.
+        if (_online != null) { _online.Close(); _online = null; }
+        _onlineLayer = null;
+        _onlineStatus = null;
+        _onlineReady = false;
         Clear();
         _menu = true;
         PadMenuNavigator.Active = true;
@@ -88,13 +103,14 @@ public partial class GameApp : Node3D
 
         var menu = Ui.VBox(10);
         menu.AddChild(Ui.Btn("PLAY MATCH", StartMatch, true));
+        menu.AddChild(Ui.Btn("PLAY WITH FRIENDS", ShowOnline));
         menu.AddChild(Ui.Btn("CHARACTER EDITOR", ShowEditor));
         menu.AddChild(Ui.Btn("MATCH SETTINGS", ShowSettings));
         menu.AddChild(Ui.Btn("CONTROLS", ShowControls));
         menu.AddChild(Ui.Btn("CONTROLLER SETUP", ShowPadSetup));
         menu.AddChild(Ui.Btn("QUIT", () => GetTree().Quit()));
         var panel = Ui.PanelC(menu, Ui.Panel);
-        Place(panel, 0, .5f, 60, -190, 330, 300);
+        Place(panel, 0, .5f, 60, -220, 330, 360);
         root.AddChild(panel);
         // Seed GUI focus: arrow keys / Enter / the pad d-pad all act on the focused Control.
         Ui.FocusFirst(root);
@@ -113,6 +129,14 @@ public partial class GameApp : Node3D
 
     public override void _Process(double delta)
     {
+        if (_online != null && _onlineLayer != null && _menu)
+        {
+            // The socket pump is drained on the main thread; no Godot signals needed.
+            _online.Client.Poll();
+            if (_online.Client.Token.Length >= 32) _resumeToken = _online.Client.Token;
+            RefreshOnlineUi();
+            if (_online.Started) { StartOnlineMatch(); return; }
+        }
         if (!_menu) return;
         _t += (float)delta;
         if (_menuCam != null)
@@ -143,6 +167,142 @@ public partial class GameApp : Node3D
             CustomHome = CustomHome?.Select(x => x.Clone()).ToList(),
         };
         view.Init(opts, CustomHome, ShowMenu);
+        AddChild(view);
+    }
+
+    // ---------------------------------------------------------------- online UI
+
+    /// <summary>PLAY WITH FRIENDS: room-code lobby for the authoritative v2 hub.
+    /// Everything network-facing lives in ArenaFC.Core.Net (Godot-free); this is
+    /// only the widgets plus a once-per-frame Poll().</summary>
+    public void ShowOnline()
+    {
+        ShowMenu();                       // 3D stadium backdrop + base menu
+        _onlineReady = false;
+        _onlineLayer = new CanvasLayer { Layer = 40, Name = "OnlineLayer" };
+        AddChild(_onlineLayer);
+
+        var dim = new ColorRect { Color = new Color(.015f, .035f, .04f, .90f), MouseFilter = Control.MouseFilterEnum.Ignore };
+        dim.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _onlineLayer.AddChild(dim);
+
+        var root = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _onlineLayer.AddChild(root);
+
+        var box = Ui.VBox(8);
+        box.AddChild(Ui.Lbl("PLAY WITH FRIENDS", 30, Ui.Accent));
+        box.AddChild(Ui.Lbl("Protocol v2  ·  server-authoritative  ·  reconnect + rollback", 13, Ui.Sub));
+        box.AddChild(Ui.Lbl(
+            "One friend starts the .NET server (run-server.sh / .bat), then everyone\n" +
+            "enters ws://HOST-IP:7777 and shares the 6-letter room code.", 13, Ui.Sub));
+
+        var urlEdit = Edit("ws://127.0.0.1:7777", "Server URL (ws:// or wss://)");
+        var roomEdit = Edit("", "Room code (blank = create a new one)");
+        var nameEdit = Edit("Player", "Your name");
+        _urlEdit = urlEdit; _roomEdit = roomEdit; _nameEdit = nameEdit;
+        box.AddChild(urlEdit); box.AddChild(roomEdit); box.AddChild(nameEdit);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 8);
+        var createBtn = Ui.Btn("CREATE MATCH", () => ConnectOnline(true), true);
+        var joinBtn = Ui.Btn("JOIN MATCH", () => ConnectOnline(false));
+        _createBtn = createBtn; _joinBtn = joinBtn;
+        row.AddChild(createBtn); row.AddChild(joinBtn);
+        box.AddChild(row);
+
+        var row2 = new HBoxContainer();
+        row2.AddThemeConstantOverride("separation", 8);
+        var readyBtn = Ui.Btn("READY", () =>
+        {
+            _onlineReady = !_onlineReady;
+            _online?.Client.SendReady(_onlineReady);
+        });
+        var startBtn = Ui.Btn("START MATCH (HOST)", () => _online?.Client.SendStart());
+        _readyBtn = readyBtn; _startBtn = startBtn;
+        row2.AddChild(readyBtn); row2.AddChild(startBtn);
+        box.AddChild(row2);
+
+        var statusLbl = Ui.Lbl("Offline", 14, Ui.Text);
+        _onlineStatus = statusLbl;
+        box.AddChild(Ui.PanelC(statusLbl, Ui.Panel));
+        box.AddChild(Ui.Btn("BACK", ShowMenu));
+
+        var panel = Ui.PanelC(box, Ui.Bg);
+        Place(panel, .5f, .5f, -300, -280, 600, 560);
+        root.AddChild(panel);
+        Ui.FocusFirst(root);
+        RefreshOnlineUi();
+    }
+
+    private static LineEdit Edit(string text, string placeholder) => new()
+    {
+        Text = text,
+        PlaceholderText = placeholder,
+        CustomMinimumSize = new Vector2(560, 38),
+        FocusMode = Control.FocusModeEnum.All,
+    };
+
+    private void ConnectOnline(bool create)
+    {
+        if (_urlEdit == null || _roomEdit == null || _nameEdit == null) return;
+        _online?.Close();
+        _online = new OnlineMatch(new MatchOptions
+        {
+            TeamSize = Options.TeamSize, Seed = Options.Seed, TimeSpeed = Options.TimeSpeed,
+            HalfMinutes = Options.HalfMinutes, Difficulty = Options.Difficulty,
+            HomeClub = Options.HomeClub, AwayClub = Options.AwayClub,
+            HomeFormation = Options.HomeFormation, AwayFormation = Options.AwayFormation,
+        });
+        string? token = _resumeToken.Length >= 32 ? _resumeToken : null;
+        _online.Connect(_urlEdit.Text, _roomEdit.Text, _nameEdit.Text, token, create);
+        _onlineReady = false;
+        RefreshOnlineUi();
+    }
+
+    private void RefreshOnlineUi()
+    {
+        var c = _online?.Client;
+        if (_onlineStatus != null)
+        {
+            string s = c?.Status ?? "Offline";
+            if (c != null && c.Names.Length > 0) s += "\nPlayers: " + string.Join(", ", c.Names);
+            if (c != null && c.Room.Length > 0) s += $"\nRoom {c.Room}  ·  slot {c.Slot}  ·  host {c.HostSlot}";
+            if (c != null && c.LastError.Length > 0) s += "\nError: " + c.LastError;
+            if (_online != null && _online.Corrections > 0)
+                s += $"\nRollback: {_online.Corrections} corrections · replay {_online.LastReplayed}t · err {_online.LastError:F2}m";
+            _onlineStatus.Text = s;
+        }
+        bool joined = c != null && c.Slot >= 0;
+        if (_createBtn != null) _createBtn.Disabled = joined;
+        if (_joinBtn != null) _joinBtn.Disabled = joined;
+        if (_readyBtn != null) _readyBtn.Disabled = !joined;
+        if (_startBtn != null) _startBtn.Disabled = !joined || (c != null && (!c.IsHost || c.Started));
+    }
+
+    /// <summary>`begin`/`resume` arrived: swap the lobby for the normal MatchView,
+    /// but hand it the online driver so no local simulation runs.</summary>
+    private void StartOnlineMatch()
+    {
+        var online = _online;
+        if (online == null || !online.Started) return;
+        _onlineLayer = null;
+        _onlineStatus = null;
+        _createBtn = _joinBtn = _readyBtn = _startBtn = null;
+        _urlEdit = _roomEdit = _nameEdit = null;
+        Clear();                          // removes the lobby + 3D menu backdrop
+        PadMenuNavigator.Active = false;
+        var view = new MatchView();
+        var o = online.Options;
+        view.Init(new MatchOptions
+        {
+            TeamSize = o.TeamSize, HalfMinutes = o.HalfMinutes, TimeSpeed = o.TimeSpeed,
+            Difficulty = o.Difficulty, Offside = true, Fouls = true,
+            HomeClub = o.HomeClub, AwayClub = o.AwayClub, Seed = o.Seed,
+            HomeFormation = o.HomeFormation, AwayFormation = o.AwayFormation,
+            AwayHuman = o.AwayHuman, CameraMode = o.CameraMode, CameraZoom = o.CameraZoom,
+        }, null, ShowMenu);
+        view.Online = online;
         AddChild(view);
     }
 
@@ -220,26 +380,34 @@ public partial class GameApp : Node3D
         var v = Ui.VBox(8);
         foreach (var line in new[]
         {
-            "KEYBOARD", "WASD / Arrows — move", "SHIFT — sprint", "E — pass", "Q — through ball",
-            "R — lofted chip pass", "SPACE (hold then release) — charged shot",
+            "KEYBOARD", "WASD / Arrows — move", "SHIFT — sprint (clearly faster)",
+            "E — short pass", "Q — through ball", "R — long ball / cross",
+            "SPACE (hold then release) — charged shot",
             "F — standing tackle / press", "SHIFT+F — slide tackle (longer reach, more foul risk)",
-            "X (hold) — shield: use your strength to get between the challenger and the ball",
+            "X (hold) — close-control dribble + shield: use strength between challenger and ball",
             "TAB / middle mouse — switch player (auto-select also keeps you near the ball)",
-            "C — cycle camera (Broadcast · Player cam · Shoulder · Sideline · Tactical)",
+            "C — cycle camera (Broadcast · Ball follow · Shoulder · Sideline · Tactical)",
             "ESC — pause", "",
             "GAMEPAD (mapped / XInput)", "Left stick / D-pad — move",
-            "A — pass · X — shoot (hold) · Y — through ball", "B — standing tackle",
-            "RB (sprint) + B — slide tackle", "LB (hold) — shield", "RB — sprint · Start — pause / switch",
-            "R3 / L3 — camera", "",
+            "A — short pass · X — shoot (hold) · Y — through ball",
+            "B — standing tackle · RB+B — slide tackle",
+            "RB / RT — sprint · LB — switch player",
+            "Back / Select — long ball / cross · LT or L3 — close-control dribble + shield",
+            "Start — pause · R3 — camera", "",
             "GAMEPAD (raw EasySMX D-input / PC mode)", "A=b2 B=b1 X=b3 Y=b0 LB=b4 RB=b5",
-            "Back=b8 shield · Start=b9 pause · L3=b10 camera", "",
+            "Back=b8 long ball · Start=b9 pause · L3=b10 dribble · R3=b11 camera", "",
             "GAMEPAD MENUS", "D-pad / left stick — move the highlighted item",
-            "ANY face button (A/B/X/Y), Start or Back — select the highlighted item",
-            "R3 / L3 — go back · left/right or A on a setting changes its value", "",
+            "ANY face button (A/B/X/Y), START or SELECT — activate the highlighted item",
+            "On overlays Back / Select goes back; on the main menu it also activates", "",
             "USB / EASYSMX PADS", "XInput mode uses the standard layout. D-input / PC mode uses the raw",
             "EasySMX order (Y B A X, LB, RB, LT, RT) automatically. CONTROLLER SETUP lists",
-            "every connected pad and lets you remap any button per pad.", "",
-            "TOUCH (Android / iOS / browser)", "Virtual stick on the left, six action buttons on the right.",
+            "every connected pad and lets you remap any button per pad.",
+            "Quick button taps are event-latched, so a press shorter than one frame is not lost.", "",
+            "CAMERA / POSSESSION (06.11.2026 second pass)", "Broadcast camera holds a dead-zone focus; it no longer drifts with every touch.",
+            "YOU / BALL / OPP nameplates, larger rings and a contextual action bar show who has the ball.",
+            "A carrier moving the stick gently enters CLOSE CONTROL automatically; LT/L3 forces it.",
+            "B / RB+B now lunge into the challenge so dispossession is visible.", "",
+            "TOUCH (Android / iOS / browser)", "Virtual stick on the left, eight action buttons on the right.",
             "Hold SHOOT to charge; release to strike.", "",
             "All three input paths produce the same commands — the match simulation is platform independent."
         }) v.AddChild(Ui.Lbl(line, line is "KEYBOARD" or "GAMEPAD" or "USB / EASYSMX PADS" or "TOUCH (Android / iOS / browser)" ? 19 : 14,

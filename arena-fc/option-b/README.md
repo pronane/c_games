@@ -24,8 +24,9 @@ browser ── wss://host/arena/ws  ──────────────�
 | --- | --- |
 | `proxy.js`, hub routing, `/arena/api/health` | `test_proxy.js` (15 checks) and `test_hub_arena.js` run against a fake game server. The hub test ran on a stand-in for Express, because the sandbox could not install the real package. Run `npm test` in `shared/netplay/server` to confirm with real Express. |
 | Godot web client (`Web/*.gd`, audio, replay, aim, rig) | Run headless in Godot 4.7.2: `Tools/run-gd-tests.sh` |
-| **The .NET server and the Docker image** | **Not built or run.** No .NET SDK was available. |
-| **`Scripts/Core/Net/*.cs`** | **Missing from the repository** (see `MISSING_NET_SOURCES.md`). The server cannot compile until they are restored. |
+| **The .NET server** | **Built on .NET 9 in CI** (`dotnet-core` job); not yet run end-to-end against the Python WebSocket smoke tests. |
+| **The Docker image** | **Not built here.** No Docker daemon in the sandbox. |
+| **`Scripts/Core/Net/*.cs`** | **Restored** — rebuilt from the checked-in wire format (see `MISSING_NET_SOURCES.md`). `Server/ArenaFC.Server.csproj` and `Tests/CoreTests.csproj` now build and pass on .NET 9 in CI. |
 
 ## 1. Export the web build (once per change to the game)
 

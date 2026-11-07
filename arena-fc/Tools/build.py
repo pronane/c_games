@@ -251,6 +251,10 @@ def build_cs() -> bool:
     log("\n[1/6] Building C# assemblies with .NET 9 …")
     rc = run([dotnet, "build", str(ROOT / "ArenaFC.sln"), "-c", "Release", "-v:q"])
     if rc != 0: die("C# build failed. See errors above.")
+    # The authoritative v2 server is a separate project; build it too so the
+    # network integration step below actually has a binary to start.
+    rc = run([dotnet, "build", str(ROOT / "Server/ArenaFC.Server.csproj"), "-c", "Release", "-v:q"])
+    if rc != 0: die("ArenaFC.Server build failed. See errors above.")
     return True
 
 

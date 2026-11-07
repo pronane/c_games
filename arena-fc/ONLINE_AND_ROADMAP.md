@@ -82,9 +82,10 @@ mid-match reconnect (180 s reservation), host migration (`--peer-host`) and roll
 | --- | --- |
 | Node hub `shared/netplay/server/arena/{sim,server,standalone}.js` | **Complete and CI-tested** (`npm test`, `net_smoketest.py`, `net_v2_smoketest.py`, two-client e2e). Owns a deterministic 60 Hz sim and emits the snapshot above. |
 | GDScript Browser Edition (`Web/NetClient.gd` → `BrowserBoot.net_apply_snapshots`) | **Works** against the Node hub: reconnect, host-migration notices, snapshot interpolation. No rollback. |
-| C# desktop/mobile client + .NET server | **Blocked.** `Scripts/Core/Net/*.cs` (NetProtocol, Packet, Snapshot, StateCodec, DTOs) and `Scripts/Godot/Net/*` (OnlineDriver, lobby UI) were never committed — see `MISSING_NET_SOURCES.md`. `dotnet build Server/ArenaFC.Server.csproj` and `Tests/CoreTests.csproj` therefore fail. `ONLINE.md` describes this design, but the sources are absent from this checkout. |
+| C# desktop/mobile client + .NET server | **Restored (option-2 rewrite).** `Scripts/Core/Net/*.cs` (protocol, DTOs, snapshots, state codec, replay, rollback, `OnlineClient` / `OnlineMatch`) and the desktop **PLAY WITH FRIENDS** lobby in `Scripts/Godot/GameApp.cs` were rebuilt from the checked-in wire format — see `MISSING_NET_SOURCES.md`. `Tests/Program.cs`, `Tests/MatchCoreTests.cs` and the server build are green in CI; see `GAMEPLAY_CAMERA_FIX_REPORT.md` for the latest verification table. A native `.NET 9` host is still needed to run the server binary and the Python WebSocket smoke tests. |
 
-So to play online right now: run the Node server and open the browser edition.
+So to play online right now: run the Node server and open the browser edition; the
+desktop C# client is now built against the same protocol and joins those rooms.
 
 ```sh
 cd shared/netplay/server
@@ -92,29 +93,26 @@ node arena/standalone.js --port 7777
 # in the browser build: Play With Friends → ws://<host>:7777 → create/join a room code
 ```
 
-To restore desktop online play, the missing `NetProtocol.cs` / `Snapshot.cs` / DTOs / `OnlineDriver.cs`
-need to be rewritten from the wire format above (the browser client and `ONLINE.md` describe it), then
-wired into `Tools/build.py --check` and the new `dotnet-core` CI job.
+Desktop online play was restored by rewriting those sources from the wire format above;
+`Tools/build.py --check` and the `dotnet-core` CI job now build/run them.
 
 ## What else can be added (prioritised)
 
-1. **Finish desktop online play** — rewrite the missing net sources against the Node wire format;
-   this is the single biggest gap and unblocks `Tests/Program.cs`, the .NET server and 11v11 online.
-2. **Restore the C# test suite** — `Tests/Program.cs` has ~100 checks (rig, protocol, snapshots,
-   rollback) but cannot compile without the net sources. Making it runnable would catch the next
-   possession-style regression automatically.
-3. **Matchmaking / room browser / accounts** — currently room codes only; add a lobby list, skill
+1. **Native .NET 9 end-to-end run** — start `Server/ArenaFC.Server.csproj` on a machine with the
+   SDK and run `Tools/net_smoketest.py`, `net_v2_smoketest.py` and the reconnect / host-migration
+   e2e suites against it. The sandbox has no native `dotnet`, so those remain unverified here.
+2. **Matchmaking / room browser / accounts** — currently room codes only; add a lobby list, skill
    rating, persistent resume tokens and a friends list.
-4. **NAT traversal / WebRTC data channels** — remove the need to port-forward; keep the server as
+3. **NAT traversal / WebRTC data channels** — remove the need to port-forward; keep the server as
    arbiter but relay less. Browser clients already speak WebRTC-friendly transports.
-5. **Spectator mode & replay sharing** — the server already writes replay JSON at full time; add a
+4. **Spectator mode & replay sharing** — the server already writes replay JSON at full time; add a
    spectator slot, a timeline scrubber and shareable match links.
-6. **Set-piece / referee polish** — visible referee, cards shown on screen, advantage rule, VAR-style
+5. **Set-piece / referee polish** — visible referee, cards shown on screen, advantage rule, VAR-style
    replays; the foul/stumble poses added this round are the groundwork.
-7. **Better AI personalities** — per-club tactics (pressing intensity, defensive line, tempo), so
+6. **Better AI personalities** — per-club tactics (pressing intensity, defensive line, tempo), so
    "World class" differs by more than a tackle probability.
-8. **Graphics** — port the new joint/toe geometry into `Tools/gen_rig.py` so the browser mesh matches
+7. **Graphics** — port the new joint/toe geometry into `Tools/gen_rig.py` so the browser mesh matches
    the desktop rig, add kit patterns/numbers, crowd animation and ball trails.
-9. **Accessibility & UX** — remappable keyboard, colour-blind kits, larger HUD, controller glyphs
+8. **Accessibility & UX** — remappable keyboard, colour-blind kits, larger HUD, controller glyphs
    that match the detected pad layout (standard vs raw), and an on-screen pad test in CONTROLLER SETUP.
-10. **Anti-cheat / input validation** — rate-limit and sanity-check input magnitudes on the server.
+9. **Anti-cheat / input validation** — rate-limit and sanity-check input magnitudes on the server.
