@@ -51,9 +51,10 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
   const kit = team === 0 ? teams.home : teams.away;
   root.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    obj.material = mats.map((m) => {
-      const mat = (m as THREE.MeshStandardMaterial).clone();
+    const wasSingle = !Array.isArray(obj.material);
+    const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]) as THREE.MeshStandardMaterial[];
+    const cloned = mats.map((m) => {
+      const mat = m.clone();
       const name = mat.name ?? '';
       if (KIT_MATERIALS.includes(name)) {
         mat.color = new THREE.Color(name === 'jersey' ? kit.primary : kit.secondary);
@@ -66,6 +67,10 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
       mat.metalness = 0.02;
       return mat;
     });
+    // Keep the original shape: three.js only iterates geometry.groups when the
+    // material is an array, and these geometries have no groups — an array
+    // here would render NOTHING at all.
+    obj.material = wasSingle ? cloned[0] : cloned;
     if (obj instanceof THREE.SkinnedMesh) {
       obj.castShadow = true;
       obj.receiveShadow = false;
