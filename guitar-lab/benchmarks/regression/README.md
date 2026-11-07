@@ -50,8 +50,10 @@ and Dixon high-resolution guitar model (`guitar-fl.pth`, ICASSP 2024).
 and run on CPU; install `server/requirements-transcription-extras.txt`.
 Published decoder thresholds are left alone.
 
-YourMT3+ was not run. The checkpoints are Apache-2.0 and about 2.8 GB. The
-inference code is GPL-3.0 and is not vendored. A default switch requires a
+`FRETWORK_TRANSCRIBER=yourmt3` runs YourMT3+ (YPTF.MoE+Multi, noPS) as a
+separate program. Its inference code is GPL-3.0 and is not vendored;
+`tools/yourmt3/setup.sh` installs it elsewhere. The 560 MB checkpoint is Apache-2.0.
+Results are in RESULTS.md. A default switch requires a
 backend to be at least Basic Pitch on every measured category, clearly better
 on average, and to have no unmeasured category from the list above. Otherwise
 it stays opt-in. There is no per-category router: a router fit on this library
