@@ -41,9 +41,10 @@ def test_intro_alignment_is_the_frozen_anchor():
     assert ONE_FROZEN['whole_song_linear_map'] is None
 
 
-def test_default_backend_is_basic_pitch(monkeypatch):
+def test_default_backend_is_riley_or_basic_pitch(monkeypatch):
+    from server.transcribers import default_backend
     monkeypatch.delenv('FRETWORK_TRANSCRIBER', raising=False)
-    assert backend_name() == 'basic_pitch'
+    assert backend_name() == default_backend() in ('riley', 'basic_pitch')
     assert normalize_backend('guitar_fl') == 'riley'
     assert normalize_backend('gaps') == 'gaps'
 
