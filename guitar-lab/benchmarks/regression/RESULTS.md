@@ -36,7 +36,7 @@ Charts are not an input to any model. The Metallica intro uses the frozen alignm
 
 ## YourMT3+ (YPTF.MoE+Multi, noPS), added separately
 
-Run on another machine from the table above, with `tools/yourmt3`. The user reverb pair and the
+Run on another machine from the table above (then as a separate program; it now runs in the engine from `server/yourmt3` and gives identical scores). The user reverb pair and the
 Metallica intro were not on that machine, so those two categories are **unmeasured** for YourMT3+.
 Basic Pitch was re-run on the same machine and matched the committed numbers.
 
@@ -52,7 +52,7 @@ Basic Pitch was re-run on the same machine and matched the committed numbers.
 - It fails the app's own rendered voice. On the clean scale it writes nothing for the five lowest notes (E2 to B3), scoring 0.545. On the distorted palm-mute chug it adds an octave above every note, scoring 0.667.
 - Keeping only guitar-labelled notes never helps here: it drops correct notes that were labelled as another instrument.
 - CPU: 70–298 s per minute of audio at fp32, about 50–100× Basic Pitch. Short clips are dominated by the fixed per-segment cost.
-- Decision: **opt-in only**. It loses the rendered category by 0.365 and has two unmeasured categories. Its code is GPL-3.0, so it runs as a separate program and is not shipped with the app.
+- Decision: **opt-in only**. It loses the rendered category by 0.365 and has two unmeasured categories. It is now built into the engine and selectable from the Note detector drop-down.
 
 ## Riley inside the engine, with the reverb fix
 
@@ -158,7 +158,7 @@ Category means hide this. A drop of more than 0.005 against Basic Pitch:
 
 - Basic Pitch: Apache-2.0, ONNX, default.
 - Riley guitar-fl and GAPS: MIT weights and wrapper; Kong CRNN inference is Apache-2.0. Optional (`requirements-transcription-extras.txt`). Decoder thresholds are the published 0.3/0.3/0.1, not fit here.
-- YourMT3+: checkpoints Apache-2.0 (~2.8 GB). Inference code is GPL-3.0 and is not vendored. It was not executed in this run.
+- YourMT3+: built in (server/yourmt3, Apache-2.0); see its section above.
 - GuitarSet excerpts: CC BY 4.0, Xi et al., ISMIR 2018. Player 05.
 - IDMT-SMT-Guitar: CC BY-NC-ND 4.0. Audio is local only. These pieces are clean direct-input electric, not amp distortion.
 - EGDB / EGDB-PG: the paired clean-and-amp set was not downloaded (the public FLAC bundle is 135 GB; the original set is on request).

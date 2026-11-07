@@ -1,0 +1,15 @@
+The amt/ folder is adapted from YourMT3+ (Sungkyun Chang et al., "YourMT3+: Multi-instrument Music
+Transcription with Enhanced Transformer Architectures and Cross-dataset Stem Augmentation", 2024),
+as published at https://huggingface.co/spaces/mimbres/YourMT3 under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0). Each file keeps its original notice.
+
+Parts of it are themselves based on other open-source code, as noted in the files:
+- model/RoPE/RoPE.py: rotary-embedding-torch by Phil Wang (lucidrains), MIT licence.
+- model/t5mod.py: Hugging Face Transformers' T5 implementation, Apache License 2.0.
+- model/optimizers.py: nanoT5 (Piotr Nawrot), Apache License 2.0 (training only; unused here).
+
+Changes for Guitar Lab:
+- Training, dataset and preprocessing code was left out.
+- server/yourmt3/__init__.py builds the model for inference without PyTorch Lightning, wandb or
+  torchmetrics (those imports are satisfied with inert stand-ins) and fetches the
+  YPTF.MoE+Multi (noPS) checkpoint (Apache-2.0) from huggingface.co/mimbres/YourMT3 on first use.

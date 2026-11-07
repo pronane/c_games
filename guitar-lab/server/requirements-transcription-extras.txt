@@ -8,10 +8,7 @@
 # CPU is enough. The first Riley/GAPS run downloads about 100 MB from
 # huggingface.co/xavriley/midi-transcription-models.
 #
-# YourMT3+ is intentionally absent. Its inference code is GPL-3.0
-# (https://github.com/mimbres/YourMT3). Checkpoints are Apache-2.0 and about
-# 2.8 GB (https://huggingface.co/mimbres/YourMT3). Clone that repo separately
-# if you accept GPL; this project does not vendor it.
+# YourMT3+ and Riley now install with requirements-transcription.txt; nothing extra is needed.
 #
 # Riley and GAPS run from server/riley (adapted, MIT); they only need torchlibrosa
 # and the PyTorch the engine already has (any version; checkpoints load as pickles).

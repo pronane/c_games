@@ -21,7 +21,7 @@ npm run dev -- --port 5173
 
 The explicit ONNX installation avoids the TensorFlow dependency pulled by Basic Pitch 0.4.0's Linux/Python 3.11 package metadata. The bundled `basic_pitch/saved_models/icassp_2022/nmp.onnx` is used; override with `FRETWORK_BASIC_PITCH_MODEL=/absolute/path/nmp.onnx` if needed. Optional-runtime warnings from Basic Pitch about TensorFlow/CoreML/TFLite are expected: ONNX works without them. No inference-time model downloads.
 
-Basic Pitch stays the default note model. Optional guitar backends (Riley `guitar-fl` and GAPS, both MIT, CPU) install from `requirements-transcription-extras.txt` and turn on with `FRETWORK_TRANSCRIBER=riley` or `FRETWORK_TRANSCRIBER=gaps`. YourMT3+ is not bundled: its inference code is GPL-3.0. The regression library and the measured comparison are in `benchmarks/regression/`.
+Basic Pitch stays the default note model. Riley (`guitar-fl`), GAPS and YourMT3+ are built into the engine (`server/riley`, `server/yourmt3`, adapted from their MIT and Apache-2.0 releases) and can be picked per song or take from the studio's **Note detector** drop-down. Their checkpoints (~100 MB and ~560 MB) download from Hugging Face the first time each is used.
 
 With these dependencies **isolated-reference sessions work**. Full-band sessions remain blocked until the guitar-capable separation model is provisioned below. `/api/health` reports configuration, not a guarantee that a model loads on every machine.
 

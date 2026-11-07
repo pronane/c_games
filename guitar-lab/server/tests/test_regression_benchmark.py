@@ -112,15 +112,14 @@ def test_yourmt3_notes_drop_drums_dedupe_and_filter_programs():
     assert [n['midi'] for n in yourmt3_notes(raw, 28, 88, 'guitar')] == [52]
 
 
-def test_yourmt3_is_never_imported_and_needs_its_own_interpreter(monkeypatch):
-    from server import transcribers
+def test_yourmt3_reports_missing_packages(monkeypatch):
+    from server import transcribers, yourmt3
     from server.models import ModelUnavailable
     import pytest
-    monkeypatch.delenv('FRETWORK_YOURMT3_PYTHON', raising=False)
-    monkeypatch.setenv('FRETWORK_YOURMT3_ROOT', '/nonexistent')
-    with pytest.raises(ModelUnavailable):
+    monkeypatch.setattr(yourmt3, 'available', lambda: False)
+    with pytest.raises(ModelUnavailable, match='transformers'):
         transcribers._transcribe_yourmt3_path(transcribers.Path('x.wav'), 40, 88)
-    assert 'GPL-3.0' in transcribers.YOURMT3_RUNNER.read_text().splitlines()[0]
+    assert transcribers.availability()['yourmt3']['installed'] is False
 
 
 def test_studio_choice_of_transcriber_is_checked(monkeypatch):
@@ -129,7 +128,8 @@ def test_studio_choice_of_transcriber_is_checked(monkeypatch):
     import pytest
     with pytest.raises(ValueError, match='Unknown transcriber'):
         transcribers.checked_backend('magic')
-    monkeypatch.delenv('FRETWORK_YOURMT3_ROOT', raising=False)
+    from server import yourmt3
+    monkeypatch.setattr(yourmt3, 'available', lambda: False)
     with pytest.raises(ValueError, match='not installed'):
         transcribers.checked_backend('yourmt3')
 

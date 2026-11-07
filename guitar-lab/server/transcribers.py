@@ -9,10 +9,8 @@ backends are off unless ``FRETWORK_TRANSCRIBER`` names one.
   (upstream Apache-2.0).
 * ``gaps`` — the same authors' later GAPS guitar checkpoint (``guitar-gaps.pth``,
   MIT), same wrapper.
-* ``yourmt3`` — YourMT3+ (YPTF.MoE+Multi, noPS). Not vendored: its inference
-  code is GPL-3.0, its checkpoints Apache-2.0. ``tools/yourmt3/setup.sh`` clones
-  it and the weights elsewhere; the GPL runner in ``tools/yourmt3`` is started
-  as a separate program, never imported. ``FRETWORK_YOURMT3_PROGRAMS=guitar``
+* ``yourmt3`` — YourMT3+ (YPTF.MoE+Multi, noPS), adapted into server/yourmt3
+  from the authors' Apache-2.0 release. ``FRETWORK_YOURMT3_PROGRAMS=guitar``
   keeps only notes it labels as guitar.
 
 Install the Riley/GAPS stack from ``server/requirements-transcription-extras.txt``.
@@ -44,11 +42,9 @@ _ALIASES = {
 }
 
 YOURMT3_NOTE = (
-    'YourMT3+ is not bundled. Its inference code is GPL-3.0 '
-    '(https://github.com/mimbres/YourMT3) and its checkpoints are Apache-2.0 '
-    '(https://huggingface.co/mimbres/YourMT3, about 2.8 GB). '
-    'Clone that repository separately and set FRETWORK_YOURMT3_ROOT. '
-    'This project does not vendor GPL code.'
+    'YourMT3+ runs from server/yourmt3 and needs transformers 4.45.1 and einops: '
+    'pip install -r server/requirements-transcription.txt. Its checkpoint (about 560 MB) '
+    'downloads from huggingface.co/mimbres/YourMT3 the first time it is used.'
 )
 
 RILEY_NOTE = (
@@ -110,11 +106,15 @@ def _spec_available(module: str) -> bool:
     return importlib.util.find_spec(module) is not None
 
 
+def _yourmt3_available() -> bool:
+    from . import yourmt3
+    return yourmt3.available()
+
+
 def availability() -> dict:
     """Which optional backends can be constructed. Does not download weights."""
     riley = (_spec_available('torchlibrosa') and _spec_available('torch')
              and _spec_available('huggingface_hub'))
-    yourmt3_root = os.environ.get('FRETWORK_YOURMT3_ROOT', '')
     return {
         'basic_pitch': {'installed': True, 'license': 'Apache-2.0', 'default': True, 'label': 'Basic Pitch',
                         'summary': 'Fast (1-4 s per minute). Default; best on the app\'s own guitar sound.'},
@@ -137,10 +137,9 @@ def availability() -> dict:
         'yourmt3': {
             'label': 'YourMT3+',
             'summary': 'Best on acoustic (.917) but misses low notes on synthetic guitar; about a minute per minute.',
-            'installed': bool(yourmt3_root and Path(yourmt3_root).is_dir()
-                              and Path(os.environ.get('FRETWORK_YOURMT3_PYTHON', '/nonexistent')).exists()),
-            'license': 'code GPL-3.0 (not vendored); checkpoints Apache-2.0',
-            'detail': YOURMT3_NOTE,
+            'installed': _yourmt3_available(),
+            'license': 'Apache-2.0 (adapted into server/yourmt3; checkpoint fetched on first use, ~560 MB)',
+            'detail': None if _yourmt3_available() else YOURMT3_NOTE,
         },
     }
 
@@ -187,7 +186,6 @@ def _transcribe_riley_path(which: str, path: Path, midi_min: int, midi_max: int)
     return notes
 
 
-YOURMT3_RUNNER = Path(__file__).resolve().parent.parent / 'tools' / 'yourmt3' / 'run_yourmt3.py'
 GUITAR_PROGRAMS = range(24, 32)  # General MIDI guitars, nylon to harmonics
 
 
@@ -218,22 +216,12 @@ def yourmt3_notes(raw: list, midi_min: int, midi_max: int, programs: str = 'all'
 
 
 def _transcribe_yourmt3_path(path: Path, midi_min: int, midi_max: int):
-    """Runs the GPL-3.0 YourMT3+ runner as a separate program (never imported here)."""
-    import json
-    import subprocess
-    root = os.environ.get('FRETWORK_YOURMT3_ROOT', '')
-    python = os.environ.get('FRETWORK_YOURMT3_PYTHON', '')
-    if not root or not Path(root).is_dir() or not python or not Path(python).exists():
-        raise ModelUnavailable(YOURMT3_NOTE + ' Run tools/yourmt3/setup.sh and set FRETWORK_YOURMT3_ROOT '
-                               'and FRETWORK_YOURMT3_PYTHON.')
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / 'notes.json'
-        proc = subprocess.run([python, str(YOURMT3_RUNNER), str(Path(path).resolve()), str(out)],
-                              env={**os.environ, 'FRETWORK_YOURMT3_ROOT': root}, capture_output=True, text=True)
-        if proc.returncode != 0 or not out.exists():
-            raise ModelUnavailable('YourMT3+ failed: ' + (proc.stderr or '').strip()[-600:])
-        raw = json.loads(out.read_text())['notes']
-    return yourmt3_notes(raw, midi_min, midi_max, os.environ.get('FRETWORK_YOURMT3_PROGRAMS', 'all'))
+    """YourMT3+ run inside the engine from server/yourmt3 (Apache-2.0, adapted)."""
+    from . import yourmt3
+    if not yourmt3.available():
+        raise ModelUnavailable(YOURMT3_NOTE)
+    return yourmt3_notes(yourmt3.transcribe(path), midi_min, midi_max,
+                         os.environ.get('FRETWORK_YOURMT3_PROGRAMS', 'all'))
 
 
 def _run_one(name: str, path: Path, midi_min: int, midi_max: int):
