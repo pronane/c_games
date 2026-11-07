@@ -626,3 +626,16 @@ def test_resegment_is_on_by_default_and_reverb_keeps_recovered_picks(monkeypatch
     ]
     kept = sa.suppress_reverb_retriggers(notes)
     assert [round(n['time'], 2) for n in kept] == [0.0, 0.06, 0.12, 1.0]
+
+
+def test_solo_take_filed_under_other_is_treated_as_the_part():
+    from server.song_analysis import solo_recording
+    row = lambda stem, v: {'stem': stem, 'verdict': v}
+    solo = [row('other', 'present'), row('guitar', 'trace'), row('vocals', 'absent'), row('drums', 'absent')]
+    assert solo_recording(solo, 'guitar')
+    band = [row('other', 'present'), row('guitar', 'trace'), row('vocals', 'present'), row('drums', 'present')]
+    assert not solo_recording(band, 'guitar')
+    separated = [row('guitar', 'present'), row('other', 'present')]
+    assert not solo_recording(separated, 'guitar')
+    silence = [row('other', 'absent'), row('guitar', 'absent')]
+    assert not solo_recording(silence, 'guitar')
