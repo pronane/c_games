@@ -83,7 +83,7 @@ export function createSong(
   processing: "cpu" | "gpu" = "cpu",
   tone: "auto" | "clean" | "crunch" | "distorted" = "auto",
   refine = false,
-  transcriber = "basic_pitch",
+  transcriber = "",
 ) {
   const body = new FormData();
   if ("file" in source) body.set("file", source.file);

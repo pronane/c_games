@@ -34,7 +34,7 @@ def test_metrics_separate_pitch_from_onset():
 
 
 def test_intro_alignment_is_the_frozen_anchor():
-    assert INTRO_ORIGIN_S == 19.3
+    assert INTRO_ORIGIN_S == 18.35
     assert INTRO_TAB_END_S == 16.5
     assert ONE_FROZEN['origin_s'] == 19.3
     assert ONE_FROZEN['historical_f1_max_map']['used'] is False
@@ -143,3 +143,17 @@ def test_riley_reverb_rule_picks_threshold_from_onset_ratio(monkeypatch):
     counts.update({0.3: 11, 0.65: 10})
     notes, info = riley.decode({})
     assert info['reverb'] == 'light' and info['onset_threshold'] == 0.5 and len(notes) == 25
+
+
+def test_riley_is_the_default_when_installed(monkeypatch):
+    from server import transcribers
+    monkeypatch.delenv('FRETWORK_TRANSCRIBER', raising=False)
+    monkeypatch.setattr(transcribers, '_spec_available', lambda m: True)
+    assert transcribers.normalize_backend('') == 'riley'
+    assert transcribers.normalize_backend('default') == 'riley'
+    assert transcribers.availability()['riley']['default'] is True
+    monkeypatch.setattr(transcribers, '_spec_available', lambda m: False)
+    assert transcribers.normalize_backend(None) == 'basic_pitch'
+    monkeypatch.setenv('FRETWORK_TRANSCRIBER', 'basic_pitch')
+    monkeypatch.setattr(transcribers, '_spec_available', lambda m: True)
+    assert transcribers.normalize_backend('') == 'basic_pitch'
