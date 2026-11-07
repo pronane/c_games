@@ -83,6 +83,7 @@ export function createSong(
   processing: "cpu" | "gpu" = "cpu",
   tone: "auto" | "clean" | "crunch" | "distorted" = "auto",
   refine = false,
+  transcriber = "basic_pitch",
 ) {
   const body = new FormData();
   if ("file" in source) body.set("file", source.file);
@@ -91,6 +92,7 @@ export function createSong(
   body.set("instrument", instrument);
   body.set("processing", processing);
   body.set("tone", tone);
+  body.set("transcriber", transcriber);
   if (refine) body.set("refine", "true");
   return api<Song>("/api/songs", { method: "POST", body });
 }

@@ -54,6 +54,26 @@ Basic Pitch was re-run on the same machine and matched the committed numbers.
 - CPU: 70–298 s per minute of audio at fp32, about 50–100× Basic Pitch. Short clips are dominated by the fixed per-segment cost.
 - Decision: **opt-in only**. It loses the rendered category by 0.365 and has two unmeasured categories. Its code is GPL-3.0, so it runs as a separate program and is not shipped with the app.
 
+## Riley inside the engine, with the reverb fix
+
+Riley now runs from `server/riley` (adapted from the MIT code) on the engine's own PyTorch, and is
+selectable per song or practice take from the studio's **Note detector** drop-down.
+Reverb tails were re-triggering Riley's onset head: on wet audio it wrote 2–9× too many notes.
+The decoder now picks its onset threshold per file from how much the note count swells between
+0.3 and 0.65: 0.5 when it barely changes (dry), 0.65 when it balloons (heavy reverb).
+
+Known-note clips (3 GuitarSet + 5 IDMT) through synthetic rooms, note F1:
+
+| | dry | room (RT60 0.8 s) | hall (2.0 s) | wash (3.5 s) |
+| --- | --- | --- | --- | --- |
+| Basic Pitch | 0.821 | 0.736 | 0.579 | 0.422 |
+| Riley, published decoder | 0.897 | 0.851 | 0.585 | 0.259 |
+| **Riley, reverb-aware** | **0.905** | **0.879** | **0.801** | **0.587** |
+
+Library categories with the new decoder: solo acoustic 0.908 (was 0.888), clean electric 0.902,
+rendered 1.000. GAPS keeps its published decoder. The real reverb pair and the Metallica intro were
+not on this machine, so Basic Pitch stays the default until those are re-measured.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.

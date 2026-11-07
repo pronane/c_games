@@ -24,6 +24,7 @@ import SongLab from "./SongLab";
 import { MEDIA_ACCEPT } from "./audioFiles";
 import TabLab, { type TabSource } from "./TabLab";
 import ProcessingToggle, { type Processing } from "./ProcessingToggle";
+import TranscriberSelect from "./TranscriberSelect";
 import type { BarMark } from "./feedback";
 import {
   defaultSettings,
@@ -308,6 +309,7 @@ function App() {
           }}
         />
         <ProcessingToggle value={processing} onChange={setProcessing} disabled={recording || busy} />
+        <TranscriberSelect disabled={recording || busy} />
         <SongLab
           settings={settings}
           onSettings={(next) => {

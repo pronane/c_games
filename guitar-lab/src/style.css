@@ -2040,3 +2040,14 @@ footer span:first-child {
   margin: 0;
   padding-left: 18px;
 }
+
+.transcriber-select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0;
+}
+.transcriber-select small {
+  flex-basis: 100%;
+}

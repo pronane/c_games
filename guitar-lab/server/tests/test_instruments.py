@@ -55,7 +55,7 @@ def test_bass_profile_used_for_separation_and_transcription(monkeypatch):
     assert calls == ['bass']
     client.post(f'/api/jobs/{key}/approve', headers=headers, json={'approved': True})
     complete = wait_job(key, 'complete')
-    assert calls[1:] == [{'midi_min': 28, 'midi_max': 67}]*2
+    assert calls[1:] == [{'midi_min': 28, 'midi_max': 67, 'backend': 'basic_pitch'}]*2
     assert complete['instrument_profile']['separation_stem'] == 'bass'
     valid = {'notes': [{'id': 0, 'time': .3, 'duration': .4, 'midi': 28, 'string': 4, 'fret': 0}]}
     assert client.put(f'/api/jobs/{key}/notes', headers=headers, json=valid).status_code == 200

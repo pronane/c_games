@@ -43,6 +43,7 @@ import { encodeWav, api, type Health } from "./engineApi";
 import { synthesize } from "./tabScore";
 import { soundFromEstimate, useGuitarSound } from "./guitarTone";
 import GuitarSoundPicker from "./GuitarSoundPicker";
+import TranscriberSelect, { useTranscriber } from "./TranscriberSelect";
 import RefinementReport from "./RefinementReport";
 import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
 import { Recorder } from "./recorder";
@@ -117,6 +118,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [latency, setLatency] = useState<LatencyResult | null>(() => loadLatency()),
     [locating, setLocating] = useState(false),
     [located, setLocated] = useState<(LocateResult & { buffer: AudioBuffer }) | null>(null),
+    [transcriber] = useTranscriber(),
     [songTone, setSongTone] = useState<"auto" | "clean" | "crunch" | "distorted">("auto"),
     [refine, setRefine] = useState(false),
     [refineAvailable, setRefineAvailable] = useState(false),
@@ -215,6 +217,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         processing,
         profile.openStrings.length ? songTone : "auto",
         refine && profile.id === "guitar" && refineAvailable,
+        transcriber,
       );
       songId.current = created.id;
       setSong(created);
@@ -719,6 +722,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
           </small>
         </div>
       )}
+      <TranscriberSelect disabled={busy} />
       {profile.openStrings.length > 0 && (
         <label className="speed song-tone">
           Guitar sound in this song
