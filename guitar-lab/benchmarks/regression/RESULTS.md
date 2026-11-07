@@ -34,6 +34,26 @@ Charts are not an input to any model. The Metallica intro uses the frozen alignm
   - unmeasured: Carcassi Op.60 No.1 recording (aligned MIDI only; audio not located)
   - mean category delta vs Basic Pitch: -0.059
 
+## YourMT3+ (YPTF.MoE+Multi, noPS), added separately
+
+Run on another machine from the table above, with `tools/yourmt3`. The user reverb pair and the
+Metallica intro were not on that machine, so those two categories are **unmeasured** for YourMT3+.
+Basic Pitch was re-run on the same machine and matched the committed numbers.
+
+| backend | clean_electric | rendered | reverb_clear (synthetic pair only) | solo_acoustic |
+| --- | --- | --- | --- | --- |
+| basic_pitch | 0.824 | 0.971 | 1.000 | 0.815 |
+| riley (from above) | 0.902 | 1.000 | — | 0.888 |
+| yourmt3, all pitched notes | 0.880 | **0.606** | 1.000 | **0.917** |
+| yourmt3, guitar-labelled only | 0.863 | 0.606 | 0.955 | 0.917 |
+
+- Best of all backends on real acoustic guitar: rock solo 0.929, funk solo 0.889 and jazz comping 0.934, against Basic Pitch's 0.873, 0.761 and 0.810.
+- On IDMT clean electric it sits between Basic Pitch and Riley. The biggest gain is on quintfall: 0.853 against Basic Pitch's 0.667.
+- It fails the app's own rendered voice. On the clean scale it writes nothing for the five lowest notes (E2 to B3), scoring 0.545. On the distorted palm-mute chug it adds an octave above every note, scoring 0.667.
+- Keeping only guitar-labelled notes never helps here: it drops correct notes that were labelled as another instrument.
+- CPU: 70–298 s per minute of audio at fp32, about 50–100× Basic Pitch. Short clips are dominated by the fixed per-segment cost.
+- Decision: **opt-in only**. It loses the rendered category by 0.365 and has two unmeasured categories. Its code is GPL-3.0, so it runs as a separate program and is not shipped with the app.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
