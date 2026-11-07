@@ -51,8 +51,8 @@ and run on CPU; install `server/requirements-transcription-extras.txt`.
 Published decoder thresholds are left alone.
 
 `FRETWORK_TRANSCRIBER=yourmt3` runs YourMT3+ (YPTF.MoE+Multi, noPS) as a
-separate program. Its inference code is GPL-3.0 and is not vendored;
-`tools/yourmt3/setup.sh` installs it elsewhere. The 560 MB checkpoint is Apache-2.0.
+inside the engine from `server/yourmt3`, adapted from the authors' Apache-2.0 release.
+Its 560 MB checkpoint (Apache-2.0) downloads on first use.
 Results are in RESULTS.md. A default switch requires a
 backend to be at least Basic Pitch on every measured category, clearly better
 on average, and to have no unmeasured category from the list above. Otherwise

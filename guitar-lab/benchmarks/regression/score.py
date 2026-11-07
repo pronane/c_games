@@ -472,8 +472,7 @@ def write_report(payload, path: Path):
         '- Basic Pitch: Apache-2.0, ONNX, default.',
         '- Riley guitar-fl and GAPS: MIT weights and wrapper; Kong CRNN inference is Apache-2.0. '
         'Optional (`requirements-transcription-extras.txt`). Decoder thresholds are the published 0.3/0.3/0.1, not fit here.',
-        '- YourMT3+: checkpoints Apache-2.0 (~2.8 GB). Inference code is GPL-3.0 and is not vendored. '
-        'It was not executed in this run.',
+        '- YourMT3+: built in (server/yourmt3, Apache-2.0); run it with --backend yourmt3.',
         '- GuitarSet excerpts: CC BY 4.0, Xi et al., ISMIR 2018. Player 05.',
         '- IDMT-SMT-Guitar: CC BY-NC-ND 4.0. Audio is local only. These pieces are clean direct-input electric, not amp distortion.',
         '- EGDB / EGDB-PG: the paired clean-and-amp set was not downloaded (the public FLAC bundle is 135 GB; the original set is on request).',
