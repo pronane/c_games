@@ -64,6 +64,19 @@ def normalize_backend(name=None) -> str:
     return _ALIASES.get(key, key)
 
 
+def checked_backend(name=None) -> str:
+    """A transcriber chosen in the studio: known and installed, else ValueError with the fix."""
+    chosen = normalize_backend(name)
+    info = availability().get(chosen)
+    if chosen == 'basic_pitch':
+        return chosen
+    if info is None:
+        raise ValueError(f'Unknown transcriber {name!r}. Use basic_pitch, riley, gaps or yourmt3.')
+    if not info.get('installed'):
+        raise ValueError(f"{info.get('label', chosen)} is not installed here. {info.get('detail') or ''}".strip())
+    return chosen
+
+
 def backend_name() -> str:
     return normalize_backend(None)
 
@@ -99,26 +112,31 @@ def _spec_available(module: str) -> bool:
 
 def availability() -> dict:
     """Which optional backends can be constructed. Does not download weights."""
-    riley = (_spec_available('piano_transcription_inference') and _spec_available('torch')
+    riley = (_spec_available('torchlibrosa') and _spec_available('torch')
              and _spec_available('huggingface_hub'))
     yourmt3_root = os.environ.get('FRETWORK_YOURMT3_ROOT', '')
     return {
-        'basic_pitch': {'installed': True, 'license': 'Apache-2.0', 'default': True},
+        'basic_pitch': {'installed': True, 'license': 'Apache-2.0', 'default': True, 'label': 'Basic Pitch',
+                        'summary': 'Fast (1-4 s per minute). Default; best on the app\'s own guitar sound.'},
         'riley': {
-            'installed': riley,
-            'license': 'MIT (wrapper and guitar-fl.pth); CRNN inference Apache-2.0',
+            'installed': riley, 'label': 'Riley guitar model',
+            'summary': 'Most accurate on real guitar (acoustic .908, electric .902); reverb-aware. 10-30 s per minute.',
+            'license': 'MIT (adapted into server/riley; checkpoint fetched on first use, ~100 MB)',
             'checkpoint': 'guitar-fl.pth',
             'paper': 'Riley, Edwards, Dixon, ICASSP 2024',
             'detail': None if riley else RILEY_NOTE,
         },
         'gaps': {
-            'installed': riley,
+            'installed': riley, 'label': 'GAPS (classical guitar)',
+            'summary': 'Classical guitar model; falls apart on distorted playing.',
             'license': 'MIT',
             'checkpoint': 'guitar-gaps.pth',
             'paper': 'Riley et al., GAPS, 2024',
             'detail': None if riley else RILEY_NOTE,
         },
         'yourmt3': {
+            'label': 'YourMT3+',
+            'summary': 'Best on acoustic (.917) but misses low notes on synthetic guitar; about a minute per minute.',
             'installed': bool(yourmt3_root and Path(yourmt3_root).is_dir()
                               and Path(os.environ.get('FRETWORK_YOURMT3_PYTHON', '/nonexistent')).exists()),
             'license': 'code GPL-3.0 (not vendored); checkpoints Apache-2.0',
@@ -150,49 +168,23 @@ def _notes_from_midi_bytes(data: bytes, midi_min: int, midi_max: int):
     return notes
 
 
-# guitar-fl is the ICASSP 2024 domain-adaptation model. guitar-gaps is the later
-# GAPS checkpoint. hf-midi-transcription 0.1.1's instrument list only names
-# "guitar" (GAPS), so the checkpoint is loaded directly.
-_CHECKPOINTS = {'riley': 'guitar-fl.pth', 'gaps': 'guitar-gaps.pth'}
-
-
-def _load_riley(which: str):
-    cached = _MODELS.get(which)
-    if cached is not None:
-        return cached
+def _transcribe_riley_path(which: str, path: Path, midi_min: int, midi_max: int):
+    """Riley (guitar-fl) or GAPS, run in the engine from server/riley."""
+    import librosa
     try:
-        import torch
-        from huggingface_hub import hf_hub_download
-        from piano_transcription_inference import PianoTranscription, sample_rate
+        import torchlibrosa  # noqa: F401
+        from . import riley
     except ImportError as exc:
         raise ModelUnavailable(RILEY_NOTE) from exc
-    filename = _CHECKPOINTS[which]
-    checkpoint = hf_hub_download(repo_id='xavriley/midi-transcription-models', filename=filename)
-    # Published decoder thresholds (onset 0.3 / offset 0.3 / frame 0.1). Not retuned here.
-    model = PianoTranscription(
-        'Regress_onset_offset_frame_velocity_CRNN',
-        device=torch.device('cpu'),
-        checkpoint_path=checkpoint,
-        segment_samples=int(sample_rate) * 10,
-        batch_size=1,
-    )
-    _MODELS[which] = (model, int(sample_rate))
-    return _MODELS[which]
-
-
-def _transcribe_riley_path(which: str, path: Path, midi_min: int, midi_max: int):
-    import librosa
-    model, sample_rate = _load_riley(which)
-    audio, _ = librosa.load(str(path), sr=sample_rate, mono=True)
-    fd, midi_name = tempfile.mkstemp(suffix='.mid')
-    os.close(fd)
-    midi_path = Path(midi_name)
-    try:
-        model.transcribe(audio, str(midi_path))
-        data = midi_path.read_bytes()
-    finally:
-        midi_path.unlink(missing_ok=True)
-    return _notes_from_midi_bytes(data, midi_min, midi_max)
+    audio, _ = librosa.load(str(path), sr=riley.SAMPLE_RATE, mono=True)
+    out = riley.posteriors(audio, which)
+    # The reverb-adaptive decoder was tuned on Riley; GAPS keeps its published thresholds.
+    notes = riley.decode(out)[0] if which == 'riley' else riley.notes_from_posteriors(out)
+    notes = [n for n in notes if midi_min <= n['midi'] <= midi_max]
+    notes.sort(key=lambda n: (n['time'], n['midi']))
+    for i, n in enumerate(notes):
+        n['id'] = i
+    return notes
 
 
 YOURMT3_RUNNER = Path(__file__).resolve().parent.parent / 'tools' / 'yourmt3' / 'run_yourmt3.py'

@@ -256,9 +256,9 @@ def transcribe(path, midi_min=40, midi_max=88, posteriors=False, thresholds=None
     return merge_note_lists(*lists)
 
 
-def transcribe_profile(path, profile, posteriors=False):
+def transcribe_profile(path, profile, posteriors=False, backend=None):
     if profile['transcription_method'] != 'basic_pitch_onnx':
         raise ModelUnavailable('The selected transcription method is not implemented; no substitute was used.')
     if posteriors:
         return transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'], posteriors=True)
-    return transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'])
+    return transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'], backend=backend)

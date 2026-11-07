@@ -121,3 +121,25 @@ def test_yourmt3_is_never_imported_and_needs_its_own_interpreter(monkeypatch):
     with pytest.raises(ModelUnavailable):
         transcribers._transcribe_yourmt3_path(transcribers.Path('x.wav'), 40, 88)
     assert 'GPL-3.0' in transcribers.YOURMT3_RUNNER.read_text().splitlines()[0]
+
+
+def test_studio_choice_of_transcriber_is_checked(monkeypatch):
+    from server import transcribers
+    assert transcribers.checked_backend('basic_pitch') == 'basic_pitch'
+    import pytest
+    with pytest.raises(ValueError, match='Unknown transcriber'):
+        transcribers.checked_backend('magic')
+    monkeypatch.delenv('FRETWORK_YOURMT3_ROOT', raising=False)
+    with pytest.raises(ValueError, match='not installed'):
+        transcribers.checked_backend('yourmt3')
+
+
+def test_riley_reverb_rule_picks_threshold_from_onset_ratio(monkeypatch):
+    from server import riley
+    counts = {0.3: 30, 0.65: 10, 0.5: 25}
+    monkeypatch.setattr(riley, 'notes_from_posteriors', lambda out, onset=None, **k: [{}] * counts[onset or 0.3])
+    notes, info = riley.decode({})
+    assert info['reverb'] == 'heavy' and info['onset_threshold'] == 0.65 and len(notes) == 10
+    counts.update({0.3: 11, 0.65: 10})
+    notes, info = riley.decode({})
+    assert info['reverb'] == 'light' and info['onset_threshold'] == 0.5 and len(notes) == 25

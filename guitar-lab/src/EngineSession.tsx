@@ -20,6 +20,7 @@ import { summarise, type BarMark } from "./feedback";
 import HeardTake from "./HeardTake";
 import RefinementReport from "./RefinementReport";
 import type { Processing } from "./ProcessingToggle";
+import { useTranscriber } from "./TranscriberSelect";
 import { tabPosition, type ResolvedInstrument } from "./instruments";
 
 type Props = {
@@ -74,7 +75,8 @@ export default function EngineSession({
     [edits, setEdits] = useState<EngineNote[]>([]),
     [dirty, setDirty] = useState(false),
     [display, setDisplay] = useState("Notes & tab"),
-    [refine, setRefine] = useState(false);
+    [refine, setRefine] = useState(false),
+    [transcriber] = useTranscriber();
   const jobRef = useRef<string | null>(null),
     generation = useRef(0),
     mounted = useRef(true),
@@ -178,6 +180,7 @@ export default function EngineSession({
       body.set("consent", "true");
       body.set("kind", referenceNotes ? "isolated" : kind);
       body.set("processing", processing);
+      body.set("transcriber", transcriber);
       if (referenceNotes)
         body.set(
           "reference_notes",

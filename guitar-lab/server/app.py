@@ -18,6 +18,7 @@ import numpy as np
 import soundfile as sf
 
 from . import models
+from .transcribers import transcription_label
 from .analysis import align, observations, score_informed
 from .refine import refine_transcription, refinement_gate, skipped_refinement
 from .model_store import install_stream, InvalidCheckpoint
@@ -51,6 +52,7 @@ class Job:
     # Notes from an uploaded tab/score: the exact reference, so it is not transcribed.
     reference_notes: list | None = None
     refine: bool = False
+    transcriber: str = 'basic_pitch'
 
 
 def cleanup():
@@ -148,8 +150,8 @@ def run_job(job, phase):
             if job.reference_notes is not None:
                 reference_notes = job.reference_notes
             else:
-                job.stage = f"Transcribing reference {job.profile['name']} with Basic Pitch"
-                reference_notes = models.transcribe_profile(job.folder/'guitar.wav', job.profile)
+                job.stage = f"Transcribing reference {job.profile['name']} ({transcription_label(job.transcriber)})"
+                reference_notes = models.transcribe_profile(job.folder/'guitar.wav', job.profile, backend=job.transcriber)
             cancelled(job)
             gate = refinement_gate(job.profile['id'], job.refine, notation=job.reference_notes is not None)
             if gate is None:
@@ -168,11 +170,12 @@ def run_job(job, phase):
             else:
                 refinement = skipped_refinement(gate, requested=bool(job.refine))
             cancelled(job)
-            job.stage = 'Transcribing your take with Basic Pitch'
+            job.stage = f'Transcribing your take ({transcription_label(job.transcriber)})'
             if job.reference_notes is not None:
+                # Checking against a tab uses Basic Pitch's onset map (score-informed).
                 take_notes, post = models.transcribe_profile(job.folder/'take.wav', job.profile, posteriors=True)
             else:
-                take_notes = models.transcribe_profile(job.folder/'take.wav', job.profile)
+                take_notes = models.transcribe_profile(job.folder/'take.wav', job.profile, backend=job.transcriber)
             cancelled(job)
             versions = {}
             for name in ('librosa', 'demucs', 'basic-pitch', 'torch', 'onnxruntime'):
@@ -180,7 +183,7 @@ def run_job(job, phase):
                     versions[name] = importlib.metadata.version(name)
                 except importlib.metadata.PackageNotFoundError:
                     pass
-            from .transcribers import backend_name, transcription_label
+            from .transcribers import backend_name
             if job.reference_notes is not None:
                 # This branch asked for posteriors, which stay on Basic Pitch.
                 tx_label = 'Reference: notes from the uploaded tab/score. Take: Basic Pitch ONNX (CPU).'
@@ -273,12 +276,18 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
                      original_offset: float = Form(0), instrument: str = Form('guitar'), tuning: str = Form('standard'),
                      capo: int = Form(0), notation: str | None = Form(None), processing: str = Form('cpu'),
                      reference_notes: str | None = Form(None), refine: bool = Form(False),
+                     transcriber: str = Form(''),
                      x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
         raise HTTPException(422, 'Explicit upload consent is required.')
     try:
         policy = policy_for(processing)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    from .transcribers import checked_backend
+    try:
+        transcriber = checked_backend(transcriber)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     tab_notes = parse_reference_notes(reference_notes) if reference_notes else None
@@ -303,7 +312,7 @@ async def create_job(reference: UploadFile = File(...), take: UploadFile = File(
         folder = ROOT/key
         folder.mkdir(mode=0o700)
         # Reserve capacity before streaming uploads.
-        job = Job(key, folder, kind, original_offset, 0, profile=profile, stage='Receiving consented excerpts',
+        job = Job(key, folder, kind, original_offset, 0, profile=profile, transcriber=transcriber, stage='Receiving consented excerpts',
                   policy=policy, reference_notes=tab_notes, refine=refine)
         JOBS[key] = job
     try:

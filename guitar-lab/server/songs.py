@@ -57,6 +57,7 @@ class Song:
     notes: dict = field(default_factory=dict)     # part id -> transcribed notes (pre-fingering)
     policy: str = 'cpu'                           # separation device: 'cpu' or 'auto' (graphics card)
     tone: str = 'auto'                            # guitar sound for transcription: auto, clean, crunch, distorted
+    transcriber: str = 'basic_pitch'              # note detector chosen in the studio
     comparisons: list = field(default_factory=list)  # last few take-vs-target results (no audio)
     reference: str | None = None                  # optional recording/MIDI for the advisory fingerprint check
     refine: bool = False                          # opt-in render-and-revise loop (also needs FRETWORK_REFINE=1)
@@ -297,7 +298,7 @@ def run_song(song: Song):
                 effects_detected = {'effects': [], 'error': str(exc)}
         thresholds = models.thresholds_for(sound, chosen_by_user=song.tone != 'auto')
         from .transcribers import backend_name, transcription_label as _tx_label
-        song.stage = f'Transcribing the {profile["name"].lower()} notes (Basic Pitch)'
+        song.stage = f'Transcribing the {profile["name"].lower()} notes ({_tx_label(song.transcriber)})'
         widest = min(min(t) for t in profile['tunings'].values()) if profile['tunings'] else profile['midi_min']
         # Notation never reaches this path. Audio targets can opt into the loop.
         refine_gate = refinement_gate(song.instrument, song.refine)
@@ -323,8 +324,9 @@ def run_song(song: Song):
                                                    posteriors=True, thresholds=clean_model.CANDIDATE_THRESHOLDS)
                     song.notes[p['id']], _info = clean_model.refine(cand, post, effects_detected)
                 else:
-                    song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'], thresholds=thresholds)
-                    if sa.promote_enabled() and backend_name() == 'basic_pitch':
+                    song.notes[p['id']] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
+                                                            thresholds=thresholds, backend=song.transcriber)
+                    if sa.promote_enabled() and song.transcriber == 'basic_pitch':
                         # Low-threshold pool for evidence-gated promotion of missed notes.
                         # An optional backend does not get a Basic Pitch note mixed in.
                         p['candidates'] = models.transcribe(path, midi_min=widest, midi_max=profile['midi_max'],
@@ -394,7 +396,7 @@ def run_song(song: Song):
             'tuning': tuning, 'reference_cents': round(cents, 1), 'tone': tone,
             'effects_detected': effects_detected,
             'provenance': dict(provenance,
-                               transcription='Basic Pitch ONNX' if backend_name() == 'basic_pitch' else _tx_label(),
+                               transcription=_tx_label(song.transcriber),
                                onset_threshold=thresholds[0],
                                frame_threshold=thresholds[1]),
             'warnings': [
@@ -429,13 +431,18 @@ def run_song(song: Song):
 @router.post('', status_code=202)
 async def create_song(file: UploadFile | None = File(None), url: str | None = Form(None),
                       consent: bool = Form(False), instrument: str = Form('guitar'), processing: str = Form('cpu'),
-                      tone: str = Form('auto'), refine: bool = Form(False),
+                      tone: str = Form('auto'), refine: bool = Form(False), transcriber: str = Form(''),
                       x_fretwork_client: str | None = Header(None)):
     client(x_fretwork_client)
     if not consent:
         raise HTTPException(422, 'Explicit upload consent is required.')
     try:
         policy = policy_for(processing)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    from .transcribers import checked_backend
+    try:
+        transcriber = checked_backend(transcriber)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     if tone not in ('auto', 'clean', 'crunch', 'distorted'):
@@ -459,7 +466,7 @@ async def create_song(file: UploadFile | None = File(None), url: str | None = Fo
         folder = ROOT/f'song-{key}'
         folder.mkdir(mode=0o700)
         song = Song(key, folder, instrument, (file.filename if file else '') or 'Uploaded song',
-                    stage='Receiving the song', policy=policy, tone=tone, refine=refine)
+                    stage='Receiving the song', policy=policy, tone=tone, refine=refine, transcriber=transcriber)
         SONGS[key] = song
     try:
         if file is not None:
