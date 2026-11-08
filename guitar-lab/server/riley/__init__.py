@@ -27,7 +27,9 @@ def load(which: str = 'riley', device: str = 'cpu'):
     import torch
     from huggingface_hub import hf_hub_download
     from .models import Regress_onset_offset_frame_velocity_CRNN
-    path = hf_hub_download(repo_id=REPO, filename=CHECKPOINTS[which])
+    import os
+    custom = os.environ.get('FRETWORK_RILEY_CHECKPOINT') if which == 'riley' else None
+    path = custom or hf_hub_download(repo_id=REPO, filename=CHECKPOINTS[which])
     model = Regress_onset_offset_frame_velocity_CRNN(frames_per_second=config.frames_per_second,
                                                     classes_num=config.classes_num)
     # The checkpoints are plain pickles from before torch 2.6's weights-only default.
