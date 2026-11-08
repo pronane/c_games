@@ -167,6 +167,31 @@ there). No released transcriber here was trained on that. The realistic fix is t
 amp-rendered guitar from tabs with known notes, which the app can already render, used to
 fine-tune Riley.
 
+## Fine-tuning Riley on amp-rendered guitar: not adopted
+
+The model was fine-tuned for 330 steps on 1,441 ten-second segments:
+- GuitarSet players 00–04, re-amped through random crunch and high-gain chains.
+- Original double-tracked riffs, rendered with a plucked-string model.
+- The front end was frozen; 14.1M of 24.7M parameters were trained.
+
+Held-out loss on the same kind of data fell from 0.0445 to 0.0293. On One, it got worse:
+
+| Checkpoint | Clean half (0.5) | Heavy half (0.5) | Heavy, best threshold |
+|---|---|---|---|
+| Released | .695 | .082 | .104 (0.2) |
+| Step 110 | .673 | .063 | |
+| Step 220 | .663 | .040 | |
+| Step 330 | .662 | .054 | .101 (0.1) |
+
+The heavy half of One (aggregate, released model, threshold 0.5):
+- **Note counts:** 1,273 notes heard against 4,762 in the tab.
+- **Timing:** onset F1 is .45 when pitch is ignored, so the notes are found roughly in time.
+- **Pitch:** pitch-class F1 is .22 and note F1 is .08. Pitch is where it fails: the heard median is MIDI 55, the tab's is 47, so the model is hearing distortion overtones and octaves.
+
+Fine-tuning made the model more cautious (504 notes heard) without fixing pitch. The synthetic amp chains and plucked-string riffs don't transfer to a real heavy record. At every threshold, no checkpoint beats the released model on the heavy half, and every checkpoint is worse on the clean half, so the released weights stay.
+
+The tools (`training/`) and the `FRETWORK_RILEY_CHECKPOINT` override stay for later attempts with real multitrack recordings that come with tabs.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.

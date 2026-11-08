@@ -22,3 +22,7 @@ FRETWORK_RILEY_CHECKPOINT=runs/heavy/step_440.pth python -m benchmarks.regressio
 
 No commercial recordings or tabs are used for training. The user's private recordings are
 only used as held-out tests.
+
+## Result so far
+
+First run: 330 steps on CPU, about 1.5 hours. It was **not adopted**. Loss on held-out synthetic data improved, but One's heavy half didn't improve and its clean half got worse. See `benchmarks/regression/RESULTS.md`, "Fine-tuning Riley on amp-rendered guitar". The failure is pitch (overtones and octaves) under real high-gain tone. Synthetic amps and plucked-string riffs don't close that gap.
