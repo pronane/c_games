@@ -16,6 +16,9 @@ can play on the same device (keyboard + gamepad, or two gamepads).
 | **Shift** | Sprint |
 | **Q** or **Tab** | Switch player (defence) |
 | **B** | Bounce the ball |
+| **Z / X** | Bend a set shot (left / right) |
+| **C** | Cycle camera (broadcast → wing → chase → aerial → tactical) |
+| **V** | Toggle player rings / markers |
 | **Esc** | Pause / back |
 
 ## Gamepad (standard mapping — Xbox / PlayStation / Switch Pro / Stadia)
@@ -31,6 +34,7 @@ can play on the same device (keyboard + gamepad, or two gamepads).
 | **LB / L1** | Bounce |
 | **RB / R1** or **RT / R2** | Sprint |
 | **Start / Options** | Pause |
+| **L3 / R3** | Cycle camera |
 | **Back / Select** | Menu navigation: back (in a menu, quits to menu from pause) |
 | **Left stick (Y)** / **D-pad** (in menus) | Move focus between buttons |
 | **A / Cross** (in menus) | Select the focused menu button |

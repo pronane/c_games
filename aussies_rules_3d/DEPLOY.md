@@ -54,7 +54,31 @@ docker build -t aussie-rules-3d .
 docker run -p 8080:80 aussie-rules-3d
 ```
 
-## 5. CI verification
+## 5. Desktop app (Electron)
+
+The browser build doubles as a desktop app via a minimal Electron shell
+(`electron/main.cjs`) that loads `dist/` from disk — no server involved.
+
+```bash
+npm install          # postinstall fetches the Electron binary from GitHub
+npm run desktop      # builds dist/ and launches the app
+npm run desktop:start  # launches the existing build
+```
+
+Notes:
+
+* The Electron binary (~100 MB) is downloaded on first `npm install` from
+  GitHub release assets. In sandboxed/CI environments that block those
+  hosts (e.g. `objects.githubusercontent.com`), use
+  `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install` and prefer the PWA path.
+* The shell is hardened: `contextIsolation` + `sandbox` on,
+  `nodeIntegration` off, menu bar hidden, external links open in the system
+  browser, and a friendly error page if `dist/` is missing.
+* Code signing / installer packaging (NSIS, dmg, AppImage) is **not**
+  configured yet; for most users the PWA ("install app" in your browser)
+  is the smoothest desktop experience and starts offline.
+
+## 6. CI verification
 
 `npm run verify` is CI-friendly (exit code 0/1): it runs TypeScript, the full
 test suite, the production build and the glTF asset checks. A GitHub Actions

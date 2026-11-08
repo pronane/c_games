@@ -9,7 +9,7 @@
 export type GameAction =
   | 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight'
   | 'kick' | 'handball' | 'tackle' | 'switchPlayer' | 'sprint' | 'bounce'
-  | 'pause' | 'confirm' | 'back';
+  | 'pause' | 'confirm' | 'back' | 'camera' | 'toggleMarkers';
 
 /** Keyboard: code → action (KeyboardEvent.code values). */
 export const KEYBOARD_MAP: Record<string, GameAction> = {
@@ -32,6 +32,8 @@ export const KEYBOARD_MAP: Record<string, GameAction> = {
   Escape: 'pause',
   Enter: 'confirm',
   Backspace: 'back',
+  KeyC: 'camera',
+  KeyV: 'toggleMarkers',
 };
 
 /** Gamepad standard mapping: button index → action. */
@@ -144,6 +146,8 @@ export interface InputFrame {
   pause: boolean;
   confirm: boolean;
   back: boolean;
+  camera: boolean;
+  toggleMarkers: boolean;
   aimZ: number;
 }
 
@@ -153,6 +157,7 @@ export function emptyInputFrame(): InputFrame {
     kickHeld: false, kickReleased: false,
     handball: false, tackle: false, switchPlayer: false, bounce: false,
     pause: false, confirm: false, back: false,
+    camera: false, toggleMarkers: false,
     aimZ: 0,
   };
 }

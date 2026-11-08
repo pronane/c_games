@@ -11,3 +11,6 @@ tools/blender/**/__pycache__/
 *.log
 .DS_Store
 npm-debug.log*
+
+# video renderer venv (not committed)
+tools/video/venv/

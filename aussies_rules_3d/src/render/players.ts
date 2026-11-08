@@ -17,6 +17,8 @@ export interface PlayerView {
   team: TeamId;
   number: number;
   facing: number;
+  /** Coloured ground ring (yellow + pulsing for the controlled player). */
+  ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
 }
 
 export interface Teams {
@@ -108,6 +110,22 @@ export function createPlayerViews(
     const idle = actions.get('idle');
     idle?.play();
 
+    // ground ring: light-blue (home) / pink (away), yellow + pulse when controlled
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.18, 1.46, 28),
+      new THREE.MeshBasicMaterial({
+        color: p.team === 0 ? 0x7fd0ff : 0xff8f8f,
+        transparent: true,
+        opacity: 0.65,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.03;
+    ring.renderOrder = 2;
+    root.add(ring);
+
     views.set(p.id, {
       root,
       mixer,
@@ -117,6 +135,7 @@ export function createPlayerViews(
       team: p.team,
       number: p.number,
       facing: p.facing,
+      ring,
     });
   }
   return views;
@@ -164,8 +183,11 @@ export function syncPlayerViews(
   views: Map<number, PlayerView>,
   state: MatchState,
   dt: number,
-  celebrating: boolean
+  celebrating: boolean,
+  controlledId: number | null = null,
+  markersOn = true
 ): void {
+  const now = performance.now() / 1000;
   for (const p of state.players) {
     const view = views.get(p.id);
     if (!view) continue;
@@ -174,6 +196,22 @@ export function syncPlayerViews(
       continue;
     }
     view.root.visible = true;
+
+    // team rings — the quickest way to read who is who from the broadcast cam
+    if (!markersOn) {
+      view.ring.visible = false;
+    } else {
+      view.ring.visible = true;
+      if (p.id === controlledId) {
+        view.ring.material.color.setHex(0xffd23f);
+        view.ring.material.opacity = 0.95;
+        view.ring.scale.setScalar(1 + 0.16 * Math.sin(now * 5));
+      } else {
+        view.ring.material.color.setHex(view.team === 0 ? 0x7fd0ff : 0xff8f8f);
+        view.ring.material.opacity = 0.6;
+        view.ring.scale.setScalar(1);
+      }
+    }
 
     const b = state.ball;
     // ball carrier animates with the ball; others react to movement

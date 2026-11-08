@@ -10,7 +10,8 @@ tablet, TV, or installed as an app.
 | Keyboard · gamepad · touch · PWA install | Skinned rigs + 11 baked animations, PBR arena, broadcast cam | 18-a-side, marks, handballs, tackles, holding the ball, 50 m penalties, last-disposal OOB |
 
 **[▶ Play it](#quick-start)** · [Install](INSTALL.md) · [Controls](CONTROLS.md) ·
-[Rules](RULES.md) · [Deploy](DEPLOY.md) · [3D pipeline](tools/blender/README.md)
+[Rules](RULES.md) · [Deploy](DEPLOY.md) · [3D pipeline](tools/blender/README.md) ·
+[Design review](docs/DESIGN_REVIEW.md) · [Gameplay video](docs/gameplay.mp4)
 
 ## Quick start
 
@@ -52,11 +53,23 @@ For development with hot reload: `npm run dev`.
   goal inside 50), three difficulty levels, contest physics for the oval
   ball, and full laws enforcement.
 
+## Gameplay video & design review
+
+[![Aussie Rules 3D — first-quarter highlights](docs/gameplay-poster.png)](docs/gameplay.mp4)
+
+**[▶ Watch the first-quarter highlight reel](docs/gameplay.mp4)** — a 40-second
+Melbourne v Collingwood montage rendered from the live MatchSim (tactical
+tracking camera, score bug, goal banners). The full production-quality review
+of the gameplay overhaul — camera research, the swarm/readability fixes,
+contextual control hints, the desktop version — is in
+[**docs/DESIGN_REVIEW.md**](docs/DESIGN_REVIEW.md).
+
 ## Device-agnostic by design
 
 | Where | How |
 |---|---|
 | Desktop browser | Keyboard + mouse, or any gamepad (with rumble) |
+| Desktop app | `npm run desktop` — Electron shell loads the build (see [DEPLOY.md](DEPLOY.md)) · or install as a PWA |
 | Phone / tablet browser | Touch controls: virtual stick + big action buttons |
 | Installed app (any OS) | PWA — install from the browser, plays offline |
 | Two players, one device | Player 2 joins on gamepad 1 (local co-op) |
