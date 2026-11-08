@@ -14,9 +14,18 @@ from __future__ import annotations
 
 from benchmarks.score_alignment import ONE_FROZEN
 
-# Audio time of tab 0, from the intro chroma anchor. Not the rejected F1-max line.
-INTRO_ORIGIN_S = float(ONE_FROZEN['origin_s'])
+# The chart is written at 108 BPM, but the recording's intro plays at 99.4 BPM: a beat tracker
+# on the audio alone gives 99.4 over both 19 s and 41 s windows, with 100 or 108 as its prior.
+# Playing the chart at 108 drifts ~0.7 s off by the end of the window, which is why every
+# detector scored ~0.1 here. Tab 0 is then placed by lining the chart's onset times up with
+# the audio's onset-strength envelope (pitch-blind): 0.95 s before the earlier chroma anchor.
+# No transcription output went into either number.
+INTRO_CHART_BPM = 108.0
+INTRO_AUDIO_BPM = 99.4
+INTRO_STRETCH = INTRO_CHART_BPM / INTRO_AUDIO_BPM
+INTRO_ORIGIN_S = round(float(ONE_FROZEN['origin_s']) - 0.95, 2)
 INTRO_TAB_END_S = 16.5
+INTRO_AUDIO_END_S = INTRO_ORIGIN_S + INTRO_TAB_END_S * INTRO_STRETCH
 TPQ = 960
 DOUBLE_TIME_BAR = 153
 DOUBLE_TIME_BPM = 216.0
@@ -85,6 +94,7 @@ def intro_reference(path, origin_s=INTRO_ORIGIN_S, tab_end_s=INTRO_TAB_END_S):
             continue
         shifted = dict(note)
         shifted['tab_time'] = note['time']
-        shifted['time'] = note['time'] + float(origin_s)
+        shifted['time'] = float(origin_s) + note['time'] * INTRO_STRETCH
+        shifted['duration'] = note['duration'] * INTRO_STRETCH
         out.append(shifted)
     return out

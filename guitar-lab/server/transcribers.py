@@ -1,7 +1,8 @@
 """Optional guitar transcription backends.
 
-The default note list is still Basic Pitch (see ``server.models``). Other
-backends are off unless ``FRETWORK_TRANSCRIBER`` names one.
+The default is Riley when it is installed (it wins every measured category of
+the regression library; see benchmarks/regression/RESULTS.md), else Basic Pitch.
+``FRETWORK_TRANSCRIBER`` or the studio's Note detector drop-down picks another.
 
 * ``riley`` — Riley, Edwards, Dixon, "High Resolution Guitar Transcription via
   Domain Adaptation" (ICASSP 2024). Checkpoint ``guitar-fl.pth``. Wrapper and
@@ -29,7 +30,7 @@ _MODELS: dict = {}
 
 _ALIASES = {
     'basic': 'basic_pitch',
-    'default': 'basic_pitch',
+    'default': '',
     'bp': 'basic_pitch',
     'basicpitch': 'basic_pitch',
     'guitar_fl': 'riley',
@@ -53,11 +54,17 @@ RILEY_NOTE = (
 )
 
 
+def default_backend() -> str:
+    """Riley when its packages are installed, else Basic Pitch."""
+    return 'riley' if _spec_available('torchlibrosa') and _spec_available('torch') else 'basic_pitch'
+
+
 def normalize_backend(name=None) -> str:
     if name is None or str(name).strip() == '':
-        name = os.environ.get('FRETWORK_TRANSCRIBER', 'basic_pitch')
+        name = os.environ.get('FRETWORK_TRANSCRIBER', '') or default_backend()
     key = str(name).strip().lower().replace(' ', '_')
-    return _ALIASES.get(key, key)
+    key = _ALIASES.get(key, key)
+    return key or default_backend()
 
 
 def checked_backend(name=None) -> str:
@@ -115,12 +122,13 @@ def availability() -> dict:
     """Which optional backends can be constructed. Does not download weights."""
     riley = (_spec_available('torchlibrosa') and _spec_available('torch')
              and _spec_available('huggingface_hub'))
-    return {
-        'basic_pitch': {'installed': True, 'license': 'Apache-2.0', 'default': True, 'label': 'Basic Pitch',
-                        'summary': 'Fast (1-4 s per minute). Default; best on the app\'s own guitar sound.'},
+    default = default_backend()
+    out = {
+        'basic_pitch': {'installed': True, 'license': 'Apache-2.0', 'label': 'Basic Pitch',
+                        'summary': 'Fastest (1-4 s per minute); less accurate on real guitar.'},
         'riley': {
             'installed': riley, 'label': 'Riley guitar model',
-            'summary': 'Most accurate on real guitar (acoustic .908, electric .902); reverb-aware. 10-30 s per minute.',
+            'summary': 'Most accurate on every test (acoustic .908, electric .902, One intro .873); reverb-aware. 10-30 s per minute.',
             'license': 'MIT (adapted into server/riley; checkpoint fetched on first use, ~100 MB)',
             'checkpoint': 'guitar-fl.pth',
             'paper': 'Riley, Edwards, Dixon, ICASSP 2024',
@@ -142,6 +150,8 @@ def availability() -> dict:
             'detail': None if _yourmt3_available() else YOURMT3_NOTE,
         },
     }
+    out[default]['default'] = True
+    return out
 
 
 def _notes_from_midi_bytes(data: bytes, midi_min: int, midi_max: int):

@@ -242,6 +242,16 @@ def run_song(song: Song):
             write_track(tracks, name, y, sr_s)
         profile = resolve_profile(song.instrument)
         stem_name = profile['separation_stem']
+        solo = song.instrument != 'piano' and sa.solo_recording(found, stem_name)
+        if solo:
+            # A solo take the separator filed under 'other': transcribe the whole recording.
+            mix = np.asarray(audio, dtype=np.float32)
+            mix = np.stack([mix, mix], 1) if mix.ndim == 1 else mix
+            if sr != sr_s:
+                import librosa
+                mix = librosa.resample(mix.T, orig_sr=sr, target_sr=sr_s).T.astype(np.float32)
+            stems[stem_name] = mix
+            write_track(tracks, stem_name, mix, sr_s)
         stem = stems[stem_name]
 
         song.stage = f'Looking for more than one {profile["name"].lower()} part'
@@ -400,6 +410,8 @@ def run_song(song: Song):
                                onset_threshold=thresholds[0],
                                frame_threshold=thresholds[1]),
             'warnings': [
+                *(['No separate guitar stem was found and nothing else plays, so this was treated as a solo '
+                   'recording and the whole take was transcribed.'] if solo else []),
                 'Every result here is an automatic estimate. Check notes and chords by ear and correct them.',
                 'Parts panned to the same place and playing at the same time cannot be separated.',
                 'Tab positions are suggestions: the same note can be played on several strings.',

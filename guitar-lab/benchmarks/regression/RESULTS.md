@@ -74,6 +74,28 @@ Library categories with the new decoder: solo acoustic 0.908 (was 0.888), clean 
 rendered 1.000. GAPS keeps its published decoder. The real reverb pair and the Metallica intro were
 not on this machine, so Basic Pitch stays the default until those are re-measured.
 
+## Metallica intro re-timed (beat-tracked tempo)
+
+The chart is written at 108 BPM, but the recording's intro plays at **99.4 BPM**. A beat tracker
+on the audio gives 99.4 BPM over 19 s and 41 s windows, starting from either a 100 or a 108 prior.
+Scored at 108, the reference drifted about 0.7 s by the end of the window, so every detector got
+about 0.1. Tab 0 is now placed by lining up the chart's onset times with the audio's onset envelope,
+which is pitch-blind and ignores every detector's notes. It lands 0.95 s before the old chroma anchor.
+An F1 search over stretch and offset picks the same map for all three detectors (stretch 1.085–1.09,
+offset −0.94 to −1.02), but it was only used as a cross-check.
+
+| backend | intro note F1 | precision | recall |
+| --- | --- | --- | --- |
+| Basic Pitch | 0.458 | 0.330 | 0.750 |
+| **Riley** | **0.873** | 1.000 | 0.775 |
+| GAPS | 0.845 | 0.968 | 0.750 |
+| YourMT3+ | 0.566 | 0.455 | 0.750 |
+
+Riley now wins every measured category. The real reverb/clear pair still can't be scored,
+because only the reverb take (take A) is on this machine. On take A, Riley's reverb check reads
+heavy reverb: it finds 6.7× more onsets at threshold 0.3 than at 0.65, so it decodes at 0.65.
+That is the same note explosion behind the old 0.16–0.18 result.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
