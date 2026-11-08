@@ -135,15 +135,19 @@ def test_studio_choice_of_transcriber_is_checked(monkeypatch):
         transcribers.checked_backend('yourmt3')
 
 
-def test_riley_reverb_rule_picks_threshold_from_onset_ratio(monkeypatch):
+def test_riley_reverb_rule_picks_threshold_per_stretch(monkeypatch):
     from server import riley
-    counts = {0.3: 30, 0.65: 10, 0.5: 25}
-    monkeypatch.setattr(riley, 'notes_from_posteriors', lambda out, onset=None, **k: [{}] * counts[onset or 0.3])
-    notes, info = riley.decode({})
-    assert info['reverb'] == 'heavy' and info['onset_threshold'] == 0.65 and len(notes) == 10
-    counts.update({0.3: 11, 0.65: 10})
-    notes, info = riley.decode({})
-    assert info['reverb'] == 'light' and info['onset_threshold'] == 0.5 and len(notes) == 25
+    # Notes per onset threshold, spread over 0-40 s: the first 20 s dry, the next 20 s wet.
+    def notes(n, a, b):
+        return [{'time': a + (b - a) * k / n, 'duration': 0.1} for k in range(n)]
+    table = {0.3: notes(11, 0, 20) + notes(30, 20, 40), 0.65: notes(10, 0, 20) + notes(10, 20, 40),
+             0.5: notes(12, 0, 20) + notes(25, 20, 40)}
+    monkeypatch.setattr(riley, 'notes_from_posteriors', lambda out, onset=None, **k: table[onset or 0.3])
+    out, info = riley.decode({})
+    first = [n for n in out if n['time'] < 20]
+    second = [n for n in out if n['time'] >= 20]
+    assert len(first) == 12 and len(second) == 10       # dry stretch at 0.5, wet stretch at 0.65
+    assert info['reverb'] == 'mixed' and info['wet_share'] == 0.5
 
 
 def test_riley_is_the_default_when_installed(monkeypatch):

@@ -96,6 +96,27 @@ because only the reverb take (take A) is on this machine. On take A, Riley's rev
 heavy reverb: it finds 6.7× more onsets at threshold 0.3 than at 0.65, so it decodes at 0.65.
 That is the same note explosion behind the old 0.16–0.18 result.
 
+## Whole song: tab-named parts on One (private recording + tab)
+
+`server/tab_align.py` lines the user's tab (5 guitar tracks, repeats played out) up with the full
+recording. Over the intro the map is 0.17 s out on average against the beat-tracked reference.
+Riley ran on the Demucs guitar stem, and its notes were scored against all five tab guitar parts.
+
+| stretch | Riley note F1 | precision | recall |
+| --- | --- | --- | --- |
+| 0:00–3:30 (clean / acoustic) | 0.654 | 0.80 | 0.55 |
+| 3:30–7:30 (heavy, distorted) | 0.027 | 0.16 | 0.01 |
+
+The heavy half fails on transcription, not alignment. A local ±2.5 s shift search per 30 s
+window never lifts F1 above 0.08. Riley writes 25–35 notes per 30 s there, where the tab has
+about 400. At onset threshold 0.3, which writes ~5× more notes, it still reaches only F1 0.10
+there. Basic Pitch scores 0.056 there and 0.511 in the first half.
+
+Riley's reverb check also fires on this dry studio stem. Distortion swells the onset count
+just as reverb does, so 74% of 20 s stretches decode at 0.65. A fixed 0.5 would score 0.695
+in the first half. The check now decides per 20 s stretch instead of per file, which leaves the
+simulated-room results unchanged. Telling reverb apart from distortion is still open.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.

@@ -44,6 +44,7 @@ import { synthesize } from "./tabScore";
 import { soundFromEstimate, useGuitarSound } from "./guitarTone";
 import GuitarSoundPicker from "./GuitarSoundPicker";
 import TranscriberSelect, { useTranscriber } from "./TranscriberSelect";
+import TabParts from "./TabParts";
 import RefinementReport from "./RefinementReport";
 import { addClicks, clickTimes, loadLatency, type LatencyResult } from "./practice";
 import { Recorder } from "./recorder";
@@ -975,6 +976,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
               {scoreBusy ? "Writing it out…" : "Show tab & notation"}
             </button>
           </div>
+          {song && result && song.instrument === "guitar" && <TabParts songId={song.id} songTitle={song.name} />}
           {score && (
             <div className="score">
               <p className="helper">

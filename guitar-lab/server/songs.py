@@ -55,6 +55,7 @@ class Song:
     cancelled: bool = False
     active: bool = True
     notes: dict = field(default_factory=dict)     # part id -> transcribed notes (pre-fingering)
+    tab_parts: dict | None = None                 # the player's tab lined up with this song
     policy: str = 'cpu'                           # separation device: 'cpu' or 'auto' (graphics card)
     tone: str = 'auto'                            # guitar sound for transcription: auto, clean, crunch, distorted
     transcriber: str = 'basic_pitch'              # note detector chosen in the studio
@@ -744,3 +745,69 @@ def delete_song(key: str, x_fretwork_client: str | None = Header(None)):
         if not song.active:
             shutil.rmtree(song.folder, ignore_errors=True)
             SONGS.pop(key, None)
+
+
+class TabNote(BaseModel):
+    time: float = Field(ge=0)
+    duration: float = Field(gt=0, le=60)
+    midi: int = Field(ge=0, le=127)
+    bar: int | None = None
+    string: int | None = None
+    fret: int | None = None
+
+
+class TabTrack(BaseModel):
+    name: str = Field(max_length=120)
+    track: int | None = None
+    notes: list[TabNote] = Field(max_length=40000)
+
+
+class TabPartsRequest(BaseModel):
+    tracks: list[TabTrack] = Field(min_length=1, max_length=16)
+
+
+@router.post('/{key}/tab-parts')
+async def tab_parts(key: str, request: TabPartsRequest, x_fretwork_client: str | None = Header(None)):
+    """Name and split the song's guitar parts from the player's own tab file.
+
+    The studio reads the tab (repeats played out) and sends each track's notes on the tab's
+    clock. The tab is lined up with the recording, each track's notes are moved onto the
+    recording's clock, and every note the app heard is given to the tab part it matches."""
+    client(x_fretwork_client)
+    song = get_song(key)
+    if song.status != 'complete' or not song.result:
+        raise HTTPException(409, 'Wait for the breakdown to finish.')
+    tracks = [{'name': t.name, 'track': t.track, 'notes': [n.model_dump() for n in t.notes]}
+              for t in request.tracks if t.notes]
+    if not tracks:
+        raise HTTPException(422, 'The tab has no pitched notes in the chosen tracks.')
+    from . import tab_align as ta
+
+    def work():
+        mix, sr = sf.read(song.folder/'tracks'/'mix.flac', dtype='float32')
+        mono = mix.mean(axis=1) if mix.ndim > 1 else mix
+        everything = [n for t in tracks for n in t['notes']]
+        mapping = ta.refine(ta.align(everything, mono, sr), everything, mono, sr)
+        placed = ta.place_tracks(tracks, mapping)
+        heard = []
+        for pid, notes in song.notes.items():
+            for n in notes:
+                heard.append(dict(n, id=f"{pid}:{n.get('id', len(heard))}", part=pid))
+        assigned = ta.assign(heard, placed)
+        return mapping, placed, assigned
+
+    try:
+        mapping, placed, assigned = await asyncio.to_thread(work)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    song.tab_parts = {'parts': placed, 'assigned': assigned}
+    return {
+        'alignment': {'tempo_ratio': mapping['tempo_ratio'], 'similarity': mapping['similarity'],
+                      'start': round(float(ta.to_audio_time(mapping, 0.0)), 2), 'refined': mapping.get('refined', False),
+                      'attack_match': mapping.get('attack_match')},
+        'parts': [{'name': t['name'], 'track': t['track'], 'sections': t['sections'],
+                   'notes': t['notes'], 'match': assigned['match'][t['name']],
+                   'heard_ids': assigned['by_track'][t['name']]} for t in placed],
+        'unassigned': len(assigned['unassigned']),
+        'heard': sum(len(v) for v in song.notes.values()),
+    }
