@@ -5,6 +5,90 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v11: people to rigged 3D characters (`forge.py capture`)
+A **turnaround video** (the person stands still while you walk once round them) or **one photo** becomes a rigged,
+textured 3D character: **GLB, FBX and OBJ** with a 26-bone game skeleton (pelvis, spine_01.., thigh_l, calf_l,
+upperarm_l ...), MakeHuman's own skin weights and Sprite Forge's clips (idle, walk, run, jump, kick, punch,
+celebrate). It is the same skeleton as `forge.py look`, so every sprite, console and game exporter works with it.
+All of it runs inside Sprite Forge on the CPU. Blender and MakeHuman are used only to check the result.
+
+```
+forge.py human --setup --from-git          # once: the CC0 MakeHuman body (no pip needed)
+forge.py capture --setup                   # once: the MediaPipe pose + segmentation models (Apache-2.0)
+forge.py capture turnaround.mp4 --name mike --height-cm 180      # -> captures/mike/out/mike.glb .fbx .obj
+forge.py capture photo.jpg --name mike --height-cm 180           # one photo works too (depth + back estimated)
+forge.py capture --rebuild --name mike     # redo texture + exports from the saved fit
+```
+
+How it works (`sforge/capture*.py`):
+1. **Track.** For each sampled frame, MediaPipe gives the 33 pose landmarks (2D and 3D), a person mask, and
+   hair / skin / clothes labels. It also gives the body's yaw, which is unwrapped round the orbit.
+2. **Fit.** The CC0 MakeHuman body is fitted to the person's silhouette in about 24 frames round the orbit. The fit
+   covers gender, muscle, weight and proportions, plus 22 shape sliders (torso / hip depth and width, belly,
+   buttocks, bust, waist, hips, thighs, calves, arms, shoulders, neck, head, limb and torso lengths). Arms and legs
+   are posed to the measured stance. Each frame has its own perspective camera: PnP from the joints, with the yaw
+   held near the orbit and left / right swapped when MediaPipe reads a back view mirrored, then refined on the
+   silhouette.
+3. **Texture.** Every texel of MakeHuman's UV layout is projected into the frames. It keeps the views where it is
+   the visible surface, inside the person (by mask and labels), and facing the camera. Closer and sharper views
+   weigh more. The views are blended with a robust (weighted-median) mix, with a per-frame exposure gain. The face
+   comes from the single best frontal frame (no double eyes).
+4. **Export.** GLB (skin, texture, clips), FBX written by Sprite Forge's own writer (texture embedded), OBJ + MTL,
+   a turntable picture, a fit overlay and report.json.
+5. **Check.** Every 4th frame is left out of the texture. The model is re-rendered from those frames' cameras and
+   compared with the real frames (silhouette IoU, colour dE, SSIM).
+
+**One photo.** The silhouette gives widths and lengths. The depth a photo cannot see comes from **priors learned
+from the turnaround videos** (`sforge/data/capture_priors.json`, numbers only). The back is painted from the
+front: per row band, the median colour of each label, so a logo on the front does not reappear on the back. Hidden
+hands become skin, and the back of the head is hair when the photo shows hair.
+
+**Checked against the real tools:**
+* *MakeHuman.* `tools/capture_vs_makehuman_blender.py` builds the same fitted body with MPFB2 (MakeHuman's own
+  code in Blender). It matches Sprite Forge's standalone build to 0.3 mm mean and under 1 mm max.
+* *Blender's importers.* `tools/capture_check_blender.py` loads the GLB, FBX and OBJ in Blender: 26 bones, 7
+  actions, texture present, correct height. It also renders the clips (`blender_check.png`).
+
+Tests and benchmarks:
+* `tools/test_capture.py` (synthetic, needs no people) films a known body with a virtual orbit, fits it back,
+  bakes the texture and checks the exports.
+* `tools/capture_bench.py` is the turnaround benchmark and writes the priors.
+
+Measured on 5 real turnaround videos (2 to 3 people per worker, CPU only, about 8 to 14 minutes each):
+
+| | Mike | Anna | Declan | PR | Tmon |
+|---|---|---|---|---|---|
+| fit silhouette IoU (video) | 0.869 | 0.873 | 0.817 | 0.784 | 0.868 |
+| held-out frames: IoU / colour dE / SSIM | 0.85 / 8.9 / 0.64 | 0.86 / 7.5 / 0.73 | 0.81 / 7.0 / 0.65 | 0.78 / 8.4 / 0.63 | 0.87 / 10.7 / 0.73 |
+
+What one photo predicts about the views it never saw (`tools/capture_bench.py`, leave-one-out priors, mean
+silhouette IoU over every other frame of the person's video):
+
+| body | Mike | Anna | Declan | PR | Tmon | mean |
+|---|---|---|---|---|---|---|
+| average MakeHuman body | 0.807 | 0.816 | 0.779 | 0.757 | 0.844 | 0.801 |
+| photo fit, no priors | 0.847 | 0.855 | 0.779 | 0.761 | 0.860 | 0.820 |
+| **photo fit + video priors** | **0.849** | **0.859** | **0.789** | **0.763** | **0.865** | **0.825** |
+| video fit (upper bound) | 0.858 | 0.861 | 0.808 | 0.787 | 0.871 | 0.837 |
+
+One photo with the learned priors closes two thirds of the gap between the average body and a full turnaround, and
+the priors help all five people. The photo's painted back is judged against the real back views: colour dE 14 to
+35, mean 21. The 35 is Tmon, whose back was filmed in a warmer-lit room, which no photo of the front can predict.
+
+Synthetic check (`tools/test_capture.py --quick`): silhouette IoU 0.955, body vertex error 0.65 cm (the starting
+body was 1.72 cm off), texture error 6 / 255, and GLB / FBX / OBJ all pass.
+
+Known limits:
+* The body is MakeHuman's undressed body, so loose clothes (a long jumper, a hoodie) are fitted as body volume.
+  Hair is not modelled as geometry; it is painted on the head.
+* Coloured light in the room (a TV) is baked into the texture.
+* Clothed silhouettes cannot tell a man's body from a woman's: use `--body male|female`.
+* The face comes from the best single frame of a phone video (768 px), so it is soft.
+* Motion: `forge.py mocap --rig captures/NAME/out/NAME.glb` puts video motion on the captured character. A
+  toddler's walk clip worked (9 deg mean bone error). A dark, crowded pub dance worked for most frames (12 deg) but
+  falls over in its last frames.
+* `forge.py mocap` no longer crashes on clips over 600 frames.
+
 ## New in v10.3: self-contained looks, better beards and long hair
 * **No other game or program needed.** `forge.py look` and the Appearance tab now use a built-in template: the CC0
   MakeHuman body with a 26-bone skeleton and Sprite Forge's own clips (idle, walk, run, jump, kick, punch,
