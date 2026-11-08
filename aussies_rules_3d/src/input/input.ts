@@ -155,6 +155,10 @@ export class InputManager {
       frame.pause = edges.has('pause');
       frame.confirm = edges.has('confirm');
       frame.back = edges.has('back');
+      frame.camera = edges.has('camera');
+      frame.toggleMarkers = edges.has('toggleMarkers');
+      // Z/X bend a set shot (keyboard equivalent of the right stick)
+      frame.aimZ = (this.keys.has('KeyX') ? 1 : 0) + (this.keys.has('KeyZ') ? -1 : 0);
     }
 
     // --------------------------------------------------------------- touch
@@ -236,6 +240,12 @@ export class InputManager {
             break;
           case 'back':
             if (down && !wasDown) frame.back = true;
+            break;
+          case 'camera':
+            if (down && !wasDown) frame.camera = true;
+            break;
+          case 'toggleMarkers':
+            if (down && !wasDown) frame.toggleMarkers = true;
             break;
           case 'moveUp':
             if (down) frame.moveZ -= 1;

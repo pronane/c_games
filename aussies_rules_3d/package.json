@@ -1,7 +1,7 @@
 {
   "name": "aussie-rules-3d",
   "version": "1.0.0",
-  "description": "Aussie Rules 3D — a full 3D Australian rules football game (AFL 2026 laws) that runs on any device in the browser. Rigged, animated players and a Melbourne arena generated with Blender.",
+  "description": "Aussie Rules 3D \u2014 a full 3D Australian rules football game (AFL 2026 laws) that runs on any device in the browser. Rigged, animated players and a Melbourne arena generated with Blender.",
   "license": "MIT",
   "type": "module",
   "private": true,
@@ -17,15 +17,19 @@
     "test:watch": "vitest",
     "check": "node scripts/check.mjs",
     "assets": "node scripts/build-assets.mjs",
-    "verify": "node scripts/check.mjs"
+    "verify": "node scripts/check.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:start": "electron ."
   },
   "dependencies": {
     "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/three": "^0.187.0",
+    "electron": "^33.4.11",
     "typescript": "^5.6.3",
     "vite": "^7.1.9",
     "vitest": "^3.2.4"
-  }
+  },
+  "main": "electron/main.cjs"
 }

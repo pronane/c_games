@@ -68,14 +68,15 @@ export function homePosition(
 
   // hold the 6-6-6 shape at centre ball-ups
   if (phase === 'centreBallUp') {
-    const gx = attackGoalX(p.team);
-    if (shape.fx > 0.1) {
-      x = gx - dir * (28 + shape.fx * 20);
-    } else if (shape.fx < -0.1) {
-      x = -gx - dir * (28 - shape.fx * 20);
-    } else {
-      x = dir * 14;
-    }
+  const gx = attackGoalX(p.team);
+  const dg = defendGoalX(p.team);
+  if (shape.fx > 0.1) {
+    x = gx - dir * (28 + shape.fx * 20);
+  } else if (shape.fx < -0.1) {
+    x = dg + dir * (28 + -shape.fx * 20);
+  } else {
+    x = dir * 14;
+  }
     z = shape.fz * 60 * (p.number % 2 === 0 ? 1 : -1) + (p.number % 5) * 4 - 8;
   }
 
@@ -165,10 +166,13 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
 
   // --------------------------------------------------------- ball contest
   const loose = b.mode === 'loose';
+  // limit the pack: only the three nearest players per team may chase the ball
+  const mayChase = teammatesCloserToBall(p, ctx) < 3;
   const chaseThis =
-    (loose && distBall < 26) ||
-    (ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 14) ||
-    (ctx.carrierId !== null && isNearestChaser(p, ctx));
+    mayChase &&
+    ((loose && distBall < 11) ||
+      (ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 8) ||
+      (ctx.carrierId !== null && isNearestChaser(p, ctx)));
 
   if (chaseThis) {
     // lead the intercept slightly
@@ -211,6 +215,18 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
   }
 
   return intent;
+}
+
+/** How many teammates are closer to the ball than this player — caps the pack. */
+function teammatesCloserToBall(p: PlayerState, ctx: AiContext): number {
+  const b = ctx.state.ball;
+  const d = (b.x - p.x) ** 2 + (b.z - p.z) ** 2;
+  let n = 0;
+  for (const q of ctx.state.players) {
+    if (q.team !== p.team || q.id === p.id || q.onBench) continue;
+    if ((b.x - q.x) ** 2 + (b.z - q.z) ** 2 < d) n++;
+  }
+  return n;
 }
 
 function isPressured(p: PlayerState, ctx: AiContext): boolean {
