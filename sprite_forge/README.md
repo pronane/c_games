@@ -5,6 +5,65 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v11.2: the face's own shape, faces painted where they are, the room's light taken out
+**Face** (`sforge/capture_face.py`):
+
+* **Detect.** MediaPipe's Face Landmarker (478 points) runs on every frame that sees the face.
+* **One head pose per frame.** The body's cameras put the face 25 to 40% of its width off, because the head is a
+  small part of a whole-body fit and moves a little during the turnaround. So each frame gets the head's own pose
+  from its landmarks.
+* **Fit the face shape.** MakeHuman's own face modifiers (nose, mouth, eyes, brows, chin, cheeks, forehead and head
+  size) are fitted to all those frames at once. The landmarks are matched to MakeHuman's face by running the same
+  detector on a render of it.
+* **Paint.** The texture bake projects the face, scalp and hair through each frame's head pose, so the face is
+  painted where it really is on the head. In v11.1 a front view could show a split, doubled face.
+* **MakeHuman.** The fitted face is made of ordinary MakeHuman modifiers, so `NAME.mhm` carries it into
+  MakeHuman / MPFB.
+* **`--face-photo PHOTO`.** Optional: a close-up, front-on photo of the face is posed the same way, colour-matched
+  to the video and feathered onto the face. `--no-face` keeps MakeHuman's average face.
+
+**Light** (`sforge/capture_light.py`). The person stands still while the camera walks round, so the room's light
+on each bit of the body depends only on which way it faces.
+* **Fit.** A smooth coloured light (spherical harmonics, order 2) is fitted together with one colour per material:
+  hair / skin / clothes, split by colour so a white shirt and black shorts are separate. It is then divided out of
+  the texture.
+* **Outputs.** The exported texture holds the true colours, for engines and Blender to light. `NAME_lighting.json`
+  holds the light, and `NAME_texture_as_filmed.png` the texture as filmed. `--keep-light` leaves the light in.
+* **Synthetic check** (`tools/test_light.py`). A known one-sided warm light on a body with known colours is
+  removed: colour error 17.8 → 0.3, and the left / right difference halves, down to the test's own texture noise.
+
+Results on the five real captures, v11.1 → v11.2:
+
+| | Mike | Anna | Declan | PR | Tmon | mean |
+|---|---|---|---|---|---|---|
+| face identity (SFace) on held-out renders | 0.53 → 0.54 | 0.36 → **0.50** | 0.32 → **0.38** | 0.44 → **0.53** | 0.36 → **0.47** | 0.40 → **0.48** |
+| face landmarks on held-out frames (error, % of face width) | 2.8 → 1.6 | 2.7 → 2.0 | 2.1 → 1.7 | 2.0 → 1.6 | 2.2 → 1.9 | 2.4 → 1.8 |
+| left / right colour difference, clothes (dE, as filmed → light removed) | 14.5 → 11.9 | 10.2 → 8.0 | 2.9 → 3.0 | 8.2 → kept | 15.9 → 13.6 | |
+
+Notes on the table:
+* **Face identity.** It is OpenCV's face recogniser (0.363 = same person) comparing held-out real frames with the
+  character rendered from the same camera. Every person is now above the threshold; in v11.1 Declan was below it
+  and Anna and Tmon were borderline.
+* **Unchanged.** Silhouette, LPIPS, DISTS and DINOv2 on the held-out frames don't move: those frames are compared
+  with the texture as filmed.
+* **Light removal** helps most where the room light is lopsided (Mike, Anna, Tmon).
+  * **PR.** His black, striped clothes were partly read as light, and the light-free texture came out less
+    symmetric. A safeguard notices that and keeps the texture as filmed.
+* **Close-up photo.** The `--face-photo` path was run with the closest frame of Mike's video standing in for a
+  photo: it placed it with 1.5% landmark error and painted it in. No real close-ups have been tried yet.
+
+**Still opens everywhere** (`tools/capture_compat.py`, all five):
+* Khronos glTF-Validator: 0 errors and 0 warnings.
+* Godot, Blender and Assimp load the GLB, FBX and OBJ.
+* MakeHuman (MPFB2) loads each `.mhm` with the face modifiers (64 to 72 shape keys). The human it builds is within
+  2.8 to 4.0 mm mean of Sprite Forge's body. On the head alone it matches the *fitted* face (Mike 1.2 mm, Anna
+  0.9 mm) better than MakeHuman's average face (1.9 / 1.4 mm), so MakeHuman reads the face modifiers the same way.
+
+v11.2 limits:
+* Light from a **nearby** source (Anna's TV: purple on the side of her hair) is local, not room-wide, and stays.
+* The face is only as sharp as the best video frame (a 60 to 230 px face) unless a close-up photo is given.
+* Hair is still painted on a shell; long hair hanging free is not modelled.
+
 ## New in v11.1: clothes, skirts and hair as their own meshes; MakeHuman / Blender round trip; external judges
 `forge.py capture` now builds the person in layers on one 26-bone skeleton:
 

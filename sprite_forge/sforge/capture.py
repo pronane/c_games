@@ -87,7 +87,7 @@ def turntable(P, F, fuv, tex, path, yaws=(0, 45, 90, 135, 180, 225, 270, 315), s
 
 
 def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0, tex_res=1024, track_dir=None,
-        fit_iters=3, gender=None, log=print, layers=True):
+        fit_iters=3, gender=None, log=print, layers=True, face=True, delight=True, face_photo=None):
     t0 = time.time()
     d = os.path.join(out_root, name)
     os.makedirs(d, exist_ok=True)
@@ -105,7 +105,8 @@ def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0
     pickle.dump(dict(mac=f.mac, sl=f.sl, par=f.cams.par, focal=f.cams.focal_k, dirs=f.dirs, height_m=height_m,
                      fit=dict(iou=res["iou"], iou_start=res["iou_start"], frames=len(res["iou_frames"]))),
                 open(os.path.join(d, "fit.pkl"), "wb"))
-    rep = finish(d, name, height_m, tex_res, log=log, fitter=f, layers=layers)
+    rep = finish(d, name, height_m, tex_res, log=log, fitter=f, layers=layers, face=face, delight=delight,
+                 face_photo=face_photo)
     rep["video"] = os.path.basename(video) if video else None
     rep["seconds"] = round(time.time() - t0)
     json.dump(rep, open(os.path.join(d, "out", "report.json"), "w"), indent=1)
@@ -128,7 +129,8 @@ def _save_pairs(f, frames, renders, out_dir):
         Image.fromarray((m * 255).astype(np.uint8)).save(os.path.join(out_dir, "%04d_rmask.png" % r["i"]))
 
 
-def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=True, out_name="out"):
+def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=True, out_name="out", face=True,
+           delight=True, face_photo=None):
     """cameras for every usable frame, texture (checked on held-out frames), exports. Re-runnable from fit.pkl
     (`forge.py capture --rebuild NAME`) when the texture or export code improves - no refit needed."""
     import cv2
@@ -149,6 +151,28 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
     else:
         for i, p in fp["par"].items():
             rv, _ = cv2.Rodrigues(CF.Cameras.rot(*p[:3])); f.cams.par[i] = p; f.cams.cam[i] = (rv.reshape(3), p[3:6])
+    # every 4th usable frame is held out of the texture (and of the face fit) and used to check it
+    held = allf[2::4]
+    train = [r for r in allf if r not in held]
+    # the face's own shape and each frame's head pose (v11.2)
+    finfo = None
+    if face:
+        from . import capture_face as CFA
+        sl0 = dict(f.sl)
+        finfo = CFA.fit_face(f, train, log=log)
+        if finfo:
+            corr = f.face["corr"]
+            sl1 = dict(f.sl); f.sl = sl0
+            e0 = CFA.landmark_error(f, held, corr)
+            f.sl = sl1
+            e1 = CFA.landmark_error(f, held, corr)
+            finfo.update(heldout_err_pct_before=e0[0], heldout_err_pct_after=e1[0], heldout_frames=e1[1])
+            if e1[0] is not None:
+                log("face: held-out frames, landmark error %.1f%% -> %.1f%% of the face width (%d frames)" % (e0[0], e1[0], e1[1]))
+            # head poses for every frame that sees the face (the held-out ones are only used for the final texture)
+            sh_, P_, _ = f.posed()
+            dets = CFA.detect(f.dir, allf)
+            f.face["poses"] = CFA.head_poses(f, allf, dets, CFA.pts(P_, corr), guess=f.face["poses"])
     # clothes / skirt / hair layers over the tight body (v11.1); --no-layers keeps the bare body
     mesh = None; linfo = None
     if layers:
@@ -158,20 +182,60 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
         res_ = tex_res * 2                                         # the atlas: four quarters of tex_res
     else:
         res_ = tex_res
-    # every 4th usable frame is held out of the texture and used to check it
-    held = allf[2::4]
-    train = [r for r in allf if r not in held]
-    tex, cov, st = CT.bake(f, frames=train, res=res_, log=log, mesh=mesh)
+    tex, cov, st = CT.bake(f, frames=train, res=res_, log=lambda *a: None, mesh=mesh, delight=delight)
     renders = {}
-    check = evaluate(f, held, tex, log=log, mesh=mesh, keep_renders=renders)
+    # the held-out frames are real footage, with the room's light in them: they are compared with the texture as
+    # filmed (the light put back), the exported texture is the light-free one
+    ctex = st.get("lit_texture", tex)
+    use_photo = face_photo and getattr(f, "face", None)
+    if use_photo:
+        from . import capture_face as CFA
+        ctex, _ = CFA.paint_photo(f, ctex, mesh, face_photo, log=lambda *a: None)
+    check = evaluate(f, held, ctex, log=log, mesh=mesh, keep_renders=renders)
     _save_pairs(f, held, renders, os.path.join(d, out_name, "heldout"))
-    tex, cov, st = CT.bake(f, frames=allf, res=res_, log=log, mesh=mesh)    # final: every frame
+    tex, cov, st = CT.bake(f, frames=allf, res=res_, log=log, mesh=mesh, delight=delight)    # final: every frame
+    lit = st.pop("lit_texture", None)
+    if use_photo:
+        tex, st["face_photo"] = CFA.paint_photo(f, tex, mesh, face_photo, log=log)
+        if lit is not None:
+            lit, _ = CFA.paint_photo(f, lit, mesh, face_photo, log=lambda *a: None)
+    outd = os.path.join(d, out_name)
+    os.makedirs(outd, exist_ok=True)
     sh = f.bm.shape(f.mac, f.sl, height_m)
     Pst, _, Sst = sh.pose(f.dirs)
-    outd = os.path.join(d, out_name)
+    Pm = mesh[0].pose(mesh[1]) if mesh is not None else None
+    if lit is not None:
+        # light taken out? bodies and most clothes are left / right symmetric, a lamp on one side is not. If the
+        # light-free texture is LESS symmetric, the light found was really the clothes (dark, striped): keep the
+        # texture as filmed
+        from . import capture_light as CLI
+        Vq, Fq, uvq, lay = (Pm, mesh[0].F, mesh[0].fuv, mesh[0].layer) if mesh is not None else (Pst, f.bm.F, f.bm.fuv, None)
+        sym = {}
+        for nm_, lid in (("body", 0), ("clothes", 1)):
+            m_ = (lay == lid) if lay is not None else None
+            if m_ is not None and not m_.any():
+                continue
+            a_ = CLI.symmetry_de(Vq, Fq, uvq, lit, m_)[0]; b_ = CLI.symmetry_de(Vq, Fq, uvq, tex, m_)[0]
+            sym[nm_] = dict(as_filmed=round(a_, 2), light_removed=round(b_, 2))
+        keep = np.mean([v["light_removed"] for v in sym.values()]) <= np.mean([v["as_filmed"] for v in sym.values()])
+        st["light"].update(left_right_dE=sym, kept_removed=bool(keep))
+        log("light: left / right colour difference %s - %s" % (", ".join(
+            "%s dE %.1f -> %.1f" % (k, v["as_filmed"], v["light_removed"]) for k, v in sym.items()),
+            "light removed" if keep else "not better: the texture is kept as filmed"))
+        if keep:
+            Image.fromarray(lit).save(os.path.join(outd, name + "_texture_as_filmed.png"))
+            json.dump(dict(model="real spherical harmonics, order 2, per RGB channel, in log space: "
+                                 "as_filmed = (albedo + 4) * exp(sum_k sh[c][k] * Y_k(normal)) - 4; normal in the "
+                                 "character's frame (x = its left, y up, z front); constant terms are in the albedo",
+                           sh=st["light"]["sh"], spread=st["light"]["spread"], tint=st["light"]["tint"]),
+                      open(os.path.join(outd, name + "_lighting.json"), "w"), indent=1)
+        else:
+            tex = lit
+            for fn in (name + "_texture_as_filmed.png", name + "_lighting.json"):
+                if os.path.isfile(os.path.join(outd, fn)):
+                    os.remove(os.path.join(outd, fn))
     mh = dict(macros=f.mac, sliders=f.sl, height_m=height_m)
     if mesh is not None:
-        Pm = mesh[0].pose(mesh[1])
         files = CE.export(sh, Pst, tex, outd, name, log=log, mesh=mesh[0], posed_mesh=Pm, makehuman=mh,
                           extras={"capture": dict(macros=f.mac, sliders=f.sl, height_m=height_m, layers=linfo)})
         turntable(Pm, mesh[0].F, mesh[0].fuv, tex, os.path.join(outd, name + "_turntable.jpg"))
@@ -182,7 +246,7 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
     f.overlay(os.path.join(outd, name + "_fit_overlay.jpg"))
     rep = dict(name=name, height_m=height_m, fit=fp.get("fit"),
                macros={k: float(v) for k, v in f.mac.items()}, sliders={k: float(v) for k, v in f.sl.items()},
-               pose={k: v for k, v in f.dirs.items()}, texture=st, check=check, layers=linfo,
+               pose={k: v for k, v in f.dirs.items()}, texture=st, check=check, layers=linfo, face=finfo,
                files={k: (os.path.basename(v) if isinstance(v, str) else None) for k, v in files.items() if k != "rig"})
     json.dump(rep, open(os.path.join(outd, "report.json"), "w"), indent=1)
     return rep
@@ -202,11 +266,15 @@ def main(argv):
                     help="the body's sex; auto fits it (clothes can fool it: a long jumper reads as either)")
     ap.add_argument("--no-layers", action="store_true",
                     help="bare body only: no separate clothes / skirt / hair meshes (v11 behaviour)")
+    ap.add_argument("--face-photo", help="a close-up photo of the face (front-on, even light): painted onto the face")
+    ap.add_argument("--no-face", action="store_true", help="keep MakeHuman's average face (no face-shape fit)")
+    ap.add_argument("--keep-light", action="store_true",
+                    help="leave the room's light in the texture (default: divided out; see NAME_lighting.json)")
     ap.add_argument("--rebuild", action="store_true", help="redo texture + exports of an existing capture (OUT/NAME) from its fit")
     a = ap.parse_args(argv)
     if a.rebuild:
         finish(os.path.join(a.out, a.name), a.name, a.height_cm / 100.0 if a.height_cm != 175.0 else None, a.texture,
-               layers=not a.no_layers)
+               layers=not a.no_layers, face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo)
         return 0
     if a.setup:
         CTR.setup(); return 0
@@ -217,5 +285,6 @@ def main(argv):
         from . import capture_photo as CPH                  # one photo: depth from the priors, back painted
         CPH.run_photo(a.video, a.name, a.out, a.height_cm / 100.0, a.texture, gender=g)
         return 0
-    run(a.video, a.name, a.out, a.height_cm / 100.0, a.fps, a.texture, gender=g, layers=not a.no_layers)
+    run(a.video, a.name, a.out, a.height_cm / 100.0, a.fps, a.texture, gender=g, layers=not a.no_layers,
+        face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo)
     return 0

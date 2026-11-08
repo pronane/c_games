@@ -38,7 +38,10 @@ def _sharpness(img):
     return float(cv2.Laplacian(g, cv2.CV_64F).var())
 
 
-def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None):
+# head texels are weighted by (frame's head score / best) ** FACE_POWER: high = the face from (nearly) one frame
+FACE_POWER = float(os.environ.get("SFS_FACE_POWER", "10"))
+
+def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False):
     """-> (texture RGB uint8 (res,res,3), coverage (res,res) float, stats)
     mesh: optional (rest Mesh, skinning matrices) from capture_layers - body + clothes + skirt + hair in one atlas;
     default the bare body with MakeHuman's UVs"""
@@ -70,6 +73,13 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     hi = [bm.bi[b] for b in ("head", "neck01") if b in bm.bi]
     head_v = np.isin(Jm[:, 0], hi) & (Wm[:, 0] > 0.5) & body_v
     head_t = head_v[F[ti]].any(1)
+    # v11.2: frames that see the face carry the head's own pose (capture_face): the head's texels (face, scalp, hair
+    # shell) are projected through it - the body camera puts the face 10-50 px off in a phone turnaround
+    face = getattr(fitter, "face", None) or {}
+    poses = face.get("poses", {})
+    hv = (Jm[:, 0] == bm.bi["head"]) & (Wm[:, 0] > 0.5)
+    hd_t = hv[F[ti]].all(1)
+    hd_F = F[hv[F].all(1)]
     cols, ws, used, labs = [], [], [], []
     for r in frames:
         if r["i"] not in fitter.cams.cam:
@@ -101,6 +111,20 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         facing = np.clip((Ncam * view).sum(1), 0, 1)
         # detail: pixels per metre at the texel (closer frames see more), and the frame's sharpness
         ppm = K[0, 0] / np.maximum(Xc[:, 2], 0.3)
+        if r["i"] in poses and hd_t.any():
+            Rh, _ = cv2.Rodrigues(np.asarray(poses[r["i"]][0], float)); th = np.asarray(poses[r["i"]][1], float)
+            Ph = P @ Rh.T + th
+            hx = Ph[:, 0] / Ph[:, 2] * K[0, 0] + K[0, 2]; hy = Ph[:, 1] / Ph[:, 2] * K[1, 1] + K[1, 2]
+            _, _, zh = rasterise(hx, hy, -Ph[:, 2], hd_F, W, H, K=6)
+            zh = zh.reshape(H, W)
+            Xh = X[hd_t] @ Rh.T + th
+            uh = Xh[:, 0] / Xh[:, 2] * K[0, 0] + K[0, 2]; vh = Xh[:, 1] / Xh[:, 2] * K[1, 1] + K[1, 2]
+            uih = np.clip(np.round(uh - 0.5).astype(int), 0, W - 1); vih = np.clip(np.round(vh - 0.5).astype(int), 0, H - 1)
+            inh = (uh >= 0) & (uh < W) & (vh >= 0) & (vh < H)
+            u[hd_t], v[hd_t], ui[hd_t], vi[hd_t] = uh, vh, uih, vih
+            vis[hd_t] = inh & (np.abs(-Xh[:, 2] - zh[vih, uih]) < 0.025)
+            vh_ = -(Xh / np.linalg.norm(Xh, axis=1, keepdims=True))
+            facing[hd_t] = np.clip(((Nt[hd_t] @ Rh.T) * vh_).sum(1), 0, 1)
         ok = vis & (facing > min_facing) & (m[vi, ui] > 0.6)        # grazing views stretch; mask edge = background
         pw = np.where(head_t, power * 2.0, power)                         # a face blurs when views are mixed
         w = np.where(ok, facing ** pw * m[vi, ui] * (ppm / 400.0) ** 2, 0.0) * (_sharpness(img) ** 0.5)
@@ -159,7 +183,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     if face_t.any():
         hs = (Wt[:, face_t]).sum(1)
         hs = hs / (hs.max() + 1e-9)
-        Wt[:, face_t] *= (hs[:, None] ** 10)
+        Wt[:, face_t] *= (hs[:, None] ** FACE_POWER)
     # exposure: one RGB gain per frame against the blended result, two rounds. Samples stay uint8 and the blend runs
     # in texel chunks: (frames x texels) float copies of a 2048^2 atlas would need several GB
     n = C.shape[1]; CH = 150000
@@ -190,17 +214,30 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         out.append(mean * (1 - al) + med * al)
     mix = np.concatenate(out)
     cover = Wt.sum(0)
-    tex = np.zeros((res, res, 3), np.float32); cov = np.zeros((res, res), np.float32)
-    tex[inside] = mix; cov[inside] = cover
-    seen = cov > 1e-6 * (cover.max() + 1e-9)
-    # fill the unseen parts of the islands, then bleed into the gutters (mip / filtering safety)
-    # unseen texels and the gutters are filled together, from seen texels only (filling the holes first let the
-    # black gutters bleed into them along the island edges)
-    t8 = np.clip(tex, 0, 255).astype(np.uint8)
-    unknown = (~seen).astype(np.uint8)
-    if unknown.any():
-        t8 = cv2.inpaint(t8, unknown, 6, cv2.INPAINT_TELEA)
+    seen_t = cover > 1e-6 * (cover.max() + 1e-9)
+    light = None
+    if delight:
+        # v11.2: the room's light divided out (capture_light); the lit texture is kept for the held-out check
+        from . import capture_light as CLI
+        lay_t = (M.layer[F[ti, 0]] if mesh is not None else np.zeros(len(ti), int))
+        groups = lay_t * 4 + np.where(tally[1:].sum(0) > 0, major, 0)
+        alb, light = CLI.fit_light(mix, Nt, groups, weights=seen_t.astype(float), log=log)
+    seen = np.zeros((res, res), bool); seen[inside] = seen_t
+    cov = np.zeros((res, res), np.float32); cov[inside] = cover
+
+    def fill(colours):
+        # unseen texels and the gutters are filled together, from seen texels only (filling the holes first let
+        # the black gutters bleed into them along the island edges)
+        tex = np.zeros((res, res, 3), np.float32); tex[inside] = colours
+        t8 = np.clip(tex, 0, 255).astype(np.uint8)
+        unknown = (~seen).astype(np.uint8)
+        return cv2.inpaint(t8, unknown, 6, cv2.INPAINT_TELEA) if unknown.any() else t8
+    t8 = fill(mix)
     stats = dict(frames=len(used), seen=float(seen.sum() / max(1, inside.sum())), gains=gains.tolist())
+    if light is not None and light.get("applied"):
+        stats["light"] = light
+        stats["lit_texture"] = t8                                       # as filmed (the room's light in it)
+        t8 = fill(alb)
     log("texture: %d frames, %.0f%% of the body seen, %dx%d" % (len(used), 100 * stats["seen"], res, res))
     return t8, cov, stats
 

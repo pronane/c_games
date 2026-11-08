@@ -103,13 +103,18 @@ def height_macro(macros, sliders, height_m, bm=None, mpfb=True):
 
 
 def modifier_lines(sliders):
+    """-> [("group/base-neg|pos", value)] - MakeHuman modifier lines (a negative value applies the -neg target)"""
+    from .capture_face import FACE_SLIDERS
     out = []
     for k, s in sorted((sliders or {}).items()):
-        if k not in CB.SLIDERS or abs(float(s)) < 1e-4:
+        if abs(float(s)) < 1e-4:
             continue
-        dn, up = CB.SLIDERS[k]                                   # "torso/torso-scale-depth-decr", "...-incr"
-        base = dn[:-len("-decr")]
-        out.append(("%s-decr|incr" % base, float(s)))
+        if k in CB.SLIDERS:
+            dn, up = CB.SLIDERS[k]                               # "torso/torso-scale-depth-decr", "...-incr"
+            out.append(("%s-decr|incr" % dn[:-len("-decr")], float(s)))
+        elif k in FACE_SLIDERS:
+            for base, neg, pos in FACE_SLIDERS[k]:               # "nose/nose-trans", "down", "up"
+                out.append(("%s-%s|%s" % (base, neg, pos), float(s)))
     return out
 
 
@@ -130,8 +135,9 @@ def write(out_dir, name, macros, sliders, height_m=None):
     open(mhm, "w").write("\n".join(L) + "\n")
     targets = []
     for m, v in mods:
-        base = m.split("/", 1)[1].replace("-decr|incr", "")
-        targets.append({"target": base + ("-incr" if v > 0 else "-decr"), "value": abs(v)})
+        base, pair = m.split("/", 1)[1].rsplit("-", 1)            # "nose-trans", "down|up"
+        neg, pos = pair.split("|")
+        targets.append({"target": "%s-%s" % (base, pos if v > 0 else neg), "value": abs(v)})
     js = {"phenotype": {"gender": ph["gender"], "age": ph["age"], "muscle": ph["muscle"], "weight": ph["weight"],
                         "height": ph["height"], "proportions": ph["proportions"], "cupsize": ph["cupsize"],
                         "firmness": ph["firmness"],
