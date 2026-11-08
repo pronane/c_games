@@ -86,6 +86,16 @@ class BodyModel:
             for t in (dn, up):
                 pair.append(self._dense(t))
             self.slider_d[k] = pair
+        # the face (capture_face.FACE_SLIDERS): each slider moves one or more MakeHuman modifiers together
+        from .capture_face import FACE_SLIDERS
+        for k, mods in FACE_SLIDERS.items():
+            pair = [None, None]
+            for base, neg, pos in mods:
+                for side, suf in ((0, neg), (1, pos)):
+                    D = self._dense("%s-%s" % (base, suf))
+                    if D is not None:
+                        pair[side] = D if pair[side] is None else pair[side] + D
+            self.slider_d[k] = pair
 
     def _kept_parent(self, b):
         p = self.parent_of.get(b)

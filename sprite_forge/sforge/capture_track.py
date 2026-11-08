@@ -12,7 +12,7 @@ The yaw comes from the world landmarks (shoulder + hip line) and is then made co
 sometimes swaps front and back, an orbit does not jump 180 degrees between neighbouring frames.
 
 Models (Apache-2.0, Google MediaPipe; downloaded once into models/ by `forge.py capture --setup`):
-  pose_landmarker_heavy.task, selfie_multiclass_256x256.tflite
+  pose_landmarker_heavy.task, selfie_multiclass_256x256.tflite, face_landmarker.task (v11.2: the face shape)
 """
 from __future__ import annotations
 import json
@@ -28,6 +28,7 @@ GCS = "https://storage.googleapis.com/mediapipe-models/"
 MODEL_URLS = {
     "pose_landmarker_heavy.task": GCS + "pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task",
     "selfie_multiclass_256x256.tflite": GCS + "image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+    "face_landmarker.task": GCS + "face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
 }
 # BlazePose indices
 NOSE, L_SH, R_SH, L_EL, R_EL, L_WR, R_WR, L_HIP, R_HIP, L_KN, R_KN, L_AN, R_AN = 0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28
