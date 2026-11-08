@@ -149,6 +149,24 @@ So tail decay cannot separate them either, and neither can the onset swell or th
 estimate. Riley keeps the per-20 s onset-swell rule. Its known cost is the dry first half of
 One: 0.654 against 0.695 with a fixed 0.5.
 
+## Heavy sections: not a separation leak
+
+In One's heavy half the Demucs 'other' stem is silent (RMS 0.000 against 0.191 for guitar),
+so the guitar is not leaking into 'other'. Riley's note F1 against the aligned tab:
+
+| input | onset | 0–3:30 | 3:30–7:30 |
+| --- | --- | --- | --- |
+| guitar stem | 0.5 | 0.695 | 0.082 |
+| guitar + other | 0.5 | 0.692 | 0.083 |
+| guitar + other | 0.3 | 0.660 | 0.105 |
+| full mix (no separation) | 0.5 | 0.604 | 0.027 |
+
+Separation is doing its job: it beats the raw mix in both halves. The failure is
+transcription of dense, double-tracked high-gain playing (the chart's tempo jumps to 216 BPM
+there). No released transcriber here was trained on that. The realistic fix is training data:
+amp-rendered guitar from tabs with known notes, which the app can already render, used to
+fine-tune Riley.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
