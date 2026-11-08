@@ -117,6 +117,56 @@ just as reverb does, so 74% of 20 s stretches decode at 0.65. A fixed 0.5 would 
 in the first half. The check now decides per 20 s stretch instead of per file, which leaves the
 simulated-room results unchanged. Telling reverb apart from distortion is still open.
 
+## Tempo: double/half-time check against the mix
+
+The breakdown takes its tempo from the drum and bass stems. On busy hi-hats that can lock onto
+double time: one user song read 184.6 BPM, while its published tempo is about 97. The
+drum-based estimate is now checked against the full mix. The candidates are both estimates
+and their halves and doubles, scored on how strongly the mix repeats at the beat and at the
+bar, with a gentle preference for 70–160 BPM.
+
+| song (user files, full breakdown path) | listed | before | now |
+| --- | --- | --- | --- |
+| slow grunge ballad | ~97 | 184.6 | **94.9** |
+| power ballad | 140 | 136.0 | 143.6 |
+| hard-rock ballad | ~91 | 90.3 | 90.3 |
+| post-grunge single | 146 (one site) | 129.2 | 129.2 (not an octave error; unresolved) |
+
+GuitarSet, 360 clips with the tempo in each file name (mix only): correct within 4% went from
+62.2% to 65.0%. Double-time errors fell from 7.5% to 2.8%, and half-time errors rose from 3.1%
+to 5.3%. The rest are mostly 3:4 / 4:3 confusions in funk and jazz comping.
+
+## Reverb vs distortion: a negative result
+
+Note tails were measured in dB/s at each note's own pitch over the 300 ms after it ends:
+
+- Clean clips: dry −50 to −65, simulated hall −9 to −17, very wet −3 to −5.
+- One's dry studio guitar stem: −13. Distortion sustains like a hall.
+- The heavy half: −7.
+- The user's reverb take: −9.
+
+So tail decay cannot separate them either, and neither can the onset swell or the tone
+estimate. Riley keeps the per-20 s onset-swell rule. Its known cost is the dry first half of
+One: 0.654 against 0.695 with a fixed 0.5.
+
+## Heavy sections: not a separation leak
+
+In One's heavy half the Demucs 'other' stem is silent (RMS 0.000 against 0.191 for guitar),
+so the guitar is not leaking into 'other'. Riley's note F1 against the aligned tab:
+
+| input | onset | 0–3:30 | 3:30–7:30 |
+| --- | --- | --- | --- |
+| guitar stem | 0.5 | 0.695 | 0.082 |
+| guitar + other | 0.5 | 0.692 | 0.083 |
+| guitar + other | 0.3 | 0.660 | 0.105 |
+| full mix (no separation) | 0.5 | 0.604 | 0.027 |
+
+Separation is doing its job: it beats the raw mix in both halves. The failure is
+transcription of dense, double-tracked high-gain playing (the chart's tempo jumps to 216 BPM
+there). No released transcriber here was trained on that. The realistic fix is training data:
+amp-rendered guitar from tabs with known notes, which the app can already render, used to
+fine-tune Riley.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
