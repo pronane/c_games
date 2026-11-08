@@ -277,7 +277,8 @@ def run_song(song: Song):
         drums_present = any(r['stem'] == 'drums' and r['verdict'] == 'present' for r in found)
         rhythm = mono22(stems['drums']+stems['bass']) if drums_present else mono22(audio)
         harmonic = mono22(sum(stems[k] for k in sa.HARMONIC_STEMS if k in stems))
-        grid = sa.beat_grid(rhythm, 22050, mono22(stems['bass']), harmonic)
+        grid = sa.beat_grid(rhythm, 22050, mono22(stems['bass']), harmonic,
+                            mix_audio=librosa.resample(sa.mono(audio), orig_sr=sr, target_sr=22050) if drums_present else None)
         cents = sa.estimate_tuning_cents(harmonic, 22050)
         chroma = librosa.feature.chroma_cqt(y=harmonic+mono22(stems['vocals'])*.5, sr=22050, hop_length=512,
                                             tuning=cents/100)
