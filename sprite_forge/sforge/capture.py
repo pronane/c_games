@@ -26,10 +26,14 @@ from PIL import Image
 from . import capture_track as CTR, capture_fit as CF, capture_texture as CT, capture_export as CE
 
 
-def evaluate(fitter, frames, tex, log=print):
-    """re-render held-out frames from their cameras and compare with the real frames (inside the person mask)"""
+def evaluate(fitter, frames, tex, log=print, mesh=None, keep_renders=None):
+    """re-render held-out frames from their cameras and compare with the real frames (inside the person mask).
+    mesh: (rest Mesh, skin matrices) of the layered character; keep_renders: dict filled with frame -> render"""
     import cv2
     sh, P, Pg = fitter.posed()
+    Fm, fuvm = fitter.bm.F, fitter.bm.fuv
+    if mesh is not None:
+        P = mesh[0].pose(mesh[1]); Fm, fuvm = mesh[0].F, mesh[0].fuv
     rows = []
     for r in frames:
         if r["i"] not in fitter.cams.cam:
@@ -39,7 +43,9 @@ def evaluate(fitter, frames, tex, log=print):
         H, W = img.shape[:2]
         rv, tv = fitter.cams.cam[r["i"]]
         R, _ = cv2.Rodrigues(rv)
-        ren, m = CT.render(P, fitter.bm.F, fitter.bm.fuv, tex, size=(W, H), cam=(R, tv, fitter.cams.K(r["size"])))
+        ren, m = CT.render(P, Fm, fuvm, tex, size=(W, H), cam=(R, tv, fitter.cams.K(r["size"])))
+        if keep_renders is not None:
+            keep_renders[r["i"]] = (ren, m)
         inter = m & msk; union = m | msk
         iou = inter.sum() / max(1, union.sum())
         lab_a = cv2.cvtColor(ren, cv2.COLOR_RGB2LAB).astype(float); lab_b = cv2.cvtColor(img, cv2.COLOR_RGB2LAB).astype(float)
@@ -81,7 +87,7 @@ def turntable(P, F, fuv, tex, path, yaws=(0, 45, 90, 135, 180, 225, 270, 315), s
 
 
 def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0, tex_res=1024, track_dir=None,
-        fit_iters=3, gender=None, log=print):
+        fit_iters=3, gender=None, log=print, layers=True):
     t0 = time.time()
     d = os.path.join(out_root, name)
     os.makedirs(d, exist_ok=True)
@@ -99,7 +105,7 @@ def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0
     pickle.dump(dict(mac=f.mac, sl=f.sl, par=f.cams.par, focal=f.cams.focal_k, dirs=f.dirs, height_m=height_m,
                      fit=dict(iou=res["iou"], iou_start=res["iou_start"], frames=len(res["iou_frames"]))),
                 open(os.path.join(d, "fit.pkl"), "wb"))
-    rep = finish(d, name, height_m, tex_res, log=log, fitter=f)
+    rep = finish(d, name, height_m, tex_res, log=log, fitter=f, layers=layers)
     rep["video"] = os.path.basename(video) if video else None
     rep["seconds"] = round(time.time() - t0)
     json.dump(rep, open(os.path.join(d, "out", "report.json"), "w"), indent=1)
@@ -107,7 +113,22 @@ def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0
     return rep
 
 
-def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None):
+def _save_pairs(f, frames, renders, out_dir):
+    """real frame | render from the same camera, for the held-out frames (what external metrics compare)"""
+    os.makedirs(out_dir, exist_ok=True)
+    for r in frames:
+        if r["i"] not in renders:
+            continue
+        img = np.asarray(Image.open(os.path.join(f.dir, "frames", "%04d.jpg" % r["i"])).convert("RGB"))
+        msk = np.asarray(Image.open(os.path.join(f.dir, "masks", "%04d.png" % r["i"]))) > 127
+        ren, m = renders[r["i"]]
+        Image.fromarray(img).save(os.path.join(out_dir, "%04d_real.jpg" % r["i"]), quality=95)
+        Image.fromarray(ren).save(os.path.join(out_dir, "%04d_render.jpg" % r["i"]), quality=95)
+        Image.fromarray((msk * 255).astype(np.uint8)).save(os.path.join(out_dir, "%04d_mask.png" % r["i"]))
+        Image.fromarray((m * 255).astype(np.uint8)).save(os.path.join(out_dir, "%04d_rmask.png" % r["i"]))
+
+
+def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=True, out_name="out"):
     """cameras for every usable frame, texture (checked on held-out frames), exports. Re-runnable from fit.pkl
     (`forge.py capture --rebuild NAME`) when the texture or export code improves - no refit needed."""
     import cv2
@@ -128,21 +149,40 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None):
     else:
         for i, p in fp["par"].items():
             rv, _ = cv2.Rodrigues(CF.Cameras.rot(*p[:3])); f.cams.par[i] = p; f.cams.cam[i] = (rv.reshape(3), p[3:6])
+    # clothes / skirt / hair layers over the tight body (v11.1); --no-layers keeps the bare body
+    mesh = None; linfo = None
+    if layers:
+        from . import capture_layers as CL
+        M, linfo, S = CL.fit_layers(f, log=log)
+        mesh = (M, S)
+        res_ = tex_res * 2                                         # the atlas: four quarters of tex_res
+    else:
+        res_ = tex_res
     # every 4th usable frame is held out of the texture and used to check it
     held = allf[2::4]
     train = [r for r in allf if r not in held]
-    tex, cov, st = CT.bake(f, frames=train, res=tex_res, log=log)
-    check = evaluate(f, held, tex, log=log)
-    tex, cov, st = CT.bake(f, frames=allf, res=tex_res, log=log)               # final: every frame
+    tex, cov, st = CT.bake(f, frames=train, res=res_, log=log, mesh=mesh)
+    renders = {}
+    check = evaluate(f, held, tex, log=log, mesh=mesh, keep_renders=renders)
+    _save_pairs(f, held, renders, os.path.join(d, out_name, "heldout"))
+    tex, cov, st = CT.bake(f, frames=allf, res=res_, log=log, mesh=mesh)    # final: every frame
     sh = f.bm.shape(f.mac, f.sl, height_m)
-    Pst, _, _ = sh.pose(f.dirs)
-    outd = os.path.join(d, "out")
-    files = CE.export(sh, Pst, tex, outd, name, log=log, extras={"capture": dict(macros=f.mac, sliders=f.sl, height_m=height_m)})
-    turntable(Pst, f.bm.F, f.bm.fuv, tex, os.path.join(outd, name + "_turntable.jpg"))
+    Pst, _, Sst = sh.pose(f.dirs)
+    outd = os.path.join(d, out_name)
+    mh = dict(macros=f.mac, sliders=f.sl, height_m=height_m)
+    if mesh is not None:
+        Pm = mesh[0].pose(mesh[1])
+        files = CE.export(sh, Pst, tex, outd, name, log=log, mesh=mesh[0], posed_mesh=Pm, makehuman=mh,
+                          extras={"capture": dict(macros=f.mac, sliders=f.sl, height_m=height_m, layers=linfo)})
+        turntable(Pm, mesh[0].F, mesh[0].fuv, tex, os.path.join(outd, name + "_turntable.jpg"))
+    else:
+        files = CE.export(sh, Pst, tex, outd, name, log=log, makehuman=mh,
+                          extras={"capture": dict(macros=f.mac, sliders=f.sl, height_m=height_m)})
+        turntable(Pst, f.bm.F, f.bm.fuv, tex, os.path.join(outd, name + "_turntable.jpg"))
     f.overlay(os.path.join(outd, name + "_fit_overlay.jpg"))
     rep = dict(name=name, height_m=height_m, fit=fp.get("fit"),
                macros={k: float(v) for k, v in f.mac.items()}, sliders={k: float(v) for k, v in f.sl.items()},
-               pose={k: v for k, v in f.dirs.items()}, texture=st, check=check,
+               pose={k: v for k, v in f.dirs.items()}, texture=st, check=check, layers=linfo,
                files={k: (os.path.basename(v) if isinstance(v, str) else None) for k, v in files.items() if k != "rig"})
     json.dump(rep, open(os.path.join(outd, "report.json"), "w"), indent=1)
     return rep
@@ -160,10 +200,13 @@ def main(argv):
     ap.add_argument("--texture", type=int, default=1024)
     ap.add_argument("--body", choices=["auto", "male", "female"], default="auto",
                     help="the body's sex; auto fits it (clothes can fool it: a long jumper reads as either)")
+    ap.add_argument("--no-layers", action="store_true",
+                    help="bare body only: no separate clothes / skirt / hair meshes (v11 behaviour)")
     ap.add_argument("--rebuild", action="store_true", help="redo texture + exports of an existing capture (OUT/NAME) from its fit")
     a = ap.parse_args(argv)
     if a.rebuild:
-        finish(os.path.join(a.out, a.name), a.name, a.height_cm / 100.0 if a.height_cm != 175.0 else None, a.texture)
+        finish(os.path.join(a.out, a.name), a.name, a.height_cm / 100.0 if a.height_cm != 175.0 else None, a.texture,
+               layers=not a.no_layers)
         return 0
     if a.setup:
         CTR.setup(); return 0
@@ -174,5 +217,5 @@ def main(argv):
         from . import capture_photo as CPH                  # one photo: depth from the priors, back painted
         CPH.run_photo(a.video, a.name, a.out, a.height_cm / 100.0, a.texture, gender=g)
         return 0
-    run(a.video, a.name, a.out, a.height_cm / 100.0, a.fps, a.texture, gender=g)
+    run(a.video, a.name, a.out, a.height_cm / 100.0, a.fps, a.texture, gender=g, layers=not a.no_layers)
     return 0

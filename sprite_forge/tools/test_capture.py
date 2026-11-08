@@ -67,7 +67,9 @@ def main(argv=None):
         img, m = CT.render(P, bm.F, bm.fuv, tex, size=(W, Hh), cam=(R, t, K), bg=(90, 100, 110))
         Image.fromarray(img).save(os.path.join(cap, "frames", "%04d.jpg" % k), quality=95)
         Image.fromarray((m * 255).astype(np.uint8)).save(os.path.join(cap, "masks", "%04d.png" % k))
-        Image.fromarray((m * 4).astype(np.uint8)).save(os.path.join(cap, "parts", "%04d.png" % k))   # 4 = clothes
+        # 2 = body skin: the synthetic person wears nothing. (Labelled clothes, v11.1's fit would - by design - let
+        # the body sit inside them and come out ~1 cm small: skin-tight clothes are read as possibly loose)
+        Image.fromarray((m * 2).astype(np.uint8)).save(os.path.join(cap, "parts", "%04d.png" % k))
         Pc = Pg @ R.T + t
         uv = Pc[:, :2] / Pc[:, 2:3] * K[0, 0] + K[:2, 2]
         lm = [[W / 2, Hh / 2, 0.0]] * 33

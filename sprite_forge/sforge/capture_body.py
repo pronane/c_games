@@ -105,7 +105,10 @@ class BodyModel:
         key = tuple(round(float(mac.get(k, 0.5)), 3) for k in MACROS)
         if key not in self._macro_cache:
             p = dict(HU.DEFAULTS); p.update(dict(zip(MACROS, key))); p["height"] = 0.5
-            V, _ = HU.morph(self.Vall, self.T, HU.macro_weights(p))
+            # MakeHuman's own macro mixing as MPFB2 does it (capture_mh.mpfb_macro_weights): the body built here is
+            # then exactly the body MakeHuman / MPFB build from the exported .mhm
+            from .capture_mh import mpfb_macro_weights
+            V, _ = HU.morph(self.Vall, self.T, mpfb_macro_weights(p))
             if len(self._macro_cache) > 64:
                 self._macro_cache.clear()
             self._macro_cache[key] = V
@@ -160,7 +163,12 @@ class Shape:
                 Pg[i] = Pg[p] + Rp @ (self.head[i] - self.head[p])
             R = Rp
             if dirs and b in dirs:
-                cur = Rp @ (self.tail[i] - self.head[i])
+                # a limb direction is measured joint to joint (hip -> knee, shoulder -> elbow): aim the bone's next
+                # kept joint, not its own tail - the 26-bone rig drops MakeHuman's upperleg02 / upperarm02 /
+                # lowerarm02.., so a tail lies part-way down the limb and off its line
+                end = LIMB_END.get(b)
+                tip = self.head[m.bi[end]] if end in m.bi else self.tail[i]
+                cur = Rp @ (tip - self.head[i])
                 R = _rot_between(cur, np.asarray(dirs[b], float)) @ Rp
             Rg[i] = R
         S = np.zeros((nb, 3, 4))
@@ -172,6 +180,11 @@ class Shape:
             w = m.W[:, k]
             P += w[:, None] * np.einsum("nij,nj->ni", S[m.J[:, k]], Vh)
         return P, Pg, S
+
+
+LIMB_END = {"upperleg01.L": "lowerleg01.L", "lowerleg01.L": "foot.L", "upperleg01.R": "lowerleg01.R",
+            "lowerleg01.R": "foot.R", "upperarm01.L": "lowerarm01.L", "lowerarm01.L": "wrist.L",
+            "upperarm01.R": "lowerarm01.R", "lowerarm01.R": "wrist.R"}
 
 
 def _rot_between(a, b):

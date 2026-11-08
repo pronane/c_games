@@ -208,19 +208,34 @@ class Target:
         p = np.asarray(Image.open(os.path.join(cap_dir, "parts", name)))
         w, h = int(r["size"][0] * scale), int(r["size"][1] * scale)
         self.mask = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize((w, h), Image.BILINEAR)) > 127
-        hair = np.asarray(Image.fromarray(((p == 1) * 255).astype(np.uint8)).resize((w, h), Image.NEAREST)) > 0
+        lab = lambda c: np.asarray(Image.fromarray((np.isin(p, c) * 255).astype(np.uint8)).resize((w, h), Image.NEAREST)) > 0
+        hair = lab([1])
         self.care = ~hair
+        self.clothes = lab([4, 5]) & self.mask
         self.r = r
+        self.pose = "t" if r.get("tpose") else "s"
 
 
-def iou(render, t):
+CLOTHES_SLACK = 0.3     # a missed clothes pixel costs this much: loose clothes may stand off the body
+
+
+def iou(render, t, tight=False):
+    """silhouette overlap, hair ignored. tight: the BODY under the clothes - its pixels outside the person and the
+    person's skin pixels it misses cost fully, clothes pixels it does not reach cost only CLOTHES_SLACK (a jumper
+    or a dress hangs away from the body; the clothes layer fills that later)"""
     a = render.astype(bool) & t.care; b = t.mask & t.care
-    u = (a | b).sum()
-    return float((a & b).sum()) / u if u else 0.0
+    if not tight:
+        u = (a | b).sum()
+        return float((a & b).sum()) / u if u else 0.0
+    tp = (a & b).sum(); fp = (a & ~b).sum()
+    miss = b & ~a
+    fn = (miss & ~t.clothes).sum() + CLOTHES_SLACK * (miss & t.clothes).sum()
+    d = tp + fp + fn
+    return float(tp) / d if d else 0.0
 
 
 class Fitter:
-    def __init__(self, cap_dir, height_m=1.75, n_frames=24, work_px=220, log=print):
+    def __init__(self, cap_dir, height_m=1.75, n_frames=24, work_px=220, tight=True, use_tpose=True, log=print):
         self.dir = cap_dir; self.log = log
         self.track = load(cap_dir)
         self.bm = CB.BodyModel()
@@ -230,6 +245,11 @@ class Fitter:
         self.dirs = measure_pose(self.track, stand)
         tp = [r for r in self.track["frames"] if r.get("ok") and r.get("tpose")]
         self.dirs_t = measure_pose(self.track, tp) if len(tp) >= 3 else None
+        if self.dirs_t and use_tpose:
+            # the T-pose frames: arms out, so arm length and shoulder width show directly (by the sides they hide
+            # against the torso) - up to 6 of them join the fit with the body posed in the measured T-pose
+            self.frames += pick_frames(self.track, 6, tpose=True)
+        self.tight = tight
         self.cams = Cameras()
         # working scale: the person ~work_px tall
         hs = []
@@ -240,30 +260,43 @@ class Fitter:
         self.targets = [Target(cap_dir, r, self.scale) for r in self.frames]
         self.mac = dict(gender=0.5, age=0.5, muscle=0.5, weight=0.5, proportions=0.5)
         self.sl = {k: 0.0 for k in CB.SLIDERS}
-        log("fit: %d frames round the orbit, posed bones %s, working scale %.2f" % (
-            len(self.frames), ",".join(sorted(self.dirs)), self.scale))
+        log("fit: %d frames round the orbit (%d T-pose), posed bones %s, working scale %.2f, %s" % (
+            len(self.frames), sum(1 for r in self.frames if r.get("tpose")), ",".join(sorted(self.dirs)), self.scale,
+            "body under the clothes" if tight else "dressed silhouette"))
 
     def posed(self, mac=None, sl=None, dirs=None):
         sh = self.bm.shape(mac or self.mac, sl or self.sl, self.height)
         P, Pg, S = sh.pose(dirs if dirs is not None else self.dirs)
+        self._last_shape = sh
         return sh, P, Pg
 
-    def solve_cameras(self, Pg):
+    def _tposed(self):
+        """the same body in the T-pose measured from the clip's T-pose frames (None without them)"""
+        if not self.dirs_t or not any(t.pose == "t" for t in self.targets):
+            return None, None
+        P, Pg, _ = self._last_shape.pose(self.dirs_t)
+        return P, Pg
+
+    def solve_cameras(self, Pg, Pgt=None):
         bad = 0
         for r in self.frames:
-            if not self.cams.solve(r, Pg, self.bm):
+            J = Pgt if (r.get("tpose") and Pgt is not None) else Pg
+            if not self.cams.solve(r, J, self.bm):
                 bad += 1
         return bad
 
-    def score(self, P, Pg, cams=True, detail=False):
+    def score(self, P, Pg, cams=True, detail=False, tight=None):
+        tight = getattr(self, "tight", False) if tight is None else tight
+        Pt, Pgt = self._tposed()
         if cams:
-            self.solve_cameras(Pg)
+            self.solve_cameras(Pg, Pgt)
         out = []
         for t in self.targets:
             if t.r["i"] not in self.cams.cam:
                 continue
-            uv = self.cams.project(t.r, P)
-            out.append(iou(raster(uv, self.bm.F, t.r["size"], self.scale), t))
+            Q = Pt if (t.pose == "t" and Pt is not None) else P
+            uv = self.cams.project(t.r, Q)
+            out.append(iou(raster(uv, self.bm.F, t.r["size"], self.scale), t, tight))
         return out if detail else float(np.mean(out)) if out else 0.0
 
     def refine_focal(self):
@@ -280,16 +313,24 @@ class Fitter:
         self.log("fit: focal %.2f x frame size (joint reprojection %.1f px)" % (best[1], best[0]))
         return best
 
-    def refine_cameras(self, P, Pg, evals=90):
+    def refine_cameras(self, P, Pg, evals=90, layers=None):
         """each camera nudged (yaw, pitch, roll, position) so the body's silhouette matches the frame's mask, with
         the joint landmarks as a soft anchor - joint positions of a template body and MediaPipe's landmarks differ
         by a few cm, the silhouette does not"""
         import cv2
         from scipy.optimize import minimize
+        P0, Pg0 = P, Pg
+        Pt, Pgt = self._tposed()
+        Fm = self.bm.F if layers is None else layers[1]
         for t in self.targets:
             r = t.r
             if r["i"] not in self.cams.par:
                 continue
+            if t.pose == "t" and Pt is not None and layers is None:
+                P, Pg = Pt, Pgt
+            else:
+                P, Pg = (P0, Pg0) if layers is None else (layers[0], Pg0)
+            tight = getattr(self, "tight", False) and layers is None
             p0 = self.cams.par[r["i"]].copy()
             K = self.cams.K(r["size"])
             idx = cam_landmarks(r)
@@ -303,7 +344,7 @@ class Fitter:
 
             def f(z):
                 p = p0 + z * step
-                sil = iou(raster(proj(p, P), self.bm.F, r["size"], self.scale), t)
+                sil = iou(raster(proj(p, P), Fm, r["size"], self.scale), t, tight)
                 lmk = float(np.mean(np.minimum(np.linalg.norm(proj(p, X) - x, axis=1) / hp, 0.15)))
                 return (1 - sil) + 0.5 * lmk + 0.002 * float(np.sum(z * z))
             res = minimize(f, np.zeros(6), method="Powell", options=dict(maxfev=evals, xtol=0.05, ftol=1e-4))
@@ -322,13 +363,16 @@ class Fitter:
         """Powell from the average body stays near it: gender in particular sits in a valley (a man fitted from 0.5
         ended at 0.4). A coarse grid over gender x weight x muscle first, cameras re-solved for each, picks the
         starting body."""
-        best = None
         base = dict(self.mac)
+        sh, P, Pg = self.posed(base, self.sl)
+        self.solve_cameras(Pg)
+        best = (self.score(P, Pg), base)                     # the starting body competes too
         for g in ((self.mac["gender"],) if getattr(self, "gender_fixed", False) else (0.0, 0.5, 1.0)):
             for w in (0.35, 0.6, 0.85):
                 for mu in (0.3, 0.6):
                     mac = dict(base, gender=g, weight=w, muscle=mu)
                     sh, P, Pg = self.posed(mac, self.sl)
+                    self.solve_cameras(Pg)                    # each body gets its own cameras (fair comparison)
                     v = self.score(P, Pg)
                     if best is None or v > best[0]:
                         best = (v, mac)

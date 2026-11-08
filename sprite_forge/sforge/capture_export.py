@@ -34,7 +34,13 @@ def make_rig(shape, name="captured"):
     return r
 
 
-def export(shape, posed_V, texture, out_dir, name="captured", clips=None, log=print, extras=None):
+LAYER_NAMES = ["Body", "Clothes", "Skirt", "Hair"]
+
+
+def export(shape, posed_V, texture, out_dir, name="captured", clips=None, log=print, extras=None, mesh=None,
+           posed_mesh=None, makehuman=None):
+    """mesh: capture_layers.Mesh (body + clothes + skirt + hair, one atlas) - default the bare body.
+    makehuman: dict(macros, sliders) -> also NAME.mhm (MakeHuman 1.x) and NAME.mpfb.json (MPFB2 in Blender)"""
     from . import bonemap as BM, samplerigs as SR, rigrec as RR, glbpack, mhchar, fbx as FBX
     from .mhtemplate import NAMES
     from .rigrec import quat_from_mats, polar
@@ -54,42 +60,74 @@ def export(shape, posed_V, texture, out_dir, name="captured", clips=None, log=pr
     glb = os.path.join(out_dir, name + ".glb")
     tmp = glb + ".skel.glb"
     RR.write_glb(r, tmp, list(r.clips))
-    uvq = np.round(r.fuv.reshape(-1, 2) * 1e6).astype(np.int64)
-    key = np.c_[r.F.reshape(-1), uvq]
-    uk, inv = np.unique(key, axis=0, return_inverse=True)
-    vi = uk[:, 0]
-    UV = uk[:, 1:] / 1e6
-    UV[:, 1] = 1.0 - UV[:, 1]
-    F = inv.reshape(-1, 3)
-    V = r.V[vi]
+    if mesh is None:
+        from .capture_layers import Mesh
+        mesh = Mesh(shape.V, shape.m.F, shape.m.fuv, shape.m.J, shape.m.W, np.zeros(len(shape.V), int))
+    parts = []
+    for lid, lname in enumerate(LAYER_NAMES):
+        vsel = mesh.layer == lid
+        if not vsel.any():
+            continue
+        fsel = vsel[mesh.F].all(1)
+        Fl = mesh.F[fsel]; fuv = mesh.fuv[fsel]
+        # one vertex per (position, uv) pair: glTF / FBX want per-vertex UVs
+        uvq = np.round(fuv.reshape(-1, 2) * 1e6).astype(np.int64)
+        key = np.c_[Fl.reshape(-1), uvq]
+        uk, inv = np.unique(key, axis=0, return_inverse=True)
+        vi = uk[:, 0]
+        UV = uk[:, 1:] / 1e6
+        UV[:, 1] = 1.0 - UV[:, 1]
+        F = inv.reshape(-1, 3)
+        V = mesh.V[vi]
+        parts.append(mhchar.Part(name=lname, role=lname.lower(), V=V, F=F, UV=UV, J=mesh.J[vi].astype(np.uint16),
+                                 W=mesh.W[vi].astype(np.float32), N=mhchar.normals(V, F), image="atlas"))
     png = io.BytesIO(); Image.fromarray(texture).save(png, "PNG")
-    ex = {"source": "Sprite Forge capture (MakeHuman CC0 body + photo texture)"}
+    ex = {"source": "Sprite Forge capture (MakeHuman CC0 body + photo texture)",
+          "layers": [p.name for p in parts]}
     ex.update(extras or {})
-    glbpack.pack(tmp, glb, V, mhchar.normals(V, F), UV, F, r.J[vi].astype(np.uint16), r.W[vi].astype(np.float32),
-                 png.getvalue(), name=name, extras=ex)
+    glbpack.pack_parts(tmp, glb, parts, {"atlas": png.getvalue()}, extras=ex)
     os.remove(tmp)
     fbx = os.path.join(out_dir, name + ".fbx")
     try:
         FBX.write_fbx_from_glb(glb, fbx)
     except Exception as e:                                                  # noqa: BLE001
         log("capture: FBX failed (%s) - GLB and OBJ are fine" % e); fbx = None
-    obj = write_obj(posed_V, shape.m.F, shape.m.fuv, texture, out_dir, name)
+    pm = posed_mesh if posed_mesh is not None else posed_V
+    obj = write_obj(pm, mesh.F, mesh.fuv, texture, out_dir, name, layer=mesh.layer)
     Image.fromarray(texture).save(os.path.join(out_dir, name + "_texture.png"))
-    log("capture: %s.glb (%d bones, %d clips: %s), %s, %s" % (name, len(r.bones), len(r.clips), ", ".join(r.clips),
-                                                              os.path.basename(fbx) if fbx else "no FBX", os.path.basename(obj)))
-    return dict(glb=glb, fbx=fbx, obj=obj, rig=r)
+    if (mesh.layer > 0).any():                       # the body quarter alone: a MakeHuman / MPFB skin image
+        h = texture.shape[0] // 2
+        Image.fromarray(texture[:h, :h]).save(os.path.join(out_dir, name + "_skin.png"))
+    out = dict(glb=glb, fbx=fbx, obj=obj, rig=r)
+    if makehuman:
+        from . import capture_mh
+        out.update(capture_mh.write(out_dir, name, makehuman["macros"], makehuman["sliders"], makehuman.get("height_m")))
+    log("capture: %s.glb (%s; %d bones, %d clips: %s), %s, %s" % (
+        name, " + ".join(p.name for p in parts), len(r.bones), len(r.clips), ", ".join(r.clips),
+        os.path.basename(fbx) if fbx else "no FBX", os.path.basename(obj)))
+    return out
 
 
-def write_obj(V, F, fuv, texture, out_dir, name):
+def write_obj(V, F, fuv, texture, out_dir, name, layer=None):
+    """OBJ + MTL in the captured stance; one named object per layer (Body / Clothes / Skirt / Hair) so Blender,
+    MakeHuman-style tools and game engines import them as separate, editable meshes"""
     tex = name + "_texture.png"
     with open(os.path.join(out_dir, name + ".mtl"), "w") as f:
-        f.write("newmtl skin\nKd 1 1 1\nKa 0 0 0\nKs 0 0 0\nmap_Kd %s\n" % tex)
+        f.write("newmtl atlas\nKd 1 1 1\nKa 0 0 0\nKs 0 0 0\nillum 1\nmap_Kd %s\n" % tex)
     p = os.path.join(out_dir, name + ".obj")
     uv = fuv.reshape(-1, 2)
+    lay = np.zeros(len(V), int) if layer is None else layer
+    flay = lay[F[:, 0]]
     with open(p, "w") as f:
-        f.write("# Sprite Forge capture - MakeHuman CC0 topology, metres, Y up\nmtllib %s.mtl\nusemtl skin\n" % name)
+        f.write("# Sprite Forge capture - MakeHuman CC0 topology (+ clothes / hair layers), metres, Y up\n")
+        f.write("mtllib %s.mtl\n" % name)
         f.write("".join("v %.5f %.5f %.5f\n" % tuple(v) for v in V))
         f.write("".join("vt %.6f %.6f\n" % tuple(t) for t in uv))
-        f.write("".join("f %d/%d %d/%d %d/%d\n" % (a + 1, 3 * k + 1, b + 1, 3 * k + 2, c + 1, 3 * k + 3)
-                        for k, (a, b, c) in enumerate(F)))
+        for lid, lname in enumerate(LAYER_NAMES):
+            ks = np.nonzero(flay == lid)[0]
+            if not len(ks):
+                continue
+            f.write("o %s\ng %s\nusemtl atlas\n" % (lname, lname))
+            f.write("".join("f %d/%d %d/%d %d/%d\n" % (F[k, 0] + 1, 3 * k + 1, F[k, 1] + 1, 3 * k + 2, F[k, 2] + 1, 3 * k + 3)
+                            for k in ks))
     return p
