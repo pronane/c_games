@@ -1326,20 +1326,37 @@ class App(ctk.CTk):
         self._sync_play_button(False)
         win = ctk.CTkToplevel(self)
         win.title("Audio editor — original remains unchanged")
-        win.geometry("760x570")
-        win.minsize(620, 470)
+        win.geometry("850x670")
+        win.minsize(680, 590)
         win.configure(fg_color=BG)
         win.transient(self)
         win.grab_set()
         win.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(win, text="Select a range, then trim to it or remove it",
                      font=_f(20, "bold"), text_color=TEXT).grid(row=0, column=0, padx=20, pady=(18, 4), sticky="w")
-        ctk.CTkLabel(win, text="Drag on the waveform, or enter start/end times. The source file is never changed.",
-                     font=_f(12), text_color=MUTED).grid(row=1, column=0, padx=20, pady=(0, 10), sticky="w")
+        ctk.CTkLabel(win, text="Drag on the waveform, use the position slider + Set start/end, or type times. Apply Remove selection repeatedly for multiple cuts; Undo reverses the last cut. The source is never changed.",
+                     font=_f(12), text_color=MUTED, wraplength=750, justify="left").grid(row=1, column=0, padx=20, pady=(0, 10), sticky="w")
         canvas = tk.Canvas(win, height=190, bg="#0f131a", highlightthickness=1, highlightbackground=STROKE)
         canvas.grid(row=2, column=0, padx=20, pady=6, sticky="ew")
+        scrub = ctk.CTkFrame(win, fg_color="transparent")
+        scrub.grid(row=3, column=0, padx=20, pady=(8, 2), sticky="ew")
+        scrub.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(scrub, text="Position", text_color=MUTED).grid(row=0, column=0, padx=(0, 8))
+        position_label = ctk.CTkLabel(scrub, text="0:00.00", width=70, text_color=TEXT)
+        position_label.grid(row=0, column=2, padx=8)
+        position = {"value": 0.0}
+        def seek_changed(value):
+            position["value"] = float(value)
+            position_label.configure(text=human_time(position["value"]))
+            draw()
+        seek_slider = ctk.CTkSlider(scrub, from_=0, to=max(session.duration, 0.01), command=seek_changed)
+        seek_slider.grid(row=0, column=1, sticky="ew")
+        ctk.CTkButton(scrub, text="Set start here", width=100, height=28,
+                      command=lambda: startv.set(f"{position['value']:.3f}")).grid(row=0, column=3, padx=4)
+        ctk.CTkButton(scrub, text="Set end here", width=100, height=28,
+                      command=lambda: endv.set(f"{position['value']:.3f}")).grid(row=0, column=4, padx=4)
         times = ctk.CTkFrame(win, fg_color="transparent")
-        times.grid(row=3, column=0, padx=20, pady=5, sticky="w")
+        times.grid(row=4, column=0, padx=20, pady=5, sticky="w")
         ctk.CTkLabel(times, text="Start (seconds)", text_color=MUTED).pack(side="left")
         startv, endv = tk.StringVar(value="0.00"), tk.StringVar(value=f"{session.duration:.2f}")
         start_entry = ctk.CTkEntry(times, width=100, textvariable=startv)
@@ -1349,11 +1366,20 @@ class App(ctk.CTk):
         end_entry.pack(side="left", padx=8)
         info = ctk.CTkLabel(win, text=f"Current edit: {session.duration:.2f} sec  ·  {audio.samplerate:,} Hz  ·  {audio.channels} channel(s)",
                             text_color=MUTED, font=_f(12))
-        info.grid(row=4, column=0, padx=20, pady=4, sticky="w")
-        status = ctk.CTkLabel(win, text="Original preserved. Save creates a separate file.", text_color=GREEN, font=_f(12))
-        status.grid(row=5, column=0, padx=20, pady=4, sticky="w")
+        info.grid(row=5, column=0, padx=20, pady=4, sticky="w")
+        status_row = ctk.CTkFrame(win, fg_color="transparent")
+        status_row.grid(row=6, column=0, padx=20, pady=4, sticky="ew")
+        status_row.grid_columnconfigure(0, weight=1)
+        status = ctk.CTkLabel(status_row, text="Original preserved. Save creates a separate file.", text_color=GREEN, font=_f(12))
+        status.grid(row=0, column=0, sticky="w")
+        save_format = ctk.CTkOptionMenu(status_row, values=["WAV 32-bit float (default)", "FLAC 24-bit (smaller)"],
+                                        width=190, height=28, font=_f(11), fg_color=CARD_HI,
+                                        button_color=CARD_HI, button_hover_color=STROKE,
+                                        dropdown_fg_color=CARD, text_color=TEXT)
+        save_format.set("WAV 32-bit float (default)")
+        save_format.grid(row=0, column=1, sticky="e")
         controls = ctk.CTkFrame(win, fg_color="transparent")
-        controls.grid(row=6, column=0, padx=20, pady=(10, 18), sticky="ew")
+        controls.grid(row=7, column=0, padx=20, pady=(10, 18), sticky="ew")
         preview_player = Player()
         temp_paths = []
         busy = {"value": False}
@@ -1376,14 +1402,19 @@ class App(ctk.CTk):
                 dur = max(session.duration, 0.001)
                 x1, x2 = max(0, min(w, a/dur*w)), max(0, min(w, b/dur*w))
                 canvas.create_rectangle(x1, 1, x2, h-1, fill="#2563eb", stipple="gray25", outline="#93c5fd", width=2)
-                canvas.tag_lower("selection")
             except ValueError:
                 pass
+            play_x = max(0.0, min(w, position["value"] / max(session.duration, 0.001) * w))
+            canvas.create_line(play_x, 0, play_x, h, fill="#fbbf24", width=2)
             canvas.create_text(8, 8, anchor="nw", text=f"0.00 s", fill="#94a3b8")
             canvas.create_text(w-8, 8, anchor="ne", text=f"{session.duration:.2f} s", fill="#94a3b8")
 
         def update_wave():
             peaks_cache["value"] = np.stack(session.overview_peaks(900), axis=1)
+            position["value"] = min(position["value"], session.duration)
+            seek_slider.configure(to=max(session.duration, 0.01))
+            seek_slider.set(position["value"])
+            position_label.configure(text=human_time(position["value"]))
             info.configure(text=f"Current edit: {session.duration:.2f} sec  ·  {audio.samplerate:,} Hz  ·  {audio.channels} channel(s)")
             draw()
             undo_btn.configure(state="normal" if session._undo else "disabled")
@@ -1414,8 +1445,14 @@ class App(ctk.CTk):
             a, b = float(startv.get()), float(endv.get())
             if b < a:
                 a, b = b, a
-            if a < 0 or b > session.duration or b <= a:
-                raise ValueError("Choose a valid range within the current waveform.")
+            # Time fields are rounded for readability; tolerate that rounding at the file edge.
+            edge_tolerance = 0.02
+            if a < -edge_tolerance or b > session.duration + edge_tolerance:
+                raise ValueError("Choose a range within the current waveform.")
+            a = max(0.0, min(session.duration, a))
+            b = max(0.0, min(session.duration, b))
+            if b <= a:
+                raise ValueError("Choose a range longer than zero seconds.")
             return a, b
         def set_busy(flag, message=None):
             busy["value"] = flag
@@ -1472,11 +1509,15 @@ class App(ctk.CTk):
         def save_copy():
             if busy["value"]: return
             source = Path(audio.path)
-            suffix = source.suffix.lower() if source.suffix.lower() in (".wav", ".flac") else ".wav"
-            suggested = unique_path(str(source.with_name(source.stem + " (edited)" + suffix)))
-            path = filedialog.asksaveasfilename(parent=win, title="Save edited copy", initialdir=str(Path(suggested).parent),
-                                               initialfile=Path(suggested).name, defaultextension=suffix,
-                                               filetypes=[("WAV audio", "*.wav"), ("FLAC audio", "*.flac")])
+            suffix = ".flac" if save_format.get().startswith("FLAC") else ".wav"
+            suggested = unique_path(source.parent, source.stem + " (edited)", suffix)
+            win.lift()
+            win.focus_force()
+            status.configure(text="Choose where to save the edited copy…", text_color=BLUE)
+            save_types = [("FLAC 24-bit audio (smaller)", "*.flac")] if suffix == ".flac" else [("WAV 32-bit float audio", "*.wav")]
+            path = filedialog.asksaveasfilename(parent=win, title="Save edited copy", initialdir=str(suggested.parent),
+                                               initialfile=suggested.name, defaultextension=suffix,
+                                               filetypes=save_types)
             if not path: return
             set_busy(True, "Saving edited copy…")
             def work():

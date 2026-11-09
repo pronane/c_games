@@ -14,7 +14,7 @@ the default source is the system audio stream itself, so the recording is a
 * **Full quality:** the device's native sample rate, 48 kHz, or anything up to
   192 kHz. Stored as 32-bit float WAV (or lossless 24-bit FLAC).
 * **Playback built in:** seek, pause, volume, waveform with progress.
-* **Basic non-destructive editor:** select a range on the waveform or enter start/end seconds, preview it, trim to it or remove it (including a middle cut), and undo/redo. Saving creates a separate edited WAV/FLAC copy; the original remains intact. WAV export keeps float32 samples; FLAC is encoded as lossless 24-bit PCM.
+* **Basic non-destructive editor:** scrub to a time with the position slider, set range endpoints, or drag on the waveform; preview, trim, or remove sections (including repeated middle cuts), with undo/redo. Saving creates a separate edited WAV/FLAC copy; the original remains intact. WAV export keeps float32 samples; FLAC is encoded as lossless 24-bit PCM.
 * Windows first, Linux supported, single-file-per-module, no installer needed.
 
 ![Recording system audio](docs/screenshot-recording.png)
