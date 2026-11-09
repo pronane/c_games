@@ -1,0 +1,5 @@
+# Required: audio capture, UI, and selectable lossless FLAC output
+soundcard>=0.4.3      # WASAPI loopback on Windows, PulseAudio monitors on Linux
+numpy>=1.24           # audio buffers
+customtkinter>=5.2    # modern dark UI (works with 6.x too)
+soundfile>=0.12       # FLAC encoding + robust decoding

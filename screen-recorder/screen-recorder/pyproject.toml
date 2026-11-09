@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c-games-screen-recorder"
+version = "0.1.0"
+description = "Reusable desktop/game-screen capture to MP4"
+requires-python = ">=3.10"
+dependencies = ["mss>=9.0", "numpy>=1.24"]
+
+[project.scripts]
+screen-recorder = "screen_recorder.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["screen_recorder*"]
