@@ -192,6 +192,41 @@ Fine-tuning made the model more cautious (504 notes heard) without fixing pitch.
 
 The tools (`training/`) and the `FRETWORK_RILEY_CHECKPOINT` override stay for later attempts with real multitrack recordings that come with tabs.
 
+## Tab library: the user's tabs against the user's recordings (private)
+
+Seven tab/recording pairs, scored like One: the tab is lined up with the full mix, its guitar
+tracks become the reference, and the detector runs on the Demucs guitar stem. Files stay in
+`data/private/songs` (not in the repo); only aggregates are reported. The tabs are fan charts
+and are not assumed exact.
+
+| Song | Recording | Tuning shift found | Band tempo vs chart | Tab guitar notes | Riley (0.5) | Basic Pitch | Right pitch within 300 ms | Best / worst 30 s |
+|---|---|---|---|---|---|---|---|---|
+| Down in a Hole | 2:00 clip | 0 | 94% | 691 | .400 | .294 | .59 | .44 / .37 |
+| 18 and Life | 2:31 clip | 0 | 100% | 823 | .227 | .243 | .60 | .61 / .15 |
+| Every Rose Has Its Thorn | 1:53 clip | −1 | 97% | 991 | .213 | .168 | .43 | .54 / .11 |
+| November Rain | 8:57 | −1 | 101% | 4,601 | .167 | .146 | .35 | .31 / .00 |
+| Home Sweet Home | 4:54 | 0 | 100% | 819 | .164 | .156 | .56 | .27 / .08 |
+| One (new full-band GP3) | 7:26 | 0 | 97% | 4,468 | .300 | .268 | .31 | .91 / .00 |
+| One (one-guitar arrangement) | 7:26 | 0 | 94% | 2,868 | .221 | .182 | .27 | .85 / .01 |
+
+What the new material showed:
+- **Clips:** three recordings are about two minutes of a longer song. The old line fit needed
+  60% of the tab inside the recording and failed on them. It now scores every offset (FFT
+  cross-correlation) and needs 60% of the shorter of the two.
+- **Tuning:** two charts are written a half step above the record. The line-up now tries
+  ±1 and ±2 semitones and takes a shift only when it fits clearly better (0.03).
+- **One, new full-band tab:** the clean half averages .76 per 30 s (the GP4 gave .695 over the
+  same half), so this chart is the closer reference there. The heavy half is still .07.
+- **Full-band ballads score low** (.16–.40) for every detector. These numbers mix three things
+  that this test cannot separate: detector misses, strummed parts written as full six-string
+  chords on every strum, and guitar that Demucs leaves in other stems (piano-led songs).
+  "Right pitch within 300 ms" (.35–.60) is the looser view: about half of the tab's notes are
+  heard near where the tab puts them.
+- **Tab-only references:** For Whom the Bell Tolls and the Alice in Chains collection have no
+  recording yet, so nothing is scored for them.
+
+Riley stays ahead of Basic Pitch on five of the seven pairs; 18 and Life is within .02.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.

@@ -11,7 +11,16 @@ type Match = { tab_notes: number; heard_matched: number; precision: number; reca
 type PlacedNote = { time: number; duration: number; midi: number; bar?: number };
 type Part = { name: string; track: number | null; sections: Section[]; notes: PlacedNote[]; match: Match };
 type Result = {
-  alignment: { tempo_ratio: number; similarity: number; start: number; refined: boolean; attack_match: number | null };
+  alignment: {
+    tempo_ratio: number;
+    similarity: number;
+    start: number;
+    refined: boolean;
+    attack_match: number | null;
+    transpose?: number;
+    tab_from?: number;
+    tab_to?: number;
+  };
   parts: Part[];
   unassigned: number;
   heard: number;
@@ -106,6 +115,7 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
     const rec = mix.current,
       rate = c.sampleRate,
       first = part.sections[0];
+    if (!first) return;
     // The part's first stretch, with a second either side.
     const from = Math.max(0, first.start - 1),
       to = Math.min(rec.duration, first.end + 1),
@@ -159,8 +169,9 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
       </h3>
       <p className="helper">
         Load your own tab of {songTitle || "this song"} (Guitar Pro, MusicXML). Its tracks (Guitar 1, Riff A, Solo…) are lined up
-        with the recording, even when the band plays at a different tempo from the chart, and every note the app heard is
-        given to the part it belongs to. Two guitars in the same place in the mix can then still be told apart.
+        with the recording, even when the band plays at a different tempo or tuning from the chart, or the recording is only
+        part of the song. Every note the app heard is given to the part it belongs to, so two guitars in the same place in
+        the mix can still be told apart.
       </p>
       <input
         id="tab-parts-file"
@@ -174,8 +185,16 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
       {result && (
         <>
           <p className="helper">
-            Tab starts at {fmt(result.alignment.start)} in the recording; the band plays at {percent(1 / result.alignment.tempo_ratio)} of the
-            chart's tempo. {result.heard - result.unassigned} of the {result.heard} notes the app heard match a part of the tab.
+            {(result.alignment.tab_from ?? 0) > 2
+              ? `The recording starts ${fmt(result.alignment.tab_from!)} into the tab`
+              : `Tab starts at ${fmt(result.alignment.start)} in the recording`}
+            ; the band plays at {percent(1 / result.alignment.tempo_ratio)} of the chart's tempo.{" "}
+            {result.heard - result.unassigned} of the {result.heard} notes the app heard match a part of the tab.
+            {result.alignment.transpose
+              ? ` The record sounds ${Math.abs(result.alignment.transpose)} semitone${Math.abs(result.alignment.transpose) > 1 ? "s" : ""} ${
+                  result.alignment.transpose < 0 ? "lower" : "higher"
+                } than the tab is written (a different tuning), so the tab's notes were moved to the pitch that sounds.`
+              : ""}
           </p>
           <table className="tab-parts-table">
             <thead>
@@ -191,6 +210,7 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
                 <tr key={p.name}>
                   <td>{p.name}</td>
                   <td>
+                    {!p.sections.length && "Not in this recording"}
                     {p.sections
                       .slice(0, 4)
                       .map((s) => `${fmt(s.start)}–${fmt(s.end)}${s.first_bar ? ` (bars ${s.first_bar}–${s.last_bar})` : ""}`)
@@ -201,9 +221,13 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
                     {percent(p.match.recall)} <small className="helper">of {p.match.tab_notes}</small>
                   </td>
                   <td className="presets">
-                    {button(p, "record", "Record")}
-                    {button(p, "tab", "Tab")}
-                    {button(p, "both", "Both")}
+                    {p.sections.length > 0 && (
+                      <>
+                        {button(p, "record", "Record")}
+                        {button(p, "tab", "Tab")}
+                        {button(p, "both", "Both")}
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

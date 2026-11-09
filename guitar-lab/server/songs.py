@@ -788,7 +788,8 @@ async def tab_parts(key: str, request: TabPartsRequest, x_fretwork_client: str |
         mix, sr = sf.read(song.folder/'tracks'/'mix.flac', dtype='float32')
         mono = mix.mean(axis=1) if mix.ndim > 1 else mix
         everything = [n for t in tracks for n in t['notes']]
-        mapping = ta.refine(ta.align(everything, mono, sr), everything, mono, sr)
+        # Charts are often written in standard tuning for songs played a half or whole step down.
+        mapping = ta.refine(ta.align(everything, mono, sr, transposes=(0, -1, 1, -2, 2)), everything, mono, sr)
         placed = ta.place_tracks(tracks, mapping)
         heard = []
         for pid, notes in song.notes.items():
@@ -805,7 +806,8 @@ async def tab_parts(key: str, request: TabPartsRequest, x_fretwork_client: str |
     return {
         'alignment': {'tempo_ratio': mapping['tempo_ratio'], 'similarity': mapping['similarity'],
                       'start': round(float(ta.to_audio_time(mapping, 0.0)), 2), 'refined': mapping.get('refined', False),
-                      'attack_match': mapping.get('attack_match')},
+                      'attack_match': mapping.get('attack_match'), 'transpose': mapping.get('transpose', 0),
+                      'tab_from': round(float(mapping['tab'][0]), 2), 'tab_to': round(float(mapping['tab'][-1]), 2)},
         'parts': [{'name': t['name'], 'track': t['track'], 'sections': t['sections'],
                    'notes': t['notes'], 'match': assigned['match'][t['name']],
                    'heard_ids': assigned['by_track'][t['name']]} for t in placed],
