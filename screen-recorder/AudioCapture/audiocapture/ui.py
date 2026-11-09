@@ -45,8 +45,9 @@ from .settings import (
 )
 from .dialogs import Dialog
 from .waveform import Waveform
-from .editing import AudioEditSession
+from .editing import AudioEditSession, remove_audio_ranges_in_place
 from .url_source import validate_web_url, url_recording_stem, autoplay_url
+from .auto_next import SilenceAutoAdvance
 
 # ---------------------------------------------------------------- palette ---
 BG = "#12151c"
@@ -109,6 +110,14 @@ class App(ctk.CTk):
         self._web_listbox = None
         self._web_waiting_audio = False
         self._web_audio_hits = 0
+        self._web_auto_next_watch = SilenceAutoAdvance(
+            delay_seconds=float(self.settings["url_auto_next_delay"]),
+            silence_seconds=float(self.settings["url_auto_next_silence"]),
+            threshold_rms=10 ** (float(self.settings.get("url_auto_next_threshold_db", -54.0)) / 20))
+        self._web_auto_next_enabled = bool(self.settings["url_auto_next"])
+        self._web_auto_stop_after_current = False
+        self._web_auto_next_triggered = False
+        self._web_auto_cut_ranges: list[tuple[float, float]] = []
         self._web_url_manager = None
 
         self._build_ui()
@@ -258,7 +267,7 @@ class App(ctk.CTk):
             text_color=TEXT, anchor="w", command=self._on_quality_change)
         self.channel_menu.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self.format_menu = ctk.CTkOptionMenu(
-            row, values=["WAV", "FLAC"], font=_f(12), height=34, corner_radius=8,
+            row, values=["WAV", "FLAC", "M4A AAC 320", "MP3 320"], font=_f(12), height=34, corner_radius=8,
             fg_color=CARD_HI, button_color=STROKE, button_hover_color="#39435a",
             dropdown_fg_color=CARD_HI, dropdown_hover_color=STROKE, dropdown_font=_f(12),
             text_color=TEXT, anchor="w", command=self._on_quality_change)
@@ -596,14 +605,14 @@ class App(ctk.CTk):
         dialog = ctk.CTkToplevel(self)
         self._web_url_manager = dialog
         dialog.title("Web URL playlist")
-        dialog.geometry("620x650")
-        dialog.minsize(580, 620)
+        dialog.geometry("620x750")
+        dialog.minsize(580, 700)
         dialog.transient(self)
         dialog.configure(fg_color=BG)
         dialog.update_idletasks()
         x = self.winfo_rootx() + max(0, (self.winfo_width() - 620) // 2)
-        y = self.winfo_rooty() + max(0, (self.winfo_height() - 650) // 2)
-        dialog.geometry(f"620x650+{x}+{y}")
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - 750) // 2)
+        dialog.geometry(f"620x750+{x}+{y}")
         dialog.protocol("WM_DELETE_WINDOW", dialog.withdraw)
 
         ctk.CTkLabel(dialog, text="Web URL playlist", font=_f(18, "bold"),
@@ -673,11 +682,39 @@ class App(ctk.CTk):
             variable=self.web_autoplay_var, font=_f(11), text_color=TEXT,
             command=lambda: self.settings.__setitem__("url_autoplay", bool(self.web_autoplay_var.get()))
         ).pack(anchor="w", padx=22, pady=(6, 0))
+        auto_frame = ctk.CTkFrame(dialog, fg_color=CARD, corner_radius=9)
+        auto_frame.pack(fill="x", padx=22, pady=(8, 2))
+        self.web_auto_next_var = ctk.BooleanVar(value=bool(self.settings["url_auto_next"]))
+        ctk.CTkCheckBox(auto_frame, text="Auto-next after silence", variable=self.web_auto_next_var,
+                        font=_f(11, "bold"), text_color=TEXT,
+                        command=self._toggle_web_auto_next).pack(anchor="w", padx=10, pady=(7, 3))
+        timing = ctk.CTkFrame(auto_frame, fg_color="transparent")
+        timing.pack(fill="x", padx=8, pady=(0, 7))
+        delay_value = int(float(self.settings["url_auto_next_delay"]))
+        self.web_auto_delay_entry = ctk.CTkEntry(
+            timing, width=70, height=28,
+            textvariable=tk.StringVar(value=f"{delay_value // 60}:{delay_value % 60:02d}"))
+        self.web_auto_silence_entry = ctk.CTkEntry(
+            timing, width=55, height=28,
+            textvariable=tk.StringVar(value=str(self.settings["url_auto_next_silence"])))
+        ctk.CTkLabel(timing, text="Start checking after", text_color=MUTED, font=_f(11)).pack(side="left", padx=(2, 6))
+        self.web_auto_delay_entry.pack(side="left")
+        ctk.CTkLabel(timing, text="(min:sec); advance after", text_color=MUTED, font=_f(11)).pack(side="left", padx=6)
+        self.web_auto_silence_entry.pack(side="left")
+        ctk.CTkLabel(timing, text="sec quiet; threshold", text_color=MUTED, font=_f(11)).pack(side="left", padx=6)
+        self.web_auto_threshold_entry = ctk.CTkEntry(
+            timing, width=52, height=28,
+            textvariable=tk.StringVar(value=str(self.settings.get("url_auto_next_threshold_db", -54.0))))
+        self.web_auto_threshold_entry.pack(side="left")
+        ctk.CTkLabel(timing, text="dBFS", text_color=MUTED, font=_f(11)).pack(side="left", padx=4)
+        ctk.CTkLabel(auto_frame, text="Live input meter below; red marker shows silence cutoff. Set the cutoff just above the idle noise floor.",
+                     text_color=MUTED, font=_f(10), wraplength=500, justify="left").pack(anchor="w", padx=10, pady=(0, 6))
         ctk.CTkLabel(
             dialog,
             text=("Separate: Start playlist opens and records the selected URL. Next URL saves it and starts the next file.\n"
                   "Combined: start once; Next URL opens remaining pages into that file. Pause/Resume is available.\n"
                   "Autoplay is best-effort. If blocked, sign in/click Play; meter status confirms audio activity. Retry URL reopens it.\n"
+                  "Auto-next waits from first detected audio (or URL start if none), then requires continuous silence below -54 dBFS. It removes that quiet tail from saved audio; sound returning resets the timer, and the playlist stops after its last URL.\n"
                   "Saved playlists strip auth tokens. Capture is system loopback and includes other computer sounds."),
             font=_f(10), text_color=MUTED, justify="left", anchor="w", wraplength=570
         ).pack(anchor="w", padx=22, pady=(8, 4))
@@ -707,6 +744,45 @@ class App(ctk.CTk):
     def _set_url_file_mode(self, value: str) -> None:
         value = "combined" if value == "combined" else "separate"
         self.settings["url_file_mode"] = value
+
+    def _toggle_web_auto_next(self) -> None:
+        enabled = bool(self.web_auto_next_var.get())
+        self.settings["url_auto_next"] = enabled
+        self._web_auto_next_enabled = enabled
+        if not enabled:
+            self._web_auto_next_watch.pause(time.monotonic())
+
+    def _apply_web_auto_next_settings(self) -> bool:
+        enabled = bool(self.web_auto_next_var.get()) if hasattr(self, "web_auto_next_var") else bool(self.settings["url_auto_next"])
+        self.settings["url_auto_next"] = enabled
+        if not enabled:
+            self._web_auto_next_enabled = False
+            return True
+        try:
+            raw_delay = self.web_auto_delay_entry.get().strip() if hasattr(self, "web_auto_delay_entry") else str(self.settings["url_auto_next_delay"])
+            if ":" in raw_delay:
+                minutes, seconds = raw_delay.split(":", 1)
+                delay = float(minutes) * 60 + float(seconds)
+                if float(minutes) < 0 or not 0 <= float(seconds) < 60:
+                    raise ValueError
+            else:
+                delay = float(raw_delay)
+            silence = float(self.web_auto_silence_entry.get().strip() if hasattr(self, "web_auto_silence_entry") else self.settings["url_auto_next_silence"])
+            threshold_db = float(self.web_auto_threshold_entry.get().strip() if hasattr(self, "web_auto_threshold_entry") else self.settings.get("url_auto_next_threshold_db", -54.0))
+            if not (0 <= delay <= 7200 and 0.5 <= silence <= 120 and -80 <= threshold_db <= -20):
+                raise ValueError
+        except (TypeError, ValueError):
+            Dialog.warn(self._web_url_manager, "Check auto-next timing",
+                        "Enter a grace period as minutes:seconds, silence from 0.5 to 120 seconds, and threshold from -80 to -20 dBFS.")
+            return False
+        self.settings["url_auto_next_delay"] = int(delay)
+        self.settings["url_auto_next_silence"] = silence
+        self.settings["url_auto_next_threshold_db"] = threshold_db
+        self._web_auto_next_enabled = True
+        self._web_auto_next_watch.delay_seconds = float(delay)
+        self._web_auto_next_watch.silence_seconds = float(silence)
+        self._web_auto_next_watch.threshold_rms = 10 ** (threshold_db / 20)
+        return True
 
     def _load_web_url_list(self, listbox) -> None:
         if self.recorder is not None:
@@ -761,8 +837,8 @@ class App(ctk.CTk):
         names = sorted(load_saved_playlists())
         self.web_saved_menu.configure(values=names)
         self.web_saved_menu.set(stored_name)
-        note = (f"Removed {removed} auth-related URL parameter(s). Sign-in will use the browser session."
-                if removed else "No auth parameters needed removal.")
+        note = (f"Removed query/fragment data from {removed} URL(s) before saving (this may remove page IDs). Sign-in stays in your browser."
+                if removed else "No query or fragment data was present. Sign-in stays in your browser.")
         Dialog.info(self._web_url_manager, "Playlist saved safely", note)
 
     def _load_saved_web_playlist(self, listbox) -> None:
@@ -838,6 +914,35 @@ class App(ctk.CTk):
             # stopped it; when already recording we leave the single file open.
             self.start_recording()
 
+    def _on_web_auto_next_silence(self) -> None:
+        """Advance after the configured grace period and continuous silence."""
+        if self.recorder is None or self._web_auto_next_triggered:
+            return
+        self._web_auto_next_triggered = True
+        rec = self.recorder
+        if rec is not None:
+            end_time = rec.duration
+            gap = float(self._web_auto_next_watch.silence_seconds)
+            start_time = max(0.0, end_time - gap)
+            if end_time > start_time:
+                self._web_auto_cut_ranges.append((start_time, end_time))
+        current = self._web_opened_index
+        target = current + 1
+        if current < 0 or target >= len(self._web_url_items):
+            self._web_auto_stop_after_current = True
+            self._pending_web_next = None
+            self._set_status("Silence detected after the final URL; saving and stopping playlist.", WARN)
+            self.stop_recording()
+            return
+        self._set_status(
+            f"Silence detected for {self._web_auto_next_watch.silence_seconds:g}s; advancing to URL {target + 1}.", WARN)
+        if self.settings["url_file_mode"] == "separate":
+            self._pending_web_next = target
+            self.stop_recording()
+        else:
+            # Keep the combined recording running while opening the next page.
+            self._open_web_url(self._web_listbox, index=target)
+
     def _start_web_url_index(self, index: int) -> None:
         listbox = self._web_listbox
         if listbox is None or not self._web_url_items:
@@ -883,6 +988,8 @@ class App(ctk.CTk):
         if self.recorder is not None:
             self._web_waiting_audio = True
             self._web_audio_hits = 0
+            self._web_auto_next_watch.reset(time.monotonic())
+            self._web_auto_next_triggered = False
         if not bool(self.settings["url_autoplay"]):
             hint = "Autoplay requests are disabled; click Play in the browser if needed."
         elif autoplay_provider:
@@ -962,15 +1069,19 @@ class App(ctk.CTk):
         # what we will actually write: never upmix a mono device to stereo
         ch = 2 if self.channel_menu.get() == "Stereo" else 1
         container = self.format_menu.get()
-        depth = "32-bit float" if container == "WAV" else "24-bit"
-        format_note = ("uncompressed, preserves float32 samples" if container == "WAV"
-                       else "FLAC lossless codec, 24-bit PCM")
+        if container == "WAV":
+            depth, format_note = "32-bit float", "uncompressed; preserves captured float samples"
+            approx = rate * ch * 4 * 60 / 1_000_000
+        elif container == "FLAC":
+            depth, format_note = "24-bit", "lossless FLAC; 24-bit PCM"
+            approx = rate * ch * 3 * 60 / 1_000_000 * 0.45
+        else:
+            depth = "AAC 320 kbps" if container.startswith("M4A") else "MP3 320 kbps"
+            format_note = "high-bitrate lossy encode"
+            approx = 320 * 1000 * 60 / 8 / 1_000_000
         self.quality_hint.configure(
             text=f"{depth} {'stereo' if ch == 2 else 'mono'} \u00b7 "
                  f"{rate / 1000:g} kHz \u00b7 {format_note}")
-        approx = rate * ch * (4 if container == "WAV" else 3) * 60 / 1_000_000
-        if container == "FLAC":
-            approx *= 0.45  # typical compressed audio; actual size depends on content
         self.chip_top.configure(text=f"{describe_channels(ch)} \u00b7 {rate / 1000:g} kHz")
         self.quality_chip.configure(
             text=f"\u25C6 {container} {depth} \u00b7 {rate / 1000:g} kHz \u00b7 "
@@ -997,6 +1108,8 @@ class App(ctk.CTk):
             self.start_recording()
 
     def start_recording(self) -> None:
+        if self.mode_switch.get() == "Web URL" and not self._apply_web_auto_next_settings():
+            return
         dev = self.current_device
         if dev is None:
             Dialog.warn(self, "No device selected",
@@ -1008,7 +1121,8 @@ class App(ctk.CTk):
         rate = self._selected_rate()
         channels = self._selected_channels()
         container = self.format_menu.get()
-        ext = ".wav" if container == "WAV" else ".flac"
+        ext = (".wav" if container == "WAV" else ".flac" if container == "FLAC"
+               else ".m4a" if container.startswith("M4A") else ".mp3")
         stem = build_filename(self.settings["filename_pattern"])
         if self.mode_switch.get() == "Web URL":
             if (self._web_selected_index < 0 or
@@ -1042,6 +1156,10 @@ class App(ctk.CTk):
             return
 
         self._rec_started_monotonic = time.monotonic()
+        if self.mode_switch.get() == "Web URL":
+            self._web_auto_next_watch.reset(self._rec_started_monotonic)
+            self._web_auto_cut_ranges = []
+        self._web_auto_next_triggered = False
         self.rec_button.configure(text="\u25A0   Stop", fg_color="#9f1239",
                                   hover_color=ACCENT)
         self.pause_btn.configure(text="Pause", state="normal")
@@ -1075,6 +1193,7 @@ class App(ctk.CTk):
             self.meter_text.configure(text="Input level  \u2212\u221e dBFS")
         else:
             rec.pause()
+            self._web_auto_next_watch.pause(time.monotonic())
             self.pause_btn.configure(text="Resume")
             self._set_status("Paused", WARN)
             self.meter_text.configure(text="Paused \u00b7 audio is not being captured")
@@ -1093,6 +1212,15 @@ class App(ctk.CTk):
             error = None
             try:
                 info = rec.stop()
+                ranges = list(self._web_auto_cut_ranges)
+                if info is not None and ranges:
+                    try:
+                        info.frames = remove_audio_ranges_in_place(
+                            info.path, ranges, bitrate_kbps=320)
+                        info.duration = info.frames / float(info.samplerate)
+                    except Exception as trim_exc:
+                        info.fallback_reason = (
+                            f"Silence-gap trim could not be applied; kept the untrimmed recording ({trim_exc}).")
             except Exception as exc:
                 error = exc
             self._post(lambda: self._recording_finished(info, error))
@@ -1107,6 +1235,8 @@ class App(ctk.CTk):
         self._lock_controls(False)
         if error is not None:
             self._pending_web_next = None
+            self._web_auto_stop_after_current = False
+            self._web_auto_next_triggered = False
             self._set_status("Recording failed", WARN)
             Dialog.error(self, "Recording stopped unexpectedly", str(error))
             self.wave.clear()
@@ -1117,10 +1247,11 @@ class App(ctk.CTk):
         self.meter_text.configure(text="Saved \u00b7 ready to play")
         self._draw_meter(0.0, 0.0)
         self._set_status("Saved", GREEN)
+        auto_silence_completion = self._web_auto_next_triggered
         note = ""
         if info.fallback_reason:
             note = " " + info.fallback_reason
-        if getattr(info, "is_silent", False):
+        if getattr(info, "is_silent", False) and not auto_silence_completion:
             Dialog.warn(
                 self, "Saved \u2014 but the recording is silent",
                 "The file was saved, but it contains silence only.\n\n"
@@ -1130,12 +1261,20 @@ class App(ctk.CTk):
                 f"Saved to: {os.path.basename(info.path)}")
         self._load_for_playback(info.path, autoplay=False)
         self.refresh_library()
-        if note:
+        if info.fallback_reason and "Silence-gap trim" in info.fallback_reason:
+            self._set_status("Saved without silence trim", WARN)
+            Dialog.warn(self, "Silence-gap trim skipped", info.fallback_reason)
+        elif note:
             self._set_status("Saved (converted to WAV)", GREEN)
         next_index = self._pending_web_next
+        stop_after_silence = self._web_auto_stop_after_current
         self._pending_web_next = None
+        self._web_auto_stop_after_current = False
+        self._web_auto_next_triggered = False
         if next_index is not None:
             self.after(400, lambda idx=next_index: self._start_web_url_index(idx))
+        elif stop_after_silence:
+            self._set_status("Playlist complete; stopped after silence at the final URL.", GREEN)
 
     def _lock_controls(self, locked: bool) -> None:
         state = "disabled" if locked else "normal"
@@ -1258,9 +1397,9 @@ class App(ctk.CTk):
 
     def open_file_dialog(self) -> None:
         path = filedialog.askopenfilename(
-            title="Open audio file",
+            title="Open audio or video (the audio track is used)",
             initialdir=self.settings["output_dir"],
-            filetypes=[("Audio files", "*.wav *.flac *.ogg *.mp3 *.m4a *.aiff *.aif"),
+            filetypes=[("Audio and video files", "*.wav *.flac *.ogg *.mp3 *.m4a *.aac *.mp4 *.m4v *.mov *.aiff *.aif"),
                        ("All files", "*.*")])
         if path:
             self._load_for_playback(path)
@@ -1326,8 +1465,8 @@ class App(ctk.CTk):
         self._sync_play_button(False)
         win = ctk.CTkToplevel(self)
         win.title("Audio editor — original remains unchanged")
-        win.geometry("850x670")
-        win.minsize(680, 590)
+        win.geometry("900x730")
+        win.minsize(700, 650)
         win.configure(fg_color=BG)
         win.transient(self)
         win.grab_set()
@@ -1364,22 +1503,40 @@ class App(ctk.CTk):
         ctk.CTkLabel(times, text="End (seconds)", text_color=MUTED).pack(side="left")
         end_entry = ctk.CTkEntry(times, width=100, textvariable=endv)
         end_entry.pack(side="left", padx=8)
-        info = ctk.CTkLabel(win, text=f"Current edit: {session.duration:.2f} sec  ·  {audio.samplerate:,} Hz  ·  {audio.channels} channel(s)",
+        range_frame = ctk.CTkFrame(win, fg_color=CARD, corner_radius=8)
+        range_frame.grid(row=5, column=0, padx=20, pady=6, sticky="ew")
+        range_frame.grid_columnconfigure(1, weight=1)
+        range_frame.grid_columnconfigure(3, weight=1)
+        ctk.CTkLabel(range_frame, text="Selection start", text_color=MUTED).grid(row=0, column=0, padx=8)
+        ctk.CTkLabel(range_frame, text="Selection end", text_color=MUTED).grid(row=0, column=2, padx=8)
+        range_sync = {"busy": False}
+        def range_slider_changed(which, value):
+            if range_sync["busy"]:
+                return
+            target = startv if which == "start" else endv
+            target.set(f"{float(value):.3f}")
+        start_range_slider = ctk.CTkSlider(range_frame, from_=0, to=max(session.duration, 0.01),
+                                            command=lambda value: range_slider_changed("start", value))
+        start_range_slider.grid(row=0, column=1, sticky="ew", padx=6, pady=10)
+        end_range_slider = ctk.CTkSlider(range_frame, from_=0, to=max(session.duration, 0.01),
+                                          command=lambda value: range_slider_changed("end", value))
+        end_range_slider.grid(row=0, column=3, sticky="ew", padx=6, pady=10)
+        info = ctk.CTkLabel(win, text=f"Current edit: {session.duration:.2f} sec  ·  {audio.samplerate:,} Hz  ·  {audio.channels} channel(s)", 
                             text_color=MUTED, font=_f(12))
-        info.grid(row=5, column=0, padx=20, pady=4, sticky="w")
+        info.grid(row=6, column=0, padx=20, pady=4, sticky="w")
         status_row = ctk.CTkFrame(win, fg_color="transparent")
-        status_row.grid(row=6, column=0, padx=20, pady=4, sticky="ew")
+        status_row.grid(row=7, column=0, padx=20, pady=4, sticky="ew")
         status_row.grid_columnconfigure(0, weight=1)
         status = ctk.CTkLabel(status_row, text="Original preserved. Save creates a separate file.", text_color=GREEN, font=_f(12))
         status.grid(row=0, column=0, sticky="w")
-        save_format = ctk.CTkOptionMenu(status_row, values=["WAV 32-bit float (default)", "FLAC 24-bit (smaller)"],
-                                        width=190, height=28, font=_f(11), fg_color=CARD_HI,
+        save_format = ctk.CTkOptionMenu(status_row, values=["WAV 32-bit float (default)", "FLAC 24-bit (smaller)", "M4A AAC 320 kbps", "MP3 320 kbps", "MP3 256 kbps"],
+                                        width=220, height=28, font=_f(11), fg_color=CARD_HI,
                                         button_color=CARD_HI, button_hover_color=STROKE,
                                         dropdown_fg_color=CARD, text_color=TEXT)
         save_format.set("WAV 32-bit float (default)")
         save_format.grid(row=0, column=1, sticky="e")
         controls = ctk.CTkFrame(win, fg_color="transparent")
-        controls.grid(row=7, column=0, padx=20, pady=(10, 18), sticky="ew")
+        controls.grid(row=8, column=0, padx=20, pady=(10, 18), sticky="ew")
         preview_player = Player()
         temp_paths = []
         busy = {"value": False}
@@ -1414,6 +1571,13 @@ class App(ctk.CTk):
             position["value"] = min(position["value"], session.duration)
             seek_slider.configure(to=max(session.duration, 0.01))
             seek_slider.set(position["value"])
+            start_range_slider.configure(to=max(session.duration, 0.01))
+            end_range_slider.configure(to=max(session.duration, 0.01))
+            try:
+                start_range_slider.set(max(0.0, min(session.duration, float(startv.get()))))
+                end_range_slider.set(max(0.0, min(session.duration, float(endv.get()))))
+            except ValueError:
+                pass
             position_label.configure(text=human_time(position["value"]))
             info.configure(text=f"Current edit: {session.duration:.2f} sec  ·  {audio.samplerate:,} Hz  ·  {audio.channels} channel(s)")
             draw()
@@ -1509,12 +1673,21 @@ class App(ctk.CTk):
         def save_copy():
             if busy["value"]: return
             source = Path(audio.path)
-            suffix = ".flac" if save_format.get().startswith("FLAC") else ".wav"
+            selected_format = save_format.get()
+            if selected_format.startswith("FLAC"):
+                suffix, bitrate = ".flac", 320
+            elif selected_format.startswith("M4A"):
+                suffix, bitrate = ".m4a", 320
+            elif selected_format.startswith("MP3"):
+                suffix, bitrate = ".mp3", 256 if "256" in selected_format else 320
+            else:
+                suffix, bitrate = ".wav", 320
             suggested = unique_path(source.parent, source.stem + " (edited)", suffix)
             win.lift()
             win.focus_force()
             status.configure(text="Choose where to save the edited copy…", text_color=BLUE)
-            save_types = [("FLAC 24-bit audio (smaller)", "*.flac")] if suffix == ".flac" else [("WAV 32-bit float audio", "*.wav")]
+            type_labels = {".wav": "WAV 32-bit float", ".flac": "FLAC 24-bit", ".m4a": "M4A AAC", ".mp3": "MP3"}
+            save_types = [(type_labels[suffix], f"*{suffix}")]
             path = filedialog.asksaveasfilename(parent=win, title="Save edited copy", initialdir=str(suggested.parent),
                                                initialfile=suggested.name, defaultextension=suffix,
                                                filetypes=save_types)
@@ -1522,7 +1695,7 @@ class App(ctk.CTk):
             set_busy(True, "Saving edited copy…")
             def work():
                 try:
-                    result = session.export(path)
+                    result = session.export(path, bitrate_kbps=bitrate)
                     self._post(lambda: saved(result))
                 except Exception as exc:
                     self._post(lambda exc=exc: (set_busy(False), status.configure(text=f"Save failed: {exc}", text_color=ACCENT)))
@@ -1532,6 +1705,37 @@ class App(ctk.CTk):
             self.refresh_library()
             self._load_for_playback(path)
             status.configure(text=f"Saved new copy: {os.path.basename(path)}", text_color=GREEN)
+        break_scan = {"ranges": [], "index": -1}
+        def find_possible_break():
+            if busy["value"]:
+                return
+            if break_scan["ranges"]:
+                break_scan["index"] = (break_scan["index"] + 1) % len(break_scan["ranges"])
+                select_break_candidate()
+                return
+            set_busy(True, "Scanning for abrupt loudness changes…")
+            def work_breaks():
+                try:
+                    found = session.suspected_breaks()
+                    self._post(lambda found=found: breaks_ready(found))
+                except Exception as exc:
+                    self._post(lambda exc=exc: (set_busy(False), status.configure(text=f"Scan failed: {exc}", text_color=ACCENT)))
+            threading.Thread(target=work_breaks, daemon=True).start()
+        def breaks_ready(found):
+            set_busy(False)
+            break_scan["ranges"] = found
+            break_scan["index"] = 0 if found else -1
+            if found:
+                select_break_candidate()
+            else:
+                status.configure(text="No abrupt loudness changes found. This is only a heuristic, not ad detection.", text_color=MUTED)
+        def select_break_candidate():
+            a, b = break_scan["ranges"][break_scan["index"]]
+            startv.set(f"{a:.3f}"); endv.set(f"{b:.3f}")
+            start_range_slider.set(a); end_range_slider.set(b)
+            status.configure(text=f"Possible break {break_scan['index'] + 1}/{len(break_scan['ranges'])}: review and preview before cutting; loudness heuristic only.", text_color=WARN)
+        break_btn = ctk.CTkButton(controls, text="Find possible breaks", command=find_possible_break, width=145)
+        break_btn.pack(side="left", padx=4)
         preview_btn = ctk.CTkButton(controls, text="Preview selection", command=preview, width=130)
         preview_btn.pack(side="left", padx=4)
         trim_btn = ctk.CTkButton(controls, text="Trim to selection", command=lambda: edit("trim"), width=125, fg_color=BLUE, hover_color=BLUE_HOVER)
@@ -1544,7 +1748,7 @@ class App(ctk.CTk):
         redo_btn.pack(side="left", padx=4)
         save_btn = ctk.CTkButton(controls, text="Save edited copy…", command=save_copy, width=145, fg_color=GREEN, hover_color="#16a34a")
         save_btn.pack(side="right", padx=4)
-        action_buttons = [preview_btn, trim_btn, remove_btn, undo_btn, redo_btn, save_btn]
+        action_buttons = [break_btn, preview_btn, trim_btn, remove_btn, undo_btn, redo_btn, save_btn]
         win.protocol("WM_DELETE_WINDOW", lambda: (preview_player.stop(), [os.path.exists(p) and os.remove(p) for p in temp_paths], win.destroy()))
         update_wave()
 
@@ -1562,7 +1766,9 @@ class App(ctk.CTk):
     def _update_name_preview(self) -> None:
         pattern = self.name_entry.get()
         self.settings["filename_pattern"] = pattern
-        ext = ".wav" if self.format_menu.get() == "WAV" else ".flac"
+        container = self.format_menu.get()
+        ext = (".wav" if container == "WAV" else ".flac" if container == "FLAC"
+               else ".m4a" if container.startswith("M4A") else ".mp3")
         self.name_preview.configure(text="e.g. " + build_filename(pattern) + ext)
 
     # =====================================================================
@@ -1589,6 +1795,8 @@ class App(ctk.CTk):
             return 20 * math.log10(max(x, 1e-6))
         lit_rms = int(max(0.0, min(1.0, (db(rms) + 60) / 60)) * bars)
         lit_peak = int(max(0.0, min(1.0, (db(peak) + 60) / 60)) * bars)
+        threshold_db = float(self.settings.get("url_auto_next_threshold_db", -54.0))
+        threshold_x = max(0.0, min(float(w), (threshold_db + 60) / 60 * w))
         for i in range(bars):
             x0 = i * seg_w + 1
             x1 = (i + 1) * seg_w - 1
@@ -1599,6 +1807,7 @@ class App(ctk.CTk):
             else:
                 color = "#20262f"
             c.create_rectangle(x0, 4, x1, h - 4, fill=color, outline="")
+        c.create_line(threshold_x, 2, threshold_x, h - 2, fill="#ff5364", width=2)
         if peak > 0.999:
             c.create_text(w - 40, h / 2, text="CLIP", fill="#ffffff",
                           font=("Segoe UI", 10, "bold"))
@@ -1626,9 +1835,15 @@ class App(ctk.CTk):
         rec = self.recorder
         if rec is not None:
             self.time_label.configure(text=human_time(rec.duration))
-            size = rec.frames * rec.channels * (4 if rec.container == "WAV" else 3)
+            if rec.container.startswith(("M4A", "MP3")):
+                size = rec.duration * 320_000 / 8
+            else:
+                size = rec.frames * rec.channels * (4 if rec.container == "WAV" else 3)
             self.size_label.configure(text=human_size(int(size)))
             if rec.paused:
+                self._web_auto_next_watch.update(time.monotonic(), 0.0,
+                                                enabled=self._web_auto_next_enabled,
+                                                paused=True)
                 self._draw_meter(0.0, 0.0)
                 return
             rms, peak = rec.level()
@@ -1645,6 +1860,12 @@ class App(ctk.CTk):
                     self._set_status("Browser audio detected", GREEN)
                     self.source_note.configure(
                         text="System audio detected. This meter sees the full system mix, including other sounds.")
+            if (self._web_auto_next_enabled and self.mode_switch.get() == "Web URL"
+                    and self._web_opened_index >= 0):
+                watch_rms = 0.0 if self._web_waiting_audio else rms
+                if self._web_auto_next_watch.update(time.monotonic(), watch_rms):
+                    self._on_web_auto_next_silence()
+                    return
             if self._web_waiting_audio:
                 self.meter_text.configure(
                     text=f"Waiting for browser audio · {dbs:+.1f} dBFS · sign in/click Play if idle")

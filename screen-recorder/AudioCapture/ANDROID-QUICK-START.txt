@@ -1,0 +1,27 @@
+ANDROID APK — QUICK START
+
+Install the included APK on a phone
+1. Copy AudioCapture-Mobile-debug.apk to the Android phone (USB, Drive, email, etc.).
+2. Open the APK in Files/Downloads. If prompted, allow that app to install unknown apps.
+3. Tap Install, then open Audio Capture Studio.
+4. Android asks for permission when playback capture starts. Capture remains subject to Android and source-app policy.
+
+Install from a computer with USB debugging
+- Connect/unlock the phone and enable USB debugging.
+- Windows: run install_android_apk.bat
+- macOS/Linux: run ./install_android_apk.sh
+The script uses adb if a device is connected; otherwise it prints the manual install steps.
+
+Build a fresh APK
+Prerequisites:
+- JDK 17 (not Java 11; Java 25 is not selected because the project is configured and validated with Java 17).
+- Android Studio or Android SDK Platform 35 and Build Tools. Set ANDROID_HOME to the SDK directory if Android Studio is installed in a non-default location.
+- Internet access for the first Gradle/dependency download.
+
+Then:
+- Windows: run build_android_apk.bat
+- macOS/Linux: run ./build_android_apk.sh
+The script builds android-app/app/build/outputs/apk/debug/app-debug.apk and copies it to AudioCapture-Mobile-debug.apk in this folder.
+For Android Studio, open the android-app folder and choose Build > Build Bundle(s) / APK(s) > Build APK(s).
+
+This APK is debug-signed for testing/sideloading, not a Play Store release. The x86_64 host used to produce this package did not have KVM, so emulator screenshots/runtime validation could not be completed here.

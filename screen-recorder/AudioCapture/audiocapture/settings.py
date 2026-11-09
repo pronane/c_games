@@ -46,6 +46,10 @@ DEFAULTS: Dict[str, Any] = {
     "container": "WAV",  # exact float32 capture; choose FLAC explicitly to compress
     "url_file_mode": "separate",  # one file per URL unless user chooses combined
     "url_autoplay": True,  # best-effort site-specific autoplay request
+    "url_auto_next": True,  # silence-based playlist advance
+    "url_auto_next_delay": 150,  # grace period before silence detection
+    "url_auto_next_silence": 5.0,  # continuous quiet required to advance
+    "url_auto_next_threshold_db": -54.0,  # RMS silence cutoff; tune using live meter
     "device_id": None,
     "device_kind": "loopback",
     "volume": 0.85,

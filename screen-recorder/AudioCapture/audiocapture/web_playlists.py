@@ -24,29 +24,15 @@ def is_sensitive_parameter(key: str) -> bool:
 
 
 def sanitize_url_for_storage(url: str) -> tuple[str, int]:
-    """Strip userinfo and sensitive query/fragment keys; preserve benign URL parameters."""
+    """For persistent playlists, never store URL queries or fragments (tokens may use arbitrary names)."""
     valid, reason = validate_web_url(url)
     if not valid:
         raise ValueError(reason)
     parts = urlsplit(url.strip())
-    query = parse_qsl(parts.query, keep_blank_values=True)
-    safe_query = [(k, v) for k, v in query if not is_sensitive_parameter(k)]
-    removed = len(query) - len(safe_query)
-
-    # OAuth implicit-flow tokens sometimes live in the URL fragment.
-    fragment_pairs = parse_qsl(parts.fragment, keep_blank_values=True)
-    if fragment_pairs:
-        safe_fragment = [(k, v) for k, v in fragment_pairs if not is_sensitive_parameter(k)]
-        removed += len(fragment_pairs) - len(safe_fragment)
-        fragment = urlencode(safe_fragment, doseq=True)
-    elif any(term in parts.fragment.casefold() for term in ("token", "secret", "password", "auth")):
-        fragment = ""
-        removed += 1
-    else:
-        fragment = parts.fragment
-
-    safe = urlunsplit((parts.scheme, parts.netloc, parts.path,
-                       urlencode(safe_query, doseq=True), fragment))
+    # Query and fragment names are provider-specific and cannot be safely
+    # classified; discard them all before any persistent write.
+    removed = int(bool(parts.query)) + int(bool(parts.fragment))
+    safe = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
     return safe, removed
 
 

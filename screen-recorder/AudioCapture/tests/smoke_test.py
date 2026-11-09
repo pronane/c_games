@@ -57,9 +57,10 @@ def test_record_and_read():
     tmp = "/tmp/test_rec"
     os.makedirs(tmp, exist_ok=True)
     paths = []
-    for container in ("WAV", "FLAC"):
-        path = os.path.join(tmp, f"smoke_{container.lower()}"
-                                 + (".wav" if container == "WAV" else ".flac"))
+    formats = (("WAV", ".wav"), ("FLAC", ".flac"),
+               ("M4A AAC 320", ".m4a"), ("MP3 320", ".mp3"))
+    for container, ext in formats:
+        path = os.path.join(tmp, f"smoke_{container.lower().replace(' ', '_')}" + ext)
         for p in (path,):
             if os.path.exists(p):
                 os.remove(p)
@@ -91,9 +92,11 @@ def test_record_and_read():
             fmt = int.from_bytes(head[20:22], "little")
             assert fmt == 3, f"expected IEEE float, got {fmt}"
             print(f"   WAV: float32, data chunk {data_size} bytes OK")
-        # duration helper
-        d = wav_duration(info.path)
-        assert abs(d - info.duration) < 0.1, f"wav_duration mismatch {d} vs {info.duration}"
+        # The stdlib duration helper handles WAV/FLAC; compressed containers
+        # were checked through AudioFile's FFmpeg-backed decode above.
+        if info.path.endswith((".wav", ".flac")):
+            d = wav_duration(info.path)
+            assert abs(d - info.duration) < 0.1, f"duration mismatch {d} vs {info.duration}"
     return paths
 
 

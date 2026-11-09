@@ -2,4 +2,5 @@
 soundcard>=0.4.3      # WASAPI loopback on Windows, PulseAudio monitors on Linux
 numpy>=1.24           # audio buffers
 customtkinter>=5.2    # modern dark UI (works with 6.x too)
-soundfile>=0.12       # FLAC encoding + robust decoding
+soundfile>=0.12       # FLAC encoding + robust WAV/FLAC decoding
+imageio-ffmpeg>=0.5.1  # bundled FFmpeg for MP3/AAC encode and MP4 audio extraction

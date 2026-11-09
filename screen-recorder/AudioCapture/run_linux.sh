@@ -11,11 +11,11 @@ fi
 # shellcheck disable=SC1091
 . .venv/bin/activate
 
-if [ ! -f ".venv/.deps_installed" ]; then
-    echo "Installing dependencies..."
+if [ "$(cat .venv/.deps_installed 2>/dev/null || true)" != "AudioCapture-2" ]; then
+    echo "Installing or updating dependencies..."
     pip install --upgrade pip --quiet
     pip install -r requirements.txt --quiet
-    touch .venv/.deps_installed
+    echo "AudioCapture-2" > .venv/.deps_installed
 fi
 
 exec python audiocapture_app.py "$@"

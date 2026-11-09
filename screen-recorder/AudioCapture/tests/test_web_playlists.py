@@ -1,4 +1,4 @@
-"""Stored playlists keep useful URL parameters and strip auth material."""
+"""Stored playlists discard all query/fragment data to avoid persisting tokens."""
 import sys
 from pathlib import Path
 import tempfile
@@ -9,12 +9,12 @@ from audiocapture.web_playlists import (
 )
 
 
-def test_auth_query_and_fragment_are_removed_but_youtube_params_stay():
-    url = "https://www.youtube.com/watch?v=abc&list=xyz&access_token=secret&X-Goog-Signature=private#t=12&session_id=secret"
+def test_all_query_and_fragment_data_are_removed():
+    url = "https://www.youtube.com/watch?v=abc&list=xyz&access_token=secret#t=12&session_id=secret"
     safe, removed = sanitize_url_for_storage(url)
-    assert "access_token" not in safe and "secret" not in safe and "signature" not in safe.lower()
-    assert "v=abc" in safe and "list=xyz" in safe and "t=12" in safe
-    assert removed == 3
+    assert safe == "https://www.youtube.com/watch"
+    assert "secret" not in safe and "abc" not in safe
+    assert removed == 1
 
 
 def test_named_playlist_round_trip_is_sanitized():

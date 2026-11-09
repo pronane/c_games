@@ -9,10 +9,11 @@ datas, binaries, hiddenimports = [], [], [
     "audiocapture", "audiocapture.audio", "audiocapture.recorder",
     "audiocapture.ui", "audiocapture.waveform", "audiocapture.dialogs",
     "audiocapture.settings", "audiocapture.url_source",
-    "audiocapture.web_playlists", "audiocapture.editing", "soundcard",
+    "audiocapture.web_playlists", "audiocapture.editing",
+    "audiocapture.ffmpeg_support", "soundcard", "imageio_ffmpeg",
 ]
 # Pull package data and optional/native imports needed by the packaged runtime.
-for package in ("customtkinter", "soundfile", "soundcard"):
+for package in ("customtkinter", "soundfile", "soundcard", "imageio_ffmpeg"):
     d, b, h = collect_all(package)
     datas += d
     binaries += b

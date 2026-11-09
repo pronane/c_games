@@ -28,12 +28,14 @@ if not exist ".venv\" (
 
 call ".venv\Scripts\activate.bat"
 
-if not exist ".venv\.deps_installed" (
-    echo Installing dependencies...
+set "DEPS_VERSION="
+if exist ".venv\.deps_installed" set /p DEPS_VERSION=<".venv\.deps_installed"
+if not "%DEPS_VERSION%"=="AudioCapture-2" (
+    echo Installing or updating dependencies...
     python -m pip install --upgrade pip --quiet
     python -m pip install -r requirements.txt --quiet || goto :error
     if exist "requirements-windows.txt" python -m pip install -r requirements-windows.txt --quiet
-    echo ok > ".venv\.deps_installed"
+    echo AudioCapture-2 > ".venv\.deps_installed"
 )
 
 start "" pythonw audiocapture_app.py 2>nul

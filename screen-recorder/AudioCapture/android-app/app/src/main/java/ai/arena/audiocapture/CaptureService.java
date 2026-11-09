@@ -39,6 +39,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class CaptureService extends Service {
     public static final String ACTION_START = "ai.arena.audiocapture.START";
     public static final String ACTION_STOP = "ai.arena.audiocapture.STOP";
+    public static final String ACTION_URL_ADVANCED = "ai.arena.audiocapture.URL_ADVANCED";
+    public static final String ACTION_AUTO_NEXT = "ai.arena.audiocapture.AUTO_NEXT";
+    public static final String ACTION_LEVEL = "ai.arena.audiocapture.LEVEL";
+    public static final String EXTRA_AUTO_NEXT = "autoNext";
+    public static final String EXTRA_GRACE_SECONDS = "graceSeconds";
+    public static final String EXTRA_SILENCE_SECONDS = "silenceSeconds";
+    public static final String EXTRA_THRESHOLD_DB = "thresholdDb";
     public static final String EXTRA_RESULT_CODE = "resultCode";
     public static final String EXTRA_RESULT_DATA = "resultData";
     private static final String CHANNEL = "audio_capture";
@@ -49,10 +56,18 @@ public class CaptureService extends Service {
     private MediaProjection projection;
     private Thread worker;
     private File tempFile;
+    private volatile boolean autoNextEnabled;
+    private volatile boolean waitingForUrlAdvance;
+    private volatile long graceMs=150000, silenceMs=5000, firstSoundAt, quietStartedAt, recordingStartedAt;
+    private volatile double thresholdRms=Math.pow(10,-54.0/20.0);
+    private volatile long quietStartFrame;
+    private long framesWritten;
+    private final java.util.List<long[]> silenceCuts = new java.util.ArrayList<>();
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) { stopSelf(); return START_NOT_STICKY; }
         if (ACTION_STOP.equals(intent.getAction())) { stopCapture(null); return START_NOT_STICKY; }
+        if (ACTION_URL_ADVANCED.equals(intent.getAction())) { waitingForUrlAdvance=false; firstSoundAt=0; quietStartedAt=0; return START_NOT_STICKY; }
         if (ACTION_START.equals(intent.getAction())) beginCapture(intent);
         return START_NOT_STICKY;
     }
@@ -64,6 +79,11 @@ public class CaptureService extends Service {
             startForeground(NOTIFICATION_ID, notification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
         else startForeground(NOTIFICATION_ID, notification());
         try {
+            autoNextEnabled=intent.getBooleanExtra(EXTRA_AUTO_NEXT,false);
+            graceMs=(long)(intent.getDoubleExtra(EXTRA_GRACE_SECONDS,150)*1000);
+            silenceMs=(long)(intent.getDoubleExtra(EXTRA_SILENCE_SECONDS,5)*1000);
+            thresholdRms=Math.pow(10,intent.getDoubleExtra(EXTRA_THRESHOLD_DB,-54)/20.0);
+            framesWritten=0; firstSoundAt=0; quietStartedAt=0; waitingForUrlAdvance=false; silenceCuts.clear();
             int resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0);
             Intent resultData = intent.getParcelableExtra(EXTRA_RESULT_DATA);
             MediaProjectionManager manager = (MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
@@ -88,6 +108,7 @@ public class CaptureService extends Service {
             if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) throw new IllegalStateException("Audio capture could not be initialized on this device.");
             tempFile = new File(getCacheDir(), "capture-" + System.currentTimeMillis() + ".wavpart");
             audioRecord.startRecording();
+            recordingStartedAt=android.os.SystemClock.elapsedRealtime();
             active.set(true);
             worker = new Thread(this::recordLoop, "playback-audio-capture");
             worker.start();
@@ -101,14 +122,25 @@ public class CaptureService extends Service {
     private void recordLoop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
         short[] samples = new short[8192];
+        long lastLevelBroadcast=0;
         try (FileOutputStream out = new FileOutputStream(tempFile)) {
             out.write(new byte[44]);
             while (active.get()) {
                 int n = audioRecord.read(samples, 0, samples.length, AudioRecord.READ_BLOCKING);
                 if (n > 0) {
+                    long now=android.os.SystemClock.elapsedRealtime();
+                    long frameStart=framesWritten;
+                    long frames=n/CHANNELS;
+                    double sum=0; for(int i=0;i<n;i++){double v=samples[i]/32768.0;sum+=v*v;}
+                    double rms=Math.sqrt(sum/Math.max(1,n));
+                    if(now-lastLevelBroadcast>=300){Intent level=new Intent(ACTION_LEVEL).setPackage(getPackageName()).putExtra("rms",rms);sendBroadcast(level);lastLevelBroadcast=now;}
+                    if(autoNextEnabled&&!waitingForUrlAdvance){
+                        if(rms>=thresholdRms){if(firstSoundAt==0)firstSoundAt=now;quietStartedAt=0;}
+                        else {long anchor=firstSoundAt==0?recordingStartedAt:firstSoundAt;if(now-anchor>=graceMs){if(quietStartedAt==0){quietStartedAt=now;quietStartFrame=frameStart;}if(now-quietStartedAt>=silenceMs){waitingForUrlAdvance=true;synchronized(silenceCuts){silenceCuts.add(new long[]{quietStartFrame,frameStart+frames});}sendAutoNextNotice();}}}
+                    }
                     ByteBuffer bytes = ByteBuffer.allocate(n * 2).order(ByteOrder.LITTLE_ENDIAN);
                     for (int i = 0; i < n; i++) bytes.putShort(samples[i]);
-                    out.write(bytes.array());
+                    out.write(bytes.array()); framesWritten+=frames;
                 } else if (n < 0) {
                     Log.w("AudioCapture", "AudioRecord read returned " + n);
                     break;
@@ -143,7 +175,9 @@ public class CaptureService extends Service {
     }
 
     private String publishWav(File file) throws Exception {
-        try (RandomAccessFile wav = new RandomAccessFile(file, "rw")) {
+        File source=file;
+        if(!silenceCuts.isEmpty()) source=makeTrimmedWav(file);
+        try (RandomAccessFile wav = new RandomAccessFile(source, "rw")) {
             long length = wav.length();
             long dataBytes = length - 44;
             if (dataBytes <= 0) throw new IllegalStateException("No audio samples were captured.");
@@ -162,7 +196,7 @@ public class CaptureService extends Service {
         if (Build.VERSION.SDK_INT >= 29) values.put(MediaStore.Audio.Media.IS_PENDING, 1);
         android.net.Uri uri = getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
         if (uri == null) throw new IllegalStateException("Could not create a media-library entry.");
-        try (FileInputStream in = new FileInputStream(file); OutputStream out = getContentResolver().openOutputStream(uri, "w")) {
+        try (FileInputStream in = new FileInputStream(source); OutputStream out = getContentResolver().openOutputStream(uri, "w")) {
             if (out == null) throw new IllegalStateException("Could not open the output recording.");
             byte[] buffer = new byte[65536]; int n;
             while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
@@ -172,11 +206,31 @@ public class CaptureService extends Service {
             ContentValues done = new ContentValues(); done.put(MediaStore.Audio.Media.IS_PENDING, 0);
             getContentResolver().update(uri, done, null, null);
         }
+        if(source!=file) source.delete();
         return name;
+    }
+
+    private File makeTrimmedWav(File original) throws Exception {
+        java.util.List<long[]> cuts=new java.util.ArrayList<>();
+        synchronized(silenceCuts){for(long[] r:silenceCuts)cuts.add(r.clone());}
+        cuts.sort(java.util.Comparator.comparingLong(r->r[0]));
+        long totalFrames=Math.max(0,(original.length()-44)/(CHANNELS*2));
+        File outFile=new File(getCacheDir(),"capture-trim-"+System.currentTimeMillis()+".wavpart");
+        try(RandomAccessFile src=new RandomAccessFile(original,"r");FileOutputStream out=new FileOutputStream(outFile)){
+            out.write(new byte[44]);byte[] buf=new byte[65536];long pos=0;
+            for(long[] cut:cuts){long a=Math.max(pos,Math.min(totalFrames,cut[0])),b=Math.max(a,Math.min(totalFrames,cut[1]));if(a>pos)copyPcm(src,out,buf,pos,a-pos);pos=Math.max(pos,b);}
+            if(pos<totalFrames)copyPcm(src,out,buf,pos,totalFrames-pos);out.flush();
+        }
+        return outFile;
+    }
+    private static void copyPcm(RandomAccessFile src,FileOutputStream out,byte[] buffer,long startFrame,long frames)throws Exception{
+        src.seek(44+startFrame*CHANNELS*2);long left=frames*CHANNELS*2;while(left>0){int n=(int)Math.min(buffer.length,left);src.readFully(buffer,0,n);out.write(buffer,0,n);left-=n;}
     }
 
     private static void writeLe16(RandomAccessFile f, int x) throws Exception { f.write(x & 255); f.write((x >>> 8) & 255); }
     private static void writeLe32(RandomAccessFile f, int x) throws Exception { f.write(x & 255); f.write((x >>> 8) & 255); f.write((x >>> 16) & 255); f.write((x >>> 24) & 255); }
+
+    private void sendAutoNextNotice(){Intent i=new Intent(ACTION_AUTO_NEXT).setPackage(getPackageName()).putExtra("message","Configured silence detected. Tap notification to open the next URL.");sendBroadcast(i);}
 
     private void broadcast(String message) {
         Intent i = new Intent("ai.arena.audiocapture.SAVED").setPackage(getPackageName()).putExtra("message", message);

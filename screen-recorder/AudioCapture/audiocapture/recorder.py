@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import queue
+import subprocess
 import threading
 import time
 import wave
@@ -28,6 +29,7 @@ from typing import List, Optional
 import numpy as np
 
 from .audio import Device, downmix_block, ensure_com_initialized
+from .ffmpeg_support import decode_audio_to_temp_wav, ffmpeg_executable, pcm_encoder_command
 
 SAMPLE_WIDTH_FLOAT = 4  # bytes per float32 sample
 
@@ -381,15 +383,28 @@ class Recorder:
         return out
 
     def _writer_loop(self) -> None:
+        base, _ext = os.path.splitext(self.out_path)
         use_flac = self.container == "FLAC" and _sf is not None
-        base, ext = os.path.splitext(self.out_path)
+        encoder = "aac" if self.container.startswith("M4A") else "mp3" if self.container.startswith("MP3") else None
+        bitrate = 320
+        ffmpeg_proc = None
         if self.container == "FLAC" and _sf is None:
-            self.fallback_reason = (
-                "FLAC encoder (soundfile) not available - saved as WAV instead."
-            )
-            use_flac = False
-            ext = ".wav"
-            self.out_path = base + ext
+            self.fallback_reason = "FLAC encoder (soundfile) unavailable - saved as WAV instead."
+            self.container, self.out_path, use_flac = "WAV", base + ".wav", False
+        if self.container == "FLAC" and not use_flac:
+            self.fallback_reason = "FLAC encoder unavailable - saved as WAV instead."
+            self.container, self.out_path = "WAV", base + ".wav"
+        use_ffmpeg = encoder is not None
+        if use_ffmpeg:
+            try:
+                bitrate = 320
+                ffmpeg_proc = subprocess.Popen(
+                    pcm_encoder_command(self.out_path, self.samplerate, self.channels, encoder, bitrate),
+                    stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            except Exception as exc:
+                self.fallback_reason = f"{self.container} encoder unavailable ({exc}) - saved as WAV instead."
+                self.container, self.out_path, use_ffmpeg = "WAV", base + ".wav", False
+                ffmpeg_proc = None
         wav_handle = None
         sf_handle = None
         pending: List[np.ndarray] = []
@@ -398,23 +413,15 @@ class Recorder:
             if use_flac:
                 try:
                     sf_handle = _sf.SoundFile(
-                        self.out_path,
-                        mode="w",
-                        samplerate=self.samplerate,
-                        channels=self.channels,
-                        subtype="PCM_24",  # lossless 24-bit
-                        format="FLAC",
-                    )
+                        self.out_path, mode="w", samplerate=self.samplerate,
+                        channels=self.channels, subtype="PCM_24", format="FLAC")
                 except Exception as exc:
-                    self.fallback_reason = (
-                        f"FLAC unavailable ({exc}) - saved as WAV instead."
-                    )
+                    self.fallback_reason = f"FLAC unavailable ({exc}) - saved as WAV instead."
                     use_flac = False
                     sf_handle = None
-                    self.out_path = base + ".wav"
-            if not use_flac:
+                    self.container, self.out_path = "WAV", base + ".wav"
+            if not use_flac and not use_ffmpeg:
                 wav_handle = open(self.out_path, "wb")
-                # placeholder header; rewritten on stop (sizes unknown now)
                 write_wav_header(wav_handle, self.samplerate, self.channels, 0)
 
             while True:
@@ -433,6 +440,8 @@ class Recorder:
                     if len(data):
                         if use_flac and sf_handle is not None:
                             sf_handle.write(data)
+                        elif use_ffmpeg and ffmpeg_proc is not None and ffmpeg_proc.stdin:
+                            ffmpeg_proc.stdin.write(data.astype("<f4", copy=False).tobytes())
                         else:
                             wav_handle.write(data.astype("<f4", copy=False).tobytes())
                         frames_written += len(data)
@@ -451,6 +460,8 @@ class Recorder:
                 if len(data):
                     if use_flac and sf_handle is not None:
                         sf_handle.write(data)
+                    elif use_ffmpeg and ffmpeg_proc is not None and ffmpeg_proc.stdin:
+                        ffmpeg_proc.stdin.write(data.astype("<f4", copy=False).tobytes())
                     else:
                         wav_handle.write(data.astype("<f4", copy=False).tobytes())
                     frames_written += len(data)
@@ -469,14 +480,30 @@ class Recorder:
                     wav_handle.close()
             except Exception:
                 pass
-            if not use_flac:
+            if ffmpeg_proc is not None:
+                try:
+                    if ffmpeg_proc.stdin and not ffmpeg_proc.stdin.closed:
+                        ffmpeg_proc.stdin.close()
+                    err = ffmpeg_proc.stderr.read() if ffmpeg_proc.stderr else b""
+                    if ffmpeg_proc.stderr:
+                        ffmpeg_proc.stderr.close()
+                    code = ffmpeg_proc.wait(timeout=30)
+                    if code and self._writer_error is None:
+                        self._writer_error = RuntimeError(
+                            "FFmpeg recording encoder failed: " + err.decode("utf-8", "replace")[-1200:])
+                except Exception as exc:
+                    if self._writer_error is None:
+                        self._writer_error = exc
+            if not use_flac and not use_ffmpeg:
                 fix_wav_header(self.out_path)
             if frames_written == 0 and not self._writer_error:
-                # valid (silent) file is friendlier than a 0-byte file
-                try:
-                    write_silent_wav(self.out_path, self.samplerate, self.channels)
-                except Exception:
-                    pass
+                if use_ffmpeg:
+                    self._writer_error = RuntimeError("No audio samples were captured by the encoder.")
+                else:
+                    try:
+                        write_silent_wav(self.out_path, self.samplerate, self.channels)
+                    except Exception:
+                        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -497,6 +524,8 @@ class AudioFile:
 
     def __init__(self, path: str, stream_large: bool = True) -> None:
         self.path = path
+        self._decode_path = path
+        self._temporary_decode_path = None
         self.data = None
         self.samplerate = 0
         self.channels = 1
@@ -514,8 +543,8 @@ class AudioFile:
         if _sf is None:
             raise RuntimeError("streaming playback needs the 'soundfile' package")
         if self._sf_info is None:
-            self._sf_info = _sf.info(self.path)
-        with _sf.SoundFile(self.path) as fh:
+            self._sf_info = _sf.info(self._decode_path)
+        with _sf.SoundFile(self._decode_path) as fh:
             fh.seek(min(start_frame, len(fh)))
             block = fh.read(frames, dtype="float32", always_2d=True)
         return np.ascontiguousarray(block, dtype=np.float32)
@@ -539,7 +568,7 @@ class AudioFile:
         step = total / cols
         win = max(256, int(step))
         try:
-            with _sf.SoundFile(self.path) as fh:
+            with _sf.SoundFile(self._decode_path) as fh:
                 for i in range(cols):
                     fh.seek(min(int(i * step), max(0, total - 1)))
                     block = fh.read(win, dtype="float32", always_2d=True)
@@ -551,11 +580,20 @@ class AudioFile:
         return np.stack([mins, maxs], axis=1)
 
     def _load(self, stream_large: bool = True) -> None:
+        # FFmpeg handles common compressed containers and extracts audio-only
+        # from video inputs such as MP4; the source file is never modified.
+        if os.path.splitext(self.path)[1].lower() in {".mp3", ".m4a", ".mp4", ".m4v", ".mov", ".aac"}:
+            try:
+                self._temporary_decode_path = decode_audio_to_temp_wav(self.path)
+                self._decode_path = self._temporary_decode_path
+            except Exception as exc:
+                self.error = str(exc)
+                return
         # Decide up-front whether to stream, and remember the metadata
         if _sf is not None and stream_large:
             try:
-                info = _sf.info(self.path)
-                size = os.path.getsize(self.path)
+                info = _sf.info(self._decode_path)
+                size = os.path.getsize(self._decode_path)
                 if size > IN_MEMORY_LIMIT:
                     self.samplerate = int(info.samplerate)
                     self.channels = int(info.channels)
@@ -567,7 +605,7 @@ class AudioFile:
                 pass
         if _sf is not None:
             try:
-                data, sr = _sf.read(self.path, dtype="float32", always_2d=True)
+                data, sr = _sf.read(self._decode_path, dtype="float32", always_2d=True)
                 self.data = np.ascontiguousarray(data, dtype=np.float32)
                 self.samplerate = int(sr)
                 self.channels = int(self.data.shape[1])
@@ -577,7 +615,7 @@ class AudioFile:
                 self.error = str(exc)
         # wave-module fallback (16/24/32-bit PCM or float)
         try:
-            with wave.open(self.path, "rb") as wf:
+            with wave.open(self._decode_path, "rb") as wf:
                 self.channels = wf.getnchannels()
                 self.samplerate = wf.getframerate()
                 width = wf.getsampwidth()
@@ -601,6 +639,19 @@ class AudioFile:
         except Exception as exc:
             if not self.error:
                 self.error = str(exc)
+
+    def close(self) -> None:
+        """Remove any temporary decoded audio once no longer needed."""
+        temp_path = self._temporary_decode_path
+        self._temporary_decode_path = None
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+    def __del__(self):
+        self.close()
 
 
 class Player:
