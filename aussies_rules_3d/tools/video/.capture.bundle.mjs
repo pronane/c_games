@@ -1120,10 +1120,11 @@ function homePosition(p, ballX, ballZ, phase) {
   let z = anchorZ + shape.fz * 52 * (p.id % 2 === 0 ? 1 : -1);
   if (phase === "centreBallUp") {
     const gx = attackGoalX(p.team);
+    const dg = defendGoalX(p.team);
     if (shape.fx > 0.1) {
       x = gx - dir * (28 + shape.fx * 20);
     } else if (shape.fx < -0.1) {
-      x = -gx - dir * (28 - shape.fx * 20);
+      x = dg + dir * (28 + -shape.fx * 20);
     } else {
       x = dir * 14;
     }
@@ -1186,7 +1187,8 @@ function aiIntentFor(p, ctx) {
     return intent;
   }
   const loose = b.mode === "loose";
-  const chaseThis = loose && distBall < 26 || ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 14 || ctx.carrierId !== null && isNearestChaser(p, ctx);
+  const mayChase = teammatesCloserToBall(p, ctx) < 3;
+  const chaseThis = mayChase && (loose && distBall < 11 || ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 8 || ctx.carrierId !== null && isNearestChaser(p, ctx));
   if (chaseThis) {
     const lead = 0.28 * diff.reaction;
     intent.moveX = normalize(toBallX + b.vx * lead);
@@ -1219,6 +1221,16 @@ function aiIntentFor(p, ctx) {
     intent.moveZ = normalize(-p.z * 0.5);
   }
   return intent;
+}
+function teammatesCloserToBall(p, ctx) {
+  const b = ctx.state.ball;
+  const d = (b.x - p.x) ** 2 + (b.z - p.z) ** 2;
+  let n = 0;
+  for (const q of ctx.state.players) {
+    if (q.team !== p.team || q.id === p.id || q.onBench) continue;
+    if ((b.x - q.x) ** 2 + (b.z - q.z) ** 2 < d) n++;
+  }
+  return n;
 }
 function isPressured(p, ctx) {
   for (const q of ctx.state.players) {
@@ -1331,7 +1343,7 @@ function emptyHumanIntent() {
 }
 var CATCH_RADIUS = 1.45;
 var TACKLE_RADIUS = 1.55;
-var SEPARATION_RADIUS = 0.62;
+var SEPARATION_RADIUS = 0.72;
 var MatchSim = class {
   engine;
   difficulty;
@@ -1530,7 +1542,7 @@ var MatchSim = class {
         const dz = c.z - a.z;
         const d = Math.hypot(dx, dz);
         if (d > 1e-3 && d < SEPARATION_RADIUS * 2) {
-          const push = (SEPARATION_RADIUS * 2 - d) / 2;
+          const push = (SEPARATION_RADIUS * 2 - d) * 0.32;
           const nx = dx / d;
           const nz = dz / d;
           a.x -= nx * push;

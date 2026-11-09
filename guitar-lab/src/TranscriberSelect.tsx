@@ -24,19 +24,31 @@ function options() {
 
 const listeners = new Set<(t: TranscriberId) => void>();
 let shared: TranscriberId | null = null;
-function load(): TranscriberId {
+/** The browser's remembered choice, if any; otherwise the engine's default is used. */
+function remembered(): TranscriberId | null {
   try {
     const v = localStorage.getItem(KEY);
     if (v && (ORDER as string[]).includes(v)) return v as TranscriberId;
   } catch {}
-  return "basic_pitch";
+  return null;
 }
+const engineDefault = (o: Options): TranscriberId =>
+  (ORDER.find((id) => o[id]?.default && o[id]?.installed) ?? "basic_pitch") as TranscriberId;
 
 /** One choice for the whole studio, remembered in this browser. */
 export function useTranscriber(): [TranscriberId, (t: TranscriberId) => void] {
-  const [value, set] = useState<TranscriberId>(() => (shared ??= load()));
+  const [value, set] = useState<TranscriberId>(() => shared ?? remembered() ?? "basic_pitch");
   useEffect(() => {
     listeners.add(set);
+    // No choice made yet in this browser: take the engine's default once it answers.
+    if (!shared && !remembered())
+      options().then((o) => {
+        if (!shared) {
+          shared = engineDefault(o);
+          listeners.forEach((l) => l(shared!));
+        }
+      });
+    else shared ??= remembered();
     return () => void listeners.delete(set);
   }, []);
   return [
@@ -60,7 +72,7 @@ export default function TranscriberSelect({ disabled }: { disabled?: boolean }) 
       if (!live) return;
       setOpts(o);
       // A remembered choice that this engine can't run falls back to the default.
-      if (o[value] && !o[value]!.installed) setValue("basic_pitch");
+      if (o[value] && !o[value]!.installed) setValue(engineDefault(o));
     });
     return () => {
       live = false;
@@ -74,7 +86,7 @@ export default function TranscriberSelect({ disabled }: { disabled?: boolean }) 
         {ORDER.filter((id) => id === "basic_pitch" || opts[id]).map((id) => (
           <option key={id} value={id} disabled={id !== "basic_pitch" && !opts[id]?.installed}>
             {(opts[id]?.label ?? (id === "basic_pitch" ? "Basic Pitch" : id)) +
-              (id === "basic_pitch" ? " (default)" : opts[id]?.installed ? "" : " (not installed)")}
+              (opts[id]?.default ? " (default)" : id === "basic_pitch" || opts[id]?.installed ? "" : " (not installed)")}
           </option>
         ))}
       </select>

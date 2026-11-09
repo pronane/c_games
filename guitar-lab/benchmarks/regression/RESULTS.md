@@ -74,6 +74,124 @@ Library categories with the new decoder: solo acoustic 0.908 (was 0.888), clean 
 rendered 1.000. GAPS keeps its published decoder. The real reverb pair and the Metallica intro were
 not on this machine, so Basic Pitch stays the default until those are re-measured.
 
+## Metallica intro re-timed (beat-tracked tempo)
+
+The chart is written at 108 BPM, but the recording's intro plays at **99.4 BPM**. A beat tracker
+on the audio gives 99.4 BPM over 19 s and 41 s windows, starting from either a 100 or a 108 prior.
+Scored at 108, the reference drifted about 0.7 s by the end of the window, so every detector got
+about 0.1. Tab 0 is now placed by lining up the chart's onset times with the audio's onset envelope,
+which is pitch-blind and ignores every detector's notes. It lands 0.95 s before the old chroma anchor.
+An F1 search over stretch and offset picks the same map for all three detectors (stretch 1.085–1.09,
+offset −0.94 to −1.02), but it was only used as a cross-check.
+
+| backend | intro note F1 | precision | recall |
+| --- | --- | --- | --- |
+| Basic Pitch | 0.458 | 0.330 | 0.750 |
+| **Riley** | **0.873** | 1.000 | 0.775 |
+| GAPS | 0.845 | 0.968 | 0.750 |
+| YourMT3+ | 0.566 | 0.455 | 0.750 |
+
+Riley now wins every measured category. The real reverb/clear pair still can't be scored,
+because only the reverb take (take A) is on this machine. On take A, Riley's reverb check reads
+heavy reverb: it finds 6.7× more onsets at threshold 0.3 than at 0.65, so it decodes at 0.65.
+That is the same note explosion behind the old 0.16–0.18 result.
+
+## Whole song: tab-named parts on One (private recording + tab)
+
+`server/tab_align.py` lines the user's tab (5 guitar tracks, repeats played out) up with the full
+recording. Over the intro the map is 0.17 s out on average against the beat-tracked reference.
+Riley ran on the Demucs guitar stem, and its notes were scored against all five tab guitar parts.
+
+| stretch | Riley note F1 | precision | recall |
+| --- | --- | --- | --- |
+| 0:00–3:30 (clean / acoustic) | 0.654 | 0.80 | 0.55 |
+| 3:30–7:30 (heavy, distorted) | 0.027 | 0.16 | 0.01 |
+
+The heavy half fails on transcription, not alignment. A local ±2.5 s shift search per 30 s
+window never lifts F1 above 0.08. Riley writes 25–35 notes per 30 s there, where the tab has
+about 400. At onset threshold 0.3, which writes ~5× more notes, it still reaches only F1 0.10
+there. Basic Pitch scores 0.056 there and 0.511 in the first half.
+
+Riley's reverb check also fires on this dry studio stem. Distortion swells the onset count
+just as reverb does, so 74% of 20 s stretches decode at 0.65. A fixed 0.5 would score 0.695
+in the first half. The check now decides per 20 s stretch instead of per file, which leaves the
+simulated-room results unchanged. Telling reverb apart from distortion is still open.
+
+## Tempo: double/half-time check against the mix
+
+The breakdown takes its tempo from the drum and bass stems. On busy hi-hats that can lock onto
+double time: one user song read 184.6 BPM, while its published tempo is about 97. The
+drum-based estimate is now checked against the full mix. The candidates are both estimates
+and their halves and doubles, scored on how strongly the mix repeats at the beat and at the
+bar, with a gentle preference for 70–160 BPM.
+
+| song (user files, full breakdown path) | listed | before | now |
+| --- | --- | --- | --- |
+| slow grunge ballad | ~97 | 184.6 | **94.9** |
+| power ballad | 140 | 136.0 | 143.6 |
+| hard-rock ballad | ~91 | 90.3 | 90.3 |
+| post-grunge single | 146 (one site) | 129.2 | 129.2 (not an octave error; unresolved) |
+
+GuitarSet, 360 clips with the tempo in each file name (mix only): correct within 4% went from
+62.2% to 65.0%. Double-time errors fell from 7.5% to 2.8%, and half-time errors rose from 3.1%
+to 5.3%. The rest are mostly 3:4 / 4:3 confusions in funk and jazz comping.
+
+## Reverb vs distortion: a negative result
+
+Note tails were measured in dB/s at each note's own pitch over the 300 ms after it ends:
+
+- Clean clips: dry −50 to −65, simulated hall −9 to −17, very wet −3 to −5.
+- One's dry studio guitar stem: −13. Distortion sustains like a hall.
+- The heavy half: −7.
+- The user's reverb take: −9.
+
+So tail decay cannot separate them either, and neither can the onset swell or the tone
+estimate. Riley keeps the per-20 s onset-swell rule. Its known cost is the dry first half of
+One: 0.654 against 0.695 with a fixed 0.5.
+
+## Heavy sections: not a separation leak
+
+In One's heavy half the Demucs 'other' stem is silent (RMS 0.000 against 0.191 for guitar),
+so the guitar is not leaking into 'other'. Riley's note F1 against the aligned tab:
+
+| input | onset | 0–3:30 | 3:30–7:30 |
+| --- | --- | --- | --- |
+| guitar stem | 0.5 | 0.695 | 0.082 |
+| guitar + other | 0.5 | 0.692 | 0.083 |
+| guitar + other | 0.3 | 0.660 | 0.105 |
+| full mix (no separation) | 0.5 | 0.604 | 0.027 |
+
+Separation is doing its job: it beats the raw mix in both halves. The failure is
+transcription of dense, double-tracked high-gain playing (the chart's tempo jumps to 216 BPM
+there). No released transcriber here was trained on that. The realistic fix is training data:
+amp-rendered guitar from tabs with known notes, which the app can already render, used to
+fine-tune Riley.
+
+## Fine-tuning Riley on amp-rendered guitar: not adopted
+
+The model was fine-tuned for 330 steps on 1,441 ten-second segments:
+- GuitarSet players 00–04, re-amped through random crunch and high-gain chains.
+- Original double-tracked riffs, rendered with a plucked-string model.
+- The front end was frozen; 14.1M of 24.7M parameters were trained.
+
+Held-out loss on the same kind of data fell from 0.0445 to 0.0293. On One, it got worse:
+
+| Checkpoint | Clean half (0.5) | Heavy half (0.5) | Heavy, best threshold |
+|---|---|---|---|
+| Released | .695 | .082 | .104 (0.2) |
+| Step 110 | .673 | .063 | |
+| Step 220 | .663 | .040 | |
+| Step 330 | .662 | .054 | .101 (0.1) |
+
+The heavy half of One (aggregate, released model, threshold 0.5):
+- **Note counts:** 1,273 notes heard against 4,762 in the tab.
+- **Timing:** onset F1 is .45 when pitch is ignored, so the notes are found roughly in time.
+- **Pitch:** pitch-class F1 is .22 and note F1 is .08. Pitch is where it fails: the heard median is MIDI 55, the tab's is 47, so the model is hearing distortion overtones and octaves.
+
+Fine-tuning made the model more cautious (504 notes heard) without fixing pitch. The synthetic amp chains and plucked-string riffs don't transfer to a real heavy record. At every threshold, no checkpoint beats the released model on the heavy half, and every checkpoint is worse on the clean half, so the released weights stay.
+
+The tools (`training/`) and the `FRETWORK_RILEY_CHECKPOINT` override stay for later attempts with real multitrack recordings that come with tabs.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.

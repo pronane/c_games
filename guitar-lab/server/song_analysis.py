@@ -149,15 +149,43 @@ def chroma_similarity(a, b, sr):
 
 # ---------------------------------------------------------------- tempo, bars, key, tuning
 
-def beat_grid(rhythm_audio, sr, bass_audio=None, harmonic_audio=None):
+def tempo_score(env, sr, bpm, hop=512):
+    """How well a tempo explains an onset envelope: autocorrelation at the beat and at the
+    bar (4 beats), with a gentle preference for 70-160 BPM (log-normal around 110)."""
+    lag = 60 / bpm * sr / hop
+    e = env - env.mean()
+    ac = np.correlate(e, e, 'full')[len(e) - 1:]
+    ac /= ac[0] + 1e-9
+    at = lambda L: float(ac[int(round(L))]) if L < len(ac) - 1 else 0.0
+    return at(lag) + 0.6 * at(4 * lag) - 0.075 * (np.log2(bpm / 110) / 0.5) ** 2
+
+
+def choose_tempo(candidates, mix, sr):
+    """Pick among tempo estimates (e.g. from the drum stem and from the full mix) by how well
+    each explains the whole mix. Drums alone often lock onto the hi-hat and report double time;
+    the mix (chords, bass, vocals) shows the real beat and bar."""
+    import librosa
+    env = librosa.onset.onset_strength(y=mono(mix), sr=sr, hop_length=512, aggregate=np.median)
+    pool = sorted({round(c, 1) for c in candidates for c in (c, c / 2, c * 2) if 55 <= c <= 210})
+    return max(pool, key=lambda b: tempo_score(env, sr, b))
+
+
+def beat_grid(rhythm_audio, sr, bass_audio=None, harmonic_audio=None, mix_audio=None):
     """Beat times plus a 4/4 bar grid.
 
     The downbeat is the beat phase where the harmony changes most (chords usually change on
     beat one), helped by bass attacks. Bass or kick alone is ambiguous when they hit every beat.
+    With `mix_audio`, the tempo is checked against the full mix to catch double/half time.
     """
     import librosa
     y = mono(rhythm_audio)
-    tempo, beats = librosa.beat.beat_track(y=y, sr=sr, units='time', trim=False)
+    start = None
+    if mix_audio is not None:
+        first = float(np.atleast_1d(librosa.beat.beat_track(y=y, sr=sr, trim=False)[0])[0])
+        alone = float(np.atleast_1d(librosa.beat.beat_track(y=mono(mix_audio), sr=sr, trim=False)[0])[0])
+        start = choose_tempo([t for t in (first, alone) if t], mix_audio, sr) if first or alone else None
+    tempo, beats = librosa.beat.beat_track(y=y, sr=sr, units='time', trim=False,
+                                           **({'bpm': start} if start else {}))
     tempo = float(np.atleast_1d(tempo)[0])
     beats = np.asarray(beats, dtype=float)
     if len(beats) < 8 or not tempo:
@@ -1430,3 +1458,14 @@ def tone_estimate(audio, sr):
               'uncertain': 'Not sure whether this guitar is clean or distorted.'}[tone]
     return {'tone': tone, 'brightness': round(bright, 3), 'loudness_spread_db': round(spread, 1),
             'crest_factor': round(crest, 2), 'detail': detail}
+
+
+def solo_recording(found: list, stem_name: str) -> bool:
+    """True when the separator did not put the instrument in its own stem but nothing else
+    plays either: a solo take (often acoustic or wet with reverb) that Demucs filed under
+    'other'. Then the whole recording is the part. A real band keeps its separated stem."""
+    verdict = {r['stem']: r['verdict'] for r in found}
+    if verdict.get(stem_name) == 'present':
+        return False
+    band = [s for s, v in verdict.items() if v == 'present' and s not in ('other', 'piano', stem_name)]
+    return not band and any(v == 'present' for s, v in verdict.items() if s in ('other', 'piano'))

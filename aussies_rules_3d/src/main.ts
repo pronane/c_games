@@ -82,6 +82,8 @@ class Game {
   private menuNavDir = 0;
   private menuConfirmDown = false;
   private menuBackDown = false;
+  private showMarkers = true;
+  private hintTimer = 0;
 
   async boot(): Promise<void> {
     this.menus.setLoading(0.1, 'Building the Melbourne arena…');
@@ -94,7 +96,8 @@ class Game {
     this.menus.setLoading(0.75, 'Inflating the Sherrin…');
     const ballGltf = await loader.loadAsync('./assets/ball.glb');
     this.ballMesh = ballGltf.scene;
-    this.ballMesh.scale.setScalar(1.05);
+    // AFL Sherrin is ~27 cm long — the raw GLB is modelled ~1.45 m, scale it down.
+    this.ballMesh.scale.setScalar(0.19);
     this.world.scene.add(this.ballMesh);
 
     this.menus.setLoading(0.95, 'Ready.');
@@ -187,7 +190,7 @@ class Game {
     this.hud.setHint(
       this.input.isTouchDevice
         ? 'Left: stick · Right: KICK / HAND / TACKLE'
-        : 'WASD move · Space kick · E handball · F tackle · Shift sprint · Q switch · Esc pause'
+        : 'WASD move · Space kick · E handpass · F tackle · Q switch · C camera · V markers · Esc pause'
     );
     this.menus.hideAll();
     this.phase = 'playing';
@@ -336,6 +339,13 @@ class Game {
       this.pause();
       return;
     }
+    if (frame.camera) {
+      this.hud.callout(`CAMERA: ${this.broadcast.cycleView()}`, '', '#cfe3ff');
+    }
+    if (frame.toggleMarkers) {
+      this.showMarkers = !this.showMarkers;
+      this.hud.callout(this.showMarkers ? 'PLAYER MARKERS: ON' : 'PLAYER MARKERS: OFF', '', '#cfe3ff');
+    }
 
     const intent = toHumanIntent(frame);
     const simDt = 1 / 60;
@@ -367,7 +377,7 @@ class Game {
     }
 
     const controlled = sim.controlled();
-    syncPlayerViews(this.views, sim.state, dt, this.celebrationTimer > 0);
+    syncPlayerViews(this.views, sim.state, dt, this.celebrationTimer > 0, sim.controlledId, this.showMarkers);
 
     // ball mesh
     const b = sim.state.ball;
@@ -386,6 +396,11 @@ class Game {
     this.world.update(dt, b);
 
     // HUD
+    this.hintTimer -= dt;
+    if (this.hintTimer <= 0) {
+      this.hintTimer = 0.6;
+      if (!this.input.isTouchDevice) this.hud.setHint(this.contextHint());
+    }
     this.hud.update(dt, sim.state, this.teams.home.name, this.teams.away.name);
     if (controlled) {
       this.hud.setPlayer(controlled.number, controlled.name);
@@ -527,6 +542,31 @@ class Game {
         `${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
       );
     }
+  }
+
+  /** A one-line, always-relevant coaching hint for what's happening right now. */
+  private contextHint(): string {
+    const sim = this.sim!;
+    const b = sim.state.ball;
+    const phase = sim.state.phase;
+    const hasBall = b.mode === 'held' && b.holderId === sim.controlledId;
+
+    if (phase === 'freeKick' && sim.state.freeKick?.isSetShot) {
+      return 'SET SHOT — hold SPACE to charge, Z / X (or right stick) to bend it, release to kick';
+    }
+    if (phase === 'freeKick') {
+      return 'FREE KICK — hold SPACE, release to kick · E to handball to a leading teammate';
+    }
+    if (phase === 'kickIn') {
+      return 'KICK-IN — hold SPACE to charge, release to clear it downfield';
+    }
+    if (phase === 'centreBallUp') {
+      return 'BALL-UP — win the tap: F to ruck / contest, Q to switch to support';
+    }
+    if (hasBall) {
+      return 'YOU HAVE IT — SPACE kick (hold for power) · E handball · B bounce · Shift sprint';
+    }
+    return 'DEFENDING — F tackle · Q switch to nearest · C camera · V markers';
   }
 
   private onResize(): void {

@@ -24,7 +24,8 @@ from benchmarks.regression import catalog, material
 from benchmarks.regression.metrics import (
     chroma_time_map, score_notes, src_span_for_dst_window, warp_times,
 )
-from benchmarks.regression.tab_notes import INTRO_ORIGIN_S, INTRO_TAB_END_S, intro_reference
+from benchmarks.regression.tab_notes import (INTRO_AUDIO_END_S, INTRO_ORIGIN_S, INTRO_STRETCH, INTRO_TAB_END_S,
+                                             intro_reference)
 
 REFERENCE = catalog.ROOT / 'reference'
 MIDI_MIN, MIDI_MAX = 36, 88
@@ -266,7 +267,7 @@ def score_metallica(backend):
     ref = intro_reference(paths['tab'])
     # 50 ms of audio past the window so an onset on the last note can still match.
     # Estimates after the window are dropped; they are not extra credit.
-    end = INTRO_ORIGIN_S + INTRO_TAB_END_S
+    end = INTRO_AUDIO_END_S
     window = (INTRO_ORIGIN_S, end + 0.05)
     metrics = _score_file(backend, paths['audio'], ref, window=window, score_end=end)
     # Estimates are shifted onto the file clock by _score_file. Drop anything
@@ -277,9 +278,10 @@ def score_metallica(backend):
         'status': 'ok',
         'origin_s': INTRO_ORIGIN_S,
         'tab_window_s': [0.0, INTRO_TAB_END_S],
-        'audio_window_s': [INTRO_ORIGIN_S, INTRO_ORIGIN_S + INTRO_TAB_END_S],
+        'audio_window_s': [INTRO_ORIGIN_S, round(INTRO_AUDIO_END_S, 3)],
+        'tempo_stretch': round(INTRO_STRETCH, 4),
         'separation': 'not applied; the intro is the clean guitar before the band',
-        'alignment': 'frozen chroma anchor, not an F1-maximising map',
+        'alignment': 'beat-tracked tempo (99.4 BPM) and onset-envelope origin; no transcription F1 used',
         **metrics,
     })]
 
@@ -390,8 +392,8 @@ def write_report(payload, path: Path):
         '',
         'Basic Pitch is the in-app default. Other backends are opt-in '
         '(`FRETWORK_TRANSCRIBER`) unless the decision below says otherwise.',
-        'Charts are not an input to any model. The Metallica intro uses the frozen '
-        f'alignment (tab 0 = {INTRO_ORIGIN_S} s), not a whole-song F1 search.',
+        'Charts are not an input to any model. The Metallica intro is timed at the recording\'s '
+        f'beat-tracked tempo (tab 0 = {INTRO_ORIGIN_S} s, stretch {INTRO_STRETCH:.4f}), not a whole-song F1 search.',
         '',
         '## Coverage',
         '',

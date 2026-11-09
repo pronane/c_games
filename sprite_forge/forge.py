@@ -503,6 +503,9 @@ def main(argv=None):
         else:
             print(json.dumps(C.stats(), indent=1))
         return 0
+    if argv and argv[0] == "capture":       # v11: turnaround video / photo -> rigged, textured 3D character
+        from sforge import capture
+        return capture.main(argv[1:])
     if argv and argv[0] == "human":         # v7: MakeHuman mode (CC0 assets, own code) -> library rig
         from sforge import human
         return human.main(argv[1:])
@@ -683,6 +686,7 @@ v9:
     sub.add_parser("gui", help="open the visual studio")
     sub.add_parser("library", help="user library of FBX/GLB rigs, animations, kits + .sfpack packs (forge.py library -h)")
     sub.add_parser("retarget", help="apply clips from one library rig / FBX / GLB to another (forge.py retarget -h)")
+    sub.add_parser("capture", help="v11: a turnaround video (or one photo) of a person -> rigged, textured 3D character: GLB / FBX / OBJ with skeleton and clips (forge.py capture -h)")
     sub.add_parser("human", help="v7: MakeHuman mode - parametric human (gender/age/muscle/weight/height/proportions) from the CC0 MakeHuman assets -> library rig (forge.py human -h)")
     sub.add_parser("look", help="v10.2: realistic MakeHuman character from appearance keys (muscles, hair, beard, brows, lips, nose, eyes...) -> preview / GLB / sprites (forge.py look -h)")
     sub.add_parser("autoskin", help="v7 EXPERIMENTAL: skin your own static mesh (OBJ/GLB/FBX) to a library skeleton by bone distance (forge.py autoskin -h)")

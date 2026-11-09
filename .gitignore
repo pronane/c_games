@@ -21,5 +21,7 @@ sprite_forge/tools/models/
 sprite_forge/library/refs/
 # MakeHuman CC0 assets (forge.py human --setup [--from-git])
 sprite_forge/assets/makehuman/
+sprite_forge/models/
+sprite_forge/captures/
 # Local guitar-lab benchmark audio that cannot be redistributed
 guitar-lab/benchmarks/regression/data/private/

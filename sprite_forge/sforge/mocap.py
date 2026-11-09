@@ -366,7 +366,9 @@ def analyse(d, move, loop, n_frames, facing="auto", log=print, period=None, swap
     F = (xs - xs.mean(axis=0)) / max(1.0, float(xs.std()))
     Dm = dist_matrix(F.reshape(N, -1)) if N <= 600 else None
     sel = {}
-    if loop:
+    if loop and Dm is None:                       # very long clip: no self-similarity matrix (memory) - whole clip
+        p, pin = float(N - 1), {"note": "clip over 600 frames - no repeat search; trim it with VIDEO@START-END"}
+    elif loop:
         p, pin = find_period(Dm, fps, loco=False, override=period)
         if not p:
             p = float(N - 1); pin = {"note": "no repeat found - using the whole clip"}

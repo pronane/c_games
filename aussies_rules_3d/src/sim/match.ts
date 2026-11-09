@@ -42,7 +42,9 @@ export function emptyHumanIntent(): HumanIntent {
 
 const CATCH_RADIUS = 1.45;
 const TACKLE_RADIUS = 1.55;
-const SEPARATION_RADIUS = 0.62;
+// Keep bodies from stacking, but stay below the tackle range (1.55 m) so the
+// contest resolves — and resolve softly so a standing player isn't bulldozed.
+const SEPARATION_RADIUS = 0.72;
 
 export class MatchSim {
   engine: RulesEngine;
@@ -291,7 +293,7 @@ export class MatchSim {
         const dz = c.z - a.z;
         const d = Math.hypot(dx, dz);
         if (d > 0.001 && d < SEPARATION_RADIUS * 2) {
-          const push = (SEPARATION_RADIUS * 2 - d) / 2;
+          const push = (SEPARATION_RADIUS * 2 - d) * 0.32;
           const nx = dx / d;
           const nz = dz / d;
           a.x -= nx * push;
