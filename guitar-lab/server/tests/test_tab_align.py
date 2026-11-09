@@ -93,3 +93,30 @@ def test_tab_parts_endpoint_names_the_song_parts(tmp_path):
     bad = client.post('/api/songs/tab-song/tab-parts', headers={'X-Fretwork-Client': 'studio'}, json={'tracks': [{'name': 'x', 'notes': []}]})
     assert bad.status_code == 422
     del SONGS[song.id]
+
+
+def test_a_clip_of_the_song_in_another_tuning_lines_up_with_its_part_of_the_tab():
+    tracks = _tracks()
+    notes = [n for t in tracks for n in t['notes']]
+    # Recording: only tab 14–40 s, 5% slower, played a half step lower than the chart is written.
+    warp = lambda t: 1.05 * (t - 14.0)
+    inside = [dict(n, midi=n['midi'] - 1) for n in notes if 14.0 <= n['time'] < 40.0]
+    audio = _render(inside, warp, warp(40.0) + 0.5)
+    m = ta.refine(ta.align(notes, audio, SR, transposes=(0, -1, 1, -2, 2)), notes, audio, SR)
+    assert m['transpose'] == -1
+    err = [abs(float(ta.to_audio_time(m, t)) - warp(t)) for t in np.arange(16, 39, 2)]
+    assert np.median(err) < 0.08 and max(err) < 0.3, err
+    placed = ta.place_tracks(tracks, m)
+    rhythm = placed[0]['notes']
+    # Notes outside the clip are left out, not piled up at its ends; pitches are the ones that sound.
+    assert 0.4 * len(tracks[0]['notes']) < len(rhythm) < 0.7 * len(tracks[0]['notes'])
+    assert min(n['tab_time'] for n in rhythm) > 12 and max(n['tab_time'] for n in rhythm) < 42
+    assert {n['midi'] for n in rhythm} == {n['midi'] - 1 for n in tracks[0]['notes']}
+
+
+def test_a_chart_in_the_right_tuning_is_not_transposed():
+    tracks = _tracks()
+    notes = [n for t in tracks for n in t['notes']]
+    warp = lambda t: 2.0 + t
+    audio = _render(notes, warp, warp(48) + 2)
+    assert ta.align(notes, audio, SR, transposes=(0, -1, 1, -2, 2))['transpose'] == 0

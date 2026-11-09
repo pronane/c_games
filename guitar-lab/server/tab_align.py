@@ -48,31 +48,61 @@ def audio_chroma(audio: np.ndarray, sr: int) -> np.ndarray:
     return librosa.feature.chroma_cens(y=y, sr=SR, hop_length=HOP)
 
 
-def linear_fit(X: np.ndarray, Y: np.ndarray, ratios=np.arange(0.5, 2.01, 0.01), max_offset_s: float = 90.0):
+RATIO_PRIOR = 0.03
+
+
+def linear_fit(X: np.ndarray, Y: np.ndarray, ratios=np.arange(0.5, 2.01, 0.01), max_offset_s: float = 90.0,
+               min_overlap: float = 0.6):
     """Coarse map audio = offset + ratio * tab by chroma correlation (unit-norm frames).
-    Ratios down to 0.5 and up to 2 cover a chart written at double or half the record's tempo."""
+    Ratios down to 0.5 and up to 2 cover a chart written at double or half the record's tempo.
+
+    The recording may be the whole song or only part of it (a clip, or a take that starts at
+    the solo): the tab may start up to max_offset_s into the recording, or the recording may
+    start anywhere inside the tab, as long as min_overlap of the shorter of the two is covered.
+    Every offset is scored at once per ratio with an FFT cross-correlation. A short clip of a
+    repeating riff fits nearly as well at double speed, so ties go to the tempo nearest the
+    chart's (RATIO_PRIOR per octave away)."""
+    from scipy.signal import fftconvolve
     best = (-1.0, 1.0, 0.0)
     span = int(max_offset_s * FPS)
+    ny = Y.shape[1]
+    Yr = Y[:, ::-1]
     for ratio in ratios:
-        idx = (np.arange(X.shape[1]) * ratio).astype(int)
-        for off in range(-span, span + 1):
-            j = idx + off
-            ok = (j >= 0) & (j < Y.shape[1])
-            if ok.sum() < 0.6 * len(j):
-                continue
-            score = float((X[:, ok] * Y[:, j[ok]]).sum() / ok.sum())
-            if score > best[0]:
-                best = (score, float(ratio), off / FPS)
-    return {'similarity': best[0], 'ratio': best[1], 'offset': best[2]}
+        nx = int(X.shape[1] * ratio)
+        if nx < 8:
+            continue
+        Xr = X[:, np.minimum((np.arange(nx) / ratio).astype(int), X.shape[1] - 1)]
+        # corr[k] = sum over frames of Xr[:, i] . Y[:, i + off], with off = k - (nx - 1)
+        corr = sum(fftconvolve(Yr[c], Xr[c], mode='full') for c in range(X.shape[0]))[::-1]
+        offs = np.arange(-(nx - 1), ny)
+        overlap = np.minimum(nx, ny - offs) - np.maximum(0, -offs)
+        ok = (overlap >= min_overlap * min(nx, ny)) & (offs <= span)
+        if not ok.any():
+            continue
+        score = np.where(ok, corr / np.maximum(overlap, 1), -1.0)
+        k = int(np.argmax(score))
+        ranked = float(score[k]) - RATIO_PRIOR * abs(np.log2(ratio))
+        if ranked > best[0]:
+            best = (ranked, float(ratio), float(offs[k]) / FPS, float(score[k]))
+    return {'similarity': best[3] if len(best) > 3 else -1.0, 'ratio': best[1], 'offset': best[2]}
 
 
-def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = None) -> dict:
+TRANSPOSE_MARGIN = 0.03
+
+
+def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = None,
+          transposes=(0,)) -> dict:
     """Map from tab seconds to recording seconds.
 
     Two stages: a straight-line fit (start offset and overall tempo ratio, by chroma
     correlation), then dynamic time warping in a band around that line to follow tempo drift
     and changes. Returns monotonic anchor pairs {'tab': [...], 'audio': [...]}, the line,
-    and how well the chroma matched (cosine similarity on the warped path; 1 = identical)."""
+    and how well the chroma matched (cosine similarity on the warped path; 1 = identical).
+
+    transposes: semitone shifts to try, for a chart written in a different tuning from the
+    record (standard-tuning tab of a song played a half step down). A shift other than 0 is
+    only taken when it fits clearly better (TRANSPOSE_MARGIN); it is returned as 'transpose'
+    and place_tracks applies it, so placed notes carry the pitch that sounds."""
     import librosa
     if not notes:
         raise ValueError('The tab has no notes to line up.')
@@ -81,7 +111,14 @@ def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = 
     Y = _unit(audio_chroma(audio, sr))
     if not np.any(Y > 0):
         raise ValueError('The recording has no pitched sound to line up with.')
-    line = linear_fit(X, Y)
+    line, transpose = linear_fit(X, Y), 0
+    for shift in transposes:
+        if shift:
+            other = linear_fit(np.roll(X, shift, axis=0), Y)
+            if other['similarity'] > line['similarity'] + (TRANSPOSE_MARGIN if not transpose else 0):
+                line, transpose = other, int(shift)
+    if transpose:
+        X = np.roll(X, transpose, axis=0)
     ratio, offset = line['ratio'], line['offset']
     # The tab redrawn on the recording's clock along the line, then warped locally (±BAND s).
     n_audio = Y.shape[1]
@@ -106,7 +143,8 @@ def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = 
     audio_t = np.maximum.accumulate(np.asarray(audio_t))
     similarity = float(1 - np.mean([C[i, j] for i, j in path]))
     return {'tab': tab_t, 'audio': list(map(float, audio_t)), 'similarity': round(similarity, 3),
-            'line': {k: round(v, 3) for k, v in line.items()}, 'tempo_ratio': round(ratio, 3)}
+            'line': {k: round(v, 3) for k, v in line.items()}, 'tempo_ratio': round(ratio, 3),
+            'transpose': transpose}
 
 
 BAND_S = 8.0
@@ -135,8 +173,8 @@ def refine_pass(mapping: dict, notes: list, audio: np.ndarray, sr: int, window_s
     flux /= np.percentile(flux[flux > 0], 99) + 1e-9 if np.any(flux > 0) else 1.0
     fps = SR / hop
     rows = []
-    for n in notes:
-        k = int(n['midi']) - low
+    for n in covered(mapping, notes):
+        k = int(n['midi']) + int(mapping.get('transpose', 0)) - low
         if 0 <= k < 84:
             rows.append((float(n['time']), k))
     rows.sort()
@@ -186,16 +224,26 @@ def to_audio_time(mapping: dict, t: float | np.ndarray):
     return np.interp(t, mapping['tab'], mapping['audio'])
 
 
+def covered(mapping: dict, notes: list, margin: float = 0.5) -> list:
+    """The tab notes that fall inside the stretch of tab the recording covers. A clip or a take
+    of one section lines up with only part of the chart; the rest is not in the recording."""
+    lo, hi = mapping['tab'][0] - margin, mapping['tab'][-1] + margin
+    return [n for n in notes if lo <= n['time'] <= hi]
+
+
 def place_tracks(tracks: list, mapping: dict) -> list:
     """Each tab track's notes moved onto the recording's clock, plus the stretches (bars) where
-    the track plays, for naming parts like 'Guitar Solo, 2:31-3:40'."""
+    the track plays, for naming parts like 'Guitar Solo, 2:31-3:40'. Notes outside the stretch
+    the recording covers are left out, and a chart in another tuning is moved to the pitch
+    that sounds."""
     out = []
+    shift = int(mapping.get('transpose', 0))
     for tr in tracks:
         notes = []
-        for n in tr['notes']:
+        for n in covered(mapping, tr['notes']):
             a = float(to_audio_time(mapping, n['time']))
             b = float(to_audio_time(mapping, n['time'] + n['duration']))
-            notes.append(dict(n, time=a, duration=max(0.03, b - a), tab_time=n['time']))
+            notes.append(dict(n, midi=int(n['midi']) + shift, time=a, duration=max(0.03, b - a), tab_time=n['time']))
         out.append({'name': tr['name'], 'track': tr.get('track'), 'notes': notes, 'sections': sections(notes)})
     return out
 
