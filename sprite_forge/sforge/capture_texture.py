@@ -41,7 +41,7 @@ def _sharpness(img):
 # head texels are weighted by (frame's head score / best) ** FACE_POWER: high = the face from (nearly) one frame
 FACE_POWER = float(os.environ.get("SFS_FACE_POWER", "10"))
 
-def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False):
+def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False, clean=True):
     """-> (texture RGB uint8 (res,res,3), coverage (res,res) float, stats)
     mesh: optional (rest Mesh, skinning matrices) from capture_layers - body + clothes + skirt + hair in one atlas;
     default the bare body with MakeHuman's UVs"""
@@ -225,15 +225,30 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     seen = np.zeros((res, res), bool); seen[inside] = seen_t
     cov = np.zeros((res, res), np.float32); cov[inside] = cover
 
+    stats = dict(frames=len(used), seen=float(seen.sum() / max(1, inside.sum())), gains=gains.tolist())
+    known = seen
+    if clean:
+        # v11.3: off-colour skin and garment speckles dropped, every unseen texel filled on the body in 3D
+        # (capture_clean) - only the gutters between UV islands are left to 2D inpainting
+        from . import capture_clean as CC
+        lay_c = (M.layer[F[ti, 0]] if mesh is not None else np.zeros(len(ti), int))
+        lab_c = np.where(tally[1:].sum(0) > 0, major, 0)
+        bone_c = Jm[F[ti, 0], 0]
+        skin_b = [bm.bi[b] for b in ("wrist.L", "wrist.R", "neck01") if b in bm.bi]
+        args = (Xr, lay_c, lab_c, bone_c, head_t, skin_b, skin_b[:2])
+        mix, _, stats["clean"] = CC.clean(mix, seen_t, *args, log=log)
+        if light is not None and light.get("applied"):
+            alb, _, _ = CC.clean(alb, seen_t, *args, log=lambda *a: None)
+        known = inside
+
     def fill(colours):
-        # unseen texels and the gutters are filled together, from seen texels only (filling the holes first let
+        # unseen texels and the gutters are filled together, from known texels only (filling the holes first let
         # the black gutters bleed into them along the island edges)
         tex = np.zeros((res, res, 3), np.float32); tex[inside] = colours
         t8 = np.clip(tex, 0, 255).astype(np.uint8)
-        unknown = (~seen).astype(np.uint8)
+        unknown = (~known).astype(np.uint8)
         return cv2.inpaint(t8, unknown, 6, cv2.INPAINT_TELEA) if unknown.any() else t8
     t8 = fill(mix)
-    stats = dict(frames=len(used), seen=float(seen.sum() / max(1, inside.sum())), gains=gains.tolist())
     if light is not None and light.get("applied"):
         stats["light"] = light
         stats["lit_texture"] = t8                                       # as filmed (the room's light in it)
