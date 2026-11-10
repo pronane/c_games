@@ -298,7 +298,13 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         return;
     }
     s->runPhase += dt * 0.35f;                 /* a quiet idle, not a sped-up loop */
-    if (carrying) { *clip = C_KEEPER_READY; *t = fmodf(s->runPhase, clipLen(C_KEEPER_READY)); return; }
+    /* Outfield players stand up and cradle the ball. keeper_ready is a low
+     * set stance and reads as a crouch once the ball is in the hands. */
+    if (carrying) {
+        *clip = keeper ? C_KEEPER_READY : C_IDLE;
+        *t = fmodf(s->runPhase, clipLen(*clip));
+        return;
+    }
     *clip = keeper ? C_KEEPER_IDLE : C_IDLE;
     *t = fmodf(s->runPhase, clipLen(*clip));
 }
@@ -401,11 +407,33 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     double t0 = GetTime();
     Model lm = lookModel(lookOf(s));
 #if RAYLIB_VERSION_MAJOR >= 6
+    /* Raylib 6's UpdateModelAnimation writes CPU-skinned vertices into the
+     * mesh VBOs. The GPU shader then skins those vertices again, so any clip
+     * that leaves the bind pose (run, run-with-ball, the standing carry)
+     * folds the body onto the grass. Jog stays near the bind pose, which is
+     * why only that cycle looked upright. Hold the CPU buffers aside so the
+     * upload is skipped and the shader skins the bind pose once. */
+    float *holdV[MAX_PARTS], *holdN[MAX_PARTS];
+    int held = 0;
+    if (gpuSkin) {
+        held = lm.meshCount < MAX_PARTS ? lm.meshCount : MAX_PARTS;
+        for (int i = 0; i < held; i++) {
+            holdV[i] = lm.meshes[i].animVertices;
+            holdN[i] = lm.meshes[i].animNormals;
+            lm.meshes[i].animVertices = NULL;
+            lm.meshes[i].animNormals = NULL;
+        }
+    }
     if (s->blend < 0.999f && s->prevClip >= 0 && !poseFar)
         UpdateModelAnimationEx(lm, anims[clipIdx[s->prevClip]], clipFrame(s->prevClip, s->prevT),
                                anims[clipIdx[clip]], clipFrame(clip, t), w);
     else
         UpdateModelAnimation(lm, anims[clipIdx[clip]], clipFrame(clip, t));
+    if (gpuSkin)
+        for (int i = 0; i < held; i++) {
+            lm.meshes[i].animVertices = holdV[i];
+            lm.meshes[i].animNormals = holdN[i];
+        }
     if (model.currentPose) memcpy(s->pose, model.currentPose, sizeof(Transform) * (size_t)nb);
 #else
     sampleClip(clip, t, sampleA);
@@ -2183,13 +2211,16 @@ static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
         game.players[0][me].action = GAME_ACT_NONE;
         game.solo_rhythm = 0;
         camMode = 5;
-        pad.axis[0] = pad.axis[1] = 0;
+        pad.axis[0] = 0; pad.axis[1] = 0;
     }
+    /* keep him running so the carry cycle is on screen, not a freeze */
+    if (frame >= 538 && frame < 576) pad.axis[0] = 0.85f;
     if (frame >= 540 && frame <= 556) {
         game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
         game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
         game.steps_carried = 3; game.step_time = 0.4f;
         game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
         game_select_player(&game, me);
     }
     if (frame == 552) TakeScreenshot("v35_ring_orange_3.png");
@@ -2198,10 +2229,21 @@ static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
         game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
         game.steps_carried = 5; game.step_time = 0.5f;
         game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
         game_select_player(&game, me);
     }
     if (frame == 570) TakeScreenshot("v35_ring_red_5.png");
-    if (frame == 582) {
+    if (frame == 576) { pad.axis[0] = 0; pad.axis[1] = 0; }
+    if (frame >= 578 && frame <= 604) {
+        game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.steps_carried = 2; game.step_time = 0.2f;
+        game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
+        game_select_player(&game, me);
+    }
+    if (frame == 602) TakeScreenshot("v35_stand_with_ball.png");
+    if (frame == 612) {
         GameInput kick = { 0 };
         game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
         game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
@@ -2214,8 +2256,8 @@ static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
         game_update(&game, kick, 0.1f);
         camMode = 1;
     }
-    if (frame == 596) TakeScreenshot("v35_overcarry_free.png");
-    if (frame == 610) { CloseWindow(); exit(0); }
+    if (frame == 628) TakeScreenshot("v35_overcarry_free.png");
+    if (frame == 640) { CloseWindow(); exit(0); }
 }
 
 int main(int argc, char **argv)

@@ -274,10 +274,10 @@ bone on the contact frame, and hand passes from the striking hand. Clips cross-f
 
 | Source file | Clip | Used for |
 |---|---|---|
-| anim_idle | idle | standing |
+| anim_idle | idle | standing, including an outfield player holding the ball |
 | anim_run | run | running without the ball |
 | anim_run_ball | run_ball | carrying the ball (one-arm carry); also the bounce |
-| anim_keeper_ready | keeper_ready | keeper stance; ball cradled in both hands when standing |
+| anim_keeper_ready | keeper_ready | goalkeeper's low set stance |
 | anim_kick_run | kick_run | running drop punt, ground kick |
 | anim_drop_kick | drop_kick | frees / sideline / 45 (run-up) |
 | anim_kick_out | kick_out | keeper kick-out |
