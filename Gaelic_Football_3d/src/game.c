@@ -9,11 +9,15 @@
 #define AI_SPEED 8.2f
 #define AI_JOG_SPEED 5.8f
 #define CPU_CARRY_SPEED 7.6f
+#define AI_CHASE_FAR 7.25f          /* closing on a human carrier, still not a sprint past him */
+#define AI_CHASE_NEAR 6.35f         /* inside 8 m: hold, do not outrun the man on the ball */
 #define HIGH_FIELD_RADIUS 2.1f
 #define HIGH_FIELD_REACH 4.2f
 #define KICKER_PICKUP_GUARD 3.5f
-#define CPU_TACKLE_RANGE 2.2f
-#define CPU_TACKLE_COMMIT_TIME 0.3f
+#define CPU_TACKLE_RANGE 2.05f
+#define CPU_TACKLE_COMMIT_TIME 0.70f
+#define JOCKEY_SPEED 5.4f
+#define STAMINA_DRAIN 0.048f        /* full bar lasts about 20 s of sprinting */
 #define PICKUP_ANIMATION_TIME 0.45f
 #define FOOT_PICKUP_RADIUS 1.6f
 
@@ -139,6 +143,7 @@ static void reset_positions(GameState *game)
             member->action_time = 0.0f;
             member->action_released = 1;
             member->tackle_cooldown = 0.0f;
+            member->stamina = 1.0f;
         }
     }
 }
@@ -211,6 +216,10 @@ void game_init(GameState *game)
     game->enforce_three_v_three = 0;
     game->ai_support = 0;
     game->assist_target = -1;
+    game->kickout_plan = 2;         /* long middle until the taker picks */
+    game->press_height = 1;         /* zonal */
+    game->mark_clock = 0.0f;
+    game->contest_grade = 0;
     game->referee.x = GAME_PITCH_LENGTH * 0.5f;
     game->referee.z = GAME_PITCH_WIDTH * 0.5f + 12.0f;
     game->referee.facing_x = 0.0f;
@@ -436,6 +445,41 @@ static void queue_release(GameState *game, int team, int index, float dir_x,
 
 static void resolve_strike(GameState *game, int team, int index);
 
+/* Re-aim an assisted pass at the contact frame (late receiver lock). */
+static void refresh_late_lock(GameState *game, int index)
+{
+    int t = game->assist_target;
+    GamePlayer *player, *other;
+    float dx, dz, d, lead;
+    if (t < 0 || t >= GAME_TEAM_SIZE || t == index) return;
+    other = &game->players[0][t];
+    if (other->off) return;
+    player = &game->players[0][index];
+    dx = other->x - player->x;
+    dz = other->z - player->z;
+    d = sqrtf(dx * dx + dz * dz);
+    if (d < 2.0f || d > 72.0f) return;
+    lead = fminf(other->movement * PLAYER_SPEED * 0.40f, 4.0f);
+    dx += other->facing_x * lead;
+    dz += other->facing_z * lead;
+    d = sqrtf(dx * dx + dz * dz);
+    if (d < 0.4f) return;
+    player->release_dx = player->facing_x = dx / d;
+    player->release_dz = player->facing_z = dz / d;
+}
+
+/* Where a short, long or wing kick-out is aimed. Must finish past the 40 m arc. */
+static void kickout_spot(int team, int plan, float *x, float *z)
+{
+    float dir = team == 0 ? 1.0f : -1.0f;
+    float ox = team == 0 ? GAME_KICKOUT_LINE : GAME_PITCH_LENGTH - GAME_KICKOUT_LINE;
+    if (plan == 1) { *x = ox + dir * 27.0f; *z = 18.0f; }
+    else if (plan == 3) { *x = ox + dir * 36.0f; *z = 74.0f; }
+    else { *x = ox + dir * 52.0f; *z = GAME_PITCH_WIDTH * 0.5f; }
+    *x = clampf(*x, 2.0f, GAME_PITCH_LENGTH - 2.0f);
+    *z = clampf(*z, 2.0f, GAME_PITCH_WIDTH - 2.0f);
+}
+
 static void update_actions(GameState *game, float delta_time)
 {
     int team, index;
@@ -457,9 +501,12 @@ static void update_actions(GameState *game, float delta_time)
             }
             if (!player->action_released &&
                 player->action_time >= game_action_contact(player->action)) {
-                if (game->ball_team == team && game->ball_player == index)
+                if (game->ball_team == team && game->ball_player == index) {
+                    if (team == 0 && game->assist_target >= 0 &&
+                        (player->action == GAME_ACT_HANDPASS || player->action == GAME_ACT_KICK))
+                        refresh_late_lock(game, index);
                     perform_release(game, team, index);
-                else
+                } else
                     player->action_released = 1;   /* lost the ball first */
             }
             if (player->action_time >= game_action_duration(player->action))
@@ -797,6 +844,7 @@ static void award_mark(GameState *game, int team, int player, GameEvent ev)
     game->event_team = team;
     place_restart(game, team, player, x, m->z, GAME_RESTART_FREE);
     game->mark_play_on = 1;
+    game->mark_clock = 15.0f;       /* 15 seconds to kick or play on; opponents stay 13 m out */
     set_event(game, ev);
 }
 
@@ -924,6 +972,18 @@ static void release_ball(GameState *game, float speed, float lift, float curve,
     if (length < 0.001f) { aim_x = 1.0f; aim_z = 0.0f; }
     else { aim_x /= length; aim_z /= length; }
 
+    if (player->stamina < 0.40f)
+        speed *= 0.82f + 0.18f * (player->stamina / 0.40f);
+    if (action == GAME_ACT_KICKOUT) {
+        float tx, tz, dx, dz, d;
+        kickout_spot(0, game->kickout_plan > 0 ? game->kickout_plan : 2, &tx, &tz);
+        dx = tx - player->x;
+        dz = tz - player->z;
+        d = sqrtf(dx * dx + dz * dz);
+        if (d > 1.0f) { aim_x = dx / d; aim_z = dz / d; }
+        speed = fmaxf(speed, 15.0f + d * 0.18f);
+        lift = lift_for(d, speed, 1.0f, game->kickout_plan == 1 ? 2.6f : 5.8f);
+    }
     if (action == GAME_ACT_HANDPASS) {
         int mate, best = -1;
         float best_score = -1000000.0f;
@@ -1018,6 +1078,21 @@ static void cpu_kick_in(GameState *game)
         float z = GAME_PITCH_WIDTH * 0.5f + (frand01(game) < 0.5f ? -1.0f : 1.0f) *
                   (1.2f + frand01(game) * 1.8f);
         cpu_release_toward(game, kicker, 0.0f, z, 27.0f, 0.9f, GAME_EVENT_KICKED);
+        return;
+    }
+    if (game->restart_type == GAME_RESTART_KICKOUT) {
+        int plan = game->kickout_plan > 0 ? game->kickout_plan : 2;
+        float tx, tz, d, speed;
+        if (team == 1) {
+            if (game->press_height == 2) plan = 2;          /* pressed: go over them */
+            else if (game->press_height == 0) plan = 1;     /* dropped off: take the short one */
+            else plan = frand01(game) < 0.45f ? 3 : 2;
+        }
+        kickout_spot(team, plan, &tx, &tz);
+        d = sqrtf(distance_squared(k->x, k->z, tx, tz));
+        speed = 16.0f + d * 0.20f;
+        cpu_release_toward(game, kicker, tx, tz, speed,
+                           lift_for(d, speed, 1.0f, plan == 1 ? 2.4f : 6.2f), GAME_EVENT_KICKED);
         return;
     }
     if (game->restart_type == GAME_RESTART_FREE ||
@@ -1138,6 +1213,36 @@ static void ai_move_to(GamePlayer *m, int team, int player, float tx, float tz, 
     m->movement = clampf(step / (AI_SPEED * delta_time), 0.0f, 1.0f);
 }
 
+/* During a kick-out, teammates show short / long / wing and the other side holds a press line. */
+static void shape_kickout(GameState *game, float delta_time)
+{
+    int kicking, i;
+    float tx, tz, depth, dir, line;
+    if (!game->restart_pending || game->restart_type != GAME_RESTART_KICKOUT || game->ball_team < 0)
+        return;
+    kicking = game->ball_team;
+    kickout_spot(kicking, game->kickout_plan > 0 ? game->kickout_plan : 2, &tx, &tz);
+    for (i = 0; i < 2; i++) {
+        int idx = (game->kickout_plan == 2) ? (i ? 8 : 7) : (i ? 5 : 4);
+        float ox = tx + (i ? 5.0f : -3.0f), oz = tz + (i ? 8.0f : -7.0f);
+        if (idx == game->ball_player || game->players[kicking][idx].off) continue;
+        if (kicking == 0 && idx == game->selected_player) continue;
+        ai_move_to(&game->players[kicking][idx], kicking, idx, ox, oz, delta_time);
+    }
+    dir = kicking == 0 ? 1.0f : -1.0f;
+    depth = game->press_height == 2 ? 43.0f : game->press_height == 0 ? 70.0f : 54.0f;
+    line = (kicking == 0 ? 0.0f : GAME_PITCH_LENGTH) + dir * depth;
+    for (i = 1; i < GAME_TEAM_SIZE; i++) {
+        GamePlayer *m = &game->players[1 - kicking][i];
+        if (m->off) continue;
+        if ((1 - kicking) == 0 && i == game->selected_player) continue;
+        if (fabsf(m->x - line) > 3.5f)
+            ai_move_to(m, 1 - kicking, i, line, FORMATION_Z[i], delta_time);
+        else
+            m->movement *= 0.4f;
+    }
+}
+
 static void update_support_and_marking(GameState *game, float delta_time, const int *chasers)
 {
     int team, player, k;
@@ -1188,6 +1293,36 @@ static void update_support_and_marking(GameState *game, float delta_time, const 
                 ai_move_to(&game->players[team][player], team, player,
                            a->x + gx / gl * 1.8f, a->z + gz / gl * 1.8f, delta_time);
             }
+        }
+    }
+}
+
+static float stamina_scale(const GamePlayer *p)
+{
+    if (p->stamina > 0.35f) return 1.0f;
+    return 0.70f + 0.30f * (p->stamina / 0.35f);
+}
+
+static void update_stamina(GameState *game, const GameInput *input, float delta_time)
+{
+    int team, player;
+    for (team = 0; team < 2; team++) {
+        for (player = 0; player < GAME_TEAM_SIZE; player++) {
+            GamePlayer *p = &game->players[team][player];
+            int sprint;
+            if (p->off) {
+                p->stamina = fminf(1.0f, p->stamina + delta_time * 0.04f);
+                continue;
+            }
+            if (team == 0 && player == game->selected_player)
+                sprint = input->sprint && !input->jockey && p->movement > 0.45f;
+            else
+                sprint = p->movement > 0.92f;
+            if (sprint) p->stamina -= delta_time * STAMINA_DRAIN;
+            else if (p->movement < 0.35f) p->stamina += delta_time * 0.055f;
+            else p->stamina += delta_time * 0.018f;
+            if (p->stamina < 0.05f) p->stamina = 0.05f;
+            if (p->stamina > 1.0f) p->stamina = 1.0f;
         }
     }
 }
@@ -1243,11 +1378,11 @@ static void update_cpu_players(GameState *game, float delta_time)
                 member->movement = 0.0f;
                 continue;
             }
-            if (game->ball_team < 0 && game->ball.in_flight &&
+            if (member->jump_time <= 0.0f && game->ball_team < 0 && game->ball.in_flight &&
                 game->ball.height >= 1.2f && game->ball.height <= 4.8f &&
                 distance_squared(member->x, member->z, game->ball.x,
                                  game->ball.z) <= 4.0f * 4.0f) {
-                member->jump_time = 0.7f;
+                member->jump_time = 0.7f;   /* start the leap once; do not freeze it at the takeoff */
             }
             if (game->ball_team != team) {
                 float distance = distance_squared(member->x, member->z,
@@ -1266,7 +1401,13 @@ static void update_cpu_players(GameState *game, float delta_time)
             float dz = chase_z - chaser->z;
             float length = sqrtf(dx * dx + dz * dz);
             if (length > 0.001f) {
-                float step = AI_SPEED * delta_time;
+                float cap = AI_SPEED * stamina_scale(chaser);
+                float step;
+                /* a CPU defender closing on the human carrier holds his line
+                 * instead of sprinting through him */
+                if (team == 1 && game->ball_team == 0 && game->ball_player >= 0)
+                    cap = (length > 8.0f ? AI_CHASE_FAR : AI_CHASE_NEAR) * stamina_scale(chaser);
+                step = cap * delta_time;
                 if (game->ball_team >= 0 && step > length - 1.0f) step = length - 1.0f;
                 if (step < 0.0f) step = 0.0f;
                 chaser->facing_x = dx / length;
@@ -1313,16 +1454,32 @@ static void update_cpu_players(GameState *game, float delta_time)
                 game->cpu_tackle_time = 0.0f;
                 if (game->players[1][tackler].tackle_cooldown > 0.0f) return;
                 begin_action(&game->players[1][tackler], GAME_ACT_TACKLE);
-                game->players[1][tackler].tackle_cooldown = 0.9f;
-                roll = frand01(game);
-                if (roll < 0.18f) {
-                    int foul = pick_cynical_foul(game);
-                    if (foul != GAME_FOUL_TECHNICAL)
-                        begin_action(&game->players[1][tackler], GAME_ACT_TRIP);
-                    commit_foul(game, 1, tackler, game->ball_player, foul, carrier->x, carrier->z);
-                    return;
+                game->players[1][tackler].tackle_cooldown = 1.15f;
+                {
+                    /* from behind is a free; a frontal tackle is less certain,
+                     * and a solo or bounce (ball off the hand) is easier to time */
+                    float bx = game->players[1][tackler].x - carrier->x;
+                    float bz = game->players[1][tackler].z - carrier->z;
+                    float bl = sqrtf(bx * bx + bz * bz);
+                    float approach = bl > 0.05f ? (bx * carrier->facing_x + bz * carrier->facing_z) / bl : 1.0f;
+                    int heavy = carrier->action == GAME_ACT_SOLO || carrier->action == GAME_ACT_BOUNCE;
+                    float miss_at;
+                    if (bl < 3.2f && approach < -0.28f) {
+                        commit_foul(game, 1, tackler, game->ball_player, GAME_FOUL_TECHNICAL,
+                                    carrier->x, carrier->z);
+                        return;
+                    }
+                    roll = frand01(game);
+                    miss_at = heavy ? 0.40f : 0.62f;
+                    if (roll < 0.10f) {
+                        int foul = pick_cynical_foul(game);
+                        if (foul != GAME_FOUL_TECHNICAL)
+                            begin_action(&game->players[1][tackler], GAME_ACT_TRIP);
+                        commit_foul(game, 1, tackler, game->ball_player, foul, carrier->x, carrier->z);
+                        return;
+                    }
+                    if (roll > miss_at) return;    /* tackle missed */
                 }
-                if (roll > 0.62f) return;          /* tackle missed */
                 game->ball_team = 1;
                 game->ball_player = tackler;
                 game->steps_carried = 0;
@@ -1379,6 +1536,7 @@ static void update_cpu_players(GameState *game, float delta_time)
     memset(ai_handled, 0, sizeof ai_handled);
     if (game->ai_support && !game->restart_pending) update_support_and_marking(game, delta_time, chasers);
     update_formation(game, delta_time, chasers);
+    shape_kickout(game, delta_time);
 }
 
 /* Everyone not chasing/supporting drifts to a ball-relative formation spot.
@@ -1800,7 +1958,8 @@ static void update_ball(GameState *game, float delta_time, int pickup_input)
         int player;
         int catcher_team = -1;
         int catcher_player = -1;
-        float closest = HIGH_FIELD_RADIUS * HIGH_FIELD_RADIUS;
+        int best_grade = 0;
+        float best_score = -1000000.0f;
         for (team = 0; team < 2; team++) {
             for (player = 0; player < GAME_TEAM_SIZE; player++) {
                 if (game->players[team][player].off) continue;
@@ -1825,11 +1984,23 @@ static void update_ball(GameState *game, float delta_time, int pickup_input)
                     (game->ball.height - previous_height) * fraction;
                 distance = distance_squared(member->x, member->z,
                                             ball_x, ball_z);
-                if (distance <= closest && ball_height >= 1.0f &&
-                    ball_height <= HIGH_FIELD_REACH) {
-                    closest = distance;
-                    catcher_team = team;
-                    catcher_player = player;
+                if (distance <= HIGH_FIELD_RADIUS * HIGH_FIELD_RADIUS &&
+                    ball_height >= 1.0f && ball_height <= HIGH_FIELD_REACH) {
+                    /* jump phase: 0 just left the ground, ~0.5 at the top, 1 landing */
+                    float phase = 1.0f - member->jump_time / 0.75f;
+                    int grade;
+                    float score;
+                    if (phase < 0.0f) phase = 0.0f;
+                    if (phase > 1.0f) phase = 1.0f;
+                    grade = phase < 0.18f ? 1 : phase > 0.82f ? 3 : 2;   /* early, perfect, late */
+                    if (member->stamina < 0.22f && grade == 2) grade = 1;
+                    score = (grade == 2 ? 4.0f : 0.0f) - sqrtf(distance);
+                    if (score > best_score) {
+                        best_score = score;
+                        best_grade = grade;
+                        catcher_team = team;
+                        catcher_player = player;
+                    }
                 }
             }
         }
@@ -1847,17 +2018,42 @@ static void update_ball(GameState *game, float delta_time, int pickup_input)
                            game->players[catcher_team][catcher_player].x,
                            game->players[catcher_team][catcher_player].z))
             return;
+        if (catcher_team >= 0 && best_grade != 2 && fabsf(game->ball.velocity_y) > 4.0f) {
+            /* mistimed contest on a dropping ball: it spills sideways into a scramble */
+            float vx = game->ball.velocity_x, vz = game->ball.velocity_z;
+            float sp = sqrtf(vx * vx + vz * vz);
+            float side = best_grade == 1 ? 1.0f : -1.0f;
+            if (sp < 0.5f) { vx = 1.0f; vz = 0.0f; sp = 1.0f; }
+            game->ball.velocity_x = -vz / sp * 6.5f * side;
+            game->ball.velocity_z = vx / sp * 6.5f * side;
+            game->ball.velocity_y = 3.4f;
+            if (game->ball.height < 1.2f) game->ball.height = 1.2f;
+            game->ball.in_flight = 1;
+            game->players[catcher_team][catcher_player].jump_time = 0.0f;
+            game->contest_grade = 4;
+            game->contest_time = 1.8f;
+            game->last_touch_team = catcher_team;
+            set_event(game, GAME_EVENT_BREAKING_BALL);
+            return;
+        }
         if (catcher_team >= 0) {
             GamePlayer *c = &game->players[catcher_team][catcher_player];
             GameEvent mark = GAME_EVENT_NONE;
+            game->contest_grade = best_grade;
+            game->contest_time = 1.5f;
             if (game->from_kickout && game->last_release_team >= 0 &&
                 fabsf(c->x - goal_x_of(1 - game->last_release_team)) >= 45.0f)
                 mark = GAME_EVENT_KICKOUT_MARK;        /* rule 2.12 (i) */
             else if (game->kick_clean && game->last_release_team == catcher_team &&
-                     game->last_release_player != catcher_player &&
-                     fabsf(game->kick_origin_x - goal_x_of(catcher_team)) >= 45.0f &&
-                     fabsf(c->x - goal_x_of(catcher_team)) <= GAME_KICKOUT_LINE)
-                mark = GAME_EVENT_ADVANCED_MARK;       /* rule 2.12 (ii) */
+                     game->last_release_player != catcher_player) {
+                /* Advanced mark: a kick from outside the 45, travelling 20 m or more,
+                 * caught clean inside the 45. A kick-pass into the 45 qualifies. */
+                float gx = goal_x_of(catcher_team);
+                float travelled = sqrtf(distance_squared(game->kick_origin_x, game->kick_origin_z, c->x, c->z));
+                if (fabsf(game->kick_origin_x - gx) >= 45.0f &&
+                    fabsf(c->x - gx) <= 45.0f && travelled >= 20.0f)
+                    mark = GAME_EVENT_ADVANCED_MARK;
+            }
             if (mark != GAME_EVENT_NONE) {
                 game->kickout_in_progress = 0;
                 game->kickout_team = -1;
@@ -2029,6 +2225,18 @@ void game_update(GameState *game, GameInput input, float delta_time)
     if (delta_time <= 0.0f) return;
     if (delta_time > 0.1f) delta_time = 0.1f;
 
+    if (input.kickout_plan >= 1 && input.kickout_plan <= 3) game->kickout_plan = input.kickout_plan;
+    if (input.press_height >= 1 && input.press_height <= 3) game->press_height = input.press_height - 1;
+    if (game->mark_play_on && game->restart_pending && game->card_time <= 0.0f) {
+        game->mark_clock -= delta_time;
+        if (game->mark_clock <= 0.0f) { game->mark_clock = 0.0f; game->mark_play_on = 0; }
+    }
+    if (game->contest_time > 0.0f) {
+        game->contest_time -= delta_time;
+        if (game->contest_time <= 0.0f) game->contest_grade = 0;
+    }
+    update_stamina(game, &input, delta_time);
+
     /* new carrier: reset the step / bounce counters and the clean-kick flag */
     if (game->ball_team >= 0 && (game->ball_team != game->prev_ball_team ||
                                  game->ball_player != game->prev_ball_player)) {
@@ -2053,6 +2261,10 @@ void game_update(GameState *game, GameInput input, float delta_time)
     sync_selected_player(game);
     controlled = &game->players[0][game->selected_player];
     busy = player_busy(controlled);
+    if (controlled->jump_time > 0.0f) {
+        controlled->jump_time -= delta_time;
+        if (controlled->jump_time < 0.0f) controlled->jump_time = 0.0f;
+    }
     if (input.high_field && !game->has_ball && controlled->jump_time <= 0.0f)
         controlled->jump_time = 0.75f;
     move_length = sqrtf(input.move_x * input.move_x + input.move_z * input.move_z);
@@ -2065,9 +2277,34 @@ void game_update(GameState *game, GameInput input, float delta_time)
         game->pickup_player == game->selected_player)
         move_length = 0.0f;
 
+    if (input.jockey && !game->has_ball && game->ball_team == 1 && game->ball_player >= 0 &&
+        !game->restart_pending && !busy) {
+        /* shadow the carrier about 2 m goal-side; the stick only shades him across */
+        const GamePlayer *a = &game->players[1][game->ball_player];
+        float gx = 0.0f - a->x, gz = GAME_PITCH_WIDTH * 0.5f - a->z;
+        float gl = sqrtf(gx * gx + gz * gz);
+        float tx, tz, dx, dz, d, step, speed;
+        if (gl < 0.01f) gl = 0.01f;
+        tx = a->x + gx / gl * 2.05f + input.move_x * 1.6f;
+        tz = a->z + gz / gl * 2.05f + input.move_z * 1.6f;
+        dx = tx - controlled->x; dz = tz - controlled->z;
+        d = sqrtf(dx * dx + dz * dz);
+        speed = JOCKEY_SPEED * stamina_scale(controlled);
+        if (d > 0.35f) {
+            step = fminf(speed * delta_time, d);
+            controlled->x = clampf(controlled->x + dx / d * step, 1.0f, GAME_PITCH_LENGTH - 1.0f);
+            controlled->z = clampf(controlled->z + dz / d * step, 1.0f, GAME_PITCH_WIDTH - 1.0f);
+            controlled->movement = clampf(step / (PLAYER_SPEED * delta_time), 0.0f, 0.85f);
+        } else controlled->movement *= 0.5f;
+        dx = a->x - controlled->x; dz = a->z - controlled->z;
+        d = sqrtf(dx * dx + dz * dz);
+        if (d > 0.05f) { controlled->facing_x = dx / d; controlled->facing_z = dz / d; }
+        move_length = 0.0f;   /* the stick has been used as a shade, not a sprint */
+    }
     if (move_length > 0.01f) {
         float speed = (input.sprint ? SPRINT_SPEED : PLAYER_SPEED) *
-                      (game->has_ball ? 0.95f : 1.0f) * (busy ? 0.3f : 1.0f);
+                      (game->has_ball ? 0.95f : 1.0f) * (busy ? 0.3f : 1.0f) *
+                      stamina_scale(controlled);
         controlled->facing_x = input.move_x / move_length;
         controlled->facing_z = input.move_z / move_length;
         if (game->restart_pending && game->has_ball) {
@@ -2164,17 +2401,28 @@ void game_update(GameState *game, GameInput input, float delta_time)
                !game->restart_pending &&
                distance_squared(controlled->x, controlled->z,
                                 game->ball.x, game->ball.z) <= 2.5f * 2.5f) {
-        float roll = frand01(game);
+        float roll;
+        GamePlayer *carrier = &game->players[1][game->ball_player];
+        float bx = controlled->x - carrier->x, bz = controlled->z - carrier->z;
+        float bl = sqrtf(bx * bx + bz * bz);
+        float approach = bl > 0.05f ? (bx * carrier->facing_x + bz * carrier->facing_z) / bl : 1.0f;
+        int heavy = carrier->action == GAME_ACT_SOLO || carrier->action == GAME_ACT_BOUNCE;
         begin_action(controlled, GAME_ACT_TACKLE);
         controlled->tackle_cooldown = 0.6f;
-        if (roll < 0.2f) {          /* mistimed: foul (sometimes a cynical pull-down / trip) */
+        if (bl < 3.2f && approach < -0.28f) {
+            commit_foul(game, 0, game->selected_player, game->ball_player, GAME_FOUL_TECHNICAL,
+                        carrier->x, carrier->z);
+            return;
+        }
+        roll = frand01(game);
+        if (roll < 0.20f) {          /* mistimed: foul (sometimes a cynical pull-down / trip) */
             int foul = pick_cynical_foul(game);
             if (foul != GAME_FOUL_TECHNICAL) begin_action(controlled, GAME_ACT_TRIP);
             commit_foul(game, 0, game->selected_player, game->ball_player, foul,
                         game->ball.x, game->ball.z);
             return;
         }
-        if (roll < 0.75f) {         /* clean open-hand flick */
+        if (roll < (heavy ? 0.90f : 0.75f)) {         /* clean open-hand flick; bonus on a heavy touch */
             game->ball_team = 0;
             game->ball_player = game->selected_player;
             game->steps_carried = 0;
@@ -2272,6 +2520,7 @@ const char *game_event_text(GameEvent event)
         case GAME_EVENT_DISSENT: return "Dissent! Free brought forward 50m";
         case GAME_EVENT_BACK_PASS: return "Back pass to the keeper - free";
         case GAME_EVENT_SIN_BIN_OVER: return "Sin bin over - back to 15";
+        case GAME_EVENT_BREAKING_BALL: return "Broke! The high ball spills";
         default: return "";
     }
 }

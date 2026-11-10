@@ -12,7 +12,8 @@
  *  A           hand pass         B            solo / bounce (auto picks legal one)
  *  X (hold)    kick, hold = power   Y         shoot (auto power, low when close)
  *  R1          sprint            R2           power kick / two-point attempt
- *  L1          switch player     L2           tackle / shoulder
+ *  L1          switch player     L2 hold      jockey (goal-side shadow)
+ *                        L2 tap       tackle / shoulder. B with no ball is the tackle too
  *  L2 + Y      hook / head hit (special - a straight RED card)
  *  Without the ball: A = toe-lift pick-up, X = jump to field a high ball.
  *  Start       pause / skip intro / confirm    Back   controller test screen

@@ -57,6 +57,7 @@ typedef enum GameEvent {
     GAME_EVENT_DISSENT,           /* free brought forward 50m */
     GAME_EVENT_BACK_PASS,
     GAME_EVENT_SIN_BIN_OVER,
+    GAME_EVENT_BREAKING_BALL, /* high catch spilled: a scramble */
     GAME_EVENT_COUNT
 } GameEvent;
 
@@ -126,6 +127,9 @@ typedef struct GameInput {
     float power;            /* 0..1 kick power (charge) */
     int special;            /* hook / head hit on the carrier (straight red!) */
     int pass_target;        /* v3.2 pass assist: teammate index + 1 (0 = engine picks) */
+    int jockey;             /* v3.4: hold to shadow the carrier, goal-side, without sprinting in */
+    int kickout_plan;       /* 0 keep, 1 short, 2 long middle, 3 wing */
+    int press_height;       /* 0 keep, 1 drop off, 2 zonal, 3 press up on a kick-out */
 } GameInput;
 
 typedef struct GamePlayer {
@@ -146,6 +150,7 @@ typedef struct GamePlayer {
     int off;                /* 0 on the pitch, 1 sin bin, 2 sent off */
     float sin_bin;          /* real seconds left in the sin bin */
     int fouls_committed;
+    float stamina;          /* v3.4: 0..1, drained by sprinting */
 } GamePlayer;
 
 typedef struct GameOfficial {
@@ -229,6 +234,12 @@ typedef struct GameState {
     /* --- v3.2 gameplay assists (set by the 3D frontend; off in unit tests) --- */
     int ai_support;         /* AI support runs for the carrier + goal-side marking */
     int assist_target;      /* this frame's pass-assist receiver, -1 none */
+    /* --- v3.4: mark clock, kick-out plan, high-ball grade, stamina is per player --- */
+    float mark_clock;       /* seconds left to play on from a mark (15) */
+    int kickout_plan;       /* 1 short, 2 long, 3 wing */
+    int press_height;       /* 0 drop, 1 zonal, 2 press */
+    int contest_grade;      /* 0 none, 1 early, 2 perfect, 3 late, 4 break */
+    float contest_time;
     void (*on_release)(struct GameState *game, int team, int player, int action, void *user);
     void *user;
 } GameState;
