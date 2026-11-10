@@ -87,6 +87,66 @@ def linear_fit(X: np.ndarray, Y: np.ndarray, ratios=np.arange(0.5, 2.01, 0.01), 
     return {'similarity': best[3] if len(best) > 3 else -1.0, 'ratio': best[1], 'offset': best[2]}
 
 
+def piecewise_guide(X: np.ndarray, Y: np.ndarray, line: dict, seg_s: float = 40.0, hop_s: float = 20.0,
+                    search_s: float = 6.0):
+    """Follow tempo changes that one straight line cannot: knots (tab frame, audio frame).
+
+    A band that slips from 101 to 112 BPM half-way through drifts 20 s off any single line, far
+    outside the warping band. The tab is cut into 40 s stretches. The stretch that fits best
+    near the overall line is the seed; its neighbours are then fitted one after another, each
+    searched ±search_s around where the previous stretch's own tempo says it should fall, with
+    its tempo free to move ±15%. A stretch with nothing to hold on to (silence in the tab, or a
+    weak fit) carries the previous tempo on. Returns None for tabs too short to need it."""
+    from scipy.signal import fftconvolve
+    nx, ny = X.shape[1], Y.shape[1]
+    seg, hop = int(seg_s * FPS), int(hop_s * FPS)
+    if nx < 2 * seg:
+        return None
+
+    def local(i0, centre, ratio0, search):
+        Xs, best = X[:, i0:i0 + seg], None
+        for r in ratio0 * np.arange(0.86, 1.161, 0.02):
+            m = int(seg * r)
+            lo, hi = max(0, int(centre - m / 2 - search * FPS)), min(ny - m, int(centre - m / 2 + search * FPS))
+            if hi < lo or m < 8:
+                continue
+            Xr = Xs[:, np.minimum((np.arange(m) / r).astype(int), seg - 1)]
+            corr = sum(fftconvolve(Y[c, lo:hi + m], Xr[c, ::-1], mode='valid') for c in range(X.shape[0])) / m
+            k = int(np.argmax(corr))
+            ranked = float(corr[k]) - RATIO_PRIOR * abs(np.log2(r / ratio0))
+            if best is None or ranked > best[0]:
+                best = (ranked, float(r), lo + k + m / 2, float(corr[k]))
+        return best
+
+    starts = list(range(0, nx - seg + 1, hop))
+    mid = lambda i0: i0 + seg / 2
+    first = [local(i0, line['offset'] * FPS + line['ratio'] * mid(i0), line['ratio'], BAND_S) for i0 in starts]
+    scored = [(f[3], k) for k, f in enumerate(first) if f]
+    if not scored:
+        return None
+    top, seed = max(scored)
+    fits = {seed: (first[seed][2], first[seed][1])}             # index -> (audio centre, ratio)
+    for step in (1, -1):
+        k = seed + step
+        while 0 <= k < len(starts):
+            c0, r0 = fits[k - step]
+            pred = c0 + step * hop * r0
+            if not (-seg * r0 / 2 < pred < ny + seg * r0 / 2):
+                break                                           # this stretch is outside the recording
+            got = local(starts[k], pred, r0, search_s)
+            fits[k] = (got[2], got[1]) if got and got[3] >= 0.5 * top else (pred, r0)
+            k += step
+    ks = sorted(fits)
+    tab_k = [mid(starts[k]) for k in ks]
+    aud_k = [fits[k][0] for k in ks]
+    # Run the first and last stretch's own tempo out to the ends of the tab.
+    r_first, r_last = fits[ks[0]][1], fits[ks[-1]][1]
+    tab_k = [0.0] + tab_k + [float(nx)]
+    aud_k = [aud_k[0] - r_first * tab_k[1]] + aud_k + [aud_k[-1] + r_last * (nx - tab_k[-2])]
+    aud_k = np.maximum.accumulate(np.asarray(aud_k) + np.arange(len(aud_k)) * 1e-6)
+    return np.asarray(tab_k), aud_k
+
+
 TRANSPOSE_MARGIN = 0.03
 
 
@@ -94,9 +154,9 @@ def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = 
           transposes=(0,)) -> dict:
     """Map from tab seconds to recording seconds.
 
-    Two stages: a straight-line fit (start offset and overall tempo ratio, by chroma
-    correlation), then dynamic time warping in a band around that line to follow tempo drift
-    and changes. Returns monotonic anchor pairs {'tab': [...], 'audio': [...]}, the line,
+    Three stages: a straight-line fit (start offset and overall tempo ratio, by chroma
+    correlation), a piecewise fit that follows tempo changes between sections, then dynamic
+    time warping in a band around that guide to follow drift within a phrase. Returns monotonic anchor pairs {'tab': [...], 'audio': [...]}, the line,
     and how well the chroma matched (cosine similarity on the warped path; 1 = identical).
 
     transposes: semitone shifts to try, for a chart written in a different tuning from the
@@ -120,9 +180,17 @@ def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = 
     if transpose:
         X = np.roll(X, transpose, axis=0)
     ratio, offset = line['ratio'], line['offset']
-    # The tab redrawn on the recording's clock along the line, then warped locally (±BAND s).
+    # The tab redrawn on the recording's clock along the guide, then warped locally (±BAND s).
     n_audio = Y.shape[1]
-    src = (np.arange(n_audio) / FPS - offset) / ratio * FPS
+    guide = piecewise_guide(X, Y, line)
+    if guide is None:
+        src = (np.arange(n_audio) / FPS - offset) / ratio * FPS
+    else:
+        tab_k, aud_k = guide
+        j = np.arange(n_audio, dtype=float)
+        src = np.interp(j, aud_k, tab_k)
+        src = np.where(j < aud_k[0], tab_k[0] - (aud_k[0] - j) / ratio, src)       # before/after the tab:
+        src = np.where(j > aud_k[-1], tab_k[-1] + (j - aud_k[-1]) / ratio, src)    # outside, dropped below
     inside = (src >= 0) & (src < X.shape[1] - 1)
     if inside.sum() < 10:
         raise ValueError('The tab and the recording do not overlap.')
