@@ -190,6 +190,14 @@ class LibContext:
             cl = self._procedural(mo.name, m, mo)
             if cl is not None:
                 return cl, "mocap:" + mo.name
+        # v11.6: a clip from your own motion library or a motion set (recorded or imported mocap) wins over the
+        # rig's own clips; the shipped starter does not
+        src_ = getattr(m, "motion_source", "") or ""
+        if (m.motion or "").startswith("lib:") and mo is not None and cfg.fill != "skip" and \
+                (src_ == "library" or src_.startswith("set:")):
+            cl = self._procedural(mo.name, m, mo)
+            if cl is not None:
+                return cl, "library:%s" % mo.name + (":" + m.character_type if getattr(m, "character_type", "") else "")
         names = [m.name] + ([m.motion] if m.motion else []) + ([mo.name] if mo else [])
         for n in names:
             if n in self.rig.clips:

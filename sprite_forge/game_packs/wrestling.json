@@ -31,6 +31,9 @@
   {
    "name": "walk",
    "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": true,
@@ -88,6 +91,9 @@
   {
    "name": "throw",
    "library": "punch",
+   "prefer": [
+    "throw_overhand"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,

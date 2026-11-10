@@ -1029,7 +1029,6 @@ C) ONE GAME FILE
   Egyptian Fighter and HD Fighter adapters still read a normal build (atlas.json, sprites.cfg, moves/).
   If those index files are missing and game_character.json is there, they rebuild the index from it.
     python tools/export_ef.py out/hero path/to/char_hero
-    python tools/to_egyptian_fighter.py out/hero path/to/char_hero
     python tools/export_hdf.py out/hero path/to/HD_Fighter hero
   Arena FC still reads a cut-out photo and landmarks (the manifest has no photo and no body shape).
   The Gaelic 3D mesh tool is unchanged.
@@ -1084,6 +1083,19 @@ COMMANDS
         Store a keys JSON that mocap already wrote. No video is opened.
   forge.py motion import walk.bvh --name walk --spdx CC0-1.0 --author "Me" --redistribution yes
         Also .fbx and .glb. The clip is retargeted onto the mannequin, then projected into pose channels.
+  forge.py motion import take.bvh --name jab --once --start 2.6 --end 3.5 --peak hand_L:0.3:0.35 --spdx ... 
+        v11.6, real mocap: any unit (CMU's ~22-unit person, cm, m), a leading T-pose is skipped, the figure is
+        turned to face forward, put on the floor and started at the origin, resampled to 30 fps, and the arms
+        re-solved so elbows and hands land where the take has them. --start/--end cut the move out of a long
+        take; --peak BONE:BEFORE:AFTER cuts one strike around the frame where that bone is furthest from the
+        hips; a --loop move is narrowed to its best loop. --raw is the v11.4 behaviour.
+  python tools/import_cmu.py --library ~/my_motions
+        23 moves of real motion capture from the CMU database (jab, cross, roundhouse, side_kick, soccer_kick,
+        jump_shot, layup, get_up, ...) into YOUR folder. CMU allows them in products but not redistributing the
+        clips, so they never go into motion_library/ or git. Build with --motion-library ~/my_motions.
+  forge.py motion record --folder clips/ --set mine [--strict]
+        v11.6: a clip without the opening T-pose is kept with a note (--strict makes it a reshoot); when the
+        tracker loses the person part of the way, the longest well-tracked stretch is kept.
   forge.py motion retarget punch --to sample_lanky --out lanky_punch.glb
   forge.py motion retarget punch --to sample_lanky --character-type heavy_brawler --save
   forge.py motion clean walk
@@ -1098,6 +1110,10 @@ BUILD
         motion_demo is a small profile that points several generic moves at the library. Copy it for your game.
   --motions punch,kick   keeps the rest of the profile's moves and only switches those names to lib:<name>.
   lib:punch in a profile move ("motion": "lib:punch") is the same switch for one move.
+
+  Game packs (v11.6): a move may list "prefer": ["jab"] before its generic "library": "punch". The first
+  clip found in your motion set or library is used, else the generic one. A clip from your own library or a
+  set is used before the rig's own clips; the shipped starter is not.
 
 CHARACTER TYPES
   A type is data: timing, stance, reach, weight. 1.0 leaves that axis alone.

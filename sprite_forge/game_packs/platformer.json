@@ -31,6 +31,9 @@
   {
    "name": "walk",
    "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": true,
@@ -52,6 +55,9 @@
   {
    "name": "run",
    "library": "run",
+   "prefer": [
+    "jog"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -73,6 +79,10 @@
   {
    "name": "jump",
    "library": "jump",
+   "prefer": [
+    "long_jump",
+    "jump_hop"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -109,6 +119,9 @@
   {
    "name": "punch",
    "library": "punch",
+   "prefer": [
+    "punch_straight"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -127,6 +140,9 @@
   {
    "name": "kick",
    "library": "kick",
+   "prefer": [
+    "kick_front"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -181,6 +197,9 @@
   {
    "name": "get_up",
    "library": "crouch",
+   "prefer": [
+    "get_up"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": false,

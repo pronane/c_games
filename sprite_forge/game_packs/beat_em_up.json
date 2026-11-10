@@ -13,6 +13,9 @@
   {
    "name": "idle",
    "library": "idle",
+   "prefer": [
+    "idle_boxing"
+   ],
    "frames": 6,
    "fps": 8,
    "loop": true,
@@ -31,6 +34,9 @@
   {
    "name": "walk",
    "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": true,
@@ -52,6 +58,9 @@
   {
    "name": "run",
    "library": "run",
+   "prefer": [
+    "jog"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -73,6 +82,9 @@
   {
    "name": "punch",
    "library": "punch",
+   "prefer": [
+    "punch_straight"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -91,6 +103,9 @@
   {
    "name": "kick",
    "library": "kick",
+   "prefer": [
+    "kick_front"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -109,6 +124,9 @@
   {
    "name": "jump",
    "library": "jump",
+   "prefer": [
+    "jump_hop"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -127,6 +145,9 @@
   {
    "name": "jumpattack",
    "library": "kick",
+   "prefer": [
+    "jump_kick"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,

@@ -52,6 +52,21 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.6: real motion capture, for any game pack
+
+* **Mocap import that works on real takes** (`motion import`): any unit, the leading T-pose skipped, turned to
+  face forward, on the floor, 30 fps, arms re-solved to the take (joints within ~2 mm). `--start/--end` and
+  `--peak hand_R` cut one move out of a long take; loops are narrowed to their best cycle.
+* **Free real motion** (`tools/import_cmu.py --library ~/my_motions`): 23 moves from the CMU Graphics Lab
+  database into your own folder. CMU allows them in products, not redistribution of the clips, so they stay out
+  of the repo. Build with `--motion-library`.
+* **Packs prefer specific clips** (`"prefer": ["jab"]` before `"library": "punch"`): boxing's jab, cross and
+  hook, fighting's roundhouse and side kick, soccer's kick and shot, gaelic's fist pass and leap catch, basketball's
+  dribble, shot and layup no longer all share one punch or kick. Without the clips the starter is used as before.
+* **Recording real footage** (`motion record --folder`): no T-pose is a note, not a reshoot (`--strict` for the
+  old rule); a take where tracking drops out keeps its longest well-tracked stretch; sets go to `--library`.
+* `tools/to_egyptian_fighter.py` is gone: `tools/export_ef.py` does the same job.
+
 ## New in v11.4: a motion library, and character types that change how a move is performed
 
 Sprite Forge could already retarget a clip and track a video. The moves themselves were still mostly
@@ -97,7 +112,7 @@ from the close-up turntables.
   * Unseen and dropped texels are filled on the body in 3D: from their mirror image first, then from the nearest
     kept texels of the same cluster, bone or layer. Before, they were inpainted in 2D across UV islands.
   * Light / dark bands inside one material are pulled part-way to its colour.
-* **Into the game** (`tools/to_egyptian_fighter.py`): converts a fighter build to Egyptian Fighter's sheet format.
+* **Into the game** (`tools/export_ef.py`): converts a fighter build to Egyptian Fighter's sheet format.
   The whole route from a captured GLB is in that file's header.
 
 On the synthetic test the clean-up costs a little texture accuracy (4.3 → 5.9 / 255) for the cleaner look; the

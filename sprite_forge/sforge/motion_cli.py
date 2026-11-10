@@ -75,6 +75,8 @@ def main(argv):
     rec.add_argument("--set", dest="set_name", help="name for that set (required with --folder)")
     rec.add_argument("--keep-temp", dest="keep_temp", action="store_true",
                      help="keep the tracker JSON under the set's _temp/ (a pose trace — do not pack it). Default: delete it.")
+    rec.add_argument("--strict", action="store_true",
+                     help="with --folder: a clip without the opening T-pose is a reshoot (default: a note; the whole take is used)")
     rec.add_argument("--name", help="library name (default: the move name)")
     rec.add_argument("--model", default="full", choices=["lite", "full", "heavy"])
     rec.add_argument("--facing", default="auto", choices=["auto", "side", "front", "mp"])
@@ -88,6 +90,13 @@ def main(argv):
     im.add_argument("--clip", help="which take inside an FBX / GLB (default: the first)")
     im.add_argument("--loop", action="store_true")
     im.add_argument("--once", action="store_true")
+    im.add_argument("--start", type=float, help="seconds into the take where the move starts (mocap takes are long)")
+    im.add_argument("--end", type=float, help="seconds into the take where the move ends")
+    im.add_argument("--no-cycle", dest="no_cycle", action="store_true",
+                    help="a --loop move is cut to its best loop inside start..end unless this is given")
+    im.add_argument("--peak", help="cut one strike out of a long take: BONE[:BEFORE:AFTER] e.g. hand_R:0.35:0.35 "
+                    "(the frame where that bone is furthest in front of the hips, inside start..end)")
+    im.add_argument("--raw", action="store_true", help="v11.4 behaviour: no cut, turn, floor or resample")
     _lic_args(im)
     rt = sub.add_parser("retarget", help="library move -> a library rig or an FBX / GLB file")
     rt.add_argument("name")
@@ -121,6 +130,16 @@ def main(argv):
     except (KeyError, ValueError, FileNotFoundError, RuntimeError) as e:
         print("error:", e.args[0] if e.args else e)
         return 2
+
+
+def _peak(txt):
+    if not txt:
+        return None
+    t = txt.split(":")
+    b = t[0]
+    pre = float(t[1]) if len(t) > 1 and t[1] else 0.35
+    post = float(t[2]) if len(t) > 2 and t[2] else pre
+    return (b, pre, post)
 
 
 def _run(a, p):
@@ -169,7 +188,8 @@ def _run(a, p):
                 print("record --folder needs --set NAME  (the clips become that motion set)")
                 return 2
             from . import session
-            rep = session.import_folder(a.folder, a.set_name, keep_temp=a.keep_temp, licence=lic)
+            rep = session.import_folder(a.folder, a.set_name, library=a.library, keep_temp=a.keep_temp, licence=lic,
+                                        strict=getattr(a, "strict", False))
             print(rep["text"], end="")
             print("Video, frames, face and body shape were not stored.")
             return 1 if rep["rejected"] else 0
@@ -187,10 +207,17 @@ def _run(a, p):
     if a.act == "import":
         lic = _lic_from(a)
         loop = True if a.loop else (False if a.once else None)
-        rec, out, probs = ML.import_file(a.file, name=a.name, clip=a.clip, library=a.library, licence=lic, loop=loop)
+        rec, out, probs = ML.import_file(a.file, name=a.name, clip=a.clip, library=a.library, licence=lic, loop=loop,
+                                         start=a.start, end=a.end, cycle=False if a.no_cycle else None, raw=a.raw,
+                                         peak=_peak(a.peak))
         info = rec.get("import") or {}
-        print("imported %s -> %s  (%d keys, projection mean %.3f m)" % (
-            rec["name"], out, len(rec["keys"]), info.get("projection_mean_m") or 0))
+        print("imported %s -> %s  (%d keys, %.2fs, pose error mean %.3f m)" % (
+            rec["name"], out, len(rec["keys"]), float(rec.get("duration") or 0), info.get("projection_mean_m") or 0))
+        if info.get("canonical"):
+            c = info["canonical"]
+            print("  cut %.2f-%.2fs%s, turned %+.0f deg to face forward, %g fps" % (
+                c["cut_s"][0], c["cut_s"][1], (", loop %.2f-%.2fs" % tuple(c["cycle_s"])) if c.get("cycle_s") else "",
+                c["turned_deg"], c["fps"]))
         if info.get("note"):
             print("  " + info["note"])
         _warn_lic(probs)

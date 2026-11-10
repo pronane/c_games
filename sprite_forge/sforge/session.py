@@ -21,7 +21,8 @@ Checks, in plain language, before a clip is kept:
                      or for longer than 0.4 s at a stretch
   body cut off       the head or a shoulder sits on the edge of the frame
   feet out of frame  ankles / toes sit on the bottom edge
-  no T-pose          the first second does not hold the arms out at shoulder height
+  no T-pose          the first second does not hold the arms out at shoulder height (v11.6: a note, not a
+                     reshoot, unless strict; the whole take is used)
 
 Where the clip repeats the move, the best repeat is kept (or a clean average of two
 close ones) and the T-pose is trimmed off. Locomotion names become a loop; a strike
@@ -134,7 +135,7 @@ def _tpose_ok(frames, fps, H):
     return ok >= 0.5 * det
 
 
-def check_track(track, move=""):
+def check_track(track, move="", strict=False):
     """-> list of plain-language reasons. Empty means the clip may be used."""
     reasons = []
     frames = list(track.get("frames") or [])
@@ -155,9 +156,42 @@ def check_track(track, move=""):
         reasons.append("tracking lost (%d of %d frames, longest gap %.2fs)" % (len(det), n, _gap_frames(frames) / fps))
     if det and _body_cut(frames, W, H):
         reasons.append("body cut off (head or shoulders leave the frame — step back so the whole body stays inside)")
-    if det and not _tpose_ok(frames, fps, H):
+    if det and strict and not _tpose_ok(frames, fps, H):
         reasons.append("no T-pose (hold the arms out at shoulder height for about 1 second before the move)")
     return reasons
+
+
+def check_notes(track):
+    """-> plain-language notes that do not stop a clip (v11.6: real footage rarely starts in a T-pose)"""
+    frames = list(track.get("frames") or [])
+    fps = float(track.get("fps") or 30.0) or 30.0
+    H = float((track.get("size") or [1, 1])[1] or 1)
+    notes = []
+    if _detected(frames) and not _tpose_ok(frames, fps, H):
+        notes.append("no T-pose (the whole take was used; a second of T-pose first gives a cleaner fit)")
+    if track.get("_cropped"):
+        notes.append("tracking was lost part of the way; kept the longest well-tracked stretch %.1f-%.1fs" % tuple(track["_cropped"]))
+    return notes
+
+
+def longest_tracked(track, max_gap_s=0.15, min_s=1.0):
+    """the longest stretch with the person tracked (gaps up to max_gap_s bridged); None if under min_s"""
+    frames = list(track.get("frames") or [])
+    fps = float(track.get("fps") or 30.0) or 30.0
+    gap_max = max(1, int(round(max_gap_s * fps)))
+    best = (0, 0); a = None; last = None
+    for i, f in enumerate(frames + [None] * (gap_max + 1)):
+        if f:
+            if a is None or (last is not None and i - last > gap_max):
+                a = i
+            last = i
+            if last + 1 - a > best[1] - best[0]:
+                best = (a, last + 1)
+    if best[1] - best[0] < min_s * fps:
+        return None
+    sub = dict(track, frames=frames[best[0]:best[1]])
+    sub["_cropped"] = (best[0] / fps, best[1] / fps)
+    return sub
 
 
 def _score_span(frames, a, b, H):
@@ -245,7 +279,7 @@ def pick_repeat(track, loop):
     if not best_lag or len(arr) < best_lag * 2:
         return dict(track, frames=rest), {"mode": "once" if not loop else "whole", "repeats": 1,
                                           "picked": 0, "trimmed_tpose_frames": start,
-                                          "note": "no clear repeat — using the clip after the T-pose"}
+                                          "note": "no clear repeat — using the clip after the T-pose" if start else "no clear repeat — using the whole clip"}
     nrep = int(len(rest) // best_lag)
     spans = [(start + i * best_lag, start + (i + 1) * best_lag) for i in range(nrep)]
     scores = [_score_span(frames, a, b, H) for a, b in spans]
@@ -382,7 +416,7 @@ def _pose_only(rec):
     return walk(rec)
 
 
-def import_folder(folder, set_name, library=None, keep_temp=False, licence=None):
+def import_folder(folder, set_name, library=None, keep_temp=False, licence=None, strict=False):
     """Import every clip in `folder` into motion set `set_name`.
 
     -> report dict with text, kept, rejected. The set lives at
@@ -437,7 +471,11 @@ def import_folder(folder, set_name, library=None, keep_temp=False, licence=None)
             rejected.append({"file": base, "move": stem, "reasons": pre})
             lines.append("%-18s RESHOOT   %s" % (base, "; ".join(pre)))
             continue
-        reasons = check_track(track, stem)
+        reasons = check_track(track, stem, strict=strict)
+        if reasons and any(r.startswith("tracking lost") for r in reasons):
+            sub = longest_tracked(track)          # real footage: keep the part where the person was tracked
+            if sub is not None and not check_track(sub, stem, strict=strict):
+                track, reasons = sub, []
         if reasons:
             rejected.append({"file": base, "move": stem, "reasons": reasons})
             lines.append("%-18s RESHOOT   %s" % (base, "; ".join(reasons)))
@@ -486,9 +524,13 @@ def import_folder(folder, set_name, library=None, keep_temp=False, licence=None)
             rejected.append({"file": base, "move": stem, "reasons": ["refusing to store a clip that still contains landmarks or video"]})
             lines.append("%-18s RESHOOT   internal check refused to store landmarks" % base)
             continue
+        notes = check_notes(track)
+        if notes:
+            rec["session"]["notes"] = notes
         ML.open_library(dest).save(rec)
         kept.append(stem)
-        lines.append("%-18s OK        %s. %d keys. stored as skeleton only." % (base, info.get("note") or info.get("mode"), len(keys)))
+        lines.append("%-18s OK        %s. %d keys. stored as skeleton only.%s" % (
+            base, info.get("note") or info.get("mode"), len(keys), "".join("\n%-18s   note:  %s" % ("", n) for n in notes)))
     # drop any media that might have been copied by mistake
     for f in os.listdir(dest):
         ext = os.path.splitext(f)[1].lower()

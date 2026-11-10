@@ -6,7 +6,16 @@
 Writes one horizontal strip per move (idle.png, walk.png, ... pyramid_blast.png = special_1,
 bum_fireball.png = special_2), the game's own sprites.cfg grid format
 (cell / baseline / stand_height / anim <state> <file> <frames> <frame_time>) and portrait.png.
-Pure Pillow; the pixels are copied unchanged from moves/<move>_<NN>.png."""
+Pure Pillow; the pixels are copied unchanged from moves/<move>_<NN>.png.
+
+For a character captured from a video (`forge.py capture`), the whole route is:
+    forge.py library --library LIB add OUT/NAME.glb --name NAME --kind rig
+    forge.py build --profile library_fighter --library LIB --rig NAME --set kit= --set clip_map= --name NAME \
+        --game fighting --frame 800x800 --figure-h 560 --ground-y 788 --root-motion inplace --strips --out BUILD
+    python tools/export_ef.py BUILD/NAME path/to/egyptian_fighter/assets/char_NAME --projectile ball
+Render near the game's cell size (figure 560 px): the game draws fighters ~300 px tall at 720p and scales the
+sheet down with mipmaps, so a 256 px build looks soft. Real strikes reach and step further than the procedural
+ones, so give the cell room (800 px wide)."""
 import json, os, sys, argparse
 from PIL import Image
 

@@ -13,6 +13,9 @@
   {
    "name": "idle",
    "library": "idle",
+   "prefer": [
+    "idle_boxing"
+   ],
    "frames": 6,
    "fps": 8,
    "loop": true,
@@ -52,6 +55,9 @@
   {
    "name": "jab",
    "library": "punch",
+   "prefer": [
+    "jab"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -70,6 +76,9 @@
   {
    "name": "cross",
    "library": "punch",
+   "prefer": [
+    "cross"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -88,6 +97,9 @@
   {
    "name": "hook",
    "library": "punch",
+   "prefer": [
+    "punch_power"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,

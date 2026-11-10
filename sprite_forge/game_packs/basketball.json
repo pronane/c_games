@@ -33,6 +33,9 @@
   {
    "name": "walk",
    "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": true,
@@ -54,6 +57,9 @@
   {
    "name": "run",
    "library": "run",
+   "prefer": [
+    "jog"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -75,6 +81,9 @@
   {
    "name": "dribble",
    "library": "run",
+   "prefer": [
+    "dribble"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -96,6 +105,9 @@
   {
    "name": "pass",
    "library": "pass",
+   "prefer": [
+    "throw_overhand"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -114,6 +126,10 @@
   {
    "name": "shoot",
    "library": "shoot",
+   "prefer": [
+    "basketball_shoot",
+    "jump_shot"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -132,6 +148,9 @@
   {
    "name": "layup",
    "library": "jump",
+   "prefer": [
+    "layup"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -150,6 +169,9 @@
   {
    "name": "block",
    "library": "block",
+   "prefer": [
+    "jump_shot"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -168,6 +190,9 @@
   {
    "name": "rebound",
    "library": "jump",
+   "prefer": [
+    "jump_vertical"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
