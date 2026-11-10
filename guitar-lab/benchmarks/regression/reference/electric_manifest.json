@@ -1,0 +1,362 @@
+{
+  "purpose": "Evaluation and regression-gate material only. Not training data, and not an input to the transcriber.",
+  "licence": "CC BY 4.0",
+  "not_downloaded": [
+    "EGDB and EGDB-PG (public bundle is 135 GB; original set is on request)",
+    "GOAT (access restricted)",
+    "Cambridge-MT (AI training not allowed)",
+    "Guitar-TECHS archives other than P3_music.zip (techniques, chords, scales, single notes)",
+    "EGSet12 best_TabCNN_tablature_trancription_model (paper weights, not a recording)"
+  ],
+  "egset12": {
+    "title": "EGSet12",
+    "zenodo": "https://zenodo.org/records/11406378",
+    "record": "11406378",
+    "doi": "10.48550/arXiv.2405.14679",
+    "licence": "CC BY 4.0",
+    "credit": "Pedroza, Hegel, Abreu, Wallace, Corey, Ryan, and Roman, Iran. EGSet12: twelve real and original solo electric guitar performances with diverse playing styles to evaluate guitar tablature transcription. Zenodo, 2024.",
+    "files": {
+      "01.gp": {
+        "md5": "811dde6c5ffd1754dcbd468100a869af",
+        "size": 14513,
+        "sha256": "c2ba49408ed5a55d5f2d26bfbb73d95e732100acf6da1affe00409d6230d1780"
+      },
+      "01.jams": {
+        "md5": "083c7dae8e6556c20b9a2d762e2c977f",
+        "size": 52172,
+        "sha256": "a8d8741567cf5247b878800dc78ad9a6f5add784d01f2c1a7328e59d650f5ee1"
+      },
+      "01.wav": {
+        "md5": "2eb739c5fb73e6327bb47267afe3eddf",
+        "size": 8640044,
+        "sha256": "f7d5bd85dfaf4e5262599cc5b07ff40ced6516690698021f16e1ce23a80d791d"
+      },
+      "02.gp": {
+        "md5": "dca6ce7f304ab28b7c3fdfbf8780a2ff",
+        "size": 14835,
+        "sha256": "36bf7e4a157a1ab2ac6759d9a13711f879d8223c351adad42820b3f7e8735d86"
+      },
+      "02.jams": {
+        "md5": "848f984b17b261a65585e25fba977a33",
+        "size": 120087,
+        "sha256": "a50fb3a0c43b689da17c665c2c88639693357136dabc4c305274f0c214898bbd"
+      },
+      "02.wav": {
+        "md5": "69b8701ea9a81428a6346e0d3d4b9b85",
+        "size": 8886896,
+        "sha256": "1f58d1b81669f559aeb1d6d53a3f83ebfd93627f4c1cc525884827d789ff428a"
+      },
+      "03.gp": {
+        "md5": "820a2337cc43c1b1b606151cfae4e6bb",
+        "size": 14398,
+        "sha256": "8f73870b4b7e897d72889771e80486d1c54e65dbce4d13ac0ea58c6acf4b8112"
+      },
+      "03.jams": {
+        "md5": "721ec50f570892f9cfa88fb1e22a6113",
+        "size": 45984,
+        "sha256": "d880a33c0ca549516396008e8e0743a17f71d8c6815c4ed3fe1f81bcca6407e3"
+      },
+      "03.wav": {
+        "md5": "28141f17e46399553c52f5ed27bc10e2",
+        "size": 10368044,
+        "sha256": "5853a7816cdb2780e674b51a9b61f5e70bd4d3b748037e712da9eaafb520ed97"
+      },
+      "04.gp": {
+        "md5": "53aa7e4d86996aaeedeeef2e47dfacf3",
+        "size": 15221,
+        "sha256": "e1cb255bd728c4ea6aa3f7bbada1ea6b6211e0c5bac0d5cc878630981184e6bd"
+      },
+      "04.jams": {
+        "md5": "87426719ac4353d73e1af09970c31eb1",
+        "size": 86938,
+        "sha256": "68d5c24779002f9e9c30cde71d88f1cd772031382f9ae3ce75f99f6e5470dd8d"
+      },
+      "04.wav": {
+        "md5": "6fe2f6f915953e8ae28b8a84a7677d0f",
+        "size": 8797130,
+        "sha256": "a5985aea3379e4a0fbe8cb7126c96e0f88517367823e3f6eaed84a7db438af2b"
+      },
+      "05.gp": {
+        "md5": "21a5166d9d16e8ac90c6ce16256a4ce8",
+        "size": 15069,
+        "sha256": "77ab8dc14e165fbc4f7d9708f6cb09f72faac27ffd85fda38c22bab0baad5896"
+      },
+      "05.jams": {
+        "md5": "c5c2fd376031177e87a3eb4ad12d220c",
+        "size": 56724,
+        "sha256": "bd9437c0ce51175aeb75c5671ffba31f5778999689c02872e80de3f966ac9f3c"
+      },
+      "05.wav": {
+        "md5": "3435348c2b6702524dade471be70e4eb",
+        "size": 9600044,
+        "sha256": "8b53f0648c1a71d5f63031d56d6c792f3be3accadbf50300463982dae453dae6"
+      },
+      "06.gp": {
+        "md5": "dad00cbe2d7a28399106f0ec7221a8f0",
+        "size": 13771,
+        "sha256": "90c6940579fbbfb50b46e1535850f12b9c1e61a311be7ddf746191528e1755b9"
+      },
+      "06.jams": {
+        "md5": "5ababdcf7741400dc93768334f6c899d",
+        "size": 186045,
+        "sha256": "ac52f065eac573fc6557c47cfd57d75d1e3ed4e8f04fdb6d23b11e44a9c330cc"
+      },
+      "06.wav": {
+        "md5": "9f7ead382f373259b466ccd1884ed173",
+        "size": 8723924,
+        "sha256": "b892b6d70bb631b16cb33023bbdf3fe15174b76ecf373eb53ec7d3b664f8da4d"
+      },
+      "07.gp": {
+        "md5": "ff4998113e7524e3063c27a7229f0c72",
+        "size": 14243,
+        "sha256": "b655232bb66db3ea82ece746e46f16d0690623c47b8879005aeac4fcb7065e34"
+      },
+      "07.jams": {
+        "md5": "e693844f4b46fd3831c7c4ee0a2c3aa8",
+        "size": 38330,
+        "sha256": "8790d6e6fa8054a195bedf8797d86093be425a0790d68d337ce99069d9fdc40c"
+      },
+      "07.wav": {
+        "md5": "77f752ab3e7a5c606a21ac7b0df4fa1c",
+        "size": 8755244,
+        "sha256": "db1585f1b4d6c2328d86df3d846bb9cbce01f8717cfd3a8cda17ff10ee84f884"
+      },
+      "08.gp": {
+        "md5": "25a607d5bc6f7df2a6864bf09d770542",
+        "size": 15050,
+        "sha256": "9a5c08ac8ac247f8c1114fb7bd953d1141cf8634c5fc2f9331e5dbd82c2b8d96"
+      },
+      "08.jams": {
+        "md5": "513e00c522d53adac0ed9966a5b4c8cd",
+        "size": 48855,
+        "sha256": "2fcbee4456d8aa97f27c7633ab60029e37a9365efa91d00296c2e4c152a2b0a5"
+      },
+      "08.wav": {
+        "md5": "a59f373c00b8a327b37ce28f6601404c",
+        "size": 9169016,
+        "sha256": "dcfb753349cb0a2bd6bba1baad0b4753b2b3ce81977633494b6186ccf8144020"
+      },
+      "09.gp": {
+        "md5": "e4e6e78962d560037cd0fc9cd60c0959",
+        "size": 14756,
+        "sha256": "83c3ffafc154a308e970c93ad974e092ce68d320652be12b5cf25b16c277a449"
+      },
+      "09.jams": {
+        "md5": "9f08cae003c6c3d9dc745c2e319496d4",
+        "size": 49728,
+        "sha256": "3cd5b0e35999bfcffee396e717c8ddc0057700aaa63c4db93ab04dbad455f24a"
+      },
+      "09.wav": {
+        "md5": "593aec1394a905a0c8b255a847f54139",
+        "size": 8730980,
+        "sha256": "2ec581885346b8180b9f58898fc923a45f742072b96eb0a14b7faaa8bd752309"
+      },
+      "10.gp": {
+        "md5": "3583cd15d0e1ae170ea2f2d77e99ef07",
+        "size": 13857,
+        "sha256": "6e0fe1640fd150df124ec54f0e20d09f95de4a119bf152f201b3355fb81a5c71"
+      },
+      "10.jams": {
+        "md5": "8cbf70e1b086f4a8fe5cac79572635ae",
+        "size": 42653,
+        "sha256": "2ea2e1fe0ff0613d257e6c422903ac86497265d8486ca0afb90f3f2668d84dff"
+      },
+      "10.wav": {
+        "md5": "123818ef1020102252192d9e7a231e07",
+        "size": 8730980,
+        "sha256": "d862abfa41f94a8875de82eea3fc7b65194fdc3c87e99b15975a796de2310c0f"
+      },
+      "11.gp": {
+        "md5": "9d7b278dd3fda47cf7a717b0a6cdec86",
+        "size": 15356,
+        "sha256": "d47c860249682921f045a4de560ec9ff83e8c2bde8ca46a1fa7ee02e79001345"
+      },
+      "11.jams": {
+        "md5": "f392b5bba5f3b99866bba91cb4d35a9a",
+        "size": 57003,
+        "sha256": "330f44c21c1c60a8bf2e395f0b0182cff05d9ef204d3caf2e9f9344779e57df5"
+      },
+      "11.wav": {
+        "md5": "4bbaecaaa3e58bef6bb15a6cd0979fe2",
+        "size": 9032774,
+        "sha256": "a8f2f28bc077ce15974827150286f76738ecc9dfd982e26abe34e1bb20381acb"
+      },
+      "12.gp": {
+        "md5": "a21a8f645d41186eb1194571110f5686",
+        "size": 15194,
+        "sha256": "74c1699ec9066c75fd38e9deaec9c4db9ffab52a596ac7f2401e4591e9a4121c"
+      },
+      "12.jams": {
+        "md5": "21217bda094eb8f29edfd1ed2f23ba45",
+        "size": 47846,
+        "sha256": "8d6aeffdd11ea957908ca486e6b3e9472b68adccae63ab676a550a7decec90fb"
+      },
+      "12.wav": {
+        "md5": "e1ee73508f37d5c28c69877a588665d2",
+        "size": 6702584,
+        "sha256": "ab5e061e449ba1ec2ab04c9e1bff0ab0f14aa7623ccef45b035553ac33976d3c"
+      }
+    }
+  },
+  "guitar_techs": {
+    "title": "Guitar-TECHS musical excerpts (player 3)",
+    "zenodo": "https://zenodo.org/records/14963133",
+    "site": "https://guitar-techs.github.io/",
+    "record": "14963133",
+    "doi": "10.1109/ICASSP49660.2025.10887996",
+    "licence": "CC BY 4.0",
+    "credit": "Pedroza, Hegel, Abreu, Wallace, Corey, Ryan M., and Roman, Iran R. Guitar-TECHS: An Electric Guitar Dataset Covering Techniques, Musical Excerpts, Chords and Scales Using a Diverse Array of Hardware. ICASSP 2025.",
+    "archive": {
+      "name": "P3_music.zip",
+      "md5": "071ba80aecf00f4a31fbd167b3f22198",
+      "size": 129505089,
+      "sha256": "033489e22600751fb5a1633e7d856b901c6782e0486fa02135e830780d9dbfe2"
+    },
+    "extracted": {
+      "P3_music/audio/directinput/directinput_01.wav": {
+        "sha256": "b985af2acea79809f572c869a007bd4b5257d4684b0636f26bd09f6482f9d0eb",
+        "size": 20880690
+      },
+      "P3_music/audio/directinput/directinput_02.wav": {
+        "sha256": "6443d2cf16732e3ee1ed266f2ae6a5d7a9a3a084f092aab0949f8b209ae231f0",
+        "size": 10752690
+      },
+      "P3_music/audio/directinput/directinput_03.wav": {
+        "sha256": "84980b5468f3315171e4e546a1d38d54e4c368ccb5fee72c759e0915f346fad0",
+        "size": 8436690
+      },
+      "P3_music/audio/directinput/directinput_04.wav": {
+        "sha256": "2d1337a6249757f2081bc9aa3eca003e7ff0a4c3f56c72e436aec366bbee3043",
+        "size": 10680690
+      },
+      "P3_music/audio/directinput/directinput_05.wav": {
+        "sha256": "71a6831d1c6280b305ad78f5cbeae58673191b7ac05a164b33ac9b5e4e8ace1e",
+        "size": 15840690
+      },
+      "P3_music/audio/directinput/directinput_06.wav": {
+        "sha256": "2fd88dc725f475e13686f50ce6c88e7fed3d6b635b62147a69d42e29a5dd6254",
+        "size": 9216690
+      },
+      "P3_music/audio/directinput/directinput_07.wav": {
+        "sha256": "73ddd8de2bda202eb896775d4264b65276f9be9e4bb45161d4fa86541bc8da99",
+        "size": 10656690
+      },
+      "P3_music/audio/directinput/directinput_08.wav": {
+        "sha256": "f58cd8dcd68eeec7c9e58839e7161671ba3af9963957e35f1f04a1f2644d3ff3",
+        "size": 7872690
+      },
+      "P3_music/audio/directinput/directinput_09.wav": {
+        "sha256": "849180cb93623d0acb4a3239072d8b96be16b6f7fe669fec629861f4bbe4bd1e",
+        "size": 11232690
+      },
+      "P3_music/audio/directinput/directinput_10.wav": {
+        "sha256": "d50cc046c4d1d39899c534738377b9d0c5d5396bbed980a029c61b7e4a77d6b8",
+        "size": 14832690
+      },
+      "P3_music/audio/directinput/directinput_11.wav": {
+        "sha256": "0842bfb4e73142205123d6d362ff8f007e277ce022a4e40dd70b824ecb7543d8",
+        "size": 6084690
+      },
+      "P3_music/audio/directinput/directinput_12.wav": {
+        "sha256": "150ef466bf645ec076396810fbfc027f423294a5f49bf7c0887bcc1ff732930e",
+        "size": 12372690
+      },
+      "P3_music/audio/micamp/micamp_01.wav": {
+        "sha256": "41bf28b085781abdad7f27893a205fec769497eadc59b79db008fb37c081b66d",
+        "size": 13920316
+      },
+      "P3_music/audio/micamp/micamp_02.wav": {
+        "sha256": "c7b2d5f65b00d1faa05be99262b5d6776993225f244f04242595edc438853328",
+        "size": 7168508
+      },
+      "P3_music/audio/micamp/micamp_03.wav": {
+        "sha256": "d43cbcb345a964bb1f0ceb492508926b0cb0b79ec65569ffca223c0e3d7a47e3",
+        "size": 5624252
+      },
+      "P3_music/audio/micamp/micamp_04.wav": {
+        "sha256": "276b7a83db540efdbf8cce5f698d1a07a5bbe3a44f3d4993ba4ab1275e8fdfbd",
+        "size": 7120312
+      },
+      "P3_music/audio/micamp/micamp_05.wav": {
+        "sha256": "1f67541d71f64758dbf334e7ccbb48807dc66ba584827ee76b326c485cd1e77d",
+        "size": 10560324
+      },
+      "P3_music/audio/micamp/micamp_06.wav": {
+        "sha256": "a1338a8629a7d429c7147308769aff7159c44e1772f23bbed07c9a70fc7bbbde",
+        "size": 6144340
+      },
+      "P3_music/audio/micamp/micamp_07.wav": {
+        "sha256": "ba2c3e81a151f7f7628fd44a3ccb268417af71481bd2c2f144866c6c79e5fb67",
+        "size": 7104408
+      },
+      "P3_music/audio/micamp/micamp_08.wav": {
+        "sha256": "d135b083b1e2083fd0536af22fc7f729885515d5b07d57183816aafba99d2d52",
+        "size": 5248244
+      },
+      "P3_music/audio/micamp/micamp_09.wav": {
+        "sha256": "ced85e52580a906ccd83e51b1ce871cfceebb59847af5975b1ac011ba25c7d7b",
+        "size": 7488124
+      },
+      "P3_music/audio/micamp/micamp_10.wav": {
+        "sha256": "16038f5c3d17c423b888e1d5c575439ae5a88b5d1905e84496ad5667e0323f30",
+        "size": 9888256
+      },
+      "P3_music/audio/micamp/micamp_11.wav": {
+        "sha256": "673f074ef65d75219bd33c34385208070acf5f755b40808ced467a4e8d93b604",
+        "size": 4056360
+      },
+      "P3_music/audio/micamp/micamp_12.wav": {
+        "sha256": "556d45f86d6d0e0a62cb05ea88093a30c9f32ede31c64a579f3844a3308ac182",
+        "size": 8248232
+      },
+      "P3_music/midi/midi_01.mid": {
+        "sha256": "b34ed51b14d9fca7bc8637785e46a170bffac2ebb541a942ec57613fe474bc5c",
+        "size": 2341
+      },
+      "P3_music/midi/midi_02.mid": {
+        "sha256": "9fdd15267c7e91696695c31f8174fa1bbc9dd43383df3d38edc2588e26597e28",
+        "size": 2227
+      },
+      "P3_music/midi/midi_03.mid": {
+        "sha256": "048f1a40e3c3d31b742c9ccccc7c05f6c73ceb87457f98d6837998451bbd568f",
+        "size": 886
+      },
+      "P3_music/midi/midi_04.mid": {
+        "sha256": "89bad9047cfa25b2b46229ea6104566e4b2e83654cbcf12cbf387987822823be",
+        "size": 1791
+      },
+      "P3_music/midi/midi_05.mid": {
+        "sha256": "d99204f280b6074f4846e77477d8f6047152115ec9e2c14cfea5c0ead47d187b",
+        "size": 968
+      },
+      "P3_music/midi/midi_06.mid": {
+        "sha256": "1847ab3c83c4a85027c8bf801a17ffc494f48d381723b39de908b29c99e094cd",
+        "size": 2643
+      },
+      "P3_music/midi/midi_07.mid": {
+        "sha256": "0fe700944a025170ceddcd5110f37464864ce261b7bed3003d96e3c86d55acd9",
+        "size": 1450
+      },
+      "P3_music/midi/midi_08.mid": {
+        "sha256": "329b128e6cb86cc2c43502ecdf8ae89e0049f69b564e29e41ef55b7b54411250",
+        "size": 1496
+      },
+      "P3_music/midi/midi_09.mid": {
+        "sha256": "105ddff1d3535652ae7268ca253d81087a817242b1b88209ed75e72267888b36",
+        "size": 1152
+      },
+      "P3_music/midi/midi_10.mid": {
+        "sha256": "b90b3903419a2536f922a4bdbf2644315653efc1ae96375d5e57e0c9b3af5331",
+        "size": 1846
+      },
+      "P3_music/midi/midi_11.mid": {
+        "sha256": "ea480b4134c5a150bea367a3b90374da73f871fa41c77af0397dd576cd81d5fc",
+        "size": 1134
+      },
+      "P3_music/midi/midi_12.mid": {
+        "sha256": "1a22cd193ac5fcc54258d3125f486bdaa7134c8bb131a7c3875d580a40ee6abe",
+        "size": 1846
+      }
+    }
+  }
+}

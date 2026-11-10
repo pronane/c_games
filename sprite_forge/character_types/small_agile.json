@@ -1,0 +1,10 @@
+{
+  "name": "small_agile",
+  "label": "Small agile",
+  "games": ["platformer", "rpg", "npc"],
+  "timing": 0.64,
+  "stance": 0.75,
+  "reach": 0.9,
+  "weight": 0.6,
+  "notes": "Fast, narrow and light. For small platformer or RPG characters."
+}

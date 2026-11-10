@@ -14,6 +14,16 @@
   python forge.py profile list | show NAME | validate FILE | new NAME [--from BASE]
   python forge.py video --clip walk=walk.mp4 --clip "jump:12=jump.mp4#plate_start=0.5" --name hero --consoles snes,gba
   python forge.py mocap --clip run=my_run.mp4 --name hero        (pose tracking -> mannequin animation, see help mocap)
+  python forge.py motion list                                 (shared-skeleton motion library, v11.4)
+  python forge.py motion record --clip punch=punch.mp4        (video -> mocap -> library)
+  python forge.py motion import clip.bvh --name punch --spdx CC0-1.0 --author "Me"
+  python forge.py motion retarget punch --to my_rig --out hero.glb
+  python forge.py motion clean punch
+  python forge.py motion record --folder clips --set owner   (v11.5: folder of clips -> skeleton set)
+  python forge.py motion shotlist --game soccer
+  python forge.py game list
+  python forge.py build --mannequin --game soccer --motion-set owner --character-type quick_striker
+  python forge.py build --mannequin --moves punch=lib:punch --character-type heavy_brawler
   python forge.py scan --video orbit.mp4 --name statue            (orbit video -> COLMAP project / mesh, see help scan)
   python forge.py doctor               -> what is installed / what each missing piece disables
   python forge.py list                 -> presets, moves, motions, kits
@@ -27,7 +37,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sforge import __version__  # noqa: E402
-from sforge.moves import MoveSpec, preset, PRESETS, PRESET_KEYS, slug  # noqa: E402
+from sforge.moves import MoveSpec, preset, PRESETS, PRESET_KEYS, slug, split_spec  # noqa: E402
 from sforge.motions import LIB, find_motion  # noqa: E402
 
 
@@ -38,8 +48,7 @@ def parse_moves(base, spec):
     by = {m.name: m for m in base}
     out = []
     for item in [x.strip() for x in spec.split(",") if x.strip()]:
-        parts = item.split(":")
-        nm, _, mot = parts[0].partition("=")
+        nm, mot, frames, fps, loop = split_spec(item)
         key = slug(nm)
         m = by.get(key)
         if m is None:
@@ -47,12 +56,12 @@ def parse_moves(base, spec):
             m = MoveSpec(key, nm, mo.category if mo else "Custom", 8, 12, bool(mo and mo.loop), mot or "", "custom move")
         if mot:
             m.motion = mot
-        if len(parts) > 1 and parts[1]:
-            m.frames = int(parts[1])
-        if len(parts) > 2 and parts[2]:
-            m.fps = int(parts[2])
-        if len(parts) > 3:
-            m.loop = parts[3].lower() in ("1", "loop", "true", "yes")
+        if frames:
+            m.frames = int(frames)
+        if fps:
+            m.fps = int(fps)
+        if loop:
+            m.loop = loop.lower() in ("1", "loop", "true", "yes")
         out.append(m)
     return out
 
@@ -95,6 +104,15 @@ def cmd_build(a):
     if a.preset:
         cfg.moves = preset(a.preset)
     cfg.moves = parse_moves(cfg.moves, a.moves)
+    if getattr(a, "game", None):
+        from sforge import gamepack
+        try:
+            gp = gamepack.apply(cfg, a.game)
+        except (ValueError, FileNotFoundError, OSError) as e:
+            print("error:", e); return 2
+        print("game pack %s: %d moves, camera %s" % (gp["name"], len(gp["moves"]), gp["camera"]))
+        if a.moves:
+            print("note: --game sets the move list (--moves was replaced)")
     if getattr(a, "landmarks", None):
         cfg.landmarks = a.landmarks
     if a.photo:
@@ -286,6 +304,32 @@ def cmd_build(a):
         cfg.motion_style = a.motion_style
     if a.footlock:
         cfg.footlock = True
+    if getattr(a, "character_type", None):
+        from sforge import chartypes
+        try:
+            chartypes.load(a.character_type)
+        except (FileNotFoundError, ValueError) as e:
+            print(e); return 2
+        cfg.character_type = a.character_type
+    if getattr(a, "motion_library", None):
+        cfg.motion_library = a.motion_library
+        os.environ["SFS_MOTIONS"] = a.motion_library
+    if getattr(a, "motion_set", None):
+        cfg.motion_set = a.motion_set
+    if getattr(a, "motions", None):
+        from sforge import motionlib as _ML
+        wanted = [slug(x) for x in a.motions.split(",") if x.strip()]
+        missing = [n for n in wanted if not _ML.has_move(n, a.motion_library)]
+        if missing:
+            print("motion library has no %s (forge.py motion list)" % ", ".join(missing)); return 2
+        by = {m.name: m for m in cfg.moves}
+        for n in wanted:
+            if n in by:
+                by[n].motion = "lib:" + n
+            else:
+                rec = _ML.load_move(n, a.motion_library)
+                cfg.moves.append(MoveSpec(n, n.replace("_", " ").title(), rec.get("category") or "Library",
+                                          8, 12, bool(rec.get("loop")), "lib:" + n, rec.get("desc") or ""))
     if a.framedata:
         cfg.framedata = True
     if cfg.vary:
@@ -338,6 +382,9 @@ def cmd_list(a):
     print("\nConsole targets (--console KEY):")
     for k in consoles.ORDER:
         print("  %-11s %-26s %s" % (k, consoles.LABELS[k], consoles.describe(k)))
+    from sforge import motionlib, chartypes
+    print("\nMotion library (forge.py motion list): " + ", ".join(motionlib.list_moves()))
+    print("Character types (--character-type): " + ", ".join(chartypes.list_types()))
 
 
 def cmd_profile(a):
@@ -518,6 +565,12 @@ def main(argv=None):
     if argv and argv[0] == "retarget":
         from sforge import library_cli
         return library_cli.retarget_main(argv[1:])
+    if argv and argv[0] == "motion":        # v11.4 shared-skeleton motion library + character types
+        from sforge import motion_cli
+        return motion_cli.main(argv[1:])
+    if argv and argv[0] == "game":          # v11.5 game-type packs
+        from sforge import gamepack
+        return gamepack.main(argv[1:])
     if argv and argv[0] == "anim-export":     # v7: character_base.glb + anim_<move>.glb (+ .fbx) + manifest.json
         from sforge import animexport
         return animexport.main(argv[1:])
@@ -551,6 +604,8 @@ def main(argv=None):
   cutout      photo -> one person cut out (transparent) + sprite + HD sprite + pose points
   turn        cut-out person seen side-on / from behind (--yaw 0|90|180|270 or any angle; estimated depth)
   export-ef   built character -> Egyptian Fighter / Padel Wars char_<name>/ folder (sprites.cfg, HD + low-res)
+  motion      v11.4 motion library: list | record | import | retarget | clean | types | sets | shotlist
+  game        v11.5 game-type packs: list | show | validate | shotlist
   package     drop-in zip for a game's assets/ folder (<= 25 MB check)
   summary     one-page pipeline summary image
   cache       build cache: cache stats | clear | prune
@@ -674,6 +729,15 @@ v9:
     v9x.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], help="v9.3 compute backend for photo3d: auto = CUDA / Apple MPS through PyTorch when available, else NumPy (default auto; env SFS_DEVICE)")
     v9x.add_argument("--motion-style", choices=["classic", "polish"], help="v9.1 photo puppet in-betweens: polish = smooth curves + limb lag when a move has more frames than key poses (default classic)")
     v9x.add_argument("--footlock", action="store_true", help="pin planted feet with 2-bone IK (no foot sliding) - mannequin / library moves")
+    v11 = b.add_argument_group("v11.4 motion library and character types")
+    v11.add_argument("--character-type", dest="character_type",
+                     help="motion personality: heavy_brawler, quick_striker, keeper, playmaker, big_boss, small_agile, balanced, or a JSON path (forge.py motion types)")
+    v11.add_argument("--motions", help="drive these moves from the motion library (comma list). Other moves stay as they are. e.g. punch,kick,tackle")
+    v11.add_argument("--motion-library", dest="motion_library", help="extra motion-library folder, searched before the shipped starter (or $SFS_MOTIONS)")
+    v115 = b.add_argument_group("v11.5 game packs, motion sets, game_character.json")
+    v115.add_argument("--game", help="game-type pack: soccer, boxing, fighting, gaelic, ... (forge.py game list) or a path to your own JSON")
+    v115.add_argument("--motion-set", dest="motion_set",
+                      help="named recorded set to read first (forge.py motion sets). 'off' ignores the saved default. Missing moves fall back to the starter, then the procedural motion.")
     v9x.add_argument("--framedata", action="store_true", help="hit / hurt boxes + startup / active / recovery -> framedata.json + framedata.cfg")
     v9x.add_argument("--blend", help="transition moves 'idle>walk:3,punch>idle:3' -> blend_<a>_<b>")
     v9x.add_argument("--no-qa", dest="no_qa", action="store_true", help="skip the sprite QA checker")
@@ -686,6 +750,7 @@ v9:
     sub.add_parser("gui", help="open the visual studio")
     sub.add_parser("library", help="user library of FBX/GLB rigs, animations, kits + .sfpack packs (forge.py library -h)")
     sub.add_parser("retarget", help="apply clips from one library rig / FBX / GLB to another (forge.py retarget -h)")
+    sub.add_parser("motion", help="v11.4 motion library on the shared skeleton: list, record, import, retarget, clean (forge.py motion -h)")
     sub.add_parser("capture", help="v11: a turnaround video (or one photo) of a person -> rigged, textured 3D character: GLB / FBX / OBJ with skeleton and clips (forge.py capture -h)")
     sub.add_parser("human", help="v7: MakeHuman mode - parametric human (gender/age/muscle/weight/height/proportions) from the CC0 MakeHuman assets -> library rig (forge.py human -h)")
     sub.add_parser("look", help="v10.2: realistic MakeHuman character from appearance keys (muscles, hair, beard, brows, lips, nose, eyes...) -> preview / GLB / sprites (forge.py look -h)")

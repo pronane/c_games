@@ -68,6 +68,20 @@ RENDERED = (
     {'id': 'ks_reverb', 'category': 'reverb_clear', 'voice': 'reverb', 'fast': True, 'pair': 'ks_clear'},
 )
 
+# EGSet12: twelve miked-amp solos, no other effects. CC BY 4.0. Audio stays out of git.
+# Guitar-TECHS P3: the twelve musical excerpts (miked amp and DI). CC BY 4.0.
+# The other Guitar-TECHS archives (chords, scales, techniques) are not part of this gate.
+EGSET12_IDS = tuple(f'{index:02d}' for index in range(1, 13))
+GUITAR_TECHS_IDS = tuple(f'{index:02d}' for index in range(1, 13))
+EGSET12_CLIPS = tuple(
+    {'id': f'egset_{piece}', 'category': 'amp_solo', 'piece': piece}
+    for piece in EGSET12_IDS
+)
+GUITAR_TECHS_CLIPS = tuple(
+    {'id': f'techs_{piece}', 'category': 'amp_excerpt', 'piece': piece}
+    for piece in GUITAR_TECHS_IDS
+)
+
 
 def _exists(path: Path) -> bool:
     return path.is_file() and path.stat().st_size > 0
@@ -95,6 +109,31 @@ def metallica_paths():
     return {'audio': folder / 'song.mp3', 'tab': folder / 'song.gp4'}
 
 
+def egset12_dir():
+    return PRIVATE / 'egset12'
+
+
+def guitar_techs_dir():
+    return PRIVATE / 'guitar_techs'
+
+
+def _egset12_ready():
+    folder = egset12_dir()
+    return all(_exists(folder / f'{piece}.wav') and _exists(folder / f'{piece}.jams')
+               for piece in EGSET12_IDS)
+
+
+def _guitar_techs_ready():
+    """Miked-amp and DI excerpts plus per-string MIDI. Room mics are not required."""
+    root = guitar_techs_dir() / 'P3_music'
+    return all(
+        _exists(root / 'audio' / 'micamp' / f'micamp_{piece}.wav')
+        and _exists(root / 'audio' / 'directinput' / f'directinput_{piece}.wav')
+        and _exists(root / 'midi' / f'midi_{piece}.mid')
+        for piece in GUITAR_TECHS_IDS
+    )
+
+
 def available_summary():
     """Which optional recordings are on disk. Does not open them."""
     idmt = idmt_dir()
@@ -108,4 +147,6 @@ def available_summary():
         'metallica': _exists(metal['audio']) and _exists(metal['tab']),
         'carcassi_audio': False,
         'egdb': False,
+        'egset12': _egset12_ready(),
+        'guitar_techs': _guitar_techs_ready(),
     }

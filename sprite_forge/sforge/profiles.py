@@ -56,7 +56,7 @@ VIEW_KEYS = {"view": "view name", "angle": "camera yaw", "image": "views/atlas_<
              "filled": "1 if not a real view", "index": "0-based view number", "frame0": "views/<view>/<first move>_00.png"}
 CFG_KEYS = {"moves", "frame", "figure_h", "ground_y", "pivot_x", "views", "view_cut", "view_moves", "view_figure_h",
             "view_frames", "prop", "console", "dither", "fill", "yaw", "outline", "gifs", "strips", "glb", "fbx",
-            "max_atlas", "cutout", "anchor", "kit", "rig", "clip_map", "root_motion",
+            "max_atlas", "cutout", "anchor", "kit", "rig", "clip_map", "root_motion", "character_type",
             "material_split", "material_slots", "anim_export", "human", "outfits", "props", "slot_colors"}
 TOP_KEYS = CFG_KEYS | {"name", "description", "vars", "images", "manifests", "notes", "game_hint"}
 MANIFEST_TYPES = {"ini", "template", "godot_spriteframes", "tiled_tsx", "unity_json", "json"}
@@ -106,7 +106,7 @@ def load(name_or_path):
 
 # ------------------------------------------------------------------ moves / config
 def resolve_moves(spec):
-    from .moves import preset, PRESETS, PRESET_KEYS, MoveSpec, slug
+    from .moves import preset, PRESETS, PRESET_KEYS, MoveSpec, slug, split_spec
     from .motions import find_motion
     if isinstance(spec, str):
         return preset(spec)
@@ -123,8 +123,7 @@ def resolve_moves(spec):
                 if k in it:
                     setattr(m, k, it[k])
             out.append(m); continue
-        parts = str(it).split(":")
-        nm, _, mot = parts[0].partition("=")
+        nm, mot, frames, fps, loop = split_spec(str(it))
         key = slug(nm)
         m = copy.deepcopy(allm[key]) if key in allm else None
         if m is None:
@@ -134,12 +133,12 @@ def resolve_moves(spec):
             m = MoveSpec(key, nm, mo.category, 8, 12, bool(mo.loop), mot or "", "profile move")
         if mot:
             m.motion = mot
-        if len(parts) > 1 and parts[1]:
-            m.frames = int(parts[1])
-        if len(parts) > 2 and parts[2]:
-            m.fps = int(parts[2])
-        if len(parts) > 3:
-            m.loop = parts[3].lower() in ("1", "loop", "true", "yes")
+        if frames:
+            m.frames = int(frames)
+        if fps:
+            m.fps = int(fps)
+        if loop:
+            m.loop = loop.lower() in ("1", "loop", "true", "yes")
         out.append(m)
     return out
 
@@ -187,6 +186,8 @@ def apply(cfg, prof):
         cfg.mode = "library"; cfg.rig = prof["rig"]
     if prof.get("root_motion"):
         cfg.root_motion = prof["root_motion"]
+    if prof.get("character_type"):
+        cfg.character_type = prof["character_type"]
     for k_ in ("material_split", "material_slots"):
         if prof.get(k_):
             setattr(cfg, k_, prof[k_])

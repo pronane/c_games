@@ -5,6 +5,104 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v11.5: film a move set, pick a game type, drop the character in
+
+v11.4 stored one clip for every game. v11.5 is the rest of that idea: your own movement as the
+default, a data file per genre, and one manifest a loader can read. `forge.py help game` has the
+same commands and the same limits.
+
+* **Recording session** (`forge.py motion record --folder CLIPS --set owner`):
+  * One clip per move, named after the move (`punch.mp4`, `walk.mp4`). Side-on, full body, about
+    1 second of T-pose, then the move about 3 times. Optional `idle_front.mp4` / `walk_front.mp4` /
+    `run_front.mp4`.
+  * The folder is imported in one go through the existing mocap tracker. A pose-track JSON (what
+    that tracker writes) is the same path, which is how the tests run with no person and no MediaPipe.
+  * Each clip is checked first. The report says what is wrong: feet out of frame, body cut off,
+    too dark, no T-pose, too short, tracking lost — and which files to reshoot.
+  * A repeated move keeps the best repeat, or a clean average of two close ones, and is trimmed to
+    a loop or a single action.
+  * Stored as skeleton keys only. The video, the frames, the face and the body shape are not kept.
+    Temporary tracker files are deleted (`--keep-temp` leaves a pose trace you should not pack).
+  * `forge.py motion use-set owner` makes that set the first place a build looks. Missing moves
+    come from the shipped starter, then the procedural motion. The build report names the source
+    of each move (`punch=set:owner`, `kick=starter`, `special1=procedural`).
+  * `forge.py motion shotlist --game soccer` is the printable checklist for that pack.
+* **Game-type packs** (`game_packs/*.json`, `forge.py game list`, `forge.py build --game soccer`):
+  * A pack is data: moves mapped to generic library names, frames / fps / loop, camera
+    (`side`, `three_quarter`, `topdown8`), props the game draws, and events (hit frames, ball
+    contact, footsteps, throw release, shoot, reload).
+  * Shipped: fighting, gaelic, platformer, topdown_rpg, kart, soccer, basketball, boxing,
+    wrestling, tennis, beat_em_up, shooter. Drop another JSON file in `game_packs/` to add one.
+  * Character types from v11.4 apply on every pack. The old profiles still build unchanged.
+  * Several moves share one starter clip until you record a file with that move's name. The
+    events are the part the game should trust. See `forge.py game show boxing`.
+* **One game file** (`out/<name>/game_character.json`, written by every build):
+  * Character, type, pack, camera, animations (strip and sheet, frames, fps, loop, pivot and
+    ground line), events, and hit / hurt boxes when the framedata pass can measure them.
+  * Loaders copied next to it: `loaders/raylib/` (header + example, same style as `spriteforge.h`),
+    `loaders/godot/game_character.gd`, `loaders/unity/GameCharacter.cs`.
+  * Egyptian Fighter and HD Fighter adapters still read a normal build. If `atlas.json` or
+    `sprites.cfg` is missing they rebuild that index from the manifest. Arena FC still needs a
+    cut-out photo. `tools/gaelic_forge.py` is still the 3D mesh, not this file.
+* **Studio**: Library → Recording session. Build and Start → What to make have the game-type
+  dropdown and the motion-set dropdown. The Build step names the manifest.
+
+Limits: the starter is procedural keys, not motion capture. A video import needs MediaPipe
+(`python tools/setup_pose.py`); without it the checker says so and does not keep the video.
+Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
+fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
+
+## New in v11.4: a motion library, and character types that change how a move is performed
+
+Sprite Forge could already retarget a clip and track a video. The moves themselves were still mostly
+hand-written poses, one pack per game. v11.4 stores a move once on the shared skeleton and lets any
+profile play it.
+
+* **Motion library** (`forge.py motion`, `motion_library/`, your clips in `library/motions/`):
+  * `motion record --clip punch=punch.mp4` runs the existing mocap tracker and stores the keys.
+  * `motion import clip.bvh` (also FBX / GLB) retargets onto the mannequin and stores the same kind of keys.
+  * `motion retarget punch --to sample_lanky` plays that clip on any mapped rig.
+  * `motion clean walk` writes foot planting, a weight shift, anticipation and follow-through back into the clip.
+  * Names are generic (`punch`, `kick`, `walk`, `tackle`, `shoot`, ...). `fighter14` and `gaelic36` map onto
+    them with `--motions punch,kick` or `"motion": "lib:punch"` in a profile. `profiles/motion_demo.json` is a
+    small example that is not a fighting-game list.
+  * The shipped starter is CC0, generated from the procedural motions. No Mixamo or Meshy clips are included.
+* **Character types** (`character_types/*.json`, `--character-type`):
+  * `timing`, `stance`, `reach` and `weight` are numbers in the file. A new type is a new file.
+  * `heavy_brawler` against `quick_striker`, or `keeper` against `playmaker`, on the same clip: the timing,
+    stance width, reach and weight change by a measured amount.
+  * Works on library clips and on the existing procedural presets, for a fighter profile or a sports profile.
+* **Studio**: Build tab and Start → What to make have the type dropdown and "Use motion library".
+  Library tab → Motions... lists the clips. `forge.py help motion` has the commands and the limits.
+
+Limits: the starter is procedural keys, not motion-capture quality. Import drops fingers, twist bones and
+facial tracks. A GLB round trip of our own mannequin keeps bone directions and lands the joints within
+about 6 cm, because the stored clip is the simpler shared skeleton. Foot planting aims the canonical
+thigh, shin and foot on that skeleton and again after retarget; the rest of a GLB is not re-solved.
+Character types change shared-skeleton builds. Photo-puppet 2D poses are not redrawn (playback fps still
+follows `timing`).
+
+## New in v11.3: captured characters in a game - texture-mapped sprites, cleaner textures
+Tried in Egyptian Fighter, where a fighter is about 300 px tall, a captured character showed different faults
+from the close-up turntables.
+
+* **Sprites are texture-mapped.** Library rigs with one texture (every `forge.py capture` character) were drawn
+  with one flat colour per triangle, which threw the face and all clothing detail away. They are now z-buffered with
+  the texture sampled at every pixel (`render.render_textured`), and lit gently so a white shirt doesn't blow out.
+  Rigs with several materials or a kit recolour still use the flat path.
+* **Texture clean-up** (`sforge/capture_clean.py`, on by default in the bake):
+  * Skin far from the person's skin colour is dropped, and hands are always treated as skin.
+  * Each surface's colours are clustered (shirt / shorts / skin / socks) and the clusters smoothed over the body in
+    3D, left / right symmetric. Speckles go and garment edges come out clean.
+  * Unseen and dropped texels are filled on the body in 3D: from their mirror image first, then from the nearest
+    kept texels of the same cluster, bone or layer. Before, they were inpainted in 2D across UV islands.
+  * Light / dark bands inside one material are pulled part-way to its colour.
+* **Into the game** (`tools/to_egyptian_fighter.py`): converts a fighter build to Egyptian Fighter's sheet format.
+  The whole route from a captured GLB is in that file's header.
+
+On the synthetic test the clean-up costs a little texture accuracy (4.3 → 5.9 / 255) for the cleaner look; the
+body fit is unchanged.
+
 ## New in v11.2: the face's own shape, faces painted where they are, the room's light taken out
 **Face** (`sforge/capture_face.py`):
 

@@ -76,7 +76,13 @@ static const char *FLAT_FS =
 "uniform vec4 colDiffuse; out vec4 finalColor;\n"
 "void main(){ finalColor = colDiffuse; }\n";
 
-/* GPU-skinned characters (raylib 5.x: UpdateModelAnimationBones + bone matrices uniform) */
+/* GPU-skinned characters. raylib 5.5 calls the bone uniform SHADER_LOC_BONE_MATRICES;
+ * raylib 6 renamed it. The GLSL name is boneMatrices on both. */
+#if RAYLIB_VERSION_MAJOR >= 6
+#define GF_LOC_BONES SHADER_LOC_MATRIX_BONETRANSFORMS
+#else
+#define GF_LOC_BONES SHADER_LOC_BONE_MATRICES
+#endif
 #define SKIN_COMMON \
 "#version 330\n" \
 "in vec3 vertexPosition; in vec2 vertexTexCoord; in vec3 vertexNormal; in vec4 vertexColor;\n" \
@@ -93,7 +99,7 @@ static const char *SKIN_VS = SKIN_COMMON
 "void main(){\n"
 "  mat4 sk = skinMat();\n"
 "  vec4 p = sk*vec4(vertexPosition,1.0);\n"
-"  vec3 n = mat3(sk)*vertexNormal;\n"
+"  vec3 n = normalize(mat3(sk)*vertexNormal);\n"
 "  fragPosition = vec3(matModel*p); fragTexCoord = vertexTexCoord; fragColor = vertexColor;\n"
 "  fragNormal = normalize(vec3(matNormal*vec4(n,0.0)));\n"
 "  gl_Position = mvp*p;\n"
@@ -719,12 +725,10 @@ static void stadiumInit(void)
     haveLit = litShader.id > 0 && litShader.id != rlGetShaderIdDefault();
     if (haveLit) {
         flatShader = LoadShaderFromMemory(FLAT_VS, FLAT_FS);
-#if RAYLIB_VERSION_MAJOR < 6
         skinShader = LoadShaderFromMemory(SKIN_VS, LIT_FS);
         flatSkinShader = LoadShaderFromMemory(FLAT_SKIN_VS, FLAT_FS);
-        gpuSkinAvailable = skinShader.id > 0 && skinShader.id != rlGetShaderIdDefault() && skinShader.locs[SHADER_LOC_BONE_MATRICES] >= 0 &&
+        gpuSkinAvailable = skinShader.id > 0 && skinShader.id != rlGetShaderIdDefault() && skinShader.locs[GF_LOC_BONES] >= 0 &&
                            flatSkinShader.id > 0 && flatSkinShader.id != rlGetShaderIdDefault();
-#endif
         gpuSkin = gpuSkinAvailable && !forceCpuSkin;
         TraceLog(LOG_INFO, "GAME: character skinning on the %s (GPU path %s)", gpuSkin ? "GPU" : "CPU", gpuSkinAvailable ? "available" : "unavailable");
         for (int k = 0; k < (gpuSkinAvailable ? 2 : 1); k++) {
@@ -836,9 +840,9 @@ static void drawStadium(void)
 
 /* Planar projected shadow of the currently posed skinned model onto the grass.
  * Depth-tested at one height so overlapping limbs never double-darken. */
-static void drawPlanarShadow(Model *mo, Vector3 pos, float yawDeg)
+static void drawPlanarShadow(Model *mo, Vector3 pos, float yawDeg, float dist)
 {
-    if (!haveLit || gfxQuality == 0) {      /* Low: soft blob */
+    if (!haveLit || gfxQuality == 0 || dist > 24.0f) {      /* Low, or far: soft blob */
         DrawCylinder((Vector3){ pos.x, 0.02f, pos.z }, 0.45f, 0.45f, 0.004f, 14, (Color){ 0, 0, 0, 95 });
         DrawCylinder((Vector3){ pos.x, 0.021f, pos.z }, 0.30f, 0.30f, 0.004f, 14, (Color){ 0, 0, 0, 60 });
         return;
@@ -855,6 +859,21 @@ static void drawPlanarShadow(Model *mo, Vector3 pos, float yawDeg)
     mo->materials[mo->meshMaterial[0]].shader = gpuSkin ? flatSkinShader : flatShader;
     mo->materials[mo->meshMaterial[0]].maps[MATERIAL_MAP_DIFFUSE].color = (Color){ 8, 18, 6, 150 };
     T = MatrixMultiply(mo->transform, T);
+    if (gpuSkin) {
+        int loc = flatSkinShader.locs[GF_LOC_BONES];
+        Matrix *mats = NULL;
+        int nb = 0;
+#if RAYLIB_VERSION_MAJOR >= 6
+        mats = model.boneMatrices;
+        nb = (int)model.skeleton.boneCount;
+#else
+        if (mo->meshCount > 0) { mats = mo->meshes[0].boneMatrices; nb = mo->meshes[0].boneCount; }
+#endif
+        if (loc >= 0 && mats && nb > 0) {
+            rlEnableShader(flatSkinShader.id);
+            rlSetUniformMatrices(loc, mats, nb);
+        }
+    }
     rlDrawRenderBatchActive();
     rlDisableBackfaceCulling();
     /* stencil: each shadow pixel is darkened once, however many limbs/players overlap */

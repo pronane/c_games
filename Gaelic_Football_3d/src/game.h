@@ -12,7 +12,8 @@
 #define GAME_LARGE_RECT_HALF 9.5f
 #define GAME_PENALTY_SPOT 11.0f
 #define GAME_BALL_REST 0.11f            /* size-5 ball, ~22cm diameter: centre height when on ground */
-#define GAME_STEP_LENGTH 1.9f           /* metres per running step for the 4-step rule */
+#define GAME_STEP_LENGTH 1.9f           /* metres per running step */
+#define GAME_CARRY_STEPS 5              /* steps 1-5 are legal; the 6th is overcarrying */
 #define GAME_BALL_GRAVITY 9.8f
 #define GAME_TEAM_SIZE 15
 #define GAME_TEAM_COUNT 4
@@ -57,8 +58,26 @@ typedef enum GameEvent {
     GAME_EVENT_DISSENT,           /* free brought forward 50m */
     GAME_EVENT_BACK_PASS,
     GAME_EVENT_SIN_BIN_OVER,
+    GAME_EVENT_BREAKING_BALL, /* high catch spilled: a scramble */
+    GAME_EVENT_TACKLE_BEHIND,   /* free: tackle came from behind */
+    GAME_EVENT_TACKLE_SHOULDER, /* free: tackle came over the shoulder */
     GAME_EVENT_COUNT
 } GameEvent;
+
+/* Colour of the step ring around the carrier's feet. */
+typedef enum GameStepRing {
+    GAME_RING_NONE = 0,
+    GAME_RING_NORMAL,    /* steps 1 and 2 */
+    GAME_RING_ORANGE,    /* step 3 */
+    GAME_RING_RED        /* steps 4 and 5 */
+} GameStepRing;
+
+/* Where a tackle comes from, relative to the carrier. */
+typedef enum GameTackleCall {
+    GAME_TACKLE_OK = 0,
+    GAME_TACKLE_BEHIND,
+    GAME_TACKLE_SHOULDER
+} GameTackleCall;
 
 /* Timed player actions: the renderer plays the matching clip and the ball is
  * released on the clip's contact frame (see game_set_action_timing). */
@@ -126,6 +145,9 @@ typedef struct GameInput {
     float power;            /* 0..1 kick power (charge) */
     int special;            /* hook / head hit on the carrier (straight red!) */
     int pass_target;        /* v3.2 pass assist: teammate index + 1 (0 = engine picks) */
+    int jockey;             /* v3.4: hold to shadow the carrier, goal-side, without sprinting in */
+    int kickout_plan;       /* 0 keep, 1 short, 2 long middle, 3 wing */
+    int press_height;       /* 0 keep, 1 drop off, 2 zonal, 3 press up on a kick-out */
 } GameInput;
 
 typedef struct GamePlayer {
@@ -146,6 +168,7 @@ typedef struct GamePlayer {
     int off;                /* 0 on the pitch, 1 sin bin, 2 sent off */
     float sin_bin;          /* real seconds left in the sin bin */
     int fouls_committed;
+    float stamina;          /* v3.4: 0..1, drained by sprinting */
 } GamePlayer;
 
 typedef struct GameOfficial {
@@ -229,6 +252,16 @@ typedef struct GameState {
     /* --- v3.2 gameplay assists (set by the 3D frontend; off in unit tests) --- */
     int ai_support;         /* AI support runs for the carrier + goal-side marking */
     int assist_target;      /* this frame's pass-assist receiver, -1 none */
+    /* --- v3.4: mark clock, kick-out plan, high-ball grade, stamina is per player --- */
+    float mark_clock;       /* seconds left to play on from a mark (15) */
+    int kickout_plan;       /* 1 short, 2 long, 3 wing */
+    int press_height;       /* 0 drop, 1 zonal, 2 press */
+    int contest_grade;      /* 0 none, 1 early, 2 perfect, 3 late, 4 break */
+    float contest_time;
+    /* Solo-rhythm helper: toe-tap or bounce on step 4. Off until toggled (T). */
+    int solo_rhythm;
+    /* CPU defender closing from behind: 0 not chosen, 1 dive in, 2 get in front. */
+    int cpu_tackle_plan;
     void (*on_release)(struct GameState *game, int team, int player, int action, void *user);
     void *user;
 } GameState;
@@ -239,6 +272,10 @@ void game_set_action_timing(int action, float contact, float duration);
 float game_action_duration(int action);
 float game_action_contact(int action);
 int game_carrier_steps(const GameState *game);
+int game_step_ring(const GameState *game);
+int game_solo_rhythm_due(const GameState *game);
+int game_tackle_call(float cx, float cz, float fx, float fz,
+                     float tx, float tz, float tfx, float tfz);
 float game_distance_to_goal(int team, float x, float z);
 void game_set_teams(GameState *game, int home_team, int away_team, int starting_player);
 void game_select_player(GameState *game, int player_index);

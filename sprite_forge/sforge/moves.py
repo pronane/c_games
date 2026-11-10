@@ -24,9 +24,17 @@ class MoveSpec:
     motion: str = ""       # library motion that drives the mannequin ("" = same as name)
     desc: str = ""
     enabled: bool = True
+    character_type: str = ""   # v11.4 motion personality (character_types/*.json); "" = unchanged
+    timing_scaled: float = 0.0  # fps already divided by this timing; stops a second pass scaling again
 
     def to_dict(self):
         return asdict(self)
+
+    def clone(self, **over):
+        """A copy that ignores attributes a build hangs on the move (motion source, pack events)."""
+        d = {k: v for k, v in self.__dict__.items() if k in MoveSpec.__dataclass_fields__}
+        d.update(over)
+        return MoveSpec(**d)
 
     @staticmethod
     def from_dict(d):
@@ -138,21 +146,54 @@ def preset(name):
     return [copy.deepcopy(m) for m in PRESETS[key]]
 
 
+def split_spec(item):
+    """'name[=motion][:frames[:fps[:loop]]]' -> (name, motion, frames, fps, loop).
+
+    The motion may be lib:name (v11.4). The colon there is not a frame separator.
+    """
+    item = item.strip()
+    name, sep, rest = item.partition("=")
+    name = name.strip()
+    motion = ""
+    if not sep:
+        bits = name.split(":")
+        name, extra = bits[0], bits[1:]
+    elif rest.lower().startswith("lib:"):
+        bits = rest.split(":")
+        motion = "lib:" + bits[1] if len(bits) > 1 else "lib:"
+        extra = bits[2:]
+    else:
+        bits = rest.split(":")
+        motion = bits[0]
+        extra = bits[1:]
+    frames = extra[0] if len(extra) > 0 else ""
+    fps = extra[1] if len(extra) > 1 else ""
+    loop = extra[2] if len(extra) > 2 else ""
+    return name, motion, frames, fps, loop
+
+
 def motion_for(spec: MoveSpec):
-    from .motions import find_motion, LIB
-    if spec.motion.startswith("blend:"):            # v9 animation blending (sforge/blend.py)
+    from .motions import find_motion
+    if (spec.motion or "").startswith("blend:"):            # v9 animation blending (sforge/blend.py)
         from .blend import blend_motion
-        return blend_motion(spec.motion)
-    m = find_motion(spec.motion) if spec.motion else None
-    if m is None:
-        m = find_motion(spec.name)
-    if m is None:                                   # v9: a preset move typed by name (e.g. 'attack' from enemy_grunt)
-        for mvs in PRESETS.values():
-            for p in mvs:
-                if p.name == spec.name and p.motion and p.motion != spec.name:
-                    m = find_motion(p.motion)
-                    if m is not None:
-                        return m
+        m = blend_motion(spec.motion)
+    else:
+        m = find_motion(spec.motion) if spec.motion else None
+        if m is None:
+            m = find_motion(spec.name)
+        if m is None:                                   # v9: a preset move typed by name (e.g. 'attack' from enemy_grunt)
+            for mvs in PRESETS.values():
+                for p in mvs:
+                    if p.name == spec.name and p.motion and p.motion != spec.name:
+                        m = find_motion(p.motion)
+                        if m is not None:
+                            break
+                if m is not None:
+                    break
+    typ = getattr(spec, "character_type", "") or ""
+    if m is not None and typ:
+        from . import chartypes
+        m = chartypes.wrap(m, typ)
     return m
 
 

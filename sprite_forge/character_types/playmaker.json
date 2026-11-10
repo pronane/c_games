@@ -1,0 +1,10 @@
+{
+  "name": "playmaker",
+  "label": "Playmaker",
+  "games": ["sports", "gaelic", "football"],
+  "timing": 0.75,
+  "stance": 0.84,
+  "reach": 0.82,
+  "weight": 0.68,
+  "notes": "A bit quicker and narrower than a keeper, with a lighter touch on the same clip."
+}

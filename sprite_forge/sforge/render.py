@@ -60,6 +60,56 @@ class RenderSettings:
         self.hd = bool(int(os.environ.get("SFORGE_HD", "0"))) if hd is None else hd
 
 
+def render_textured(P, fuv, tex, rs: RenderSettings, root_xz=(0, 0), ambient=0.68):
+    """v11.3: library rigs with ONE texture (a `forge.py capture` character, a scanned or downloaded model) drawn
+    with the texture sampled at every pixel - z-buffered, bilinear - instead of one flat colour per triangle (which
+    threw the face and every printed detail away). Same framing as render_tris. P (n,3,3) posed triangles, fuv
+    (n,3,2) with v = 0 at the top row, tex (h,w,3) uint8. Lighting is gentle (ambient 0.68, no rim): a photo
+    texture carries its own detail and a white shirt must not blow out."""
+    from .render_sculpt import rasterise
+    view = rx(rs.pitch) @ ry(rs.yaw)
+    Q = P.copy()
+    if rs.follow_root:
+        Q[..., 0] -= root_xz[0]; Q[..., 2] -= root_xz[1]
+    Q = Q @ view.T
+    ss = min(rs.ss, 2)
+    scale = rs.figure_h / HEIGHT * ss
+    W, H = rs.cell_w * ss, rs.cell_h * ss
+    sx = (rs.anchor_x * ss + Q[..., 0] * scale).ravel()
+    sy = (rs.baseline * ss - Q[..., 1] * scale).ravel()
+    F = np.arange(len(P) * 3).reshape(-1, 3)
+    tid, bc, _ = rasterise(sx, sy, Q[..., 2].ravel(), F, W, H, K=6)
+    tid = tid.reshape(H, W); bc = np.asarray(bc).reshape(H, W, 3)
+    m = tid >= 0
+    out = np.zeros((H, W, 4), np.uint8)
+    if m.any():
+        t = tid[m]
+        uv = (bc[m][:, :, None] * fuv[t]).sum(1)
+        th, tw = tex.shape[:2]
+        x = np.clip(np.mod(uv[:, 0], 1.0) * tw - 0.5, 0, tw - 1.001); y = np.clip(np.mod(uv[:, 1], 1.0) * th - 0.5, 0, th - 1.001)
+        x0 = x.astype(int); y0 = y.astype(int); fx = (x - x0)[:, None]; fy = (y - y0)[:, None]
+        tf = tex.astype(np.float32)
+        c = (tf[y0, x0] * (1 - fx) * (1 - fy) + tf[y0, x0 + 1] * fx * (1 - fy)
+             + tf[y0 + 1, x0] * (1 - fx) * fy + tf[y0 + 1, x0 + 1] * fx * fy)
+        e1 = Q[:, 1] - Q[:, 0]; e2 = Q[:, 2] - Q[:, 0]
+        N = np.cross(e1, e2); N /= (np.linalg.norm(N, axis=1, keepdims=True) + 1e-12)
+        N = N * np.where(N[:, 2:3] < 0, -1.0, 1.0)
+        shade = ambient + (1 - ambient) * np.clip(N @ rs.light, 0, 1)
+        shade = shade / (ambient + (1 - ambient) * 0.75)                   # a surface facing the light keeps its colour
+        out[m, :3] = np.clip(c * shade[t][:, None], 0, 255).astype(np.uint8)
+        out[m, 3] = 255
+    img = Image.fromarray(out, "RGBA")
+    if ss != 1:
+        img = img.resize((rs.cell_w, rs.cell_h), Image.LANCZOS)
+    if rs.outline:
+        a = img.getchannel("A")
+        grow = a.point(lambda v: 255 if v > 40 else 0).filter(ImageFilter.MaxFilter(3))
+        under = Image.new("RGBA", img.size, rs.outline_rgb + (0,))
+        under.putalpha(grow)
+        img = Image.alpha_composite(under, img)
+    return img
+
+
 def render_tris(P, mats, colors, rs: RenderSettings, root_xz=(0, 0), wire=False, rgb=None, two_sided=False):
     """P: posed triangles (n,3,3) in world metres.  rgb: optional per-triangle colours (n,3) 0-1 (library rigs);
     two_sided: draw back faces too (imported meshes often have mixed winding)."""

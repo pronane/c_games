@@ -1,0 +1,147 @@
+{
+ "name": "shooter",
+ "label": "Shooter (third-person, lite)",
+ "description": "Third-person shooter, lite: idle, run, aim, shoot, reload, hit, die. One camera, three-quarter. The game draws the gun.",
+ "camera": "three_quarter",
+ "prop": "none",
+ "props": [
+  "gun"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "aim",
+   "library": "block",
+   "frames": 4,
+   "fps": 8,
+   "loop": true,
+   "category": "Combat",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "arms up \u2014 starter block is the closest held pose, not a sight picture"
+  },
+  {
+   "name": "shoot",
+   "library": "punch",
+   "frames": 4,
+   "fps": 16,
+   "loop": false,
+   "category": "Combat",
+   "events": {
+    "hit_start": 1,
+    "hit_end": 1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": 1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "one shot; shoot is the muzzle frame"
+  },
+  {
+   "name": "reload",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Combat",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": 4,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "die",
+   "library": "hit",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "same hit clip, played once and held by the game"
+  }
+ ],
+ "notes": "No aim, shoot or reload clip in the starter. Record aim.mp4, shoot.mp4, reload.mp4, die.mp4 if you want those silhouettes. The events are still the frames the game should use.",
+ "yaw": 65
+}

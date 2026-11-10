@@ -1,0 +1,16 @@
+{
+  "name": "motion_demo",
+  "description": "v11.4 example: generic motion-library clips (not one game's move list) plus a character type. Copy this file and change the moves for a fighter, a sport, a platformer or anything else. lib:punch means the shared-skeleton library, not the procedural pose of the same name.",
+  "character_type": "quick_striker",
+  "moves": [
+    {"name": "idle", "motion": "lib:idle", "frames": 6, "fps": 8, "loop": true, "category": "Locomotion"},
+    {"name": "walk", "motion": "lib:walk", "frames": 8, "fps": 10, "loop": true, "category": "Locomotion"},
+    {"name": "punch", "motion": "lib:punch", "frames": 6, "fps": 12, "loop": false, "category": "Combat"},
+    {"name": "kick", "motion": "lib:kick", "frames": 6, "fps": 12, "loop": false, "category": "Combat"},
+    {"name": "tackle", "motion": "lib:tackle", "frames": 6, "fps": 12, "loop": false, "category": "Sports"},
+    {"name": "shoot", "motion": "lib:shoot", "frames": 6, "fps": 12, "loop": false, "category": "Sports"}
+  ],
+  "frame": [128, 128],
+  "yaw": 90,
+  "notes": "Swap character_type for heavy_brawler, keeper, playmaker, big_boss, small_agile, or a JSON file of your own."
+}

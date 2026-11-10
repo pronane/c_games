@@ -1,0 +1,10 @@
+{
+  "name": "heavy_brawler",
+  "label": "Heavy brawler",
+  "games": ["fighter", "brawler"],
+  "timing": 1.4,
+  "stance": 1.45,
+  "reach": 0.78,
+  "weight": 1.6,
+  "notes": "Slower strikes, wider guard, shorter reach, heavier ease. A big fighter, not a specific game's roster."
+}

@@ -1,0 +1,10 @@
+{
+  "name": "big_boss",
+  "label": "Big boss",
+  "games": ["rpg", "npc", "fighter"],
+  "timing": 1.5,
+  "stance": 1.55,
+  "reach": 1.22,
+  "weight": 1.75,
+  "notes": "Slow, wide and heavy, with a long reach. For bosses and large enemies."
+}

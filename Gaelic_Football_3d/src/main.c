@@ -66,17 +66,17 @@ static const char *CLIP_NAMES[C_COUNT] = {
 typedef struct { int clip; float start, end, rate; int contactBy; } ActionClip;
 static ActionClip ACTION_CLIPS[GAME_ACT_COUNT] = {
     [GAME_ACT_NONE]        = { C_IDLE, 0, 0, 1, 0 },
-    [GAME_ACT_KICK]        = { C_KICK_RUN, 0.10f, 1.05f, 1.60f, 1 },
-    [GAME_ACT_FREE_KICK]   = { C_KICK_PLACE, 0.05f, 1.55f, 1.30f, 1 },   /* plant, swing, follow-through */
-    [GAME_ACT_KICKOUT]     = { C_KICK_OUT, 5.00f, 7.20f, 1.45f, 1 },
-    [GAME_ACT_GROUND_KICK] = { C_KICK_PLACE, 0.05f, 1.55f, 1.35f, 1 },
-    [GAME_ACT_HANDPASS]    = { C_HAND_PASS, 0.05f, 0.85f, 2.00f, 2 },
-    [GAME_ACT_SOLO]        = { C_SOLO, 0.00f, 0.50f, 1.45f, 1 },
-    [GAME_ACT_BOUNCE]      = { C_RUN_BALL, 0.00f, 0.79f, 2.10f, 0 },
-    [GAME_ACT_PICKUP]      = { C_TOE_LIFT, 0.00f, 0.62f, 1.40f, 0 },     /* toe-lift (keepers: scoop) */
-    [GAME_ACT_TACKLE]      = { C_TACKLE_REACH, 0.45f, 1.15f, 1.55f, 0 }, /* block / shoulder / push */
-    [GAME_ACT_DIVE]        = { C_DIVE_SAVE, 0.30f, 1.80f, 1.40f, 0 },
-    [GAME_ACT_CATCH]       = { C_CATCH, 0.90f, 1.60f, 1.50f, 0 },
+    [GAME_ACT_KICK]        = { C_KICK_RUN, 0.10f, 1.15f, 1.12f, 1 },   /* drop onto the instep, not a flick */
+    [GAME_ACT_FREE_KICK]   = { C_KICK_PLACE, 0.05f, 1.55f, 1.12f, 1 },   /* plant, swing, follow-through */
+    [GAME_ACT_KICKOUT]     = { C_KICK_OUT, 5.00f, 7.20f, 1.15f, 1 },
+    [GAME_ACT_GROUND_KICK] = { C_KICK_PLACE, 0.05f, 1.55f, 1.15f, 1 },
+    [GAME_ACT_HANDPASS]    = { C_HAND_PASS, 0.15f, 1.05f, 1.15f, 2 },    /* step in, strike with the hand */
+    [GAME_ACT_SOLO]        = { C_SOLO, 0.00f, 0.50f, 1.08f, 1 },         /* soft toe-tap, not a double-time */
+    [GAME_ACT_BOUNCE]      = { C_RUN_BALL, 0.00f, 0.79f, 1.25f, 0 },     /* the bounce clip is not in the GLB */
+    [GAME_ACT_PICKUP]      = { C_TOE_LIFT, 0.00f, 0.62f, 1.08f, 0 },     /* toe-lift (keepers: scoop) */
+    [GAME_ACT_TACKLE]      = { C_TACKLE_REACH, 0.45f, 1.15f, 1.20f, 0 }, /* block / shoulder / push */
+    [GAME_ACT_DIVE]        = { C_DIVE_SAVE, 0.30f, 1.80f, 1.15f, 0 },
+    [GAME_ACT_CATCH]       = { C_CATCH, 0.82f, 1.70f, 1.08f, 0 },        /* at the top, then into the chest */
     [GAME_ACT_HOOK]        = { C_HOOK, 0.00f, 1.29f, 1.25f, 3 },
     [GAME_ACT_HEAD_HIT]    = { C_HEAD_HIT, 0.00f, 0.92f, 1.10f, 4 },
     [GAME_ACT_TRIP]        = { C_TRIP, 0.00f, 0.90f, 1.00f, 0 },
@@ -117,9 +117,11 @@ static GameState game;
 static int camMode = 0;
 static const char *CAM_NAMES[] = { "Broadcast (side)", "TV close (side)", "Chase", "Behind goal", "Tactical", "Player close-up" };
 #define CAM_COUNT 6
-static int autoSolo = 1;
 static float charge = -1.0f;
 static int chargeLow = 0;
+static float shotCurve = 0;      /* right stick while a kick is held: hook / screw */
+static float l2Hold = 0;         /* short tap = tackle, hold = jockey */
+static int lockReceiver = -1;    /* late pass-receiver lock until the contact frame */
 static int paused = 0;
 static float clockT = 0.0f;
 static int fullTime = 0;
@@ -138,6 +140,7 @@ static double pSkin, pUpdate, pWorld, pHud, pSwap, pFrame;  /* smoothed, ms */
 static int showPerf = 0;
 static int benchSkip = 0;        /* --bench-skip N: 1 stadium, 2 characters (profiling) */
 static int skinnedThisFrame = 0;
+static Camera3D cam;
 
 static Vector3 W(float x, float y, float z) { return (Vector3){ x - HL, y, z - HW }; }
 
@@ -163,7 +166,52 @@ static Transform *clipPose(int clip, float t)
     return ANIM_POSES(*a)[f];
 }
 
-static float clipLen(int clip) { return (float)ANIM_FRAMES(anims[clipIdx[clip]]) / ANIM_FPS; }
+static float clipLen(int clip)
+{
+    int n = ANIM_FRAMES(anims[clipIdx[clip]]);
+    if (n <= 1) return 1.0f / ANIM_FPS;
+    return (float)(n - 1) / ANIM_FPS;   /* raylib bakes keyframes at ANIM_FPS; the last frame is the clip end */
+}
+
+#if RAYLIB_VERSION_MAJOR < 6
+/* Pose at a time in seconds, interpolated between baked frames so a sparse cycle does not step.
+ * raylib 6 does this inside UpdateModelAnimation (float frame). */
+static void sampleClip(int clip, float t, Transform *out)
+{
+    ModelAnimation *a = &anims[clipIdx[clip]];
+    int n = ANIM_FRAMES(*a);
+    int nb = MODEL_BONECOUNT(model);
+    float frame, w;
+    int i0, i1;
+    Transform *A, *B;
+    if (n <= 0) return;
+    frame = t * ANIM_FPS;
+    if (frame < 0.0f) frame = 0.0f;
+    if (frame > (float)(n - 1)) frame = (float)(n - 1);
+    i0 = (int)frame;
+    i1 = i0 + 1 < n ? i0 + 1 : i0;
+    w = frame - (float)i0;
+    A = ANIM_POSES(*a)[i0];
+    if (w < 0.001f || i1 == i0) { memcpy(out, A, sizeof(Transform) * (size_t)nb); return; }
+    B = ANIM_POSES(*a)[i1];
+    for (int b = 0; b < nb; b++) {
+        out[b].translation = Vector3Lerp(A[b].translation, B[b].translation, w);
+        out[b].rotation = QuaternionSlerp(A[b].rotation, B[b].rotation, w);
+        out[b].scale = Vector3Lerp(A[b].scale, B[b].scale, w);
+    }
+}
+#endif
+
+#if RAYLIB_VERSION_MAJOR >= 6
+static float clipFrame(int clip, float t)
+{
+    int n = ANIM_FRAMES(anims[clipIdx[clip]]);
+    float f = t * ANIM_FPS;
+    if (f < 0.0f) f = 0.0f;
+    if (n > 1 && f > (float)(n - 1) - 0.001f) f = (float)(n - 1) - 0.001f;
+    return f;
+}
+#endif
 
 /* Find the contact moment inside an action's segment from the bones:
  * kicks - the frame where the kicking foot moves fastest (true contact),
@@ -214,14 +262,24 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
     if (p->action != GAME_ACT_NONE) {
         ActionClip *ac = &ACTION_CLIPS[p->action];
         *clip = ac->clip;
-        if (p->action == GAME_ACT_PICKUP && keeper) *clip = C_PICKUP;    /* keeper scoops it up */
-        if (p->action == GAME_ACT_PICKUP && keeper) { *t = fminf(0.25f + p->action_time * 2.2f, 1.25f); return; }
+        if (p->action == GAME_ACT_PICKUP && keeper) { *clip = C_KEEPER_SCOOP; *t = fminf(0.20f + p->action_time * 1.3f, 1.6f); return; }
+        if (p->action == GAME_ACT_CATCH && keeper) { *clip = C_KEEPER_HIGH_CATCH; *t = fminf(0.55f + p->action_time * 1.05f, 1.7f); return; }
         *t = fminf(ac->start + p->action_time * ac->rate, ac->end);
         return;
     }
-    if (p->jump_time > 0.0f) {                  /* high fielding: leap, arms extended */
-        *clip = C_CATCH;
-        *t = 0.35f + (0.75f - p->jump_time) * 1.15f;
+    if (game.mark_play_on && game.restart_pending && game.ball_team == team && game.ball_player == idx) {
+        *clip = keeper ? C_KEEPER_HIGH_CATCH : C_CATCH;   /* arm up: the mark has been claimed */
+        *t = keeper ? 0.95f : 1.05f;
+        return;
+    }
+    if (p->jump_time > 0.0f) {
+        /* plant, rise to the catch at the highest point, then start to come down */
+        float u = 1.0f - p->jump_time / 0.75f;
+        if (u < 0.0f) u = 0.0f;
+        if (u > 1.0f) u = 1.0f;
+        *clip = keeper ? C_KEEPER_HIGH_CATCH : C_CATCH;
+        if (keeper) *t = u < 0.5f ? 0.15f + (0.79f - 0.15f) * (u / 0.5f) : 0.79f + (1.35f - 0.79f) * ((u - 0.5f) / 0.5f);
+        else        *t = u < 0.5f ? 0.15f + (0.88f - 0.15f) * (u / 0.5f) : 0.88f + (1.45f - 0.88f) * ((u - 0.5f) / 0.5f);
         return;
     }
     if (celebT > 0 && team == celebTeam && idx == celebIdx && !carrying) {
@@ -229,23 +287,24 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         return;
     }
     if (s->speed > 0.6f) {
-        if (carrying) {
-            *clip = C_RUN_BALL;
-            s->runPhase += dt * fminf(s->speed / 3.1f, 2.5f);
-            *t = fmodf(s->runPhase, clipLen(C_RUN_BALL));
-        } else if (s->speed < 3.4f) {
-            *clip = C_JOG;
-            s->runPhase += dt * Clamp(s->speed / 2.6f, 0.6f, 1.5f);
-            *t = fmodf(s->runPhase, clipLen(C_JOG));
-        } else {
-            *clip = C_RUN;
-            s->runPhase += dt * Clamp(s->speed / 4.6f, 0.7f, 2.0f);
-            *t = fmodf(s->runPhase, clipLen(C_RUN));
-        }
+        /* play the authored cycle near its own length; only a little faster when sprinting */
+        float natural = carrying ? 5.4f : (s->speed < 3.4f ? 4.2f : 6.2f);
+        float cadence = Clamp(s->speed / natural, 0.82f, 1.22f);
+        if (carrying) *clip = C_RUN_BALL;
+        else if (s->speed < 3.4f) *clip = C_JOG;
+        else *clip = C_RUN;
+        s->runPhase += dt * cadence;
+        *t = fmodf(s->runPhase, clipLen(*clip));
         return;
     }
-    s->runPhase += dt;
-    if (carrying) { *clip = C_KEEPER_READY; *t = 0.0f; return; }   /* ball cradled out front */
+    s->runPhase += dt * 0.35f;                 /* a quiet idle, not a sped-up loop */
+    /* Outfield players stand up and cradle the ball. keeper_ready is a low
+     * set stance and reads as a crouch once the ball is in the hands. */
+    if (carrying) {
+        *clip = keeper ? C_KEEPER_READY : C_IDLE;
+        *t = fmodf(s->runPhase, clipLen(*clip));
+        return;
+    }
     *clip = keeper ? C_KEEPER_IDLE : C_IDLE;
     *t = fmodf(s->runPhase, clipLen(*clip));
 }
@@ -301,36 +360,97 @@ static int lookOf(const AnimState *s)
     return (i * 7 + 3) % (nLooks > 0 ? nLooks : 1);
 }
 
-/* Blend and upload the pose for one character, keeping a copy for bone queries. */
+static int poseFar = 0;   /* skip the cross-fade on players the camera can barely read */
+#if RAYLIB_VERSION_MAJOR < 6
+static Transform sampleA[MAX_BONES], sampleB[MAX_BONES];
+#endif
+
+/* Push the posed bone matrices into the skinning shader. DrawMesh does not do this;
+ * without it a GPU-skinned squad look stays in the bind pose. */
+static void uploadSkin(Shader sh, const Model *lm)
+{
+    int loc, nb = 0;
+    Matrix *mats = NULL;
+    if (!gpuSkin) return;
+    loc = sh.locs[GF_LOC_BONES];
+    if (loc < 0) return;
+#if RAYLIB_VERSION_MAJOR >= 6
+    mats = model.boneMatrices;
+    nb = (int)model.skeleton.boneCount;
+    (void)lm;
+#else
+    if (lm && lm->meshCount > 0) { mats = lm->meshes[0].boneMatrices; nb = lm->meshes[0].boneCount; }
+#endif
+    if (!mats || nb <= 0) return;
+    rlEnableShader(sh.id);
+    rlSetUniformMatrices(loc, mats, nb);
+}
+
+/* Blend and upload the pose for one character, keeping a copy for bone queries.
+ * raylib 6 interpolates float frames and blends two clips in UpdateModelAnimationEx.
+ * raylib 5.5 has integer frames, so the same blend is done here and uploaded as one pose. */
 static void poseCharacter(AnimState *s, int clip, float t, float dt)
 {
     int nb = MODEL_BONECOUNT(model);
+    int loco = (clip == C_RUN || clip == C_JOG || clip == C_IDLE || clip == C_RUN_BALL ||
+                clip == C_KEEPER_IDLE || clip == C_KEEPER_READY || clip == C_SIDESTEP);
+    float blendTime = loco ? 0.22f : 0.10f;
+    float w;
     if (clip != s->clip) {
         s->prevClip = s->clip; s->prevT = s->t; s->blend = 0.0f;
         s->clip = clip;
     }
     s->t = t;
-    if (s->blend < 1.0f) s->blend = fminf(1.0f, s->blend + dt / BLEND_TIME);
-    Transform *cur = clipPose(clip, t);
+    if (poseFar) s->blend = 1.0f;
+    else if (s->blend < 1.0f) s->blend = fminf(1.0f, s->blend + dt / blendTime);
+    w = s->blend * s->blend * (3.0f - 2.0f * s->blend);
+    double t0 = GetTime();
+    Model lm = lookModel(lookOf(s));
+#if RAYLIB_VERSION_MAJOR >= 6
+    /* Raylib 6's UpdateModelAnimation writes CPU-skinned vertices into the
+     * mesh VBOs. The GPU shader then skins those vertices again, so any clip
+     * that leaves the bind pose (run, run-with-ball, the standing carry)
+     * folds the body onto the grass. Jog stays near the bind pose, which is
+     * why only that cycle looked upright. Hold the CPU buffers aside so the
+     * upload is skipped and the shader skins the bind pose once. */
+    float *holdV[MAX_PARTS], *holdN[MAX_PARTS];
+    int held = 0;
+    if (gpuSkin) {
+        held = lm.meshCount < MAX_PARTS ? lm.meshCount : MAX_PARTS;
+        for (int i = 0; i < held; i++) {
+            holdV[i] = lm.meshes[i].animVertices;
+            holdN[i] = lm.meshes[i].animNormals;
+            lm.meshes[i].animVertices = NULL;
+            lm.meshes[i].animNormals = NULL;
+        }
+    }
+    if (s->blend < 0.999f && s->prevClip >= 0 && !poseFar)
+        UpdateModelAnimationEx(lm, anims[clipIdx[s->prevClip]], clipFrame(s->prevClip, s->prevT),
+                               anims[clipIdx[clip]], clipFrame(clip, t), w);
+    else
+        UpdateModelAnimation(lm, anims[clipIdx[clip]], clipFrame(clip, t));
+    if (gpuSkin)
+        for (int i = 0; i < held; i++) {
+            lm.meshes[i].animVertices = holdV[i];
+            lm.meshes[i].animNormals = holdN[i];
+        }
+    if (model.currentPose) memcpy(s->pose, model.currentPose, sizeof(Transform) * (size_t)nb);
+#else
+    sampleClip(clip, t, sampleA);
     if (s->blend < 1.0f && s->prevClip >= 0) {
-        Transform *prev = clipPose(s->prevClip, s->prevT);
-        float w = s->blend * s->blend * (3.0f - 2.0f * s->blend);
+        sampleClip(s->prevClip, s->prevT, sampleB);
         for (int b = 0; b < nb; b++) {
-            scratchPose[b].translation = Vector3Lerp(prev[b].translation, cur[b].translation, w);
-            scratchPose[b].rotation = QuaternionSlerp(prev[b].rotation, cur[b].rotation, w);
-            scratchPose[b].scale = Vector3Lerp(prev[b].scale, cur[b].scale, w);
+            scratchPose[b].translation = Vector3Lerp(sampleB[b].translation, sampleA[b].translation, w);
+            scratchPose[b].rotation = QuaternionSlerp(sampleB[b].rotation, sampleA[b].rotation, w);
+            scratchPose[b].scale = Vector3Lerp(sampleB[b].scale, sampleA[b].scale, w);
         }
     } else {
-        memcpy(scratchPose, cur, sizeof(Transform) * nb);
+        memcpy(scratchPose, sampleA, sizeof(Transform) * (size_t)nb);
     }
-    memcpy(s->pose, scratchPose, sizeof(Transform) * nb);
-    double t0 = GetTime();
-    Model lm = lookModel(lookOf(s));                              /* only this character's look is skinned */
-#if RAYLIB_VERSION_MAJOR < 6
-    if (gpuSkin) UpdateModelAnimationBones(lm, scratch, 0);      /* 52 matrices; vertices skinned on the GPU */
-    else
+    memcpy(s->pose, scratchPose, sizeof(Transform) * (size_t)nb);
+    if (gpuSkin) UpdateModelAnimationBones(lm, scratch, 0);
+    else ANIM_UPDATE(lm, scratch, 0);
 #endif
-    ANIM_UPDATE(lm, scratch, 0);                                  /* CPU skinning + VBO re-upload */
     tSkin += GetTime() - t0;
     skinnedThisFrame++;
 }
@@ -350,22 +470,29 @@ static void drawCharacter(AnimState *s, float x, float z, float yaw, int kit, fl
         DrawCapsule(W(x, 0.3f, z), W(x, 1.5f, z), 0.3f, 8, 4, kit == KIT_HOME ? BLUE : RED);
         return;
     }
+    Vector3 wp = W(x, 0, z);
+    float dist = Vector3Distance(wp, cam.position);
+    poseFar = dist > 32.0f;
     poseCharacter(s, clip, t, dt);
     Model lm = lookModel(lookOf(s));
     if (nParts) {
-        Vector3 wp = W(x, 0, z);
         Matrix tr = MatrixMultiply(model.transform, MatrixMultiply(MatrixRotateY(yaw), MatrixTranslate(wp.x, wp.y, wp.z)));
         int first = lookFirst[((lookOf(s) % nLooks) + nLooks) % nLooks];
+        uploadSkin(skinShader, &lm);
         for (int i = 0; i < lm.meshCount; i++) {
-            Material mat = model.materials[lm.meshMaterial[i]];
-            if (partRole[first + i] == ROLE_KIT) mat.maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
+            int role = partRole[first + i];
+            Material mat;
+            if (dist > 36.0f && (role == ROLE_HAIR || role == ROLE_BROWS || role == ROLE_LASHES)) continue;
+            mat = model.materials[lm.meshMaterial[i]];
+            if (role == ROLE_KIT) mat.maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
             DrawMesh(lm.meshes[i], mat, tr);
         }
     } else {
         model.materials[model.meshMaterial[0]].maps[MATERIAL_MAP_DIFFUSE].texture = kits[kit];
-        DrawModelEx(model, W(x, 0, z), (Vector3){ 0, 1, 0 }, yaw * RAD2DEG, (Vector3){ 1, 1, 1 }, WHITE);
+        uploadSkin(skinShader, &model);
+        DrawModelEx(model, wp, (Vector3){ 0, 1, 0 }, yaw * RAD2DEG, (Vector3){ 1, 1, 1 }, WHITE);
     }
-    if (haveLit) drawPlanarShadow(&lm, W(x, 0, z), yaw * RAD2DEG);
+    if (haveLit) drawPlanarShadow(&lm, wp, yaw * RAD2DEG, dist);
     else DrawCylinder(W(x, 0.01f, z), 0.42f, 0.42f, 0.005f, 12, (Color){ 0, 0, 0, 70 });
 }
 
@@ -717,13 +844,13 @@ static Vector2 smoothMove(Vector2 cur, Vector2 tgt, float dt)
         cl = fmaxf(0.0f, cl - dt * 7.0f);
         return cl > 0.0f ? Vector2Scale(Vector2Normalize(cur), cl) : (Vector2){ 0, 0 };
     }
-    if (cl < 0.08f) return Vector2Scale(Vector2Normalize(tgt), fminf(tl, cl + dt * 5.0f));
+    if (cl < 0.08f) return Vector2Scale(Vector2Normalize(tgt), fminf(tl, cl + dt * 3.2f));
     float ca = atan2f(cur.y, cur.x), ta = atan2f(tgt.y, tgt.x), da = wrapAngle(ta - ca);
-    float rate = Lerp(16.0f, 6.5f, Clamp(cl, 0, 1));                    /* rad/s */
-    if (fabsf(da) > 2.3f && cl > 0.45f) cl -= dt * 6.0f;                  /* plant and turn */
+    float rate = Lerp(11.0f, 4.0f, Clamp(cl, 0, 1));                    /* rad/s: slower at pace */
+    if (fabsf(da) > 2.05f && cl > 0.40f) cl -= dt * 7.5f;                 /* plant the foot before a cut */
     else {
         ca += Clamp(da, -rate * dt, rate * dt);
-        cl += Clamp(tl - cl, -dt * 6.0f, dt * 3.5f);
+        cl += Clamp(tl - cl, -dt * 4.0f, dt * 2.5f);                      /* weight on the way up, carry it on the way down */
     }
     return (Vector2){ cosf(ca) * cl, sinf(ca) * cl };
 }
@@ -743,16 +870,23 @@ static GameInput readInput(float dt)
     Vector2 m = camRelative(fwd, right);
     Vector2 raw = m;                                   /* the stick as pushed (aim) */
     in.sprint = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) || padDown(GAMEPAD_BUTTON_RIGHT_TRIGGER_1);
-    /* right stick: orbit / zoom the camera; drifts back to the auto framing when let go */
+    /* right stick orbits the camera, unless a kick is charging: then it bends the kick */
     {
         static float camIdle = 0;
         float rx = padAxis(GAMEPAD_AXIS_RIGHT_X), ry = padAxis(GAMEPAD_AXIS_RIGHT_Y);
-        camOrbit = Clamp(camOrbit + rx * dt * 1.4f, -1.2f, 1.2f);
-        camZoom = Clamp(camZoom + ry * dt * 0.9f, 0.55f, 1.7f);
-        if (IsKeyDown(KEY_Z)) { camOrbit -= dt; rx = 1; }
-        if (IsKeyDown(KEY_X)) { camOrbit += dt; rx = 1; }
-        camIdle = (rx != 0 || ry != 0) ? 0 : camIdle + dt;
-        if (camIdle > 3.0f) { camOrbit = Lerp(camOrbit, 0, fminf(1, dt * 0.8f)); camZoom = Lerp(camZoom, 1, fminf(1, dt * 0.8f)); }
+        if (IsKeyDown(KEY_COMMA)) rx -= 1.0f;
+        if (IsKeyDown(KEY_PERIOD)) rx += 1.0f;
+        if (charge >= 0) {
+            shotCurve = Clamp(shotCurve + rx * dt * 1.8f, -1.0f, 1.0f);
+        } else {
+            shotCurve = 0;
+            camOrbit = Clamp(camOrbit + rx * dt * 1.4f, -1.2f, 1.2f);
+            camZoom = Clamp(camZoom + ry * dt * 0.9f, 0.55f, 1.7f);
+            if (IsKeyDown(KEY_Z)) { camOrbit -= dt; rx = 1; }
+            if (IsKeyDown(KEY_X)) { camOrbit += dt; rx = 1; }
+            camIdle = (rx != 0 || ry != 0) ? 0 : camIdle + dt;
+            if (camIdle > 3.0f) { camOrbit = Lerp(camOrbit, 0, fminf(1, dt * 0.8f)); camZoom = Lerp(camZoom, 1, fminf(1, dt * 0.8f)); }
+        }
     }
     if (padPressed(GAMEPAD_BUTTON_RIGHT_THUMB) || IsKeyPressed(KEY_V)) { camOrbit = 0; camZoom = 1; }
     int l2 = padDown(GAMEPAD_BUTTON_LEFT_TRIGGER_2);
@@ -790,7 +924,7 @@ static GameInput readInput(float dt)
     in.move_x = mvSmooth.x; in.move_z = mvSmooth.y;
     {
         float ml = Vector2Length(mvSmooth);
-        sprintRamp = Clamp(sprintRamp + ((in.sprint && ml > 0.3f) ? dt * 2.2f : -dt * 4.0f), 0, 1);
+        sprintRamp = Clamp(sprintRamp + ((in.sprint && ml > 0.3f) ? dt * 1.35f : -dt * 2.4f), 0, 1);
         if (in.sprint) { float k = (7.0f + 2.0f * sprintRamp) / 9.0f; in.move_x *= k; in.move_z *= k; }
     }
     /* pass-assist rings: hand pass (cyan) and, while the kick charges, the kick pass (orange) */
@@ -816,26 +950,30 @@ static GameInput readInput(float dt)
                 GamePlayer *o = &game.players[0][assistKick];
                 float d = distTo(assistKick, me->x, me->z) + fminf(o->movement * 7.0f * 0.6f, 4.0f);
                 in.pass_target = assistKick + 1; passIntent = assistKick; passIntentT = 0;
+                lockReceiver = assistKick;
                 /* assisted: the distance sets most of the power, a longer hold still adds a little */
                 in.power = Clamp(powerForDistance(d + 2.0f) * 0.85f + in.power * 0.15f, 0.05f, 1.0f);
             }
+            in.curve = shotCurve;
             charge = -1;
         }
+        if (charge >= 0 && (padPressed(GAMEPAD_BUTTON_LEFT_TRIGGER_1) || IsKeyPressed(KEY_Q))) charge = -1; /* cancel the charge */
         /* Y / G: shoot - aim at the posts, power from the distance; low and driven when close */
         if (IsKeyPressed(KEY_G) || (yPress && !l2)) {
             float d = game_distance_to_goal(0, me->x, me->z);
             aimAtGoal(me); aimedGoal = 1;
             if (d < 21.0f && fabsf(me->z - HW) < 12.0f && !game.restart_pending) in.kick_low = 1; else in.kick = 1;
             in.power = Clamp(d / 46.0f, 0.45f, 1.0f);
+            in.curve = shotCurve;
             charge = -1;
         }
         /* R2 / L: power kick - full-power long kick; aimed at goal it is a two-point attempt */
         if ((IsKeyPressed(KEY_L) || padPressed(GAMEPAD_BUTTON_RIGHT_TRIGGER_2)) && !in.kick && !in.kick_low) {
             if (game_distance_to_goal(0, me->x, me->z) < 52.0f) { aimAtGoal(me); aimedGoal = 1; }
-            in.kick = 1; in.power = 1.0f; charge = -1;
+            in.kick = 1; in.power = 1.0f; in.curve = shotCurve; charge = -1;
         }
         in.handpass = IsKeyPressed(KEY_E) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-        if (in.handpass && assistHand >= 0) { in.pass_target = assistHand + 1; passIntent = assistHand; passIntentT = 0; }
+        if (in.handpass && assistHand >= 0) { in.pass_target = assistHand + 1; passIntent = assistHand; passIntentT = 0; lockReceiver = assistHand; }
         /* the engine turns the player to the move direction before the strike:
          * make that the aim (goal / raw stick), not the smoothed run */
         if (in.kick || in.kick_low || in.handpass) {
@@ -851,14 +989,39 @@ static GameInput readInput(float dt)
         }
     } else {
         charge = -1;
-        in.tackle = IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_K) || padPressed(GAMEPAD_BUTTON_LEFT_TRIGGER_2);
+        /* L2: a tap is the tackle, a hold is the jockey. B (without the ball) is the tackle too. */
+        if (l2) l2Hold += dt;
+        else {
+            if (l2Hold > 0.0f && l2Hold < 0.18f) in.tackle = 1;
+            l2Hold = 0;
+        }
+        in.jockey = (l2 && l2Hold >= 0.16f) || IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        if (in.jockey) in.sprint = 0;
+        in.tackle = in.tackle || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_K) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
         in.pickup = in.pickup || IsKeyDown(KEY_E) || IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_F) || padDown(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
         in.high_field = in.high_field || IsKeyPressed(KEY_J) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
         /* special move: H, or L2 + Y on the pad (deliberately a two-button combo) */
         in.special = IsKeyPressed(KEY_H) || (l2 && yPress);
-        if (in.special) in.tackle = 0;
+        if (in.special) { in.tackle = 0; in.jockey = 0; }
     }
-    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_TAB) || padPressed(GAMEPAD_BUTTON_LEFT_TRIGGER_1)) manualSwitch();
+    /* kick-out: d-pad (and 7/8/9) picks short, long or wing; U cycles how high the other team presses */
+    if (game.restart_pending && game.restart_type == GAME_RESTART_KICKOUT && game.card_time <= 0.0f) {
+        if (game.ball_team == 0) {
+            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_LEFT) || IsKeyPressed(KEY_SEVEN)) in.kickout_plan = 1;
+            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP) || IsKeyPressed(KEY_EIGHT)) in.kickout_plan = 2;
+            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_RIGHT) || IsKeyPressed(KEY_NINE)) in.kickout_plan = 3;
+        } else {
+            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP)) in.press_height = 3;
+            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN)) in.press_height = 1;
+            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_LEFT) || padPressed(GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) in.press_height = 2;
+        }
+    }
+    if (IsKeyPressed(KEY_U)) in.press_height = (game.press_height + 1) % 3 + 1;
+    /* late lock: keep sending the receiver until the ball leaves the hand or foot */
+    if (me->action == GAME_ACT_HANDPASS || me->action == GAME_ACT_KICK) {
+        if (lockReceiver >= 0) in.pass_target = lockReceiver + 1;
+    } else lockReceiver = -1;
+    if (charge < 0 && (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_TAB) || padPressed(GAMEPAD_BUTTON_LEFT_TRIGGER_1))) manualSwitch();
     return in;
 }
 
@@ -895,18 +1058,19 @@ static GameInput demoInput(void)
     return in;
 }
 
-/* auto toe-tap / bounce for the human when the 4th step is near (toggle T) */
+/* Holding B still toe-taps on step 4. The T helper is game.solo_rhythm,
+ * off until you turn it on, and the rules engine does that one. */
 static void applyAssist(GameInput *in)
 {
     GamePlayer *p = &game.players[0][game.selected_player];
-    if (!autoSolo || !game.has_ball || game.restart_pending || p->action != GAME_ACT_NONE) return;
-    if ((in->move_x != 0 || in->move_z != 0) && game_carrier_steps(&game) >= 3 && !in->kick && !in->kick_low && !in->handpass) {
+    int held = IsKeyDown(KEY_B) || padDown(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+    if (game.solo_rhythm || !held || !game.has_ball || game.restart_pending || p->action != GAME_ACT_NONE) return;
+    if ((in->move_x != 0 || in->move_z != 0) && game_solo_rhythm_due(&game) && !in->kick && !in->kick_low && !in->handpass) {
         if (!game.last_was_bounce) in->bounce = 1; else in->solo = 1;
     }
 }
 
 /* ---- camera ---------------------------------------------------------------- */
-static Camera3D cam;
 static Vector3 camFocus;
 static int camOverride = 0;       /* 1 wide stadium orbit, 2 referee/card close-up */
 static float camOverrideT = 0;
@@ -1176,13 +1340,13 @@ static void drawControls(int sw, int sh)
     /* mapping lists */
     const char *padLines[] = {
         "PAD", "A  hand pass  |  no ball: pick up", "B  solo / bounce (legal one)", "X  kick - hold for power", "    no ball: jump / high catch",
-        "Y  shoot at the posts", "R2 power kick / 2-point try", "L2 tackle / shoulder", "L2+Y hook/head hit = RED", "L1 switch   R1 sprint",
+        "Y  shoot at the posts", "R2 power kick / 2-point try", "L2 hold jockey, tap tackle", "B no ball: tackle", "L2+Y hook/head hit = RED", "L1 switch   R1 sprint",
         "R stick camera, R3 reset", "Start pause   Back this screen", "D-pad cameras / menus" };
-    for (int i = 0; i < 13; i++) DrawText(padLines[i], x + 490, y + 110 + i * 19, i == 0 ? 18 : 15, i == 0 ? GOLD : RAYWHITE);
+    for (int i = 0; i < 14; i++) DrawText(padLines[i], x + 490, y + 110 + i * 19, i == 0 ? 18 : 15, i == 0 ? GOLD : RAYWHITE);
     const char *keys[] = {
         "KEYBOARD", "WASD / arrows  move", "Shift  sprint", "Space (hold)  kick / tackle", "F  low / ground shot", "G  shoot at goal",
         "L  power kick", "E  hand pass / pick up", "R / B  solo / bounce", "J  jump to field", "H  hook (RED!)", "Q / Tab  switch player",
-        "C, 1-6  cameras", "Z / X, V  orbit, reset", "T  auto-solo", "P  pause   F2 quality", "F3  FPS / profiler" };
+        "C, 1-6  cameras", "Z / X, V  orbit, reset", "T  auto-solo on step 4 (starts off)", "P  pause   F2 quality", "F3  FPS / profiler" };
     for (int i = 0; i < 17; i++) DrawText(keys[i], x + 760, y + 110 + i * 19, i == 0 ? 18 : 15, i == 0 ? GOLD : RAYWHITE);
     DrawText("Press F1 / Back / Esc to close", x + w - 300, y + h - 26, 16, GRAY);
 }
@@ -1225,6 +1389,13 @@ static void drawHUD(int sw, int sh)
         DrawRectangle(660, 10, w + 46, 30, (Color){ 0, 0, 0, 170 });
         DrawCircle(676, 25, 8, (Color){ 255, 220, 0, 255 });
         DrawText(nm, 692, 15, 20, (Color){ 255, 230, 120, 255 });
+        {
+            float st = game.players[0][sp].stamina;
+            Color sc = st > 0.55f ? (Color){ 80, 200, 90, 255 } : st > 0.28f ? (Color){ 230, 180, 40, 255 } : (Color){ 210, 50, 40, 255 };
+            DrawRectangle(662, 64, 120, 8, (Color){ 0, 0, 0, 160 });
+            DrawRectangle(662, 64, (int)(120 * Clamp(st, 0, 1)), 8, sc);
+            DrawText("stamina", 788, 60, 14, sc);
+        }
         if (game.has_ball) { int t = passTarget(); if (t >= 0) DrawText(TextFormat("hand pass -> #%d %s", t + 1, SURNAMES[0][t]), 662, 44, 16, (Color){ 120, 235, 255, 255 }); }
         /* v3.2: your player is off screen -> an arrow at the edge pointing to him */
         GamePlayer *me = &game.players[0][sp];
@@ -1246,14 +1417,26 @@ static void drawHUD(int sw, int sh)
     /* carrier status: steps and bounce legality */
     if (game.has_ball) {
         int st = game_carrier_steps(&game);
-        DrawRectangle(10, 82, 300, 30, (Color){ 0, 0, 0, 150 });
+        int band = game_step_ring(&game);
+        Color pip = band == GAME_RING_RED ? (Color){ 220, 40, 30, 255 } :
+                    band == GAME_RING_ORANGE ? (Color){ 255, 150, 30, 255 } :
+                    (Color){ 190, 235, 190, 255 };
+        DrawRectangle(10, 82, 390, 30, (Color){ 0, 0, 0, 150 });
         DrawText("steps", 18, 89, 18, RAYWHITE);
-        for (int i = 0; i < 4; i++) DrawRectangle(80 + i * 20, 90, 14, 14, i < st ? (st >= 4 ? RED : ORANGE) : DARKGRAY);
-        DrawText(game.last_was_bounce ? "next: SOLO (R/B)" : "bounce ok (B)", 170, 89, 18, game.last_was_bounce ? ORANGE : LIME);
+        for (int i = 0; i < GAME_CARRY_STEPS; i++)
+            DrawRectangle(78 + i * 18, 90, 14, 14, i < st ? pip : DARKGRAY);
+        DrawText(game.last_was_bounce ? "next: SOLO (R/B)" : "bounce ok (B)", 176, 89, 18, game.last_was_bounce ? ORANGE : LIME);
     }
     if (game.restart_pending && game.card_time <= 0.0f) {
-        const char *r = game.restart_type == GAME_RESTART_KICKOUT ? "KICK-OUT: must pass the 40m arc" :
-                        game.restart_type == GAME_RESTART_FREE ? (game.mark_play_on ? "MARK: kick the free or play on (R / B)" : "FREE KICK  (R = Solo & Go)") :
+        const char *planName = game.kickout_plan == 1 ? "SHORT" : game.kickout_plan == 3 ? "WING" : "LONG";
+        const char *pressName = game.press_height == 0 ? "DROP" : game.press_height == 2 ? "PRESS" : "ZONAL";
+        char kickLine[96];
+        const char *r;
+        if (game.restart_type == GAME_RESTART_KICKOUT) {
+            snprintf(kickLine, sizeof kickLine, "KICK-OUT %s   press %s   (d-pad / 7 8 9, U)", planName, pressName);
+            r = kickLine;
+        } else r = game.restart_type == GAME_RESTART_FREE ? (game.mark_play_on ?
+                        TextFormat("MARK  %.0fs   kick, or play on (R)   opponents 13m", game.mark_clock) : "FREE KICK  (R = Solo & Go)") :
                         game.restart_type == GAME_RESTART_SIDELINE ? "SIDELINE KICK" :
                         game.restart_type == GAME_RESTART_FORTY_FIVE ? "45m FREE (1 point)" :
                         game.restart_type == GAME_RESTART_PENALTY ? "PENALTY: aim, F / Y shoot" : "RESTART";
@@ -1287,13 +1470,19 @@ static void drawHUD(int sw, int sh)
         DrawText(ev, sw / 2 - w / 2, sh / 4, 34, fullTime ? GOLD : RAYWHITE);
     }
     drawCommentary(sw, sh);
-    DrawText(TextFormat("Cam %d: %s   Auto-solo: %s   Gfx: %s", camMode + 1, CAM_NAMES[camMode], autoSolo ? "on" : "off", QUALITY_NAMES[gfxQuality]), sw - 520, sh - 46, 16, RAYWHITE);
+    DrawText(TextFormat("Cam %d: %s   Auto-solo (T, step 4): %s   Gfx: %s", camMode + 1, CAM_NAMES[camMode], game.solo_rhythm ? "on" : "off", QUALITY_NAMES[gfxQuality]), sw - 640, sh - 46, 16, RAYWHITE);
     if (training) return;
+    if (game.contest_time > 0.0f && game.contest_grade > 0) {
+        const char *g = game.contest_grade == 2 ? "JUMP: PERFECT" : game.contest_grade == 1 ? "JUMP: EARLY" :
+                        game.contest_grade == 3 ? "JUMP: LATE" : "BROKE IN THE AIR";
+        int gw = MeasureText(g, 22);
+        DrawText(g, sw / 2 - gw / 2, 132, 22, game.contest_grade == 2 ? LIME : game.contest_grade == 4 ? ORANGE : YELLOW);
+    }
     if (padId >= 0)
-        DrawText("PAD: A hand pass/pick up  B solo/bounce  X kick (hold)  Y shoot  R2 power kick  L2 tackle  L1 switch  R1 sprint  Back test screen",
+        DrawText("PAD: A pass/pickup  B solo (no ball: tackle)  X kick  Y shoot  R stick curl  L2 hold jockey / tap tackle  R1 sprint  U press",
                  10, sh - 22, 15, RAYWHITE);
     else
-        DrawText("WASD move  Shift sprint  SPACE kick(hold)/tackle  G shoot  E hand pass  R solo  B bounce  J jump  H hook (red!)  Q switch  F1 controls",
+        DrawText("WASD move  Shift sprint  Ctrl jockey  SPACE kick/tackle  E pass  R solo  B bounce  T step-4 solo (off)  F1 controls",
                  10, sh - 22, 15, RAYWHITE);
 }
 
@@ -1337,6 +1526,71 @@ static void groundRing(Vector3 c, float r0, float r1, Color col)
     rlEnd();
 }
 
+static void drawAimCone(void)
+{
+    GamePlayer *me;
+    float gx, gz, gd, fx, fz, fl, dot, press, half, yaw, len, px, pz;
+    Vector3 a, b, c;
+    int i;
+    if (charge < 0 || !game.has_ball) return;
+    me = &game.players[0][game.selected_player];
+    gx = GAME_PITCH_LENGTH - me->x;
+    gz = HW - me->z;
+    gd = sqrtf(gx * gx + gz * gz);
+    if (gd < 2.0f || gd > 72.0f) return;
+    fx = me->facing_x; fz = me->facing_z;
+    fl = sqrtf(fx * fx + fz * fz);
+    if (fl < 0.05f) return;
+    dot = (gx * fx + gz * fz) / (gd * fl);
+    if (dot < 0.45f) return;
+    press = 1e9f;
+    for (i = 0; i < GAME_TEAM_SIZE; i++) {
+        float dx = game.players[1][i].x - me->x, dz = game.players[1][i].z - me->z;
+        press = fminf(press, sqrtf(dx * dx + dz * dz));
+    }
+    half = 0.8f + charge * 2.4f + fmaxf(0.0f, 8.0f - press) * 0.4f + (1.0f - dot) * 5.0f;
+    half *= 1.0f + (1.0f - me->stamina) * 0.45f;
+    yaw = atan2f(gx, gz) + shotCurve * 0.42f;
+    len = fminf(gd, 26.0f);
+    fx = sinf(yaw); fz = cosf(yaw);
+    px = cosf(yaw); pz = -sinf(yaw);
+    a = W(me->x, 0.08f, me->z);
+    b = (Vector3){ a.x + fx * len + px * half, 0.08f, a.z + fz * len + pz * half };
+    c = (Vector3){ a.x + fx * len - px * half, 0.08f, a.z + fz * len - pz * half };
+    DrawTriangle3D(a, b, c, (Color){ 255, 196, 40, 80 });
+    DrawTriangle3D(a, c, b, (Color){ 255, 196, 40, 80 });
+}
+
+static void drawStepRing(Vector3 c)
+{
+    float prog, a0, a1;
+    int N = 40, n, k, band;
+    Color col;
+    if (!game.has_ball) return;
+    band = game_step_ring(&game);
+    if (band == GAME_RING_NONE) return;
+    prog = Clamp((game.steps_carried + game.step_time / GAME_STEP_LENGTH) / (float)GAME_CARRY_STEPS, 0.0f, 1.0f);
+    n = (int)(prog * N + 0.5f);
+    if (n < 1) n = 1;
+    col = band == GAME_RING_RED ? (Color){ 220, 40, 30, 230 } :
+          band == GAME_RING_ORANGE ? (Color){ 255, 150, 30, 220 } :
+          (Color){ 210, 245, 210, 220 };
+    rlBegin(RL_TRIANGLES);
+    rlColor4ub(col.r, col.g, col.b, col.a);
+    for (k = 0; k < n; k++) {
+        Vector3 i0, o0, i1, o1;
+        a0 = -PI * 0.5f + (float)k / N * 2.0f * PI;
+        a1 = -PI * 0.5f + (float)(k + 1) / N * 2.0f * PI;
+        i0 = (Vector3){ c.x + cosf(a0) * 1.05f, c.y, c.z + sinf(a0) * 1.05f };
+        o0 = (Vector3){ c.x + cosf(a0) * 1.28f, c.y, c.z + sinf(a0) * 1.28f };
+        i1 = (Vector3){ c.x + cosf(a1) * 1.05f, c.y, c.z + sinf(a1) * 1.05f };
+        o1 = (Vector3){ c.x + cosf(a1) * 1.28f, c.y, c.z + sinf(a1) * 1.28f };
+        rlVertex3f(i0.x, i0.y, i0.z); rlVertex3f(o1.x, o1.y, o1.z); rlVertex3f(o0.x, o0.y, o0.z);
+        rlVertex3f(i0.x, i0.y, i0.z); rlVertex3f(i1.x, i1.y, i1.z); rlVertex3f(o1.x, o1.y, o1.z);
+    }
+    rlEnd();
+}
+
 static void drawSelectionMarkers(void)
 {
     GamePlayer *me = &game.players[0][game.selected_player];
@@ -1345,6 +1599,9 @@ static void drawSelectionMarkers(void)
     Vector3 c = W(me->x, 0.05f, me->z);
     rlDisableBackfaceCulling();
     groundRing(c, 0.62f, 0.86f, (Color){ 255, 220, 0, 235 });
+    drawStepRing(c);
+    if (!game.has_ball && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || l2Hold >= 0.16f))
+        groundRing(c, 1.35f, 1.55f, (Color){ 80, 180, 255, 180 });   /* jockey ring */
     groundRing(c, 0.86f, 0.98f + 0.08f * pulse, (Color){ 20, 20, 20, 150 });
     /* facing tick on the ring */
     Vector3 f = { me->facing_x, 0, me->facing_z };
@@ -1377,6 +1634,7 @@ static void drawSelectionMarkers(void)
         GamePlayer *o = &game.players[0][assistKick];
         groundRing(W(o->x, 0.05f, o->z), 0.6f, 0.85f + 0.06f * pulse, (Color){ 255, 150, 30, 230 });
     }
+    drawAimCone();
     rlEnableBackfaceCulling();
 }
 
@@ -1400,6 +1658,12 @@ static void drawWorld(float dt)
     }
     if (game.restart_pending && game.restart_type != GAME_RESTART_KICKOUT)
         DrawCircle3D(W(game.ball.x, 0.04f, game.ball.z), GAME_KICKOUT_ARC_RADIUS, (Vector3){ 1, 0, 0 }, 90, (Color){ 255, 255, 255, 120 });
+    if (game.ball_team < 0 && game.ball.in_flight && game.ball.height > 1.3f) {
+        float lx, lz;
+        landingPoint(&lx, &lz, NULL);
+        groundRing(W(lx, 0.05f, lz), 0.35f, 1.15f + 0.25f * (0.5f + 0.5f * sinf((float)GetTime() * 6.0f)), (Color){ 255, 220, 50, 200 });
+        DrawLine3D(W(lx, 0.1f, lz), W(lx, fminf(game.ball.height, 6.0f), lz), (Color){ 255, 220, 50, 160 });
+    }
 
     for (int team = 0; team < 2; team++)
         for (int i = 0; i < GAME_TEAM_SIZE; i++) {
@@ -1467,8 +1731,14 @@ static void onGameEvent(GameEvent ev)
     case GAME_EVENT_WIDE: commentarySay(ev, "Wide. %s will be disappointed with that one.", O); sfxPlay(SND_GROAN, 0.7f); break;
     case GAME_EVENT_FREE: case GAME_EVENT_FOUL_TACKLE:
         commentarySay(ev, "The referee blows for a free to %s.", T); sfxPlay(SND_WHISTLE, 0.8f); break;
-    case GAME_EVENT_FOUR_STEPS: case GAME_EVENT_ILLEGAL_BOUNCE:
+    case GAME_EVENT_TACKLE_BEHIND:
+        commentarySay(ev, "Tackle from behind - free out to %s.", T); sfxPlay(SND_WHISTLE, 0.8f); break;
+    case GAME_EVENT_TACKLE_SHOULDER:
+        commentarySay(ev, "Over the shoulder - free out to %s.", T); sfxPlay(SND_WHISTLE, 0.8f); break;
+    case GAME_EVENT_FOUR_STEPS:
         commentarySay(ev, "Overcarried - too many steps, free out to %s.", T); sfxPlay(SND_WHISTLE, 0.8f); break;
+    case GAME_EVENT_ILLEGAL_BOUNCE:
+        commentarySay(ev, "Double bounce - free out to %s.", T); sfxPlay(SND_WHISTLE, 0.8f); break;
     case GAME_EVENT_YELLOW_CARD:
         commentarySay(ev, "Yellow card. #%d of %s goes in the book.", game.card_player + 1, teamName(game.card_team));
         sfxPlay(SND_WHISTLE, 0.8f); sfxPlay(SND_OOH, 0.5f); break;
@@ -1483,13 +1753,14 @@ static void onGameEvent(GameEvent ev)
                       game.card_player + 1, teamName(game.card_team));
         sfxPlay(SND_WHISTLE_DOUBLE, 1.0f); sfxPlay(SND_ROAR, 0.6f); crowdSurge(0.7f, 3.0f); break;
     case GAME_EVENT_SIN_BIN_OVER: commentarySay(ev, "The sin bin is over - %s back to full strength.", T); break;
-    case GAME_EVENT_ADVANCED_MARK: commentarySay(ev, "Clean catch inside the twenty - advanced mark to %s.", T); sfxPlay(SND_WHISTLE, 0.6f); break;
+    case GAME_EVENT_ADVANCED_MARK: commentarySay(ev, "Clean catch inside the forty-five - advanced mark to %s.", T); sfxPlay(SND_WHISTLE, 0.6f); break;
     case GAME_EVENT_KICKOUT_MARK: commentarySay(ev, "Caught clean from the kick-out - that's a mark for %s.", T); sfxPlay(SND_WHISTLE, 0.6f); break;
     case GAME_EVENT_DISSENT: commentarySay(ev, "Dissent! The free is brought forward fifty metres."); sfxPlay(SND_WHISTLE_DOUBLE, 0.8f); sfxPlay(SND_OOH, 0.6f); break;
     case GAME_EVENT_BACK_PASS: commentarySay(ev, "Back-pass to the keeper - that's a free to %s.", T); sfxPlay(SND_WHISTLE, 0.8f); break;
     case GAME_EVENT_PENALTY: commentarySay(ev, "Penalty to %s!", T); sfxPlay(SND_WHISTLE_DOUBLE, 0.9f); crowdSurge(0.7f, 4.0f); break;
     case GAME_EVENT_PENALTY_SAVED: commentarySay(ev, "Saved! The keeper guesses right!"); sfxPlay(SND_ROAR, 0.8f); crowdSurge(0.8f, 3.0f); break;
     case GAME_EVENT_HIGH_FIELD: commentarySay(ev, "Great high fielding by %s.", T); sfxPlay(SND_CHEER, 0.4f); break;
+    case GAME_EVENT_BREAKING_BALL: commentarySay(ev, "It broke in the air - scramble!"); sfxPlay(SND_OOH, 0.5f); break;
     case GAME_EVENT_TACKLE: commentarySay(ev, "Turnover! %s win it back with a great tackle.", T); sfxPlay(SND_THUD, 0.6f); sfxPlay(SND_CHEER, 0.3f); break;
     case GAME_EVENT_KICKOUT: commentarySay(ev, "Kick-out for %s.", T); break;
     case GAME_EVENT_FORTY_FIVE: commentarySay(ev, "Off a defender - 45 to %s.", T); sfxPlay(SND_WHISTLE, 0.6f); break;
@@ -1828,9 +2099,170 @@ static void shotScript32(int frame, int *state, float *stateT, int *introDemo)
     #undef LOG
 }
 
+/* v3.4 verification scenes: character, jockey, step ring, mark, kick-out, high ball, aim, stamina. */
+static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
+{
+    int me = 9;
+    (void)stateT;
+    if (frame == 2) {
+        newMatch(); *state = ST_PLAY; *introDemo = 0; demo = 0;
+        gfxQuality = 1; camMode = 5; showPerf = 0; simPad(1);
+        game.enforce_three_v_three = 0;
+        game.restart_type = GAME_RESTART_NONE; game.restart_pending = 0;
+        game.ball.in_flight = 0; game.ball.velocity_y = 0;
+        game_select_player(&game, me);
+        for (int t = 0; t < 2; t++) for (int i = 0; i < GAME_TEAM_SIZE; i++) {
+            if (t == 0 && i == me) continue;
+            game.players[t][i].x = 6.0f + i * 1.2f;
+            game.players[t][i].z = t ? 6.0f : 80.0f;
+        }
+        game.players[0][me].x = 100.0f; game.players[0][me].z = 42.0f;
+        game.players[0][me].facing_x = 1; game.players[0][me].facing_z = 0;
+        game.ball_team = -1; game.ball_player = -1; game.ball.x = 4; game.ball.z = 4;
+        game.has_ball = 0; game.restart_pending = 0;
+        game.event = GAME_EVENT_NONE; game.event_time = 0;
+    }
+    if (frame < 48) {
+        game.restart_type = GAME_RESTART_NONE; game.ball.in_flight = 0;
+        game_select_player(&game, me);
+        game.players[0][me].x = 100.0f; game.players[0][me].z = 42.0f;
+        game.players[0][me].facing_x = 1; game.players[0][me].facing_z = 0;
+        game.players[0][me].action = GAME_ACT_NONE; game.players[0][me].jump_time = 0;
+    }
+    if (frame == 40) TakeScreenshot("/opt/cursor/artifacts/v34_idle.png");
+    if (frame >= 50 && frame < 130) pad.axis[0] = 0.45f;         /* jog, so the cycle stays upright */
+    else if (frame == 130) pad.axis[0] = 0;
+    if (frame == 120) TakeScreenshot("/opt/cursor/artifacts/v34_run.png");
+    if (frame == 150) {
+        scenarioCarry(0, me, game.players[0][me].x, game.players[0][me].z);
+        game.steps_carried = 2; game.step_time = 1.2f; game.last_was_bounce = 0;
+        camMode = 5;
+    }
+    if (frame == 165) TakeScreenshot("/opt/cursor/artifacts/v34_step_ring.png");
+    if (frame == 175) { pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_RIGHT] = 1; }  /* B: solo */
+    if (frame == 176) pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_RIGHT] = 0;
+    if (frame == 188) TakeScreenshot("/opt/cursor/artifacts/v34_solo.png");
+    if (frame == 210) {
+        pad.axis[0] = 0;
+        scenarioCarry(0, me, 95.0f, 42.0f);
+        game.players[0][me].facing_x = 1; game.players[0][me].facing_z = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
+        camMode = 1;
+    }
+    if (frame == 230) pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_LEFT] = 1;   /* hold X: charge, cone toward the posts */
+    if (frame == 270) TakeScreenshot("/opt/cursor/artifacts/v34_aim_cone.png");
+    if (frame == 265) pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_LEFT] = 0;
+    if (frame == 300) {
+        game.restart_pending = 1; game.restart_type = GAME_RESTART_KICKOUT;
+        game.ball_team = 0; game.ball_player = 0; game.kickout_plan = 1; game.press_height = 2;
+        game.players[0][0].x = 20; game.players[0][0].z = 42.5f;
+        game_select_player(&game, 0);
+        camMode = 0; pad.axis[0] = 0;
+    }
+    if (frame == 340) TakeScreenshot("/opt/cursor/artifacts/v34_kickout.png");
+    if (frame == 360) {
+        game.restart_pending = 1; game.restart_type = GAME_RESTART_FREE; game.mark_play_on = 1;
+        game.mark_clock = 12.4f; game.ball_team = 0; game.ball_player = me;
+        game_select_player(&game, me);
+        game.players[0][me].x = 110; game.players[0][me].z = 40; game.players[0][me].facing_x = 1;
+        game.players[0][me].action = GAME_ACT_NONE;
+        camMode = 5;
+    }
+    if (frame == 390) TakeScreenshot("/opt/cursor/artifacts/v34_mark.png");
+    if (frame == 410) {
+        game.restart_pending = 0; game.mark_play_on = 0; game.ball_team = -1; game.ball_player = -1;
+        game.ball.in_flight = 1; game.ball.x = 80; game.ball.z = 42; game.ball.height = 14;
+        game.ball.velocity_x = 8; game.ball.velocity_z = 0; game.ball.velocity_y = 2;
+        game.players[0][me].x = 96; game.players[0][me].z = 42; game.players[0][me].jump_time = 0.55f;
+        camMode = 1;
+    }
+    if (frame == 425) TakeScreenshot("/opt/cursor/artifacts/v34_highball.png");
+    if (frame == 440) {
+        game.ball.in_flight = 0; game.ball_team = 1; game.ball_player = 8;
+        game.players[1][8].x = 88; game.players[1][8].z = 42; game.players[1][8].facing_x = 1;
+        game.players[0][me].x = 84; game.players[0][me].z = 42;
+        game_select_player(&game, me);
+        pad.btn[GAMEPAD_BUTTON_LEFT_TRIGGER_2] = 1;   /* hold L2: jockey */
+        camMode = 1;
+    }
+    if (frame == 480) TakeScreenshot("/opt/cursor/artifacts/v34_jockey.png");
+    if (frame == 490) {
+        pad.btn[GAMEPAD_BUTTON_LEFT_TRIGGER_2] = 0;
+        game.players[0][me].stamina = 0.12f;
+        game.ball_team = 0; game.ball_player = me; game.has_ball = 1;
+        camMode = 0;
+    }
+    if (frame == 500) TakeScreenshot("/opt/cursor/artifacts/v34_stamina.png");
+    if (frame == 520) {
+        game.players[0][me].action = GAME_ACT_CATCH; game.players[0][me].action_time = 0.25f;
+        game.players[0][me].action_released = 1;
+        camMode = 5;
+    }
+    if (frame == 528) TakeScreenshot("/opt/cursor/artifacts/v34_catch.png");
+    /* step ring: green/white on 1-2, orange on 3, red on 4-5, then the overcarry free */
+    if (frame == 536) {
+        scenarioCarry(0, me, 100.0f, 42.0f);
+        for (int t = 0; t < 2; t++) for (int i = 0; i < GAME_TEAM_SIZE; i++) {
+            if (t == 0 && i == me) continue;
+            game.players[t][i].x = 6.0f + (float)i * 1.1f;
+            game.players[t][i].z = t ? 6.0f : 78.0f;
+        }
+        game.players[0][me].facing_x = 1; game.players[0][me].facing_z = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
+        game.solo_rhythm = 0;
+        camMode = 5;
+        pad.axis[0] = 0; pad.axis[1] = 0;
+    }
+    /* keep him running so the carry cycle is on screen, not a freeze */
+    if (frame >= 538 && frame < 576) pad.axis[0] = 0.85f;
+    if (frame >= 540 && frame <= 556) {
+        game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.steps_carried = 3; game.step_time = 0.4f;
+        game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
+        game_select_player(&game, me);
+    }
+    if (frame == 552) TakeScreenshot("v35_ring_orange_3.png");
+    if (frame >= 558 && frame <= 574) {
+        game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.steps_carried = 5; game.step_time = 0.5f;
+        game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
+        game_select_player(&game, me);
+    }
+    if (frame == 570) TakeScreenshot("v35_ring_red_5.png");
+    if (frame == 576) { pad.axis[0] = 0; pad.axis[1] = 0; }
+    if (frame >= 578 && frame <= 604) {
+        game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.steps_carried = 2; game.step_time = 0.2f;
+        game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].action = GAME_ACT_NONE;
+        game_select_player(&game, me);
+    }
+    if (frame == 602) TakeScreenshot("v35_stand_with_ball.png");
+    if (frame == 612) {
+        GameInput kick = { 0 };
+        game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.players[0][me].x = 100.0f; game.players[0][me].z = 42.0f;
+        game.players[0][me].facing_x = 1.0f; game.players[0][me].facing_z = 0.0f;
+        game.players[0][me].action = GAME_ACT_NONE;
+        game.steps_carried = 5; game.step_time = GAME_STEP_LENGTH - 0.12f;
+        game_select_player(&game, me);
+        kick.move_x = 1.0f;
+        game_update(&game, kick, 0.1f);
+        camMode = 1;
+    }
+    if (frame == 628) TakeScreenshot("v35_overcarry_free.png");
+    if (frame == 640) { CloseWindow(); exit(0); }
+}
+
 int main(int argc, char **argv)
 {
-    int shots = 0, skipIntro = 0, bench = 0, cliQuality = -1, shots31 = 0, startTraining = 0;
+    int shots = 0, skipIntro = 0, bench = 0, cliQuality = -1, shots31 = 0, shots34 = 0, startTraining = 0;
     const char *recordPath = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
@@ -1841,6 +2273,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--quality") == 0 && i + 1 < argc) cliQuality = atoi(argv[++i]);
         else if (strcmp(argv[i], "--shots31") == 0) shots31 = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--shots32") == 0) shots31 = 2, skipIntro = 1;
+        else if (strcmp(argv[i], "--shots34") == 0) shots34 = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--training") == 0) startTraining = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--no-intro") == 0) skipIntro = 1;
         else if (strcmp(argv[i], "--record-intro") == 0 && i + 1 < argc) recordPath = argv[++i];
@@ -1850,7 +2283,7 @@ int main(int argc, char **argv)
     loadSettings();
     if (cliQuality >= 0) gfxQuality = cliQuality % 3;
     unsigned int flags = FLAG_WINDOW_RESIZABLE;
-    if (!bench && !shots && !shots31 && !recordPath) flags |= FLAG_VSYNC_HINT;
+    if (!bench && !shots && !shots31 && !shots34 && !recordPath) flags |= FLAG_VSYNC_HINT;
     if (gfxQuality == 2) flags |= FLAG_MSAA_4X_HINT;
     SetConfigFlags(flags);
     InitWindow(1280, 720, "Sunday League: Gaelic Football");
@@ -1918,7 +2351,7 @@ int main(int argc, char **argv)
     int quit = 0;
     while (!WindowShouldClose() && !quit) {
         double frameStart = GetTime();
-        float dt = (shots || shots31 || rec || bench) ? (rec ? 1.0f / 30.0f : 1.0f / 60.0f) : fminf(GetFrameTime(), 1.0f / 30.0f);
+        float dt = (shots || shots31 || shots34 || rec || bench) ? (rec ? 1.0f / 30.0f : 1.0f / 60.0f) : fminf(GetFrameTime(), 1.0f / 30.0f);
         tSkin = tUpdate = tWorld = tHud = tSwap = 0; skinnedThisFrame = 0;
         frame++;
         releaseFlash++;
@@ -1926,6 +2359,7 @@ int main(int argc, char **argv)
         padUpdate();
         if (shots31 == 1) shotScript31(frame, &state, &stateT, &introDemo);
         if (shots31 == 2) shotScript32(frame, &state, &stateT, &introDemo);
+        if (shots34) shotScript34(frame, &state, &stateT, &introDemo);
         int confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || padAnyConfirm();
         if (IsKeyPressed(KEY_F1) || padPressed(GAMEPAD_BUTTON_MIDDLE_LEFT)) showControls = !showControls;
         if (showControls && (IsKeyPressed(KEY_ESCAPE) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))) showControls = 0;
@@ -1960,10 +2394,12 @@ int main(int argc, char **argv)
         }
         if (state == ST_PLAY) {
             if (IsKeyPressed(KEY_C)) camMode = (camMode + 1) % CAM_COUNT;
-            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP)) camMode = (camMode + 1) % CAM_COUNT;
-            if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN)) camMode = (camMode + CAM_COUNT - 1) % CAM_COUNT;
+            if (!(game.restart_pending && game.restart_type == GAME_RESTART_KICKOUT)) {
+                if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_UP)) camMode = (camMode + 1) % CAM_COUNT;
+                if (padPressed(GAMEPAD_BUTTON_LEFT_FACE_DOWN)) camMode = (camMode + CAM_COUNT - 1) % CAM_COUNT;
+            }
             for (int k = 0; k < CAM_COUNT; k++) if (IsKeyPressed(KEY_ONE + k)) camMode = k;
-            if (IsKeyPressed(KEY_T)) autoSolo = !autoSolo;
+            if (IsKeyPressed(KEY_T)) game.solo_rhythm = !game.solo_rhythm;
             if (IsKeyPressed(KEY_P) || (padPressed(GAMEPAD_BUTTON_MIDDLE_RIGHT) && !fullTime)) paused = !paused;
             if (confirm && fullTime) newMatch();
             if (IsKeyPressed(KEY_ESCAPE) && !showControls) { state = ST_MENU; introDemo = 1; stateT = 0; paused = 0; if (training) newMatch(); }
@@ -2019,7 +2455,7 @@ int main(int argc, char **argv)
             if (frame > 2260) break;
         }
 
-        int frozen = showControls && state == ST_PLAY && !shots && !shots31;   /* the test screen pauses play */
+        int frozen = showControls && state == ST_PLAY && !shots && !shots31 && !shots34;   /* the test screen pauses play */
         if (!paused && !fullTime && !frozen) {
             GameInput in;
             int ai = state != ST_PLAY || introDemo || demo;
@@ -2027,7 +2463,7 @@ int main(int argc, char **argv)
             if (state == ST_PLAY && !ai && !shots) applyAssist(&in);
             double u0 = GetTime();
             game_update(&game, in, dt);
-            if (state == ST_PLAY && !ai && !training) autoSwitch(dt);
+            if (state == ST_PLAY && !ai && !training && !shots34) autoSwitch(dt);
             else { lastBT = game.ball_team; lastBP = game.ball_player; lastFlight = game.ball.in_flight; }
             if (switchFlash > 0) switchFlash -= dt;
             if (training) trainingTick(dt);
@@ -2111,6 +2547,16 @@ int main(int argc, char **argv)
                 fflush(stdout);
                 break;
             }
+        }
+        if (shots34 && frame >= 70 && frame <= 175) {
+            static FILE *clip = NULL;
+            int rw = GetRenderWidth(), rh = GetRenderHeight();
+            unsigned char *px;
+            if (!clip) clip = fopen("/tmp/v34_clip.raw", "wb");
+            px = rlReadScreenPixels(rw, rh);
+            if (clip && px) fwrite(px, 1, (size_t)rw * rh * 4, clip);
+            RL_FREE(px);
+            if (frame == 175 && clip) { fclose(clip); clip = NULL; }
         }
         if (rec) {
             int rw = GetRenderWidth(), rh = GetRenderHeight();
