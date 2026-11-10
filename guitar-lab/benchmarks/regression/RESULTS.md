@@ -227,6 +227,45 @@ What the new material showed:
 
 Riley stays ahead of Basic Pitch on five of the seven pairs; 18 and Life is within .02.
 
+## Real distortion pedals: what goes wrong (EGFxSet, CC BY 4.0)
+
+EGFxSet: every note on a Stratocaster (6 strings × 23 frets × 5 pickup settings = 690 notes,
+5 s each), recorded clean and through real Pro Co RAT2, Ibanez Tube Screamer and Boss BD-2
+Blues Driver pedals at full gain. Not in the repo; scripts in `.scratch/egfx_*.py`.
+
+**Single notes** (Riley, onset 0.5):
+
+| Sound | Real note found | Notes reported per pluck | Same note re-fired later | Octave ghosts |
+|---|---|---|---|---|
+| Clean | 84% | 0.84 | 0 | 0 |
+| Tube Screamer | 82% | 1.9 | 0.95 per pluck | 0.01 |
+| Blues Driver | 89% | 4.5 | 2.6 per pluck | 0.59 |
+| RAT | 94% | 4.5 | 2.8 per pluck | 0.23 |
+
+- Wrong pitch instead of the real one is rare (under 1%). Distortion helps on the low E string
+  (found 56% clean, 90% through the RAT).
+- The fault is re-triggering: a sustained distorted note is reported again and again.
+
+**Riffs spliced from those notes** (monophonic, the next pick stops the string; 4 riffs each):
+
+| Sound | 100 BPM eighths (0.30 s) | 140 BPM sixteenths (0.11 s) | 180 BPM sixteenths (0.08 s) |
+|---|---|---|---|
+| Clean | | F1 .998 | F1 .985 |
+| Tube Screamer | F1 1.000 | F1 .998 | F1 .983 |
+| Blues Driver | F1 .752 (precision .61) | F1 .937 | F1 .914 |
+| RAT | F1 .531 (precision .36) | F1 .890 | F1 .932 |
+
+Recall stays at .93–1.00 through every pedal and tempo. Distortion on its own does not stop
+Riley finding notes, even fast ones; it adds false repeats on notes longer than about 0.1 s.
+So the near-zero heavy half of One (where Riley hears too *few* notes) is not explained by
+distortion. The likelier cause is the dense band mix and what separation leaves in the guitar
+stem.
+
+**Re-trigger filter: not adopted.** Requiring a pick attack (onset flux, pitch-energy rise,
+frame dip) before accepting a repeat of a sounding note removes at most 72% of false repeats
+while dropping 7–30% of real repeated notes on real recordings (EGSet12, Guitar-TECHS,
+GuitarSet). Real repeats are too common in music for that trade.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
