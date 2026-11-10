@@ -87,7 +87,8 @@ static void set_event(GameState *game, GameEvent event)
     case GAME_EVENT_FREE: case GAME_EVENT_FOUL_TACKLE: case GAME_EVENT_FOUR_STEPS:
     case GAME_EVENT_ILLEGAL_BOUNCE: case GAME_EVENT_KICKOUT_SHORT:
     case GAME_EVENT_KICKOUT_TOUCHED: case GAME_EVENT_THREE_V_THREE:
-    case GAME_EVENT_PENALTY:
+    case GAME_EVENT_PENALTY: case GAME_EVENT_TACKLE_BEHIND:
+    case GAME_EVENT_TACKLE_SHOULDER:
         ref->signal = GAME_SIGNAL_FREE; break;
     case GAME_EVENT_POINT: ref->signal = GAME_SIGNAL_POINT; break;
     case GAME_EVENT_TWO_POINT: ref->signal = GAME_SIGNAL_TWO_POINT; break;
@@ -194,6 +195,8 @@ void game_init(GameState *game)
     game->pickup_delay = 0.0f;
     game->cpu_possession_time = 0.0f;
     game->steps_carried = 0;
+    game->solo_rhythm = 0;          /* T turns the step-4 solo / bounce helper on */
+    game->cpu_tackle_plan = 0;
     game->last_was_bounce = 0;
     game->last_touch_team = 0;
     game->restart_pending = 0;
@@ -327,6 +330,54 @@ float game_action_duration(int action)
 }
 
 int game_carrier_steps(const GameState *game) { return game->steps_carried; }
+
+/* Ring colour from the steps taken since the last solo, bounce or catch. */
+int game_step_ring(const GameState *game)
+{
+    int s = game->steps_carried;
+    if (s < 1 && game->step_time <= 0.02f) return GAME_RING_NONE;
+    if (s <= 2) return GAME_RING_NORMAL;
+    if (s == 3) return GAME_RING_ORANGE;
+    return GAME_RING_RED;
+}
+
+/* The T helper fires on step 4: three steps done and most of the fourth,
+ * or four steps already taken. It does not run unless solo_rhythm is on. */
+int game_solo_rhythm_due(const GameState *game)
+{
+    return game->steps_carried >= 4 ||
+           (game->steps_carried == 3 && game->step_time > GAME_STEP_LENGTH * 0.82f);
+}
+
+/* +1 is in front of the carrier, -1 is straight behind.
+ * Past about 105 degrees (behind the shoulder line) is illegal: squarely
+ * behind, or over the shoulder. A player level with the carrier who is
+ * reaching back across a shoulder, rather than at the ball, is the same foul. */
+int game_tackle_call(float cx, float cz, float fx, float fz,
+                     float tx, float tz, float tfx, float tfz)
+{
+    float bx = tx - cx, bz = tz - cz, bl, fl, approach, side, into, across, tl;
+    fl = sqrtf(fx * fx + fz * fz);
+    if (fl < 0.05f) { fx = 1.0f; fz = 0.0f; fl = 1.0f; }
+    fx /= fl; fz /= fl;
+    bl = sqrtf(bx * bx + bz * bz);
+    if (bl < 0.05f) return GAME_TACKLE_OK;
+    approach = (bx * fx + bz * fz) / bl;
+    side = (bx * -fz + bz * fx) / bl;
+    if (approach < -0.70f) return GAME_TACKLE_BEHIND;      /* more than about 134 degrees */
+    if (approach < -0.26f) return GAME_TACKLE_SHOULDER;    /* past about 105 degrees */
+    if (approach < 0.30f && bl < 3.2f) {
+        tl = sqrtf(tfx * tfx + tfz * tfz);
+        if (tl > 0.2f) {
+            tfx /= tl; tfz /= tl;
+            into = tfx * fx + tfz * fz;
+            across = tfx * -fz + tfz * fx;
+            if (into < -0.20f && fabsf(side) > 0.45f && across * side < -0.10f)
+                return GAME_TACKLE_SHOULDER;
+        }
+    }
+    return GAME_TACKLE_OK;
+}
 
 static float goal_x_of(int attacking_team)
 {
@@ -769,7 +820,7 @@ static void apply_dissent(GameState *game, int team)
 
 /* A foul by (off_team, off_idx) on the opposition at (x, z). */
 static void commit_foul(GameState *game, int off_team, int off_idx, int victim,
-                        int foul, float x, float z)
+                        int foul, float x, float z, GameEvent call)
 {
     GamePlayer *o = &game->players[off_team][off_idx];
     int fouled = 1 - off_team, card = GAME_CARD_NONE, pen = 0;
@@ -790,7 +841,7 @@ static void commit_foul(GameState *game, int off_team, int off_idx, int victim,
     }
     if (in_large_rectangle(off_team, x, z)) pen = 1;
     if (pen) award_penalty(game, fouled);
-    else award_free(game, fouled, x, z, GAME_EVENT_FOUL_TACKLE);
+    else award_free(game, fouled, x, z, call);
     o->action = keep_action;            /* keep the offender's swing / trip playing */
     o->action_time = keep_time;
     o->action_released = 1;
@@ -822,7 +873,8 @@ static void resolve_strike(GameState *game, int team, int index)
     }
     if (best < 0) return;                             /* swung at fresh air */
     commit_foul(game, team, index, best, GAME_FOUL_STRIKE,
-                game->players[other][best].x, game->players[other][best].z);
+                game->players[other][best].x, game->players[other][best].z,
+                GAME_EVENT_FOUL_TACKLE);
 }
 
 /* Frontend / test hook: make player off_idx of off_team foul the ball carrier now. */
@@ -832,7 +884,8 @@ void game_force_foul(GameState *game, int off_team, int off_idx, int foul)
     int victim = (game->ball_team == 1 - off_team && game->ball_player >= 0) ? game->ball_player : 1;
     GamePlayer *v = &game->players[1 - off_team][victim];
     o->x = v->x - (off_team == 0 ? 0.9f : -0.9f); o->z = v->z;
-    commit_foul(game, off_team, off_idx, victim, (GameFoul)foul, v->x, v->z);
+    commit_foul(game, off_team, off_idx, victim, (GameFoul)foul, v->x, v->z,
+                GAME_EVENT_FOUL_TACKLE);
 }
 
 static void award_mark(GameState *game, int team, int player, GameEvent ev)
@@ -1403,10 +1456,40 @@ static void update_cpu_players(GameState *game, float delta_time)
             if (length > 0.001f) {
                 float cap = AI_SPEED * stamina_scale(chaser);
                 float step;
+                float gap = length;
                 /* a CPU defender closing on the human carrier holds his line
                  * instead of sprinting through him */
                 if (team == 1 && game->ball_team == 0 && game->ball_player >= 0)
-                    cap = (length > 8.0f ? AI_CHASE_FAR : AI_CHASE_NEAR) * stamina_scale(chaser);
+                    cap = (gap > 8.0f ? AI_CHASE_FAR : AI_CHASE_NEAR) * stamina_scale(chaser);
+                /* Most defenders get in front before they tackle. About one
+                 * approach in six dives in from behind and takes the free. */
+                if (game->ball_team >= 0 && game->ball_player >= 0 && game->ball_team != team) {
+                    const GamePlayer *car = &game->players[game->ball_team][game->ball_player];
+                    float ax = chaser->x - car->x, az = chaser->z - car->z;
+                    float al = sqrtf(ax * ax + az * az);
+                    float ap = al > 0.05f ? (ax * car->facing_x + az * car->facing_z) / al : 1.0f;
+                    if (team == 1 && game->ball_team == 0)
+                        cap = (al > 8.0f ? AI_CHASE_FAR : AI_CHASE_NEAR) * stamina_scale(chaser);
+                    if (ap < -0.26f && al > 1.8f && al < 8.0f) {
+                        if (game->cpu_tackle_plan == 0)
+                            game->cpu_tackle_plan = frand01(game) < 0.16f ? 1 : 2;
+                        if (game->cpu_tackle_plan == 2) {
+                            float fx = car->facing_x, fz = car->facing_z;
+                            float fl = sqrtf(fx * fx + fz * fz);
+                            if (fl < 0.2f) {
+                                fx = goal_x_of(game->ball_team) > car->x ? 1.0f : -1.0f;
+                                fz = 0.0f;
+                                fl = 1.0f;
+                            }
+                            dx = car->x + fx / fl * 1.65f - chaser->x;
+                            dz = car->z + fz / fl * 1.65f - chaser->z;
+                            length = sqrtf(dx * dx + dz * dz);
+                        }
+                    } else if (ap >= -0.10f) {
+                        game->cpu_tackle_plan = 0;
+                    }
+                }
+                if (length <= 0.001f) continue;
                 step = cap * delta_time;
                 if (game->ball_team >= 0 && step > length - 1.0f) step = length - 1.0f;
                 if (step < 0.0f) step = 0.0f;
@@ -1452,52 +1535,66 @@ static void update_cpu_players(GameState *game, float delta_time)
                     }
                 }
                 game->cpu_tackle_time = 0.0f;
-                if (game->players[1][tackler].tackle_cooldown > 0.0f) return;
-                begin_action(&game->players[1][tackler], GAME_ACT_TACKLE);
-                game->players[1][tackler].tackle_cooldown = 1.15f;
                 {
-                    /* from behind is a free; a frontal tackle is less certain,
-                     * and a solo or bounce (ball off the hand) is easier to time */
-                    float bx = game->players[1][tackler].x - carrier->x;
-                    float bz = game->players[1][tackler].z - carrier->z;
+                    /* from behind or over the shoulder is a free; a frontal
+                     * tackle is less certain, and a solo or bounce is easier */
+                    GamePlayer *who = &game->players[1][tackler];
+                    float bx = who->x - carrier->x, bz = who->z - carrier->z;
                     float bl = sqrtf(bx * bx + bz * bz);
-                    float approach = bl > 0.05f ? (bx * carrier->facing_x + bz * carrier->facing_z) / bl : 1.0f;
+                    int call = game_tackle_call(carrier->x, carrier->z, carrier->facing_x, carrier->facing_z,
+                                                who->x, who->z, who->facing_x, who->facing_z);
                     int heavy = carrier->action == GAME_ACT_SOLO || carrier->action == GAME_ACT_BOUNCE;
                     float miss_at;
-                    if (bl < 3.2f && approach < -0.28f) {
-                        commit_foul(game, 1, tackler, game->ball_player, GAME_FOUL_TECHNICAL,
-                                    carrier->x, carrier->z);
+                    int swung = 0;
+                    if (call != GAME_TACKLE_OK && game->cpu_tackle_plan == 2) {
+                        /* still getting in front: no swing this time */
+                    } else if (who->tackle_cooldown > 0.0f) {
                         return;
+                    } else {
+                        begin_action(who, GAME_ACT_TACKLE);
+                        who->tackle_cooldown = 1.15f;
+                        if (bl < 3.2f && call != GAME_TACKLE_OK) {
+                            commit_foul(game, 1, tackler, game->ball_player, GAME_FOUL_TECHNICAL,
+                                        carrier->x, carrier->z,
+                                        call == GAME_TACKLE_BEHIND ? GAME_EVENT_TACKLE_BEHIND
+                                                                  : GAME_EVENT_TACKLE_SHOULDER);
+                            return;
+                        }
+                        roll = frand01(game);
+                        miss_at = heavy ? 0.40f : 0.62f;
+                        if (roll < 0.10f) {
+                            int foul = pick_cynical_foul(game);
+                            if (foul != GAME_FOUL_TECHNICAL)
+                                begin_action(&game->players[1][tackler], GAME_ACT_TRIP);
+                            commit_foul(game, 1, tackler, game->ball_player, foul, carrier->x, carrier->z,
+                                        GAME_EVENT_FOUL_TACKLE);
+                            return;
+                        }
+                        if (roll > miss_at) return;    /* tackle missed */
+                        swung = 1;
                     }
-                    roll = frand01(game);
-                    miss_at = heavy ? 0.40f : 0.62f;
-                    if (roll < 0.10f) {
-                        int foul = pick_cynical_foul(game);
-                        if (foul != GAME_FOUL_TECHNICAL)
-                            begin_action(&game->players[1][tackler], GAME_ACT_TRIP);
-                        commit_foul(game, 1, tackler, game->ball_player, foul, carrier->x, carrier->z);
-                        return;
+                    if (swung) {
+                        game->ball_team = 1;
+                        game->ball_player = tackler;
+                        game->steps_carried = 0;
+                        game->step_time = 0.0f;
+                        game->last_was_bounce = 0;
+                        game->last_touch_team = 1;
+                        game->cpu_possession_time = 0.0f;
+                        game->ball.velocity_x = 0.0f;
+                        game->ball.velocity_z = 0.0f;
+                        game->ball.velocity_y = 0.0f;
+                        game->ball.curve = 0.0f;
+                        set_event(game, GAME_EVENT_TACKLE);
                     }
-                    if (roll > miss_at) return;    /* tackle missed */
                 }
-                game->ball_team = 1;
-                game->ball_player = tackler;
-                game->steps_carried = 0;
-                game->step_time = 0.0f;
-                game->last_was_bounce = 0;
-                game->last_touch_team = 1;
-                game->cpu_possession_time = 0.0f;
-                game->ball.velocity_x = 0.0f;
-                game->ball.velocity_z = 0.0f;
-                game->ball.velocity_y = 0.0f;
-                game->ball.curve = 0.0f;
-                set_event(game, GAME_EVENT_TACKLE);
             }
         } else {
             game->cpu_tackle_time = 0.0f;
         }
     } else {
         game->cpu_tackle_time = 0.0f;
+        game->cpu_tackle_plan = 0;
     }
 
     if (game->ball_team == 1 && game->ball_player >= 0) {
@@ -1606,14 +1703,14 @@ static float nearest_defender_distance(const GameState *game, int team,
     return sqrtf(nearest);
 }
 
-/* Advance the 4-step count for any carrier; returns 1 if over-carried. */
+/* Advance the step count for any carrier. The 6th step (past GAME_CARRY_STEPS) is overcarrying. */
 static int count_steps(GameState *game, float distance)
 {
     game->step_time += distance;
     while (game->step_time >= GAME_STEP_LENGTH) {
         game->step_time -= GAME_STEP_LENGTH;
         game->steps_carried++;
-        if (game->steps_carried > 4) return 1;
+        if (game->steps_carried > GAME_CARRY_STEPS) return 1;
     }
     return 0;
 }
@@ -1718,7 +1815,8 @@ static void update_cpu_carrier(GameState *game, float delta_time)
             carrier->z = clampf(carrier->z + carrier->facing_z * step,
                                 1.0f, GAME_PITCH_WIDTH - 1.0f);
             carrier->movement = step > 0.0f ? 1.0f : 0.0f;
-            /* 4-step rule: bounce, then solo, alternately */
+            /* Solo or bounce on the 4th step, before the 6th-step overcarry.
+             * The toe-tap itself still counts a couple of steps, so this stays early. */
             if (carrier->action == GAME_ACT_NONE && game->steps_carried >= 3) {
                 if (!game->last_was_bounce) start_bounce(game, 1, carrier);
                 else start_solo(game, carrier);
@@ -2311,12 +2409,22 @@ void game_update(GameState *game, GameInput input, float delta_time)
             controlled->movement = 0.0f;          /* free taker: aim only */
         } else {
             float step = speed * move_length * delta_time;
+            int rhythm = game->solo_rhythm && game->has_ball && !game->restart_pending &&
+                         controlled->action == GAME_ACT_NONE &&
+                         !input.kick && !input.kick_low && !input.kick_high &&
+                         !input.kick_long && !input.handpass &&
+                         game_solo_rhythm_due(game);
             controlled->movement = move_length;
             controlled->x = clampf(controlled->x + controlled->facing_x * step,
                                    1.0f, GAME_PITCH_LENGTH - 1.0f);
             controlled->z = clampf(controlled->z + controlled->facing_z * step,
                                    1.0f, GAME_PITCH_WIDTH - 1.0f);
-            if (game->has_ball && count_steps(game, step)) {
+            if (rhythm) {
+                /* step 4: toe-tap, or bounce when that is the legal one */
+                if (!game->last_was_bounce) {
+                    if (!start_bounce(game, 0, controlled)) return;
+                } else start_solo(game, controlled);
+            } else if (game->has_ball && count_steps(game, step)) {
                 sync_selected_player(game);
                 award_free(game, 1, controlled->x, controlled->z, GAME_EVENT_FOUR_STEPS);
                 return;
@@ -2405,13 +2513,16 @@ void game_update(GameState *game, GameInput input, float delta_time)
         GamePlayer *carrier = &game->players[1][game->ball_player];
         float bx = controlled->x - carrier->x, bz = controlled->z - carrier->z;
         float bl = sqrtf(bx * bx + bz * bz);
-        float approach = bl > 0.05f ? (bx * carrier->facing_x + bz * carrier->facing_z) / bl : 1.0f;
+        int call = game_tackle_call(carrier->x, carrier->z, carrier->facing_x, carrier->facing_z,
+                                    controlled->x, controlled->z, controlled->facing_x, controlled->facing_z);
         int heavy = carrier->action == GAME_ACT_SOLO || carrier->action == GAME_ACT_BOUNCE;
         begin_action(controlled, GAME_ACT_TACKLE);
         controlled->tackle_cooldown = 0.6f;
-        if (bl < 3.2f && approach < -0.28f) {
+        if (bl < 3.2f && call != GAME_TACKLE_OK) {
             commit_foul(game, 0, game->selected_player, game->ball_player, GAME_FOUL_TECHNICAL,
-                        carrier->x, carrier->z);
+                        carrier->x, carrier->z,
+                        call == GAME_TACKLE_BEHIND ? GAME_EVENT_TACKLE_BEHIND
+                                                  : GAME_EVENT_TACKLE_SHOULDER);
             return;
         }
         roll = frand01(game);
@@ -2419,7 +2530,7 @@ void game_update(GameState *game, GameInput input, float delta_time)
             int foul = pick_cynical_foul(game);
             if (foul != GAME_FOUL_TECHNICAL) begin_action(controlled, GAME_ACT_TRIP);
             commit_foul(game, 0, game->selected_player, game->ball_player, foul,
-                        game->ball.x, game->ball.z);
+                        game->ball.x, game->ball.z, GAME_EVENT_FOUL_TACKLE);
             return;
         }
         if (roll < (heavy ? 0.90f : 0.75f)) {         /* clean open-hand flick; bonus on a heavy touch */
@@ -2488,7 +2599,7 @@ const char *game_event_text(GameEvent event)
         case GAME_EVENT_SOLOED: return "Solo";
         case GAME_EVENT_BOUNCED: return "Bounce";
         case GAME_EVENT_ILLEGAL_BOUNCE: return "Foul: double bounce - free";
-        case GAME_EVENT_FOUR_STEPS: return "Foul: over-carrying (4 steps) - free";
+        case GAME_EVENT_FOUR_STEPS: return "Free - overcarrying (too many steps)";
         case GAME_EVENT_POINT: return "Point!";
         case GAME_EVENT_GOAL: return "Goal!";
         case GAME_EVENT_BALL_OUT: return "Ball out - restart";
@@ -2521,6 +2632,8 @@ const char *game_event_text(GameEvent event)
         case GAME_EVENT_BACK_PASS: return "Back pass to the keeper - free";
         case GAME_EVENT_SIN_BIN_OVER: return "Sin bin over - back to 15";
         case GAME_EVENT_BREAKING_BALL: return "Broke! The high ball spills";
+        case GAME_EVENT_TACKLE_BEHIND: return "Free - tackle from behind";
+        case GAME_EVENT_TACKLE_SHOULDER: return "Free - over the shoulder";
         default: return "";
     }
 }
