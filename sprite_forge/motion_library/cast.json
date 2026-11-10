@@ -1,0 +1,207 @@
+{
+ "name": "cast",
+ "category": "NPC",
+ "desc": "spell cast: gather then thrust both hands forward",
+ "loop": false,
+ "source": "procedural:cast",
+ "origin": "builtin",
+ "from_motion": "cast",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "arm_L": [
+     3.0,
+     9.0,
+     0.0
+    ],
+    "arm_R": [
+     3.0,
+     9.0,
+     0.0
+    ],
+    "elbow_L": 12.0,
+    "elbow_R": 12.0,
+    "leg_L": [
+     3.0,
+     3.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 5.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  [
+   0.35,
+   {
+    "arm_L": [
+     40.0,
+     -10.0,
+     0.0
+    ],
+    "arm_R": [
+     40.0,
+     -10.0,
+     0.0
+    ],
+    "elbow_L": 110.0,
+    "elbow_R": 110.0,
+    "leg_L": [
+     3.0,
+     3.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 5.0,
+    "knee_R": 4.0,
+    "neck": [
+     -6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     -6.0,
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  [
+   0.6,
+   {
+    "arm_L": [
+     88.0,
+     6.0,
+     0.0
+    ],
+    "arm_R": [
+     88.0,
+     6.0,
+     0.0
+    ],
+    "elbow_L": 5.0,
+    "elbow_R": 5.0,
+    "leg_L": [
+     25.0,
+     5.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 25.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "hips": [
+     8.0,
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  [
+   0.8,
+   {
+    "arm_L": [
+     92.0,
+     6.0,
+     0.0
+    ],
+    "arm_R": [
+     92.0,
+     6.0,
+     0.0
+    ],
+    "elbow_L": 5.0,
+    "elbow_R": 5.0,
+    "leg_L": [
+     25.0,
+     5.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 25.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "hips": [
+     8.0,
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  [
+   1.0,
+   {
+    "arm_L": [
+     3.0,
+     9.0,
+     0.0
+    ],
+    "arm_R": [
+     3.0,
+     9.0,
+     0.0
+    ],
+    "elbow_L": 12.0,
+    "elbow_R": 12.0,
+    "leg_L": [
+     3.0,
+     3.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 5.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ]
+   }
+  ]
+ ],
+ "cleanup": null
+}

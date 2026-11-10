@@ -1,0 +1,28 @@
+{
+ "spdx": "CC0-1.0",
+ "custom_text": "",
+ "author": "Sprite Forge Studio",
+ "source_url": "",
+ "redistribution": "yes",
+ "attribution": "",
+ "notes": "CC0. Baked from Sprite Forge procedural motions (sforge/motions.py) by motionlib.seed_starter. No Mixamo, Meshy, or other third-party motion. Safe to ship and to put in a pack.",
+ "name": "sprite_forge_motion_starter",
+ "moves": [
+  "idle",
+  "walk",
+  "run",
+  "jump",
+  "crouch",
+  "punch",
+  "kick",
+  "block",
+  "hit",
+  "tackle",
+  "shoot",
+  "pass",
+  "save",
+  "drive",
+  "wave",
+  "cast"
+ ]
+}

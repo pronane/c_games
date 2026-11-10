@@ -1,0 +1,192 @@
+{
+ "name": "block",
+ "category": "Defence",
+ "desc": "block kick / pass",
+ "loop": false,
+ "source": "procedural:block",
+ "origin": "builtin",
+ "from_motion": "block",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "arm_R": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "elbow_L": 55.0,
+    "elbow_R": 55.0
+   }
+  ],
+  [
+   0.35,
+   {
+    "arm_L": [
+     170.0,
+     15.0,
+     0.0
+    ],
+    "arm_R": [
+     170.0,
+     15.0,
+     0.0
+    ],
+    "elbow_L": 5.0,
+    "elbow_R": 5.0,
+    "leg_L": [
+     3.0,
+     3.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 5.0,
+    "knee_R": 4.0,
+    "neck": [
+     -15.0,
+     0.0,
+     0.0
+    ],
+    "ankle_L": 30.0,
+    "ankle_R": 30.0,
+    "lift": 0.25
+   }
+  ],
+  [
+   0.6,
+   {
+    "arm_L": [
+     165.0,
+     25.0,
+     0.0
+    ],
+    "arm_R": [
+     165.0,
+     25.0,
+     0.0
+    ],
+    "elbow_L": 10.0,
+    "elbow_R": 10.0,
+    "leg_L": [
+     20.0,
+     5.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 30.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "lift": 0.3
+   }
+  ],
+  [
+   1.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "arm_R": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "elbow_L": 55.0,
+    "elbow_R": 55.0
+   }
+  ]
+ ],
+ "cleanup": null
+}

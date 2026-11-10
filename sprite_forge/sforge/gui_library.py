@@ -29,6 +29,7 @@ class LibraryTab:
         for txt, cmd in (("Add FBX / GLB...", self.add_file), ("Remove", self.remove), ("Rescan (import inbox/)", self.rescan),
                          ("Install pack...", self.install_pack), ("Export pack...", self.export_pack)):
             ttk.Button(top, text=txt, command=cmd).pack(side=tk.LEFT, padx=2)
+        ttk.Button(top, text="Motions...", command=self.motions_dialog).pack(side=tk.LEFT, padx=2)
         ttk.Button(top, text="Help", command=lambda: self.s.show_help("library")).pack(side=tk.LEFT, padx=2)
         ttk.Button(top, text="Licensing", command=lambda: self.s.show_help("licensing")).pack(side=tk.LEFT, padx=2)
         main = ttk.Frame(self.tab); main.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
@@ -63,6 +64,34 @@ class LibraryTab:
         ttk.Button(bp, text="Licence...", command=self.licence_dialog).pack(side=tk.LEFT, padx=3)
         ttk.Button(bp, text="Export GLB / FBX...", command=self.export_model).pack(side=tk.LEFT, padx=3)
         self.msg = ttk.Label(rf, text="", foreground="#26a269", wraplength=760, justify=tk.LEFT); self.msg.pack(anchor="w", pady=4)
+
+    def motions_dialog(self):
+        """v11.4: the shared-skeleton motion library and the character type the Build tab will use."""
+        from . import motionlib as ML
+        top = tk.Toplevel(self.root); top.title("Motion library"); top.transient(self.root)
+        f = ttk.Frame(top, padding=10); f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text="Moves stored once on the shared skeleton. A game profile maps its own names onto these.",
+                  wraplength=520).pack(anchor="w")
+        box = tk.Listbox(f, height=14, width=42, exportselection=False)
+        box.pack(fill=tk.BOTH, expand=True, pady=6)
+        names = ML.list_moves()
+        for n in names:
+            box.insert(tk.END, n)
+        info = ttk.Label(f, text="%d moves. Record: forge.py motion record --clip punch=punch.mp4    Import: forge.py motion import clip.bvh" % len(names),
+                         wraplength=520, foreground="#555")
+        info.pack(anchor="w")
+        row = ttk.Frame(f); row.pack(fill=tk.X, pady=(8, 0))
+        ttk.Label(row, text="Character type").pack(side=tk.LEFT)
+        cb = ttk.Combobox(row, textvariable=self.s.v["character_type"], values=self.s._character_types(), width=18, state="readonly")
+        cb.pack(side=tk.LEFT, padx=4)
+        ttk.Checkbutton(row, text="Use these motions on the Build tab", variable=self.s.b["library_motions"]).pack(side=tk.LEFT, padx=8)
+
+        def use():
+            self.s.b["library_motions"].set(True)
+            self.say("Build will use library motions where a clip exists, type %s." % (self.s.v["character_type"].get() or "(none)"))
+            top.destroy()
+        ttk.Button(f, text="Use on the Build tab", command=use).pack(anchor="w", pady=8)
+        self.dlg = top
 
     def say(self, s, err=False):
         self.msg.configure(text=s, foreground="#c01c28" if err else "#26a269"); self.s._log(s)

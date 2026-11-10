@@ -1,0 +1,10 @@
+{
+  "name": "balanced",
+  "label": "Balanced",
+  "games": ["any"],
+  "timing": 1.0,
+  "stance": 1.0,
+  "reach": 1.0,
+  "weight": 1.0,
+  "notes": "Identity type: the clip is unchanged. Useful as a baseline next to the others."
+}

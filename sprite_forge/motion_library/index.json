@@ -1,0 +1,22 @@
+{
+ "name": "sprite_forge_motion_starter",
+ "moves": [
+  "idle",
+  "walk",
+  "run",
+  "jump",
+  "crouch",
+  "punch",
+  "kick",
+  "block",
+  "hit",
+  "tackle",
+  "shoot",
+  "pass",
+  "save",
+  "drive",
+  "wave",
+  "cast"
+ ],
+ "licence": "licence.json"
+}

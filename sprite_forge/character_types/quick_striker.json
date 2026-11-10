@@ -1,0 +1,10 @@
+{
+  "name": "quick_striker",
+  "label": "Quick striker",
+  "games": ["fighter", "brawler"],
+  "timing": 0.72,
+  "stance": 0.82,
+  "reach": 1.25,
+  "weight": 0.7,
+  "notes": "Snappier timing, narrower stance, longer reach, lighter ease."
+}

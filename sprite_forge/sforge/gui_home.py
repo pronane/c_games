@@ -123,6 +123,18 @@ def forge_command(app):
         a += ["--profile", v["profile"].get()]
     if v["quality"].get() == "draft":
         a += ["--quality", "draft"]
+    ct = v.get("character_type")
+    if ct is not None and ct.get().strip() not in ("", "(none)", "none"):
+        a += ["--character-type", ct.get().strip()]
+    libm = b.get("library_motions")
+    if libm is not None and libm.get():
+        try:
+            from .motionlib import has_move
+            names = [m.name for m in mv if has_move(m.name) and not (m.motion or "").startswith("lib:")]
+            if names:
+                a += ["--motions", ",".join(names)]
+        except Exception:
+            pass
     if not b["cache"].get():
         a += ["--no-cache"]
     from .gui_style import style_argv
@@ -369,6 +381,12 @@ class HomeTab:
         self.apply_target(refresh=False)
         ttk.Label(left, text="Sets the move list, frame size, figure height and ground line\n(fine-tune them on the Build tab).",
                   foreground="#555", justify=tk.LEFT).pack(anchor="w", pady=(8, 0))
+        ttk.Label(left, text="Character type", font=(self.fam, 11, "bold")).pack(anchor="w", pady=(10, 0))
+        ttk.Combobox(left, textvariable=self.app.v["character_type"], values=self.app._character_types(),
+                     width=18, state="readonly").pack(anchor="w")
+        ttk.Checkbutton(left, text="Use the motion library\nwhere a clip exists", variable=self.app.b["library_motions"]).pack(anchor="w", pady=(4, 0))
+        ttk.Label(left, text="Same motion, different timing,\nstance, reach and weight.",
+                  foreground="#555", justify=tk.LEFT).pack(anchor="w")
         ttk.Separator(tab, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=12)
         self.pick = ttk.Frame(tab); self.pick.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, anchor="n")
         self._picker()

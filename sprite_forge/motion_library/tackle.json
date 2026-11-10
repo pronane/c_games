@@ -1,0 +1,230 @@
+{
+ "name": "tackle",
+ "category": "Defence",
+ "desc": "attempt tackle",
+ "loop": false,
+ "source": "procedural:tackle",
+ "origin": "builtin",
+ "from_motion": "tackle",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "arm_R": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "elbow_L": 55.0,
+    "elbow_R": 55.0
+   }
+  ],
+  [
+   0.35,
+   {
+    "hips": [
+     30.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -30.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     60.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     -20.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 80.0,
+    "knee_R": 20.0,
+    "arm_L": [
+     80.0,
+     10.0,
+     0.0
+    ],
+    "arm_R": [
+     80.0,
+     10.0,
+     0.0
+    ],
+    "elbow_L": 30.0,
+    "elbow_R": 30.0,
+    "pos": [
+     0.0,
+     0.2
+    ]
+   }
+  ],
+  [
+   0.6,
+   {
+    "hips": [
+     35.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -35.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     70.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     -30.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 85.0,
+    "knee_R": 10.0,
+    "arm_L": [
+     95.0,
+     -15.0,
+     0.0
+    ],
+    "arm_R": [
+     95.0,
+     -15.0,
+     0.0
+    ],
+    "elbow_L": 60.0,
+    "elbow_R": 60.0,
+    "pos": [
+     0.0,
+     0.35
+    ]
+   }
+  ],
+  [
+   1.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "arm_R": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "elbow_L": 55.0,
+    "elbow_R": 55.0,
+    "pos": [
+     0.0,
+     0.3
+    ]
+   }
+  ]
+ ],
+ "cleanup": null
+}

@@ -1,0 +1,10 @@
+{
+  "name": "keeper",
+  "label": "Keeper",
+  "games": ["sports", "gaelic", "football"],
+  "timing": 1.22,
+  "stance": 1.5,
+  "reach": 1.35,
+  "weight": 1.45,
+  "notes": "Wide ready stance and a long reach for saves. Slightly heavier than a field player."
+}

@@ -5,6 +5,36 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v11.4: a motion library, and character types that change how a move is performed
+
+Sprite Forge could already retarget a clip and track a video. The moves themselves were still mostly
+hand-written poses, one pack per game. v11.4 stores a move once on the shared skeleton and lets any
+profile play it.
+
+* **Motion library** (`forge.py motion`, `motion_library/`, your clips in `library/motions/`):
+  * `motion record --clip punch=punch.mp4` runs the existing mocap tracker and stores the keys.
+  * `motion import clip.bvh` (also FBX / GLB) retargets onto the mannequin and stores the same kind of keys.
+  * `motion retarget punch --to sample_lanky` plays that clip on any mapped rig.
+  * `motion clean walk` writes foot planting, a weight shift, anticipation and follow-through back into the clip.
+  * Names are generic (`punch`, `kick`, `walk`, `tackle`, `shoot`, ...). `fighter14` and `gaelic36` map onto
+    them with `--motions punch,kick` or `"motion": "lib:punch"` in a profile. `profiles/motion_demo.json` is a
+    small example that is not a fighting-game list.
+  * The shipped starter is CC0, generated from the procedural motions. No Mixamo or Meshy clips are included.
+* **Character types** (`character_types/*.json`, `--character-type`):
+  * `timing`, `stance`, `reach` and `weight` are numbers in the file. A new type is a new file.
+  * `heavy_brawler` against `quick_striker`, or `keeper` against `playmaker`, on the same clip: the timing,
+    stance width, reach and weight change by a measured amount.
+  * Works on library clips and on the existing procedural presets, for a fighter profile or a sports profile.
+* **Studio**: Build tab and Start → What to make have the type dropdown and "Use motion library".
+  Library tab → Motions... lists the clips. `forge.py help motion` has the commands and the limits.
+
+Limits: the starter is procedural keys, not motion-capture quality. Import drops fingers, twist bones and
+facial tracks. A GLB round trip of our own mannequin keeps bone directions and lands the joints within
+about 6 cm, because the stored clip is the simpler shared skeleton. Foot planting aims the canonical
+thigh, shin and foot on that skeleton and again after retarget; the rest of a GLB is not re-solved.
+Character types change shared-skeleton builds. Photo-puppet 2D poses are not redrawn (playback fps still
+follows `timing`).
+
 ## New in v11.3: captured characters in a game - texture-mapped sprites, cleaner textures
 Tried in Egyptian Fighter, where a fighter is about 300 px tall, a captured character showed different faults
 from the close-up turntables.
