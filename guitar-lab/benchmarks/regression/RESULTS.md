@@ -227,6 +227,63 @@ What the new material showed:
 
 Riley stays ahead of Basic Pitch on five of the seven pairs; 18 and Life is within .02.
 
+## Tab check: each tab note looked up in the recording
+
+`server/tab_check.py` reads Riley's onset map at every lined-up tab note (its pitch, ±50 ms,
+probability above 0.3). A control moves the same notes 150–400 ms off their times. A stretch
+is "confirmed" when at least 60% of its notes are found and that is 30 points above the control.
+
+**Known notes** (true notes against wrong ones; no line-up involved):
+
+| Material | Notes | Real notes confirmed | Wrong pitch passed | Wrong time passed |
+|---|---|---|---|---|
+| EGSet12 amp solos (real miked amp) | 1,567 | 88.7% | 1.7% | 0.7% |
+| Guitar-TECHS amp excerpts (real miked amp) | 1,948 | 71.6% | 0.1% | 1.0% |
+| GuitarSet clean (pickup) | 1,379 | 91% | 2% | 6% |
+| GuitarSet through simulated crunch | 1,536 | 87% | 1% | 4% |
+| GuitarSet through simulated high gain | 1,332 | 76% | 2% | 15% |
+| Original riffs through simulated amps | 1,946 | 81% | 0% | 3% |
+
+A wrong fret in a tab is caught about 98% of the time; a note that is really played is missed
+11–28% of the time. So "not found" on a single note is weak evidence; a whole stretch that is
+not found is strong evidence.
+
+**The user's tabs and recordings** (private, aggregates only; tab notes found / control):
+
+| Song | Found | Control | Share of notes in confirmed / partly / not confirmed stretches |
+|---|---|---|---|
+| One (full-band GP3) | 47.5% | 16.5% | 45% / 0% / 55% |
+| Down in a Hole (clip) | 60.2% | 29.8% | 32% / 48% / 20% |
+| 18 and Life (clip) | 63.7% | 45.8% | 16% / 33% / 52% |
+| Home Sweet Home | 60.6% | 50.1% | 0% / 29% / 71% |
+| Every Rose Has Its Thorn (clip) | 40.2% | 29.0% | 0% / 34% / 66% |
+| November Rain | 40.3% | 33.9% | 0% / 11% / 89% |
+
+- **One:** 0:20–3:40 is confirmed (84% found, control 19%). 3:40 to the end is not (18% found,
+  control 15%). The heavy half is still not checkable.
+- **Strummed ballads:** the control is high (30–50%) because the same chord tones are struck
+  again a moment later, so the check cannot tell the tab's strumming from another pattern on
+  the same chords. Most of those songs come out "not confirmed" for that reason, not because
+  the tabs are shown to be wrong.
+
+### Line-up: tempo changes between sections
+
+In One the band moves from about 101 to 112 BPM in the heavy half. One straight line plus a
+±8 s warping band cannot follow that, and the old map compensated with a false jump. A
+piecewise stage (40 s stretches, each fitted from its neighbour's tempo) follows it: the last
+30 s of One now lock to the audio's attacks (pitch-blind onset strength 1.23 at the tab's
+onsets against 0.46 just beside them; the old map gave 0.66 against 0.64).
+
+On two short clips the piecewise stage alone made things worse (Down in a Hole found 56% →
+36%), so `line_up` makes both maps and keeps the piecewise one only when the pitched-attack
+agreement improves by more than 0.005. With that rule no song is worse than before: three use
+the piecewise map (One, Every Rose, Home Sweet Home; found +2 to +4 points), three keep the
+straight line. The 0.005 margin was set on these six songs.
+
+The middle of One's heavy half (about 4:30–6:30) still does not lock at any nearby offset;
+the chart there appears to have fewer bars than the recording (the map stretches it 10–23%).
+That is not confirmed.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.

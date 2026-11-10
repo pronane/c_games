@@ -63,7 +63,7 @@ def test_rejects_an_empty_tab_and_silence():
         ta.align(_tracks()[0]['notes'], np.zeros(SR * 60, np.float32), SR)
 
 
-def test_tab_parts_endpoint_names_the_song_parts(tmp_path):
+def test_tab_parts_endpoint_names_the_song_parts(tmp_path, monkeypatch):
     import soundfile as sf
     from fastapi.testclient import TestClient
     from server import app as module
@@ -81,6 +81,13 @@ def test_tab_parts_endpoint_names_the_song_parts(tmp_path):
                              for i, n in enumerate(tracks[1]['notes'])]}
     song.result = {'duration': len(audio) / SR, 'parts': [{'id': 'guitar', 'label': 'Guitar', 'roles': []}]}
     SONGS[song.id] = song
+    # The tab check's onset map, stood in for: the recording really contains every tab note.
+    from server import tab_check as tc, transcribers
+    onsets = np.zeros((int(len(audio) / SR * tc.FPS) + 1, 88), np.float32)
+    for n in notes:
+        onsets[int(round(warp(n['time']) * tc.FPS)), n['midi'] - tc.LOW] = 0.9
+    monkeypatch.setattr(tc, 'onset_map', lambda a, sr: tc.widen(onsets))
+    monkeypatch.setattr(transcribers, 'availability', lambda: {'riley': {'installed': True}})
     client = TestClient(module.app)
     r = client.post('/api/songs/tab-song/tab-parts', headers={'X-Fretwork-Client': 'studio'}, json={'tracks': [
         {'name': t['name'], 'track': i, 'notes': t['notes']} for i, t in enumerate(tracks)]})
@@ -90,6 +97,10 @@ def test_tab_parts_endpoint_names_the_song_parts(tmp_path):
     parts = {p['name']: p for p in body['parts']}
     assert parts['Lead']['match']['recall'] > 0.85 and parts['Rhythm']['match']['recall'] == 0
     assert parts['Lead']['sections'][0]['first_bar'] == 9
+    # Heard: only the lead. Checked note by note: both parts are in the recording.
+    assert parts['Rhythm']['confirmed'] > 0.8 and parts['Lead']['confirmed'] > 0.8
+    assert body['check']['confirmed'] > 0.8 and {s['status'] for s in body['check']['stretches']} == {'confirmed'}
+    assert sum(n['confirmed'] for n in parts['Rhythm']['notes']) > 0.8 * len(parts['Rhythm']['notes'])
     bad = client.post('/api/songs/tab-song/tab-parts', headers={'X-Fretwork-Client': 'studio'}, json={'tracks': [{'name': 'x', 'notes': []}]})
     assert bad.status_code == 422
     del SONGS[song.id]

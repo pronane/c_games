@@ -8,8 +8,9 @@ import { useGuitarSound } from "./guitarTone";
 
 type Section = { start: number; end: number; first_bar: number | null; last_bar: number | null };
 type Match = { tab_notes: number; heard_matched: number; precision: number; recall: number; f1: number };
-type PlacedNote = { time: number; duration: number; midi: number; bar?: number };
-type Part = { name: string; track: number | null; sections: Section[]; notes: PlacedNote[]; match: Match };
+type PlacedNote = { time: number; duration: number; midi: number; bar?: number; confirmed?: boolean };
+type Part = { name: string; track: number | null; sections: Section[]; notes: PlacedNote[]; match: Match; confirmed?: number | null };
+type Stretch = { start: number; end: number; notes: number; confirmed: number; control: number; status: "confirmed" | "partly" | "not_confirmed" };
 type Result = {
   alignment: {
     tempo_ratio: number;
@@ -22,6 +23,7 @@ type Result = {
     tab_to?: number;
   };
   parts: Part[];
+  check?: { confirmed: number; stretches: Stretch[] } | null;
   unassigned: number;
   heard: number;
 };
@@ -79,7 +81,7 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
         })
         .filter((t) => t.notes.length);
       if (!tracks.length) throw Error("That file has no pitched tracks.");
-      setBusy(`Lining ${tracks.length} tab parts up with the recording (about half a minute)…`);
+      setBusy(`Lining ${tracks.length} tab parts up with the recording and checking each note (a minute or two for a full song)…`);
       setResult(
         await api<Result>(`/api/songs/${songId}/tab-parts`, {
           method: "POST",
@@ -202,6 +204,7 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
                 <th>Part</th>
                 <th>Where it plays</th>
                 <th title="Share of the tab's notes the app heard in the recording">Heard</th>
+                {result.check && <th title="Share of the tab's notes found in the recording when each one is looked for">Confirmed</th>}
                 <th>Listen</th>
               </tr>
             </thead>
@@ -220,6 +223,7 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
                   <td>
                     {percent(p.match.recall)} <small className="helper">of {p.match.tab_notes}</small>
                   </td>
+                  {result.check && <td>{p.sections.length > 0 && p.confirmed != null ? percent(p.confirmed) : ""}</td>}
                   <td className="presets">
                     {p.sections.length > 0 && (
                       <>
@@ -233,9 +237,30 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
               ))}
             </tbody>
           </table>
+          {result.check && (
+            <div className="tab-check" aria-label="Tab check">
+              <p className="helper">
+                <b>Tab check:</b> each tab note was looked for in the recording at its own time and pitch.{" "}
+                {percent(result.check.confirmed)} were found.
+              </p>
+              <ul className="helper">
+                {result.check.stretches.map((s) => (
+                  <li key={s.start}>
+                    {fmt(s.start)}–{fmt(s.end)}:{" "}
+                    {s.status === "confirmed"
+                      ? `the recording matches the tab (${percent(s.confirmed)} of ${s.notes} notes found).`
+                      : s.status === "partly"
+                        ? `partly matches (${percent(s.confirmed)} of ${s.notes} notes found).`
+                        : `could not be confirmed (${percent(s.confirmed)} of ${s.notes} notes found, no better than chance). The tab may differ from what is played here, or the guitar is too distorted to check.`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="helper">
             "Heard" is how much of each tab part the app's transcription found at the right time and pitch: a quick
-            accuracy check against your tab. Listen plays the part's first passage (Both: record left, tab right).
+            accuracy check against your tab. {result.check ? '"Confirmed" looks for each tab note directly, which finds more. ' : ""}
+            Listen plays the part's first passage (Both: record left, tab right).
           </p>
         </>
       )}
