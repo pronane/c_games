@@ -41,6 +41,71 @@ def _sharpness(img):
 # head texels are weighted by (frame's head score / best) ** FACE_POWER: high = the face from (nearly) one frame
 FACE_POWER = float(os.environ.get("SFS_FACE_POWER", "10"))
 
+def head_sides(col, X, side, face, log=print, ratio=1.25, force=None):
+    """-> (colours, info). How cleanly each side of the head (x > 0 / x < 0) joins the face: the colour step
+    between face texels and the side texels next to them (within 1.5 cm). The worse side, when worse by `ratio`,
+    is replaced by the mirror image of the better one."""
+    from scipy.spatial import cKDTree
+    from .capture_clean import _lab
+    L = _lab(col)
+    fi = np.nonzero(face)[0]
+    step = {}
+    for sgn, nm in ((1, "left"), (-1, "right")):
+        si = np.nonzero(side & (np.sign(X[:, 0]) == sgn))[0]
+        if len(si) < 100:
+            return col, {}
+        d, j = cKDTree(X[fi]).query(X[si], k=1)
+        near = d < 0.015
+        if near.sum() < 30:
+            return col, {}
+        step[nm] = float(np.median(np.linalg.norm(L[si[near]] - L[fi[j[near]]], axis=1)))
+    worse = force or max(step, key=step.get)
+    better = "right" if worse == "left" else "left"
+    info = dict(step=step)
+    if force or step[worse] > ratio * step[better]:
+        sb = 1 if better == "left" else -1
+        src = np.nonzero(side & (np.sign(X[:, 0]) == sb))[0]
+        dst = np.nonzero(side & (np.sign(X[:, 0]) == -sb))[0]
+        d, j = cKDTree(X[src]).query(X[dst] * [-1, 1, 1], k=3)
+        w = 1.0 / (d + 1e-3)
+        col = col.copy()
+        col[dst] = (col[src][j] * w[..., None]).sum(1) / w.sum(1)[:, None]
+        info["mirrored"] = worse
+        log("texture: the head's %s side joined the face badly (colour step %.0f vs %.0f): mirrored from the %s" % (
+            worse, step[worse], step[better], better))
+    return col, info
+
+
+def face_balance(col, X, face, log=print, strength=0.5, radius=0.02):
+    """the face from one frame keeps that frame's light: one cheek bright, the other dark. The smooth part of the
+    left / right lightness difference (each texel against its mirror image, averaged over 2 cm) is taken out half
+    each side; eyes, brows and the beard - fine detail - are left as they are"""
+    from scipy.spatial import cKDTree
+    from .capture_clean import _lab, _rgb
+    fi = np.nonzero(face)[0]
+    if len(fi) < 500:
+        return col, {}
+    L = _lab(col[fi])
+    tr = cKDTree(X[fi])
+    d, j = tr.query(X[fi] * [-1, 1, 1], k=1)
+    ok = d < 0.006
+    diff = np.where(ok, L[:, 0] - L[j, 0], 0.0)
+    # smooth over 2 cm
+    nb = tr.query_ball_point(X[fi], r=radius)
+    sm = np.array([diff[n].mean() if len(n) else 0.0 for n in nb])
+    L2 = L.copy()
+    L2[:, 0] = L[:, 0] - strength * sm
+    col = col.copy()
+    col[fi] = _rgb(L2)
+    info = dict(mean_abs_lr_step=float(np.abs(sm).mean()))
+    log("texture: face light evened left / right (mean step %.1f L)" % info["mean_abs_lr_step"])
+    return col, info
+
+
+RINGS = os.environ.get("SF_RINGS", "1") != "0"
+HEAD_MIN_FACING = float(os.environ.get("SF_HEAD_FACING", "0.4"))
+
+
 def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False, clean=True):
     """-> (texture RGB uint8 (res,res,3), coverage (res,res) float, stats)
     mesh: optional (rest Mesh, skinning matrices) from capture_layers - body + clothes + skirt + hair in one atlas;
@@ -92,6 +157,9 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         if os.path.isfile(pp):                                              # the multiclass labels must agree: a
             lab = np.asarray(Image.open(pp))                                # floor the same colour as skin is not
             person = (lab >= 1) & (lab <= 4)                                # hair, skin, face, clothes - not
+            # v11.7: "other" inside the person's own mask is something worn - socks, shoes, a watch. Before, it was
+            # thrown away with the TV and the chair, so white socks were never sampled and the shins came out skin
+            person |= (lab == 5) & (m > 0.5)
             m = m * ndi.minimum_filter(person.astype(np.float32), size=3)  # "other" (a TV, a chair) or background
         H, W = img.shape[:2]
         rv, tv = fitter.cams.cam[r["i"]]
@@ -125,7 +193,9 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
             vis[hd_t] = inh & (np.abs(-Xh[:, 2] - zh[vih, uih]) < 0.025)
             vh_ = -(Xh / np.linalg.norm(Xh, axis=1, keepdims=True))
             facing[hd_t] = np.clip(((Nt[hd_t] @ Rh.T) * vh_).sum(1), 0, 1)
-        ok = vis & (facing > min_facing) & (m[vi, ui] > 0.6)        # grazing views stretch; mask edge = background
+        # grazing views stretch; mask edge = background. v11.7: the head needs a squarer view - a frontal frame
+        # seen at a slant paints its eye onto the side of the head (a ghost eye by the ear)
+        ok = vis & (facing > np.where(hd_t, HEAD_MIN_FACING, min_facing)) & (m[vi, ui] > 0.6)
         pw = np.where(head_t, power * 2.0, power)                         # a face blurs when views are mixed
         w = np.where(ok, facing ** pw * m[vi, ui] * (ppm / 400.0) ** 2, 0.0) * (_sharpness(img) ** 0.5)
         c = _bilinear(img, u - 0.5, v - 0.5)
@@ -135,7 +205,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     # label vote per texel: hair / skin / clothes. A sample whose label disagrees with the texel's majority is a
     # misplacement (a hand hanging over the jeans, a sleeve over the waist) and is dropped
     Lb = np.stack(labs)
-    tally = np.stack([(Wt * (Lb == c)).sum(0) for c in range(4)])
+    tally = np.stack([(Wt * (Lb == c)).sum(0) for c in range(5)])
     major = np.argmax(tally[1:], 0) + 1
     strong = tally[1:].max(0) > 0.6 * (tally[1:].sum(0) + 1e-9)
     disagree = (Lb != major[None, :]) & (Lb > 0) & strong[None, :]
@@ -199,9 +269,28 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
                 gains[k] = np.clip(np.median(mix[sel], 0) / (np.median(C[k][sel].astype(np.float32), 0) + 1e-3), 0.7, 1.4)
     # robust: the weighted median (by luminance) of the views, blended with the weighted mean where the views agree.
     # One misaligned view (a leg drawn over the floor, a shadow) then cannot paint a texel
+    # v11.7: the face is painted mostly from its best frame, but where that frame sees a cheek at a slant other
+    # frames fill in - with their own exposure and light, a dark patch with a sharp edge. Each frame gets a face
+    # gain matching it to the best frame on the face texels both see
+    fgain = np.ones((len(C), 3), np.float32)
+    if face_t.any():
+        fi_ = np.nonzero(face_t)[0]
+        best = int(np.argmax(Wt[:, fi_].sum(1)))
+        for k in range(len(C)):
+            if k == best:
+                continue
+            com = fi_[(Wt[best, fi_] > 0) & (Wt[k, fi_] > 0)]
+            if len(com) > 200:
+                a_ = np.median(C[best][com].astype(np.float32) * gains[best], 0)
+                b_ = np.median(C[k][com].astype(np.float32) * gains[k], 0)
+                fgain[k] = np.clip(a_ / np.maximum(b_, 1.0), 0.6, 1.6)
+        stats_fg = float(np.abs(np.log(fgain)).mean())
     out = []
     for c in chunks:
         Cg = C[:, c].astype(np.float32) * gains[:, None, :]; Wc = Wt[:, c]
+        fc = face_t[c]
+        if fc.any():
+            Cg[:, fc] *= fgain[:, None, :]
         mean = (Wc[..., None] * Cg).sum(0) / (Wc.sum(0)[:, None] + 1e-9)
         lum = Cg @ np.array([0.299, 0.587, 0.114], np.float32)
         order = np.argsort(lum, axis=0)
@@ -220,7 +309,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         # v11.2: the room's light divided out (capture_light); the lit texture is kept for the held-out check
         from . import capture_light as CLI
         lay_t = (M.layer[F[ti, 0]] if mesh is not None else np.zeros(len(ti), int))
-        groups = lay_t * 4 + np.where(tally[1:].sum(0) > 0, major, 0)
+        groups = lay_t * 5 + np.where(tally[1:].sum(0) > 0, major, 0)
         alb, light = CLI.fit_light(mix, Nt, groups, weights=seen_t.astype(float), log=log)
     seen = np.zeros((res, res), bool); seen[inside] = seen_t
     cov = np.zeros((res, res), np.float32); cov[inside] = cover
@@ -235,11 +324,64 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         lab_c = np.where(tally[1:].sum(0) > 0, major, 0)
         bone_c = Jm[F[ti, 0], 0]
         skin_b = [bm.bi[b] for b in ("wrist.L", "wrist.R", "neck01") if b in bm.bi]
-        args = (Xr, lay_c, lab_c, bone_c, head_t, skin_b, skin_b[:2])
-        mix, _, stats["clean"] = CC.clean(mix, seen_t, *args, log=log)
+        # the neck is skin to clean like any other (only the head itself - the face - is protected)
+        prot_c = head_t & (bone_c != bm.bi.get("neck01", -1))
+        args = (Xr, lay_c, lab_c, bone_c, prot_c, skin_b, skin_b[:2])
+        # v11.7: garment edges on the limbs are rings (capture_rings)
+        from . import capture_rings as CR
+        limb_c, s_c = CR.limb_coords(sh.head, Xr, bone_c, bm.bi)
+        torso_b = [bm.bi[b] for b in ("root", "spine05", "spine04", "spine03", "spine02", "spine01", "clavicle.L",
+                                      "clavicle.R") if b in bm.bi]
+        kw = dict(limb=limb_c, s=s_c, torso_bones=torso_b) if RINGS else {}
+        # the underside of the jaw and the neck are skin or beard: a collar seen past the chin paints them the
+        # shirt's colour. Body texels there whose colour is near a garment's and far from the skin are dropped
+        neck_b = [bm.bi[b] for b in ("head", "neck01") if b in bm.bi]
+        cand = (lay_c == 0) & np.isin(bone_c, neck_b) & ((Nr[:, 1] < -0.2) | (bone_c == bm.bi.get("neck01", -1))) \
+            & (lab_c != 1)                                                 # not hair / beard
+        if cand.any() and (lay_c == 1).any():
+            from .capture_clean import _lab, W_LAB
+            L_ = _lab(mix)
+            sk = seen_t & (lay_c == 0) & (lab_c == 2) & ~head_t
+            g_ = seen_t & (lay_c == 1)
+            if sk.sum() > 200 and g_.sum() > 200:
+                from .capture_clean import _kmeans
+                skm = np.median(L_[sk], 0)
+                _, gc = _kmeans(L_[g_] * W_LAB, 3)                 # the garments' colours
+                dsk = np.linalg.norm((L_ - skm) * W_LAB, axis=1)
+                dg = np.min(np.linalg.norm((L_ * W_LAB)[:, None, :] - gc[None], axis=2), 1)
+                kw["drop"] = cand & (dg < dsk) & (dg < 30)
+                stats["chin_dropped"] = int(kw["drop"].sum())
+        mix, _, stats["clean"] = CC.clean(mix, seen_t, *args, log=log, **kw)
         if light is not None and light.get("applied"):
-            alb, _, _ = CC.clean(alb, seen_t, *args, log=lambda *a: None)
+            alb, _, _ = CC.clean(alb, seen_t, *args, log=lambda *a: None, **kw)
         known = inside
+        # v11.7: the sides of the head. The face comes from one frontal frame; each side of the head from the
+        # frames that see it. When one side's frames had a worse head pose, that side shows the ear and hairline
+        # too far forward - a seam and a second profile next to the face. The side that joins the face cleanly is
+        # mirrored onto the other
+        mix, stats["face_balance"] = face_balance(mix, Xr, face_t & (lay_c == 0), log=log)
+        if light is not None and light.get("applied"):
+            alb, _ = face_balance(alb, Xr, face_t & (lay_c == 0), log=lambda *a: None)
+        side_t = hd_t & (lay_c == 0) & ~face_t
+        if os.environ.get("SF_DEBUG_MASKS"):
+            dbg = np.zeros((res, res, 3), np.uint8); cc = np.zeros((len(ti), 3), np.uint8)
+            cc[face_t] = (255, 0, 0); cc[side_t & (Xr[:, 0] > 0)] = (0, 255, 0); cc[side_t & (Xr[:, 0] < 0)] = (0, 0, 255)
+            cc[head_t & ~hd_t] = (255, 255, 0)
+            if os.environ.get("SF_DEBUG_MASKS") == "limbs":
+                cc[:] = 128
+                for lb_, ch_ in ((2, 0), (3, 1), (0, 2), (1, 2)):
+                    sel_ = limb_c == lb_
+                    cc[sel_] = 0
+                    cc[sel_, ch_] = np.clip(60 + 200 * s_c[sel_] / 1.0, 0, 255).astype(np.uint8)
+                sel_ = (limb_c >= 0) & (np.abs(s_c - 0.75) < 0.01)
+                cc[sel_] = (255, 255, 255)
+            dbg[inside] = cc
+            stats["debug_masks"] = dbg
+        if side_t.sum() > 500 and face_t.sum() > 500:
+            mix, hinfo = head_sides(mix, Xr, side_t, face_t, log=log)
+            stats["head_sides"] = hinfo
+            if light is not None and light.get("applied") and hinfo.get("mirrored"):
+                alb, _ = head_sides(alb, Xr, side_t, face_t, log=lambda *a: None, force=hinfo["mirrored"])
 
     def fill(colours):
         # unseen texels and the gutters are filled together, from known texels only (filling the holes first let
@@ -258,9 +400,9 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
 
 
 def _label_class(l):
-    """MediaPipe multiclass -> 1 hair, 2 skin (body or face), 3 clothes, 0 other"""
+    """MediaPipe multiclass -> 1 hair, 2 skin (body or face), 3 clothes, 4 worn (socks, shoes, accessories), 0 none"""
     out = np.zeros(l.shape, np.int8)
-    out[l == 1] = 1; out[(l == 2) | (l == 3)] = 2; out[l == 4] = 3
+    out[l == 1] = 1; out[(l == 2) | (l == 3)] = 2; out[l == 4] = 3; out[l == 5] = 4
     return out
 
 

@@ -85,7 +85,74 @@ def _knn_fill(tree_pts, tree_col, q, k=4, max_d=None):
     return col.astype(np.float32), ok
 
 
-def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), log=print, flatten=0.35):
+def _ring_pass(lab, keep, cluster, want, layer, bone, limb, s, protect, torso_bones, log, label=None):
+    """v11.7: on the arms and legs a garment edge is a ring (capture_rings): per layer, the cluster each 1 cm band
+    along the limb belongs to (both sides pooled); texels of another cluster near an edge or in a clear band, and
+    every unseen limb texel, take the band's cluster. A torso garment (a shirt) is not allowed on the legs."""
+    from . import capture_rings as CR
+    changed = 0
+    tube = {}                                       # clothes layer: where its legs / sleeves end, and their colours
+    for L in (1, 0):
+        on = (layer == L) & (limb >= 0) & ~protect
+        ids = np.unique(cluster[(layer == L) & (cluster >= 0)])
+        if not on.any() or len(ids) < 2:
+            continue
+        # clusters of nearly one colour are one material (two shades of the same skin are not two garments)
+        cen = np.array([np.median(lab[cluster == c], 0) for c in ids])
+        grp = np.arange(len(ids))
+        for i in range(len(ids)):
+            for j in range(i):
+                if np.linalg.norm((cen[i] - cen[j]) * W_LAB) < 14.0:
+                    grp[grp == grp[i]] = grp[j]
+        uniq, grp = np.unique(grp, return_inverse=True)
+        size = np.array([(cluster == c).sum() for c in ids])
+        rep = np.array([ids[np.argmax(np.where(grp == g, size, -1))] for g in range(len(uniq))])  # a group's id
+        loc = {int(c): int(g) for c, g in zip(ids, grp)}
+        mat = np.full(len(lab), -1)
+        k_on = on & keep & (cluster >= 0)
+        mat[k_on] = [loc.get(int(c), -1) for c in cluster[k_on]]
+        # torso garments: most of their texels on the torso, few on the legs
+        forbid = []
+        lay_c = (layer == L) & (cluster >= 0)
+        for g in range(len(uniq)):
+            sel = lay_c & np.isin(cluster, ids[grp == g])
+            n = max(1, int(sel.sum()))
+            tor = float(np.isin(bone[sel], torso_bones).sum()) / n
+            leg = float(np.isin(limb[sel], (2, 3)).sum()) / n
+            if L == 1 and tor > 0.45 and leg < 0.3:            # clothes layer only: the body under a shirt is hidden
+                forbid.append(g)
+        fb2 = {}
+        if L == 0 and tube:
+            # bare skin below a trouser leg / sleeve is not the trousers' colour (a knee shaded dark from views where
+            # the shorts hung over it)
+            for pair, (s0, cols) in tube.items():
+                bad = [g for g in range(len(uniq)) if min(np.linalg.norm((cen[np.argmax(grp == g)] - c) * W_LAB)
+                                                         for c in cols) < 20.0]
+                fb2[pair] = (s0 + 0.015, bad)
+        bare = None
+        if L == 0:
+            nsk = [int(((label == 2) & (mat == g)).sum()) for g in range(len(uniq))]
+            bare = int(np.argmax(nsk)) if max(nsk) > 0 else None
+        ring, share, edge = CR.segment(limb, s, mat, len(uniq), forbid={(2, 3): forbid}, forbid_beyond=fb2, bare=bare)
+        own = mat
+        wrong = on & (ring >= 0) & (own != ring) & ((share >= 0.3) | (edge <= 0.025) | np.isin(own, forbid) | (own < 0))
+        if L == 1:
+            for pair in (CR.ARMS, CR.LEGS):
+                t = (layer == 1) & np.isin(limb, pair)
+                if t.sum() > 100:
+                    rr = ring[t]
+                    cols = [cen[np.argmax(grp == g)] for g in np.unique(rr[rr >= 0])]
+                    tube[pair] = (float(np.percentile(s[t], 99)), cols)
+        ch = wrong & keep
+        changed += int(ch.sum())
+        keep[wrong] = False
+        want[wrong] = rep[ring[wrong]]
+    log("texture clean: garment edges on the limbs snapped to rings (%d texels moved to their band's colour)" % changed)
+    return changed
+
+
+def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), log=print, flatten=0.5,
+          limb=None, s=None, torso_bones=(), drop=None, chroma=0.75, skin_flatten=0.8):
     """mix (N,3) blended texel colours; seen (N,) bool; X (N,3) texel positions on the rest-pose body (x = left /
     right); layer (N,) 0 body, 1 clothes, 2 skirt, 3 hair; label (N,) majority video label 0 none, 1 hair, 2 skin,
     3 clothes; bone (N,) dominant bone id; protect (N,) texels never dropped or flattened (the face);
@@ -108,6 +175,10 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
         bad |= seen & (layer == 0) & np.isin(bone, list(hand_bones)) & (d > lim)
         keep &= ~bad
         info["skin_dropped"] = int(bad.sum())
+    # ---- 1b texels the caller knows are wrong (v11.7: garment colour under the chin / on the neck)
+    if drop is not None and drop.any():
+        info["dropped_given"] = int((keep & drop).sum())
+        keep &= ~drop
     # ---- 2 garments: cluster, smooth the clusters on the surface
     cluster = np.full(N, -1)                      # global cluster id of kept garment texels
     want = np.full(N, -1)                         # cluster a dropped texel should be filled from
@@ -129,6 +200,9 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
         keep[sel[ch]] = False
         flipped += int(ch.sum()); nc += k
     info["garment_relabelled"] = flipped
+    if limb is not None and s is not None:
+        info["ring_moved"] = _ring_pass(lab, keep, cluster, want, layer, bone, limb, s, protect, list(torso_bones), log,
+                                       label=label)
     # ---- 3 fill
     out = mix.astype(np.float32).copy()
     todo = ~keep
@@ -150,6 +224,9 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
         src = np.nonzero(keep & (cluster == c))[0]
         col, ok = _knn_fill(X[src], out[src], X[q], k=4, max_d=0.08)
         out[q[ok]] = col[ok]; done[q[ok]] = True
+        q2 = q[~ok]
+        if len(q2) and len(src):                  # a band far from any of its own texels: the cluster's colour
+            out[q2] = np.median(out[src], 0); done[q2] = True
     # c) bare-skin parts: nearest kept skin on the same bone, else the person's skin colour
     skin_keep = keep & (layer == 0) & (label == 2)
     is_skin_bone = np.isin(bone, list(skin_bones))
@@ -183,17 +260,68 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
     # ---- 4 flatten bands inside each material (garment clusters; body skin as one material)
     if flatten > 0:
         lab2 = _lab(out)
-        mats = [np.nonzero(cluster == c)[0] for c in range(nc)]
-        for idx in mats:
+        # v11.7: every texel of a garment / the skin is flattened, not only the ones whose own samples survived -
+        # a dropped or never-seen texel was filled from its neighbours and kept their blotch. Each texel joins the
+        # cluster of its layer nearest in colour (a filled texel takes the cluster it was filled from: `want`)
+        memb = cluster.copy()
+        # a dropped texel belongs to the cluster it was filled from, not the one its own (rejected) colour fell in
+        memb[(~keep | (memb < 0)) & (want >= 0)] = want[(~keep | (memb < 0)) & (want >= 0)]
+        for L in np.unique(layer):
+            ids_L = np.unique(cluster[(layer == L) & (cluster >= 0)])
+            q = np.nonzero((memb < 0) & (layer == L) & ~protect)[0]
+            if len(ids_L) == 0 or len(q) == 0:
+                continue
+            cen_L = np.array([np.median(lab2[cluster == c], 0) for c in ids_L])
+            dd = np.linalg.norm((lab2[q, None, :] - cen_L[None]) * W_LAB, axis=2)
+            memb[q] = ids_L[np.argmin(dd, 1)]
+        mats = [np.nonzero(memb == c)[0] for c in range(nc)]
+        # clusters of nearly one colour in the same layer are one material (a white shirt split into a warm and a
+        # cool white): flattened together
+        cen = [np.median(lab2[m_], 0) if len(m_) else None for m_ in mats]
+        lay_of = [int(np.bincount(layer[m_]).argmax()) if len(m_) else -1 for m_ in mats]
+        # complete linkage: a cluster joins a group only when it is near every member (a chain skin -> pale skin
+        # -> grey sock must not make the socks skin)
+        groups = []
+        for i in range(nc):
+            if cen[i] is None:
+                continue
+            lim = 16.0 if lay_of[i] >= 1 else 10.0
+            for g in groups:
+                if all(lay_of[j] == lay_of[i] and np.linalg.norm((cen[i] - cen[j]) * W_LAB) < lim for j in g):
+                    g.append(i)
+                    break
+            else:
+                groups.append([i])
+        mats = [np.concatenate([mats[c] for c in g]) for g in groups]
+        # the bare skin (the material most texels labelled skin belong to, on the body layer): flattened harder - at
+        # game size blotches on a shin read as dirt, and the renderer puts its own light on the figure
+        skin_m = -1
+        best_n = 0
+        for i_, idx in enumerate(mats):
+            n_ = int(((label[idx] == 2) & (layer[idx] == 0)).sum())
+            if n_ > best_n and n_ > 0.3 * len(idx):
+                best_n, skin_m = n_, i_
+        for i_, idx in enumerate(mats):
             if len(idx) < 500:
                 continue
+            fl = flatten
+            if i_ == skin_m:
+                # only what the video called skin: a white sock or a watch in the same colour cluster stays itself.
+                # On the limbs the rings have already decided the material, so every limb texel of it is skin
+                idx = idx[(label[idx] == 2) | ((limb[idx] >= 0) if limb is not None else False)]
+                fl = skin_flatten
+                if len(idx) < 500:
+                    continue
             med = np.median(lab2[idx], 0)
             dev = lab2[idx] - med
             # deviations beyond one robust sigma are compressed, small ones (weave, print edges) kept
-            s = 1.4826 * np.median(np.abs(dev), 0) + 1.0
-            lab2[idx] = med + np.sign(dev) * (np.minimum(np.abs(dev), s) + float(np.clip(1 - flatten * 1.6, 0.2, 1)) * np.maximum(np.abs(dev) - s, 0))
-        chg = np.concatenate([i for i in mats if len(i) >= 500]) if any(len(i) >= 500 for i in mats) else np.zeros(0, int)
-        out[chg] = _rgb(lab2[chg])
+            sig = 1.4826 * np.median(np.abs(dev), 0) + 1.0
+            lab2[idx] = med + np.sign(dev) * (np.minimum(np.abs(dev), sig) + float(np.clip(1 - fl * 1.6, 0.1, 1)) * np.maximum(np.abs(dev) - sig, 0))
+            # v11.7: colour (a, b) blotches inside one material are views that disagree (a white shirt warm in one
+            # frame, cool in the next, skin showing through): pulled most of the way to the material's colour.
+            # Lightness - the folds - is left as above
+            lab2[idx, 1:] = med[1:] + (1.0 - chroma) * (lab2[idx, 1:] - med[1:])
+        out = np.where(np.any(np.abs(lab2 - _lab(out)) > 0.5, 1)[:, None], _rgb(lab2), out)
     log("texture clean: %d skin texels off-colour and %d garment texels relabelled, dropped; %d texels filled on the "
         "body in 3D (%d from their mirror image)" % (info.get("skin_dropped", 0), flipped, info["filled"], info["mirror_filled"]))
     return np.clip(out, 0, 255), keep, info
