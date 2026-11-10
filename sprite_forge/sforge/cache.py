@@ -129,6 +129,19 @@ def input_sigs(cfg):
         except Exception:
             pass
     s["env.SFS_MAKEHUMAN"] = os.environ.get("SFS_MAKEHUMAN", "")
+    ct = getattr(cfg, "character_type", "") or ""
+    if ct:
+        try:
+            from . import chartypes
+            s["character_type"] = file_sig(chartypes.path_of(ct))
+        except Exception:
+            s["character_type"] = ct
+    if any((getattr(m, "motion", "") or "").startswith("lib:") for m in (cfg.moves or [])):
+        try:
+            from . import motionlib
+            s["motion_library"] = motionlib.signature(getattr(cfg, "motion_library", "") or None)
+        except Exception:
+            s["motion_library"] = getattr(cfg, "motion_library", "")
     return s
 
 

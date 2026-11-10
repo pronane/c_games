@@ -158,10 +158,12 @@ class LibContext:
         cl, rep = RT.retarget(src, srec, clip, self.rig, self.rec, root_motion=self.cfg.root_motion, name=name)
         return cl, "lib:%s:%s" % (asset, clip)
 
-    def _procedural(self, motion_name, m):
+    def _procedural(self, motion_name, m, motion=None):
         from . import rigrec as RR, retarget as RT
+        from .moves import motion_for
+        mo = motion if motion is not None else motion_for(m)
         man, mrec = self._mannequin()
-        c = RR.motion_clip(man, motion_name, loop=m.loop)
+        c = RR.motion_clip(man, motion_name, loop=m.loop, motion=mo)
         if c is None:
             return None
         cl, _ = RT.retarget(man, mrec, c, self.rig, self.rec, root_motion=self.cfg.root_motion, name=m.name)
@@ -185,7 +187,7 @@ class LibContext:
                 self.report.warning("move %s: clip map entry %r failed (%s) - falling back" % (m.name, ref, ex))
         mo = motion_for(m)
         if mo is not None and mo.name.startswith("mocap_"):
-            cl = self._procedural(mo.name, m)
+            cl = self._procedural(mo.name, m, mo)
             if cl is not None:
                 return cl, "mocap:" + mo.name
         names = [m.name] + ([m.motion] if m.motion else []) + ([mo.name] if mo else [])
@@ -201,9 +203,12 @@ class LibContext:
                     except Exception:
                         pass
         if cfg.fill != "skip" and mo is not None:
-            cl = self._procedural(mo.name, m)
+            cl = self._procedural(mo.name, m, mo)
             if cl is not None:
-                return cl, "procedural:%s" % mo.name
+                tag = "library:%s" % mo.name if (m.motion or "").startswith("lib:") else "procedural:%s" % mo.name
+                if getattr(m, "character_type", ""):
+                    tag += ":" + m.character_type
+                return cl, tag
         if cfg.fill == "skip":
             return None, "skip"
         from .rigrec import Clip

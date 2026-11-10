@@ -1,0 +1,159 @@
+{
+ "name": "crouch",
+ "category": "Locomotion",
+ "desc": "crouch down",
+ "loop": false,
+ "source": "procedural:crouch",
+ "origin": "builtin",
+ "from_motion": "crouch",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "hips": [
+     4.0,
+     -28.0,
+     0.0
+    ],
+    "spine": [
+     4.0,
+     10.0,
+     0.0
+    ],
+    "chest": [
+     2.0,
+     14.0,
+     0.0
+    ],
+    "neck": [
+     -6.0,
+     4.0,
+     0.0
+    ],
+    "leg_L": [
+     22.0,
+     7.0,
+     0.0
+    ],
+    "leg_R": [
+     -14.0,
+     7.0,
+     0.0
+    ],
+    "knee_L": 24.0,
+    "knee_R": 20.0,
+    "arm_L": [
+     62.0,
+     10.0,
+     0.0
+    ],
+    "arm_R": [
+     48.0,
+     18.0,
+     0.0
+    ],
+    "elbow_L": 105.0,
+    "elbow_R": 125.0
+   }
+  ],
+  [
+   0.5,
+   {
+    "hips": [
+     18.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -22.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     88.0,
+     8.0,
+     0.0
+    ],
+    "leg_R": [
+     72.0,
+     8.0,
+     0.0
+    ],
+    "knee_L": 125.0,
+    "knee_R": 118.0,
+    "arm_L": [
+     70.0,
+     10.0,
+     0.0
+    ],
+    "arm_R": [
+     55.0,
+     15.0,
+     0.0
+    ],
+    "elbow_L": 110.0,
+    "elbow_R": 120.0
+   }
+  ],
+  [
+   1.0,
+   {
+    "hips": [
+     18.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -22.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     88.0,
+     8.0,
+     0.0
+    ],
+    "leg_R": [
+     72.0,
+     8.0,
+     0.0
+    ],
+    "knee_L": 125.0,
+    "knee_R": 118.0,
+    "arm_L": [
+     70.0,
+     10.0,
+     0.0
+    ],
+    "arm_R": [
+     55.0,
+     15.0,
+     0.0
+    ],
+    "elbow_L": 110.0,
+    "elbow_R": 120.0
+   }
+  ]
+ ],
+ "cleanup": null
+}

@@ -97,10 +97,11 @@ class Studio:
             pvars="", clips="", vcamera="auto", vbg="auto", slowmo="1", pmodel="full", orbit="", sframes="80",
             smesh="", sheight="", budgets="", rig="", root_motion="keep",
             msplit="auto", mslots="full", human="", outfits="", eprops="", slot_colors="",
-            turn=TURN_CHOICES[0], turn_yaw="", turn_depth="auto", turn_side="", landmarks="", quality="final").items()}
+            turn=TURN_CHOICES[0], turn_yaw="", turn_depth="auto", turn_side="", landmarks="", quality="final",
+            character_type="(none)").items()}
         self.b = {k: tk.BooleanVar(value=val) for k, val in dict(flip=False, outline=True, glb=True, fbx=True, strips=False,
                                                                 gifs=True, dither=True, side_left=False, srun=True,
-                                                                anim_export=False, cache=True).items()}
+                                                                anim_export=False, cache=True, library_motions=False).items()}
         from .gui_style import install_vars
         install_vars(self)        # v9 style / extras settings
         self.field_rows = []      # (widgets, modes)
@@ -353,6 +354,13 @@ class Studio:
         pf = ttk.Frame(mid); pf.pack(fill=tk.X)
         ttk.Combobox(pf, textvariable=self.v["preset"], values=list(PRESETS), width=32, state="readonly").pack(side=tk.LEFT)
         ttk.Button(pf, text="Load preset", command=self.load_preset).pack(side=tk.LEFT, padx=3)
+        ct = ttk.Frame(mid); ct.pack(fill=tk.X, pady=(2, 0))
+        ttk.Label(ct, text="Character type").pack(side=tk.LEFT)
+        self.ctype = ttk.Combobox(ct, textvariable=self.v["character_type"], values=self._character_types(), width=18, state="readonly")
+        self.ctype.pack(side=tk.LEFT, padx=3)
+        self._q(ct, "Character type").pack(side=tk.LEFT)
+        ttk.Checkbutton(ct, text="Use motion library where a clip exists", variable=self.b["library_motions"]).pack(side=tk.LEFT, padx=(8, 0))
+        self._q(ct, "Motion library").pack(side=tk.LEFT)
         ttk.Button(pf, text="All", width=4, command=lambda: self._all(True)).pack(side=tk.LEFT)
         ttk.Button(pf, text="None", width=5, command=lambda: self._all(False)).pack(side=tk.LEFT)
         hdr = ttk.Frame(mid); hdr.pack(fill=tk.X)
@@ -726,7 +734,7 @@ class Studio:
         ttk.Spinbox(r, from_=1, to=64, textvariable=fr, width=4).pack(side=tk.LEFT, padx=2)
         ttk.Spinbox(r, from_=1, to=60, textvariable=fps, width=4).pack(side=tk.LEFT, padx=2)
         ttk.Checkbutton(r, variable=lp).pack(side=tk.LEFT, padx=6)
-        ttk.Combobox(r, textvariable=mo, values=sorted(LIB), width=12).pack(side=tk.LEFT)
+        ttk.Combobox(r, textvariable=mo, values=self._motion_values(), width=16).pack(side=tk.LEFT)
         cl = tk.StringVar(value=getattr(m, "_clip", ""))
         cc = ttk.Combobox(r, textvariable=cl, values=self._clip_choices(), width=18); cc.pack(side=tk.LEFT, padx=2)
         Tooltip(cc, helptext.FIELD_HELP.get("Library clip", "library clip"))
@@ -748,6 +756,22 @@ class Studio:
         mot = LIB[self.v["cmotion"].get()]
         self._add_row(MoveSpec(slug(nm), nm, "Custom", 8, 12, mot.loop, mot.name, "custom move using " + mot.name))
         self.canvas.yview_moveto(1.0)
+
+    def _character_types(self):
+        try:
+            from .chartypes import list_types
+            return ["(none)"] + list_types()
+        except Exception:
+            return ["(none)"]
+
+    def _motion_values(self):
+        vals = sorted(LIB)
+        try:
+            from .motionlib import list_moves
+            vals += ["lib:" + n for n in list_moves()]
+        except Exception:
+            pass
+        return vals
 
     def selected_moves(self):
         out = []
@@ -837,6 +861,17 @@ class Studio:
         c.strips = self.b["strips"].get(); c.gifs = self.b["gifs"].get()
         c.console = consoles.by_label(v["console"].get()); c.dither = self.b["dither"].get() if c.console else None
         c.moves = self.selected_moves()
+        ct = self.v.get("character_type")
+        if ct is not None and ct.get().strip() not in ("", "(none)", "none"):
+            c.character_type = ct.get().strip()
+        if self.b.get("library_motions") and self.b["library_motions"].get():
+            try:
+                from .motionlib import has_move
+                for m in c.moves:
+                    if has_move(m.name) and not (m.motion or "").startswith("lib:"):
+                        m.motion = "lib:" + m.name
+            except Exception:
+                pass
         c.quality = v["quality"].get() or "final"; c.cache = bool(self.b["cache"].get())
         from . import views as V
         vs = v["views"].get().strip()

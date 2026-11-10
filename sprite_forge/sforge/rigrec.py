@@ -531,15 +531,15 @@ def from_mannequin(name="mannequin", kit="home", clips=None, frames=None, slots=
     return r
 
 
-def motion_clip(r, motion_name, frames=None, loop=None, duration=None):
-    """bake a procedural / mocap Motion (sforge.motions) on the mannequin skeleton at 30 fps."""
+def motion_clip(r, motion_name, frames=None, loop=None, duration=None, motion=None):
+    """bake a procedural / mocap / library Motion (sforge.motions) on the mannequin skeleton at 30 fps."""
     from .motions import find_motion
     from . import rig as R
-    m = find_motion(motion_name)
+    m = motion if motion is not None else find_motion(motion_name)
     if m is None:
         return None
     lp = m.loop if loop is None else loop
-    dur = duration or (1.0 if lp else 0.8)
+    dur = duration or getattr(m, "duration_s", None) or (1.0 if lp else 0.8)
     n = frames or max(2, int(round(dur * FPS)) + 1)
     Wf = []
     for k in range(n):

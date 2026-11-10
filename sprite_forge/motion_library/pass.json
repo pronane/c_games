@@ -1,0 +1,233 @@
+{
+ "name": "pass",
+ "category": "Ball handling",
+ "desc": "pass with hands",
+ "loop": false,
+ "source": "procedural:hand_pass",
+ "origin": "builtin",
+ "from_motion": "hand_pass",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     38.0,
+     -14.0,
+     0.0
+    ],
+    "arm_R": [
+     38.0,
+     -14.0,
+     0.0
+    ],
+    "elbow_L": 88.0,
+    "elbow_R": 88.0,
+    "ball": "hands"
+   }
+  ],
+  [
+   0.35,
+   {
+    "hips": [
+     10.0,
+     30.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     20.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     70.0,
+     -10.0,
+     0.0
+    ],
+    "arm_R": [
+     20.0,
+     20.0,
+     0.0
+    ],
+    "elbow_L": 40.0,
+    "elbow_R": 110.0,
+    "wrist_R": -20.0,
+    "ball": "hand_L"
+   }
+  ],
+  [
+   0.6,
+   {
+    "hips": [
+     10.0,
+     -15.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     -20.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     70.0,
+     -10.0,
+     0.0
+    ],
+    "arm_R": [
+     85.0,
+     -10.0,
+     0.0
+    ],
+    "elbow_L": 40.0,
+    "elbow_R": 10.0,
+    "ball": [
+     "world",
+     0.0,
+     1.25,
+     0.95
+    ]
+   }
+  ],
+  [
+   1.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     22.0,
+     16.0,
+     0.0
+    ],
+    "arm_R": [
+     70.0,
+     0.0,
+     0.0
+    ],
+    "elbow_L": 55.0,
+    "elbow_R": 20.0,
+    "ball": [
+     "world",
+     0.0,
+     1.4,
+     2.0
+    ]
+   }
+  ]
+ ],
+ "cleanup": null
+}

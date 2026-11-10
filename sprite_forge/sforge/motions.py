@@ -420,8 +420,18 @@ ALIASES = {
 
 
 def find_motion(name):
-    """Resolve a move name (any case/spacing) to a library motion, or None."""
+    """Resolve a move name (any case/spacing) to a library motion, or None.
+
+    `lib:<name>` is a clip from the v11.4 motion library (sforge/motionlib.py),
+    the shared skeleton, not the procedural pose of the same name.
+    """
     from .moves import slug
+    raw = (name or "").strip()
+    if raw.lower().startswith("lib:"):
+        from .motionlib import as_motion
+        m = as_motion(raw.split(":", 1)[1])
+        if m is not None:
+            return m
     s = slug(name)
     if s.startswith("hd_") and s not in LIB:       # v10: HD Fighter hand-posed frame library
         from .hdfighter import register

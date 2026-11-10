@@ -150,6 +150,9 @@ class BuildConfig:
     device: str = ""                   # v9.3 compute backend: '' / auto | cpu | cuda | mps  (env SFS_DEVICE)
     motion_style: str = "classic"      # v9.1: classic | polish (smooth in-betweens, sforge/motionpolish.py)
     footlock: bool = False             # pin planted feet (removes foot sliding in walk / idle)
+    # v11.4 motion library + character types (sforge/motionlib.py, sforge/chartypes.py)
+    character_type: str = ""           # character_types/<name>.json or a path: timing, stance, reach, weight
+    motion_library: str = ""           # extra motion-library folder (searched before the shipped starter)
     framedata: bool = False            # hitboxes / hurtboxes / startup-active-recovery -> framedata.json + framedata.cfg
     blend: str = ""                    # transitions "idle>walk:3,walk>idle:3" -> blend_<a>_<b> moves
     qa: bool = True                    # sprite QA checker -> qa_report.txt / qa.json
@@ -1466,6 +1469,11 @@ def build(cfg: BuildConfig, log=print, progress=None):
         _PNG_LEVEL[0] = 1
     else:
         _PNG_LEVEL[0] = 6
+    if getattr(cfg, "motion_library", ""):
+        os.environ["SFS_MOTIONS"] = cfg.motion_library
+    if getattr(cfg, "character_type", ""):
+        from . import chartypes
+        chartypes.apply_moves(cfg.moves, cfg.character_type)
     cfg.resolved()
     cfg.moves = [m for m in cfg.moves if m.enabled]
     out = os.path.join(cfg.out_root, cfg.name)
@@ -1488,6 +1496,11 @@ def build(cfg: BuildConfig, log=print, progress=None):
     except OSError:
         pass
     log("Sprite Forge Studio %s - building '%s' (%s mode, %d moves) -> %s" % (__version__, cfg.name, cfg.mode, len(cfg.moves), out))
+    if getattr(cfg, "character_type", ""):
+        from . import chartypes
+        spec = chartypes.load(cfg.character_type)
+        report.note("character type %s (%s): timing x%.2f, stance x%.2f, reach x%.2f, weight x%.2f" % (
+            spec["name"], spec["label"], spec["timing"], spec["stance"], spec["reach"], spec["weight"]))
     if cfg.blend:
         from . import blend as BL
         added = BL.add_moves(cfg, report)

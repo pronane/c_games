@@ -700,6 +700,73 @@ Python also means one code base for Windows and Linux, installed with pip only (
 """)
 
 
+T("motion", "Motion library and character types (v11.4)", r"""
+One move, stored once, usable in a fighting game, a sports game, a platformer, a kart, an RPG or a pack you
+define yourself. The clip lives on the shared skeleton: the same pose channels the mannequin, mocap and the
+procedural motions already use (hips, arm_L, knee_R, ...). A game profile maps its own move names onto those
+generic clips (punch, kick, walk, tackle, shoot, ...). This is not the Egyptian Fighter 14-move set.
+
+WHERE IT LIVES
+  motion_library/          shipped starter, CC0, baked from Sprite Forge's own procedural motions.
+                           No Mixamo, Meshy, or other third-party clips.
+  library/motions/         clips you record or import (or $SFS_MOTIONS, or --library). Same name overrides the starter.
+  character_types/*.json   how a character performs a clip. Add a file to add a type. The engine does not
+                           special-case the names.
+
+COMMANDS
+  forge.py motion list
+  forge.py motion show punch
+  forge.py motion types
+  forge.py motion type heavy_brawler
+  forge.py motion record --clip punch=my_punch.mp4 --spdx CC0-1.0 --author "Me"
+        Video goes through the existing mocap tracker (forge.py mocap / MediaPipe), then the fitted keys are
+        stored in the library. Same limits as mocap: side-on works best; no fingers; no face.
+  forge.py motion record --keys out/hero_mocap/punch.json --name punch
+        Store a keys JSON that mocap already wrote. No video is opened.
+  forge.py motion import walk.bvh --name walk --spdx CC0-1.0 --author "Me" --redistribution yes
+        Also .fbx and .glb. The clip is retargeted onto the mannequin, then projected into pose channels.
+  forge.py motion retarget punch --to sample_lanky --out lanky_punch.glb
+  forge.py motion retarget punch --to sample_lanky --character-type heavy_brawler --save
+  forge.py motion clean walk
+        Writes the clean-up back into the clip: planted feet, a weight shift, anticipation and follow-through.
+
+BUILD
+  forge.py build --mannequin --moves punch=lib:punch:6:12:once --character-type heavy_brawler --no-glb
+  forge.py build --mannequin --profile fighter14 --motions punch,kick --character-type quick_striker
+  forge.py build --mannequin --profile gaelic36 --motions tackle,shoot --character-type keeper
+  forge.py build --rig sample_lanky --moves punch=lib:punch --character-type big_boss
+  forge.py build --profile motion_demo --mannequin
+        motion_demo is a small profile that points several generic moves at the library. Copy it for your game.
+  --motions punch,kick   keeps the rest of the profile's moves and only switches those names to lib:<name>.
+  lib:punch in a profile move ("motion": "lib:punch") is the same switch for one move.
+
+CHARACTER TYPES
+  A type is data: timing, stance, reach, weight. 1.0 leaves that axis alone.
+    timing   above 1 = slower. The action peaks later in the clip, and playback fps drops.
+    stance   above 1 = wider feet and a wider guard.
+    reach    above 1 = limbs swing further and the elbow / knee straighten.
+    weight   above 1 = more knee bend, a wind-up, and a follow-through. Below 1 is lighter.
+  heavy_brawler and quick_striker are the fighter pair. keeper and playmaker are the sports pair.
+  big_boss and small_agile cover RPG / NPC / platformer. balanced is the identity (no change).
+  Two characters can share lib:punch and still read differently.
+  Studio: Build tab and Start > What to make have the type dropdown and "Use motion library".
+  Library tab > Motions... lists the clips and sets the same two controls.
+
+LIMITS (honest)
+  * The starter is the procedural motions sampled into keys. It is a real library workflow, not motion-capture
+    quality. Record or import when you have a clip you are allowed to use.
+  * Import projects the retargeted mannequin pose. Fingers, twist bones and facial tracks are not kept.
+    A GLB round trip of our own mannequin keeps bone directions and lands the joints within about 6 cm;
+    the semantic channels are a simpler skeleton than the file they came from.
+  * Clean-up refits the mannequin thigh and knee to the existing foot lock, and adds a wind-up, a
+    follow-through and a weight shift. On a retargeted GLB/FBX the same plant runs on the canonical thigh,
+    shin and foot; the rest of that file is not re-solved.
+  * Character types change shared-skeleton builds (mannequin, spec, sculpt, library rig). Photo-puppet 2D
+    poses are not redrawn. Their playback fps still follows timing, so a heavy type plays the sheet slower.
+  * Do not drop a Mixamo / Meshy clip in here unless its licence lets you. The move stores the licence you pass.
+    An incomplete record is fine locally and is not something to pack.
+""")
+
 FIELDS = [
     ("Name", "Character name; becomes the folder out/<name>/ and the symbol prefix in console headers."),
     ("Front photo", "PHOTO mode: picture of your character facing the camera or to the right. A plain background or a transparent PNG works best."),
@@ -784,6 +851,8 @@ FIELDS = [
     ("Blend", "v9: transition moves a>b:frames, e.g. idle>walk:3 -> blend_idle_walk (3D: pose blend; photo: crossfade)."),
     ("LODs", "v9 3D: model_baked.glb (1 palette texture, 1 material) + N lower-detail model_lodN.glb + lods.json."),
     ("Moves", "Tick the moves to build. frames = number of frames, fps = playback speed, loop = repeats (idle/walk) or plays once (punch)."),
+    ("Character type", "v11.4: how the character performs the same clip. heavy_brawler, quick_striker, keeper, playmaker, big_boss, small_agile, balanced, or add a JSON file in character_types/. Changes timing, stance width, reach and weight. (none) leaves the motion alone."),
+    ("Motion library", "v11.4: where a shipped or imported clip has the same name as a move (punch, walk, tackle, ...), drive that move from the motion library instead of the procedural pose. Record and import with forge.py motion."),
 ]
 FIELD_HELP = dict(FIELDS)
 
@@ -827,7 +896,8 @@ def get(key):
 ALIASES = {"sheet": "sprite-sheet", "spritesheet": "sprite-sheet", "sprite_sheet": "sprite-sheet", "start": "quickstart",
            "files": "outputs", "doctor": "install", "setup": "install", "linux": "install", "fbx": "install", "output": "outputs", "mode": "modes", "console": "consoles", "engine": "engines",
            "unity": "plugins", "godot": "plugins", "plugin": "plugins", "style": "v9", "faces": "v9", "expressions": "v9",
-           "colours": "v9", "colors": "v9", "recolor": "v9", "variants": "v9", "npc": "v9", "batch": "v9", "atlas": "v9", "qa": "v9", "framedata": "v9", "raylib": "engines", "unreal": "engines", "snes": "engines", "gba": "engines"}
+           "colours": "v9", "colors": "v9", "recolor": "v9", "variants": "v9", "npc": "v9", "batch": "v9", "atlas": "v9", "qa": "v9", "framedata": "v9", "raylib": "engines", "unreal": "engines", "snes": "engines", "gba": "engines",
+           "motions": "motion", "character-type": "motion", "character_type": "motion", "retarget-motion": "motion"}
 
 
 def render(topic=""):
