@@ -98,7 +98,7 @@ class Studio:
             smesh="", sheight="", budgets="", rig="", root_motion="keep",
             msplit="auto", mslots="full", human="", outfits="", eprops="", slot_colors="",
             turn=TURN_CHOICES[0], turn_yaw="", turn_depth="auto", turn_side="", landmarks="", quality="final",
-            character_type="(none)").items()}
+            character_type="(none)", game="(none)", motion_set="(saved default)").items()}
         self.b = {k: tk.BooleanVar(value=val) for k, val in dict(flip=False, outline=True, glb=True, fbx=True, strips=False,
                                                                 gifs=True, dither=True, side_left=False, srun=True,
                                                                 anim_export=False, cache=True, library_motions=False).items()}
@@ -300,6 +300,16 @@ class Studio:
         ttk.Entry(pf1, textvariable=self.v["pvars"], width=44).pack(side=tk.LEFT, padx=3, fill=tk.X, expand=True)
         self._q(pf1, "Profile vars").pack(side=tk.LEFT)
         self.profile_info = ttk.Label(left, text="", foreground="#555", wraplength=455, justify=tk.LEFT); self.profile_info.pack(anchor="w")
+        gf = ttk.Frame(left); gf.pack(fill=tk.X, pady=(2, 0))
+        ttk.Label(gf, text="Game type").pack(side=tk.LEFT)
+        self.game_cb = ttk.Combobox(gf, textvariable=self.v["game"], values=self._game_packs(), state="readonly", width=18)
+        self.game_cb.pack(side=tk.LEFT, padx=3)
+        self.game_cb.bind("<<ComboboxSelected>>", lambda e: self.apply_game())
+        self._q(gf, "Game type").pack(side=tk.LEFT)
+        ttk.Label(gf, text="Motion set").pack(side=tk.LEFT, padx=(8, 0))
+        self.set_cb = ttk.Combobox(gf, textvariable=self.v["motion_set"], values=self._motion_sets(), state="readonly", width=16)
+        self.set_cb.pack(side=tk.LEFT, padx=3)
+        self._q(gf, "Motion set").pack(side=tk.LEFT)
         o = ttk.Frame(left); o.pack(fill=tk.X)
         def sp(r, c, label, key, help_key=None):
             ttk.Label(o, text=label).grid(row=r, column=c * 3, sticky="w")
@@ -764,6 +774,43 @@ class Studio:
         except Exception:
             return ["(none)"]
 
+    def _game_packs(self):
+        try:
+            from .gamepack import list_packs
+            return ["(none)"] + list_packs()
+        except Exception:
+            return ["(none)"]
+
+    def _motion_sets(self):
+        try:
+            from .motionset import list_sets
+            return ["(saved default)", "(none)"] + list_sets()
+        except Exception:
+            return ["(saved default)", "(none)"]
+
+    def apply_game(self):
+        """Fill the move list, frame and camera from a game-type pack. Profiles stay as they were unless you change them."""
+        name = self.v["game"].get()
+        if name in ("", "(none)", "none"):
+            self.profile_info.configure(text="")
+            return
+        try:
+            from . import gamepack
+            pack = gamepack.load(name)
+        except Exception as e:
+            self.status.configure(text=str(e)); return
+        self._clear_rows()
+        for m in gamepack.moves_of(pack):
+            self._add_row(m)
+        self.v["fw"].set(str(pack["frame"][0])); self.v["fh"].set(str(pack["frame"][1]))
+        self.v["yaw"].set(str(int(pack["yaw"])) if pack["yaw"] == int(pack["yaw"]) else str(pack["yaw"]))
+        if pack["camera"] == "topdown8":
+            self.v["views"].set("billboard8")
+        elif pack["camera"] == "side":
+            self.v["views"].set("")
+        self.profile_info.configure(text="%s — %s  (%d moves, %s). Manifest: game_character.json." % (
+            pack["label"], pack["description"], len(pack["moves"]), pack["camera"]))
+
     def _motion_values(self):
         vals = sorted(LIB)
         try:
@@ -864,6 +911,32 @@ class Studio:
         ct = self.v.get("character_type")
         if ct is not None and ct.get().strip() not in ("", "(none)", "none"):
             c.character_type = ct.get().strip()
+        game = self.v.get("game")
+        if game is not None and game.get().strip() not in ("", "(none)", "none"):
+            c.game_pack = game.get().strip()
+            try:
+                from . import gamepack
+                pack = gamepack.load(c.game_pack)
+                c.game_camera = pack["camera"]
+                c.game_props = list(pack["props"])
+                c.game_events = gamepack.events_of(pack)
+                c.game_pack_path = pack["path"]
+                by = {m["name"]: m for m in pack["moves"]}
+                for m in c.moves:
+                    src = by.get(m.name)
+                    if not src:
+                        continue
+                    m.want_library = True
+                    m.pack_frames = src["frames"]
+                    m.library_name = src["library"]
+                    if not (m.motion or "").startswith("lib:"):
+                        m.motion = "lib:" + src["library"]
+            except Exception:
+                pass
+        ms = self.v.get("motion_set")
+        if ms is not None:
+            val = ms.get().strip()
+            c.motion_set = "" if val in ("", "(saved default)") else ("off" if val in ("(none)", "off", "none") else val)
         if self.b.get("library_motions") and self.b["library_motions"].get():
             try:
                 from .motionlib import has_move

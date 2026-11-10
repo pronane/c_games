@@ -5,6 +5,53 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v11.5: film a move set, pick a game type, drop the character in
+
+v11.4 stored one clip for every game. v11.5 is the rest of that idea: your own movement as the
+default, a data file per genre, and one manifest a loader can read. `forge.py help game` has the
+same commands and the same limits.
+
+* **Recording session** (`forge.py motion record --folder CLIPS --set owner`):
+  * One clip per move, named after the move (`punch.mp4`, `walk.mp4`). Side-on, full body, about
+    1 second of T-pose, then the move about 3 times. Optional `idle_front.mp4` / `walk_front.mp4` /
+    `run_front.mp4`.
+  * The folder is imported in one go through the existing mocap tracker. A pose-track JSON (what
+    that tracker writes) is the same path, which is how the tests run with no person and no MediaPipe.
+  * Each clip is checked first. The report says what is wrong: feet out of frame, body cut off,
+    too dark, no T-pose, too short, tracking lost — and which files to reshoot.
+  * A repeated move keeps the best repeat, or a clean average of two close ones, and is trimmed to
+    a loop or a single action.
+  * Stored as skeleton keys only. The video, the frames, the face and the body shape are not kept.
+    Temporary tracker files are deleted (`--keep-temp` leaves a pose trace you should not pack).
+  * `forge.py motion use-set owner` makes that set the first place a build looks. Missing moves
+    come from the shipped starter, then the procedural motion. The build report names the source
+    of each move (`punch=set:owner`, `kick=starter`, `special1=procedural`).
+  * `forge.py motion shotlist --game soccer` is the printable checklist for that pack.
+* **Game-type packs** (`game_packs/*.json`, `forge.py game list`, `forge.py build --game soccer`):
+  * A pack is data: moves mapped to generic library names, frames / fps / loop, camera
+    (`side`, `three_quarter`, `topdown8`), props the game draws, and events (hit frames, ball
+    contact, footsteps, throw release, shoot, reload).
+  * Shipped: fighting, gaelic, platformer, topdown_rpg, kart, soccer, basketball, boxing,
+    wrestling, tennis, beat_em_up, shooter. Drop another JSON file in `game_packs/` to add one.
+  * Character types from v11.4 apply on every pack. The old profiles still build unchanged.
+  * Several moves share one starter clip until you record a file with that move's name. The
+    events are the part the game should trust. See `forge.py game show boxing`.
+* **One game file** (`out/<name>/game_character.json`, written by every build):
+  * Character, type, pack, camera, animations (strip and sheet, frames, fps, loop, pivot and
+    ground line), events, and hit / hurt boxes when the framedata pass can measure them.
+  * Loaders copied next to it: `loaders/raylib/` (header + example, same style as `spriteforge.h`),
+    `loaders/godot/game_character.gd`, `loaders/unity/GameCharacter.cs`.
+  * Egyptian Fighter and HD Fighter adapters still read a normal build. If `atlas.json` or
+    `sprites.cfg` is missing they rebuild that index from the manifest. Arena FC still needs a
+    cut-out photo. `tools/gaelic_forge.py` is still the 3D mesh, not this file.
+* **Studio**: Library → Recording session. Build and Start → What to make have the game-type
+  dropdown and the motion-set dropdown. The Build step names the manifest.
+
+Limits: the starter is procedural keys, not motion capture. A video import needs MediaPipe
+(`python tools/setup_pose.py`); without it the checker says so and does not keep the video.
+Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
+fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
+
 ## New in v11.4: a motion library, and character types that change how a move is performed
 
 Sprite Forge could already retarget a clip and track a video. The moves themselves were still mostly

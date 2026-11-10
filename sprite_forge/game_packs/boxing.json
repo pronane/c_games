@@ -1,0 +1,180 @@
+{
+ "name": "boxing",
+ "label": "Boxing",
+ "description": "Side-on boxing. Jab, cross and hook share the punch clip and differ by the active frames.",
+ "camera": "side",
+ "prop": "none",
+ "props": [],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "guard stance \u2014 starter idle, not a boxing guard"
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "jab",
+   "library": "punch",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 2,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "cross",
+   "library": "punch",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 3,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hook",
+   "library": "punch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "block",
+   "library": "block",
+   "frames": 4,
+   "fps": 10,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "dodge",
+   "library": "crouch",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "slip \u2014 starter crouch"
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "ko",
+   "library": "hit",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knockout \u2014 same hit clip, longer"
+  }
+ ],
+ "notes": "A recorded jab, cross and hook become three clips when you name the files jab.mp4, cross.mp4, hook.mp4. Until then they are one punch, retimed by the events."
+}

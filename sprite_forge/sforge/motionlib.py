@@ -52,7 +52,7 @@ STARTER = [
     ("drive", "kart_drive"), ("wave", "wave"), ("cast", "cast"),
 ]
 
-_SKIP = {"licence.json", "index.json"}
+_SKIP = {"licence.json", "index.json", "set.json", "session_report.json"}
 
 
 def builtin_dir():
@@ -67,16 +67,42 @@ def user_dir():
     return os.path.join(libdir(), "motions")
 
 
-class MotionLibrary:
-    """Read shipped + user folders. Writes go to `write_dir` and never into the starter unless that is the folder you named."""
+def _prefer_dir():
+    """Absolute folder of the active motion set, or None.
 
-    def __init__(self, path=None):
+    `SFS_MOTION_SET` is that folder (set by a build when a named set is the default
+    source). `off` / `none` leaves the starter and the user library as they were.
+    """
+    raw = os.environ.get("SFS_MOTION_SET", "").strip()
+    if not raw or raw.lower() in ("off", "none", "(none)", "-"):
+        return None
+    if os.path.isdir(raw):
+        return os.path.abspath(raw)
+    return None
+
+
+class MotionLibrary:
+    """Read shipped + user folders. Writes go to `write_dir` and never into the starter unless that is the folder you named.
+
+    Search order, first hit wins: the active motion set (if one is selected), then
+    `write_dir` (your library/motions or --library), then the shipped starter.
+    """
+
+    def __init__(self, path=None, prefer=None):
         self.write_dir = os.path.abspath(path) if path else user_dir()
-        dirs = [self.write_dir]
+        pref = os.path.abspath(prefer) if prefer else _prefer_dir()
+        if pref and not os.path.isdir(pref):
+            pref = None
+        dirs = []
+        if pref:
+            dirs.append(pref)
+        if os.path.abspath(self.write_dir) not in dirs:
+            dirs.append(self.write_dir)
         b = os.path.abspath(BUILTIN)
-        if os.path.abspath(self.write_dir) != b:
+        if b not in dirs:
             dirs.append(b)
         self.dirs = dirs
+        self.prefer = pref
 
     def _files(self):
         """name -> path, user folder winning over the starter."""
@@ -85,7 +111,7 @@ class MotionLibrary:
             if not os.path.isdir(d):
                 continue
             for f in os.listdir(d):
-                if not f.endswith(".json") or f in _SKIP:
+                if not f.endswith(".json") or f in _SKIP or f.startswith("_"):
                     continue
                 found[os.path.splitext(f)[0]] = os.path.join(d, f)
         return found
@@ -175,8 +201,28 @@ def _licence(base=None, **over):
     return lic
 
 
-def open_library(path=None):
-    return MotionLibrary(path)
+def open_library(path=None, prefer=None):
+    return MotionLibrary(path, prefer=prefer)
+
+
+def origin_of(name, path=None):
+    """Where a stored clip was read from: `set:<name>`, `library` (your folder), or `starter`."""
+    lib = open_library(path)
+    p = os.path.abspath(lib.path_of(name))
+    parent = os.path.dirname(p)
+    if lib.prefer and parent == os.path.abspath(lib.prefer):
+        label = os.path.basename(lib.prefer.rstrip(os.sep))
+        meta = os.path.join(lib.prefer, "_set.json")
+        if os.path.isfile(meta):
+            try:
+                with open(meta, encoding="utf-8") as f:
+                    label = json.load(f).get("name") or label
+            except (OSError, json.JSONDecodeError, AttributeError):
+                pass
+        return "set:" + str(label)
+    if parent == os.path.abspath(BUILTIN):
+        return "starter"
+    return "library"
 
 
 def list_moves(path=None):
@@ -203,6 +249,10 @@ def as_motion(name, path=None):
     if rec.get("duration"):
         m.duration_s = float(rec["duration"])
     m.library = rec
+    try:
+        m.origin = origin_of(rec["name"], path)
+    except KeyError:
+        m.origin = ""
     return m
 
 

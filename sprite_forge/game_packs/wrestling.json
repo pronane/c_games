@@ -1,0 +1,162 @@
+{
+ "name": "wrestling",
+ "label": "Wrestling",
+ "description": "Side-on wrestling. throw_release is the frame the opponent should leave the hands.",
+ "camera": "side",
+ "prop": "none",
+ "props": [],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "grapple",
+   "library": "punch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "tie-up"
+  },
+  {
+   "name": "slam",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 4,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "throw",
+   "library": "punch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": 5,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "pin",
+   "library": "crouch",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "taunt",
+   "library": "wave",
+   "frames": 8,
+   "fps": 8,
+   "loop": false,
+   "category": "Extra",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  }
+ ],
+ "notes": "No grapple or slam clip in the starter. They borrow punch and kick. Record them if the silhouettes need to read as wrestling."
+}

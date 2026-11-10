@@ -30,6 +30,7 @@ class LibraryTab:
                          ("Install pack...", self.install_pack), ("Export pack...", self.export_pack)):
             ttk.Button(top, text=txt, command=cmd).pack(side=tk.LEFT, padx=2)
         ttk.Button(top, text="Motions...", command=self.motions_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Button(top, text="Recording session...", command=self.session_dialog).pack(side=tk.LEFT, padx=2)
         ttk.Button(top, text="Help", command=lambda: self.s.show_help("library")).pack(side=tk.LEFT, padx=2)
         ttk.Button(top, text="Licensing", command=lambda: self.s.show_help("licensing")).pack(side=tk.LEFT, padx=2)
         main = ttk.Frame(self.tab); main.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
@@ -91,6 +92,73 @@ class LibraryTab:
             self.say("Build will use library motions where a clip exists, type %s." % (self.s.v["character_type"].get() or "(none)"))
             top.destroy()
         ttk.Button(f, text="Use on the Build tab", command=use).pack(anchor="w", pady=8)
+        self.dlg = top
+
+    def session_dialog(self):
+        """v11.5: import a folder of clips into a named skeleton set, see what to reshoot, pick the default."""
+        from . import gamepack, motionset, session
+        top = tk.Toplevel(self.root); top.title("Recording session"); top.transient(self.root)
+        f = ttk.Frame(top, padding=10); f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text="One folder of clips (punch.mp4, walk.mp4, …). Stored as skeleton motion only.\n"
+                  "The video, the frames, the face and the body shape are not kept.",
+                  wraplength=560, justify=tk.LEFT).pack(anchor="w")
+        folder = tk.StringVar()
+        set_name = tk.StringVar(value="my_moves")
+        row = ttk.Frame(f); row.pack(fill=tk.X, pady=(8, 0))
+        ttk.Label(row, text="Folder").pack(side=tk.LEFT)
+        ttk.Entry(row, textvariable=folder, width=42).pack(side=tk.LEFT, padx=4)
+        def browse():
+            d = filedialog.askdirectory(title="Clip folder")
+            if d:
+                folder.set(d)
+        ttk.Button(row, text="...", width=3, command=browse).pack(side=tk.LEFT)
+        row2 = ttk.Frame(f); row2.pack(fill=tk.X, pady=4)
+        ttk.Label(row2, text="Set name").pack(side=tk.LEFT)
+        ttk.Entry(row2, textvariable=set_name, width=18).pack(side=tk.LEFT, padx=4)
+        game = tk.StringVar(value=gamepack.list_packs()[0] if gamepack.list_packs() else "")
+        ttk.Label(row2, text="Shot list").pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Combobox(row2, textvariable=game, values=gamepack.list_packs(), width=16, state="readonly").pack(side=tk.LEFT, padx=4)
+        box = scrolledtext.ScrolledText(f, height=16, width=78, font="TkFixedFont")
+        box.pack(fill=tk.BOTH, expand=True, pady=6)
+
+        def run():
+            if not folder.get().strip() or not set_name.get().strip():
+                box.insert(tk.END, "Pick a folder and a set name.\n"); return
+            try:
+                rep = session.import_folder(folder.get().strip(), set_name.get().strip())
+            except Exception as e:
+                box.insert(tk.END, "error: %s\n" % e); return
+            box.delete("1.0", tk.END); box.insert(tk.END, rep["text"])
+            self.s.v["motion_set"].set(rep["name"])
+            if hasattr(self.s, "set_cb"):
+                self.s.set_cb["values"] = self.s._motion_sets()
+
+        def shots():
+            if not game.get().strip():
+                return
+            try:
+                text = gamepack.shotlist(game.get().strip())
+            except Exception as e:
+                box.insert(tk.END, "error: %s\n" % e); return
+            box.delete("1.0", tk.END); box.insert(tk.END, text)
+
+        def use():
+            name = set_name.get().strip()
+            if not name:
+                return
+            try:
+                motionset.set_default(name)
+            except Exception as e:
+                box.insert(tk.END, "error: %s\n" % e); return
+            self.s.v["motion_set"].set(name)
+            if hasattr(self.s, "set_cb"):
+                self.s.set_cb["values"] = self.s._motion_sets()
+            box.insert(tk.END, "\nDefault set for builds: %s\n" % name)
+
+        btns = ttk.Frame(f); btns.pack(fill=tk.X)
+        ttk.Button(btns, text="Import folder", command=run).pack(side=tk.LEFT)
+        ttk.Button(btns, text="Show shot list", command=shots).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="Use as default set", command=use).pack(side=tk.LEFT, padx=4)
         self.dlg = top
 
     def say(self, s, err=False):

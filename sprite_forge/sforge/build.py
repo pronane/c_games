@@ -9,6 +9,7 @@ Output layout (per character):
   out/<name>/preview.png       labelled contact sheet of every move
   out/<name>/model.glb / model.fbx   (SPEC / mannequin mode only; FBX = built-in writer, Blender optional)
   out/<name>/build_report.txt  what was imported / rendered / filled
+  out/<name>/game_character.json   v11.5 engine-neutral manifest (moves, events, boxes) + loaders/
 """
 from __future__ import annotations
 import configparser
@@ -153,6 +154,13 @@ class BuildConfig:
     # v11.4 motion library + character types (sforge/motionlib.py, sforge/chartypes.py)
     character_type: str = ""           # character_types/<name>.json or a path: timing, stance, reach, weight
     motion_library: str = ""           # extra motion-library folder (searched before the shipped starter)
+    # v11.5 motion set + game pack (sforge/motionset.py, sforge/gamepack.py, sforge/gamemanifest.py)
+    motion_set: str = ""               # "" = saved default if any, "off" = none, or a set name / folder
+    game_pack: str = ""                # game_packs/<name>.json (empty = no pack; profiles still work)
+    game_pack_path: str = ""
+    game_camera: str = ""              # side | three_quarter | topdown8
+    game_props: List[str] = field(default_factory=list)
+    game_events: Dict[str, dict] = field(default_factory=dict)
     framedata: bool = False            # hitboxes / hurtboxes / startup-active-recovery -> framedata.json + framedata.cfg
     blend: str = ""                    # transitions "idle>walk:3,walk>idle:3" -> blend_<a>_<b> moves
     qa: bool = True                    # sprite QA checker -> qa_report.txt / qa.json
@@ -341,7 +349,11 @@ def _mannequin_frames(cfg, sp, report, only=None):
         tag = "mannequin" if mo.name == m.name else "mannequin:" + mo.name
         hit = C.get_frames(move_key(base, m, (sched(m), phys, cfg.footlock))) if use_cache else None
         if hit:
-            out[m.name] = (hit[0], tag, hit[2]); report.cached.append(m.name)
+            note = hit[2] or ""
+            src = getattr(m, "motion_source", "") or ""
+            if src and src not in note:
+                note = (note + "; " if note else "") + src
+            out[m.name] = (hit[0], tag, note); report.cached.append(m.name)
         else:
             todo.append((m, tag))
     if todo:
@@ -349,6 +361,9 @@ def _mannequin_frames(cfg, sp, report, only=None):
         res = C.pmap(_render_mannequin_move, [(sp, prop, rs, m, sched(m), phys, cfg.footlock) for m, _ in todo])
         for (m, tag), ims in zip(todo, res):
             note = "clipped at cell edge" if _clipped(ims) else ""
+            src = getattr(m, "motion_source", "") or ""
+            if src and src not in note:
+                note = (note + "; " if note else "") + src
             out[m.name] = (ims, tag, note)
             if use_cache:
                 C.put_frames(move_key(base, m, (sched(m), phys, cfg.footlock)), ims, tag, note)
@@ -368,13 +383,13 @@ def _mannequin_frames(cfg, sp, report, only=None):
         def _face_render(e, _sp=sp, _prop=prop, _rs=rs, _phys=phys):
             from . import moves as MV
             idle = next((m for m in cfg.moves if m.name in ("idle", "fight_idle")), cfg.moves[0])
-            m1 = MV.MoveSpec(**{**idle.__dict__, "frames": 1})
+            m1 = idle.clone(frames=1)
             return _render_mannequin_move((_sp, _prop, _rs, m1, [e], _phys))[0]
         def _face_close(e, size=160, _sp=sp, _prop=prop):
             from . import render as RD, moves as MV
             rs2 = RD.RenderSettings(size * 4, size * 7, size * 6, size * 7 - 4, size * 2, yaw=min(cfg.yaw, 30.0), pitch=4, ss=2, outline=cfg.outline)
             idle = next((m for m in cfg.moves if m.name in ("idle", "fight_idle")), cfg.moves[0])
-            im = _render_mannequin_move((_sp, _prop, rs2, MV.MoveSpec(**{**idle.__dict__, "frames": 1}), [e], False))[0]
+            im = _render_mannequin_move((_sp, _prop, rs2, idle.clone(frames=1), [e], False))[0]
             bb = X.head_box(im, 0.16)
             return im.crop(bb).resize((size, size), Image.LANCZOS) if bb else im
         cfg._face_render, cfg._face_close = _face_render, _face_close
@@ -1471,6 +1486,8 @@ def build(cfg: BuildConfig, log=print, progress=None):
         _PNG_LEVEL[0] = 6
     if getattr(cfg, "motion_library", ""):
         os.environ["SFS_MOTIONS"] = cfg.motion_library
+    from . import motionset
+    motionset.apply_cfg(cfg)
     if getattr(cfg, "character_type", ""):
         from . import chartypes
         chartypes.apply_moves(cfg.moves, cfg.character_type)
@@ -1501,6 +1518,12 @@ def build(cfg: BuildConfig, log=print, progress=None):
         spec = chartypes.load(cfg.character_type)
         report.note("character type %s (%s): timing x%.2f, stance x%.2f, reach x%.2f, weight x%.2f" % (
             spec["name"], spec["label"], spec["timing"], spec["stance"], spec["reach"], spec["weight"]))
+    if getattr(cfg, "game_pack", ""):
+        report.note("game pack %s (%s)" % (cfg.game_pack, getattr(cfg, "game_camera", "") or "default camera"))
+    _src_line = ", ".join("%s=%s" % (m.name, getattr(m, "motion_source", "") or "procedural") for m in cfg.moves)
+    if getattr(cfg, "motion_set_resolved", "") or getattr(cfg, "game_pack", "") or any(
+            (getattr(m, "motion_source", "") or "") not in ("", "procedural") for m in cfg.moves):
+        report.note("motion source: " + _src_line)
     if cfg.blend:
         from . import blend as BL
         added = BL.add_moves(cfg, report)
@@ -1737,6 +1760,15 @@ def build(cfg: BuildConfig, log=print, progress=None):
         ctx = profiles.context(cfg, out, ordered, placed, page_names, spec_by, frames, view_info, scale, px_per_m, stand_px, cols)
         written = profiles.emit(cfg.profile, ctx, out, log)
         profile_note = "%s -> %s" % (cfg.profile.get("name", "?"), ", ".join(written))
+    # v11.5 one game file + the small loaders (raylib / Godot / Unity)
+    manifest_note = ""
+    try:
+        from . import gamemanifest
+        rel, copied = gamemanifest.write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names)
+        manifest_note = rel + ((" + " + ", ".join(copied)) if copied else "")
+        report.note("manifest: " + manifest_note)
+    except Exception as e:
+        report.warning("game_character.json: %s" % e)
     # v9 extra outputs (faces, talk, regions, maps, frame data, QA, LODs)
     from . import v9out
     v9_notes = v9out.post_outputs(cfg, out, {"ordered": ordered, "placed": placed, "page_names": page_names, "pages": pages,
@@ -1767,6 +1799,7 @@ def build(cfg: BuildConfig, log=print, progress=None):
         f.write("console: %s\n" % (console_note or "none"))
         f.write("views: %s\n" % (", ".join("%s=%s" % (v, i["source"]) for v, i in view_info.items()) or "none"))
         f.write("profile: %s\n" % (profile_note or "none"))
+        f.write("manifest: %s\n" % (manifest_note or "none"))
         f.write("v9: %s\n" % ("; ".join(v9_notes) or "none"))
         for n in getattr(report, "notes", []):
             f.write("NOTE: %s\n" % n)

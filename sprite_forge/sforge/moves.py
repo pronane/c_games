@@ -30,6 +30,12 @@ class MoveSpec:
     def to_dict(self):
         return asdict(self)
 
+    def clone(self, **over):
+        """A copy that ignores attributes a build hangs on the move (motion source, pack events)."""
+        d = {k: v for k, v in self.__dict__.items() if k in MoveSpec.__dataclass_fields__}
+        d.update(over)
+        return MoveSpec(**d)
+
     @staticmethod
     def from_dict(d):
         return MoveSpec(**{k: v for k, v in d.items() if k in MoveSpec.__dataclass_fields__})

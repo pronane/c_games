@@ -19,6 +19,10 @@
   python forge.py motion import clip.bvh --name punch --spdx CC0-1.0 --author "Me"
   python forge.py motion retarget punch --to my_rig --out hero.glb
   python forge.py motion clean punch
+  python forge.py motion record --folder clips --set owner   (v11.5: folder of clips -> skeleton set)
+  python forge.py motion shotlist --game soccer
+  python forge.py game list
+  python forge.py build --mannequin --game soccer --motion-set owner --character-type quick_striker
   python forge.py build --mannequin --moves punch=lib:punch --character-type heavy_brawler
   python forge.py scan --video orbit.mp4 --name statue            (orbit video -> COLMAP project / mesh, see help scan)
   python forge.py doctor               -> what is installed / what each missing piece disables
@@ -100,6 +104,15 @@ def cmd_build(a):
     if a.preset:
         cfg.moves = preset(a.preset)
     cfg.moves = parse_moves(cfg.moves, a.moves)
+    if getattr(a, "game", None):
+        from sforge import gamepack
+        try:
+            gp = gamepack.apply(cfg, a.game)
+        except (ValueError, FileNotFoundError, OSError) as e:
+            print("error:", e); return 2
+        print("game pack %s: %d moves, camera %s" % (gp["name"], len(gp["moves"]), gp["camera"]))
+        if a.moves:
+            print("note: --game sets the move list (--moves was replaced)")
     if getattr(a, "landmarks", None):
         cfg.landmarks = a.landmarks
     if a.photo:
@@ -301,6 +314,8 @@ def cmd_build(a):
     if getattr(a, "motion_library", None):
         cfg.motion_library = a.motion_library
         os.environ["SFS_MOTIONS"] = a.motion_library
+    if getattr(a, "motion_set", None):
+        cfg.motion_set = a.motion_set
     if getattr(a, "motions", None):
         from sforge import motionlib as _ML
         wanted = [slug(x) for x in a.motions.split(",") if x.strip()]
@@ -553,6 +568,9 @@ def main(argv=None):
     if argv and argv[0] == "motion":        # v11.4 shared-skeleton motion library + character types
         from sforge import motion_cli
         return motion_cli.main(argv[1:])
+    if argv and argv[0] == "game":          # v11.5 game-type packs
+        from sforge import gamepack
+        return gamepack.main(argv[1:])
     if argv and argv[0] == "anim-export":     # v7: character_base.glb + anim_<move>.glb (+ .fbx) + manifest.json
         from sforge import animexport
         return animexport.main(argv[1:])
@@ -586,7 +604,8 @@ def main(argv=None):
   cutout      photo -> one person cut out (transparent) + sprite + HD sprite + pose points
   turn        cut-out person seen side-on / from behind (--yaw 0|90|180|270 or any angle; estimated depth)
   export-ef   built character -> Egyptian Fighter / Padel Wars char_<name>/ folder (sprites.cfg, HD + low-res)
-  motion      v11.4 motion library: list | record | import | retarget | clean | types
+  motion      v11.4 motion library: list | record | import | retarget | clean | types | sets | shotlist
+  game        v11.5 game-type packs: list | show | validate | shotlist
   package     drop-in zip for a game's assets/ folder (<= 25 MB check)
   summary     one-page pipeline summary image
   cache       build cache: cache stats | clear | prune
@@ -715,6 +734,10 @@ v9:
                      help="motion personality: heavy_brawler, quick_striker, keeper, playmaker, big_boss, small_agile, balanced, or a JSON path (forge.py motion types)")
     v11.add_argument("--motions", help="drive these moves from the motion library (comma list). Other moves stay as they are. e.g. punch,kick,tackle")
     v11.add_argument("--motion-library", dest="motion_library", help="extra motion-library folder, searched before the shipped starter (or $SFS_MOTIONS)")
+    v115 = b.add_argument_group("v11.5 game packs, motion sets, game_character.json")
+    v115.add_argument("--game", help="game-type pack: soccer, boxing, fighting, gaelic, ... (forge.py game list) or a path to your own JSON")
+    v115.add_argument("--motion-set", dest="motion_set",
+                      help="named recorded set to read first (forge.py motion sets). 'off' ignores the saved default. Missing moves fall back to the starter, then the procedural motion.")
     v9x.add_argument("--framedata", action="store_true", help="hit / hurt boxes + startup / active / recovery -> framedata.json + framedata.cfg")
     v9x.add_argument("--blend", help="transition moves 'idle>walk:3,punch>idle:3' -> blend_<a>_<b>")
     v9x.add_argument("--no-qa", dest="no_qa", action="store_true", help="skip the sprite QA checker")

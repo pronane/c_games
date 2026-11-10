@@ -1,0 +1,168 @@
+{
+ "name": "tennis",
+ "label": "Tennis / padel",
+ "description": "Side-on racket sport (tennis or padel). The game draws the ball and the racket. ball_contact is the hit.",
+ "camera": "side",
+ "prop": "none",
+ "props": [
+  "ball",
+  "racket"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "ready stance"
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "forehand",
+   "library": "kick",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Stroke",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "starter has no racket swing \u2014 kick is the wide stroke"
+  },
+  {
+   "name": "backhand",
+   "library": "punch",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Stroke",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "serve",
+   "library": "punch",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Stroke",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": 2,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "toss at throw_release, contact at ball_contact"
+  },
+  {
+   "name": "volley",
+   "library": "punch",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Stroke",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 2,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "stumble"
+  }
+ ],
+ "notes": "Padel uses the same moves. The swing is not a tennis motion until you record forehand.mp4, backhand.mp4 and serve.mp4."
+}
