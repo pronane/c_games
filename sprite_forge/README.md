@@ -52,6 +52,33 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.7: clothes that read as clothes - clean hems, socks and collars, shirts that stay on the body
+
+Seen in a game, a captured character was judged by its edges: a ragged shorts hem, one white sock and one brown,
+a white blob at the collar, dark shorts colour on the knees, and the shirt's tails painted onto the thighs, so they
+swung with the leg in a kick. v11.7 treats a garment edge as what it is - a ring round the limb.
+
+* **Rings** (`capture_rings.py`): every point on an arm or leg gets its distance along the limb (shoulder / hip ->
+  elbow / knee -> wrist / ankle -> toes). Along it, in 1 cm bands with left and right pooled, a 1D labelling with a
+  cost per change (Viterbi) decides each band's material. Sleeves, shorts and socks end in one straight edge at the
+  same place on both sides.
+* **Geometry:** the clothes layer's sleeves and trouser legs are tubes down to that hem; the hem row is slid onto
+  the ring, so the edge is straight, not the saw-tooth of whole triangles. A collar is a ring up the neck (at most
+  6 cm, as high as the views agree).
+* **Texture:** limb texels take their band's material; a torso garment (a shirt) is never painted onto the legs, and
+  the trousers' colour never below their hem. Dropped texels are flattened with the material they were filled
+  from, so no blotch survives the fill.
+* **Socks and shoes:** MediaPipe's "other" class inside the person's own mask is now a "worn" label. Before, it was
+  thrown away with the TV and the chair, so white socks were never sampled and the feet came out skin or floor.
+* **Faces:** squarer views for the head, the side of the head that joins the face badly is mirrored from the good
+  side, and the face's left / right light is evened out.
+* `tools/test_rings.py` (synthetic, 6 checks).
+* **Trade-off, measured:** held-out silhouette IoU is unchanged for all five (0.785-0.880). Colour error against
+  the real held-out frames rises (Mike dE 8.0 -> 10.9, Tmon 10.1 -> 12.9, the others +0.2-0.6): the texture is now
+  flatter than the footage, on purpose - the frames' own shading and colour casts were the blotches.
+* **Not solved:** thin vertical stripes (PR's track-pant stripes are lost), a two-shade band on Declan's jeans at
+  the knee, hand texture, Anna's TV-purple hair.
+
 ## New in v11.6: real motion capture, for any game pack
 
 * **Mocap import that works on real takes** (`motion import`): any unit, the leading T-pose skipped, turned to

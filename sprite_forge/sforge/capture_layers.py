@@ -116,14 +116,69 @@ def garment_offsets(bm, J, W, off):
     return (W * per_bone[J]).sum(1)
 
 
-def clothes_faces(bm, votes, min_share=0.5):
+HEMS = {}
+
+
+def clothes_faces(bm, votes, min_share=0.5, shape=None, log=print):
     """body faces worn by clothes: their vertices are voted clothes, grown by one ring to close small gaps; hands,
-    feet and the head never (a sleeve stops at the wrist, a collar at the neck)"""
+    feet and the head never (a sleeve stops at the wrist, a collar at the neck).
+    v11.7 (shape given): on the arms and legs the garment is a tube from the shoulder / hip down to one clean hem,
+    the same height left and right (capture_rings); lower bands (socks) stay paint on the body."""
     tot = votes[:, 1:5].sum(1) + 1e-6
     cl = votes[:, 4] / tot > min_share
+    HEMS.clear()
+    if shape is not None:
+        from . import capture_rings as CR
+        limb, sc = CR.limb_coords(shape.head, shape.V, bm.J[:, 0], bm.bi)
+        has = votes[:, 1:5].sum(1) > 1e-3
+        mat = np.where(has, cl.astype(int), -1)
+        ring, _, _ = CR.segment(limb, sc, mat, 2, which=(0, 1, 2, 3),
+                                weight=np.minimum(tot, np.percentile(tot[has], 90)) if has.any() else None)
+        hems = []
+        for pair in (CR.ARMS, CR.LEGS):
+            on = np.isin(limb, pair)
+            if not on.any():
+                continue
+            # the tube runs from s = 0 to the first change from clothes to bare
+            order = np.argsort(sc[on]); ss = sc[on][order]; rr = ring[on][order]
+            if rr[0] != 1:
+                hem = 0.0
+            else:
+                off = np.nonzero(rr != 1)[0]
+                hem = float(ss[off[0]]) if len(off) else float(ss[-1]) + 1.0
+            cl[on] = sc[on] < hem
+            hems.append(hem)
+            HEMS[pair] = hem
+        if hems:
+            log("layers: sleeves end %.0f cm down the arm, trouser legs %.0f cm down the leg (both sides)" % (
+                100 * min(hems[0], 9.99), 100 * min(hems[-1], 9.99)))
     never = [bm.bi[b] for b in ("head", "neck01", "wrist.L", "wrist.R", "foot.L", "foot.R", "toe1-1.L", "toe1-1.R")
              if b in bm.bi]
     hard = np.isin(bm.J[:, 0], never) & (bm.W[:, 0] > 0.5)
+    if shape is not None and "neck01" in bm.bi:
+        # v11.7: a collar. The base of the neck may be worn, as one ring from the bottom of the neck up to the
+        # height most of the views agree on (at most 6 cm): a shirt or jumper collar, a hood's rim
+        from . import capture_rings as CR
+        nk = (bm.J[:, 0] == bm.bi["neck01"]) & (bm.W[:, 0] > 0.5)
+        has = votes[:, 1:5].sum(1) > 1e-3
+        if (nk & has).sum() > 20:
+            y = shape.V[:, 1] - shape.V[nk, 1].min()
+            bins = np.clip((y / 0.005).astype(int), 0, 400)
+            nb = int(bins[nk].max()) + 1
+            H = np.zeros((nb, 2))
+            ev = nk & has
+            np.add.at(H, (bins[ev], cl[ev].astype(int)), 1.0)
+            tot_b = H.sum(1, keepdims=True)
+            lab = CR.viterbi(tot_b - H, 0.6 * float(np.median(tot_b[tot_b > 0])))
+            h = 0.0
+            if lab[0] == 1:
+                off = np.nonzero(lab != 1)[0]
+                h = min(0.06, (off[0] if len(off) else nb) * 0.005)
+            collar = nk & (y < h)
+            hard &= ~collar
+            cl[collar] = True
+            if h > 0:
+                log("layers: a collar %.1f cm up the neck" % (100 * h))
     cl &= ~hard
     F = bm.F
     fsel = cl[F].sum(1) >= 2
@@ -140,6 +195,24 @@ def build_clothes(shape, fsel, off, lift=0.004):
     N = vertex_normals(shape.V, bm.F)
     d = garment_offsets(bm, bm.J, bm.W, off)[used] + lift
     V = shape.V[used] + N[used] * d[:, None]
+    if HEMS:
+        # v11.7: the hem is one ring - vertices of the tube's last row past it are slid back along the limb to it,
+        # so the edge is straight, not the saw-tooth of whole triangles
+        from . import capture_rings as CR
+        limb, sc = CR.limb_coords(shape.head, shape.V[used], bm.J[used, 0], bm.bi)
+        for pair, hem in HEMS.items():
+            if hem <= 0 or hem > 5:
+                continue
+            for k in pair:
+                sel = (limb == k) & (sc > hem)
+                if not sel.any():
+                    continue
+                Q = CR._polyline(shape.head, bm.bi, CR.CHAINS[k])
+                # direction of the limb at the hem
+                seg = np.cumsum(np.r_[0, np.linalg.norm(np.diff(Q, axis=0), axis=1)])
+                i = int(np.clip(np.searchsorted(seg, hem) - 1, 0, len(Q) - 2))
+                ax = (Q[i + 1] - Q[i]) / (np.linalg.norm(Q[i + 1] - Q[i]) + 1e-9)
+                V[sel] -= (sc[sel] - hem)[:, None] * ax[None, :]
     return Mesh(V, remap[F], to_quarter(bm.fuv[fsel], "clothes"), bm.J[used], bm.W[used], np.full(len(used), 1))
 
 
@@ -445,7 +518,7 @@ def fit_layers(fitter, frames=None, log=print):
     _, _, S = sh.pose(fitter.dirs)
     votes = vertex_labels(fitter, P, fitter.bm.F, frames)
     bm = fitter.bm
-    fsel = clothes_faces(bm, votes)
+    fsel = clothes_faces(bm, votes, shape=sh, log=log)
     body = Mesh(sh.V, bm.F, to_quarter(bm.fuv, "body"), bm.J, bm.W, np.zeros(len(sh.V), int))
     stand = [t for t in fitter.targets if t.pose == "s" and t.r["i"] in fitter.cams.cam]
     stand = stand[::max(1, len(stand) // 12)]                       # 12 views round the orbit are plenty here
