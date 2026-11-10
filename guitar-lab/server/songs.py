@@ -796,10 +796,28 @@ async def tab_parts(key: str, request: TabPartsRequest, x_fretwork_client: str |
             for n in notes:
                 heard.append(dict(n, id=f"{pid}:{n.get('id', len(heard))}", part=pid))
         assigned = ta.assign(heard, placed)
-        return mapping, placed, assigned
+        return mapping, placed, assigned, tab_check(placed, mix, sr)
+
+    def tab_check(placed, mix, sr):
+        """Each tab note looked up in the recording (guitar stem when there is one). None when
+        the Riley detector is not installed: the tab is still lined up and named."""
+        from . import tab_check as tc
+        from .transcribers import availability
+        if not availability().get('riley', {}).get('installed'):
+            return None
+        stem = song.folder/'tracks'/'guitar.flac'
+        audio, rate = sf.read(stem, dtype='float32') if stem.is_file() else (mix, sr)
+        if not np.any(audio):
+            audio, rate = mix, sr
+        try:
+            return tc.check(placed, tc.onset_map(audio, rate))
+        except Exception:                                   # weights not downloadable, out of memory…
+            import logging
+            logging.getLogger(__name__).exception('tab check failed')
+            return None
 
     try:
-        mapping, placed, assigned = await asyncio.to_thread(work)
+        mapping, placed, assigned, checked = await asyncio.to_thread(work)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     song.tab_parts = {'parts': placed, 'assigned': assigned}
@@ -808,9 +826,11 @@ async def tab_parts(key: str, request: TabPartsRequest, x_fretwork_client: str |
                       'start': round(float(ta.to_audio_time(mapping, 0.0)), 2), 'refined': mapping.get('refined', False),
                       'attack_match': mapping.get('attack_match'), 'transpose': mapping.get('transpose', 0),
                       'tab_from': round(float(mapping['tab'][0]), 2), 'tab_to': round(float(mapping['tab'][-1]), 2)},
+        'check': checked and {'confirmed': checked['confirmed'], 'stretches': checked['stretches']},
         'parts': [{'name': t['name'], 'track': t['track'], 'sections': t['sections'],
                    'notes': t['notes'], 'match': assigned['match'][t['name']],
-                   'heard_ids': assigned['by_track'][t['name']]} for t in placed],
+                   'confirmed': checked['parts'][i]['confirmed'] if checked else None,
+                   'heard_ids': assigned['by_track'][t['name']]} for i, t in enumerate(placed)],
         'unassigned': len(assigned['unassigned']),
         'heard': sum(len(v) for v in song.notes.values()),
     }
