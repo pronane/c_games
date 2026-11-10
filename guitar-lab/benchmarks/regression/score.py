@@ -79,7 +79,16 @@ def _shift(notes, seconds):
     out = []
     for note in notes:
         copied = dict(note)
-        copied['time'] = float(note['time']) + float(seconds)
+        start = float(note['time']) + float(seconds)
+        # A negative frozen lag can place an onset just before the file.
+        # Drop what falls entirely before 0; clip the rest to the start.
+        if start < 0:
+            end = start + float(copied.get('duration') or 0.05)
+            if end <= 1e-4:
+                continue
+            copied['duration'] = max(0.03, end)
+            start = 0.0
+        copied['time'] = start
         out.append(copied)
     return out
 
@@ -109,8 +118,13 @@ def _idmt_notes(xml_path: Path):
     return notes
 
 
-def _score_file(backend, audio_path, ref, window=None, score_end=None):
+def _score_file(backend, audio_path, ref, window=None, score_end=None, shift=0.0, mono=False, with_f1_100=False):
     audio, sr, path = _read_any(audio_path)
+    if mono and getattr(audio, 'ndim', 1) == 2:
+        # EGSet12 and Guitar-TECHS ship dual-mono copies of one signal.
+        audio = audio.mean(axis=1)
+    if shift:
+        ref = _shift(ref, shift)
     with tempfile.TemporaryDirectory() as tmp:
         dest = Path(tmp) / 'clip.wav'
         if window is None:
@@ -129,6 +143,9 @@ def _score_file(backend, audio_path, ref, window=None, score_end=None):
         notes = _window_notes(notes, origin, score_end)
         ref_w = _window_notes(ref_w, origin, score_end)
     metrics = score_notes(notes, ref_w)
+    if with_f1_100:
+        # ±100 ms covers the misalignment Guitar-TECHS documents. Same pitch rule.
+        metrics['note_f1_100'] = score_notes(notes, ref_w, onset_tol=0.10)['note_f1']
     metrics['audio_s'] = round(float(duration), 3)
     metrics['seconds'] = round(float(elapsed), 3)
     metrics['seconds_per_audio_minute'] = round(elapsed / max(duration / 60.0, 1e-6), 2)
@@ -286,14 +303,122 @@ def score_metallica(backend):
     })]
 
 
+def _checksum_row(path, dataset, manifest_name):
+    from benchmarks.regression.electric import expected_sha256, sha256_file
+    digest = sha256_file(path)
+    expected = expected_sha256(dataset, manifest_name)
+    ok = expected is None or digest == expected
+    return digest, ok
+
+
+def _electric_missing(clip_id, category, detail):
+    return [{'id': clip_id, 'category': category, 'status': 'missing', 'detail': detail}]
+
+
+def score_egset12(backend):
+    """Twelve miked-amp solos. JAMS note_midi is the reference; the GPX tab is not parsed."""
+    if not catalog.available_summary()['egset12']:
+        return _electric_missing(
+            'egset12', 'amp_solo',
+            'EGSet12 is not in benchmarks/regression/data/private/egset12. '
+            'CC BY 4.0: python -m benchmarks.regression.download')
+    from benchmarks.regression.electric import frozen_shift, jams_note_midi
+    rows = []
+    for clip in catalog.EGSET12_CLIPS:
+        wav = catalog.egset12_dir() / f"{clip['piece']}.wav"
+        jams = catalog.egset12_dir() / f"{clip['piece']}.jams"
+        digest, ok = _checksum_row(wav, 'egset12', f"{clip['piece']}.wav")
+        jams_digest, jams_ok = _checksum_row(jams, 'egset12', f"{clip['piece']}.jams")
+        if not ok or not jams_ok:
+            rows.append({
+                'id': clip['id'], 'category': clip['category'], 'status': 'checksum',
+                'sha256': digest, 'sha256_ok': False, 'jams_sha256': jams_digest,
+            })
+            continue
+        shift, alignment = frozen_shift(clip['id'])
+        if shift is None:
+            rows.append({'id': clip['id'], 'category': clip['category'], 'status': 'error', 'detail': alignment})
+            continue
+        ref = jams_note_midi(jams)
+        try:
+            metrics = _score_file(backend, wav, ref, shift=shift, mono=True, with_f1_100=True)
+        except Exception as exc:  # noqa: BLE001 — one clip must not drop the set
+            rows.append({'id': clip['id'], 'category': clip['category'], 'status': 'error',
+                         'detail': f'{type(exc).__name__}: {exc}'})
+            continue
+        rows.append(_round({
+            'id': clip['id'], 'category': clip['category'], 'status': 'ok',
+            'signal': 'miked amp, no other effects',
+            'reference': 'JAMS note_midi, every string',
+            'sha256': digest, 'sha256_ok': True,
+            'ref_shift_s': shift, 'alignment': alignment,
+            **metrics,
+        }))
+    return rows
+
+
+def score_guitar_techs(backend):
+    """Twelve musical excerpts. The frozen signal is the miked amp unless alignment chose DI."""
+    if not catalog.available_summary()['guitar_techs']:
+        return _electric_missing(
+            'guitar_techs', 'amp_excerpt',
+            'Guitar-TECHS P3 excerpts are not in benchmarks/regression/data/private/guitar_techs. '
+            'CC BY 4.0: python -m benchmarks.regression.download')
+    from benchmarks.regression.electric import (
+        frozen_shift, load_alignment, midi_notes, techs_audio, techs_midi,
+    )
+    alignment_file = load_alignment() or {}
+    signal = alignment_file.get('guitar_techs_signal') or 'micamp'
+    rows = []
+    for clip in catalog.GUITAR_TECHS_CLIPS:
+        wav = techs_audio(clip['piece'], signal)
+        midi = techs_midi(clip['piece'])
+        if not wav.is_file() or not midi.is_file():
+            rows.append({'id': clip['id'], 'category': clip['category'], 'status': 'missing', 'signal': signal})
+            continue
+        digest, ok = _checksum_row(wav, 'guitar_techs', wav.relative_to(catalog.guitar_techs_dir()).as_posix())
+        midi_digest, midi_ok = _checksum_row(
+            midi, 'guitar_techs', midi.relative_to(catalog.guitar_techs_dir()).as_posix())
+        if not ok or not midi_ok:
+            rows.append({
+                'id': clip['id'], 'category': clip['category'], 'status': 'checksum',
+                'sha256': digest, 'sha256_ok': False, 'signal': signal,
+            })
+            continue
+        shift, alignment = frozen_shift(clip['id'])
+        if shift is None:
+            rows.append({'id': clip['id'], 'category': clip['category'], 'status': 'error', 'detail': alignment})
+            continue
+        ref = midi_notes(midi)
+        try:
+            metrics = _score_file(backend, wav, ref, shift=shift, mono=True, with_f1_100=True)
+        except Exception as exc:  # noqa: BLE001 — one clip must not drop the set
+            rows.append({'id': clip['id'], 'category': clip['category'], 'status': 'error',
+                         'detail': f'{type(exc).__name__}: {exc}', 'signal': signal})
+            continue
+        rows.append(_round({
+            'id': clip['id'], 'category': clip['category'], 'status': 'ok',
+            'signal': signal,
+            'reference': 'per-string MIDI',
+            'sha256': digest, 'sha256_ok': True, 'midi_sha256': midi_digest,
+            'ref_shift_s': shift, 'alignment': alignment,
+            **metrics,
+        }))
+    return rows
+
+
 def score_backend(backend, tier):
     rows = []
-    rows.extend(score_guitarset(backend, 'fast' if tier == 'fast' else 'full'))
-    rows.extend(score_rendered(backend, 'fast' if tier == 'fast' else 'full'))
-    if tier in ('full', 'all'):
-        rows.extend(score_idmt(backend))
-        rows.extend(score_user_pair(backend))
-        rows.extend(score_metallica(backend))
+    if tier != 'electric':
+        rows.extend(score_guitarset(backend, 'fast' if tier == 'fast' else 'full'))
+        rows.extend(score_rendered(backend, 'fast' if tier == 'fast' else 'full'))
+    if tier in ('full', 'all', 'electric'):
+        if tier != 'electric':
+            rows.extend(score_idmt(backend))
+            rows.extend(score_user_pair(backend))
+            rows.extend(score_metallica(backend))
+        rows.extend(score_egset12(backend))
+        rows.extend(score_guitar_techs(backend))
     return rows
 
 
@@ -457,16 +582,29 @@ def write_report(payload, path: Path):
             lines.append(f'Error: {body["error"]}')
             lines.append('')
             continue
-        lines.append('| clip | category | note F1 | onset F1 | pitch recall @300ms | cross F1 | s / min audio |')
-        lines.append('| --- | --- | --- | --- | --- | --- | --- |')
+        has_wide = any(row.get('note_f1_100') is not None for row in body['rows'])
+        head = '| clip | category | note F1 | onset F1 | pitch recall @300ms | cross F1 |'
+        rule = '| --- | --- | --- | --- | --- | --- |'
+        if has_wide:
+            head += ' F1@100 |'
+            rule += ' --- |'
+        head += ' s / min audio |'
+        rule += ' --- |'
+        lines.append(head)
+        lines.append(rule)
         for row in body['rows']:
             if row.get('status') != 'ok':
-                lines.append(f"| {row.get('id')} | {row.get('category')} |  |  |  |  | missing |")
+                gap = ' |' * (5 if has_wide else 4)
+                lines.append(f"| {row.get('id')} | {row.get('category')} |{gap} missing |")
                 continue
-            lines.append(
+            cells = (
                 f"| {row['id']} | {row['category']} | {_fmt(row.get('note_f1'))} | {_fmt(row.get('onset_f1'))} | "
-                f"{_fmt(row.get('pitch_recall_300ms'))} | {_fmt(row.get('cross_f1'))} | {_fmt(row.get('seconds_per_audio_minute'))} |"
+                f"{_fmt(row.get('pitch_recall_300ms'))} | {_fmt(row.get('cross_f1'))} |"
             )
+            if has_wide:
+                cells += f" {_fmt(row.get('note_f1_100'))} |"
+            cells += f" {_fmt(row.get('seconds_per_audio_minute'))} |"
+            lines.append(cells)
         lines.append('')
     lines += [
         '## Licenses and what was not run',
@@ -477,6 +615,11 @@ def write_report(payload, path: Path):
         '- YourMT3+: built in (server/yourmt3, Apache-2.0); run it with --backend yourmt3.',
         '- GuitarSet excerpts: CC BY 4.0, Xi et al., ISMIR 2018. Player 05.',
         '- IDMT-SMT-Guitar: CC BY-NC-ND 4.0. Audio is local only. These pieces are clean direct-input electric, not amp distortion.',
+        '- EGSet12: CC BY 4.0, Pedroza, Abreu, Corey, and Roman, DAFx 2024, https://zenodo.org/records/11406378. '
+        'Twelve miked-amp solos. Audio is local only. The gate scores the JAMS note_midi annotations.',
+        '- Guitar-TECHS musical excerpts (player 3, P3_music.zip only): CC BY 4.0, Pedroza, Abreu, Corey, and Roman, ICASSP 2025, '
+        'https://zenodo.org/records/14963133. Audio is local only. A frozen pitch-blind lag of at most 100 ms is applied to the per-string MIDI. '
+        'The chords, scales, and technique archives are not downloaded.',
         '- EGDB / EGDB-PG: the paired clean-and-amp set was not downloaded (the public FLAC bundle is 135 GB; the original set is on request).',
         '- Carcassi: `ground_truth_aligned_to_recording.mid` is in the tree. The recording it was aligned to was not in the attachment and was not found. '
         'A different public performance was not substituted.',
@@ -530,21 +673,26 @@ def _all_categories(payload):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Score guitar transcription backends')
-    parser.add_argument('--tier', choices=('fast', 'full', 'all'), default='all')
+    parser.add_argument('--tier', choices=('fast', 'full', 'all', 'electric'), default='all')
     parser.add_argument('--backend', action='append', dest='backends')
     parser.add_argument('--out', type=Path, default=None)
+    parser.add_argument('--no-report', action='store_true',
+                        help='Do not overwrite RESULTS.md. Use this for an electric rescore.')
     args = parser.parse_args(argv)
     backends = args.backends or ['basic_pitch']
     tier = 'full' if args.tier == 'all' else args.tier
     payload = run(backends, tier)
-    out = args.out or (REFERENCE / f'{tier}.json')
+    # electric.json is a local rescore. The lock is electric_baseline.json, written by hand from a reviewed run.
+    default_name = 'electric_last.json' if tier == 'electric' else f'{tier}.json'
+    out = args.out or (REFERENCE / default_name)
     out.parent.mkdir(parents=True, exist_ok=True)
     serial = payload
     out.write_text(json.dumps(serial, indent=2))
-    report_path = catalog.ROOT / 'RESULTS.md'
-    write_report(serial, report_path)
     print(f'wrote {out}')
-    print(f'wrote {report_path}')
+    if not args.no_report:
+        report_path = catalog.ROOT / 'RESULTS.md'
+        write_report(serial, report_path)
+        print(f'wrote {report_path}')
     for name, body in serial['backends'].items():
         print(name, body['categories'] or body['error'])
     for item in serial['decision']:

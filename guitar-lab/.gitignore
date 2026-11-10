@@ -1,4 +1,5 @@
 .cache/
 *.log
+benchmarks/regression/reference/electric_last.json
 node_modules
 .cache
