@@ -100,7 +100,7 @@ def _has_file(folder, name):
 def _candidates(m):
     from .motionlib import _slug
     mot = (getattr(m, "motion", "") or "").strip()
-    raw = []
+    raw = list(getattr(m, "library_prefer", None) or [])     # v11.6: a pack's specific clips before its generic one
     if mot.lower().startswith("lib:"):
         raw.append(mot.split(":", 1)[1])
     raw.append(getattr(m, "name", "") or "")
@@ -172,6 +172,14 @@ def apply_cfg(cfg):
         wants = (m.motion or "").lower().startswith("lib:") or getattr(m, "want_library", False)
         if wants:
             key = cands[0] if cands else m.name
+            mlib = getattr(cfg, "motion_library", "") or None
+            for c in list(getattr(m, "library_prefer", None) or []):
+                if ML.has_move(c, mlib):
+                    key = c
+                    break
+            else:
+                pref = set(ML._slug(c) for c in (getattr(m, "library_prefer", None) or []))
+                key = next((c for c in cands if c not in pref), key)
             if ML.has_move(key, getattr(cfg, "motion_library", "") or None):
                 m.motion = "lib:" + ML._slug(key)
                 m.motion_source = ML.origin_of(key, getattr(cfg, "motion_library", "") or None)

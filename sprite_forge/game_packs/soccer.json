@@ -33,6 +33,9 @@
   {
    "name": "walk",
    "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": true,
@@ -54,6 +57,9 @@
   {
    "name": "run",
    "library": "run",
+   "prefer": [
+    "jog"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -75,6 +81,9 @@
   {
    "name": "kick",
    "library": "kick",
+   "prefer": [
+    "soccer_kick"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -111,6 +120,9 @@
   {
    "name": "shoot",
    "library": "shoot",
+   "prefer": [
+    "soccer_shoot"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -147,6 +159,9 @@
   {
    "name": "header",
    "library": "jump",
+   "prefer": [
+    "jump_vertical"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -183,6 +198,9 @@
   {
    "name": "celebrate",
    "library": "wave",
+   "prefer": [
+    "jump_shot"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": false,

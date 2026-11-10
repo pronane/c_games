@@ -33,6 +33,9 @@
   {
    "name": "walk",
    "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": true,
@@ -54,6 +57,9 @@
   {
    "name": "run",
    "library": "run",
+   "prefer": [
+    "jog"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -75,6 +81,9 @@
   {
    "name": "sprint",
    "library": "run",
+   "prefer": [
+    "jog"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": true,
@@ -153,6 +162,9 @@
   {
    "name": "pick_up_aerial",
    "library": "jump",
+   "prefer": [
+    "jump_vertical"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -210,6 +222,9 @@
   {
    "name": "bounce_solo",
    "library": "run",
+   "prefer": [
+    "dribble"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": true,
@@ -231,6 +246,9 @@
   {
    "name": "hand_pass",
    "library": "pass",
+   "prefer": [
+    "punch_straight"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -249,6 +267,9 @@
   {
    "name": "low_kick_pass",
    "library": "kick",
+   "prefer": [
+    "soccer_kick"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -267,6 +288,9 @@
   {
    "name": "high_kick_pass",
    "library": "kick",
+   "prefer": [
+    "soccer_shoot"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -285,6 +309,9 @@
   {
    "name": "shoot_point",
    "library": "shoot",
+   "prefer": [
+    "soccer_shoot"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -303,6 +330,9 @@
   {
    "name": "shoot_goal",
    "library": "shoot",
+   "prefer": [
+    "soccer_kick"
+   ],
    "frames": 8,
    "fps": 14,
    "loop": false,
@@ -339,6 +369,9 @@
   {
    "name": "catch_aerial",
    "library": "jump",
+   "prefer": [
+    "jump_shot"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -450,6 +483,9 @@
   {
    "name": "jump",
    "library": "jump",
+   "prefer": [
+    "jump_vertical"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -468,6 +504,9 @@
   {
    "name": "leap_catch",
    "library": "jump",
+   "prefer": [
+    "jump_shot"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -486,6 +525,9 @@
   {
    "name": "fist_pass",
    "library": "punch",
+   "prefer": [
+    "punch_straight"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -504,6 +546,9 @@
   {
    "name": "fist_shoot",
    "library": "punch",
+   "prefer": [
+    "punch_power"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -576,6 +621,9 @@
   {
    "name": "get_up",
    "library": "crouch",
+   "prefer": [
+    "get_up"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": false,

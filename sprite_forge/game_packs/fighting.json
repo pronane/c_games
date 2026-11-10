@@ -13,6 +13,9 @@
   {
    "name": "idle",
    "library": "idle",
+   "prefer": [
+    "idle_boxing"
+   ],
    "frames": 6,
    "fps": 8,
    "loop": true,
@@ -70,6 +73,9 @@
   {
    "name": "jump",
    "library": "jump",
+   "prefer": [
+    "jump_hop"
+   ],
    "frames": 8,
    "fps": 10,
    "loop": false,
@@ -88,6 +94,9 @@
   {
    "name": "punch",
    "library": "punch",
+   "prefer": [
+    "punch_straight"
+   ],
    "frames": 6,
    "fps": 14,
    "loop": false,
@@ -106,6 +115,9 @@
   {
    "name": "kick",
    "library": "kick",
+   "prefer": [
+    "roundhouse"
+   ],
    "frames": 7,
    "fps": 14,
    "loop": false,
@@ -124,6 +136,9 @@
   {
    "name": "special1",
    "library": "punch",
+   "prefer": [
+    "punch_power"
+   ],
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -142,6 +157,9 @@
   {
    "name": "special2",
    "library": "kick",
+   "prefer": [
+    "side_kick"
+   ],
    "frames": 10,
    "fps": 14,
    "loop": false,
@@ -214,6 +232,9 @@
   {
    "name": "jumpattack",
    "library": "kick",
+   "prefer": [
+    "jump_kick"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,

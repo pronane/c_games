@@ -92,7 +92,7 @@ def write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names):
             "pivot": {"x": int(cfg.pivot_x), "y": int(cfg.ground_y)},
             "ground_y": int(cfg.ground_y),
             "source": getattr(m, "motion_source", "") or sprite_src or "procedural",
-            "library": getattr(m, "library_name", "") or ((m.motion or "").split(":", 1)[-1] if (m.motion or "").startswith("lib:") else ""),
+            "library": ((m.motion or "").split(":", 1)[-1] if (m.motion or "").startswith("lib:") else "") or getattr(m, "library_name", ""),
             "events": ev,
             "hitboxes": hits,
             "hurtboxes": hurts,
@@ -222,7 +222,7 @@ def atlas_from_manifest(folder):
 
 
 def sprites_cfg_from_manifest(folder):
-    """sprites.cfg (SpriteForge v1) from the manifest, for tools/to_egyptian_fighter.py."""
+    """sprites.cfg (SpriteForge v1) from the manifest, for the game adapters (tools/export_ef.py)."""
     man_path = os.path.join(folder, "game_character.json")
     with open(man_path, encoding="utf-8") as f:
         man = json.load(f)

@@ -102,6 +102,12 @@ def load(name_or_path):
             raise ValueError("%s: move '%s' is listed twice" % (p, nm))
         seen.add(nm)
         lib = slug(m.get("library") or nm)
+        pref = m.get("prefer") or []
+        if isinstance(pref, str):
+            pref = [pref]
+        if not isinstance(pref, list):
+            raise ValueError("%s: move '%s' prefer must be a list of library names" % (p, nm))
+        pref = [slug(x) for x in pref if str(x).strip() and slug(x) != lib]
         try:
             frames = int(m.get("frames", 6))
             fps = int(m.get("fps", 12))
@@ -113,6 +119,7 @@ def load(name_or_path):
             "name": nm,
             "label": str(m.get("label") or nm.replace("_", " ").title()),
             "library": lib,
+            "prefer": pref,
             "frames": frames,
             "fps": fps,
             "loop": bool(m.get("loop", False)),
@@ -172,6 +179,7 @@ def moves_of(pack):
         spec.want_library = True
         spec.pack_frames = m["frames"]
         spec.library_name = m["library"]
+        spec.library_prefer = list(m["prefer"])
         out.append(spec)
     return out
 

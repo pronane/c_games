@@ -726,7 +726,7 @@ def _scale_bind(rig, scale):
 
 
 def load_bvh(path):
-    """BVH -> Rig + bone map. Offsets over ~10 units are treated as centimetres.
+    """BVH -> Rig + bone map. Metres, centimetres or any other unit (the figure is scaled to 1.7 m).
 
     Rotations are applied in the channel order written in the file (R = R @ axis).
     Y-up files match the shared skeleton. Z-up files still import; the retarget
@@ -833,18 +833,189 @@ def load_bvh(path):
     fps = 1.0 / dt if dt > 1e-6 else FPS
     clip = Clip(rig.name, R, T, fps, None, "bvh:%s" % os.path.basename(path))
     rig.clips[clip.name] = clip
-    # centimetres (a person-sized figure exported as 170) -> metres. Leave 0.4..8 alone.
+    # units -> metres. A person-sized figure in metres (0.4..3) is left alone; in centimetres (40..300) x 0.01.
+    # Anything else - inches, the CMU database's own unit (a person is ~22 units tall), feet - is scaled to a
+    # 1.7 m figure: only the proportions matter to the retarget, and the root path is scaled with the bones.
     ys = bind[:, 1, 3]
     height = float(ys.max() - ys.min()) if len(ys) else 0.0
-    if height > 20.0:
+    if 40.0 <= height <= 300.0:
         _scale_bind(rig, 0.01)
-    elif height > 8.0:
+    elif height > 1e-6 and not (0.4 <= height <= 3.0):
         _scale_bind(rig, 1.7 / height)
     rec = BM.detect(rig)
     return rig, rec
 
 
-def import_file(path, name=None, clip=None, library=None, licence=None, loop=None, category=None):
+# ---------------------------------------------------------------- v11.6: real mocap onto the shared skeleton
+def _heading(W):
+    """facing of the hips about +y, degrees (0 = +z, the mannequin's forward)"""
+    z = W[:3, 2]
+    return math.degrees(math.atan2(float(z[0]), float(z[2])))
+
+
+def _cycle(feat, fps, lo=0.45, hi=1.6):
+    """best loop inside a take: frames (i, j) whose poses and velocities match. -> (i, j, score)"""
+    n = len(feat)
+    vel = np.gradient(feat, axis=0)
+    best = (0, n - 1, float("inf"))
+    pmin, pmax = max(4, int(lo * fps)), min(n - 1, int(hi * fps))
+    # a loop must move: a stretch where the figure stands still matches itself at any period, so the mismatch is
+    # measured against how much the pose changes inside the stretch
+    csum = np.concatenate([[0.0], np.cumsum(np.linalg.norm(vel, axis=1))])
+    for p in range(pmin, pmax + 1):
+        d = np.linalg.norm(feat[:n - p] - feat[p:], axis=1) + 3.0 * np.linalg.norm(vel[:n - p] - vel[p:], axis=1)
+        if not len(d):
+            continue
+        travel = (csum[p:n] - csum[:n - p])[:len(d)]          # path length of the pose over i..i+p
+        sc_all = d / (travel + 1e-3) * (1.0 + 0.15 * p / fps)  # prefer one cycle to two
+        i = int(np.argmin(sc_all))
+        if sc_all[i] < best[2]:
+            best = (i, i + p, float(sc_all[i]))
+    return best
+
+
+def _refine_arms(pose, Wd):
+    """the semantic elbow is one hinge: re-solve each arm (3 angles + elbow) so the elbow and the hand land where
+    the take has them, not just where the upper arm's own rotation points (a twisted upper arm swings the hand)"""
+    from scipy.optimize import least_squares
+    from .rig import evaluate
+    h = Wd["hips"][:3, 3]
+    for side in ("L", "R"):
+        ka, ke = "arm_" + side, "elbow_" + side
+        if ka not in pose or ke not in pose or "hand_" + side not in Wd:
+            continue
+        tgt = np.concatenate([Wd["forearm_" + side][:3, 3] - h, Wd["hand_" + side][:3, 3] - h])
+
+        def res(x):
+            p = dict(pose); p[ka] = (x[0], x[1], x[2]); p[ke] = x[3]
+            st = evaluate(p)
+            hh = st.world["hips"][:3, 3]
+            return np.concatenate([st.world["forearm_" + side][:3, 3] - hh, st.world["hand_" + side][:3, 3] - hh]) - tgt
+        x0 = np.array(list(pose[ka]) + [pose[ke]], float)
+        r0 = res(x0)
+        if np.abs(r0).max() < 0.01:
+            continue
+        sol = least_squares(res, x0, x_scale=30.0, max_nfev=60)
+        if np.linalg.norm(sol.fun) < np.linalg.norm(r0):
+            pose[ka] = tuple(float(v) for v in sol.x[:3]); pose[ke] = float(sol.x[3])
+    return pose
+
+
+def _leading_tpose(rig, W):
+    """frames at the start where both arms are held straight out at shoulder height (+ a short settle after)"""
+    try:
+        ids = [(rig.index("upperarm_" + s), rig.index("hand_" + s)) for s in ("L", "R")]
+    except (KeyError, ValueError):
+        return 0
+    n = 0
+    for f in range(len(W)):
+        ok = True
+        for ua, hd in ids:
+            d = W[f, hd, :3, 3] - W[f, ua, :3, 3]
+            if abs(d[1]) > 0.12 or np.hypot(d[0], d[2]) < 0.40:
+                ok = False
+                break
+        if not ok:
+            break
+        n += 1
+    return n
+
+
+def canonical_keys(rig, Wf, fps, start=None, end=None, cycle=False, out_fps=30.0, face=True, peak=None):
+    """retargeted mannequin worlds (F, nb, 4, 4) -> semantic keys, ready for any game.
+
+    The take is cut to [start, end] seconds, resampled to out_fps, turned so the figure faces the mannequin's
+    forward (+z; the mean facing over the cut), moved so it starts at the origin, and put on the floor: the
+    lowest contact (feet, knees, hands, head) of the clip is the floor, `lift` is the height above it (a jump
+    keeps its air time), `pos` is the travel. With cycle=True the cut is narrowed to its best loop.
+    peak=(bone, before_s, after_s) narrows the cut to one strike: the frame where that bone reaches furthest
+    from the hips (a punch's hand, a kick's foot), `before_s` ahead of it and `after_s` after it; the clip is
+    then turned so that strike points forward (+z), at the opponent.
+    -> (keys, worlds used, info)"""
+    from .rig import _CONTACT, _pt
+    F = len(Wf)
+    a = 0 if start is None else max(0, min(F - 1, int(round(start * fps))))
+    b = F - 1 if end is None else max(a + 1, min(F - 1, int(round(end * fps))))
+    step = max(1.0, fps / float(out_fps))
+    idx = np.round(np.arange(a, b + 1e-6, step)).astype(int)
+    W = Wf[idx].copy()
+    fps2 = fps / step
+    hi = rig.index("hips")
+    if start is None and len(W) > 4:          # mocap takes open with a calibration T-pose: not part of any move
+        n0 = _leading_tpose(rig, W)
+        if 0 < n0 < len(W) - 4:
+            W = W[n0:]; a += int(round(n0 * step))
+    def turn(W):
+        if not face:
+            return W, 0.0
+        h = np.array([_heading(W[f, hi]) for f in range(len(W))])
+        th = math.degrees(math.atan2(np.sin(np.radians(h)).mean(), np.cos(np.radians(h)).mean()))
+        from .mathutil import ry
+        M = np.eye(4); M[:3, :3] = ry(-th)
+        return np.einsum("ij,fbjk->fbik", M, W), th
+    W, th = turn(W)
+    info = {"cut_s": [round(a / fps, 3), round(b / fps, 3)], "turned_deg": round(-th, 1), "fps": round(fps2, 2)}
+    if peak:
+        bj, pre, post = peak
+        k = rig.index(bj)
+        reach = np.linalg.norm(W[:, k, [0, 2], 3] - W[:, hi, [0, 2], 3], axis=1)   # furthest from the hips, any way
+        i = int(np.argmax(reach))
+        i0, i1 = max(0, i - int(round(pre * fps2))), min(len(W) - 1, i + int(round(post * fps2)))
+        W = W[i0:i1 + 1]
+        info["peak_s"] = round(info["cut_s"][0] + i / fps2, 3)
+        info["cut_s"] = [round(info["cut_s"][0] + i0 / fps2, 3), round(info["cut_s"][0] + i1 / fps2, 3)]
+        if face:                              # aim the strike at +z: the opponent is in front, whatever the hips do
+            j = i - i0
+            dx, dz = W[j, k, 0, 3] - W[j, hi, 0, 3], W[j, k, 2, 3] - W[j, hi, 2, 3]
+            th2 = math.degrees(math.atan2(dx, dz))
+            from .mathutil import ry
+            M = np.eye(4); M[:3, :3] = ry(-th2)
+            W = np.einsum("ij,fbjk->fbik", M, W)
+            info["turned_deg"] = round(-th - th2, 1)
+    if cycle and len(W) > 8:
+        rel = W[:, :, :3, 3] - W[:, hi:hi + 1, :3, 3]
+        i, j, sc = _cycle(rel.reshape(len(W), -1), fps2)
+        W = W[i:j + 1]
+        info["cycle_s"] = [round(info["cut_s"][0] + i / fps2, 3), round(info["cut_s"][0] + j / fps2, 3)]
+        info["cycle_mismatch"] = round(sc, 4)
+    W = W.copy()
+    W[:, :, 0, 3] -= W[0, hi, 0, 3]
+    W[:, :, 2, 3] -= W[0, hi, 2, 3]
+    names = rig.bones
+    low = np.array([min(_pt(dict(zip(names, W[f])), j, o)[1] for j, o in _CONTACT if j in names) for f in range(len(W))])
+    floor = float(np.percentile(low, 3))
+    W[:, :, 1, 3] -= floor
+    if "root" in names:                      # the semantic pose measures every bone from an unmoved root
+        W[:, names.index("root")] = np.eye(4)
+    n = len(W)
+    keys = []
+    for f in range(n):
+        Wd = {names[k]: W[f, k] for k in range(rig.nb)}
+        pose = _refine_arms(pose_from_world(Wd), Wd)
+        pose["pos"] = (float(W[f, hi, 0, 3]), float(W[f, hi, 2, 3]))
+        pose["lift"] = max(0.0, float(low[f] - floor))
+        pose["ground"] = True
+        keys.append((0.0 if n == 1 else f / (n - 1), pose))
+    info["duration"] = round((n - 1) / fps2, 4)
+    return keys, W, info
+
+
+def pose_error(rig, W, keys):
+    """mean / max metres between the take's joints and the projected poses, both measured from the hips"""
+    from .rig import evaluate
+    hi = rig.index("hips")
+    err = []
+    for f, (_, pose) in enumerate(keys):
+        st = evaluate(pose)
+        h0 = W[f, hi, :3, 3]; h1 = st.world["hips"][:3, 3]
+        for k, bn in enumerate(rig.bones):
+            if bn in st.world and bn not in ("ball", "root"):
+                err.append(float(np.linalg.norm((W[f, k, :3, 3] - h0) - (st.world[bn][:3, 3] - h1))))
+    return (float(np.mean(err)), float(np.max(err))) if err else (0.0, 0.0)
+
+
+def import_file(path, name=None, clip=None, library=None, licence=None, loop=None, category=None,
+                start=None, end=None, cycle=None, raw=False, peak=None):
     """BVH / FBX / GLB / glTF / mocap-json -> one library move on the shared skeleton.
 
     FBX and GLB go through the existing importer and retargeter. The clip is then
@@ -876,22 +1047,32 @@ def import_file(path, name=None, clip=None, library=None, licence=None, loop=Non
     man = RR.from_mannequin(clips=[])
     mrec = BM.detect(man)
     cl, rep = RT.retarget(src, srec, src.clips[clip_name], man, mrec, name=clip_name)
-    keys = clip_to_keys(man, cl)
-    mean_e, max_e = projection_error(man, cl, keys)
+    loop_ = bool(src.clips[clip_name].loop) if loop is None else bool(loop)
+    canon = {}
+    if raw:
+        keys = clip_to_keys(man, cl)
+        mean_e, max_e = projection_error(man, cl, keys)
+        dur = float(cl.duration)
+    else:
+        keys, Wc, canon = canonical_keys(man, man.clip_worlds(cl), cl.fps, start=start, end=end,
+                                         cycle=(loop_ and not peak) if cycle is None else bool(cycle), peak=peak)
+        mean_e, max_e = pose_error(man, Wc, keys)
+        dur = canon["duration"]
     nm = _slug(name or clip_name)
     lic = _licence(licence)
     rec = {
         "name": nm,
         "category": category or "Imported",
         "desc": "imported %s clip '%s' onto the shared skeleton" % (reader, clip_name),
-        "loop": bool(src.clips[clip_name].loop) if loop is None else bool(loop),
+        "loop": loop_,
         "source": "%s:%s:%s" % (reader, os.path.basename(path), clip_name),
         "origin": "import",
         "licence": lic,
-        "duration": round(float(cl.duration), 4),
+        "duration": round(dur, 4),
         "keys": keys,
         "import": {
             "reader": reader,
+            "canonical": canon or None,
             "retarget_mean_dir_err_deg": rep.get("mean_dir_err_deg"),
             "projection_mean_m": round(mean_e, 4),
             "projection_max_m": round(max_e, 4),

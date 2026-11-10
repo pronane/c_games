@@ -19,6 +19,9 @@ screenshots/*.jpg
 sprite_forge/tools/models/
 # reference library store (people's photos / videos)
 sprite_forge/library/refs/
+# recorded motion sets and your own motions are pose traces of real people: keep them out of git
+sprite_forge/library/motion_sets/
+sprite_forge/library/motions/
 # MakeHuman CC0 assets (forge.py human --setup [--from-git])
 sprite_forge/assets/makehuman/
 sprite_forge/models/
