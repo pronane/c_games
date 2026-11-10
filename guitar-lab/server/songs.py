@@ -789,7 +789,7 @@ async def tab_parts(key: str, request: TabPartsRequest, x_fretwork_client: str |
         mono = mix.mean(axis=1) if mix.ndim > 1 else mix
         everything = [n for t in tracks for n in t['notes']]
         # Charts are often written in standard tuning for songs played a half or whole step down.
-        mapping = ta.refine(ta.align(everything, mono, sr, transposes=(0, -1, 1, -2, 2)), everything, mono, sr)
+        mapping = ta.line_up(everything, mono, sr, transposes=(0, -1, 1, -2, 2))
         placed = ta.place_tracks(tracks, mapping)
         heard = []
         for pid, notes in song.notes.items():

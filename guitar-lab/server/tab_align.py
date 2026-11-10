@@ -151,7 +151,7 @@ TRANSPOSE_MARGIN = 0.03
 
 
 def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = None,
-          transposes=(0,)) -> dict:
+          transposes=(0,), piecewise: bool = True) -> dict:
     """Map from tab seconds to recording seconds.
 
     Three stages: a straight-line fit (start offset and overall tempo ratio, by chroma
@@ -182,7 +182,7 @@ def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = 
     ratio, offset = line['ratio'], line['offset']
     # The tab redrawn on the recording's clock along the guide, then warped locally (±BAND s).
     n_audio = Y.shape[1]
-    guide = piecewise_guide(X, Y, line)
+    guide = piecewise_guide(X, Y, line) if piecewise else None
     if guide is None:
         src = (np.arange(n_audio) / FPS - offset) / ratio * FPS
     else:
@@ -212,7 +212,7 @@ def align(notes: list, audio: np.ndarray, sr: int, tab_duration: float | None = 
     similarity = float(1 - np.mean([C[i, j] for i, j in path]))
     return {'tab': tab_t, 'audio': list(map(float, audio_t)), 'similarity': round(similarity, 3),
             'line': {k: round(v, 3) for k, v in line.items()}, 'tempo_ratio': round(ratio, 3),
-            'transpose': transpose}
+            'transpose': transpose, 'piecewise': guide is not None}
 
 
 BAND_S = 8.0
@@ -385,3 +385,22 @@ def refine(mapping: dict, notes: list, audio: np.ndarray, sr: int) -> dict:
     if not first.get('refined'):
         return first
     return refine_pass(first, notes, audio, sr, window_s=5.0, step_s=1.0, search_s=0.3)
+
+
+PIECEWISE_GAIN = 0.005
+
+
+def line_up(notes: list, audio: np.ndarray, sr: int, transposes=(0,)) -> dict:
+    """The refined map from tab time to recording time, with or without the piecewise stage.
+
+    Following tempo changes section by section rescues songs whose tempo shifts part-way
+    through, but on short clips it can chase the wrong repeat. Both maps are made, and the
+    piecewise one is kept only when the recording's pitched attacks agree with it measurably
+    better (attack_match, which uses no transcription)."""
+    plain = refine(align(notes, audio, sr, transposes=transposes, piecewise=False), notes, audio, sr)
+    pieces = align(notes, audio, sr, transposes=(plain['transpose'],) if plain['transpose'] else (0,), piecewise=True)
+    if not pieces['piecewise']:
+        return plain
+    pieces = refine(pieces, notes, audio, sr)
+    better = (pieces.get('attack_match') or 0) > (plain.get('attack_match') or 0) + PIECEWISE_GAIN
+    return pieces if better else plain
