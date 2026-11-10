@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 static void test_initial_state(void)
@@ -912,14 +913,15 @@ static void test_cpu_tackle_from_behind_is_a_free(void)
         game.players[1][frame].x = 130.0f;
         game.players[1][frame].z = 80.0f;
     }
-    game.players[1][3].x = 77.6f;   /* behind the carrier, who is facing +x */
+    game.players[1][3].x = 78.6f;   /* 1.4 m behind the carrier, who is facing +x */
     game.players[1][3].z = 42.0f;
     game.ball_team = 0;
     game.ball_player = game.selected_player;
     game.has_ball = 1;
-    for (frame = 0; frame < 24 && game.event != GAME_EVENT_FOUL_TACKLE; frame++)
+    for (frame = 0; frame < 24 && game.event != GAME_EVENT_TACKLE_BEHIND; frame++)
         game_update(&game, input, 0.05f);
-    assert(game.event == GAME_EVENT_FOUL_TACKLE);
+    assert(game.event == GAME_EVENT_TACKLE_BEHIND);
+    assert(strcmp(game_event_text(game.event), "Free - tackle from behind") == 0);
     assert(game.ball_team == 0 && game.restart_pending);
 }
 
@@ -1096,6 +1098,189 @@ static void test_kickout_plan_moves_a_teammate(void)
     assert(game.players[0][4].z != z0);
 }
 
+static void park_defence(GameState *game)
+{
+    int i;
+    for (i = 0; i < GAME_TEAM_SIZE; i++) {
+        game->players[1][i].x = GAME_PITCH_LENGTH - 4.0f;
+        game->players[1][i].z = 3.0f + (float)i * 0.4f;
+    }
+}
+
+static void test_step_ring_and_overcarry(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int guard, step;
+    static const int want[4] = {
+        GAME_RING_NORMAL, GAME_RING_ORANGE, GAME_RING_RED, GAME_RING_RED
+    };
+    game_init(&game);
+    assert(game.solo_rhythm == 0);
+    park_defence(&game);
+    game.players[0][game.selected_player].x = 28.0f;
+    game.players[0][game.selected_player].z = 40.0f;
+    input.move_x = 1.0f;
+    for (step = 2; step <= 5; step++) {
+        for (guard = 0; guard < 80 && game.steps_carried < step && game.fouls == 0; guard++)
+            game_update(&game, input, 0.05f);
+        assert(game.steps_carried == step);
+        assert(game_step_ring(&game) == want[step - 2]);
+        assert(game.fouls == 0);
+        assert(game.has_ball);
+    }
+    for (guard = 0; guard < 40 && game.event != GAME_EVENT_FOUR_STEPS; guard++)
+        game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_FOUR_STEPS);
+    assert(game.fouls == 1);
+    assert(!game.has_ball);
+    assert(game.ball_team == 1 && game.restart_pending);
+    assert(strcmp(game_event_text(game.event), "Free - overcarrying (too many steps)") == 0);
+}
+
+static void test_solo_and_bounce_reset_the_count(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int guard;
+    game_init(&game);
+    park_defence(&game);
+    game.players[0][game.selected_player].x = 36.0f;
+    game.players[0][game.selected_player].z = 40.0f;
+    input.move_x = 1.0f;
+    for (guard = 0; guard < 80 && game.steps_carried < 2; guard++)
+        game_update(&game, input, 0.05f);
+    assert(game.steps_carried >= 2);
+    input.move_x = 0.0f;
+    input.solo = 1;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_SOLOED);
+    assert(game.steps_carried == 0);
+    assert(game.step_time == 0.0f);
+    input.solo = 0;
+    for (guard = 0; guard < 16; guard++) game_update(&game, input, 0.05f);
+    input.move_x = 1.0f;
+    for (guard = 0; guard < 80 && game.steps_carried < 2; guard++)
+        game_update(&game, input, 0.05f);
+    assert(game.steps_carried >= 2);
+    assert(game.has_ball);
+    input.move_x = 0.0f;
+    input.bounce = 1;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_BOUNCED);
+    assert(game.last_was_bounce);
+    assert(game.steps_carried == 0);
+    assert(game.step_time == 0.0f);
+}
+
+static void test_solo_rhythm_helper_is_off(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int who;
+    game_init(&game);
+    assert(game.solo_rhythm == 0);
+    assert(!game_solo_rhythm_due(&game));
+    park_defence(&game);
+    who = game.selected_player;
+    game.players[0][who].x = 40.0f;
+    game.players[0][who].z = 42.0f;
+    game.steps_carried = 4;
+    game.step_time = 0.0f;
+    assert(game_solo_rhythm_due(&game));
+    assert(game_step_ring(&game) == GAME_RING_RED);
+    input.move_x = 1.0f;
+    game_update(&game, input, 0.05f);
+    assert(game.event != GAME_EVENT_BOUNCED);
+    assert(game.event != GAME_EVENT_SOLOED);
+    assert(game.steps_carried >= 4);
+    assert(game.has_ball);
+    game.solo_rhythm = 1;
+    game.steps_carried = 4;
+    game.step_time = 0.0f;
+    game.players[0][who].action = GAME_ACT_NONE;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_BOUNCED);
+    assert(game.steps_carried == 0);
+    assert(game.has_ball);
+}
+
+static void test_over_shoulder_tackle_is_a_free(void)
+{
+    GameState game;
+    GameInput input = {0};
+    float ang = 115.0f * 3.14159265f / 180.0f;
+    int who, i;
+    GamePlayer *me, *carrier;
+    game_init(&game);
+    assert(game_tackle_call(80.0f, 42.0f, 1.0f, 0.0f, 78.4f, 42.0f, 1.0f, 0.0f) == GAME_TACKLE_BEHIND);
+    assert(game_tackle_call(80.0f, 42.0f, 1.0f, 0.0f, 81.3f, 42.2f, -1.0f, 0.0f) == GAME_TACKLE_OK);
+    who = game.selected_player;
+    me = &game.players[0][who];
+    for (i = 0; i < GAME_TEAM_SIZE; i++) {
+        game.players[1][i].x = 12.0f;
+        game.players[1][i].z = 8.0f;
+        if (i != who) {
+            game.players[0][i].x = 8.0f;
+            game.players[0][i].z = 70.0f;
+        }
+    }
+    carrier = &game.players[1][4];
+    carrier->x = 80.0f;
+    carrier->z = 42.0f;
+    carrier->facing_x = 1.0f;
+    carrier->facing_z = 0.0f;
+    me->x = 80.0f + cosf(ang) * 1.2f;
+    me->z = 42.0f + sinf(ang) * 1.2f;
+    me->facing_x = -cosf(ang);
+    me->facing_z = -sinf(ang);
+    game.ball_team = 1;
+    game.ball_player = 4;
+    game.ball.x = carrier->x;
+    game.ball.z = carrier->z;
+    game.ball.in_flight = 0;
+    assert(game_tackle_call(carrier->x, carrier->z, carrier->facing_x, carrier->facing_z,
+                            me->x, me->z, me->facing_x, me->facing_z) == GAME_TACKLE_SHOULDER);
+    input.tackle = 1;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_TACKLE_SHOULDER);
+    assert(strcmp(game_event_text(game.event), "Free - over the shoulder") == 0);
+    assert(game.ball_team == 1 && game.restart_pending);
+
+    /* level with him, but reaching back across the shoulder */
+    game_init(&game);
+    who = game.selected_player;
+    me = &game.players[0][who];
+    for (i = 0; i < GAME_TEAM_SIZE; i++) {
+        game.players[1][i].x = 12.0f;
+        game.players[1][i].z = 8.0f;
+        if (i != who) {
+            game.players[0][i].x = 8.0f;
+            game.players[0][i].z = 70.0f;
+        }
+    }
+    carrier = &game.players[1][4];
+    carrier->x = 80.0f;
+    carrier->z = 42.0f;
+    carrier->facing_x = 1.0f;
+    carrier->facing_z = 0.0f;
+    me->x = 80.2f;
+    me->z = 43.3f;
+    me->facing_x = -0.70f;
+    me->facing_z = -0.71f;
+    game.ball_team = 1;
+    game.ball_player = 4;
+    game.ball.x = carrier->x;
+    game.ball.z = carrier->z;
+    game.ball.in_flight = 0;
+    assert(game_tackle_call(carrier->x, carrier->z, 1.0f, 0.0f,
+                            me->x, me->z, me->facing_x, me->facing_z) == GAME_TACKLE_SHOULDER);
+    input.tackle = 1;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_TACKLE_SHOULDER);
+    assert(game.ball_team == 1 && game.restart_pending);
+}
+
 int main(void)
 {
     test_initial_state();
@@ -1140,6 +1325,10 @@ int main(void)
     test_advanced_mark_from_a_kick_into_the_45();
     test_breaking_ball_on_a_mistimed_jump();
     test_kickout_plan_moves_a_teammate();
+    test_step_ring_and_overcarry();
+    test_solo_and_bounce_reset_the_count();
+    test_solo_rhythm_helper_is_off();
+    test_over_shoulder_tackle_is_a_free();
     puts("Core game tests passed.");
     return 0;
 }

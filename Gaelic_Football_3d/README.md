@@ -23,15 +23,19 @@ The rules engine is still `src/game.c`. This pass makes a match feel less like i
 like the CPU is glued to your back. It does not change the renderer to another engine.
 
 - **CPU tackling.** A defender waits about 0.7 s inside range before he commits. A tackle
-  from behind is a free. Chasing your carrier he closes at 7.25 m/s and, inside 8 m, holds
+  from behind, or over the shoulder, is a free ("Free - tackle from behind" /
+  "Free - over the shoulder"). He usually gets in front before he tackles, and only
+  sometimes dives in. Chasing your carrier he closes at 7.25 m/s and, inside 8 m, holds
   at 6.35 m/s instead of sprinting through you.
 - **Jockey.** Hold **L2** or **Ctrl**. You shadow the carrier about 2 m on your own goal
   side, at a jog, facing him. The stick only shades you across. A **tap of L2**, or **B**
   with no ball (keyboard **K** or **Space**), is the tackle. A solo or bounce in front of
   you is easier to time. **L2+Y** is still the straight red.
-- **Solo rhythm.** A ring around your feet fills across the four steps (HUD pips too).
-  On the fourth step the game toe-taps, or bounces when a bounce is the legal one.
-  **T** turns that assist off. Holding **B** still does it.
+- **Solo rhythm.** A ring around your feet fills across five steps (HUD pips too).
+  Steps 1–2 stay the normal pale green, step 3 is orange, steps 4 and 5 are red.
+  A sixth step without a solo or a legal bounce is a free against you for overcarrying.
+  **T** turns on an assist that toe-taps, or bounces when that is the legal one, on
+  step 4. It starts **off**. Holding **B** still does the same touch.
 - **The mark.** A clean catch inside the 45, from a kick of 20 m or more that left from
   outside the 45, is an advanced mark. Kick-passes count. The catcher puts an arm up,
   a 15 s clock runs, and everyone else is kept 13 m away. Kick it, or **R** to play on.
@@ -199,7 +203,7 @@ alongside the pad.
 | Q / TAB | switch player |
 | 1-6 / C | cameras: Broadcast, TV close, Chase, Behind goal, Tactical, Player close-up |
 | Z / X, V | orbit the camera, reset |
-| T | auto-solo on the fourth step, on/off |
+| T | auto-solo on step 4, on/off (starts off) |
 | U | cycle the kick-out press (drop / zonal / press) |
 | 7 / 8 / 9 | during your kick-out: short / long / wing |
 | P | pause. F1: controller test / controls. F2 graphics quality. F3 FPS / profiler. F4 GPU/CPU skinning. Enter: new match after full time |
@@ -241,8 +245,9 @@ alongside the pad.
 * **Scoring**: goal = 3, point = 1, **two-pointer = 2** for a clean kick or free from on or
   outside the **40 m arc** (a 45 scores only 1). Umpires wave flags: green for a goal, white
   for a point, orange for a two-pointer.
-* **Carrying**: at most 4 steps, then a solo (toe-tap) or bounce. You can't bounce twice in a
-  row. **Overcarry** or a **double bounce** gives a free to the opposition.
+* **Carrying**: at most 5 steps, then a solo (toe-tap) or bounce. You can't bounce twice in a
+  row. A 6th step (**overcarry**) or a **double bounce** gives a free to the opposition.
+* **Tackle**: a tackle from behind, or over the shoulder, is a free to the ball carrier.
 * **Hand pass** has to be struck (fist action); the ball is released from the hand on the
   contact frame.
 * **Ball on the ground** is lifted with the foot (pick-up action); a hand scoop off the ground is never used.
