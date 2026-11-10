@@ -5,6 +5,27 @@ A character sprite + 3D pipeline with a visual UI. The 2D core and C/raylib load
 Tkinter UI, SPEC mode, the procedural rigged mannequin, GLB/FBX export, `character.ini`, `atlas.json` and
 game exporters.
 
+## New in v11.3: captured characters in a game - texture-mapped sprites, cleaner textures
+Tried in Egyptian Fighter, where a fighter is about 300 px tall, a captured character showed different faults
+from the close-up turntables.
+
+* **Sprites are texture-mapped.** Library rigs with one texture (every `forge.py capture` character) were drawn
+  with one flat colour per triangle, which threw the face and all clothing detail away. They are now z-buffered with
+  the texture sampled at every pixel (`render.render_textured`), and lit gently so a white shirt doesn't blow out.
+  Rigs with several materials or a kit recolour still use the flat path.
+* **Texture clean-up** (`sforge/capture_clean.py`, on by default in the bake):
+  * Skin far from the person's skin colour is dropped, and hands are always treated as skin.
+  * Each surface's colours are clustered (shirt / shorts / skin / socks) and the clusters smoothed over the body in
+    3D, left / right symmetric. Speckles go and garment edges come out clean.
+  * Unseen and dropped texels are filled on the body in 3D: from their mirror image first, then from the nearest
+    kept texels of the same cluster, bone or layer. Before, they were inpainted in 2D across UV islands.
+  * Light / dark bands inside one material are pulled part-way to its colour.
+* **Into the game** (`tools/to_egyptian_fighter.py`): converts a fighter build to Egyptian Fighter's sheet format.
+  The whole route from a captured GLB is in that file's header.
+
+On the synthetic test the clean-up costs a little texture accuracy (4.3 → 5.9 / 255) for the cleaner look; the
+body fit is unchanged.
+
 ## New in v11.2: the face's own shape, faces painted where they are, the room's light taken out
 **Face** (`sforge/capture_face.py`):
 

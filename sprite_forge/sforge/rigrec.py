@@ -268,6 +268,19 @@ class Rig:
         y = W[:, 1, 3]
         return float(y.max() - y.min()) * 1.08 if len(y) else 0.0
 
+    def single_texture(self, kit=None):
+        """the texture (h,w,3 uint8) when every face uses the same textured material and no kit recolours it -
+        then sprites are drawn texture-mapped (render.render_textured); else None (flat colour per face)"""
+        if "_single_tex" in self._tri_cache:
+            return self._tri_cache["_single_tex"] if not kit else None
+        tex = None
+        if self.fuv is not None and len(self.materials):
+            names = {self.materials[i].get("texture") for i in np.unique(np.clip(self.fmat, 0, len(self.materials) - 1))}
+            if len(names) == 1 and None not in names and next(iter(names)) in self.textures:
+                tex = np.asarray(self.textures[next(iter(names))].convert("RGB"))
+        self._tri_cache["_single_tex"] = tex
+        return tex if not kit else None
+
     def face_colors(self, kit=None):
         """per-face rgb (nf,3): material colour, texture sampled at the face's UV centroid, kit tint."""
         key = json.dumps(kit, sort_keys=True) if kit else ""
@@ -344,6 +357,10 @@ class Rig:
         if not self.has_mesh():
             return render_skeleton(self, W, rs, rxz)
         P = self.skin(W)[self.F] * scale
+        tex = self.single_texture(kit)
+        if tex is not None:
+            from .render import render_textured
+            return render_textured(P, self.fuv, tex, rs, (rxz[0] * scale, rxz[1] * scale))
         return render_tris(P, np.zeros(len(self.F), int), None, rs, (rxz[0] * scale, rxz[1] * scale), rgb=self.face_colors(kit), two_sided=True)
 
     # ---------- transforms
