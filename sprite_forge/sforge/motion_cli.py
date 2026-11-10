@@ -71,6 +71,10 @@ def main(argv):
                          epilog="--library DIR may be placed before or after the subcommand.")
     rec.add_argument("--clip", help="MOVE[:FRAMES]=VIDEO  (same as forge.py mocap; needs MediaPipe)")
     rec.add_argument("--keys", help="mocap keys JSON already written by forge.py mocap (no video needed)")
+    rec.add_argument("--folder", help="v11.5: a folder of clips (punch.mp4, walk.mp4, or a pose-track .json). One import, one named set.")
+    rec.add_argument("--set", dest="set_name", help="name for that set (required with --folder)")
+    rec.add_argument("--keep-temp", dest="keep_temp", action="store_true",
+                     help="keep the tracker JSON under the set's _temp/ (a pose trace — do not pack it). Default: delete it.")
     rec.add_argument("--name", help="library name (default: the move name)")
     rec.add_argument("--model", default="full", choices=["lite", "full", "heavy"])
     rec.add_argument("--facing", default="auto", choices=["auto", "side", "front", "mp"])
@@ -99,6 +103,13 @@ def main(argv):
     cl.add_argument("--no-weight", dest="no_weight", action="store_true")
     cl.add_argument("--no-anticipation", dest="no_anticipation", action="store_true")
     cl.add_argument("--no-follow", dest="no_follow", action="store_true")
+    sub.add_parser("sets", help="v11.5: named motion sets (skeleton only) and which one is the default")
+    use = sub.add_parser("use-set", help="v11.5: make a set the default source for builds (or --off)")
+    use.add_argument("name", nargs="?", help="set name. Omit with --off to clear.")
+    use.add_argument("--off", action="store_true", help="builds do not read a saved default set")
+    shot = sub.add_parser("shotlist", help="v11.5: printable checklist of clips to film for a game pack")
+    shot.add_argument("--game", required=True, help="pack name or a path (forge.py game list)")
+    shot.add_argument("--out", help="also write the checklist to this text file")
     sub.add_parser("types", help="list character types (timing, stance, reach, weight)")
     ts = sub.add_parser("type", help="show one character type")
     ts.add_argument("name")
@@ -153,6 +164,15 @@ def _run(a, p):
     if a.act == "record":
         lic = _lic_from(a)
         loop = True if a.loop else (False if a.once else None)
+        if getattr(a, "folder", None):
+            if not a.set_name:
+                print("record --folder needs --set NAME  (the clips become that motion set)")
+                return 2
+            from . import session
+            rep = session.import_folder(a.folder, a.set_name, keep_temp=a.keep_temp, licence=lic)
+            print(rep["text"], end="")
+            print("Video, frames, face and body shape were not stored.")
+            return 1 if rep["rejected"] else 0
         if a.keys:
             rec, out, probs = ML.record_keys(a.keys, name=a.name, path=a.library, loop=loop, licence=lic)
         elif a.clip:
@@ -222,6 +242,48 @@ def _run(a, p):
         if "weight_shift_m" in report:
             print("  weight shift: %.3f m" % report["weight_shift_m"])
         print("  " + report.get("note", ""))
+        return 0
+    if a.act == "sets":
+        from . import motionset as MS
+        print("motion sets: %s" % MS.sets_root(None))
+        names = MS.list_sets(None)
+        default = MS.saved_default(None)
+        if not names:
+            print("  (none yet)  forge.py motion record --folder CLIPS --set my_moves")
+        for n in names:
+            mark = "  default" if n == default else ""
+            print("  %-20s%s" % (n, mark))
+        if default and default not in names:
+            print("  saved default '%s' is missing — forge.py motion use-set --off" % default)
+        elif not default:
+            print("no default set (builds use the starter / procedural motions unless you pass --motion-set)")
+        return 0
+    if a.act == "use-set":
+        from . import motionset as MS
+        try:
+            label = MS.set_default("" if a.off else (a.name or ""), None)
+        except FileNotFoundError as e:
+            print("error:", e)
+            return 2
+        if not label:
+            print("default motion set cleared")
+        else:
+            print("default motion set: %s" % label)
+            print("Builds read that set first. Missing moves come from the starter, then the procedural motion.")
+            print("The set is skeleton JSON only. forge.py build --motion-set off ignores it for one build.")
+        return 0
+    if a.act == "shotlist":
+        from . import gamepack
+        try:
+            text = gamepack.shotlist(a.game)
+        except (ValueError, FileNotFoundError, OSError) as e:
+            print("error:", e)
+            return 2
+        print(text, end="")
+        if a.out:
+            with open(a.out, "w", encoding="utf-8") as f:
+                f.write(text)
+            print("wrote", a.out)
         return 0
     if a.act == "types":
         from . import chartypes as CT

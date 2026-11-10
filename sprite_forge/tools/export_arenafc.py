@@ -11,7 +11,10 @@ character goes in as measured proportions + the photo's own colours, not as spri
   shorts    thighs (trousers)             -> ShortsColor;   socks/boots: ankles / feet
   shape     shoulder width / height and leg / arm length vs the editor's defaults (clamped to its Sanitize ranges)
 Copy OUT.json into the game's user://characters folder and use "Load selected character JSON" in the editor.
-Pure numpy + Pillow; landmarks are MediaPipe-33 order as written by `forge.py cutout`."""
+Pure numpy + Pillow; landmarks are MediaPipe-33 order as written by `forge.py cutout`.
+
+v11.5 game_character.json is a sprite manifest and does not carry a photo or a body shape, so this
+adapter still reads the cut-out and the landmarks. It is not a reader of that manifest."""
 import argparse, json, math
 import numpy as np
 from PIL import Image

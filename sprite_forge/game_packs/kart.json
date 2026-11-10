@@ -1,0 +1,162 @@
+{
+ "name": "kart",
+ "label": "Kart racer",
+ "description": "Driver motions for a kart the game draws itself. The shared library has one drive clip; steer and boost are that clip with their own events.",
+ "camera": "three_quarter",
+ "prop": "none",
+ "props": [
+  "kart"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "drive",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "sitting \u2014 starter drive is the closest generic clip, not a separate seated idle"
+  },
+  {
+   "name": "drive",
+   "library": "drive",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "steer_left",
+   "library": "drive",
+   "frames": 4,
+   "fps": 10,
+   "loop": false,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "steer_right",
+   "library": "drive",
+   "frames": 4,
+   "fps": 10,
+   "loop": false,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "boost",
+   "library": "drive",
+   "frames": 6,
+   "fps": 12,
+   "loop": true,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Kart",
+   "events": {
+    "hit_start": 1,
+    "hit_end": 3,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "throw",
+   "library": "punch",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 3,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "item throw"
+  },
+  {
+   "name": "victory",
+   "library": "wave",
+   "frames": 8,
+   "fps": 8,
+   "loop": true,
+   "category": "Kart",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  }
+ ],
+ "notes": "profiles/kart_racer.json is still the 8-angle driver sheet (sprite.png, portrait, character.ini) for TurboTumble64. This pack does not draw a kart. prop is none so the mannequin is the driver only.",
+ "yaw": 65
+}

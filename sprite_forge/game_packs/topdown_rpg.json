@@ -1,0 +1,133 @@
+{
+ "name": "topdown_rpg",
+ "label": "Top-down RPG",
+ "description": "Top-down / 8-direction RPG. Idle and walk are rendered in 8 directions; the other moves are on the main sheet.",
+ "camera": "topdown8",
+ "prop": "none",
+ "props": [],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "punch",
+   "library": "punch",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Combat",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 3,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "melee"
+  },
+  {
+   "name": "cast",
+   "library": "cast",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Combat",
+   "events": {
+    "hit_start": 4,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "spell"
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  }
+ ],
+ "notes": "Only idle and walk are built in all 8 directions (view_moves). Add run or punch to view_moves in the JSON if the game needs them from every angle. That render is eight cameras, so it is slower.",
+ "view_moves": [
+  "idle",
+  "walk"
+ ]
+}

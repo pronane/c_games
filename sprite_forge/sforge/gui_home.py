@@ -135,6 +135,12 @@ def forge_command(app):
                 a += ["--motions", ",".join(names)]
         except Exception:
             pass
+    game = v.get("game")
+    if game is not None and game.get().strip() not in ("", "(none)", "none"):
+        a += ["--game", game.get().strip()]
+    ms = v.get("motion_set")
+    if ms is not None and ms.get().strip() not in ("", "(saved default)"):
+        a += ["--motion-set", "off" if ms.get().strip() in ("(none)", "off", "none") else ms.get().strip()]
     if not b["cache"].get():
         a += ["--no-cache"]
     from .gui_style import style_argv
@@ -385,7 +391,15 @@ class HomeTab:
         ttk.Combobox(left, textvariable=self.app.v["character_type"], values=self.app._character_types(),
                      width=18, state="readonly").pack(anchor="w")
         ttk.Checkbutton(left, text="Use the motion library\nwhere a clip exists", variable=self.app.b["library_motions"]).pack(anchor="w", pady=(4, 0))
-        ttk.Label(left, text="Same motion, different timing,\nstance, reach and weight.",
+        ttk.Label(left, text="Game type", font=(self.fam, 11, "bold")).pack(anchor="w", pady=(10, 0))
+        gcb = ttk.Combobox(left, textvariable=self.app.v["game"], values=self.app._game_packs(),
+                           width=18, state="readonly")
+        gcb.pack(anchor="w")
+        gcb.bind("<<ComboboxSelected>>", lambda e: (self.app.apply_game(), self._picker() if hasattr(self, "pick") else None, self._tinfo()))
+        ttk.Label(left, text="Motion set", font=(self.fam, 11, "bold")).pack(anchor="w", pady=(8, 0))
+        ttk.Combobox(left, textvariable=self.app.v["motion_set"], values=self.app._motion_sets(),
+                     width=18, state="readonly").pack(anchor="w")
+        ttk.Label(left, text="A pack picks the moves and events.\nA set is your filmed skeleton,\nused before the starter.",
                   foreground="#555", justify=tk.LEFT).pack(anchor="w")
         ttk.Separator(tab, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=12)
         self.pick = ttk.Frame(tab); self.pick.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, anchor="n")
@@ -534,6 +548,8 @@ class HomeTab:
         for val, lab in (("draft", "Quick preview (half size, 4 frames a move, no 3D/console files)"), ("final", "Final (full size, every frame, all files)")):
             ttk.Radiobutton(f, text=lab, value=val, variable=v["quality"]).pack(anchor="w")
         ttk.Checkbutton(f, text="Re-use unchanged moves from the last build (faster)", variable=self.app.b["cache"]).pack(anchor="w", pady=(4, 0))
+        ttk.Label(self.body, text="Every build writes game_character.json (moves, fps, loop, pivot, events, hitboxes) and copies the raylib, Godot 4 and Unity loaders into loaders/.",
+                  foreground="#555", wraplength=1100, justify=tk.LEFT).pack(anchor="w", pady=(8, 0))
         ttk.Label(self.body, text="Same as typing:", foreground="#555").pack(anchor="w", pady=(10, 0))
         self.cmd = tk.Text(self.body, height=4, width=150, font="TkFixedFont", wrap=tk.WORD, background="#f4f4f4")
         self.cmd.pack(anchor="w", fill=tk.X)

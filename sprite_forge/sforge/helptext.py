@@ -684,6 +684,118 @@ UNITY 2021.3+ (plugins/unity/com.spriteforge.importer)
   HONEST: compiled against stub Unity APIs only (tools/unity_stub_check) - not yet run inside Unity.
 """)
 
+T("game", "Recording sessions, game packs, one game file (v11.5)", r"""
+Sprite Forge v11.5 is the step after the motion library. You film a set of moves once. You pick a
+game type. The build writes one file a fighting game, a sport, a platformer or a shooter can load,
+plus a small loader for raylib, Godot 4 and Unity.
+
+The old profiles (fighter14, gaelic36, platformer, topdown8dir, kart_racer, retro_*) still build
+the way they did. A game pack does not replace them. --game is the new move list; --profile is
+still the extra images and manifests.
+
+A) RECORD YOURSELF  (skeleton only)
+  Film about 20-30 moves, one clip each, named after the move: punch.mp4, walk.mp4.
+  Side-on, full body, feet on the ground, bright enough to see.
+  Hold a T-pose (arms straight out) for about 1 second, then do the move about 3 times.
+  Optional front clip for idle / walk / run: idle_front.mp4, walk_front.mp4, run_front.mp4.
+
+  What to film, from the pack you care about:
+    forge.py motion shotlist --game soccer
+    forge.py motion shotlist --game boxing --out shotlist.txt
+    forge.py game shotlist soccer
+
+  Import the whole folder in one go. This uses the existing mocap tracker (not a second one):
+    forge.py motion record --folder CLIPS --set owner
+  Exits 1 if any clip needs a reshoot (the report still lists what was stored).
+  A .json pose track (the file the tracker writes) is accepted too, so a test can run with no person
+  and no MediaPipe. A video needs the same setup as forge.py mocap: python tools/setup_pose.py
+
+  The checker says what is wrong, in plain language, and which files to reshoot:
+    feet out of frame, body cut off, too dark, no T-pose, too short, tracking lost.
+  A clip that repeats the move keeps the best repeat, or a clean average of two close ones, and trims
+  the T-pose off. A walk becomes a loop. A punch becomes one action.
+
+  Stored: pose channels on the shared skeleton (library/motion_sets/owner/*.json).
+  Not stored: the video, the image frames, the face, the body shape. Temporary tracker files are
+  deleted. --keep-temp leaves a pose trace in _temp/ — do not pack that folder.
+  Nothing in a release zip is a recording of a person.
+
+  Make that set the default source for every build:
+    forge.py motion use-set owner
+    forge.py motion sets
+    forge.py build --mannequin --game soccer --motion-set owner
+    forge.py build --mannequin --game soccer --motion-set off
+  Order for each move: the set, then a clip you imported on its own, then the shipped starter,
+  then the live procedural motion if the library has no clip of that name.
+  The build report has a line "motion source: punch=set:owner, kick=starter, ...".
+  With no set saved and no --motion-set, a build is unchanged from v11.4.
+
+  Studio: Library tab > Recording session... (folder, check results, shot list, default set).
+  Build tab and Start > What to make have the Motion set dropdown.
+
+B) GAME-TYPE PACKS  (data, not code)
+  A pack is game_packs/<name>.json. It lists the moves the genre needs, each mapped to a generic
+  library name (punch, kick, walk, ...), with frames / fps / loop, a camera (side, three_quarter,
+  topdown8), props the GAME draws, and events (hit_start, hit_end, ball_contact, footsteps,
+  throw_release, shoot, reload). -1 means that event is not used.
+
+    forge.py game list
+    forge.py game show soccer
+    forge.py game validate
+    forge.py build --mannequin --game soccer --character-type quick_striker --no-glb
+    forge.py build --mannequin --game boxing --character-type heavy_brawler --no-glb
+
+  Shipped packs: fighting, gaelic, platformer, topdown_rpg, kart, soccer, basketball, boxing,
+  wrestling, tennis (tennis/padel), beat_em_up, shooter (idle/run/aim/shoot/reload/hit/die).
+  Add your own by dropping a JSON file in game_packs/, or pass a path:
+    forge.py build --mannequin --game my_pack.json
+  No code change. Character types apply on every pack: the pack chooses the moves, the type
+  chooses timing, stance, reach and weight.
+
+  Honest limits of the starter library: several game moves share one clip (a jab and a cross are
+  both "punch" until you record jab.mp4 and cross.mp4). header, dribble, aim, reload and the kart
+  steer clips are the nearest generic motion, not a bespoke animation. The events are what the
+  game should trust. profiles/kart_racer.json is still the 8-angle driver sheet. tools/gaelic_forge.py
+  is still the 3D sculpted player and does not read the pack.
+
+C) ONE GAME FILE
+  Every build writes out/<name>/game_character.json:
+    character, character type, game pack, camera, frame size, pivot and ground line,
+    one animation per move (strip and sheet, frames, fps, loop),
+    gameplay events, hitboxes and hurtboxes where the framedata pass can measure them.
+  It also copies loaders/ next to the character (text only):
+    loaders/raylib/game_character.h + example.c     (same idea as spriteforge/include/spriteforge.h)
+    loaders/godot/game_character.gd                 (Godot 4)
+    loaders/unity/GameCharacter.cs
+
+  Raylib, after a window is open:
+    #define GAME_CHARACTER_IMPLEMENTATION
+    #include "game_character.h"
+    GC_Load(&hero, "out/hero");
+    GC_Play(&hero, GC_Find(&hero, "idle"));
+    GC_Update(&hero, GetFrameTime());
+    GC_Draw(&hero, x, groundY, false, 1.0f);
+  Headless check (Linux):
+    gcc -std=c99 -O2 -I loaders/raylib -I raylib/src loaders/raylib/example.c -o /tmp/gc_example -L raylib/src -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+    xvfb-run -a /tmp/gc_example out/hero --shots preview.png
+
+  Godot 4: attach game_character.gd to a Node2D, set character_dir, it plays idle.
+  Unity: put the folder in StreamingAssets and add the GameCharacter component.
+  Hitboxes are estimated from the silhouette (the v9 framedata pass), not hand-authored collision.
+  A Quick preview builds fewer frames, so event indices are scaled to those frames.
+
+  Egyptian Fighter and HD Fighter adapters still read a normal build (atlas.json, sprites.cfg, moves/).
+  If those index files are missing and game_character.json is there, they rebuild the index from it.
+    python tools/export_ef.py out/hero path/to/char_hero
+    python tools/to_egyptian_fighter.py out/hero path/to/char_hero
+    python tools/export_hdf.py out/hero path/to/HD_Fighter hero
+  Arena FC still reads a cut-out photo and landmarks (the manifest has no photo and no body shape).
+  The Gaelic 3D mesh tool is unchanged.
+
+Studio: the Game type dropdown lists the packs. The Build step says the manifest and the loaders
+are part of the output.
+""")
+
 T("python", "Is Python fast enough? (how the engine is built)", r"""
 Python is the glue; the heavy lifting runs in native code:
   ffmpeg (C)            decoding / encoding video          ~500 frames/s at 640x360 on an 8-core CPU (imageio-ffmpeg)
@@ -765,6 +877,8 @@ LIMITS (honest)
     poses are not redrawn. Their playback fps still follows timing, so a heavy type plays the sheet slower.
   * Do not drop a Mixamo / Meshy clip in here unless its licence lets you. The move stores the licence you pass.
     An incomplete record is fine locally and is not something to pack.
+
+v11.5 recording sessions, game-type packs and game_character.json: forge.py help game
 """)
 
 FIELDS = [
@@ -853,6 +967,8 @@ FIELDS = [
     ("Moves", "Tick the moves to build. frames = number of frames, fps = playback speed, loop = repeats (idle/walk) or plays once (punch)."),
     ("Character type", "v11.4: how the character performs the same clip. heavy_brawler, quick_striker, keeper, playmaker, big_boss, small_agile, balanced, or add a JSON file in character_types/. Changes timing, stance width, reach and weight. (none) leaves the motion alone."),
     ("Motion library", "v11.4: where a shipped or imported clip has the same name as a move (punch, walk, tackle, ...), drive that move from the motion library instead of the procedural pose. Record and import with forge.py motion."),
+    ("Game type", "v11.5: a game-type pack (soccer, boxing, fighting, gaelic, ...). It sets the move list, the camera, and the gameplay events. Add your own by dropping a JSON file in game_packs/. (none) leaves the move list alone. Profiles still work."),
+    ("Motion set", "v11.5: a recorded set of skeleton clips (Library > Recording session, or forge.py motion record --folder). Builds read that set first, then the starter fills anything missing. (saved default) uses the set you marked with forge.py motion use-set. (none) ignores it."),
 ]
 FIELD_HELP = dict(FIELDS)
 
@@ -897,7 +1013,9 @@ ALIASES = {"sheet": "sprite-sheet", "spritesheet": "sprite-sheet", "sprite_sheet
            "files": "outputs", "doctor": "install", "setup": "install", "linux": "install", "fbx": "install", "output": "outputs", "mode": "modes", "console": "consoles", "engine": "engines",
            "unity": "plugins", "godot": "plugins", "plugin": "plugins", "style": "v9", "faces": "v9", "expressions": "v9",
            "colours": "v9", "colors": "v9", "recolor": "v9", "variants": "v9", "npc": "v9", "batch": "v9", "atlas": "v9", "qa": "v9", "framedata": "v9", "raylib": "engines", "unreal": "engines", "snes": "engines", "gba": "engines",
-           "motions": "motion", "character-type": "motion", "character_type": "motion", "retarget-motion": "motion"}
+           "motions": "motion", "character-type": "motion", "character_type": "motion", "retarget-motion": "motion",
+           "v115": "game", "pack": "game", "packs": "game", "shotlist": "game", "session": "game",
+           "manifest": "game", "game_character": "game"}
 
 
 def render(topic=""):

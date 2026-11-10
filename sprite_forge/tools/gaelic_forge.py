@@ -4,7 +4,10 @@ one watertight mesh, polygon budget, UVs, skin weights, baked kit textures, pack
     python3 tools/gaelic_forge.py --out /tmp/gf_forge [--tris 22000] [--install]
 
 Reads the skeleton + 32 animation clips from Gaelic_Football_3d/assets/models/gaelic_player.glb (kept unchanged) and
-writes <out>/gaelic_player.glb + <out>/kit_<name>.png (home, away, gk_home, gk_away, referee, umpire)."""
+writes <out>/gaelic_player.glb + <out>/kit_<name>.png (home, away, gk_home, gk_away, referee, umpire).
+
+The sprite move list for a Gaelic build is game_packs/gaelic.json (`forge.py build --game gaelic`). This tool
+is still the 3D mesh. It does not read game_character.json."""
 from __future__ import annotations
 import argparse, io, json, os, shutil, sys, time
 import numpy as np

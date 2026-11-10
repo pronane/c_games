@@ -1,0 +1,219 @@
+{
+ "name": "beat_em_up",
+ "label": "Beat 'em up",
+ "description": "Side-on brawler. Hit windows on the strikes, a release frame on the throw, footsteps on the walk cycles.",
+ "camera": "side",
+ "prop": "none",
+ "props": [],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "punch",
+   "library": "punch",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 3,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "kick",
+   "library": "kick",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "jump",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "jumpattack",
+   "library": "kick",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "block",
+   "library": "block",
+   "frames": 4,
+   "fps": 10,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "pickup",
+   "library": "crouch",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "pick up a weapon or a foe"
+  },
+  {
+   "name": "throw",
+   "library": "punch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 4,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": 5,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  }
+ ],
+ "notes": ""
+}

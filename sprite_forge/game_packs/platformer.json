@@ -1,0 +1,201 @@
+{
+ "name": "platformer",
+ "label": "Platformer",
+ "description": "Side-scrolling platformer. Footsteps on the cycles, a hit window on the attacks.",
+ "camera": "side",
+ "prop": "none",
+ "props": [],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "jump",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "crouch",
+   "library": "crouch",
+   "frames": 4,
+   "fps": 10,
+   "loop": false,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "punch",
+   "library": "punch",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 3,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "kick",
+   "library": "kick",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "fall",
+   "library": "hit",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knockdown \u2014 starter has no separate fall clip"
+  },
+  {
+   "name": "get_up",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Damage",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  }
+ ],
+ "notes": "profiles/platformer.json still writes the Godot / Unity / Tiled files from the procedural preset. This pack is the move list plus events; the build also writes game_character.json."
+}

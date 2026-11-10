@@ -16,6 +16,13 @@ EF_STATES = ["idle", "walk", "crouch", "jump", "punch", "kick", "pyramid_blast",
 
 
 def export(src, dst, projectile=None):
+    # v11.5: a folder that only has game_character.json still exports. A normal build already has atlas.json.
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        from sforge.gamemanifest import ensure_atlas
+        ensure_atlas(src)
+    except Exception:
+        pass
     js = json.load(open(os.path.join(src, "atlas.json")))
     meta, an = js["meta"], js["animations"]
     fw, fh, gy = meta["frame_w"], meta["frame_h"], meta["ground_y"]

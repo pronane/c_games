@@ -9,7 +9,7 @@ the upright idle figure is --figure px tall (the built-in fighters are ~170), wr
 select/portrait_<tag>.png and adds the character to BOTH meta.json files (F2 toggles between them).
 State map: lp/hp = punch, lk/hk = kick, super = special1, win = victory, lose = hit (held).
 Pure Pillow; pixels are scaled, never redrawn."""
-import argparse, json, os
+import argparse, json, os, sys
 from PIL import Image
 
 STATES = {"idle": "idle", "walk": "walk", "crouch": "crouch", "jump": "jump", "lp": "punch", "hp": "punch",
@@ -23,6 +23,13 @@ def main():
     ap.add_argument("src"); ap.add_argument("game"); ap.add_argument("tag")
     ap.add_argument("--figure", type=int, default=182); ap.add_argument("--feet", type=int, default=226)
     a = ap.parse_args()
+    # v11.5: if the folder has game_character.json but no atlas.json, rebuild the index the adapter reads.
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        from sforge.gamemanifest import ensure_atlas
+        ensure_atlas(a.src)
+    except Exception:
+        pass
     js = json.load(open(os.path.join(a.src, "atlas.json")))
     meta, an = js["meta"], js["animations"]
     gy, px = meta["ground_y"], meta.get("pivot", {}).get("x", meta["frame_w"] // 2)

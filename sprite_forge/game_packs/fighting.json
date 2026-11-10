@@ -1,0 +1,270 @@
+{
+ "name": "fighting",
+ "label": "Fighting",
+ "description": "Side-on fighter. The 14 move names match the existing fighter14 profile; each one plays a generic library clip.",
+ "camera": "side",
+ "prop": "none",
+ "props": [],
+ "frame": [
+  128,
+  160
+ ],
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "fighting stance"
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": "stance walk"
+  },
+  {
+   "name": "crouch",
+   "library": "crouch",
+   "frames": 4,
+   "fps": 10,
+   "loop": false,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "crouch"
+  },
+  {
+   "name": "jump",
+   "library": "jump",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Basic",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "jump"
+  },
+  {
+   "name": "punch",
+   "library": "punch",
+   "frames": 6,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 3,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "straight punch"
+  },
+  {
+   "name": "kick",
+   "library": "kick",
+   "frames": 7,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "front kick"
+  },
+  {
+   "name": "special1",
+   "library": "punch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 4,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "rising strike \u2014 same library clip as punch, later active frames"
+  },
+  {
+   "name": "special2",
+   "library": "kick",
+   "frames": 10,
+   "fps": 14,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 5,
+    "hit_end": 7,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "spinning kick \u2014 same library clip as kick, later active frames"
+  },
+  {
+   "name": "block",
+   "library": "block",
+   "frames": 3,
+   "fps": 10,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "guard"
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "take a hit"
+  },
+  {
+   "name": "throw",
+   "library": "punch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 4,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": 5,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "grab and throw"
+  },
+  {
+   "name": "jumpattack",
+   "library": "kick",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Attack",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "flying kick"
+  },
+  {
+   "name": "taunt",
+   "library": "wave",
+   "frames": 8,
+   "fps": 8,
+   "loop": false,
+   "category": "Extra",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "taunt"
+  },
+  {
+   "name": "victory",
+   "library": "wave",
+   "frames": 10,
+   "fps": 8,
+   "loop": true,
+   "category": "Extra",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "victory"
+  }
+ ],
+ "notes": "special1 and special2 share a library clip with punch and kick. The events are what make them different in the game. The old fighter14 profile still builds the procedural fighter motions if you do not pass --game."
+}

@@ -32,6 +32,13 @@ def main(argv=None):
     ap.add_argument("build"); ap.add_argument("out")
     ap.add_argument("--projectile", choices=["ball", "book", "card", "bubble", "fire", "fire_blue"])
     a = ap.parse_args(argv)
+    # v11.5: a manifest-only folder still has the move list. A normal build already has sprites.cfg.
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        from sforge.gamemanifest import ensure_sprites_cfg
+        ensure_sprites_cfg(a.build)
+    except Exception:
+        pass
     cfg = os.path.join(a.build, "sprites.cfg")
     frame = ground = height = None
     moves = []

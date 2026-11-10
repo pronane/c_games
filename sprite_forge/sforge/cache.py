@@ -142,6 +142,14 @@ def input_sigs(cfg):
             s["motion_library"] = motionlib.signature(getattr(cfg, "motion_library", "") or None)
         except Exception:
             s["motion_library"] = getattr(cfg, "motion_library", "")
+    pref = os.environ.get("SFS_MOTION_SET", "").strip()
+    if pref and os.path.isdir(pref):
+        s["motion_set"] = file_sig(pref)
+    gp = getattr(cfg, "game_pack_path", "") or ""
+    if gp and os.path.isfile(gp):
+        s["game_pack"] = file_sig(gp)
+    elif getattr(cfg, "game_pack", ""):
+        s["game_pack"] = cfg.game_pack
     return s
 
 
