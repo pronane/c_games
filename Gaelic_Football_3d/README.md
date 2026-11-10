@@ -1,4 +1,4 @@
-# Sunday League: Gaelic Football (C + raylib), v3.3
+# Sunday League: Gaelic Football (C + raylib), v3.4
 
 3D Gaelic football on a full-size pitch (140 x 85 m) with two 15-a-side teams, a referee
 and four umpires. The game runs on **your original rules engine** (`src/game.c` / `src/game.h`,
@@ -16,6 +16,47 @@ brought over from `legacy/` and extended), with a raylib 3D frontend in `src/mai
 
 Works with raylib 5.5 and 6.x. Run the game from this folder, because `assets/` is loaded
 relative to the exe.
+
+## v3.4: weight, defending, and the Sprite Forge footballer
+
+The rules engine is still `src/game.c`. This pass makes a match feel less like ice and less
+like the CPU is glued to your back. It does not change the renderer to another engine.
+
+- **CPU tackling.** A defender waits about 0.7 s inside range before he commits. A tackle
+  from behind is a free. Chasing your carrier he closes at 7.25 m/s and, inside 8 m, holds
+  at 6.35 m/s instead of sprinting through you.
+- **Jockey.** Hold **L2** or **Ctrl**. You shadow the carrier about 2 m on your own goal
+  side, at a jog, facing him. The stick only shades you across. A **tap of L2**, or **B**
+  with no ball (keyboard **K** or **Space**), is the tackle. A solo or bounce in front of
+  you is easier to time. **L2+Y** is still the straight red.
+- **Solo rhythm.** A ring around your feet fills across the four steps (HUD pips too).
+  On the fourth step the game toe-taps, or bounces when a bounce is the legal one.
+  **T** turns that assist off. Holding **B** still does it.
+- **The mark.** A clean catch inside the 45, from a kick of 20 m or more that left from
+  outside the 45, is an advanced mark. Kick-passes count. The catcher puts an arm up,
+  a 15 s clock runs, and everyone else is kept 13 m away. Kick it, or **R** to play on.
+- **Kick-outs.** While the kick-out is on, the d-pad (or **7 / 8 / 9**) picks **short**,
+  **long** or **wing**. Teammates show for it. **U**, or the d-pad when the other keeper
+  has it, sets your press: drop, zonal or press. The CPU kick-out answers that press.
+- **High ball.** A landing marker sits on the drop. Jump timing is graded early / perfect /
+  late. A clean take is the catch; a mistimed jump on a dropping ball spills it sideways.
+- **Stamina, aim, curl.** Sprinting drains a bar on the HUD and, once it is low, cuts your
+  speed and your kick. Charging a shot toward the posts draws an aim cone. The **right stick**
+  (or **comma / period**) bends it while you hold the kick. **L1** or **Q** cancels a charge.
+  An assisted pass is re-aimed at the contact frame.
+
+Animation: on raylib 6 the pose is `UpdateModelAnimationEx` (float frames, two-clip blend).
+On 5.5 the same blend is done in the game and uploaded as one pose, so an MSYS2 UCRT64
+raylib 5.5 build still links. Squad looks upload their bone matrices before each draw, which
+is what keeps the Sprite Forge body out of the bind pose on the GPU path. Far players skip
+the cross-fade. On Low, and for anyone past about 24 m, shadows stay blobs. **F2 / F3 / F4**
+are unchanged.
+
+The new Mixamo FBX files in `assets/source/` (`Gaelic_football_bounce.fbx`, the toe-lift,
+the push, the jog clips, the keeper catches) use the same bone names but are not in
+`gaelic_player.glb`. They were left out: there is no FBX converter in this tree, and a bad
+retarget would stiffen the body the clips were fitted to. Bounce still plays the carry
+cycle, with the ball dropped by the game. That is the main remaining visual limit.
 
 ## Start-up
 The game opens with a **20-second AI-vs-AI attract demo**. It uses broadcast cameras (aerial
@@ -123,26 +164,29 @@ alongside the pad.
 | Pad | With the ball | Without the ball |
 |---|---|---|
 | Left stick | move (camera-relative) | move |
-| Right stick | orbit / zoom the camera (R3 resets) | same |
+| Right stick | orbit / zoom the camera (R3 resets). While a kick is held, the stick curls it | same |
 | A | hand pass | toe-lift pick-up |
-| B | solo or bounce (picks the legal one) | - |
 | X | kick: hold for power, release to kick | jump / high catch |
 | Y | shoot: faces the posts; a low drive when close and central | - |
 | R1 | sprint (about 9 m/s) | sprint |
 | R2 | power kick: full-power long kick, aimed at the posts within 52 m (a two-point attempt from outside the arc) | - |
 | L1 | - | switch to the player nearest the ball |
-| L2 | - | tackle / shoulder charge |
+| L2 hold | - | jockey: shadow the carrier, goal side |
+| L2 tap | - | tackle / shoulder (a quick press and release) |
+| B | solo or bounce (picks the legal one) | tackle |
 | L2 + Y | - | **hook / head-hit special move: always a RED card** |
 | Start | pause; skip the intro; menu select | |
 | Back | controller test screen (F1 on the keyboard) | |
-| D-pad | menu up/down; next/previous camera in a match | |
+| D-pad | menu up/down; next/previous camera in a match. During a kick-out: short / long / wing, or your press | |
 
 ## Controls: keyboard
 | Key | Action |
 |---|---|
 | WASD / arrows | move (relative to the camera) |
-| Left Shift | sprint |
+| Left Shift | sprint (drains stamina) |
+| Left Ctrl | jockey |
 | SPACE hold + release | drop-punt pass/shot, with power set by hold time; without the ball: tackle |
+| , / . | curl a kick while it is held |
 | F | low driven / ground shot |
 | G | shoot at goal (auto-aim) |
 | L | power kick / two-point attempt |
@@ -155,7 +199,9 @@ alongside the pad.
 | Q / TAB | switch player |
 | 1-6 / C | cameras: Broadcast, TV close, Chase, Behind goal, Tactical, Player close-up |
 | Z / X, V | orbit the camera, reset |
-| T | auto-solo assist on/off |
+| T | auto-solo on the fourth step, on/off |
+| U | cycle the kick-out press (drop / zonal / press) |
+| 7 / 8 / 9 | during your kick-out: short / long / wing |
 | P | pause. F1: controller test / controls. F2 graphics quality. F3 FPS / profiler. F4 GPU/CPU skinning. Enter: new match after full time |
 
 ## Cards and discipline (shown by the referee)
@@ -212,9 +258,8 @@ alongside the pad.
 * **3v3**: each team keeps at least 3 outfield players in each half. A breach gives a free.
 * Referee runs with play and signals frees and scores. Restarts and fouls show event text.
 
-**Not implemented:** advanced mark, the back-pass-to-keeper restriction, 50 m advance for
-dissent/tactical fouls, cards/sin-bin, early-movement offences at the throw-in, the
-"kick-out must be kicked forward" detail, and extra time.
+The advanced mark, kick-out mark, back-pass, dissent and cards are in the engine. Not in
+this build: early-movement offences at the throw-in, and extra time.
 
 ## Animation
 `assets/models/gaelic_player.glb` holds the skinned player (52 bones) plus 32 clips. The ball

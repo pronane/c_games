@@ -443,7 +443,8 @@ static void test_cpu_tackles_home_carrier_after_closing_down(void)
     game.ball.z = game.players[0][game.selected_player].z;
     game.has_ball = 1;
 
-    for (frame = 0; frame < 10 && game.ball_team == 0; frame++)
+    /* v3.4: the CPU waits longer before committing, so the close-down takes about 0.7 s */
+    for (frame = 0; frame < 24 && game.ball_team == 0; frame++)
         game_update(&game, input, 0.05f);
 
     assert(game.ball_team == 1);
@@ -897,6 +898,204 @@ static void test_goal_chance_zone(void)
     assert(game_goal_chance_zone(1, 15.0f, 40.0f));
 }
 
+static void test_cpu_tackle_from_behind_is_a_free(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int frame;
+    game_init(&game);
+    game.players[0][game.selected_player].x = 80.0f;
+    game.players[0][game.selected_player].z = 42.0f;
+    game.players[0][game.selected_player].facing_x = 1.0f;
+    game.players[0][game.selected_player].facing_z = 0.0f;
+    for (frame = 0; frame < GAME_TEAM_SIZE; frame++) {
+        game.players[1][frame].x = 130.0f;
+        game.players[1][frame].z = 80.0f;
+    }
+    game.players[1][3].x = 77.6f;   /* behind the carrier, who is facing +x */
+    game.players[1][3].z = 42.0f;
+    game.ball_team = 0;
+    game.ball_player = game.selected_player;
+    game.has_ball = 1;
+    for (frame = 0; frame < 24 && game.event != GAME_EVENT_FOUL_TACKLE; frame++)
+        game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_FOUL_TACKLE);
+    assert(game.ball_team == 0 && game.restart_pending);
+}
+
+static void test_cpu_chase_does_not_outrun_the_carrier(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int frame;
+    float x0;
+    game_init(&game);
+    game.players[0][game.selected_player].x = 40.0f;
+    game.players[0][game.selected_player].z = 40.0f;
+    for (frame = 0; frame < GAME_TEAM_SIZE; frame++) {
+        game.players[1][frame].x = 120.0f;
+        game.players[1][frame].z = 70.0f;
+    }
+    game.players[1][6].x = 20.0f;
+    game.players[1][6].z = 40.0f;
+    game.ball_team = 0;
+    game.ball_player = game.selected_player;
+    game.has_ball = 1;
+    x0 = game.players[1][6].x;
+    for (frame = 0; frame < 20; frame++) game_update(&game, input, 0.05f);
+    /* 1 second at the far chase cap (7.25 m/s) is the most he may gain */
+    assert(game.players[1][6].x - x0 < 7.4f);
+    assert(game.players[1][6].x > x0);
+}
+
+static void test_jockey_holds_goal_side(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int frame;
+    float start;
+    game_init(&game);
+    game.players[0][game.selected_player].x = 82.0f;   /* just the wrong side of the carrier; jockey drops goal-side */
+    game.players[0][game.selected_player].z = 42.0f;
+    for (frame = 0; frame < GAME_TEAM_SIZE; frame++) {
+        game.players[1][frame].x = 130.0f;
+        game.players[1][frame].z = 70.0f;
+    }
+    game.players[1][9].x = 78.0f;
+    game.players[1][9].z = 42.0f;
+    game.ball_team = 1;
+    game.ball_player = 9;
+    game.has_ball = 0;
+    input.jockey = 1;
+    start = game.players[0][game.selected_player].x;
+    for (frame = 0; frame < 40; frame++) {
+        game.players[1][9].x = 78.0f;
+        game.players[1][9].z = 42.0f;
+        game.players[1][9].action = GAME_ACT_FREE_KICK;   /* hold him so the shadow spot stays put */
+        game.players[1][9].action_time = 0.0f;
+        game.players[1][9].action_released = 1;
+        game.ball_team = 1;
+        game.ball_player = 9;
+        game_update(&game, input, 0.05f);
+    }
+    /* own goal is x = 0, so jockeying steps back toward it, not through the carrier at 78 */
+    assert(game.players[0][game.selected_player].x < start);
+    assert(game.players[0][game.selected_player].x < game.players[1][9].x);
+}
+
+static void test_stamina_limits_a_long_sprint(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int frame, who;
+    float fresh, tired;
+    GamePlayer *me;
+    game_init(&game);
+    who = game.selected_player;
+    me = &game.players[0][who];
+    for (frame = 0; frame < GAME_TEAM_SIZE; frame++) {
+        game.players[1][frame].x = 130.0f;
+        game.players[1][frame].z = 80.0f;
+    }
+    game.ball_team = -1;
+    game.ball_player = -1;
+    game.ball.x = 2.0f;
+    game.ball.z = 2.0f;
+    input.move_x = 1.0f;
+    input.sprint = 1;
+    for (frame = 0; frame < 120; frame++) {          /* 6 s, kept as the controlled player */
+        game.selected_player = who;
+        me->x = 60.0f;
+        game.ball_team = -1;
+        game.ball_player = -1;
+        game_update(&game, input, 0.05f);
+    }
+    assert(me->stamina < 0.80f);
+    game.selected_player = who;
+    me->stamina = 1.0f;
+    me->x = 40.0f;
+    game_update(&game, input, 0.05f);
+    fresh = me->x - 40.0f;
+    game.selected_player = who;
+    me->stamina = 0.08f;
+    me->x = 40.0f;
+    game_update(&game, input, 0.05f);
+    tired = me->x - 40.0f;
+    assert(tired < fresh * 0.85f);
+}
+
+static void test_advanced_mark_from_a_kick_into_the_45(void)
+{
+    GameState game;
+    GameInput input = {0};
+    GamePlayer *me;
+    game_init(&game);
+    me = &game.players[0][game.selected_player];
+    me->x = 100.0f; me->z = 40.0f;          /* 40 m from the goal: inside the 45, outside the 20 */
+    for (int i = 0; i < GAME_TEAM_SIZE; i++) {
+        game.players[1][i].x = 20.0f;
+        game.players[1][i].z = 10.0f;
+    }
+    game.ball_team = -1; game.ball_player = -1;
+    game.ball.x = 99.0f; game.ball.z = 40.0f; game.ball.height = 2.0f;
+    game.ball.velocity_x = 8.0f; game.ball.velocity_y = 0.0f; game.ball.in_flight = 1;
+    game.kick_clean = 1; game.kick_origin_x = 70.0f; game.kick_origin_z = 40.0f;
+    game.last_release_team = 0; game.last_release_player = 4; game.last_touch_team = 0;
+    input.high_field = 1;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_ADVANCED_MARK);
+    assert(game.mark_play_on && game.mark_clock > 14.0f);
+    assert(game.restart_pending);
+}
+
+static void test_breaking_ball_on_a_mistimed_jump(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int i;
+    GamePlayer *me;
+    game_init(&game);
+    me = &game.players[0][game.selected_player];
+    me->x = 80.0f; me->z = 42.0f;
+    me->jump_time = 0.74f;                  /* just left the ground: early */
+    for (i = 0; i < GAME_TEAM_SIZE; i++) {
+        game.players[1][i].x = 10.0f;
+        game.players[1][i].z = 10.0f;
+        game.players[0][i].x = 10.0f;
+        game.players[0][i].z = 70.0f;
+    }
+    me->x = 80.0f; me->z = 42.0f; me->jump_time = 0.74f;
+    game.ball_team = -1; game.ball_player = -1;
+    game.ball.x = 80.2f; game.ball.z = 42.0f; game.ball.height = 2.4f;
+    game.ball.velocity_x = 2.0f; game.ball.velocity_z = 0.0f; game.ball.velocity_y = -8.0f;
+    game.ball.in_flight = 1;
+    game_update(&game, input, 0.05f);
+    assert(game.event == GAME_EVENT_BREAKING_BALL);
+    assert(game.ball.in_flight);
+    assert(game.ball_team < 0);
+    assert(game.contest_grade == 4);
+}
+
+static void test_kickout_plan_moves_a_teammate(void)
+{
+    GameState game;
+    GameInput input = {0};
+    int frame;
+    float z0;
+    game_init(&game);
+    game.restart_pending = 1;
+    game.restart_type = GAME_RESTART_KICKOUT;
+    game.ball_team = 0;
+    game.ball_player = 0;
+    game.has_ball = 1;
+    game.selected_player = 0;
+    z0 = game.players[0][4].z;
+    input.kickout_plan = 1;                 /* short, toward the near sideline */
+    for (frame = 0; frame < 40; frame++) game_update(&game, input, 0.05f);
+    assert(game.kickout_plan == 1);
+    assert(game.players[0][4].z != z0);
+}
+
 int main(void)
 {
     test_initial_state();
@@ -934,6 +1133,13 @@ int main(void)
     test_advanced_mark();
     test_back_pass_to_keeper_is_a_free();
     test_goal_chance_zone();
+    test_cpu_tackle_from_behind_is_a_free();
+    test_cpu_chase_does_not_outrun_the_carrier();
+    test_jockey_holds_goal_side();
+    test_stamina_limits_a_long_sprint();
+    test_advanced_mark_from_a_kick_into_the_45();
+    test_breaking_ball_on_a_mistimed_jump();
+    test_kickout_plan_moves_a_teammate();
     puts("Core game tests passed.");
     return 0;
 }
