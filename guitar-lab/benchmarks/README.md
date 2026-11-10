@@ -2,7 +2,9 @@
 
 Note-level regression across acoustic, clean electric, reverb, rendered, and full-band
 intro clips is `benchmarks/regression/` (`python -m benchmarks.regression`). The committed
-Basic Pitch numbers are the reference. See [regression/README.md](regression/README.md).
+Basic Pitch numbers are the reference. EGSet12 and the twelve Guitar-TECHS musical
+excerpts are an extra no-drop floor on the same harness (CC BY 4.0, local audio only).
+See [regression/README.md](regression/README.md).
 
 
 

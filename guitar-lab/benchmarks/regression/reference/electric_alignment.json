@@ -1,0 +1,310 @@
+{
+  "method": "Pitch-blind onset-envelope cross-correlation against reference onset times. Search limited to ±100 ms (hop 128). A peak below 0.08 stores a shift of 0. Transcription notes are not an input, and the lag is not chosen by note F1. Guitar-TECHS authors warn of up to 100 ms misalignment between signals; this one constant per excerpt is the correction. Residual error inside that bound is why note F1 at ±100 ms is locked beside F1 at ±50 ms.",
+  "limit_s": 0.1,
+  "hop": 128,
+  "weak_peak": 0.08,
+  "guitar_techs_signal": "micamp",
+  "guitar_techs_signal_reason": "miked amp kept (correlation 0.301, mean |lag| 10.4 ms; direct input 0.295, 13.1 ms)",
+  "guitar_techs_signal_stats": {
+    "micamp": {
+      "peak": 0.3006,
+      "abs_lag": 0.0104,
+      "weak": 0
+    },
+    "directinput": {
+      "peak": 0.295,
+      "abs_lag": 0.0131,
+      "weak": 0
+    }
+  },
+  "clips": {
+    "egset_01": {
+      "shift_s": 0.008,
+      "estimated_shift_s": 0.008,
+      "peak": 0.3661,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_02": {
+      "shift_s": 0.0107,
+      "estimated_shift_s": 0.0107,
+      "peak": 0.1665,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_03": {
+      "shift_s": 0.008,
+      "estimated_shift_s": 0.008,
+      "peak": 0.1974,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_04": {
+      "shift_s": 0.0107,
+      "estimated_shift_s": 0.0107,
+      "peak": 0.2469,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_05": {
+      "shift_s": 0.008,
+      "estimated_shift_s": 0.008,
+      "peak": 0.369,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_06": {
+      "shift_s": 0.024,
+      "estimated_shift_s": 0.024,
+      "peak": 0.1949,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_07": {
+      "shift_s": 0.0107,
+      "estimated_shift_s": 0.0107,
+      "peak": 0.3295,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_08": {
+      "shift_s": 0.0107,
+      "estimated_shift_s": 0.0107,
+      "peak": 0.3443,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_09": {
+      "shift_s": 0.0133,
+      "estimated_shift_s": 0.0133,
+      "peak": 0.3245,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_10": {
+      "shift_s": 0.0133,
+      "estimated_shift_s": 0.0133,
+      "peak": 0.2755,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_11": {
+      "shift_s": 0.0107,
+      "estimated_shift_s": 0.0107,
+      "peak": 0.2649,
+      "weak": false,
+      "signal": "mic"
+    },
+    "egset_12": {
+      "shift_s": 0.0107,
+      "estimated_shift_s": 0.0107,
+      "peak": 0.3551,
+      "weak": false,
+      "signal": "mic"
+    },
+    "techs_01": {
+      "shift_s": -0.0213,
+      "estimated_shift_s": -0.0213,
+      "peak": 0.2254,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.2254,
+          "estimated_shift_s": -0.0213
+        },
+        "directinput": {
+          "peak": 0.2227,
+          "estimated_shift_s": -0.024
+        }
+      }
+    },
+    "techs_02": {
+      "shift_s": -0.0107,
+      "estimated_shift_s": -0.0107,
+      "peak": 0.3042,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3042,
+          "estimated_shift_s": -0.0107
+        },
+        "directinput": {
+          "peak": 0.3037,
+          "estimated_shift_s": -0.016
+        }
+      }
+    },
+    "techs_03": {
+      "shift_s": -0.0053,
+      "estimated_shift_s": -0.0053,
+      "peak": 0.3359,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3359,
+          "estimated_shift_s": -0.0053
+        },
+        "directinput": {
+          "peak": 0.3274,
+          "estimated_shift_s": -0.008
+        }
+      }
+    },
+    "techs_04": {
+      "shift_s": -0.008,
+      "estimated_shift_s": -0.008,
+      "peak": 0.3209,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3209,
+          "estimated_shift_s": -0.008
+        },
+        "directinput": {
+          "peak": 0.3104,
+          "estimated_shift_s": -0.008
+        }
+      }
+    },
+    "techs_05": {
+      "shift_s": -0.008,
+      "estimated_shift_s": -0.008,
+      "peak": 0.2637,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.2637,
+          "estimated_shift_s": -0.008
+        },
+        "directinput": {
+          "peak": 0.256,
+          "estimated_shift_s": -0.0107
+        }
+      }
+    },
+    "techs_06": {
+      "shift_s": -0.016,
+      "estimated_shift_s": -0.016,
+      "peak": 0.2838,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.2838,
+          "estimated_shift_s": -0.016
+        },
+        "directinput": {
+          "peak": 0.2742,
+          "estimated_shift_s": -0.0187
+        }
+      }
+    },
+    "techs_07": {
+      "shift_s": -0.008,
+      "estimated_shift_s": -0.008,
+      "peak": 0.2256,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.2256,
+          "estimated_shift_s": -0.008
+        },
+        "directinput": {
+          "peak": 0.2251,
+          "estimated_shift_s": -0.0107
+        }
+      }
+    },
+    "techs_08": {
+      "shift_s": -0.008,
+      "estimated_shift_s": -0.008,
+      "peak": 0.3363,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3363,
+          "estimated_shift_s": -0.008
+        },
+        "directinput": {
+          "peak": 0.3272,
+          "estimated_shift_s": -0.0107
+        }
+      }
+    },
+    "techs_09": {
+      "shift_s": -0.008,
+      "estimated_shift_s": -0.008,
+      "peak": 0.3686,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3686,
+          "estimated_shift_s": -0.008
+        },
+        "directinput": {
+          "peak": 0.365,
+          "estimated_shift_s": -0.0107
+        }
+      }
+    },
+    "techs_10": {
+      "shift_s": -0.008,
+      "estimated_shift_s": -0.008,
+      "peak": 0.3391,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3391,
+          "estimated_shift_s": -0.008
+        },
+        "directinput": {
+          "peak": 0.339,
+          "estimated_shift_s": -0.0107
+        }
+      }
+    },
+    "techs_11": {
+      "shift_s": -0.0133,
+      "estimated_shift_s": -0.0133,
+      "peak": 0.3391,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.3391,
+          "estimated_shift_s": -0.0133
+        },
+        "directinput": {
+          "peak": 0.333,
+          "estimated_shift_s": -0.016
+        }
+      }
+    },
+    "techs_12": {
+      "shift_s": -0.0107,
+      "estimated_shift_s": -0.0107,
+      "peak": 0.2645,
+      "weak": false,
+      "signal": "micamp",
+      "alternatives": {
+        "micamp": {
+          "peak": 0.2645,
+          "estimated_shift_s": -0.0107
+        },
+        "directinput": {
+          "peak": 0.2563,
+          "estimated_shift_s": -0.0133
+        }
+      }
+    }
+  }
+}

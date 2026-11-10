@@ -317,3 +317,99 @@ Category means hide this. A drop of more than 0.005 against Basic Pitch:
 - EGDB / EGDB-PG: the paired clean-and-amp set was not downloaded (the public FLAC bundle is 135 GB; the original set is on request).
 - Carcassi: `ground_truth_aligned_to_recording.mid` is in the tree. The recording it was aligned to was not in the attachment and was not found. A different public performance was not substituted.
 - Metallica and the user AAC takes: local only, not committed.
+
+## Real miked-amp electric (EGSet12 and Guitar-TECHS excerpts)
+
+Added as gate material. Audio is not in the repo. The numbers below are the
+locked floors in `reference/electric_baseline.json`. A later transcription may
+score higher. A clip that falls by more than 0.02, or a category mean that
+falls by more than 0.01, fails `test_electric_sets_do_not_drop_below_the_locked_baseline`
+when the files are on disk. Without the files that test skips.
+
+Same transcribe entry as the rest of this library: Basic Pitch at 0.6/0.4, Riley
+with its reverb-aware decoder. No chart is an input. Song-level ghost suppression
+and missed-note pickup are not in this score. The default transcriber is unchanged.
+EGDB's high-gain pairs are still unmeasured, so this does not clear that gap.
+
+Both sets are CC BY 4.0, for evaluation only.
+
+- EGSet12: Pedroza, Abreu, Corey, and Roman, DAFx 2024. https://zenodo.org/records/11406378. doi:10.48550/arXiv.2405.14679. All 12 miked-amp solos, no other effects. Reference is the JAMS `note_midi` annotations (one per string).
+- Guitar-TECHS excerpts: Pedroza, Abreu, Corey, and Roman, ICASSP 2025. https://zenodo.org/records/14963133 and https://guitar-techs.github.io/. doi:10.1109/ICASSP49660.2025.10887996. Only `P3_music.zip` (the 12 musical excerpts, about 8 minutes). Not the 4.1 GB of techniques, chords, and scales.
+
+The authors warn of up to 100 ms misalignment. Each clip has one frozen lag from
+a pitch-blind onset-envelope correlation inside ±100 ms (`electric_alignment.json`).
+It is not chosen by note F1. EGSet12 landed at +8 to +24 ms. Guitar-TECHS miked
+amp landed at −5 to −21 ms (mean absolute 10.4 ms). Direct input was 13.1 ms and
+no stronger, so the gate scores the miked amp. Note F1 at ±100 ms is locked
+beside ±50 ms.
+
+| backend | amp solo F1@50 | amp solo F1@100 | amp excerpt F1@50 | amp excerpt F1@100 |
+| --- | --- | --- | --- | --- |
+| basic_pitch | 0.828 | 0.851 | 0.663 | 0.675 |
+| riley | 0.893 | 0.914 | 0.772 | 0.780 |
+
+Riley is ahead on both sets. That does not switch the default: it was already
+Riley when the package is installed, and the unmeasured EGDB and Carcassi gaps
+remain.
+
+Per clip, note F1 at ±50 ms. The ±100 ms number is in parentheses when it differs.
+
+### basic_pitch
+
+| clip | F1@50 (F1@100) | onset F1 | pitch recall @300ms | notes ref/est |
+| --- | --- | --- | --- | --- |
+| egset_01 | 0.906 | 0.906 | 0.989 | 92/109 |
+| egset_02 | 0.762 | 0.767 | 0.636 | 242/162 |
+| egset_03 | 0.682 (0.832) | 0.694 | 0.949 | 78/95 |
+| egset_04 | 0.771 (0.792) | 0.785 | 0.671 | 170/118 |
+| egset_05 | 0.902 (0.930) | 0.902 | 0.990 | 102/113 |
+| egset_06 | 0.562 (0.595) | 0.648 | 0.530 | 370/238 |
+| egset_07 | 0.932 | 0.947 | 0.969 | 64/69 |
+| egset_08 | 0.964 | 0.964 | 0.964 | 84/84 |
+| egset_09 | 0.916 | 0.916 | 0.933 | 89/90 |
+| egset_10 | 0.872 (0.899) | 0.872 | 0.972 | 71/78 |
+| egset_11 | 0.738 (0.757) | 0.878 | 0.845 | 103/111 |
+| egset_12 | 0.929 | 0.929 | 0.951 | 82/86 |
+| techs_01 | 0.764 (0.773) | 0.778 | 0.723 | 235/192 |
+| techs_02 | 0.775 | 0.808 | 0.741 | 224/199 |
+| techs_03 | 0.615 (0.644) | 0.664 | 0.859 | 78/130 |
+| techs_04 | 0.686 (0.702) | 0.734 | 0.789 | 175/204 |
+| techs_05 | 0.700 (0.722) | 0.722 | 0.750 | 88/92 |
+| techs_06 | 0.662 (0.667) | 0.685 | 0.534 | 275/160 |
+| techs_07 | 0.534 (0.543) | 0.552 | 0.408 | 147/74 |
+| techs_08 | 0.659 (0.674) | 0.705 | 0.627 | 142/116 |
+| techs_09 | 0.674 (0.682) | 0.722 | 0.836 | 104/151 |
+| techs_10 | 0.521 (0.533) | 0.599 | 0.754 | 191/323 |
+| techs_11 | 0.671 (0.695) | 0.695 | 0.563 | 103/64 |
+| techs_12 | 0.692 | 0.704 | 0.637 | 182/139 |
+
+### riley
+
+| clip | F1@50 (F1@100) | onset F1 | pitch recall @300ms | notes ref/est |
+| --- | --- | --- | --- | --- |
+| egset_01 | 0.994 | 0.994 | 0.989 | 92/91 |
+| egset_02 | 0.869 | 0.913 | 0.806 | 242/207 |
+| egset_03 | 0.776 (0.921) | 0.790 | 0.936 | 78/74 |
+| egset_04 | 0.931 | 0.931 | 0.876 | 170/150 |
+| egset_05 | 0.956 (0.975) | 0.956 | 0.990 | 102/101 |
+| egset_06 | 0.642 (0.656) | 0.688 | 0.505 | 370/200 |
+| egset_07 | 0.985 | 0.985 | 1.000 | 64/66 |
+| egset_08 | 0.950 | 0.950 | 0.905 | 84/76 |
+| egset_09 | 0.929 | 0.929 | 0.888 | 89/81 |
+| egset_10 | 0.929 (0.957) | 0.929 | 0.972 | 71/69 |
+| egset_11 | 0.794 (0.813) | 0.938 | 0.854 | 103/106 |
+| egset_12 | 0.958 (0.982) | 0.958 | 0.988 | 82/83 |
+| techs_01 | 0.773 (0.798) | 0.798 | 0.672 | 235/161 |
+| techs_02 | 0.950 (0.959) | 0.954 | 0.938 | 224/214 |
+| techs_03 | 0.918 (0.932) | 0.932 | 0.872 | 78/68 |
+| techs_04 | 0.869 | 0.888 | 0.823 | 175/154 |
+| techs_05 | 0.797 | 0.797 | 0.670 | 88/60 |
+| techs_06 | 0.656 (0.660) | 0.675 | 0.506 | 275/143 |
+| techs_07 | 0.440 (0.461) | 0.461 | 0.299 | 147/44 |
+| techs_08 | 0.655 (0.664) | 0.691 | 0.528 | 142/81 |
+| techs_09 | 0.895 | 0.895 | 0.817 | 104/86 |
+| techs_10 | 0.806 | 0.806 | 0.686 | 191/134 |
+| techs_11 | 0.767 (0.779) | 0.779 | 0.660 | 103/69 |
+| techs_12 | 0.733 (0.740) | 0.747 | 0.593 | 182/110 |
+
+Download with `python -m benchmarks.regression.download` from `guitar-lab/`.
