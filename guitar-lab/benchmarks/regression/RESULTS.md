@@ -266,6 +266,36 @@ frame dip) before accepting a repeat of a sounding note removes at most 72% of f
 while dropping 7–30% of real repeated notes on real recordings (EGSet12, Guitar-TECHS,
 GuitarSet). Real repeats are too common in music for that trade.
 
+## Separation is the bottleneck on heavy mixes
+
+**NIN "1,000,000"** (the band's own multitrack, CC BY-NC-SA 3.0 US; real distorted guitars).
+The ten stems were summed into a mix and separated three ways. Reference: Riley's notes on the
+real guitar tracks (Gtr + Gtr2, 959 notes). Score: how many of those notes Riley also finds on
+each separated guitar (note F1), and scale-invariant SDR against the real guitar.
+
+| Guitar source | SI-SDR | Agreement (F1) | Precision | Recall |
+|---|---|---|---|---|
+| Demucs htdemucs_6s guitar (current) | −2.9 dB | .238 | .348 | .180 |
+| BS-RoFormer-SW guitar | −1.8 dB | .283 | .385 | .224 |
+| becruily Mel-Band RoFormer guitar | +0.9 dB | .300 | .283 | .319 |
+| Full mix, no separation | −2.1 dB | .330 | .744 | .212 |
+| BS-RoFormer-SW guitar + other | −0.5 dB | .426 | .482 | .382 |
+| Demucs guitar + other | +1.4 dB | .497 | .635 | .409 |
+
+On the separated guitar Riley finds about a fifth of what it finds on the real guitar track.
+Newer separators help a little, not a lot. Demucs files much of this song's guitar under "other".
+
+**One, heavy half** (210–450 s, against the full-band tab): Demucs .126, BS-RoFormer-SW .116,
+becruily .116, full mix .031. No separator does better there.
+
+**Adding "other" on the user's six songs: not adopted.** It is no better on any of them and
+worse on four (note F1, guitar → guitar + other): Every Rose .246 → .208, Down in a Hole .400 →
+.399, 18 and Life .227 → .214, Home Sweet Home .176 → .155, November Rain .167 → .153, One heavy
+half .126 → .126 ("other" is 49 dB below the guitar there). It helps only where Demucs misfiles
+the guitar, as on the NIN song.
+
+Licences: BS-RoFormer-SW and the becruily model state none; neither is used by the app.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
