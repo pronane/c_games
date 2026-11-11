@@ -52,6 +52,29 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.9: a sharper texture - prints, lettering and stripes survive
+
+The cameras and the fitted body put each point of the texture within a centimetre or two of where a frame shows
+it: enough for the silhouette, not for a 1 cm stripe or a logo's lettering. Averaged over frames that each miss by
+a different centimetre, thin detail went grey - and the clean then treated the grey as a blotch.
+
+* **Frames aligned by optical flow** (`capture_texture.align_flows`): a first texture is drawn into every frame
+  from its camera, and the frame is matched to the drawing (DIS optical flow on locally normalised grey, so
+  exposure does not matter). The flow is smoothed, capped at 3% of the frame and fades out over the person's outer
+  15 px; hands and feet keep the camera's projection (on the outline the flow matches the floor). The texture is
+  then baked again from the corrected positions. Typical shift: 7-10 px per frame.
+* **Detail put back after the clean**: the clean still decides each garment's colours and edges. On the clothes,
+  where at least two views agree (spread under 25), the clean texture's own blur plus the aligned bake's fine
+  detail replaces it - a print's lettering, a stripe, a shirt's folds - but not where the clean moved a garment
+  edge (a hem snapped to its ring).
+* `SF_ALIGN=0` turns it off. It costs one extra bake per capture.
+* **Measured** (all five rebuilt): silhouette IoU unchanged. With the registration taken out of the comparison
+  (each held-out frame warped onto the render by optical flow), the rendered detail rises towards the footage's
+  (Mike 0.73 -> 0.83 of the frames' detail, PR 0.93 -> 0.97). Declan's frames are softer than his texture already
+  and gain noise rather than detail (aligned SSIM 0.754 -> 0.735). The plain held-out SSIM drops 0.01-0.03: a
+  sharper texture seen through a camera that is a centimetre off scores lower than a blurred one.
+* A synthetic capture with perfect cameras gets a 0.5 px median shift - the flow does not invent motion.
+
 ## New in v11.8: hands, feet in socks and shoes, no trousers on the feet
 
 * **Hands** read as skin: at game size a hand is a few pixels, and the bake gave it fingers stained with the
