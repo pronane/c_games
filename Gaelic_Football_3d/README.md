@@ -56,11 +56,15 @@ is what keeps the Sprite Forge body out of the bind pose on the GPU path. Far pl
 the cross-fade. On Low, and for anyone past about 24 m, shadows stay blobs. **F2 / F3 / F4**
 are unchanged.
 
-The new Mixamo FBX files in `assets/source/` (`Gaelic_football_bounce.fbx`, the toe-lift,
-the push, the jog clips, the keeper catches) use the same bone names but are not in
-`gaelic_player.glb`. They were left out: there is no FBX converter in this tree, and a bad
-retarget would stiffen the body the clips were fitted to. Bounce still plays the carry
-cycle, with the ball dropped by the game. That is the main remaining visual limit.
+A walk, jog and sprint play the clip fast enough to follow the ground speed (the old 1x cycle
+was a glide at 7 m/s). The stance foot stays where it landed until the leg has to push off.
+A turn eases the stick and lets the chest lead the hips. Standing or jogging, the ball is in
+both hands; sprinting, it is in the right hand and the other arm keeps the clip's swing.
+A solo puts it on the toe, a bounce on the ground, and a kick or a fist lets it go from that
+bone. `Gaelic_football_bounce.fbx` is a near-stand with a hand dip, not a running bounce, so
+a moving bounce still uses the carry cycle. The squad GLB is not replaced. To hang one
+retargeted clip on a copy, see `sprite_forge/tools/GAELIC_CLIP_MERGE.md`. The rest of the
+gameplay list is `ROADMAP.md`.
 
 ## Start-up
 The game opens with a **20-second AI-vs-AI attract demo**. It uses broadcast cameras (aerial
@@ -77,6 +81,8 @@ Launch options:
 - `--cpu-skin`
 - `--bench [frames]` (AI v AI, uncapped; prints average fps and a ms breakdown)
 - `--screenshots` / `--shots31` / `--shots32` (scripted test scenes that write `v3_*.png` / `v31_*.png` / `v32_*.png`; the shots31/32 scripts drive a simulated pad)
+- `--shots-motion` (stand, walk, jog, sprint, turn, stop, carry, solo, bounce, fist, kick, catch, keeper). `--record-motion FILE.mp4` writes that scene with ffmpeg
+- `--model PATH` loads a candidate GLB instead of `assets/models/gaelic_player.glb`
 - `--record-intro FILE` (raw 30 fps RGBA frames plus `FILE.wav`, for ffmpeg)
 
 ## Who am I?
@@ -276,7 +282,7 @@ bone on the contact frame, and hand passes from the striking hand. Clips cross-f
 |---|---|---|
 | anim_idle | idle | standing, including an outfield player holding the ball |
 | anim_run | run | running without the ball |
-| anim_run_ball | run_ball | carrying the ball (one-arm carry); also the bounce |
+| anim_run_ball | run_ball | carrying the ball; also a bounce while he is moving |
 | anim_keeper_ready | keeper_ready | goalkeeper's low set stance |
 | anim_kick_run | kick_run | running drop punt, ground kick |
 | anim_drop_kick | drop_kick | frees / sideline / 45 (run-up) |

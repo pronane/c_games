@@ -17,6 +17,10 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include "glmin.h"
+#if !defined(_WIN32)
+extern FILE *popen(const char *cmd, const char *mode);
+extern int pclose(FILE *stream);
+#endif
 
 /* ---- raylib 5.5 / 6.x compatibility ------------------------------------ */
 #if RAYLIB_VERSION_MAJOR >= 6
@@ -33,7 +37,7 @@
 #define ANIM_UPDATE(m, a, f) UpdateModelAnimation((m), (a), (int)(f))
 #endif
 
-#define PLAYER_GLB "assets/models/gaelic_player.glb"
+static const char *playerGlb = "assets/models/gaelic_player.glb";
 #define HL (GAME_PITCH_LENGTH * 0.5f)
 #define HW (GAME_PITCH_WIDTH * 0.5f)
 #define ANIM_FPS 60.0f
@@ -88,6 +92,10 @@ static ModelAnimation *anims;
 static int animCount;
 static int clipIdx[C_COUNT];
 static int boneFootL = -1, boneFootR = -1, boneHandL = -1, boneHandR = -1, boneHead = -1;
+static int boneSpine = -1, boneSpine1 = -1, boneArmUL = -1, boneArmUR = -1, boneArmLL = -1, boneArmLR = -1;
+static int boneMidL = -1, boneMidR = -1, boneThumbL = -1, boneThumbR = -1;
+static int boneThighL = -1, boneThighR = -1, boneCalfL = -1, boneCalfR = -1, boneToeL = -1, boneToeR = -1;
+static int clipBounce = -1;       /* optional; the shipped GLB has no bounce take */
 static int actionFoot[GAME_ACT_COUNT];      /* bone index of the kicking foot */
 static float actionContactClip[GAME_ACT_COUNT];
 static Vector3 actionContactPos[GAME_ACT_COUNT];   /* model-space contact bone position */
@@ -107,7 +115,15 @@ typedef struct {
     float blend;                   /* 0..1, 1 = fully current */
     Transform pose[MAX_BONES];     /* last rendered pose (model space) */
     float lastX, lastZ, speed;     /* measured ground speed */
-    int lastAction; float runPhase;
+    float prevSpeed, accel;        /* m/s^2, for shorter strides while speeding up */
+    float faceYaw, bodyYaw;        /* facing, and the hips which trail it through a turn */
+    int yawInit;
+    float turnRate;                /* |delta facing| / dt, rad/s */
+    float runPhase;
+    float plantX[2], plantZ[2];
+    int plantOn[2];
+    int lastAction;
+    int useBounce;
 } AnimState;
 
 #define N_CHAR (2 * GAME_TEAM_SIZE + 5)   /* players, referee, 4 umpires */
@@ -156,9 +172,15 @@ static int findBone(const char *name)
     return -1;
 }
 
+static int poseOverride = -1;   /* anims[] index, or -1 to use the clip enum */
+static ModelAnimation *animFor(int clip)
+{
+    if (poseOverride >= 0) return &anims[poseOverride];
+    return &anims[clipIdx[clip]];
+}
 static Transform *clipPose(int clip, float t)
 {
-    ModelAnimation *a = &anims[clipIdx[clip]];
+    ModelAnimation *a = animFor(clip);
     int n = ANIM_FRAMES(*a);
     int f = (int)(t * ANIM_FPS);
     if (f < 0) f = 0;
@@ -168,7 +190,7 @@ static Transform *clipPose(int clip, float t)
 
 static float clipLen(int clip)
 {
-    int n = ANIM_FRAMES(anims[clipIdx[clip]]);
+    int n = ANIM_FRAMES(*animFor(clip));
     if (n <= 1) return 1.0f / ANIM_FPS;
     return (float)(n - 1) / ANIM_FPS;   /* raylib bakes keyframes at ANIM_FPS; the last frame is the clip end */
 }
@@ -178,7 +200,7 @@ static float clipLen(int clip)
  * raylib 6 does this inside UpdateModelAnimation (float frame). */
 static void sampleClip(int clip, float t, Transform *out)
 {
-    ModelAnimation *a = &anims[clipIdx[clip]];
+    ModelAnimation *a = animFor(clip);
     int n = ANIM_FRAMES(*a);
     int nb = MODEL_BONECOUNT(model);
     float frame, w;
@@ -205,7 +227,7 @@ static void sampleClip(int clip, float t, Transform *out)
 #if RAYLIB_VERSION_MAJOR >= 6
 static float clipFrame(int clip, float t)
 {
-    int n = ANIM_FRAMES(anims[clipIdx[clip]]);
+    int n = ANIM_FRAMES(*animFor(clip));
     float f = t * ANIM_FPS;
     if (f < 0.0f) f = 0.0f;
     if (n > 1 && f > (float)(n - 1) - 0.001f) f = (float)(n - 1) - 0.001f;
@@ -259,6 +281,18 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
 {
     int carrying = game.ball_team == team && game.ball_player == idx;
     int keeper = idx == 0;
+    s->useBounce = 0;
+    if (p->action == GAME_ACT_BOUNCE && clipBounce >= 0 && s->speed < 1.15f) {
+        /* The Gaelic bounce take is a near-stand with a hand dip, not a running bounce.
+         * Use it only when he has almost stopped. A running bounce stays on the carry cycle. */
+        float n = (float)(ANIM_FRAMES(anims[clipBounce]) - 1) / ANIM_FPS;
+        float dur = game_action_duration(GAME_ACT_BOUNCE);
+        float u = dur > 0.05f ? p->action_time / dur : 0.0f;
+        *clip = C_IDLE;
+        *t = fminf(fmaxf(u, 0.0f) * n, n > 0.02f ? n - 0.02f : 0.0f);
+        s->useBounce = 1;
+        return;
+    }
     if (p->action != GAME_ACT_NONE) {
         ActionClip *ac = &ACTION_CLIPS[p->action];
         *clip = ac->clip;
@@ -286,14 +320,22 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         *clip = C_CELEBRATE; *t = fminf(2.6f - celebT, clipLen(C_CELEBRATE) - 0.02f);
         return;
     }
-    if (s->speed > 0.6f) {
-        /* play the authored cycle near its own length; only a little faster when sprinting */
-        float natural = carrying ? 5.4f : (s->speed < 3.4f ? 4.2f : 6.2f);
-        float cadence = Clamp(s->speed / natural, 0.82f, 1.22f);
+    if (s->speed > 0.55f) {
+        /* Foot travel at rate 1, measured on the shipped clips (same foot, peak to peak):
+         * jog 0.77 m / 0.75 s, run 1.12 m / 0.71 s, run_ball 0.90 m / 0.79 s, sidestep ~0.58 m / 0.71 s.
+         * Playing them near 1x while the player does 7 m/s is the glide. Rate tracks ground speed,
+         * capped so a short Mixamo stride does not buzz. A turn or a speed-up shortens the stride. */
+        float authored, rate;
+        int turning = s->turnRate > 2.0f && s->speed > 0.9f && s->speed < 6.2f;
         if (carrying) *clip = C_RUN_BALL;
-        else if (s->speed < 3.4f) *clip = C_JOG;
+        else if (turning) *clip = C_SIDESTEP;
+        else if (s->speed < 4.6f) *clip = C_JOG;
         else *clip = C_RUN;
-        s->runPhase += dt * cadence;
+        authored = *clip == C_JOG ? 1.02f : *clip == C_RUN ? 1.58f : *clip == C_RUN_BALL ? 1.13f : 0.82f;
+        rate = Clamp(s->speed / authored, 0.85f, 2.15f);
+        if (s->accel > 1.8f) rate *= 1.12f;          /* shorter strides while the speed is still building */
+        if (turning) rate *= 1.15f;
+        s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
         return;
     }
@@ -386,12 +428,363 @@ static void uploadSkin(Shader sh, const Model *lm)
     rlSetUniformMatrices(loc, mats, nb);
 }
 
+/* Both hands close on a ball in front of the chest. The idle and run clips
+ * leave the hands about 60 cm apart, so a ball at their midpoint sat beside
+ * the hip. This bends the upper arm, forearm and hand (and the fingers with
+ * them) onto the ball, on top of whatever clip is playing. */
+static int boneChild(int b)
+{
+    if (b < 0 || b >= MODEL_BONECOUNT(model)) return -1;
+    return MODEL_BONES(model)[b].parent;
+}
+static int boneUnder(int b, int anc)
+{
+    int guard = 0;
+    while (b >= 0 && guard++ < 16) {
+        if (b == anc) return 1;
+        b = boneChild(b);
+    }
+    return 0;
+}
+static Quaternion quatFromTo(Vector3 from, Vector3 to)
+{
+    float fl = Vector3Length(from), tl = Vector3Length(to);
+    if (fl < 1e-5f || tl < 1e-5f) return QuaternionIdentity();
+    from = Vector3Scale(from, 1.0f / fl);
+    to = Vector3Scale(to, 1.0f / tl);
+    float d = Vector3DotProduct(from, to);
+    Vector3 axis;
+    if (d > 0.9995f) return QuaternionIdentity();
+    if (d < -0.9995f) {
+        axis = Vector3CrossProduct(from, (Vector3){ 1, 0, 0 });
+        if (Vector3Length(axis) < 1e-3f) axis = Vector3CrossProduct(from, (Vector3){ 0, 1, 0 });
+        return QuaternionFromAxisAngle(Vector3Normalize(axis), PI);
+    }
+    axis = Vector3CrossProduct(from, to);
+    return QuaternionNormalize((Quaternion){ axis.x, axis.y, axis.z, 1.0f + d });
+}
+static void aimBone(Transform *bone, Vector3 fromDir, Vector3 toDir)
+{
+    Quaternion q = quatFromTo(fromDir, toDir);
+    bone->rotation = QuaternionNormalize(QuaternionMultiply(q, bone->rotation));
+}
+/* Two-bone IK. Shoulder stays put. Elbow uses `pole` so it points out to the side. */
+static void solveArm(Transform *pose, int upper, int lower, int hand, int mid,
+                     Vector3 target, Vector3 pole, Vector3 curlAt)
+{
+    Vector3 S = pose[upper].translation, E = pose[lower].translation, H = pose[hand].translation;
+    float L1 = Vector3Distance(S, E), L2 = Vector3Distance(E, H);
+    Vector3 dir, elbow;
+    float dist, a, h2, h;
+    Quaternion qHand;
+    int b, nb;
+    if (L1 < 0.04f || L2 < 0.04f) return;
+    dir = Vector3Subtract(target, S);
+    dist = Vector3Length(dir);
+    if (dist < 0.02f) return;
+    if (dist > L1 + L2 - 0.01f) dist = L1 + L2 - 0.01f;
+    if (dist < fabsf(L1 - L2) + 0.01f) dist = fabsf(L1 - L2) + 0.01f;
+    dir = Vector3Scale(dir, dist / Vector3Length(Vector3Subtract(target, S)));
+    a = (L1 * L1 - L2 * L2 + dist * dist) / (2.0f * dist);
+    h2 = L1 * L1 - a * a;
+    h = h2 > 0.0f ? sqrtf(h2) : 0.0f;
+    dir = Vector3Normalize(dir);
+    pole = Vector3Subtract(pole, Vector3Scale(dir, Vector3DotProduct(pole, dir)));
+    if (Vector3Length(pole) < 1e-4f) pole = (Vector3){ 0, -1, 0 };
+    pole = Vector3Normalize(pole);
+    elbow = Vector3Add(Vector3Add(S, Vector3Scale(dir, a)), Vector3Scale(pole, h));
+    /* wrist lands on the target; if the chain cannot quite reach, put it at the solved distance */
+    if (Vector3Distance(target, S) > L1 + L2 - 0.01f)
+        target = Vector3Add(S, Vector3Scale(Vector3Normalize(Vector3Subtract(target, S)), dist));
+    (void)mid;
+    (void)curlAt;
+    (void)qHand;
+    (void)b;
+    (void)nb;
+    aimBone(&pose[upper], Vector3Subtract(E, S), Vector3Subtract(elbow, S));
+    aimBone(&pose[lower], Vector3Subtract(H, E), Vector3Subtract(target, elbow));
+    pose[lower].translation = elbow;
+    pose[hand].translation = target;
+}
+/* Put the three knuckles of one finger on the ball so the hand closes around it. */
+static void plantFinger(Transform *pose, int b1, int b2, int b3, Vector3 p1, Vector3 p2, Vector3 p3)
+{
+    if (b1 < 0 || b2 < 0 || b3 < 0) return;
+    aimBone(&pose[b1], Vector3Subtract(pose[b2].translation, pose[b1].translation), Vector3Subtract(p2, p1));
+    aimBone(&pose[b2], Vector3Subtract(pose[b3].translation, pose[b2].translation), Vector3Subtract(p3, p2));
+    pose[b1].translation = p1;
+    pose[b2].translation = p2;
+    pose[b3].translation = p3;
+}
+/* Turn the whole hand so the palm faces the ball and the fingers lie across it.
+ * Finger vertices are mostly hung off the hand bone, so the bone origins alone
+ * do not close the hand. */
+static Transform bindOf(int i)
+{
+#if RAYLIB_VERSION_MAJOR >= 6
+    return model.skeleton.bindPose[i];
+#else
+    return model.bindPose[i];
+#endif
+}
+/* The skinned hand points along these bind-space directions (measured from the
+ * mesh: fingertips are +Z and a little down, the back of the hand is +X). */
+static void orientHand(Transform *pose, int hand, float side, Vector3 wrist,
+                       Vector3 wantFinger, Vector3 wantOut)
+{
+    Vector3 bf = { 0.16f * side, -0.42f, 0.89f };
+    Vector3 bo = { 0.86f * side, 0.08f, -0.50f };
+    Vector3 nt;
+    Quaternion q, twist;
+    if (hand < 0) return;
+    q = quatFromTo(bf, wantFinger);
+    nt = Vector3RotateByQuaternion(bo, q);
+    twist = quatFromTo(nt, wantOut);
+    pose[hand].rotation = QuaternionNormalize(QuaternionMultiply(twist, QuaternionMultiply(q, bindOf(hand).rotation)));
+    pose[hand].translation = wrist;
+}
+static void wrapHand(Transform *pose, int side, Vector3 ball)
+{
+    /* side +1 is the character's left. Knuckles sit on the ball, tips curl over the front. */
+    static const int left[5] = { 22, 23, 25, 24, 26 };  /* index, middle, ring, pinky, thumb */
+    static const int right[5] = { 27, 28, 30, 29, 31 };
+    const int *base = side > 0 ? left : right;
+    int i;
+    for (i = 0; i < 4; i++) {
+        float y = 0.045f - (float)i * 0.028f;
+        float x = (float)side;
+        plantFinger(pose, base[i], base[i] + 10, base[i] + 20,
+                    (Vector3){ ball.x + x * 0.07f, ball.y + y, ball.z + 0.06f },
+                    (Vector3){ ball.x + x * 0.02f, ball.y + y + 0.02f, ball.z + 0.10f },
+                    (Vector3){ ball.x - x * 0.02f, ball.y + y * 0.4f, ball.z + 0.08f });
+    }
+    plantFinger(pose, base[4], base[4] + 10, base[4] + 20,
+                (Vector3){ ball.x + (float)side * 0.05f, ball.y + 0.09f, ball.z - 0.01f },
+                (Vector3){ ball.x + (float)side * 0.01f, ball.y + 0.10f, ball.z + 0.05f },
+                (Vector3){ ball.x - (float)side * 0.02f, ball.y + 0.07f, ball.z + 0.07f });
+}
+static float cradleWeight(const AnimState *s)
+{
+    int idx = (int)(s - as), team, pi;
+    const GamePlayer *p;
+    float dur, u;
+    if (idx < 0 || idx >= 2 * GAME_TEAM_SIZE) return 0.0f;
+    team = idx / GAME_TEAM_SIZE;
+    pi = idx % GAME_TEAM_SIZE;
+    if (game.ball_team != team || game.ball_player != pi) return 0.0f;
+    p = &game.players[team][pi];
+    if (p->action == GAME_ACT_SOLO || p->action == GAME_ACT_BOUNCE) {
+        /* Hands let go while the ball is on the foot or the ground, then close again. */
+        float dur = game_action_duration(p->action);
+        float u = dur > 0.05f ? p->action_time / dur : 0.0f;
+        if (p->action == GAME_ACT_SOLO) {
+            if (u < 0.28f) return 1.0f;
+            if (u < 0.62f) return 0.0f;
+            return Clamp((u - 0.62f) / 0.25f, 0.0f, 1.0f);
+        }
+        if (u < 0.12f) return 1.0f;
+        if (u < 0.72f) return 0.0f;
+        return Clamp((u - 0.72f) / 0.28f, 0.0f, 1.0f);
+    }
+    if (p->action == GAME_ACT_NONE) return 1.0f;
+    if (p->action != GAME_ACT_CATCH && p->action != GAME_ACT_PICKUP) return 0.0f;
+    dur = game_action_duration(p->action);
+    u = dur > 0.05f ? p->action_time / dur : 1.0f;
+    if (u < 0.50f) return 0.0f;
+    return Clamp((u - 0.50f) / 0.50f, 0.0f, 1.0f);
+}
+static void cradleBall(AnimState *s, int clip)
+{
+    float w = cradleWeight(s);
+    Transform saved[MAX_BONES];
+    Vector3 chest, ball, curl;
+    float tuck;
+    int nb, i;
+    (void)clip;
+    if (w <= 0.0f || boneArmUL < 0 || boneHandL < 0 || boneSpine < 0) return;
+    nb = MODEL_BONECOUNT(model);
+    memcpy(saved, s->pose, sizeof(Transform) * (size_t)nb);
+    tuck = Clamp((s->speed - 4.2f) / 3.2f, 0.0f, 1.0f);   /* walk: out front, sprint: into the chest */
+    chest = s->pose[boneSpine].translation;
+    /* Standing and jogging: both hands. Sprinting: one hand, so the other arm keeps the clip's swing. */
+    if (tuck < 0.55f) {
+        ball = (Vector3){
+            chest.x + Lerp(0.0f, -0.04f, tuck),
+            chest.y - Lerp(0.10f, 0.02f, tuck),
+            chest.z + Lerp(0.20f, 0.14f, tuck)
+        };
+        curl = (Vector3){ ball.x, ball.y + 0.05f, ball.z + 0.03f };
+        {
+            Vector3 wL = { ball.x + 0.09f, ball.y - 0.01f, ball.z - 0.02f };
+            Vector3 wR = { ball.x - 0.09f, ball.y - 0.01f, ball.z - 0.02f };
+            solveArm(s->pose, boneArmUL, boneArmLL, boneHandL, boneMidL, wL,
+                     (Vector3){ 1.0f, -0.45f, -0.15f }, curl);
+            solveArm(s->pose, boneArmUR, boneArmLR, boneHandR, boneMidR, wR,
+                     (Vector3){ -1.0f, -0.45f, -0.15f }, curl);
+            orientHand(s->pose, boneHandL, 1.0f, wL,
+                       (Vector3){ -0.25f, 0.45f, 0.86f }, (Vector3){ 1.0f, 0.15f, -0.1f });
+            orientHand(s->pose, boneHandR, -1.0f, wR,
+                       (Vector3){ 0.25f, 0.45f, 0.86f }, (Vector3){ -1.0f, 0.15f, -0.1f });
+        }
+        wrapHand(s->pose, 1, ball);
+        wrapHand(s->pose, -1, ball);
+    } else {
+        ball = (Vector3){ chest.x - 0.10f, chest.y - 0.02f, chest.z + 0.16f };
+        curl = (Vector3){ ball.x, ball.y + 0.04f, ball.z + 0.02f };
+        {
+            Vector3 wR = { ball.x - 0.02f, ball.y - 0.01f, ball.z - 0.04f };
+            solveArm(s->pose, boneArmUR, boneArmLR, boneHandR, boneMidR, wR,
+                     (Vector3){ -0.7f, -0.35f, 0.15f }, curl);
+            orientHand(s->pose, boneHandR, -1.0f, wR,
+                       (Vector3){ 0.15f, 0.35f, 0.92f }, (Vector3){ -0.9f, 0.2f, 0.0f });
+        }
+        wrapHand(s->pose, -1, ball);
+    }
+    if (w < 0.999f) {
+        for (i = 0; i < nb; i++) {
+            if (!boneUnder(i, boneArmUL) && !boneUnder(i, boneArmUR)) continue;
+            s->pose[i].translation = Vector3Lerp(saved[i].translation, s->pose[i].translation, w);
+            s->pose[i].rotation = QuaternionSlerp(saved[i].rotation, s->pose[i].rotation, w);
+        }
+    }
+}
+#if RAYLIB_VERSION_MAJOR >= 6
+static Matrix invBind[MAX_BONES];
+static int invBindReady;
+static Matrix trsOf(Transform t)
+{
+    return MatrixMultiply(MatrixMultiply(
+               MatrixScale(t.scale.x, t.scale.y, t.scale.z),
+               QuaternionToMatrix(t.rotation)),
+           MatrixTranslate(t.translation.x, t.translation.y, t.translation.z));
+}
+static void cacheInvBind(void)
+{
+    int i, n;
+    if (invBindReady) return;
+    n = MODEL_BONECOUNT(model);
+    for (i = 0; i < n; i++) invBind[i] = MatrixInvert(trsOf(model.skeleton.bindPose[i]));
+    invBindReady = 1;
+}
+#endif
+static void uploadPose(AnimState *s, Model *lm)
+{
+    int nb = MODEL_BONECOUNT(model);
+#if RAYLIB_VERSION_MAJOR >= 6
+    int i;
+    cacheInvBind();
+    if (gpuSkin) {
+        for (i = 0; i < nb; i++)
+            model.boneMatrices[i] = MatrixMultiply(invBind[i], trsOf(s->pose[i]));
+    } else {
+        static Transform *one[1];
+        static ModelAnimation poseAnim;
+        static int poseAnimReady;
+        if (!poseAnimReady) { poseAnim = anims[clipIdx[C_IDLE]]; poseAnimReady = 1; }
+        one[0] = s->pose;
+        poseAnim.keyframeCount = 1;
+        poseAnim.keyframePoses = one;
+        UpdateModelAnimation(*lm, poseAnim, 0.0f);
+    }
+#else
+    memcpy(scratchPose, s->pose, sizeof(Transform) * (size_t)nb);
+    if (gpuSkin) UpdateModelAnimationBones(*lm, scratch, 0);
+    else ANIM_UPDATE(*lm, scratch, 0);
+#endif
+}
+
+static float wrapAngle(float a);
+/* Stance foot stays on the ground point where it landed. The swing foot is the clip's.
+ * Released when the leg cannot reach, which is the push-off, or when the clip lifts it.
+ * Kicks, the solo and the toe-lift keep the authored foot. */
+static int legBusy(const AnimState *s)
+{
+    int idx = (int)(s - as), act;
+    if (idx < 0 || idx >= 2 * GAME_TEAM_SIZE) return 0;
+    act = game.players[idx / GAME_TEAM_SIZE][idx % GAME_TEAM_SIZE].action;
+    return act == GAME_ACT_KICK || act == GAME_ACT_FREE_KICK || act == GAME_ACT_KICKOUT ||
+           act == GAME_ACT_GROUND_KICK || act == GAME_ACT_SOLO || act == GAME_ACT_PICKUP ||
+           act == GAME_ACT_DIVE || act == GAME_ACT_FALL || act == GAME_ACT_TRIP || act == GAME_ACT_HOOK;
+}
+static int finite3(Vector3 v)
+{
+    return v.x == v.x && v.y == v.y && v.z == v.z && fabsf(v.x) < 80.0f && fabsf(v.y) < 80.0f && fabsf(v.z) < 80.0f;
+}
+static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int toe)
+{
+    Vector3 hip, oldFoot, model, pole, worldFoot, wp, rel;
+    float L1, L2, yaw, lift;
+    Transform keepT, keepC, keepF, keepToe;
+    if (thigh < 0 || calf < 0 || foot < 0) return;
+    lift = s->pose[foot].translation.y;
+    yaw = s->bodyYaw;
+    worldFoot = Vector3Add(W(s->lastX, 0, s->lastZ),
+                           Vector3RotateByAxisAngle(s->pose[foot].translation, (Vector3){ 0, 1, 0 }, yaw));
+    if (lift > 0.20f) { s->plantOn[side] = 0; return; }
+    if (!s->plantOn[side]) {
+        if (lift > 0.11f) return;
+        s->plantX[side] = worldFoot.x;
+        s->plantZ[side] = worldFoot.z;
+        s->plantOn[side] = 1;
+    }
+    wp = W(s->lastX, 0, s->lastZ);
+    rel = (Vector3){ s->plantX[side] - wp.x, 0.08f, s->plantZ[side] - wp.z };
+    model = Vector3RotateByAxisAngle(rel, (Vector3){ 0, 1, 0 }, -yaw);
+    model.y = 0.08f;
+    hip = s->pose[thigh].translation;
+    L1 = Vector3Distance(hip, s->pose[calf].translation);
+    L2 = Vector3Distance(s->pose[calf].translation, s->pose[foot].translation);
+    if (L1 < 0.05f || L2 < 0.05f) return;
+    if (Vector3Distance(hip, model) > (L1 + L2) * 0.97f) { s->plantOn[side] = 0; return; }
+    keepT = s->pose[thigh]; keepC = s->pose[calf]; keepF = s->pose[foot];
+    keepToe = toe >= 0 ? s->pose[toe] : keepF;
+    pole = Vector3Subtract(s->pose[calf].translation, hip);
+    if (Vector3Length(pole) < 1e-3f) pole = (Vector3){ side ? -1.0f : 1.0f, 0.2f, 1.0f };
+    oldFoot = s->pose[foot].translation;
+    solveArm(s->pose, thigh, calf, foot, -1, model, pole, model);
+    if (!finite3(s->pose[foot].translation) || !finite3(s->pose[calf].translation) ||
+        Vector3Distance(hip, s->pose[foot].translation) > L1 + L2 + 0.02f) {
+        s->pose[thigh] = keepT; s->pose[calf] = keepC; s->pose[foot] = keepF;
+        if (toe >= 0) s->pose[toe] = keepToe;
+        s->plantOn[side] = 0;
+        return;
+    }
+    if (toe >= 0)
+        s->pose[toe].translation = Vector3Add(s->pose[toe].translation, Vector3Subtract(s->pose[foot].translation, oldFoot));
+}
+static void plantFeet(AnimState *s)
+{
+    if (s->speed < 0.45f || legBusy(s) || boneThighL < 0) {
+        s->plantOn[0] = s->plantOn[1] = 0;
+        return;
+    }
+    plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL);
+    plantOne(s, 1, boneThighR, boneCalfR, boneFootR, boneToeR);
+}
+/* Chest leads the hips through a turn; the head stays closer to the facing. Small, and only while turning. */
+static void twistBone(Transform *bone, float ang)
+{
+    Quaternion q = QuaternionFromAxisAngle((Vector3){ 0, 1, 0 }, ang);
+    bone->rotation = QuaternionNormalize(QuaternionMultiply(q, bone->rotation));
+}
+static void coordinateTurn(AnimState *s)
+{
+    float lead;
+    if (!s->yawInit) return;
+    lead = Clamp(wrapAngle(s->faceYaw - s->bodyYaw), -0.45f, 0.45f);
+    if (fabsf(lead) < 0.04f) return;
+    if (boneSpine1 >= 0) twistBone(&s->pose[boneSpine1], lead * 0.55f);
+    if (boneSpine >= 0) twistBone(&s->pose[boneSpine], lead * 0.25f);
+    if (boneHead >= 0) twistBone(&s->pose[boneHead], -lead * 0.35f);
+}
+
 /* Blend and upload the pose for one character, keeping a copy for bone queries.
  * raylib 6 interpolates float frames and blends two clips in UpdateModelAnimationEx.
  * raylib 5.5 has integer frames, so the same blend is done here and uploaded as one pose. */
 static void poseCharacter(AnimState *s, int clip, float t, float dt)
 {
     int nb = MODEL_BONECOUNT(model);
+    poseOverride = (s->useBounce && clipBounce >= 0) ? clipBounce : -1;
     int loco = (clip == C_RUN || clip == C_JOG || clip == C_IDLE || clip == C_RUN_BALL ||
                 clip == C_KEEPER_IDLE || clip == C_KEEPER_READY || clip == C_SIDESTEP);
     float blendTime = loco ? 0.22f : 0.10f;
@@ -425,10 +818,10 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
         }
     }
     if (s->blend < 0.999f && s->prevClip >= 0 && !poseFar)
-        UpdateModelAnimationEx(lm, anims[clipIdx[s->prevClip]], clipFrame(s->prevClip, s->prevT),
-                               anims[clipIdx[clip]], clipFrame(clip, t), w);
+        UpdateModelAnimationEx(lm, *animFor(s->prevClip), clipFrame(s->prevClip, s->prevT),
+                               *animFor(clip), clipFrame(clip, t), w);
     else
-        UpdateModelAnimation(lm, anims[clipIdx[clip]], clipFrame(clip, t));
+        UpdateModelAnimation(lm, *animFor(clip), clipFrame(clip, t));
     if (gpuSkin)
         for (int i = 0; i < held; i++) {
             lm.meshes[i].animVertices = holdV[i];
@@ -448,9 +841,12 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
         memcpy(scratchPose, sampleA, sizeof(Transform) * (size_t)nb);
     }
     memcpy(s->pose, scratchPose, sizeof(Transform) * (size_t)nb);
-    if (gpuSkin) UpdateModelAnimationBones(lm, scratch, 0);
-    else ANIM_UPDATE(lm, scratch, 0);
 #endif
+    cradleBall(s, clip);
+    plantFeet(s);
+    coordinateTurn(s);
+    uploadPose(s, &lm);
+    poseOverride = -1;
     tSkin += GetTime() - t0;
     skinnedThisFrame++;
 }
@@ -499,24 +895,27 @@ static void drawCharacter(AnimState *s, float x, float z, float yaw, int kit, fl
 /* ---- ball ---------------------------------------------------------------- */
 static Vector3 ballDrawPos;
 
+static float poseYaw(const AnimState *s, const GamePlayer *p)
+{
+    return s->yawInit ? s->bodyYaw : yawOf(p->facing_x, p->facing_z);
+}
 static Vector3 handsMid(const AnimState *s, const GamePlayer *p)
 {
-    float yaw = yawOf(p->facing_x, p->facing_z);
+    float yaw = poseYaw(s, p);
     Vector3 l = boneWorld(s, boneHandL, p->x, p->z, yaw), r = boneWorld(s, boneHandR, p->x, p->z, yaw);
-    Vector3 m = Vector3Lerp(l, r, 0.5f);
-    Vector3 f = { sinf(yaw), 0, cosf(yaw) };
-    return Vector3Add(m, Vector3Scale(f, 0.06f));
+    /* Sprint tucks the ball into the right hand. The left arm is the clip's swing, so the midpoint would hang in space. */
+    Vector3 m = s->speed > 5.9f ? r : Vector3Lerp(l, r, 0.5f);
+    return Vector3Add(m, (Vector3){ sinf(yaw) * 0.03f, 0.015f, cosf(yaw) * 0.03f });
 }
 
 static Vector3 carriedBall(int team, int idx)
 {
     const GamePlayer *p = &game.players[team][idx];
     const AnimState *s = &as[team * GAME_TEAM_SIZE + idx];
-    float yaw = yawOf(p->facing_x, p->facing_z);
+    float yaw = poseYaw(s, p);
     Vector3 f = { sinf(yaw), 0, cosf(yaw) };
     Vector3 hands = handsMid(s, p);
-    Vector3 handR = Vector3Add(boneWorld(s, boneHandR, p->x, p->z, yaw), Vector3Add(Vector3Scale(f, 0.05f), (Vector3){ 0, 0.06f, 0 }));
-    Vector3 hold = s->clip == C_RUN_BALL ? handR : hands;      /* one-arm carry when running */
+    Vector3 hold = hands;   /* both hands: the cradle pose puts a wrist on each side of this point */
     float u;
     switch (p->action) {
     case GAME_ACT_SOLO: {          /* drop to the foot, toe-tap back to the hands */
@@ -524,9 +923,9 @@ static Vector3 carriedBall(int team, int idx)
         Vector3 foot = boneWorld(s, actionFoot[GAME_ACT_SOLO], p->x, p->z, yaw);
         foot = Vector3Add(foot, Vector3Add(Vector3Scale(f, 0.12f), (Vector3){ 0, BALL_R, 0 }));
         u = p->action_time / d;
-        if (u < 0.45f) return Vector3Lerp(hands, foot, u / 0.45f);
-        if (u < 0.55f) return foot;
-        return Vector3Lerp(foot, hands, (u - 0.55f) / 0.45f);
+        if (u < 0.38f) return Vector3Lerp(hands, foot, u / 0.38f);
+        if (u < 0.62f) return foot;
+        return Vector3Lerp(foot, hands, (u - 0.62f) / 0.38f);
     }
     case GAME_ACT_BOUNCE: {        /* thrown down just ahead, returns to the chest */
         float d = game_action_duration(GAME_ACT_BOUNCE);
@@ -550,8 +949,19 @@ static Vector3 carriedBall(int team, int idx)
         u = Clamp((p->action_time - (contact - dropT)) / dropT, 0.0f, 1.0f);
         return Vector3Lerp(hands, foot, u * u);
     }
-    case GAME_ACT_HANDPASS:
-        return Vector3Add(boneWorld(s, boneHandL, p->x, p->z, yaw), Vector3Scale(f, 0.08f));
+    case GAME_ACT_PICKUP: {    /* toe-lift off the ground, then into the cradle */
+        float d = game_action_duration(GAME_ACT_PICKUP);
+        Vector3 foot = boneWorld(s, boneFootR >= 0 ? boneFootR : boneFootL, p->x, p->z, yaw);
+        foot = Vector3Add(foot, Vector3Add(Vector3Scale(f, 0.16f), (Vector3){ 0, BALL_R, 0 }));
+        u = d > 0.05f ? p->action_time / d : 1.0f;
+        if (u < 0.40f) return foot;
+        return Vector3Lerp(foot, hands, (u - 0.40f) / 0.60f);
+    }
+    case GAME_ACT_HANDPASS: {
+        int h = actionFoot[GAME_ACT_HANDPASS];
+        if (h < 0) h = boneHandR;
+        return Vector3Add(boneWorld(s, h, p->x, p->z, yaw), Vector3Scale(f, 0.06f));
+    }
     default:
         return hold;
     }
@@ -563,11 +973,14 @@ static void onRelease(GameState *g, int team, int idx, int action, void *user)
     (void)user;
     GamePlayer *p = &g->players[team][idx];
     AnimState *s = &as[team * GAME_TEAM_SIZE + idx];
-    float yaw = yawOf(p->facing_x, p->facing_z);
+    float yaw = poseYaw(s, p);
     Vector3 f = { sinf(yaw), 0, cosf(yaw) };
     Vector3 at;
     if (!haveModel) return;
-    if (action == GAME_ACT_HANDPASS) at = boneWorld(s, boneHandR, p->x, p->z, yaw);
+    if (action == GAME_ACT_HANDPASS) {
+        int h = actionFoot[GAME_ACT_HANDPASS];
+        at = boneWorld(s, h >= 0 ? h : boneHandR, p->x, p->z, yaw);
+    }
     else if (action == GAME_ACT_FREE_KICK || action == GAME_ACT_KICKOUT || action == GAME_ACT_GROUND_KICK) at = carriedBall(team, idx);
     else at = Vector3Add(boneWorld(s, actionFoot[action] >= 0 ? actionFoot[action] : boneFootR, p->x, p->z, yaw), Vector3Scale(f, 0.15f));
     g->ball.x = at.x + HL;
@@ -601,7 +1014,19 @@ static void drawOfficials(float dt)
     float ryaw = yawOf(r->facing_x, r->facing_z);
     int clip = C_IDLE; float t = fmodf(GetTime(), clipLen(C_IDLE));
     int showingCard = r->signal == GAME_SIGNAL_CARD && game.card_time > 0.0f;
+    rs->prevSpeed = rs->speed;
     rs->speed = Lerp(rs->speed, r->movement * 7.0f, 0.2f);
+    rs->accel = dt > 0 ? (rs->speed - rs->prevSpeed) / dt : 0;
+    {
+        float face = yawOf(r->facing_x, r->facing_z), err, maxw;
+        if (!rs->yawInit) { rs->bodyYaw = rs->faceYaw = face; rs->yawInit = 1; }
+        rs->turnRate = dt > 0 ? fabsf(wrapAngle(face - rs->faceYaw)) / dt : 0;
+        rs->faceYaw = face;
+        err = wrapAngle(face - rs->bodyYaw);
+        maxw = 7.5f * dt;
+        rs->bodyYaw += Clamp(err, -maxw, maxw);
+        ryaw = rs->bodyYaw;
+    }
     if (showingCard && rs->speed < 1.0f) {
         clip = C_CATCH; t = 0.75f;                                   /* card held high */
     } else if (r->signal == GAME_SIGNAL_POINT || r->signal == GAME_SIGNAL_TWO_POINT || r->signal == GAME_SIGNAL_GOAL ||
@@ -611,10 +1036,16 @@ static void drawOfficials(float dt)
         clip = C_HAND_PASS; t = 0.40f;                               /* arms out toward the free */
         ryaw = r->signal_dir > 0 ? PI / 2 : -PI / 2;
     } else if (rs->speed > 0.6f) {
-        clip = rs->speed < 3.4f ? C_JOG : C_RUN;
-        rs->runPhase += dt * Clamp(rs->speed / (clip == C_JOG ? 2.6f : 4.6f), 0.6f, 1.8f);
+        float authored;
+        clip = rs->speed < 4.6f ? C_JOG : C_RUN;
+        authored = clip == C_JOG ? 1.02f : 1.58f;
+        rs->runPhase += dt * Clamp(rs->speed / authored, 0.85f, 2.15f);
         t = fmodf(rs->runPhase, clipLen(clip));
     }
+    if (r->signal == GAME_SIGNAL_FREE || r->signal == GAME_SIGNAL_WIDE) {
+        rs->bodyYaw = ryaw; rs->faceYaw = ryaw;
+    }
+    rs->lastX = r->x; rs->lastZ = r->z;
     drawCharacter(rs, r->x, r->z, ryaw, KIT_REF, dt, clip, t);
     if (showingCard && haveModel) {
         Vector3 h = boneWorld(rs, boneHandR, r->x, r->z, ryaw);
@@ -635,6 +1066,7 @@ static void drawOfficials(float dt)
             ((game.event_team == 0) == (end == 1));
         Color flag = game.event == GAME_EVENT_GOAL ? GREEN : game.event == GAME_EVENT_TWO_POINT ? ORANGE : RAYWHITE;
         int wave = scoredHere && (game.event != GAME_EVENT_GOAL || u % 2 == 0);
+        us->lastX = gx; us->lastZ = z; us->speed = 0; us->bodyYaw = us->faceYaw = yaw; us->yawInit = 1;
         drawCharacter(us, gx, z, yaw, KIT_UMP, dt, wave ? C_CATCH : C_IDLE, wave ? 0.70f + 0.06f * sinf((float)GetTime() * 9) : fmodf((float)GetTime() + u, clipLen(C_IDLE)));
         if (haveModel) {
             Vector3 h = boneWorld(us, boneHandR, gx, z, yaw);
@@ -847,7 +1279,7 @@ static Vector2 smoothMove(Vector2 cur, Vector2 tgt, float dt)
     if (cl < 0.08f) return Vector2Scale(Vector2Normalize(tgt), fminf(tl, cl + dt * 3.2f));
     float ca = atan2f(cur.y, cur.x), ta = atan2f(tgt.y, tgt.x), da = wrapAngle(ta - ca);
     float rate = Lerp(11.0f, 4.0f, Clamp(cl, 0, 1));                    /* rad/s: slower at pace */
-    if (fabsf(da) > 2.05f && cl > 0.40f) cl -= dt * 7.5f;                 /* plant the foot before a cut */
+    if (fabsf(da) > 0.85f && cl > 0.35f) cl -= dt * 5.5f;                 /* ease off into a turn, then push */
     else {
         ca += Clamp(da, -rate * dt, rate * dt);
         cl += Clamp(tl - cl, -dt * 4.0f, dt * 2.5f);                      /* weight on the way up, carry it on the way down */
@@ -1129,9 +1561,21 @@ static Vector3 smoothDamp3(Vector3 cur, Vector3 tgt, Vector3 *vel, float smoothT
     return Vector3Add(tgt, Vector3Scale(Vector3Add(ch, tmp), e));
 }
 
+static int camHands;   /* tight shot on the carrier's hands */
 static void updateCamera(float dt)
 {
     Vector3 b = W(game.ball.x, 0, game.ball.z);
+    if (camHands && game.ball_team >= 0 && game.ball_player >= 0) {
+        GamePlayer *c = &game.players[game.ball_team][game.ball_player];
+        float yaw = yawOf(c->facing_x, c->facing_z);
+        Vector3 f = { sinf(yaw), 0, cosf(yaw) }, right = { f.z, 0, -f.x };
+        Vector3 chest = W(c->x, 0.98f, c->z);
+        cam.position = Vector3Add(chest, Vector3Add(Vector3Scale(right, 1.35f), Vector3Scale(f, 1.15f)));
+        cam.position.y += 0.05f;
+        cam.target = Vector3Add(chest, Vector3Scale(f, 0.12f));
+        cam.fovy = 36;
+        return;
+    }
     GamePlayer *h = &game.players[0][game.selected_player];
     Vector3 hp = W(h->x, 0, h->z);
     Vector3 focus;
@@ -1671,13 +2115,26 @@ static void drawWorld(float dt)
             AnimState *s = &as[team * GAME_TEAM_SIZE + i];
             float dx = p->x - s->lastX, dz = p->z - s->lastZ;
             float sp = dt > 0 ? sqrtf(dx * dx + dz * dz) / dt : 0;
+            float face, err, maxw;
             if (sp > 15.0f) sp = 0;          /* teleport (restart) */
-            s->speed = Lerp(s->speed, sp, 0.25f);
+            s->prevSpeed = s->speed;
+            s->speed = Lerp(s->speed, sp, 0.35f);
+            s->accel = dt > 0 ? (s->speed - s->prevSpeed) / dt : 0;
             s->lastX = p->x; s->lastZ = p->z;
             if (hiddenOff(team, i) || (benchSkip & 2)) continue;
-            float yaw = yawOf(p->facing_x, p->facing_z);
-            if (p->off && s->speed > 0.6f && (dx * dx + dz * dz) > 1e-6f) yaw = yawOf(dx, dz);
-            if (p->action == GAME_ACT_DIVE) yaw += (float)game.keeper_guess * PI / 2 * (team == 0 ? 1.0f : -1.0f);
+            face = yawOf(p->facing_x, p->facing_z);
+            if (p->off && s->speed > 0.6f && (dx * dx + dz * dz) > 1e-6f) face = yawOf(dx, dz);
+            if (p->action == GAME_ACT_DIVE) face += (float)game.keeper_guess * PI / 2 * (team == 0 ? 1.0f : -1.0f);
+            if (!s->yawInit) { s->bodyYaw = s->faceYaw = face; s->yawInit = 1; }
+            s->turnRate = dt > 0 ? fabsf(wrapAngle(face - s->faceYaw)) / dt : 0;
+            s->faceYaw = face;
+            err = wrapAngle(face - s->bodyYaw);
+            maxw = (s->turnRate > 2.0f ? 4.0f : 7.5f) * dt;
+            s->bodyYaw += Clamp(err, -maxw, maxw);
+            err = wrapAngle(face - s->bodyYaw);
+            if (err > 0.45f) s->bodyYaw = face - 0.45f;
+            if (err < -0.45f) s->bodyYaw = face + 0.45f;
+            float yaw = s->bodyYaw;
             int clip; float t;
             desiredClip(team, i, p, s, dt, &clip, &t);
             int kit = i == 0 ? (team ? KIT_GK_AWAY : KIT_GK_HOME) : (team ? KIT_AWAY : KIT_HOME);
@@ -2100,6 +2557,7 @@ static void shotScript32(int frame, int *state, float *stateT, int *introDemo)
 }
 
 /* v3.4 verification scenes: character, jockey, step ring, mark, kick-out, high ball, aim, stamina. */
+static void checkHold(const char *tag);
 static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
 {
     int me = 9;
@@ -2242,7 +2700,12 @@ static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
         game.players[0][me].action = GAME_ACT_NONE;
         game_select_player(&game, me);
     }
-    if (frame == 602) TakeScreenshot("v35_stand_with_ball.png");
+    if (frame == 544) camHands = 1;
+    if (frame == 552) checkHold("orange-run");
+    if (frame == 568) { checkHold("run"); TakeScreenshot("v35_run_with_ball.png"); }
+    if (frame == 570) checkHold("red-run");
+    if (frame == 602) { checkHold("stand"); TakeScreenshot("v35_stand_with_ball.png"); }
+
     if (frame == 612) {
         GameInput kick = { 0 };
         game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
@@ -2257,15 +2720,207 @@ static void shotScript34(int frame, int *state, float *stateT, int *introDemo)
         camMode = 1;
     }
     if (frame == 628) TakeScreenshot("v35_overcarry_free.png");
-    if (frame == 640) { CloseWindow(); exit(0); }
+    if (frame >= 634 && frame <= 668) {
+        float dur = game_action_duration(GAME_ACT_CATCH);
+        game.ball_team = 0; game.ball_player = me; game.solo_rhythm = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.event = GAME_EVENT_NONE; game.event_time = 0;
+        game.players[0][me].x = 100.0f; game.players[0][me].z = 42.0f;
+        game.players[0][me].facing_x = 1.0f; game.players[0][me].facing_z = 0.0f;
+        game.players[0][me].action = GAME_ACT_CATCH;
+        game.players[0][me].action_time = dur * 0.92f;   /* ball back in the hands */
+        game.players[0][me].action_released = 1;
+        game_select_player(&game, me);
+        pad.axis[0] = 0;
+        camHands = 1;
+    }
+    if (frame == 660) { checkHold("catch"); TakeScreenshot("v35_after_catch.png"); }
+    if (frame == 676) { CloseWindow(); exit(0); }
+}
+
+/* Walk, jog, sprint, turn, stop, then the ball through the hands, the toe, the ground, the fist and the kick.
+ * Prints MOTION lines and exits non-zero if a contact or an upright pose fails. */
+static int motionFail, motionDone;
+#ifndef _WIN32
+static FILE *motionMp4;
+#endif
+static void motionBad(const char *msg)
+{
+    fprintf(stderr, "MOTION FAIL %s\n", msg);
+    motionFail = 1;
+}
+static void shotScriptMotion(int frame, int *state, float *stateT, int *introDemo)
+{
+    int me = 9, t, i;
+    GamePlayer *p = &game.players[0][me];
+    AnimState *s = &as[me];
+    float head;
+    static float phaseMark = -1;
+    if (frame == 1) {
+        newMatch(); *state = ST_PLAY; *introDemo = 0; demo = 0;
+        gfxQuality = 1; camMode = 5; showPerf = 0; simPad(1);
+        game.enforce_three_v_three = 0;
+        game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
+        game.ball.in_flight = 0; game.solo_rhythm = 0;
+        game_select_player(&game, me);
+        printf("MOTION skin %s clips %d bones %d bounce-clip %s\n",
+               gpuSkin ? "GPU" : "CPU", animCount, haveModel ? MODEL_BONECOUNT(model) : 0,
+               clipBounce >= 0 ? "yes" : "no");
+        fflush(stdout);
+    }
+    for (t = 0; t < 2; t++) for (i = 0; i < GAME_TEAM_SIZE; i++) {
+        if (t == 0 && (i == me || i == 0)) continue;
+        game.players[t][i].x = 4.0f + (float)i;
+        game.players[t][i].z = t ? 4.0f : 80.0f;
+        game.players[t][i].action = GAME_ACT_NONE;
+    }
+    pad.axis[0] = pad.axis[1] = 0;
+    pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 0;
+    pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_RIGHT] = 0;
+    pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_DOWN] = 0;
+    pad.btn[GAMEPAD_BUTTON_RIGHT_FACE_LEFT] = 0;
+    camHands = 0;
+    /* 1s stand, 3s walk, 3s jog, 3s sprint, 2s stop, 2.5s turn back */
+    if (frame < 30) { p->x = 55; p->z = 42; p->facing_x = 1; p->facing_z = 0; }
+    else if (frame < 120) pad.axis[0] = 0.40f;
+    else if (frame < 210) { pad.axis[0] = 0.70f; camMode = 0; }   /* broadcast, so the stride reads at match distance */
+    else if (frame < 300) { pad.axis[0] = 1.0f; pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 1; }
+    else if (frame < 360) { }
+    else if (frame < 440) pad.axis[0] = -0.85f;
+    if (frame == 40 || frame == 160 || frame == 250 || frame == 340) {
+        head = haveModel && boneHead >= 0 ? s->pose[boneHead].translation.y : 1.7f;
+        printf("MOTION frame %d speed %.2f clip %s phase %.2f head %.2f turn %.2f\n",
+               frame, s->speed, (s->clip >= 0 && s->clip < C_COUNT) ? CLIP_NAMES[s->clip] : "?",
+               s->runPhase, head, s->turnRate);
+        fflush(stdout);
+        if (head < 1.15f) motionBad("head has folded");
+        if (s->pose[boneHead].translation.x != s->pose[boneHead].translation.x) motionBad("pose not finite");
+    }
+    if (frame == 80) phaseMark = s->runPhase;
+    if (frame == 150 && phaseMark >= 0 && s->runPhase < phaseMark + 0.20f)
+        motionBad("gait phase did not advance");
+    /* ball in the hands, then jog and sprint with it */
+    if (frame == 450) { scenarioCarry(0, me, p->x, p->z); camMode = 5; }
+    if (frame > 450 && frame < 670) {
+        /* keep the five-step count from turning the carry demo into a free */
+        game.steps_carried = 1; game.step_time = 0.2f; game.ball_team = 0; game.ball_player = me;
+    }
+    if (frame > 450 && frame < 500) { /* stand */ camHands = 1; }
+    else if (frame >= 500 && frame < 580) { pad.axis[0] = 0.55f; camHands = 1; }
+    else if (frame >= 580 && frame < 660) { pad.axis[0] = 1.0f; pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 1; camHands = 1; }
+    if (frame == 480 || frame == 640) checkHold(frame == 480 ? "motion-stand" : "motion-sprint");
+    /* scrub the contact actions so the ball is seen on the toe, the ground, the fist and the foot */
+    if (frame >= 670 && frame < 820) {
+        float u = (float)(frame - 670) / 150.0f;
+        int act = u < 0.25f ? GAME_ACT_SOLO : u < 0.5f ? GAME_ACT_BOUNCE : u < 0.75f ? GAME_ACT_HANDPASS : GAME_ACT_KICK;
+        float dur, lu, q0;
+        if (game.ball_team != 0) scenarioCarry(0, me, p->x, p->z);
+        p->action_released = 1;
+        p->action = act;
+        dur = game_action_duration(act);
+        q0 = floorf(u * 4.0f) / 4.0f;
+        lu = (u - q0) / 0.25f;
+        p->action_time = fmaxf(0.0f, lu * dur * 0.92f - 0.04f);
+        camHands = 1; camMode = 5; pad.axis[0] = 0.15f;
+        if (frame > 671) {
+            /* ballDrawPos is the previous frame, which was this same action just before a quarter boundary */
+            static int prevAct = -1;
+            static float bestSolo = 99, bestBounce = 99, bestFist = 99, bestKick = 99;
+            if (prevAct == GAME_ACT_SOLO) bestSolo = fminf(bestSolo, ballDrawPos.y);
+            if (prevAct == GAME_ACT_BOUNCE) bestBounce = fminf(bestBounce, ballDrawPos.y);
+            if (prevAct == GAME_ACT_HANDPASS && boneHandR >= 0) {
+                int h = actionFoot[GAME_ACT_HANDPASS] >= 0 ? actionFoot[GAME_ACT_HANDPASS] : boneHandR;
+                bestFist = fminf(bestFist, Vector3Distance(boneWorld(s, h, p->x, p->z, poseYaw(s, p)), ballDrawPos));
+            }
+            if (prevAct == GAME_ACT_KICK && boneFootR >= 0) {
+                int h = actionFoot[GAME_ACT_KICK] >= 0 ? actionFoot[GAME_ACT_KICK] : boneFootR;
+                bestKick = fminf(bestKick, Vector3Distance(boneWorld(s, h, p->x, p->z, poseYaw(s, p)), ballDrawPos));
+            }
+            prevAct = act;
+            if (frame == 819) {
+                printf("MOTION contact solo-low %.2f bounce-low %.2f fist %.2f kick %.2f\n", bestSolo, bestBounce, bestFist, bestKick);
+                fflush(stdout);
+                if (bestSolo > 0.45f) motionBad("solo ball did not reach the foot");
+                if (bestBounce > 0.28f) motionBad("bounce did not reach the ground");
+                if (bestFist > 0.30f) motionBad("fist pass left the striking hand");
+                if (bestKick > 0.40f) motionBad("kick did not meet the foot");
+            }
+        }
+    }
+    if (frame >= 830 && frame < 900) {
+        float u = (float)(frame - 830) / 70.0f;
+        float dur = game_action_duration(GAME_ACT_CATCH);
+        if (game.ball_team != 0) scenarioCarry(0, me, p->x, p->z);
+        p->action = GAME_ACT_CATCH; p->action_released = 1;
+        p->action_time = u * dur * 0.9f;
+        camHands = 1; camMode = 5;
+    }
+    if (frame >= 910 && frame < 980) {
+        GamePlayer *k = &game.players[0][0];
+        float u = (float)(frame - 910) / 70.0f;
+        float dur = game_action_duration(GAME_ACT_CATCH);
+        k->x = p->x; k->z = p->z + 2.0f; k->facing_x = 1; k->facing_z = 0;
+        scenarioCarry(0, 0, k->x, k->z);
+        k->action = GAME_ACT_CATCH; k->action_released = 1; k->action_time = u * dur * 0.9f;
+        game_select_player(&game, 0);
+        camMode = 5; camHands = 1;
+    }
+    if (frame == 905) {
+        head = s->pose[boneHead].translation.y;
+        if (head < 1.15f) motionBad("catch folded the carrier");
+        printf("MOTION catch head %.2f\n", head); fflush(stdout);
+    }
+    if (frame == 990) {
+        float hy = as[0].pose[boneHead].translation.y;
+        printf("MOTION keeper head %.2f\n", hy); fflush(stdout);
+        if (hy < 0.7f) motionBad("keeper folded");
+        printf("MOTION %s\n", motionFail ? "FAILED" : "OK");
+        fflush(stdout);
+        motionDone = 1;
+    }
+    (void)stateT;
+}
+
+static void checkHold(const char *tag)
+{
+    int idx;
+    const GamePlayer *p;
+    const AnimState *s;
+    float dl, dr, yaw, head;
+    if (game.ball_team < 0 || game.ball_player < 0 || boneHandL < 0 || boneHead < 0) return;
+    idx = game.ball_team * GAME_TEAM_SIZE + game.ball_player;
+    p = &game.players[game.ball_team][game.ball_player];
+    s = &as[idx];
+    yaw = poseYaw(s, p);
+    dl = Vector3Distance(boneWorld(s, boneHandL, p->x, p->z, yaw), ballDrawPos);
+    dr = Vector3Distance(boneWorld(s, boneHandR, p->x, p->z, yaw), ballDrawPos);
+    head = s->pose[boneHead].translation.y;
+    printf("HOLD %s nearer-wrist %.3f m (L %.3f R %.3f) head %.2f speed %.2f act %d ball-y %.2f\n",
+           tag, fminf(dl, dr), dl, dr, head, s->speed, p->action, ballDrawPos.y);
+    fflush(stdout);
+    if (fminf(dl, dr) > 0.20f) {
+        fprintf(stderr, "ball is %.3f m from the nearer wrist (%s)\n", fminf(dl, dr), tag);
+        exit(2);
+    }
+    if (s->speed < 4.0f && (dl > 0.22f || dr > 0.22f)) {
+        fprintf(stderr, "standing carry should use both hands (%s: L %.3f R %.3f)\n", tag, dl, dr);
+        exit(2);
+    }
+    if (head < 1.05f) {
+        fprintf(stderr, "carrier head is at %.2f m (%s); the pose has folded\n", head, tag);
+        exit(2);
+    }
 }
 
 int main(int argc, char **argv)
 {
-    int shots = 0, skipIntro = 0, bench = 0, cliQuality = -1, shots31 = 0, shots34 = 0, startTraining = 0;
-    const char *recordPath = NULL;
+    int shots = 0, skipIntro = 0, bench = 0, cliQuality = -1, shots31 = 0, shots34 = 0, shotsMotion = 0, startTraining = 0;
+    const char *recordPath = NULL, *recordMotion = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
+        else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
+        else if (strcmp(argv[i], "--shots-motion") == 0) shotsMotion = 1, skipIntro = 1;
+        else if (strcmp(argv[i], "--record-motion") == 0 && i + 1 < argc) { recordMotion = argv[++i]; shotsMotion = 1; skipIntro = 1; }
         else if (strcmp(argv[i], "--demo") == 0) cmdDemo = demo = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--cpu-skin") == 0) forceCpuSkin = 1;
         else if (strcmp(argv[i], "--bench-skip") == 0 && i + 1 < argc) benchSkip = atoi(argv[++i]);
@@ -2283,7 +2938,7 @@ int main(int argc, char **argv)
     loadSettings();
     if (cliQuality >= 0) gfxQuality = cliQuality % 3;
     unsigned int flags = FLAG_WINDOW_RESIZABLE;
-    if (!bench && !shots && !shots31 && !shots34 && !recordPath) flags |= FLAG_VSYNC_HINT;
+    if (!bench && !shots && !shots31 && !shots34 && !shotsMotion && !recordPath) flags |= FLAG_VSYNC_HINT;
     if (gfxQuality == 2) flags |= FLAG_MSAA_4X_HINT;
     SetConfigFlags(flags);
     InitWindow(1280, 720, "Sunday League: Gaelic Football");
@@ -2295,14 +2950,16 @@ int main(int argc, char **argv)
     rlSetClipPlanes(0.3, 2600.0);
 
     for (int i = 0; i < C_COUNT; i++) clipIdx[i] = -1;
-    if (FileExists(PLAYER_GLB)) {
-        model = LoadModel(PLAYER_GLB);
-        anims = LoadModelAnimations(PLAYER_GLB, &animCount);
-        for (int i = 0; i < animCount; i++)
+    if (FileExists(playerGlb)) {
+        model = LoadModel(playerGlb);
+        anims = LoadModelAnimations(playerGlb, &animCount);
+        for (int i = 0; i < animCount; i++) {
+            if (strcmp(anims[i].name, "bounce") == 0 && IsModelAnimationValid(model, anims[i])) clipBounce = i;
             for (int k = 0; k < C_COUNT; k++)
                 if (strcmp(anims[i].name, CLIP_NAMES[k]) == 0 && IsModelAnimationValid(model, anims[i])) clipIdx[k] = i;
+        }
         haveModel = model.meshCount > 0 && MODEL_BONECOUNT(model) <= MAX_BONES;
-        loadParts(PLAYER_GLB);
+        loadParts(playerGlb);
         for (int k = 0; k < C_COUNT; k++) if (clipIdx[k] < 0) { haveModel = 0; TraceLog(LOG_WARNING, "GAME: clip '%s' missing", CLIP_NAMES[k]); }
     }
     stadiumInit();
@@ -2310,6 +2967,15 @@ int main(int argc, char **argv)
         boneFootL = findBone("foot_l"); boneFootR = findBone("foot_r");
         boneHandL = findBone("hand_l"); boneHandR = findBone("hand_r"); boneHead = findBone("head");
         bonePelvis = findBone("pelvis"); if (bonePelvis < 0) bonePelvis = 0;
+        boneSpine = findBone("spine_03");
+        boneSpine1 = findBone("spine_01");
+        boneThighL = findBone("thigh_l"); boneThighR = findBone("thigh_r");
+        boneCalfL = findBone("calf_l"); boneCalfR = findBone("calf_r");
+        boneToeL = findBone("ball_l"); boneToeR = findBone("ball_r");
+        boneArmUL = findBone("upperarm_l"); boneArmUR = findBone("upperarm_r");
+        boneArmLL = findBone("lowerarm_l"); boneArmLR = findBone("lowerarm_r");
+        boneMidL = findBone("middle_01_l"); boneMidR = findBone("middle_01_r");
+        boneThumbL = findBone("thumb_01_l"); boneThumbR = findBone("thumb_01_r");
         scratch = anims[clipIdx[C_IDLE]];
         scratchPosePtr[0] = scratchPose;
 #if RAYLIB_VERSION_MAJOR >= 6
@@ -2351,7 +3017,7 @@ int main(int argc, char **argv)
     int quit = 0;
     while (!WindowShouldClose() && !quit) {
         double frameStart = GetTime();
-        float dt = (shots || shots31 || shots34 || rec || bench) ? (rec ? 1.0f / 30.0f : 1.0f / 60.0f) : fminf(GetFrameTime(), 1.0f / 30.0f);
+        float dt = (shots || shots31 || shots34 || shotsMotion || rec || bench) ? ((rec || shotsMotion) ? 1.0f / 30.0f : 1.0f / 60.0f) : fminf(GetFrameTime(), 1.0f / 30.0f);
         tSkin = tUpdate = tWorld = tHud = tSwap = 0; skinnedThisFrame = 0;
         frame++;
         releaseFlash++;
@@ -2360,6 +3026,7 @@ int main(int argc, char **argv)
         if (shots31 == 1) shotScript31(frame, &state, &stateT, &introDemo);
         if (shots31 == 2) shotScript32(frame, &state, &stateT, &introDemo);
         if (shots34) shotScript34(frame, &state, &stateT, &introDemo);
+        if (shotsMotion) shotScriptMotion(frame, &state, &stateT, &introDemo);
         int confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || padAnyConfirm();
         if (IsKeyPressed(KEY_F1) || padPressed(GAMEPAD_BUTTON_MIDDLE_LEFT)) showControls = !showControls;
         if (showControls && (IsKeyPressed(KEY_ESCAPE) || padPressed(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))) showControls = 0;
@@ -2565,6 +3232,25 @@ int main(int argc, char **argv)
             fwrite(px, 1, (size_t)rw * rh * 4, rec);
             RL_FREE(px);
         }
+#ifndef _WIN32
+        if (recordMotion) {
+            int rw = GetRenderWidth(), rh = GetRenderHeight();
+            unsigned char *px;
+            if (!motionMp4 && frame == 1) {
+                char cmd[640];
+                snprintf(cmd, sizeof cmd,
+                         "ffmpeg -y -loglevel error -f rawvideo -pix_fmt rgba -s %dx%d -r 30 -i - "
+                         "-vf scale=960:540 -c:v libx264 -pix_fmt yuv420p -movflags +faststart \"%s\"",
+                         rw, rh, recordMotion);
+                motionMp4 = popen(cmd, "w");
+            }
+            px = rlReadScreenPixels(rw, rh);
+            if (motionMp4 && px) fwrite(px, 1, (size_t)rw * rh * 4, motionMp4);
+            RL_FREE(px);
+        }
+        if (motionDone && motionMp4) { pclose(motionMp4); motionMp4 = NULL; }
+#endif
+        if (motionDone) { CloseWindow(); exit(motionFail ? 2 : 0); }
     }
     if (rec) fclose(rec);
     if (recWav) {   /* finish the WAV header */

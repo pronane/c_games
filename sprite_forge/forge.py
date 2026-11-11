@@ -589,6 +589,9 @@ def main(argv=None):
     from sforge import v9_cli
     if argv and argv[0] in v9_cli.COMMANDS:     # v9: recolor variants atlas batch qa framedata npc sets expressions
         return v9_cli.main(argv)
+    if argv and argv[0] == "gaelic-clip":  # merge one retargeted clip into a *copy* of the Gaelic player
+        from sforge import gaelic_clip
+        return gaelic_clip.main(argv[1:])
     if argv and argv[0] == "doctor":
         from sforge import doctor
         return doctor.run(argv[1:])
@@ -609,6 +612,7 @@ def main(argv=None):
   package     drop-in zip for a game's assets/ folder (<= 25 MB check)
   summary     one-page pipeline summary image
   cache       build cache: cache stats | clear | prune
+  gaelic-clip check a Gaelic player GLB, or merge one retargeted clip into a copy (never --install)
 v9:
 """ + "\n".join("  %-11s %s" % kv for kv in v9_cli.HELP.items()))
     sub = p.add_subparsers(dest="cmd")
