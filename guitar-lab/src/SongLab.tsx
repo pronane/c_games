@@ -649,8 +649,11 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
       const at = Math.round(from * b.sampleRate);
       mixInto(separated, Array.from({ length: b.numberOfChannels }, (_, ch) => b.getChannelData(ch).subarray(at, at + frames)), 1);
     }
+    // Every heard note plays, including the ones no fingering was found for (a dense passage
+    // can leave many without a string): leaving them out made the playback miss notes the
+    // app did hear.
     const notes = score.notes
-      .filter((n) => n.string != null && n.time + n.duration > from)
+      .filter((n) => n.time + n.duration > from)
       .map((n) => ({ ...n, time: n.time - from }));
     const written = synthesize(notes, rate, duration - from, 1, 0.3, sound);
     const left = which === "written" ? written : separated[0],
