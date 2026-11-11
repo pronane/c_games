@@ -327,16 +327,51 @@ def write_synthetic_clip(template_glb, out_path, name="synth_step", fault=None):
     write_glb(out_path, doc, out_buf)
 
 
+def _repo_root():
+    """Directory that contains both sprite_forge and Gaelic_Football_3d. Independent of cwd."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    d = here
+    for _ in range(8):
+        if (os.path.isdir(os.path.join(d, "Gaelic_Football_3d"))
+                and os.path.isdir(os.path.join(d, "sprite_forge"))):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return None
+
+
 def _identity(path):
+    """sha256 plus a path relative to the repository root. Cwd is not used."""
     ab = os.path.abspath(path)
-    try:
-        rel = os.path.relpath(ab, os.getcwd()).replace("\\", "/")
-    except ValueError:
-        rel = None
-    if not rel or rel.startswith("..") or os.path.isabs(rel):
-        return {"name": os.path.basename(ab), "sha256": _sha(ab), "path": None,
-                "note": "outside the working directory; the sha256 is the identity"}
-    return {"name": os.path.basename(ab), "sha256": _sha(ab), "path": rel}
+    root = _repo_root()
+    rel = None
+    if root:
+        try:
+            rel = os.path.relpath(ab, root).replace("\\", "/")
+        except ValueError:
+            rel = None
+        if not rel or rel.startswith("..") or os.path.isabs(rel):
+            rel = None
+    info = {"name": os.path.basename(ab), "sha256": _sha(ab), "path": rel}
+    if rel is None:
+        info["note"] = "outside the repository; the sha256 is the identity"
+    return info
+
+
+def _retarget_command_ok(cmd):
+    """A recorded forge.py retarget line. Not executed, and not a prose note."""
+    if not cmd or "\n" in cmd:
+        return False
+    text = cmd.strip()
+    if not text.startswith("python"):
+        return False
+    if "forge.py" not in text or "retarget" not in text.split():
+        return False
+    if ".fbx" not in text and ".glb" not in text:
+        return False
+    return True
 
 
 def _canonical_player_path(path):
@@ -377,6 +412,13 @@ def cmd_merge(a):
         return 2
     if os.path.exists(out_glb) and not a.replace:
         print("output already exists; pass --replace to overwrite this candidate", file=sys.stderr)
+        return 2
+    if a.provenance == "retarget":
+        if not _retarget_command_ok(a.retarget_cmd):
+            print("a retarget claim needs --retarget-cmd as an exact 'python ... forge.py retarget ... .fbx/.glb' line. It is stored and not re-run.", file=sys.stderr)
+            return 2
+    elif a.retarget_cmd:
+        print("--retarget-cmd is only for --provenance retarget. An authored fixture has no retarget command.", file=sys.stderr)
         return 2
     before = _sha(player)
     doc, buf = read_glb(player)
@@ -424,7 +466,9 @@ def cmd_merge(a):
         "channels_copied": report["channels"],
         "unmapped_nodes": report["unmapped"],
         "keys": key_rep,
-        "retarget_command": a.retarget_cmd,
+        "provenance": a.provenance,
+        "retarget_command": a.retarget_cmd if a.provenance == "retarget" else None,
+        "retarget_command_executed": False,
         "merge_command": "python3 forge.py gaelic-clip merge <player> <clip> --source %s --name %s --out <dir>" % (a.source, a.name),
         "parts_copied": bool(a.parts),
         "rights": "Not established. Vendor metadata inside a file is not permission to redistribute, and it is not proof of a violation. Keep the candidate local until the real licence and author are known.",
@@ -454,7 +498,10 @@ def main(argv):
     m.add_argument("--textures")
     m.add_argument("--replace", action="store_true", help="overwrite an existing candidate in --out")
     m.add_argument("--replace-clip", action="store_true", help="displace a clip the player already has")
-    m.add_argument("--retarget-cmd", default=None, help="exact forge.py retarget command that produced the clip, stored in the manifest")
+    m.add_argument("--provenance", choices=["unspecified", "authored", "retarget"], default="unspecified",
+                   help="authored = keys written by this repo, no FBX retarget; retarget = an external clip whose exact forge.py retarget line is in --retarget-cmd (recorded, not re-run)")
+    m.add_argument("--retarget-cmd", default=None,
+                   help="exact 'python ... forge.py retarget <file.fbx|glb> ...' line. Required with --provenance retarget. Stored, not executed.")
     a = p.parse_args(argv)
     if a.cmd == "check":
         return cmd_check(a)

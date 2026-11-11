@@ -45,8 +45,7 @@ def main():
         write_synthetic_clip(TEMPLATE, synth)
         out_dir = os.path.join(tmp, "candidate")
         code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
-                        "--parts", PARTS, "--out", out_dir,
-                        "--retarget-cmd", "synthetic fixture authored by the test, not a vendor clip")
+                        "--parts", PARTS, "--out", out_dir, "--provenance", "authored")
         assert code == 0, out
         doc, _buf = read_glb(os.path.join(out_dir, "gaelic_player.glb"))
         names = _anim_names(doc)
@@ -57,9 +56,11 @@ def main():
         assert len(doc["skins"][0]["joints"]) == 52
         man = json.load(open(os.path.join(out_dir, "manifest.json"), encoding="utf-8"))
         assert man["player"]["sha256"] == before
-        assert man["player"]["path"] and not os.path.isabs(man["player"]["path"])
-        assert "/tmp/" not in json.dumps(man["player"])
-        assert man["retarget_command"].startswith("synthetic")
+        assert man["player"]["path"] == "Gaelic_Football_3d/assets/models/gaelic_player.glb"
+        assert man["clip"]["path"] is None and man["clip"]["sha256"]
+        assert man["provenance"] == "authored"
+        assert man["retarget_command"] is None
+        assert man["retarget_command_executed"] is False
         assert "Not established" in man["rights"]
         assert man["keys"]["pelvis"]["xz_span_m"][1] < 0.1
         assert sha(PLAYER) == before
@@ -76,6 +77,17 @@ def main():
                         "--out", os.path.join(GAME, "assets", "models"))
         assert code == 2, out
         assert sha(PLAYER) == before
+        # a sentence is not a retarget recipe, and an authored fixture cannot carry one
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--provenance", "retarget",
+                        "--retarget-cmd", "synthetic fixture authored by the test, not a vendor clip",
+                        "--out", os.path.join(tmp, "sentence"))
+        assert code == 2 and "retarget" in out, out
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--provenance", "authored",
+                        "--retarget-cmd", "python3 forge.py retarget clip.fbx template.glb --root-motion inplace --out one.glb",
+                        "--out", os.path.join(tmp, "invented"))
+        assert code == 2, out
         for fault in ("time", "quat", "pelvis"):
             bad = os.path.join(tmp, fault + ".glb")
             write_synthetic_clip(TEMPLATE, bad, fault=fault)
