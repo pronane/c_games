@@ -1461,11 +1461,17 @@ def tone_estimate(audio, sr):
 
 
 def solo_recording(found: list, stem_name: str) -> bool:
-    """True when the separator did not put the instrument in its own stem but nothing else
-    plays either: a solo take (often acoustic or wet with reverb) that Demucs filed under
-    'other'. Then the whole recording is the part. A real band keeps its separated stem."""
+    """True when nothing but the instrument plays: a solo take. Then the whole recording is the
+    part, whatever the separator did with it.
+
+    The separator often splits a solo guitar between its 'guitar' stem and 'other' (a clean
+    phone recording of one guitar: 60% guitar, 39% other), or files all of it under 'other'
+    or 'piano' (acoustic, or wet with reverb). Transcribing only the 'guitar' stem then drops
+    the notes that went elsewhere. A recording with drums, bass, vocals (or, for a guitar,
+    piano that plays alongside it) is a band, and keeps its separated stem."""
     verdict = {r['stem']: r['verdict'] for r in found}
     if verdict.get(stem_name) == 'present':
-        return False
+        band = [s for s, v in verdict.items() if v == 'present' and s not in ('other', stem_name)]
+        return not band and verdict.get('other') == 'present'
     band = [s for s, v in verdict.items() if v == 'present' and s not in ('other', 'piano', stem_name)]
     return not band and any(v == 'present' for s, v in verdict.items() if s in ('other', 'piano'))
