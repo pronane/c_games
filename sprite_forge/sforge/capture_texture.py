@@ -106,10 +106,82 @@ RINGS = os.environ.get("SF_RINGS", "1") != "0"
 HEAD_MIN_FACING = float(os.environ.get("SF_HEAD_FACING", "0.4"))
 
 
-def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False, clean=True):
+ALIGN = os.environ.get("SF_ALIGN", "1") != "0"
+SURE_SD = float(os.environ.get("SF_SURE_SD", "25"))
+SHARP_SIGMA = float(os.environ.get("SF_SHARP_SIGMA", "10"))
+
+
+def align_flows(fitter, frames, tex, mesh=None, log=print, max_frac=0.03):
+    """v11.9: per frame, where the character really is in the picture, to the pixel.
+
+    The cameras and the body put each texel within a centimetre or two of where the frame shows it - enough for the
+    silhouette, not for a 1 cm stripe or a logo: averaged over frames that each miss by a different centimetre,
+    thin detail goes grey. Here the first texture is drawn into each frame from its camera and the frame is matched
+    to that drawing by optical flow (DIS, on locally normalised grey so exposure does not matter): the flow says how
+    far each drawn pixel has to move to land on the real one. It is smoothed, capped at `max_frac` of the frame
+    height and kept only where both the drawing and the person are. -> {frame index: (fx, fy) float32 HxW}"""
+    import cv2
+    from scipy import ndimage as ndi
+    sh, P, Pg = fitter.posed()
+    Fm, fuvm = fitter.bm.F, fitter.bm.fuv
+    if mesh is not None:
+        P = mesh[0].pose(mesh[1]); Fm, fuvm = mesh[0].F, mesh[0].fuv
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+
+    def norm(g, m):
+        g = g.astype(np.float32)
+        mu = cv2.GaussianBlur(g, (0, 0), 6); sd = np.sqrt(np.maximum(cv2.GaussianBlur(g * g, (0, 0), 6) - mu * mu, 1.0))
+        z = np.clip((g - mu) / sd, -3, 3)
+        return np.where(m, z * 40 + 128, 128).astype(np.uint8)
+    flows = {}; mags = []
+    for r in frames:
+        if r["i"] not in fitter.cams.cam:
+            continue
+        img = np.asarray(Image.open(os.path.join(fitter.dir, "frames", "%04d.jpg" % r["i"])).convert("RGB"))
+        msk = np.asarray(Image.open(os.path.join(fitter.dir, "masks", "%04d.png" % r["i"]))) > 127
+        H, W = img.shape[:2]
+        rv, tv = fitter.cams.cam[r["i"]]
+        R, _ = cv2.Rodrigues(rv)
+        ren, m = render(P, Fm, fuvm, tex, size=(W, H), cam=(R, tv, fitter.cams.K(r["size"])))
+        both = ndi.binary_dilation(m & msk, iterations=8)
+        a = norm(cv2.cvtColor(ren, cv2.COLOR_RGB2GRAY), both)
+        b = norm(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), both)
+        fl = dis.calc(a, b, None)                                      # ren(x) ~ img(x + fl(x))
+        cap = max_frac * H
+        for k in range(2):
+            f_ = fl[..., k]
+            f_ = np.where(m & msk, f_, 0.0)
+            # smooth inside the drawing only (normalised convolution), so the zeros outside do not pull it in
+            wsm = cv2.GaussianBlur((m & msk).astype(np.float32), (0, 0), 4)
+            f_ = cv2.GaussianBlur(f_.astype(np.float32), (0, 0), 4) / np.maximum(wsm, 1e-3)
+            # near the outline (feet on the floor, a hand against the trousers) the flow matches the wrong thing:
+            # it fades to nothing over the outer 15 px of the person
+            fade = np.clip(ndi.distance_transform_edt(m & msk) / 15.0, 0, 1)
+            fl[..., k] = np.clip(f_, -cap, cap) * fade
+        flows[r["i"]] = (fl[..., 0].astype(np.float32), fl[..., 1].astype(np.float32))
+        sel = m & msk
+        if sel.any():
+            mags.append(float(np.median(np.hypot(fl[..., 0][sel], fl[..., 1][sel]))))
+    if mags:
+        log("texture: frames aligned to the first texture by optical flow, median shift %.1f px (%.1f-%.1f)" % (
+            float(np.median(mags)), min(mags), max(mags)))
+    return flows
+
+
+def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False, clean=True,
+         flows=None, align=None):
     """-> (texture RGB uint8 (res,res,3), coverage (res,res) float, stats)
     mesh: optional (rest Mesh, skinning matrices) from capture_layers - body + clothes + skirt + hair in one atlas;
-    default the bare body with MakeHuman's UVs"""
+    default the bare body with MakeHuman's UVs.
+    align (default on, SF_ALIGN=0 off): v11.9 - a first, plain texture is baked, every frame is matched to it by
+    optical flow (align_flows) and the texture is baked again from the corrected positions"""
+    if align is None:
+        align = ALIGN
+    if align and flows is None:
+        fr = frames or [t.r for t in fitter.targets]
+        t0, _, _ = bake(fitter, frames=fr, res=res, power=power, min_facing=min_facing, log=lambda *a: None,
+                        mesh=mesh, delight=False, clean=False, align=False)
+        flows = align_flows(fitter, fr, t0, mesh=mesh, log=log)
     import cv2
     from scipy import ndimage as ndi
     bm = fitter.bm
@@ -146,6 +218,11 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     hd_t = hv[F[ti]].all(1)
     hd_F = F[hv[F].all(1)]
     cols, ws, used, labs = [], [], [], []
+    # v11.9: hands and feet are thin and sit on the person's outline (against the floor, the trousers): optical flow
+    # matches the wrong thing there, so they keep the camera's own projection
+    ext_b = [bm.bi[b] for b in bm.bi if b.split(".")[0] in ("foot", "toe1-1", "toe2-1", "toe3-1", "toe4-1", "toe5-1",
+                                                               "wrist") or b.startswith(("finger", "metacarpal", "toe"))]
+    ext_t = np.isin(Jm[F[ti, 0], 0], ext_b)
     for r in frames:
         if r["i"] not in fitter.cams.cam:
             continue
@@ -197,6 +274,14 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         # seen at a slant paints its eye onto the side of the head (a ghost eye by the ear)
         ok = vis & (facing > np.where(hd_t, HEAD_MIN_FACING, min_facing)) & (m[vi, ui] > 0.6)
         pw = np.where(head_t, power * 2.0, power)                         # a face blurs when views are mixed
+        if flows and r["i"] in flows:
+            # v11.9: sample where the frame really shows the texel (the head has its own pose already)
+            fx, fy = flows[r["i"]]
+            bd = (~hd_t if r["i"] in poses else np.ones(len(u), bool)) & ~ext_t
+            du = fx[vi, ui]; dv = fy[vi, ui]
+            u = np.where(bd, u + du, u); v = np.where(bd, v + dv, v)
+            ui = np.clip(np.round(u - 0.5).astype(int), 0, W - 1); vi = np.clip(np.round(v - 0.5).astype(int), 0, H - 1)
+            ok &= (u >= 0) & (u < W) & (v >= 0) & (v < H) & (m[vi, ui] > 0.6)
         w = np.where(ok, facing ** pw * m[vi, ui] * (ppm / 400.0) ** 2, 0.0) * (_sharpness(img) ** 0.5)
         c = _bilinear(img, u - 0.5, v - 0.5)
         cols.append(np.clip(np.round(c), 0, 255).astype(np.uint8)); ws.append(w.astype(np.float32)); used.append(r["i"])
@@ -285,7 +370,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
                 b_ = np.median(C[k][com].astype(np.float32) * gains[k], 0)
                 fgain[k] = np.clip(a_ / np.maximum(b_, 1.0), 0.6, 1.6)
         stats_fg = float(np.abs(np.log(fgain)).mean())
-    out = []
+    out = []; sd_out = []; ne_out = []
     for c in chunks:
         Cg = C[:, c].astype(np.float32) * gains[:, None, :]; Wc = Wt[:, c]
         fc = face_t[c]
@@ -301,7 +386,13 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         spread = np.linalg.norm(mean - med, axis=1)
         al = np.clip((spread - 8.0) / 20.0, 0, 1)[:, None]               # disagreement -> trust the median
         out.append(mean * (1 - al) + med * al)
+        # v11.9: how well the views agree - their weighted spread round the mean, and how many views really count
+        sw = Wc.sum(0)
+        var = (Wc[..., None] * (Cg - mean[None]) ** 2).sum(0) / (sw[:, None] + 1e-9)
+        neff = sw ** 2 / ((Wc ** 2).sum(0) + 1e-12)
+        sd_out.append(np.sqrt(var.mean(1))); ne_out.append(neff)
     mix = np.concatenate(out)
+    view_sd = np.concatenate(sd_out); view_n = np.concatenate(ne_out)
     cover = Wt.sum(0)
     seen_t = cover > 1e-6 * (cover.max() + 1e-9)
     light = None
@@ -351,6 +442,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
                 dg = np.min(np.linalg.norm((L_ * W_LAB)[:, None, :] - gc[None], axis=2), 1)
                 kw["drop"] = cand & (dg < dsk) & (dg < 30)
                 stats["chin_dropped"] = int(kw["drop"].sum())
+        mix_raw = mix.copy(); alb_raw = alb.copy() if (light is not None and light.get("applied")) else None
         mix, _, stats["clean"] = CC.clean(mix, seen_t, *args, log=log, **kw)
         if light is not None and light.get("applied"):
             alb, _, _ = CC.clean(alb, seen_t, *args, log=lambda *a: None, **kw)
@@ -390,11 +482,55 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         t8 = np.clip(tex, 0, 255).astype(np.uint8)
         unknown = (~known).astype(np.uint8)
         return cv2.inpaint(t8, unknown, 6, cv2.INPAINT_TELEA) if unknown.any() else t8
+    detail = None
+    if clean and flows and mesh is not None:
+        # v11.9: the clean decides each garment's colours and edges; the fine detail - a print's lettering, a
+        # stripe, a seam - is put back on top of it from the aligned bake, but only on the clothes and only where
+        # at least two views agree on it (blotches are views that disagree; detail is what every view sees).
+        # Detail = the raw texture minus its own blur (SHARP_SIGMA texels), so a colour cast or a big patch is not
+        sure_t = seen_t & (view_n >= 1.8) & (view_sd < SURE_SD) & (lay_c >= 1)
+        sm = np.zeros((res, res), np.float32); sm[inside] = sure_t
+        sm = cv2.GaussianBlur(sm, (0, 0), 1.5)                          # soft edge of the detail mask
+        # where the clean may have moved a garment edge: the limbs and the hips (rings, hems); a print on the chest
+        # is never an edge the clean moved, however different its raw colours are from the clean's blocks
+        moved = np.zeros((res, res), np.float32)
+        if "limb" in kw and kw["limb"] is not None:
+            moved[inside] = (kw["limb"] >= 0)
+        moved = cv2.dilate(moved, np.ones((9, 9), np.uint8))
+
+        def detail_of(raw):
+            img_ = fill(raw).astype(np.float32)
+            return img_ - cv2.GaussianBlur(img_, (0, 0), SHARP_SIGMA)
+
+        def sharpen(clean_img, raw):
+            # where the views agree: the clean texture's own blur (its colours, without the blocks the clean leaves
+            # round small features) plus the raw detail; elsewhere the clean texture as it is
+            c_ = clean_img.astype(np.float32)
+            base = cv2.GaussianBlur(c_, (0, 0), SHARP_SIGMA)
+            sh_ = base + detail_of(raw)
+            # not where the clean moved a garment edge (a hem snapped to its ring): there the raw detail is the old
+            # edge, and adding it back would smear the shirt into the shorts
+            far = np.linalg.norm(fill(raw).astype(np.float32) - c_, axis=2)
+            # the clean's own garment edges on the limbs (hems): a strong step in the clean texture, widened by the
+            # blur's reach. A stripe down a leg is not one - the clean has no stripe - so it gets its detail back
+            step = np.linalg.norm(c_ - cv2.GaussianBlur(c_, (0, 0), 3), axis=2) > 20
+            hem = cv2.dilate((step & (moved > 0)).astype(np.uint8), np.ones((int(2 * SHARP_SIGMA) | 1,) * 2, np.uint8))
+            w_ = sm * (1.0 - hem * (1.0 - np.clip((60.0 - far) / 30.0, 0, 1)))
+            w_ = np.minimum(w_, cv2.erode(w_, np.ones((5, 5), np.uint8)) + 0.0)
+            w_ = cv2.GaussianBlur(w_, (0, 0), 1.5)
+            return np.clip(c_ + w_[..., None] * (sh_ - c_), 0, 255).astype(np.uint8)
+        detail = True
+        stats["sure"] = float(sure_t.sum() / max(1, (seen_t & (lay_c >= 1)).sum()))
+        log("texture: detail put back on %.0f%% of the clothes (views agree within %g)" % (100 * stats["sure"], SURE_SD))
     t8 = fill(mix)
+    if detail is not None:
+        t8 = sharpen(t8, mix_raw)
     if light is not None and light.get("applied"):
         stats["light"] = light
         stats["lit_texture"] = t8                                       # as filmed (the room's light in it)
         t8 = fill(alb)
+        if detail is not None:
+            t8 = sharpen(t8, alb_raw)
     log("texture: %d frames, %.0f%% of the body seen, %dx%d" % (len(used), 100 * stats["seen"], res, res))
     return t8, cov, stats
 
