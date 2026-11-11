@@ -225,8 +225,9 @@ def score_user_pair(backend):
     takes = catalog.user_takes()
     if not catalog.available_summary()['user_reverb_pair']:
         return [{'id': 'user_reverb_pair', 'category': 'reverb_clear', 'status': 'missing',
-                 'detail': 'Place take_a_4m51.aac (reverb) and take_c_synth_4m58.aac (clear) '
-                           'in benchmarks/regression/data/private/user/.'}]
+                 'detail': 'Place take_a_4m51.aac and take_c_synth_4m58.aac '
+                           'in benchmarks/regression/data/private/user/. '
+                           'They are separate performances, not a confirmed dry/wet pair.'}]
     clear_audio, clear_sr, _ = _read_any(takes['clear'])
     wet_audio, wet_sr, _ = _read_any(takes['reverb'])
     src_t, dst_t = chroma_time_map(wet_audio, wet_sr, clear_audio, clear_sr)

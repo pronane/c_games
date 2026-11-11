@@ -1,0 +1,149 @@
+{
+  "ground_truth": false,
+  "note": "No ground-truth tab. These numbers lock the current song-path decoder. current_upload.aac is byte-identical to take_c_synth_4m58.aac. Take A and take C are separate performances (pitch-class cosine 0.9669, note F1 after an audio-only time map 0.3448), not a confirmed dry/wet pair. Take B does not line up with A (note F1 0.0316).",
+  "decoder": "riley song path (upload decode, then per-channel transcription when both channels are active)",
+  "same_bytes": [
+    "current_upload.aac",
+    "take_c_synth_4m58.aac"
+  ],
+  "rows": [
+    {
+      "id": "current_upload.aac",
+      "sha256": "cb121e0fd26f48cec619e651fb77a9587bde54b54891e959fd879b5465b14564",
+      "n_notes": 238,
+      "duration_s": 305.017,
+      "notes_per_second": 0.7803,
+      "median_duration_s": 0.4287,
+      "p10_duration_s": 0.2351,
+      "short_fraction": 0.0,
+      "median_ioi_s": 0.5458,
+      "first_onset_s": 4.4047,
+      "last_onset_s": 291.5847,
+      "pitch_class": [
+        0.0126,
+        0.0882,
+        0.0924,
+        0.0294,
+        0.1513,
+        0.0168,
+        0.0882,
+        0.0546,
+        0.0924,
+        0.1639,
+        0.0126,
+        0.1975
+      ],
+      "playback_onset_lag_s": 0.0004
+    },
+    {
+      "id": "take_a_4m51.aac",
+      "sha256": "f0e075a1c53be2fabd5fb0e3305c34420e995e85731a7d7c798f75e7e0a97322",
+      "n_notes": 627,
+      "duration_s": 300.373,
+      "notes_per_second": 2.0874,
+      "median_duration_s": 0.288,
+      "p10_duration_s": 0.1692,
+      "short_fraction": 0.0223,
+      "median_ioi_s": 0.2163,
+      "first_onset_s": 0.0354,
+      "last_onset_s": 287.2359,
+      "pitch_class": [
+        0.0144,
+        0.0813,
+        0.1164,
+        0.0335,
+        0.1627,
+        0.0,
+        0.0813,
+        0.0159,
+        0.067,
+        0.1324,
+        0.0175,
+        0.2775
+      ],
+      "playback_onset_lag_s": 0.0007
+    },
+    {
+      "id": "take_b_1m44.aac",
+      "sha256": "8aa776e0739f1101466e00d939900f0e3ac66f41349be9e2f92621bd91c3267e",
+      "n_notes": 565,
+      "duration_s": 108.855,
+      "notes_per_second": 5.1904,
+      "median_duration_s": 0.2109,
+      "p10_duration_s": 0.0782,
+      "short_fraction": 0.115,
+      "median_ioi_s": 0.0744,
+      "first_onset_s": 5.0114,
+      "last_onset_s": 92.2548,
+      "pitch_class": [
+        0.0,
+        0.0973,
+        0.0442,
+        0.0,
+        0.2637,
+        0.0,
+        0.0354,
+        0.0,
+        0.1487,
+        0.223,
+        0.0,
+        0.1876
+      ],
+      "playback_onset_lag_s": 0.0006
+    },
+    {
+      "id": "take_c_synth_4m58.aac",
+      "sha256": "cb121e0fd26f48cec619e651fb77a9587bde54b54891e959fd879b5465b14564",
+      "n_notes": 238,
+      "duration_s": 305.017,
+      "notes_per_second": 0.7803,
+      "median_duration_s": 0.4287,
+      "p10_duration_s": 0.2351,
+      "short_fraction": 0.0,
+      "median_ioi_s": 0.5458,
+      "first_onset_s": 4.4047,
+      "last_onset_s": 291.5847,
+      "pitch_class": [
+        0.0126,
+        0.0882,
+        0.0924,
+        0.0294,
+        0.1513,
+        0.0168,
+        0.0882,
+        0.0546,
+        0.0924,
+        0.1639,
+        0.0126,
+        0.1975
+      ],
+      "playback_onset_lag_s": 0.0004
+    }
+  ],
+  "pairs": [
+    {
+      "src": "take_a_4m51.aac",
+      "dst": "take_c_synth_4m58.aac",
+      "why": "separate performances of one song, not a dry/wet pair",
+      "note_f1_50": 0.3448,
+      "onset_f1_50": 0.4019,
+      "pitch_class_cosine": 0.9669
+    },
+    {
+      "src": "take_a_4m51.aac",
+      "dst": "take_b_1m44.aac",
+      "why": "earlier notes say B does not line up with A",
+      "note_f1_50": 0.0316,
+      "onset_f1_50": 0.2661,
+      "pitch_class_cosine": 0.8805
+    },
+    {
+      "src": "current_upload.aac",
+      "dst": "take_c_synth_4m58.aac",
+      "why": "same bytes, so the decoder must emit the same notes",
+      "note_f1_50": 1.0,
+      "onset_f1_50": 1.0,
+      "pitch_class_cosine": 1.0
+    }
+  ]
+}

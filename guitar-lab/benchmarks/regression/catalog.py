@@ -56,9 +56,11 @@ IDMT_PIECES = (
     'quintfall',
 )
 
-# Clear-timeline windows for the user's reverb/clear pair. Chosen from the
-# active regions in the attached RESULTS (rests near 114–126 s and 235–248 s
-# are outside). Not searched to maximise note F1.
+# Windows on take C's clock used by the older A-against-C comparison.
+# Chosen from the active regions in the attached RESULTS (rests near 114–126 s
+# and 235–248 s are outside). Not searched to maximise note F1.
+# Take A and take C are separate performances, not a confirmed dry/wet pair.
+# benchmarks/recordings is the behaviour lock and does not treat them as one.
 USER_WINDOWS = ((30.0, 60.0), (150.0, 180.0))
 
 RENDERED = (
@@ -97,6 +99,11 @@ def idmt_dir():
 
 
 def user_takes():
+    """Local AAC paths for the older A-against-C comparison.
+
+    The dict keys are historical. The files are not a confirmed dry/wet pair
+    of one performance. The behaviour lock lives in ``benchmarks/recordings``.
+    """
     folder = PRIVATE / 'user'
     return {
         'clear': folder / 'take_c_synth_4m58.aac',
