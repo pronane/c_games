@@ -887,6 +887,30 @@ static void pickFootProbe(void)
     probeVert = best;
     TraceLog(LOG_INFO, "GAME: foot probe mesh %d vert %d weight %.2f", mi, best, bestW);
 }
+/* Raylib leaves SUPPORT_GPU_SKINNING off by default, so UploadMesh never puts bone
+ * indices or weights in the VAO. The skin shader then reads the default attribute
+ * (0,0,0,1) and the whole body is drawn with one bone: a rigid bind pose. */
+static void attachBoneAttributes(void)
+{
+    int i, n = 0;
+    for (i = 0; i < model.meshCount; i++) {
+        Mesh *mesh = &model.meshes[i];
+        unsigned char *ids = MESH_BONE_IDS(*mesh);
+        if (!ids || !mesh->boneWeights || mesh->vaoId == 0 || mesh->vertexCount <= 0) continue;
+        rlEnableVertexArray(mesh->vaoId);
+        rlLoadVertexBuffer(ids, mesh->vertexCount * 4 * (int)sizeof(unsigned char), false);
+        rlSetVertexAttribute(7, 4, RL_UNSIGNED_BYTE, false, 0, 0);
+        rlEnableVertexAttribute(7);
+        rlLoadVertexBuffer(mesh->boneWeights, mesh->vertexCount * 4 * (int)sizeof(float), false);
+        rlSetVertexAttribute(8, 4, RL_FLOAT, false, 0, 0);
+        rlEnableVertexAttribute(8);
+        rlDisableVertexArray();
+        n++;
+    }
+    TraceLog(LOG_INFO, "GAME: bone index/weight buffers attached to %d mesh VAOs at locations 7 and 8", n);
+    printf("DRAW bone-vbos %d meshes (raylib did not upload these; GPU skinning needs them)\n", n);
+    fflush(stdout);
+}
 static Matrix *skinMatrices(void)
 {
 #if RAYLIB_VERSION_MAJOR >= 6
@@ -1575,6 +1599,7 @@ static void applyAssist(GameInput *in)
 /* ---- camera ---------------------------------------------------------------- */
 static Vector3 camFocus;
 static int camOverride = 0;       /* 1 wide stadium orbit, 2 referee/card close-up */
+static int camHardSnap = 0;       /* motion test: jump the camera instead of flying through the stand */
 static float camOverrideT = 0;
 
 /* v3.2 framing: how wide the shot should be (0 tight .. 1 wide) and where play is.
@@ -1656,7 +1681,7 @@ static void updateCamera(float dt)
     if (dt > 0.0f) camFocus = smoothDamp3(camFocus, focus, &camFocusVel, game.ball.in_flight ? 0.45f : 0.6f, dt);
     float o = camOpen;
     Vector3 pos, tgt = camFocus;
-    float snap = dt * 4.0f;
+    float snap = camHardSnap ? 1.0f : dt * 4.0f;
     cam.fovy = 40;
     camOverrideT += dt;
     if (camOverride == 1) {
@@ -2977,6 +3002,8 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
         int k;
         float march = (float)(frame - 990) * 0.12f;
         camMode = 1;
+        camHardSnap = 1;
+        camFocus = W(70.0f + march, 1.0f, 42.0f);
         p->x = 70.0f + march; p->z = 42.0f; p->facing_x = 1; p->facing_z = 0;
         p->action = GAME_ACT_NONE;
         pad.axis[0] = 0;
@@ -3105,6 +3132,7 @@ int main(int argc, char **argv)
 #endif
         detectContacts();
         pickFootProbe();
+        attachBoneAttributes();
         if (haveLit) for (int m = 0; m < model.materialCount; m++) model.materials[m].shader = gpuSkin ? skinShader : litShader;
         TraceLog(LOG_INFO, "GAME: %d clips loaded, %d bones", C_COUNT, MODEL_BONECOUNT(model));
     }
@@ -3311,6 +3339,11 @@ int main(int argc, char **argv)
         else { drawHUD(sw, sh); if (training) drawTrainingHUD(sw, sh); }
         if (showControls) drawControls(sw, sh);
         if (paused && state == ST_PLAY) DrawText("PAUSED", sw / 2 - MeasureText("PAUSED", 48) / 2, sh / 2 - 24, 48, GOLD);
+        if (skinBanner) {
+            const char *lab = gpuSkin ? "GPU SKIN" : "CPU SKIN";
+            DrawRectangle(12, 78, 240, 40, (Color){ 0, 0, 0, 210 });
+            DrawText(lab, 22, 86, 30, gpuSkin ? (Color){ 120, 255, 160, 255 } : (Color){ 255, 210, 80, 255 });
+        }
         if (showPerf) drawPerf(sw);
         tHud = GetTime() - h0;
         double s0 = GetTime();
