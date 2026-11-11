@@ -52,6 +52,35 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.10: every frame's camera registered to its own picture, and checks for any new video
+
+* **Registration** (`capture_register.py`, on by default, `--no-register` to skip): the landmark cameras leave
+  each frame 5-10 px off what its picture shows. A first plain texture is drawn from each frame's camera, DIS
+  optical flow (forward / backward checked, away from the outline, only where there is texture) says where each
+  visible vertex really is, and the camera is re-solved to those points - position first, the angles held close.
+  Three rounds. A move is **kept only if** the misfit left falls by at least 10%, the outline does not get worse
+  (IoU drop under 0.005), it is a correction and not a jump (under 8 degrees and 12% of the distance per round)
+  and it rests on at least 150 trusted points over a quarter of the person's height. Otherwise the frame keeps
+  its camera and the report says why.
+* **Measured on the five:** median misfit Tmon 13.6 -> 4.4 px, Mike 6.3 -> 3.5, Declan 7.2 -> 5.3, PR 8.4 -> 7.3,
+  Anna 8.5 -> 7.6; no frame that moved got worse; silhouette IoU unchanged; held-out SSIM within +-0.006. Real people also move a little between frames (arms,
+  sway), which no camera can absorb: the texture's own flow alignment (v11.9) takes care of what is left.
+* **`tools/check_capture.py CAPTURE_DIR`** (or `--all captures/`): the gate for any new video's capture - files
+  and a valid skinned GLB, held-out IoU >= 0.70, texture coverage, registration (misfit did not grow, no frame
+  worse, no move beyond a correction; a warning when most frames are still far off), face landmark error.
+* **Tests that do not depend on the five samples:**
+  - `tools/test_register.py` (14 checks): knocked-off cameras come back (3.6 -> 0.2 px) and no frame gets
+    worse; a right camera stays put; a frame that is not the person, a camera 15 degrees off (a tracking
+    failure) and a tiny person are all left alone; half the person hidden never ends up worse; and seven kinds of
+    video the samples do not have - full body, a close-up with the legs cut off, a dim noisy room, motion blur,
+    heavy JPEG, a ragged segmentation mask, plain one-colour clothes - never worse, and better wherever there is
+    detail to align to.
+  - `tools/test_capture.py` (9 checks): the whole synthetic capture, now with its cameras knocked off by what a
+    real video leaves: misfit in the pictures halved, cameras a third of the way back, texture closer to the
+    truth.
+  - `tools/test_check_capture.py` (12 checks): the gate passes a good capture and catches each kind of broken
+    one for its own reason; a one-photo capture is judged on its photo fit.
+
 ## New in v11.9: a sharper texture - prints, lettering and stripes survive
 
 The cameras and the fitted body put each point of the texture within a centimetre or two of where a frame shows

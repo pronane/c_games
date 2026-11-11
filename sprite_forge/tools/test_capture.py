@@ -8,7 +8,10 @@
    33 MediaPipe landmarks it would give (joints projected), written as a capture track
 3. the fitter starts from the AVERAGE body and recovers the shape; the texture is baked back from the frames
 Checks: silhouette IoU after the fit, the body's vertex error against the truth, texture colour error against the
-truth texture, and the GLB / FBX / OBJ exports (skeleton, clips). Skips (exit 0) without the MakeHuman assets."""
+truth texture, and the GLB / FBX / OBJ exports (skeleton, clips). v11.10: the fitted cameras are then knocked off
+by 1-2 degrees / 1-2 cm (what a real video's landmark cameras are): the registration must halve the misfit in the
+pictures, bring the cameras at least a third of the way back to the truth (the fitted body is not exactly the true
+one, so the best camera for it is not exactly the true camera) and make the texture closer to the truth. Skips (exit 0) without the MakeHuman assets."""
 from __future__ import annotations
 import argparse
 import json
@@ -53,7 +56,7 @@ def main(argv=None):
     tex[(np.floor(yy * 24) % 2) == 0] *= 0.8
     tex = np.clip(tex, 0, 255).astype(np.uint8)
     W, Hh = 480, 640
-    frames = []
+    frames = []; truth_cams = {}
     n = 10 if a.quick else 16
     rng = np.random.default_rng(3)
     cams = CF.Cameras(0.8)
@@ -65,6 +68,7 @@ def main(argv=None):
         t = np.array([rng.normal(0, 0.05), 0.9 + rng.normal(0, 0.05), dist])
         K = cams.K((W, Hh))
         img, m = CT.render(P, bm.F, bm.fuv, tex, size=(W, Hh), cam=(R, t, K), bg=(90, 100, 110))
+        truth_cams[k] = (R, t, K)
         Image.fromarray(img).save(os.path.join(cap, "frames", "%04d.jpg" % k), quality=95)
         Image.fromarray((m * 255).astype(np.uint8)).save(os.path.join(cap, "masks", "%04d.png" % k))
         # 2 = body skin: the synthetic person wears nothing. (Labelled clothes, v11.1's fit would - by design - let
@@ -102,6 +106,38 @@ def main(argv=None):
     seen = (tid >= 0) & (cov > 0)
     tex_err = float(np.mean(np.abs(t8[seen].astype(float) - tex[seen].astype(float))))
     print("texture: mean abs colour error %.1f / 255 on %.0f%% of texels" % (tex_err, 100 * seen.mean()))
+    # ---- v11.10 registration: a real video's landmark cameras are 1-2 cm / 1-2 degrees off (the synthetic fit is
+    # nearly perfect), so knock them off by that much and let the registration find the pictures again
+    import cv2
+    from sforge import capture_register as CRG
+    _, Pfit, _ = f.posed()
+
+    def cam_err():
+        e = []
+        for t_ in f.targets:
+            i = t_.r["i"]
+            if i not in f.cams.par:
+                continue
+            Rt, tt, Kt = truth_cams[i]
+            a_ = P @ Rt.T + tt; a_ = a_[:, :2] / a_[:, 2:3] * Kt[0, 0] + Kt[:2, 2]
+            b_, _ = CRG._project(f.cams.par[i], P, Kt)
+            e.append(float(np.median(np.linalg.norm(a_ - b_, axis=1))))
+        return float(np.median(e))
+    e_fit = cam_err()
+    rng2 = np.random.default_rng(11)
+    for i in list(f.cams.par):
+        p_ = np.array(f.cams.par[i], float)
+        p_[:3] += rng2.uniform(-1, 1, 3) * rng2.uniform(1.0, 2.0); p_[3:6] += rng2.uniform(-1, 1, 3) * rng2.uniform(0.01, 0.02)
+        rv_, _ = cv2.Rodrigues(CF.Cameras.rot(*p_[:3])); f.cams.par[i] = p_; f.cams.cam[i] = (rv_.reshape(3), p_[3:6].copy())
+    e_knock = cam_err()
+    tk, _, _ = CT.bake(f, frames=[t.r for t in f.targets], res=R_, align=False, clean=False, log=lambda *x: None)
+    tex_err_k = float(np.mean(np.abs(tk[seen].astype(float) - tex[seen].astype(float))))
+    _, rsum = CRG.register(f, [t.r for t in f.targets], tk, log=print)
+    e_reg = cam_err()
+    tr, _, _ = CT.bake(f, frames=[t.r for t in f.targets], res=R_, align=False, clean=False, log=lambda *x: None)
+    tex_err_r = float(np.mean(np.abs(tr[seen].astype(float) - tex[seen].astype(float))))
+    print("cameras vs truth (median px): fitted %.2f, knocked off %.2f, registered %.2f; texture error %.1f -> %.1f" % (
+        e_fit, e_knock, e_reg, tex_err_k, tex_err_r))
     files = CE.export(fit_sh, fit_sh.pose(f.dirs)[0], t8, os.path.join(out, "export"), "synthetic")
     from sforge import fbx as FBX
     fs = FBX.summary(files["fbx"])
@@ -110,7 +146,12 @@ def main(argv=None):
               ("texture error < 25", tex_err < 25),
               ("GLB written", os.path.getsize(files["glb"]) > 100000),
               ("FBX: 26 bones, 7 takes", fs["limb_nodes"] == 26 and len(fs["anim_stacks"]) == 7),
-              ("OBJ written", os.path.getsize(files["obj"]) > 100000)]
+              ("OBJ written", os.path.getsize(files["obj"]) > 100000),
+              # the fitted body is not exactly the true one, so the camera that fits the pictures best is not exactly
+              # the true camera: the pictures' misfit must halve, the camera must come at least a third of the way back
+              ("registration: misfit in the pictures halved", rsum["flow_px_after"] < 0.5 * rsum["flow_px_before"]),
+              ("registration: cameras a third of the way back", e_reg < 0.67 * e_knock),
+              ("registration: texture closer to the truth", tex_err_r < tex_err_k)]
     bad = 0
     for name, ok in checks:
         print("%-44s %s" % (name, "PASS" if ok else "FAIL")); bad += not ok
