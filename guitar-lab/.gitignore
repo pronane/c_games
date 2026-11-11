@@ -1,5 +1,7 @@
 .cache/
 *.log
 benchmarks/regression/reference/electric_last.json
+# Local GOAT audio. CC BY-NC 4.0, not part of the repository.
+benchmarks/goat/private/
 node_modules
 .cache
