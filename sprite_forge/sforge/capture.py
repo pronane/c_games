@@ -87,7 +87,7 @@ def turntable(P, F, fuv, tex, path, yaws=(0, 45, 90, 135, 180, 225, 270, 315), s
 
 
 def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0, tex_res=1024, track_dir=None,
-        fit_iters=3, gender=None, log=print, layers=True, face=True, delight=True, face_photo=None):
+        fit_iters=3, gender=None, log=print, layers=True, face=True, delight=True, face_photo=None, register=True):
     t0 = time.time()
     d = os.path.join(out_root, name)
     os.makedirs(d, exist_ok=True)
@@ -106,7 +106,7 @@ def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0
                      fit=dict(iou=res["iou"], iou_start=res["iou_start"], frames=len(res["iou_frames"]))),
                 open(os.path.join(d, "fit.pkl"), "wb"))
     rep = finish(d, name, height_m, tex_res, log=log, fitter=f, layers=layers, face=face, delight=delight,
-                 face_photo=face_photo)
+                 face_photo=face_photo, register=register)
     rep["video"] = os.path.basename(video) if video else None
     rep["seconds"] = round(time.time() - t0)
     json.dump(rep, open(os.path.join(d, "out", "report.json"), "w"), indent=1)
@@ -130,7 +130,7 @@ def _save_pairs(f, frames, renders, out_dir):
 
 
 def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=True, out_name="out", face=True,
-           delight=True, face_photo=None):
+           delight=True, face_photo=None, register=True):
     """cameras for every usable frame, texture (checked on held-out frames), exports. Re-runnable from fit.pkl
     (`forge.py capture --rebuild NAME`) when the texture or export code improves - no refit needed."""
     import cv2
@@ -182,6 +182,19 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
         res_ = tex_res * 2                                         # the atlas: four quarters of tex_res
     else:
         res_ = tex_res
+    # v11.10: every frame's camera moved to where its picture says it is (optical flow against a first texture);
+    # each move is kept only if it is small and really better - see capture_register
+    rinfo = None
+    if register:
+        from . import capture_register as CRG
+        t0, _, _ = CT.bake(f, frames=train, res=res_, log=lambda *a: None, mesh=mesh, delight=False, clean=False,
+                           align=False)
+        rframes, rinfo = CRG.register(f, allf, t0, mesh=mesh, log=log)
+        rinfo["per_frame"] = {int(k): dict(moved=v["moved"], start_px=v.get("start_px"), end_px=v.get("end_px"),
+                                           d_rot_deg=v.get("d_rot_deg", 0.0), d_t_frac=v.get("d_t_frac", 0.0))
+                              for k, v in rframes.items()}
+        fp["par"] = dict(f.cams.par); fp["registered"] = True
+        pickle.dump(fp, open(os.path.join(d, "fit.pkl"), "wb"))
     tex, cov, st = CT.bake(f, frames=train, res=res_, log=lambda *a: None, mesh=mesh, delight=delight)
     renders = {}
     # the held-out frames are real footage, with the room's light in them: they are compared with the texture as
@@ -246,7 +259,7 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
     f.overlay(os.path.join(outd, name + "_fit_overlay.jpg"))
     rep = dict(name=name, height_m=height_m, fit=fp.get("fit"),
                macros={k: float(v) for k, v in f.mac.items()}, sliders={k: float(v) for k, v in f.sl.items()},
-               pose={k: v for k, v in f.dirs.items()}, texture=st, check=check, layers=linfo, face=finfo,
+               pose={k: v for k, v in f.dirs.items()}, texture=st, check=check, layers=linfo, face=finfo, register=rinfo,
                files={k: (os.path.basename(v) if isinstance(v, str) else None) for k, v in files.items() if k != "rig"})
     json.dump(rep, open(os.path.join(outd, "report.json"), "w"), indent=1)
     return rep
@@ -270,11 +283,14 @@ def main(argv):
     ap.add_argument("--no-face", action="store_true", help="keep MakeHuman's average face (no face-shape fit)")
     ap.add_argument("--keep-light", action="store_true",
                     help="leave the room's light in the texture (default: divided out; see NAME_lighting.json)")
+    ap.add_argument("--no-register", action="store_true",
+                    help="keep the landmark cameras (default: each frame's camera is moved to where its picture says)")
     ap.add_argument("--rebuild", action="store_true", help="redo texture + exports of an existing capture (OUT/NAME) from its fit")
     a = ap.parse_args(argv)
     if a.rebuild:
         finish(os.path.join(a.out, a.name), a.name, a.height_cm / 100.0 if a.height_cm != 175.0 else None, a.texture,
-               layers=not a.no_layers, face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo)
+               layers=not a.no_layers, face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo,
+               register=not a.no_register)
         return 0
     if a.setup:
         CTR.setup(); return 0
@@ -286,5 +302,5 @@ def main(argv):
         CPH.run_photo(a.video, a.name, a.out, a.height_cm / 100.0, a.texture, gender=g)
         return 0
     run(a.video, a.name, a.out, a.height_cm / 100.0, a.fps, a.texture, gender=g, layers=not a.no_layers,
-        face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo)
+        face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo, register=not a.no_register)
     return 0
