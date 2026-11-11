@@ -123,11 +123,13 @@ would be tuning to the test charts.
 `data/private/` is gitignored.
 
 - `private/idmt/dataset3/` — IDMT dataset 3 wav + xml
-- `private/user/take_a_4m51.aac` — reverb/delay take
-- `private/user/take_c_synth_4m58.aac` — clear synth of the same piece
+- `private/user/take_a_4m51.aac` and `take_c_synth_4m58.aac` — two earlier
+  performances. They are not a confirmed dry/wet pair. The behaviour lock,
+  which also covers `take_b_1m44.aac` and `current_upload.aac`, is
+  `benchmarks/recordings/` (no ground-truth tab).
 - `private/metallica/song.mp3` and `song.gp4` — local copy of the remaster and the tab
 - `private/egset12/` — EGSet12 wav, JAMS, and Guitar Pro (CC BY 4.0, downloaded)
 - `private/guitar_techs/` — Guitar-TECHS P3 excerpts, miked amp, DI, and MIDI (CC BY 4.0, downloaded)
 - `private/cache/P3_music.zip` — that excerpt archive
 
-`take_b` is a different song and is not used.
+The older A-against-C helper does not use `take_b`. The recordings lock does.
