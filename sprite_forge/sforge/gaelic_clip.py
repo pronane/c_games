@@ -206,6 +206,179 @@ def merge_clip(player_doc, player_buf, clip_doc, clip_buf, source_name, dest_nam
     return out, buf, report
 
 
+def _decode(doc, buf, index):
+    import numpy as np
+    acc = doc["accessors"][index]
+    raw = _acc_bytes(doc, buf, index)
+    dt = {5126: np.float32, 5123: np.uint16, 5121: np.uint8, 5125: np.uint32}[acc["componentType"]]
+    n = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}[acc["type"]]
+    return np.frombuffer(raw, dtype=dt).reshape(acc["count"], n).astype(np.float64)
+
+
+def inspect_animation(doc, buf, anim):
+    """Reject a clip whose keys could not be a real pose. Returns (errors, report)."""
+    import numpy as np
+    names = _names(doc)
+    errors = []
+    pelvis = None
+    seen = set()
+    quat_ok = 0
+    for ch in anim.get("channels", []):
+        node = names[ch["target"]["node"]] if ch["target"]["node"] < len(names) else "?"
+        path = ch["target"]["path"]
+        key = (node, path)
+        if key in seen:
+            errors.append("duplicate channel %s.%s" % (node, path))
+        seen.add(key)
+        sm = anim["samplers"][ch["sampler"]]
+        times = _decode(doc, buf, sm["input"]).reshape(-1)
+        values = _decode(doc, buf, sm["output"])
+        if times.shape[0] != values.shape[0]:
+            errors.append("%s.%s time/value count differ" % (node, path))
+            continue
+        if not np.all(np.isfinite(times)) or not np.all(np.isfinite(values)):
+            errors.append("%s.%s has a non-finite key" % (node, path))
+            continue
+        if times.shape[0] >= 2 and np.any(np.diff(times) <= 0):
+            errors.append("%s.%s times are not strictly increasing" % (node, path))
+        if path == "rotation":
+            nrm = np.linalg.norm(values, axis=1)
+            if np.any(np.abs(nrm - 1.0) > 0.05):
+                errors.append("%s rotation quaternion is not unit length" % node)
+            else:
+                quat_ok += 1
+        if node == "pelvis" and path == "translation":
+            pelvis = {
+                "samples": int(times.shape[0]),
+                "xz_span_m": [round(float(values[:, 0].max() - values[:, 0].min()), 4),
+                              round(float(values[:, 2].max() - values[:, 2].min()), 4)],
+                "y_span_m": round(float(values[:, 1].max() - values[:, 1].min()), 4),
+            }
+            if np.any(np.abs(values) > 50.0):
+                errors.append("pelvis translation is not a metre-scale pose")
+    report = {"unique_channels": len(seen), "unit_quaternions": quat_ok, "pelvis": pelvis}
+    return errors, report
+
+
+def write_synthetic_clip(template_glb, out_path, name="synth_step", fault=None):
+    """A clip this repo authored (no vendor motion). fault is 'time', 'quat' or 'pelvis'."""
+    import numpy as np
+    doc, buf = read_glb(template_glb)
+    names = _names(doc)
+    want = {"pelvis": "translation", "thigh_l": "rotation", "calf_l": "rotation", "foot_l": "rotation"}
+    idx = {n: i for i, n in enumerate(names)}
+    for n in want:
+        if n not in idx:
+            raise ValueError("template has no %s" % n)
+    times = np.array([0.0, 0.25, 0.5, 0.75], np.float32)
+    if fault == "time":
+        times = np.array([0.0, 0.5, 0.25, 1.0], np.float32)
+    pel = np.array([[0.0, 0.90, 0.0], [0.0, 0.96, 0.02], [0.0, 0.90, 0.0], [0.0, 0.94, -0.02]], np.float32)
+    if fault == "pelvis":
+        pel[:, 2] = np.array([0, 40, 80, 120], np.float32)
+
+    def quat(angle):
+        if fault == "quat" and angle > 0:
+            return np.array([0, 0, 0, 0], np.float32)
+        return np.array([0, 0, np.sin(angle * 0.5), np.cos(angle * 0.5)], np.float32)
+
+    thigh = np.stack([quat(a) for a in (0.0, 0.6, 0.0, -0.5)]).astype(np.float32)
+    calf = np.stack([quat(a) for a in (0.0, -0.8, -0.2, 0.1)]).astype(np.float32)
+    foot = np.stack([quat(a) for a in (0.0, 0.3, 0.0, -0.2)]).astype(np.float32)
+    tracks = [("pelvis", "translation", pel), ("thigh_l", "rotation", thigh),
+              ("calf_l", "rotation", calf), ("foot_l", "rotation", foot)]
+    out_buf = bytearray()
+    views, accs, samplers, channels = [], [], [], []
+
+    def add(arr):
+        raw = np.ascontiguousarray(arr).tobytes()
+        while len(out_buf) % 4:
+            out_buf.append(0)
+        views.append({"buffer": 0, "byteOffset": len(out_buf), "byteLength": len(raw)})
+        out_buf.extend(raw)
+        return len(views) - 1
+
+    time_view = add(times)
+    accs.append({"bufferView": time_view, "componentType": 5126, "type": "SCALAR", "count": 4,
+                 "min": [float(times.min())], "max": [float(times.max())]})
+    time_acc = 0
+    for node, path, values in tracks:
+        view = add(values)
+        typ = "VEC3" if path == "translation" else "VEC4"
+        accs.append({"bufferView": view, "componentType": 5126, "type": typ, "count": int(values.shape[0])})
+        samplers.append({"input": time_acc, "output": len(accs) - 1, "interpolation": "LINEAR"})
+        channels.append({"sampler": len(samplers) - 1, "target": {"node": idx[node], "path": path}})
+    doc["animations"] = [{"name": name, "samplers": samplers, "channels": channels}]
+    doc["accessors"] = accs
+    doc["bufferViews"] = views
+    # Drop bulky images/meshes? Keep the template nodes and skin so bone names match, drop mesh
+    # payloads by pointing buffer only at the keys. Nodes that reference missing meshes would be
+    # invalid. Keep the original meshes' buffer by concatenating is hard. Write keys-only GLB:
+    # retarget/merge only reads nodes + animation channels, which this file has.
+    for nd in doc["nodes"]:
+        nd.pop("mesh", None)
+        nd.pop("skin", None)
+    doc.pop("meshes", None)
+    doc.pop("skins", None)
+    doc.pop("materials", None)
+    doc.pop("textures", None)
+    doc.pop("images", None)
+    doc.pop("samplers", None)
+    write_glb(out_path, doc, out_buf)
+
+
+def _repo_root():
+    """Directory that contains both sprite_forge and Gaelic_Football_3d. Independent of cwd."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    d = here
+    for _ in range(8):
+        if (os.path.isdir(os.path.join(d, "Gaelic_Football_3d"))
+                and os.path.isdir(os.path.join(d, "sprite_forge"))):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return None
+
+
+def _identity(path):
+    """sha256 plus a path relative to the repository root. Cwd is not used."""
+    ab = os.path.abspath(path)
+    root = _repo_root()
+    rel = None
+    if root:
+        try:
+            rel = os.path.relpath(ab, root).replace("\\", "/")
+        except ValueError:
+            rel = None
+        if not rel or rel.startswith("..") or os.path.isabs(rel):
+            rel = None
+    info = {"name": os.path.basename(ab), "sha256": _sha(ab), "path": rel}
+    if rel is None:
+        info["note"] = "outside the repository; the sha256 is the identity"
+    return info
+
+
+def _retarget_command_ok(cmd):
+    """A recorded forge.py retarget line. Not executed, and not a prose note."""
+    if not cmd or "\n" in cmd:
+        return False
+    text = cmd.strip()
+    if not text.startswith("python"):
+        return False
+    if "forge.py" not in text or "retarget" not in text.split():
+        return False
+    if ".fbx" not in text and ".glb" not in text:
+        return False
+    return True
+
+
+def _canonical_player_path(path):
+    norm = os.path.normpath(os.path.abspath(path)).replace("\\", "/")
+    return norm.endswith("/assets/models/gaelic_player.glb") or norm.endswith("/assets/models")
+
+
 def _sha(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -229,21 +402,47 @@ def cmd_check(a):
 
 
 def cmd_merge(a):
+    from sforge import __version__
     player = os.path.abspath(a.player)
     clip = os.path.abspath(a.clip)
     out_dir = os.path.abspath(a.out)
     out_glb = os.path.join(out_dir, "gaelic_player.glb")
-    if os.path.abspath(out_glb) == player or os.path.abspath(out_glb) == clip:
-        print("refusing to write over an input GLB", file=sys.stderr)
+    if os.path.abspath(out_glb) in (player, clip) or _canonical_player_path(out_glb) or _canonical_player_path(out_dir):
+        print("refusing to write the shipped gaelic_player.glb or over an input", file=sys.stderr)
+        return 2
+    if os.path.exists(out_glb) and not a.replace:
+        print("output already exists; pass --replace to overwrite this candidate", file=sys.stderr)
+        return 2
+    if a.provenance == "retarget":
+        if not _retarget_command_ok(a.retarget_cmd):
+            print("a retarget claim needs --retarget-cmd as an exact 'python ... forge.py retarget ... .fbx/.glb' line. It is stored and not re-run.", file=sys.stderr)
+            return 2
+    elif a.retarget_cmd:
+        print("--retarget-cmd is only for --provenance retarget. An authored fixture has no retarget command.", file=sys.stderr)
         return 2
     before = _sha(player)
     doc, buf = read_glb(player)
     cdoc, cbuf = read_glb(clip)
+    if a.name in _anim_names(doc) and not a.replace_clip:
+        print("clip %r is already on the player; pass --replace-clip to displace it" % a.name, file=sys.stderr)
+        return 2
+    src_anims = {an.get("name"): an for an in cdoc.get("animations", [])}
+    if a.source not in src_anims:
+        print("clip GLB has no animation %r" % a.source, file=sys.stderr)
+        return 2
+    key_err, key_rep = inspect_animation(cdoc, cbuf, src_anims[a.source])
+    if key_err:
+        print(json.dumps({"ok": False, "errors": key_err, "keys": key_rep}, indent=1))
+        return 1
     merged, mbuf, report = merge_clip(doc, buf, cdoc, cbuf, a.source, a.name)
     err = validate(merged, a.parts, a.textures)
-    # The new name is allowed on top of the required set. A replaced required name still has to be there.
     if a.name not in _anim_names(merged):
         err.append("merge did not produce %s" % a.name)
+    old = set(_anim_names(doc))
+    new = set(_anim_names(merged))
+    missing = sorted(old - new - ({a.name} if a.replace_clip else set()))
+    if missing:
+        err.append("merge dropped clips: %s" % ", ".join(missing))
     if err:
         print(json.dumps({"ok": False, "errors": err, "report": report}, indent=1))
         return 1
@@ -255,26 +454,29 @@ def cmd_merge(a):
         print("input player GLB changed under us; refusing", file=sys.stderr)
         return 2
     manifest = {
-        "role": "candidate",
-        "note": "Not the shipped gaelic_player.glb. The game keeps loading the canonical file unless --model points here.",
-        "player_source": player,
-        "player_sha256": before,
-        "clip_source": clip,
-        "clip_sha256": _sha(clip),
+        "role": "local candidate only",
+        "note": "Do not commit this file. The game loads assets/models/gaelic_player.glb unless --model is set.",
+        "sprite_forge": __version__,
+        "player": _identity(player),
+        "clip": _identity(clip),
         "source_animation": a.source,
         "dest_animation": a.name,
+        "replaced_existing_clip": report["replaced"],
+        "displaced_clip": a.name if report["replaced"] else None,
         "channels_copied": report["channels"],
         "unmapped_nodes": report["unmapped"],
-        "replaced_existing": report["replaced"],
+        "keys": key_rep,
+        "provenance": a.provenance,
+        "retarget_command": a.retarget_cmd if a.provenance == "retarget" else None,
+        "retarget_command_executed": False,
+        "merge_command": "python3 forge.py gaelic-clip merge <player> <clip> --source %s --name %s --out <dir>" % (a.source, a.name),
         "parts_copied": bool(a.parts),
-        "textures": "not rewritten; pass the existing assets/textures atlas, which stays paired with .parts",
-        "licence": "not asserted by this tool. Record the clip's real licence and author before redistribution. Do not invent one.",
-        "command": "forge.py gaelic-clip merge",
+        "rights": "Not established. Vendor metadata inside a file is not permission to redistribute, and it is not proof of a violation. Keep the candidate local until the real licence and author are known.",
     }
     with open(os.path.join(out_dir, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=1)
         f.write("\n")
-    print(json.dumps({"ok": True, "out": out_glb, "report": report}, indent=1))
+    print(json.dumps({"ok": True, "out": _identity(out_glb), "report": report, "keys": key_rep}, indent=1))
     return 0
 
 
@@ -294,6 +496,12 @@ def main(argv):
     m.add_argument("--out", required=True, help="directory for gaelic_player.glb, parts and manifest.json")
     m.add_argument("--parts")
     m.add_argument("--textures")
+    m.add_argument("--replace", action="store_true", help="overwrite an existing candidate in --out")
+    m.add_argument("--replace-clip", action="store_true", help="displace a clip the player already has")
+    m.add_argument("--provenance", choices=["unspecified", "authored", "retarget"], default="unspecified",
+                   help="authored = keys written by this repo, no FBX retarget; retarget = an external clip whose exact forge.py retarget line is in --retarget-cmd (recorded, not re-run)")
+    m.add_argument("--retarget-cmd", default=None,
+                   help="exact 'python ... forge.py retarget <file.fbx|glb> ...' line. Required with --provenance retarget. Stored, not executed.")
     a = p.parse_args(argv)
     if a.cmd == "check":
         return cmd_check(a)

@@ -9,7 +9,7 @@ PLAYER = os.path.join(GAME, "assets", "models", "gaelic_player.glb")
 PARTS = os.path.join(GAME, "assets", "models", "gaelic_player.parts")
 TEX = os.path.join(GAME, "assets", "textures")
 sys.path.insert(0, HERE)
-from sforge.gaelic_clip import CLIP_NAMES, read_glb, _anim_names
+from sforge.gaelic_clip import CLIP_NAMES, read_glb, _anim_names, write_synthetic_clip
 
 FORGE = os.path.join(HERE, "forge.py")
 
@@ -41,26 +41,59 @@ def main():
 
     tmp = tempfile.mkdtemp(prefix="gf_clip_")
     try:
-        code, out = run("merge", TEMPLATE, TEMPLATE, "--source", "jog", "--name", "bounce",
-                        "--out", tmp)
+        synth = os.path.join(tmp, "synth.glb")
+        write_synthetic_clip(TEMPLATE, synth)
+        out_dir = os.path.join(tmp, "candidate")
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--parts", PARTS, "--out", out_dir, "--provenance", "authored")
         assert code == 0, out
-        doc, _buf = read_glb(os.path.join(tmp, "gaelic_player.glb"))
+        doc, _buf = read_glb(os.path.join(out_dir, "gaelic_player.glb"))
         names = _anim_names(doc)
-        assert "jog" in names and "bounce" in names
-        assert len(doc["skins"][0]["joints"]) <= 64
-        joints = [doc["nodes"][i]["name"] for i in doc["skins"][0]["joints"]]
-        for b in ("pelvis", "foot_l", "foot_r", "hand_l", "hand_r", "head"):
-            assert b in joints
-        assert os.path.isfile(TEMPLATE)
-        nest = os.path.join(tmp, "same")
-        os.makedirs(nest)
-        shutil.copyfile(TEMPLATE, os.path.join(nest, "gaelic_player.glb"))
-        code, out = run("merge", os.path.join(nest, "gaelic_player.glb"), TEMPLATE,
-                        "--source", "jog", "--name", "bounce", "--out", nest)
+        for clip in CLIP_NAMES:
+            assert clip in names
+        assert "synth_step" in names
+        assert len(doc["meshes"]) == 95
+        assert len(doc["skins"][0]["joints"]) == 52
+        man = json.load(open(os.path.join(out_dir, "manifest.json"), encoding="utf-8"))
+        assert man["player"]["sha256"] == before
+        assert man["player"]["path"] == "Gaelic_Football_3d/assets/models/gaelic_player.glb"
+        assert man["clip"]["path"] is None and man["clip"]["sha256"]
+        assert man["provenance"] == "authored"
+        assert man["retarget_command"] is None
+        assert man["retarget_command_executed"] is False
+        assert "Not established" in man["rights"]
+        assert man["keys"]["pelvis"]["xz_span_m"][1] < 0.1
+        assert sha(PLAYER) == before
+        # a second write into the same directory is refused
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--out", out_dir)
         assert code == 2, out
-        man = json.load(open(os.path.join(tmp, "manifest.json"), encoding="utf-8"))
-        assert man["licence"].startswith("not asserted")
-        assert "CC0" not in man["licence"]
+        # displacing the shipped run clip needs an explicit flag
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "run",
+                        "--out", os.path.join(tmp, "nope"))
+        assert code == 2 and "replace-clip" in out, out
+        # the canonical model path cannot be the output
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--out", os.path.join(GAME, "assets", "models"))
+        assert code == 2, out
+        assert sha(PLAYER) == before
+        # a sentence is not a retarget recipe, and an authored fixture cannot carry one
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--provenance", "retarget",
+                        "--retarget-cmd", "synthetic fixture authored by the test, not a vendor clip",
+                        "--out", os.path.join(tmp, "sentence"))
+        assert code == 2 and "retarget" in out, out
+        code, out = run("merge", PLAYER, synth, "--source", "synth_step", "--name", "synth_step",
+                        "--provenance", "authored",
+                        "--retarget-cmd", "python3 forge.py retarget clip.fbx template.glb --root-motion inplace --out one.glb",
+                        "--out", os.path.join(tmp, "invented"))
+        assert code == 2, out
+        for fault in ("time", "quat", "pelvis"):
+            bad = os.path.join(tmp, fault + ".glb")
+            write_synthetic_clip(TEMPLATE, bad, fault=fault)
+            code, out = run("merge", PLAYER, bad, "--source", "synth_step", "--name", "synth_step",
+                            "--out", os.path.join(tmp, "bad-" + fault))
+            assert code == 1, (fault, out)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("gaelic clip merge: ok")

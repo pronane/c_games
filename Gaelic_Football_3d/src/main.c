@@ -120,6 +120,7 @@ typedef struct {
     int yawInit;
     float turnRate;                /* |delta facing| / dt, rad/s */
     float runPhase;
+    float strideScale;             /* >1 lengthens the clip's short stride up to a human maximum */
     float plantX[2], plantZ[2];
     int plantOn[2];
     int lastAction;
@@ -147,6 +148,13 @@ static int lastReleaseAction = 0;
 static int celebTeam = -1, celebIdx = -1; static float celebT = 0;
 static int showControls = 0;
 static int forceCpuSkin = 0;
+static int skinBanner = 0;          /* big GPU/CPU label on the motion recordings */
+static int probeMeshI = -1, probeVert = -1;
+#if RAYLIB_VERSION_MAJOR >= 6
+#define MESH_BONE_IDS(m) ((m).boneIndices)
+#else
+#define MESH_BONE_IDS(m) ((m).boneIds)
+#endif
 static int cmdDemo = 0;          /* --demo: CPU plays the human team in matches */
 static int training = 0;         /* training mode (free play, keeper only) */
 static int trainPoints = 0, trainGoals = 0, trainShots = 0, trainWides = 0;
@@ -321,24 +329,29 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         return;
     }
     if (s->speed > 0.55f) {
-        /* Foot travel at rate 1, measured on the shipped clips (same foot, peak to peak):
-         * jog 0.77 m / 0.75 s, run 1.12 m / 0.71 s, run_ball 0.90 m / 0.79 s, sidestep ~0.58 m / 0.71 s.
-         * Playing them near 1x while the player does 7 m/s is the glide. Rate tracks ground speed,
-         * capped so a short Mixamo stride does not buzz. A turn or a speed-up shortens the stride. */
-        float authored, rate;
+        /* The clips cover about 0.8–1.1 m per cycle. A leg can honestly reach about 2.25 m,
+         * and a same-foot cycle stays under ~2.15/s (about 4.3 steps/s). Faster than that
+         * is a blur, so a 9 m/s sprint still slides; walk and jog can meet the ground. */
+        float authored, prefer, stride, rate;
         int turning = s->turnRate > 2.0f && s->speed > 0.9f && s->speed < 6.2f;
         if (carrying) *clip = C_RUN_BALL;
         else if (turning) *clip = C_SIDESTEP;
         else if (s->speed < 4.6f) *clip = C_JOG;
         else *clip = C_RUN;
-        authored = *clip == C_JOG ? 1.02f : *clip == C_RUN ? 1.58f : *clip == C_RUN_BALL ? 1.13f : 0.82f;
-        rate = Clamp(s->speed / authored, 0.85f, 2.15f);
-        if (s->accel > 1.8f) rate *= 1.12f;          /* shorter strides while the speed is still building */
-        if (turning) rate *= 1.15f;
+        authored = *clip == C_JOG ? 0.77f : *clip == C_RUN ? 1.12f : *clip == C_RUN_BALL ? 0.90f : 0.58f;
+        prefer = Clamp(0.90f + 0.13f * s->speed, 0.90f, 2.15f);
+        if (s->accel > 2.2f) prefer = fminf(prefer * 1.08f, 2.3f);   /* short quick steps leaving a stand */
+        if (s->accel < -2.2f) prefer *= 0.84f;                        /* longer plant as he stops */
+        if (turning) prefer = fminf(prefer * 1.06f, 2.3f);
+        stride = s->speed / prefer;
+        if (stride > 2.25f) stride = 2.25f;
+        s->strideScale = Clamp(stride / authored, 1.0f, 2.35f);
+        rate = Clamp(prefer * clipLen(*clip), 0.70f, 1.70f);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
         return;
     }
+    s->strideScale = 1.0f;
     s->runPhase += dt * 0.35f;                 /* a quiet idle, not a sped-up loop */
     /* Outfield players stand up and cradle the ball. keeper_ready is a low
      * set stance and reads as a crouch once the ball is in the hands. */
@@ -543,25 +556,33 @@ static void orientHand(Transform *pose, int hand, float side, Vector3 wrist,
     pose[hand].rotation = QuaternionNormalize(QuaternionMultiply(twist, QuaternionMultiply(q, bindOf(hand).rotation)));
     pose[hand].translation = wrist;
 }
+static Vector3 outsideBall(Vector3 ball, Vector3 p)
+{
+    Vector3 d = Vector3Subtract(p, ball);
+    float len = Vector3Length(d);
+    if (len < 1e-4f) return Vector3Add(ball, (Vector3){ 0, BALL_R + 0.012f, 0 });
+    if (len < BALL_R + 0.012f) return Vector3Add(ball, Vector3Scale(d, (BALL_R + 0.014f) / len));
+    return p;
+}
 static void wrapHand(Transform *pose, int side, Vector3 ball)
 {
-    /* side +1 is the character's left. Knuckles sit on the ball, tips curl over the front. */
+    /* side +1 is the character's left. Knuckles and tips stay outside the leather. */
     static const int left[5] = { 22, 23, 25, 24, 26 };  /* index, middle, ring, pinky, thumb */
     static const int right[5] = { 27, 28, 30, 29, 31 };
     const int *base = side > 0 ? left : right;
     int i;
     for (i = 0; i < 4; i++) {
-        float y = 0.045f - (float)i * 0.028f;
+        float y = 0.055f - (float)i * 0.030f;
         float x = (float)side;
         plantFinger(pose, base[i], base[i] + 10, base[i] + 20,
-                    (Vector3){ ball.x + x * 0.07f, ball.y + y, ball.z + 0.06f },
-                    (Vector3){ ball.x + x * 0.02f, ball.y + y + 0.02f, ball.z + 0.10f },
-                    (Vector3){ ball.x - x * 0.02f, ball.y + y * 0.4f, ball.z + 0.08f });
+                    outsideBall(ball, (Vector3){ ball.x + x * 0.10f, ball.y + y, ball.z + 0.02f }),
+                    outsideBall(ball, (Vector3){ ball.x + x * 0.06f, ball.y + y + 0.04f, ball.z + 0.09f }),
+                    outsideBall(ball, (Vector3){ ball.x + x * 0.02f, ball.y + y * 0.3f, ball.z + 0.11f }));
     }
     plantFinger(pose, base[4], base[4] + 10, base[4] + 20,
-                (Vector3){ ball.x + (float)side * 0.05f, ball.y + 0.09f, ball.z - 0.01f },
-                (Vector3){ ball.x + (float)side * 0.01f, ball.y + 0.10f, ball.z + 0.05f },
-                (Vector3){ ball.x - (float)side * 0.02f, ball.y + 0.07f, ball.z + 0.07f });
+                outsideBall(ball, (Vector3){ ball.x + (float)side * 0.09f, ball.y + 0.08f, ball.z - 0.02f }),
+                outsideBall(ball, (Vector3){ ball.x + (float)side * 0.05f, ball.y + 0.11f, ball.z + 0.04f }),
+                outsideBall(ball, (Vector3){ ball.x + (float)side * 0.02f, ball.y + 0.10f, ball.z + 0.09f }));
 }
 static float cradleWeight(const AnimState *s)
 {
@@ -752,6 +773,34 @@ static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int 
     if (toe >= 0)
         s->pose[toe].translation = Vector3Add(s->pose[toe].translation, Vector3Subtract(s->pose[foot].translation, oldFoot));
 }
+static void stretchLeg(AnimState *s, int thigh, int calf, int foot, int toe, float scale)
+{
+    Vector3 hip, footP, delta, target, old;
+    float L1, L2, reach, dist;
+    if (thigh < 0 || calf < 0 || foot < 0 || scale < 1.04f) return;
+    hip = s->pose[thigh].translation;
+    footP = s->pose[foot].translation;
+    delta = Vector3Subtract(footP, hip);
+    delta.z *= scale;                 /* model +Z is the way he runs */
+    target = Vector3Add(hip, delta);
+    L1 = Vector3Distance(hip, s->pose[calf].translation);
+    L2 = Vector3Distance(s->pose[calf].translation, footP);
+    reach = (L1 + L2) * 0.97f;
+    dist = Vector3Distance(hip, target);
+    if (L1 < 0.05f || L2 < 0.05f || reach < 0.1f) return;
+    if (dist > reach) target = Vector3Add(hip, Vector3Scale(Vector3Subtract(target, hip), reach / dist));
+    old = footP;
+    solveArm(s->pose, thigh, calf, foot, -1, target,
+             Vector3Subtract(s->pose[calf].translation, hip), target);
+    if (toe >= 0)
+        s->pose[toe].translation = Vector3Add(s->pose[toe].translation, Vector3Subtract(s->pose[foot].translation, old));
+}
+static void lengthenStride(AnimState *s)
+{
+    if (s->strideScale < 1.04f || s->speed < 0.7f || legBusy(s)) return;
+    stretchLeg(s, boneThighL, boneCalfL, boneFootL, boneToeL, s->strideScale);
+    stretchLeg(s, boneThighR, boneCalfR, boneFootR, boneToeR, s->strideScale);
+}
 static void plantFeet(AnimState *s)
 {
     if (s->speed < 0.45f || legBusy(s) || boneThighL < 0) {
@@ -760,6 +809,14 @@ static void plantFeet(AnimState *s)
     }
     plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL);
     plantOne(s, 1, boneThighR, boneCalfR, boneFootR, boneToeR);
+}
+/* A few centimetres of the pelvis toward the foot that is down. Not a whole-body tilt. */
+static void weightOntoStance(AnimState *s)
+{
+    float shift;
+    if (bonePelvis < 0 || boneFootL < 0 || s->speed < 0.5f || legBusy(s)) return;
+    shift = s->pose[boneFootL].translation.y < s->pose[boneFootR].translation.y ? 0.028f : -0.028f;
+    s->pose[bonePelvis].translation.x += shift;
 }
 /* Chest leads the hips through a turn; the head stays closer to the facing. Small, and only while turning. */
 static void twistBone(Transform *bone, float ang)
@@ -781,13 +838,14 @@ static void coordinateTurn(AnimState *s)
 /* Blend and upload the pose for one character, keeping a copy for bone queries.
  * raylib 6 interpolates float frames and blends two clips in UpdateModelAnimationEx.
  * raylib 5.5 has integer frames, so the same blend is done here and uploaded as one pose. */
+static void measureCarrierFoot(void);
 static void poseCharacter(AnimState *s, int clip, float t, float dt)
 {
     int nb = MODEL_BONECOUNT(model);
     poseOverride = (s->useBounce && clipBounce >= 0) ? clipBounce : -1;
     int loco = (clip == C_RUN || clip == C_JOG || clip == C_IDLE || clip == C_RUN_BALL ||
                 clip == C_KEEPER_IDLE || clip == C_KEEPER_READY || clip == C_SIDESTEP);
-    float blendTime = loco ? 0.22f : 0.10f;
+    float blendTime = loco ? ((s->prevClip == C_IDLE || clip == C_IDLE) ? 0.40f : 0.24f) : 0.12f;
     float w;
     if (clip != s->clip) {
         s->prevClip = s->clip; s->prevT = s->t; s->blend = 0.0f;
@@ -843,15 +901,103 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     memcpy(s->pose, scratchPose, sizeof(Transform) * (size_t)nb);
 #endif
     cradleBall(s, clip);
+    lengthenStride(s);
     plantFeet(s);
+    weightOntoStance(s);
     coordinateTurn(s);
     uploadPose(s, &lm);
+    if ((int)(s - as) == 9) measureCarrierFoot();
     poseOverride = -1;
     tSkin += GetTime() - t0;
     skinnedThisFrame++;
 }
 
 static float yawOf(float fx, float fz) { return (fx * fx + fz * fz < 1e-4f) ? 0.0f : atan2f(fx, fz); }
+
+/* One foot vertex, skinned the same way the shader does, plus the CPU buffer if it was uploaded.
+ * Bone origins moving do not prove this vertex moved. */
+static void pickFootProbe(void)
+{
+    int mi, v, k, best = -1;
+    float bestW = 0.2f;
+    Mesh mesh;
+    if (!haveModel || boneFootL < 0) return;
+    /* Character 9 is the motion-test carrier. Probe his look, not look 0: CPU skinning writes only the posed look's vertex buffer. */
+    mi = nParts ? lookFirst[(9 * 7 + 3) % (nLooks > 0 ? nLooks : 1)] : 0;
+    if (mi < 0 || mi >= model.meshCount) return;
+    mesh = model.meshes[mi];
+    if (!MESH_BONE_IDS(mesh) || !mesh.boneWeights || !mesh.vertices) return;
+    for (v = 0; v < mesh.vertexCount; v++) {
+        for (k = 0; k < 4; k++) {
+            if (MESH_BONE_IDS(mesh)[v * 4 + k] == (unsigned char)boneFootL && mesh.boneWeights[v * 4 + k] > bestW) {
+                bestW = mesh.boneWeights[v * 4 + k];
+                best = v;
+            }
+        }
+    }
+    probeMeshI = mi;
+    probeVert = best;
+    TraceLog(LOG_INFO, "GAME: foot probe mesh %d vert %d weight %.2f", mi, best, bestW);
+}
+/* Raylib leaves SUPPORT_GPU_SKINNING off by default, so UploadMesh never puts bone
+ * indices or weights in the VAO. The skin shader then reads the default attribute
+ * (0,0,0,1) and the whole body is drawn with one bone: a rigid bind pose. */
+static void attachBoneAttributes(void)
+{
+    int i, n = 0;
+    for (i = 0; i < model.meshCount; i++) {
+        Mesh *mesh = &model.meshes[i];
+        unsigned char *ids = MESH_BONE_IDS(*mesh);
+        if (!ids || !mesh->boneWeights || mesh->vaoId == 0 || mesh->vertexCount <= 0) continue;
+        rlEnableVertexArray(mesh->vaoId);
+        rlLoadVertexBuffer(ids, mesh->vertexCount * 4 * (int)sizeof(unsigned char), false);
+        rlSetVertexAttribute(7, 4, RL_UNSIGNED_BYTE, false, 0, 0);
+        rlEnableVertexAttribute(7);
+        rlLoadVertexBuffer(mesh->boneWeights, mesh->vertexCount * 4 * (int)sizeof(float), false);
+        rlSetVertexAttribute(8, 4, RL_FLOAT, false, 0, 0);
+        rlEnableVertexAttribute(8);
+        rlDisableVertexArray();
+        n++;
+    }
+    TraceLog(LOG_INFO, "GAME: bone index/weight buffers attached to %d mesh VAOs at locations 7 and 8", n);
+    printf("DRAW bone-vbos %d meshes (raylib did not upload these; GPU skinning needs them)\n", n);
+    fflush(stdout);
+}
+static Matrix *skinMatrices(void)
+{
+#if RAYLIB_VERSION_MAJOR >= 6
+    return model.boneMatrices;
+#else
+    if (probeMeshI >= 0 && probeMeshI < model.meshCount) return model.meshes[probeMeshI].boneMatrices;
+    return NULL;
+#endif
+}
+static float probeSkinnedY, probeBufferY;   /* last value measured inside the carrier's own pose */
+static void measureCarrierFoot(void)
+{
+    Mesh mesh;
+    Matrix *mats;
+    Vector3 p, out;
+    int k;
+    if (probeVert < 0) return;
+    mesh = model.meshes[probeMeshI];
+    mats = skinMatrices();
+    p = (Vector3){ mesh.vertices[probeVert * 3], mesh.vertices[probeVert * 3 + 1], mesh.vertices[probeVert * 3 + 2] };
+    out = (Vector3){ 0, 0, 0 };
+    for (k = 0; k < 4; k++) {
+        int b = MESH_BONE_IDS(mesh)[probeVert * 4 + k];
+        float w = mesh.boneWeights[probeVert * 4 + k];
+        if (w <= 0.0f || !mats || b < 0 || b >= MODEL_BONECOUNT(model)) continue;
+        out = Vector3Add(out, Vector3Scale(Vector3Transform(p, mats[b]), w));
+    }
+    probeSkinnedY = out.y;
+    probeBufferY = mesh.animVertices ? mesh.animVertices[probeVert * 3 + 1] : -1.0f;
+}
+static void probeFoot(const char *tag)
+{
+    printf("MESH %s skinned-y %.3f cpu-buffer-y %.3f\n", tag, probeSkinnedY, probeBufferY);
+    fflush(stdout);
+}
 
 /* World position of a bone in a character's last pose. */
 static Vector3 boneWorld(const AnimState *s, int bone, float x, float z, float yaw)
@@ -918,14 +1064,17 @@ static Vector3 carriedBall(int team, int idx)
     Vector3 hold = hands;   /* both hands: the cradle pose puts a wrist on each side of this point */
     float u;
     switch (p->action) {
-    case GAME_ACT_SOLO: {          /* drop to the foot, toe-tap back to the hands */
+    case GAME_ACT_SOLO: {          /* onto the toe, not the ankle or the thigh */
         float d = game_action_duration(GAME_ACT_SOLO);
-        Vector3 foot = boneWorld(s, actionFoot[GAME_ACT_SOLO], p->x, p->z, yaw);
-        foot = Vector3Add(foot, Vector3Add(Vector3Scale(f, 0.12f), (Vector3){ 0, BALL_R, 0 }));
+        int fb = actionFoot[GAME_ACT_SOLO];
+        int toe = fb == boneFootL ? boneToeL : boneToeR;
+        Vector3 at = boneWorld(s, toe >= 0 ? toe : fb, p->x, p->z, yaw);
+        at = Vector3Add(at, Vector3Scale(f, 0.04f));
+        at.y = fmaxf(at.y + 0.025f, BALL_R);
         u = p->action_time / d;
-        if (u < 0.38f) return Vector3Lerp(hands, foot, u / 0.38f);
-        if (u < 0.62f) return foot;
-        return Vector3Lerp(foot, hands, (u - 0.62f) / 0.38f);
+        if (u < 0.30f) return Vector3Lerp(hands, at, u / 0.30f);
+        if (u < 0.68f) return at;
+        return Vector3Lerp(at, hands, (u - 0.68f) / 0.32f);
     }
     case GAME_ACT_BOUNCE: {        /* thrown down just ahead, returns to the chest */
         float d = game_action_duration(GAME_ACT_BOUNCE);
@@ -1505,6 +1654,8 @@ static void applyAssist(GameInput *in)
 /* ---- camera ---------------------------------------------------------------- */
 static Vector3 camFocus;
 static int camOverride = 0;       /* 1 wide stadium orbit, 2 referee/card close-up */
+static int camHardSnap = 0;       /* motion test: jump the camera instead of flying through the stand */
+static int camSide = 0;            /* motion test: side-on, so the feet can be judged against the lines */
 static float camOverrideT = 0;
 
 /* v3.2 framing: how wide the shot should be (0 tight .. 1 wide) and where play is.
@@ -1586,10 +1737,14 @@ static void updateCamera(float dt)
     if (dt > 0.0f) camFocus = smoothDamp3(camFocus, focus, &camFocusVel, game.ball.in_flight ? 0.45f : 0.6f, dt);
     float o = camOpen;
     Vector3 pos, tgt = camFocus;
-    float snap = dt * 4.0f;
+    float snap = camHardSnap ? 1.0f : dt * 4.0f;
     cam.fovy = 40;
     camOverrideT += dt;
-    if (camOverride == 1) {
+    if (camSide) {
+        pos = (Vector3){ hp.x, 1.25f, hp.z + 6.4f };
+        tgt = (Vector3){ hp.x, 0.85f, hp.z };
+        cam.fovy = 30; snap = 1.0f;
+    } else if (camOverride == 1) {
         float a = 0.35f + camOverrideT * 0.12f;
         pos = (Vector3){ sinf(a) * 150.0f, 62.0f, cosf(a) * 120.0f }; tgt = (Vector3){ 0, 4, 0 }; cam.fovy = 50; snap = 1.0f;
     } else if (camOverride == 2) {
@@ -2408,6 +2563,11 @@ static void drawPerf(int sw)
     int fps = GetFPS();
     DrawText(TextFormat("%d FPS  (%.1f ms)", fps, pFrame), x + 10, y + 8, 24, fps >= 55 ? LIME : fps >= 30 ? YELLOW : RED);
     DrawText(TextFormat("quality %s (F2)  skinning %s (F4)", QUALITY_NAMES[gfxQuality], gpuSkin ? "GPU" : "CPU"), x + 10, y + 38, 15, RAYWHITE);
+    if (skinBanner) {
+        const char *lab = gpuSkin ? "GPU SKIN" : "CPU SKIN";
+        DrawRectangle(12, 78, 220, 36, (Color){ 0, 0, 0, 180 });
+        DrawText(lab, 22, 86, 28, gpuSkin ? (Color){ 120, 255, 160, 255 } : (Color){ 255, 210, 80, 255 });
+    }
     DrawText(TextFormat("game update  %5.2f ms", pUpdate), x + 10, y + 60, 15, LIGHTGRAY);
     DrawText(TextFormat("skin/pose    %5.2f ms  (%d chars)", pSkin, skinnedThisFrame), x + 10, y + 78, 15, LIGHTGRAY);
     DrawText(TextFormat("3D submit    %5.2f ms", pWorld), x + 10, y + 96, 15, LIGHTGRAY);
@@ -2758,18 +2918,23 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
     static float phaseMark = -1;
     if (frame == 1) {
         newMatch(); *state = ST_PLAY; *introDemo = 0; demo = 0;
-        gfxQuality = 1; camMode = 5; showPerf = 0; simPad(1);
+        gfxQuality = 1; camMode = 5; camSide = 1; showPerf = 0; simPad(1);
         game.enforce_three_v_three = 0;
         game.restart_pending = 0; game.restart_type = GAME_RESTART_NONE;
         game.ball.in_flight = 0; game.solo_rhythm = 0;
         game_select_player(&game, me);
-        printf("MOTION skin %s clips %d bones %d bounce-clip %s\n",
+        printf("MOTION skin %s clips %d bones %d bounce-clip %s attrib-id %d attrib-wt %d\n",
                gpuSkin ? "GPU" : "CPU", animCount, haveModel ? MODEL_BONECOUNT(model) : 0,
-               clipBounce >= 0 ? "yes" : "no");
+               clipBounce >= 0 ? "yes" : "no",
+               skinShader.locs[SHADER_LOC_VERTEX_BONEIDS], skinShader.locs[SHADER_LOC_VERTEX_BONEWEIGHTS]);
         fflush(stdout);
+        if (gpuSkin && (skinShader.locs[SHADER_LOC_VERTEX_BONEIDS] != 7 ||
+                        skinShader.locs[SHADER_LOC_VERTEX_BONEWEIGHTS] != 8))
+            motionBad("skin attributes are not on the mesh VAO locations 7 and 8");
     }
     for (t = 0; t < 2; t++) for (i = 0; i < GAME_TEAM_SIZE; i++) {
         if (t == 0 && (i == me || i == 0)) continue;
+        if (frame >= 990 && t == 0 && i >= 1 && i <= 4) continue;
         game.players[t][i].x = 4.0f + (float)i;
         game.players[t][i].z = t ? 4.0f : 80.0f;
         game.players[t][i].action = GAME_ACT_NONE;
@@ -2782,25 +2947,40 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
     camHands = 0;
     /* 1s stand, 3s walk, 3s jog, 3s sprint, 2s stop, 2.5s turn back */
     if (frame < 30) { p->x = 55; p->z = 42; p->facing_x = 1; p->facing_z = 0; }
-    else if (frame < 120) pad.axis[0] = 0.40f;
-    else if (frame < 210) { pad.axis[0] = 0.70f; camMode = 0; }   /* broadcast, so the stride reads at match distance */
-    else if (frame < 300) { pad.axis[0] = 1.0f; pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 1; }
+    else if (frame < 120) { pad.axis[0] = 0.40f; camMode = 5; }
+    else if (frame < 210) { pad.axis[0] = 0.70f; camMode = 5; }
+    else if (frame < 300) { pad.axis[0] = 1.0f; pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 1; camMode = 5; }
     else if (frame < 360) { }
     else if (frame < 440) pad.axis[0] = -0.85f;
-    if (frame == 40 || frame == 160 || frame == 250 || frame == 340) {
+    if (frame == 40 || frame == 100 || frame == 160 || frame == 250 || frame == 340) {
+        static float footLo = 99, footHi = -99, bufLo = 99, bufHi = -99;
         head = haveModel && boneHead >= 0 ? s->pose[boneHead].translation.y : 1.7f;
         printf("MOTION frame %d speed %.2f clip %s phase %.2f head %.2f turn %.2f\n",
                frame, s->speed, (s->clip >= 0 && s->clip < C_COUNT) ? CLIP_NAMES[s->clip] : "?",
                s->runPhase, head, s->turnRate);
+        probeFoot(frame == 40 ? "stand" : frame == 100 ? "walk" : frame == 160 ? "jog" : frame == 250 ? "sprint" : "stop");
+        if (probeSkinnedY < footLo) footLo = probeSkinnedY;
+        if (probeSkinnedY > footHi) footHi = probeSkinnedY;
+        if (!gpuSkin && probeBufferY >= 0) {
+            if (probeBufferY < bufLo) bufLo = probeBufferY;
+            if (probeBufferY > bufHi) bufHi = probeBufferY;
+        }
+        if (frame == 340) {
+            printf("MESH foot-vert range skinned %.3f m cpu-buffer %.3f m\n", footHi - footLo, gpuSkin ? -1.0f : bufHi - bufLo);
+            fflush(stdout);
+            if (footHi - footLo < 0.08f) motionBad("skinned foot vertex did not move through the gait");
+            if (!gpuSkin && bufHi - bufLo < 0.08f) motionBad("CPU vertex buffer did not move through the gait");
+            if (getenv("GF_QUICK")) motionDone = 1;
+        }
         fflush(stdout);
         if (head < 1.15f) motionBad("head has folded");
-        if (s->pose[boneHead].translation.x != s->pose[boneHead].translation.x) motionBad("pose not finite");
+        if (boneHead >= 0 && s->pose[boneHead].translation.x != s->pose[boneHead].translation.x) motionBad("pose not finite");
     }
     if (frame == 80) phaseMark = s->runPhase;
     if (frame == 150 && phaseMark >= 0 && s->runPhase < phaseMark + 0.20f)
         motionBad("gait phase did not advance");
     /* ball in the hands, then jog and sprint with it */
-    if (frame == 450) { scenarioCarry(0, me, p->x, p->z); camMode = 5; }
+    if (frame == 450) { scenarioCarry(0, me, p->x, p->z); camMode = 5; camSide = 0; }
     if (frame > 450 && frame < 670) {
         /* keep the five-step count from turning the carry demo into a free */
         game.steps_carried = 1; game.step_time = 0.2f; game.ball_team = 0; game.ball_player = me;
@@ -2874,6 +3054,33 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
         float hy = as[0].pose[boneHead].translation.y;
         printf("MOTION keeper head %.2f\n", hy); fflush(stdout);
         if (hy < 0.7f) motionBad("keeper folded");
+        game_select_player(&game, me);
+        camMode = 1; camHands = 0;
+    }
+    /* a few outfield players running together, so this is not only one isolated body */
+    if (frame >= 990 && frame < 1110) {
+        int k;
+        float march = (float)(frame - 990) * 0.12f;
+        camMode = 1;
+        camHardSnap = 1;
+        camFocus = W(70.0f + march, 1.0f, 42.0f);
+        p->x = 70.0f + march; p->z = 42.0f; p->facing_x = 1; p->facing_z = 0;
+        p->action = GAME_ACT_NONE;
+        pad.axis[0] = 0;
+        for (k = 1; k <= 4; k++) {
+            GamePlayer *q = &game.players[0][k];
+            q->x = 62.0f + march + (float)k * 2.4f;
+            q->z = 42.0f + (float)(k - 2) * 2.6f;
+            q->facing_x = 1; q->facing_z = 0;
+            q->action = GAME_ACT_NONE;
+        }
+        game.players[1][3].x = 84.0f + march; game.players[1][3].z = 38.0f;
+        game.players[1][3].facing_x = -1; game.players[1][3].facing_z = 0;
+        game.players[1][4].x = 88.0f + march; game.players[1][4].z = 46.0f;
+        game.players[1][4].facing_x = -1; game.players[1][4].facing_z = 0;
+    }
+    if (frame == 1110) {
+        probeFoot("match");
         printf("MOTION %s\n", motionFail ? "FAILED" : "OK");
         fflush(stdout);
         motionDone = 1;
@@ -2919,8 +3126,8 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
-        else if (strcmp(argv[i], "--shots-motion") == 0) shotsMotion = 1, skipIntro = 1;
-        else if (strcmp(argv[i], "--record-motion") == 0 && i + 1 < argc) { recordMotion = argv[++i]; shotsMotion = 1; skipIntro = 1; }
+        else if (strcmp(argv[i], "--shots-motion") == 0) shotsMotion = 1, skinBanner = 1, skipIntro = 1;
+        else if (strcmp(argv[i], "--record-motion") == 0 && i + 1 < argc) { recordMotion = argv[++i]; shotsMotion = 1; skinBanner = 1; skipIntro = 1; }
         else if (strcmp(argv[i], "--demo") == 0) cmdDemo = demo = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--cpu-skin") == 0) forceCpuSkin = 1;
         else if (strcmp(argv[i], "--bench-skip") == 0 && i + 1 < argc) benchSkip = atoi(argv[++i]);
@@ -2984,6 +3191,8 @@ int main(int argc, char **argv)
         scratch.frameCount = 1; scratch.framePoses = scratchPosePtr;
 #endif
         detectContacts();
+        pickFootProbe();
+        attachBoneAttributes();
         if (haveLit) for (int m = 0; m < model.materialCount; m++) model.materials[m].shader = gpuSkin ? skinShader : litShader;
         TraceLog(LOG_INFO, "GAME: %d clips loaded, %d bones", C_COUNT, MODEL_BONECOUNT(model));
     }
@@ -3190,6 +3399,11 @@ int main(int argc, char **argv)
         else { drawHUD(sw, sh); if (training) drawTrainingHUD(sw, sh); }
         if (showControls) drawControls(sw, sh);
         if (paused && state == ST_PLAY) DrawText("PAUSED", sw / 2 - MeasureText("PAUSED", 48) / 2, sh / 2 - 24, 48, GOLD);
+        if (skinBanner) {
+            const char *lab = gpuSkin ? "GPU SKIN" : "CPU SKIN";
+            DrawRectangle(12, 78, 240, 40, (Color){ 0, 0, 0, 210 });
+            DrawText(lab, 22, 86, 30, gpuSkin ? (Color){ 120, 255, 160, 255 } : (Color){ 255, 210, 80, 255 });
+        }
         if (showPerf) drawPerf(sw);
         tHud = GetTime() - h0;
         double s0 = GetTime();

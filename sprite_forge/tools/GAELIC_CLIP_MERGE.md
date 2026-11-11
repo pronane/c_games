@@ -1,28 +1,25 @@
 # Gaelic clip merge
 
-The shipped footballer is `Gaelic_Football_3d/assets/models/gaelic_player.glb`: 52 joints, the 32 clips named in `src/main.c` `CLIP_NAMES`, and one mesh per line of `gaelic_player.parts`. Kit textures are a split atlas (left half jersey, socks and boots; right half shorts). Sprite Forge's mannequin is a different skeleton. `forge.py retarget` can put one FBX clip onto `assets/source/makehuman_template.glb`. It does not merge that clip into the squad player, and it drops fingers, twist bones and the face that the template does not share.
-
-`forge.py gaelic-clip` is the missing step. It checks the player, or copies one named clip onto a **new** GLB by bone name. It does not rewrite meshes, skin weights, materials or the other clips, and it will not write over the file it read.
+The shipped footballer is `Gaelic_Football_3d/assets/models/gaelic_player.glb` (52 joints, the 32 clips named in `src/main.c`, one mesh per `.parts` line). `forge.py retarget` can put one clip onto `assets/source/makehuman_template.glb`. It does not merge that clip into the squad player.
 
 ```
-python3 forge.py gaelic-clip check \
-  ../Gaelic_Football_3d/assets/models/gaelic_player.glb \
-  --parts ../Gaelic_Football_3d/assets/models/gaelic_player.parts \
-  --textures ../Gaelic_Football_3d/assets/textures
+python3 forge.py gaelic-clip check PLAYER.glb --parts gaelic_player.parts --textures assets/textures
 
-python3 forge.py retarget CANDIDATE.fbx \
-  ../Gaelic_Football_3d/assets/source/makehuman_template.glb \
+python3 forge.py retarget CLIP.fbx assets/source/makehuman_template.glb \
   --root-motion inplace --out /tmp/gf_one_clip.glb
 
-python3 forge.py gaelic-clip merge \
-  ../Gaelic_Football_3d/assets/models/gaelic_player.glb /tmp/gf_one_clip.glb \
-  --source CLIP_NAME --name bounce \
-  --parts ../Gaelic_Football_3d/assets/models/gaelic_player.parts \
-  --out /tmp/gf_candidate
+python3 forge.py gaelic-clip merge PLAYER.glb /tmp/gf_one_clip.glb \
+  --source CLIP_NAME --name bounce --out /tmp/gf_candidate \
+  --provenance retarget \
+  --retarget-cmd "python3 forge.py retarget CLIP.fbx assets/source/makehuman_template.glb --root-motion inplace --out /tmp/gf_one_clip.glb"
 ```
 
-The candidate directory holds `gaelic_player.glb`, a copy of `.parts`, and `manifest.json`. The game keeps loading the canonical GLB. Point `--model` at the candidate to try it. Do not run `gaelic_squad.py --install` or `gaelic_forge.py --install` as part of this. Those replace the squad.
+Paths in the manifest are relative to the repository root (`Gaelic_Football_3d/...`), not to the shell's current directory. A file outside the repo keeps its sha256 and has `"path": null`.
 
-There is no photo-to-Gaelic command. Reference pictures are pose guides, not model files, and they are not assets. The manifest does not invent a licence: record the clip's real author and terms before anyone redistributes it.
+`--provenance authored` is a clip this repo wrote. It has no retarget command. `--provenance retarget` is an external clip: `--retarget-cmd` must be the exact `python ... forge.py retarget ... .fbx` or `.glb` line. That line is stored and is not run again. A sentence is rejected. Leaving provenance unspecified does not claim either source.
 
-`python3 tools/test_gaelic_clip_merge.py` checks the shipped player and a template merge.
+The manifest stores sha256 identities, the Sprite Forge version, and the measured pelvis travel. It does not invent a licence. Vendor metadata inside an FBX is not permission to redistribute the result. Keep the candidate on the machine that built it until the real author and terms are known. This branch tip does not contain a merged bounce GLB. The commit merged by pull request 80 still does; that history was not rewritten. These checks do not say anything about how the player runs.
+
+The output cannot be `assets/models/gaelic_player.glb`. An existing candidate needs `--replace`. A name the player already uses (`run`, `jog`, …) needs `--replace-clip`, and the manifest names the clip that was displaced. Keys are rejected when times go backwards, a quaternion is not unit length, or a pelvis translation is not in metres.
+
+`python3 tools/test_gaelic_clip_merge.py` checks the shipped player and merges a synthetic clip (authored by the test) into a temporary copy of the 95-mesh squad.

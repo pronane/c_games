@@ -83,16 +83,36 @@ static const char *FLAT_FS =
 #else
 #define GF_LOC_BONES SHADER_LOC_BONE_MATRICES
 #endif
+/* Bone attributes must sit on the same locations raylib binds into the mesh VAO
+ * (indices 7, weights 8). A differently named input is linked somewhere else, so the
+ * shader skins every vertex with bone 0 and the body stays in the bind pose. */
+#if RAYLIB_VERSION_MAJOR >= 6
+#define SKIN_BONE_DECL "layout(location = 7) in vec4 vertexBoneIndices;\n"
+#define SKIN_BONE_X "vertexBoneIndices.x"
+#define SKIN_BONE_Y "vertexBoneIndices.y"
+#define SKIN_BONE_Z "vertexBoneIndices.z"
+#define SKIN_BONE_W "vertexBoneIndices.w"
+#else
+#define SKIN_BONE_DECL "layout(location = 7) in vec4 vertexBoneIds;\n"
+#define SKIN_BONE_X "vertexBoneIds.x"
+#define SKIN_BONE_Y "vertexBoneIds.y"
+#define SKIN_BONE_Z "vertexBoneIds.z"
+#define SKIN_BONE_W "vertexBoneIds.w"
+#endif
 #define SKIN_COMMON \
 "#version 330\n" \
-"in vec3 vertexPosition; in vec2 vertexTexCoord; in vec3 vertexNormal; in vec4 vertexColor;\n" \
-"in vec4 vertexBoneIds; in vec4 vertexBoneWeights;\n" \
+"layout(location = 0) in vec3 vertexPosition;\n" \
+"layout(location = 1) in vec2 vertexTexCoord;\n" \
+"layout(location = 2) in vec3 vertexNormal;\n" \
+"layout(location = 3) in vec4 vertexColor;\n" \
+SKIN_BONE_DECL \
+"layout(location = 8) in vec4 vertexBoneWeights;\n" \
 "#define MAX_BONE_NUM 64\n" \
 "uniform mat4 boneMatrices[MAX_BONE_NUM];\n" \
 "uniform mat4 mvp; uniform mat4 matModel; uniform mat4 matNormal;\n" \
 "mat4 skinMat(){\n" \
-"  return vertexBoneWeights.x*boneMatrices[int(vertexBoneIds.x)] + vertexBoneWeights.y*boneMatrices[int(vertexBoneIds.y)]\n" \
-"       + vertexBoneWeights.z*boneMatrices[int(vertexBoneIds.z)] + vertexBoneWeights.w*boneMatrices[int(vertexBoneIds.w)];\n" \
+"  return vertexBoneWeights.x*boneMatrices[int(" SKIN_BONE_X ")] + vertexBoneWeights.y*boneMatrices[int(" SKIN_BONE_Y ")]\n" \
+"       + vertexBoneWeights.z*boneMatrices[int(" SKIN_BONE_Z ")] + vertexBoneWeights.w*boneMatrices[int(" SKIN_BONE_W ")];\n" \
 "}\n"
 static const char *SKIN_VS = SKIN_COMMON
 "out vec3 fragPosition; out vec2 fragTexCoord; out vec4 fragColor; out vec3 fragNormal;\n"
@@ -727,6 +747,10 @@ static void stadiumInit(void)
         flatShader = LoadShaderFromMemory(FLAT_VS, FLAT_FS);
         skinShader = LoadShaderFromMemory(SKIN_VS, LIT_FS);
         flatSkinShader = LoadShaderFromMemory(FLAT_SKIN_VS, FLAT_FS);
+        TraceLog(LOG_INFO, "GAME: skin attribs bone-id %d bone-wt %d bone-uniform %d",
+                 skinShader.locs[SHADER_LOC_VERTEX_BONEIDS],
+                 skinShader.locs[SHADER_LOC_VERTEX_BONEWEIGHTS],
+                 skinShader.locs[GF_LOC_BONES]);
         gpuSkinAvailable = skinShader.id > 0 && skinShader.id != rlGetShaderIdDefault() && skinShader.locs[GF_LOC_BONES] >= 0 &&
                            flatSkinShader.id > 0 && flatSkinShader.id != rlGetShaderIdDefault();
         gpuSkin = gpuSkinAvailable && !forceCpuSkin;

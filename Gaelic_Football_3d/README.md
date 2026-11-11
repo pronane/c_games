@@ -61,10 +61,11 @@ was a glide at 7 m/s). The stance foot stays where it landed until the leg has t
 A turn eases the stick and lets the chest lead the hips. Standing or jogging, the ball is in
 both hands; sprinting, it is in the right hand and the other arm keeps the clip's swing.
 A solo puts it on the toe, a bounce on the ground, and a kick or a fist lets it go from that
-bone. `Gaelic_football_bounce.fbx` is a near-stand with a hand dip, not a running bounce, so
-a moving bounce still uses the carry cycle. The squad GLB is not replaced. To hang one
-retargeted clip on a copy, see `sprite_forge/tools/GAELIC_CLIP_MERGE.md`. The rest of the
-gameplay list is `ROADMAP.md`.
+bone. `Gaelic_football_bounce.fbx` names Mixamo in its metadata. That is not a licence, so
+no merged copy of it is in this tree. A moving bounce still uses the carry cycle. The GPU
+skin shader reads bone indices and weights from the same attribute locations as the mesh
+(7 and 8); without that the body was drawn stuck in the bind pose while the bones moved.
+See `sprite_forge/tools/GAELIC_CLIP_MERGE.md`. The rest of the list is `ROADMAP.md`.
 
 ## Start-up
 The game opens with a **20-second AI-vs-AI attract demo**. It uses broadcast cameras (aerial
