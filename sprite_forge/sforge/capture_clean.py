@@ -136,6 +136,10 @@ def _ring_pass(lab, keep, cluster, want, layer, bone, limb, s, protect, torso_bo
         ring, share, edge = CR.segment(limb, s, mat, len(uniq), forbid={(2, 3): forbid}, forbid_beyond=fb2, bare=bare)
         own = mat
         wrong = on & (ring >= 0) & (own != ring) & ((share >= 0.3) | (edge <= 0.025) | np.isin(own, forbid) | (own < 0))
+        # v11.8: the trousers' colour below the trousers' hem (feet seen through the jeans' hem in most frames) is
+        # wrong however much of the band it fills
+        for pair, (s0, bad) in fb2.items():
+            wrong |= on & np.isin(limb, pair) & (s > s0) & np.isin(own, bad) & (ring >= 0) & (own != ring)
         if L == 1:
             for pair in (CR.ARMS, CR.LEGS):
                 t = (layer == 1) & np.isin(limb, pair)
@@ -321,6 +325,24 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
             # frame, cool in the next, skin showing through): pulled most of the way to the material's colour.
             # Lightness - the folds - is left as above
             lab2[idx, 1:] = med[1:] + (1.0 - chroma) * (lab2[idx, 1:] - med[1:])
+        # v11.8: hands. At game size a hand is a few pixels of skin; what the bake gives it is fingers stained with
+        # the trousers they hung against and red / dark streaks from views that disagree. Unless the video says
+        # they are not skin (gloves), hand texels are pulled to the body's skin colour: lightness half-way (the
+        # knuckles keep some shape), colour nearly all the way
+        hb = (layer == 0) & np.isin(bone, list(hand_bones)) & ~protect
+        if hb.sum() > 200 and skin_m >= 0:
+            seen_h = hb & seen
+            skin_share = float((label[seen_h] == 2).mean()) if seen_h.any() else 1.0
+            if skin_share >= 0.3:
+                ref = mats[skin_m]
+                ref = ref[(label[ref] == 2) & ~np.isin(bone[ref], list(hand_bones))]
+                if len(ref) > 500:
+                    med = np.median(lab2[ref], 0)
+                    hi_ = np.nonzero(hb)[0]
+                    dL = np.clip(lab2[hi_, 0] - med[0], -30, 30)
+                    lab2[hi_, 0] = med[0] + 0.5 * dL
+                    lab2[hi_, 1:] = med[1:] + 0.15 * (lab2[hi_, 1:] - med[1:])
+                    info["hands_evened"] = int(len(hi_))
         out = np.where(np.any(np.abs(lab2 - _lab(out)) > 0.5, 1)[:, None], _rgb(lab2), out)
     log("texture clean: %d skin texels off-colour and %d garment texels relabelled, dropped; %d texels filled on the "
         "body in 3D (%d from their mirror image)" % (info.get("skin_dropped", 0), flipped, info["filled"], info["mirror_filled"]))

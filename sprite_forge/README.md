@@ -52,6 +52,27 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.8: hands, feet in socks and shoes, no trousers on the feet
+
+* **Hands** read as skin: at game size a hand is a few pixels, and the bake gave it fingers stained with the
+  trousers it hung against and red / dark streaks. Unless the video says they are not skin (gloves), hand texels
+  are pulled to the body's skin colour (colour nearly all the way, lightness half-way so knuckles keep some shape).
+* **Feet in socks or shoes have no toes** (`capture_layers.shod_feet`): MakeHuman's foot is bare, with five
+  modelled toes, so a sock showed five white toes. When the video calls the feet something worn, the front of each
+  foot becomes one rounded toe box of the same length, width and height, sole on the floor. Bare feet are untouched.
+* **No trouser colour on the feet**: below a trouser leg's hem its colour was only forbidden for the band's
+  choice, so feet seen through the hem in most frames stayed jeans-blue. Now those texels are refilled too, and
+  dark shoes and socks show.
+* `tools/test_feet.py` (needs the MakeHuman assets, 4 checks).
+* **Tried and dropped:** keeping vertical stripes (a material that holds one angle round the limb). The bake blurs
+  thin stripes into a grey that also covers the rest of the trousers, so keeping it made PR's black track pants grey.
+  Thin stripes need a sharper bake first. Clothes folds as a normal map are for 3D engines, not the sprites, and
+  are left for later.
+* **Rebuilt all five:** silhouette IoU unchanged; held-out colour error up a little more (Mike 10.9 -> 11.3, Tmon
+  12.9 -> 13.9, PR 8.3 -> 9.1, Anna and Declan within 0.1) - the hands are now even skin, not what each frame saw.
+* **Known:** PR's black socks come out brown (under black trousers their colour is the trousers' colour, which the
+  rule above refuses on the feet); Anna's patterned light socks read as bare feet.
+
 ## New in v11.7: clothes that read as clothes - clean hems, socks and collars, shirts that stay on the body
 
 Seen in a game, a captured character was judged by its edges: a ragged shorts hem, one white sock and one brown,

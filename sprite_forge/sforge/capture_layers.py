@@ -508,6 +508,79 @@ def dress_like(fitter, shape, P, Pg, frames, hem):
     return len(below) < 2 or dist(mid, below) >= 25.0
 
 
+def shod_feet(bm, sh, votes, log=print):
+    """v11.8: feet in socks or shoes have no toes. MakeHuman's foot is bare - five modelled toes, which a white
+    sock then shows as five white toes. When the video calls the feet something worn (clothes / "other": socks,
+    shoes) more than skin, the front of each foot becomes one rounded toe box of the same size.
+    -> body vertices (rest pose)"""
+    V = sh.V.copy()
+    fb = [bm.bi[b] for b in ("foot.L", "foot.R", "toe1-1.L", "toe1-1.R") if b in bm.bi]
+    tb = [bm.bi[b] for b in ("toe1-1.L", "toe1-1.R") if b in bm.bi]
+    foot = np.isin(bm.J[:, 0], fb) & (bm.W[:, 0] > 0.3)
+    if foot.sum() < 50 or not tb:
+        return V
+    v = votes[foot]
+    worn = float(v[:, 4].sum() + v[:, 5].sum()); skin = float(v[:, 2].sum() + v[:, 3].sum())
+    if worn <= skin:
+        return V
+    # the part that moves: the toes and the front half of the foot (ahead of the ball), both feet
+    toe = np.isin(bm.J[:, 0], tb) & (bm.W[:, 0] > 0.2)
+    ball = np.array([sh.head[b] for b in tb])
+    front = foot & (V[:, 2] > (ball[:, 2].min() - 0.03))
+    mov = toe | front
+    # a toe box: each 5 mm slice across the front of the foot keeps the envelope of the toes (their width and
+    # height) and every vertex in it is put on a rounded-rectangle outline of that envelope, at its own angle - the
+    # gaps between the toes close, the foot keeps its size. It blends in over the first 2 cm behind the toes
+    for side in (1.0, -1.0):
+        m = np.nonzero(mov & (np.sign(sh.V[:, 0]) == side))[0]
+        if len(m) < 30:
+            continue
+        P = V[m]
+        z0 = P[:, 2].min()
+        k = ((P[:, 2] - z0) / 0.005).astype(int)
+        nk = int(k.max()) + 1
+        ext = np.full((nk, 4), np.nan)                                    # xmin, xmax, ymin, ymax per slice
+        for i in range(nk):
+            q = P[k == i]
+            if len(q):
+                ext[i] = [q[:, 0].min(), q[:, 0].max(), q[:, 1].min(), q[:, 1].max()]
+        good = ~np.isnan(ext[:, 0])
+        for c in range(4):                                                # gaps between slices: interpolate
+            ext[:, c] = np.interp(np.arange(nk), np.nonzero(good)[0], ext[good, c])
+        sm = ext.copy()
+        for i in range(nk):                                               # smooth along the foot
+            sm[i] = ext[max(0, i - 1):i + 2].mean(0)
+        cx = 0.5 * (sm[k, 0] + sm[k, 1]); ax = 0.5 * (sm[k, 1] - sm[k, 0]) + 1e-4
+        cy = 0.5 * (sm[k, 2] + sm[k, 3]); ay = 0.5 * (sm[k, 3] - sm[k, 2]) + 1e-4
+        phi = np.arctan2((P[:, 1] - cy) / ay, (P[:, 0] - cx) / ax)
+        pw = 4.0                                                          # rounded rectangle (superellipse)
+        r = (np.abs(np.cos(phi)) ** pw + np.abs(np.sin(phi)) ** pw) ** (-1.0 / pw)
+        tgt = P.copy()
+        tgt[:, 0] = cx + ax * r * np.cos(phi)
+        tgt[:, 1] = cy + ay * r * np.sin(phi)
+        w = np.clip((P[:, 2] - z0) / 0.02, 0, 1)[:, None]               # blend in behind the toes
+        V[m] = P + w * (tgt - P)
+    # the vertices that sat between the toes now fold over their neighbours: a few light smoothing passes over the
+    # toe box, then back onto its outline
+    idx = np.nonzero(mov)[0]
+    nb = [[] for _ in range(len(V))]
+    for a_, b_, c_ in bm.F:
+        nb[a_] += [b_, c_]; nb[b_] += [a_, c_]; nb[c_] += [a_, b_]
+    nbs = [np.unique(nb[i]) for i in idx]
+    box = V[idx].copy()
+    for _ in range(10):
+        avg = np.array([V[n].mean(0) if len(n) else V[i] for i, n in zip(idx, nbs)])
+        V[idx] = V[idx] + 0.5 * (avg - V[idx])
+    # smoothing shrinks: half of each vertex's pull inwards is given back
+    V[idx] = V[idx] + 0.3 * (box - V[idx])
+    # keep the sole on the floor where it was
+    low = sh.V[mov, 1].min()
+    V[mov, 1] = np.maximum(V[mov, 1], low)
+    log("layers: feet in socks / shoes (worn %.0f%% of their votes): toes smoothed into one shape" % (
+        100 * worn / max(1e-9, worn + skin)))
+    return V
+
+
 def fit_layers(fitter, frames=None, log=print):
     """-> (merged Mesh in rest pose, info). Clothes offsets (+ skirt) fitted to the full silhouettes with the
     cameras held; hair thickness / length from the hair labels."""
@@ -519,7 +592,8 @@ def fit_layers(fitter, frames=None, log=print):
     votes = vertex_labels(fitter, P, fitter.bm.F, frames)
     bm = fitter.bm
     fsel = clothes_faces(bm, votes, shape=sh, log=log)
-    body = Mesh(sh.V, bm.F, to_quarter(bm.fuv, "body"), bm.J, bm.W, np.zeros(len(sh.V), int))
+    Vb = shod_feet(bm, sh, votes, log=log)
+    body = Mesh(Vb, bm.F, to_quarter(bm.fuv, "body"), bm.J, bm.W, np.zeros(len(sh.V), int))
     stand = [t for t in fitter.targets if t.pose == "s" and t.r["i"] in fitter.cams.cam]
     stand = stand[::max(1, len(stand) // 12)]                       # 12 views round the orbit are plenty here
     skirt_on = needs_skirt(fitter, sh, P, frames)
