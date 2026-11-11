@@ -768,8 +768,21 @@ static void stadiumInit(void)
         skyModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = skyTex;
     }
     {
-        Mesh bm = GenMeshSphere(BALL_R, 12, 16);
+        Mesh bm = GenMeshSphere(BALL_R, 24, 32);
+        Image ball = GenImageColor(128, 64, (Color){ 244, 240, 230, 255 });
+        int x, y;
+        /* White leather, dark seams. No maker's mark: the panels are drawn here. */
+        for (y = 0; y < 64; y++) for (x = 0; x < 128; x++) {
+            int col = (x / 32 + y / 16) & 1;
+            int seam = (x % 32) < 2 || (y % 16) < 2;
+            float wave = fabsf((float)y - 32.0f - 10.0f * sinf((float)x * 0.09f));
+            Color c = col ? (Color){ 250, 246, 236, 255 } : (Color){ 228, 222, 206, 255 };
+            if (seam || wave < 1.4f) c = (Color){ 42, 42, 46, 255 };
+            ImageDrawPixel(&ball, x, y, c);
+        }
         ballModel = LoadModelFromMesh(bm);
+        ballModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = LoadTextureFromImage(ball);
+        UnloadImage(ball);
         if (haveLit) ballModel.materials[0].shader = litShader;
     }
     buildStadium();
@@ -891,7 +904,7 @@ static void drawPlanarShadow(Model *mo, Vector3 pos, float yawDeg, float dist)
 
 static void drawBallLit(Vector3 p)
 {
-    if (haveLit) DrawModel(ballModel, p, 1.0f, (Color){ 240, 234, 216, 255 });
+    if (haveLit) DrawModel(ballModel, p, 1.0f, WHITE);
     else DrawSphere(p, BALL_R, (Color){ 238, 232, 214, 255 });
     DrawSphereWires(p, BALL_R * 1.01f, 6, 8, (Color){ 120, 110, 90, 90 });
     /* shadow along the sun direction */
