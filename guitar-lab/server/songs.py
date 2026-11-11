@@ -412,8 +412,8 @@ def run_song(song: Song):
                                onset_threshold=thresholds[0],
                                frame_threshold=thresholds[1]),
             'warnings': [
-                *(['No separate guitar stem was found and nothing else plays, so this was treated as a solo '
-                   'recording and the whole take was transcribed.'] if solo else []),
+                *(['Nothing but the guitar plays, so this was treated as a solo recording and the whole take '
+                   'was transcribed, including what the separator put in other stems.'] if solo else []),
                 'Every result here is an automatic estimate. Check notes and chords by ear and correct them.',
                 'Parts panned to the same place and playing at the same time cannot be separated.',
                 'Tab positions are suggestions: the same note can be played on several strings.',

@@ -635,7 +635,13 @@ def test_solo_take_filed_under_other_is_treated_as_the_part():
     assert solo_recording(solo, 'guitar')
     band = [row('other', 'present'), row('guitar', 'trace'), row('vocals', 'present'), row('drums', 'present')]
     assert not solo_recording(band, 'guitar')
-    separated = [row('guitar', 'present'), row('other', 'present')]
-    assert not solo_recording(separated, 'guitar')
+    # One guitar that the separator split between its guitar stem and 'other': still a solo take.
+    split = [row('guitar', 'present'), row('other', 'present'), row('vocals', 'absent'), row('drums', 'absent')]
+    assert solo_recording(split, 'guitar')
+    # A guitar on its own stem with nothing in 'other': the stem is already the whole part.
+    assert not solo_recording([row('guitar', 'present'), row('other', 'trace')], 'guitar')
+    # A band keeps its separated guitar, with or without anything in 'other'.
+    assert not solo_recording([row('guitar', 'present'), row('other', 'present'), row('drums', 'present')], 'guitar')
+    assert not solo_recording([row('guitar', 'present'), row('other', 'present'), row('piano', 'present')], 'guitar')
     silence = [row('other', 'absent'), row('guitar', 'absent')]
     assert not solo_recording(silence, 'guitar')
