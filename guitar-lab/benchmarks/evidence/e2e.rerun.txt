@@ -1,0 +1,15 @@
+
+> guitar-lab@0.2.0 test:e2e
+> node tests/browser-smoke.mjs
+
+Review stage reached.
+locator.waitFor: Target crashed 
+Call log:
+  - waiting for getByRole('region', { name: 'Specialist analysis engine' }).getByText('Editable transcription') to be visible
+
+    at /home/user/c_games/guitar-lab/tests/browser-smoke.mjs:38:6 {
+  log: [
+    "  - waiting for getByRole('region', { name: 'Specialist analysis engine' }).getByText('Editable transcription') to be visible"
+  ],
+  name: 'Error'
+}

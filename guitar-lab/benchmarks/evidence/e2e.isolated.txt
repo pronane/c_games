@@ -1,0 +1,8 @@
+
+> guitar-lab@0.2.0 test:e2e
+> node tests/browser-smoke.mjs
+
+Review stage reached.
+Real pipeline notes: 0
+Error: Expected notes from real Basic Pitch
+    at file:///home/user/c_games/guitar-lab/tests/browser-smoke.mjs:41:25

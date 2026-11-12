@@ -4,6 +4,12 @@ Consolidated: 31 October 2026
 Evaluated source: `f2817d7`  
 Review branch: `arena/23399fc5-c-games`
 
+## Follow-up evidence
+
+[Fresh rerun and opt-in experiments](evidence/README.md) now provide new versioned
+results and test logs. The historical artifact limitations below still apply to
+the older runs, not to the new evidence. No merge has been performed.
+
 ## Executive conclusion
 
 Keep Riley as the primary guitar-transcription candidate. It materially outperformed Basic Pitch on the three bundled real recordings, but better note recognition does not yet make the app a trustworthy judge of arbitrary learner performances against full-band songs.

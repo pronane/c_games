@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:riley
+> node tests/riley-smoke.mjs
+
+{"status":200,"transcription":"clean-guitar Riley guitar-fl (high-resolution CRNN, MIT)","note_count":102,"duration_policy":"review_only","browser_errors":[]}

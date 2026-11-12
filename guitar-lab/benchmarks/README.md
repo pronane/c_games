@@ -1,5 +1,11 @@
 # Accuracy benchmarks
 
+## Fresh branch evidence
+
+See [evidence/README.md](evidence/README.md) for fresh paired results, the uploaded
+AAC's unlabelled-window checks, opt-in policy changes, test logs and remaining
+browser/separation blockers. No merge or release approval is implied.
+
 ## Consolidated evaluation and next steps
 
 See [Guitar-engine findings](GUITAR_ENGINE_FINDINGS.md) for the Riley/Basic Pitch

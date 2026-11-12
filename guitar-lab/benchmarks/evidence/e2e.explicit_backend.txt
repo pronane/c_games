@@ -1,0 +1,8 @@
+
+> guitar-lab@0.2.0 test:e2e
+> node tests/browser-smoke.mjs
+
+Review stage reached.
+Real pipeline notes: 16
+Mobile page overflow: false Errors: []
+Edit/recompute and delete passed.

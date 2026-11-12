@@ -1,0 +1,22 @@
+
+> guitar-lab@0.2.0 test:profiles
+> node tests/profile-smoke.mjs
+
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///home/user/c_games/guitar-lab/tests/profile-smoke.mjs:92:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.22.3

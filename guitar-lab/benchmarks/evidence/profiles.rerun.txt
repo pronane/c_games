@@ -1,0 +1,20 @@
+
+> guitar-lab@0.2.0 test:profiles
+> node tests/profile-smoke.mjs
+
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+locator.waitFor: Target crashed 
+Call log:
+  - waiting for getByRole('region', { name: 'Specialist analysis engine' }).getByText('Supplied piano reference · quality check') to be visible
+
+    at /home/user/c_games/guitar-lab/tests/profile-smoke.mjs:84:6 {
+  log: [
+    "  - waiting for getByRole('region', { name: 'Specialist analysis engine' }).getByText('Supplied piano reference · quality check') to be visible"
+  ],
+  name: 'Error'
+}
+
+Node.js v22.22.3

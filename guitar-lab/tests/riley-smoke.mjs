@@ -3,8 +3,8 @@ import { chromium } from 'playwright-core';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const root = new URL('../benchmarks/regression/data/guitarset/', import.meta.url);
-const audio = await readFile(new URL('05_Rock1-90-C#_solo_mic.wav', root));
-const truth = JSON.parse(await readFile(new URL('05_Rock1-90-C#_solo.notes.json', root), 'utf8'));
+const audio = await readFile(new URL(encodeURIComponent('05_Rock1-90-C#_solo_mic.wav'), root));
+const truth = JSON.parse(await readFile(new URL(encodeURIComponent('05_Rock1-90-C#_solo.notes.json'), root), 'utf8'));
 const browser = await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE_PATH, headless:true,
   args:['--no-sandbox','--disable-dev-shm-usage']});
 try {

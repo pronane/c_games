@@ -1,0 +1,5 @@
+test:e2e	1
+test:inputs	0
+test:profiles	1
+test:tab	1
+test:song	124

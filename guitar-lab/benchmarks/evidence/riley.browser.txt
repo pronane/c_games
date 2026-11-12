@@ -1,0 +1,19 @@
+
+> guitar-lab@0.2.0 test:riley
+> node tests/riley-smoke.mjs
+
+node:internal/fs/promises:639
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: ENOENT: no such file or directory, open '/home/user/c_games/guitar-lab/benchmarks/regression/data/guitarset/05_Rock1-90-C'
+    at async open (node:internal/fs/promises:639:25)
+    at async readFile (node:internal/fs/promises:1249:14)
+    at async file:///home/user/c_games/guitar-lab/tests/riley-smoke.mjs:6:15 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/home/user/c_games/guitar-lab/benchmarks/regression/data/guitarset/05_Rock1-90-C'
+}
+
+Node.js v22.22.3
