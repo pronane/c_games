@@ -190,6 +190,14 @@ def register(fitter, frames, tex, mesh=None, log=print, rounds=3):
             K = fitter.cams.K(r["size"])
             new, info = register_frame(P, F, fuv, tex, img, pm, fitter.cams.par[i], K)
             if info.get("kept"):
+                # the landmark fit's camera is kept for the hands and feet (capture_texture draws them through it): it
+                # was placed by the ankle, heel, toe and wrist keypoints, this one lines up the bulk of the body, and
+                # hands and feet move on their own. With the registered camera PR's navy socks and Mike's white ones
+                # were partly painted from the floor and the skin
+                c0 = getattr(fitter.cams, "cam0", None)
+                if c0 is None:
+                    c0 = fitter.cams.cam0 = {}
+                c0.setdefault(i, fitter.cams.cam[i])
                 rv, _ = cv2.Rodrigues(fitter.cams.rot(*new[:3]))
                 fitter.cams.par[i] = new
                 fitter.cams.cam[i] = (rv.reshape(3), new[3:6].copy())

@@ -63,8 +63,17 @@ fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real pers
   and it rests on at least 150 trusted points over a quarter of the person's height. Otherwise the frame keeps
   its camera and the report says why.
 * **Measured on the five:** median misfit Tmon 13.6 -> 4.4 px, Mike 6.3 -> 3.5, Declan 7.2 -> 5.3, PR 8.4 -> 7.3,
-  Anna 8.5 -> 7.6; no frame that moved got worse; silhouette IoU unchanged; held-out SSIM within +-0.006. Real people also move a little between frames (arms,
-  sway), which no camera can absorb: the texture's own flow alignment (v11.9) takes care of what is left.
+  Anna 8.5 -> 7.6; no frame that moved got worse; silhouette IoU unchanged; held-out SSIM within +-0.006. Real people
+  also move a little between frames (arms, sway), which no camera can absorb: the texture's own flow alignment
+  (v11.9) takes care of what is left. The gain is real but modest.
+* **Hands and feet keep the landmark camera.** The registered camera lines up the bulk of the body; hands and feet
+  move on their own, and through it PR's navy socks and Mike's white ones were partly painted from the floor and the
+  skin. They are drawn through the landmark fit's camera, which was placed by the ankle, toe and wrist keypoints.
+* **Shoes and socks keep their own colour** (found while checking v11.10): feet the video calls worn are a
+  material of their own in the clean - they were pulled to the colour of whatever cluster they fell in (PR's navy
+  socks shared one with shaded skin), and the rings may no longer paint them with a skin-coloured band (Declan's
+  black socks). Anna's patterned socks now read as socks rather than bare feet. Still wrong: Tmon's white trainers
+  come out tan (a wooden floor round them in every frame); v11.9 had them black.
 * **`tools/check_capture.py CAPTURE_DIR`** (or `--all captures/`): the gate for any new video's capture - files
   and a valid skinned GLB, held-out IoU >= 0.70, texture coverage, registration (misfit did not grow, no frame
   worse, no move beyond a correction; a warning when most frames are still far off), face landmark error.
@@ -75,9 +84,11 @@ fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real pers
     video the samples do not have - full body, a close-up with the legs cut off, a dim noisy room, motion blur,
     heavy JPEG, a ragged segmentation mask, plain one-colour clothes - never worse, and better wherever there is
     detail to align to.
-  - `tools/test_capture.py` (9 checks): the whole synthetic capture, now with its cameras knocked off by what a
+  - `tools/test_feet.py` (7 checks): adds dark socks in the skin's colour cluster keeping their colour, white
+    trainers under black trousers staying white, bare feet still cleaned as skin.
+  - `tools/test_capture.py` (10 checks): the whole synthetic capture, now with its cameras knocked off by what a
     real video leaves: misfit in the pictures halved, cameras a third of the way back, texture closer to the
-    truth.
+    truth, and every moved frame keeping its landmark camera for the hands and feet.
   - `tools/test_check_capture.py` (12 checks): the gate passes a good capture and catches each kind of broken
     one for its own reason; a one-photo capture is judged on its photo fit.
 

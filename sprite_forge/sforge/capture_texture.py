@@ -270,6 +270,23 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
             vis[hd_t] = inh & (np.abs(-Xh[:, 2] - zh[vih, uih]) < 0.025)
             vh_ = -(Xh / np.linalg.norm(Xh, axis=1, keepdims=True))
             facing[hd_t] = np.clip(((Nt[hd_t] @ Rh.T) * vh_).sum(1), 0, 1)
+        c0 = getattr(fitter.cams, "cam0", None) or {}
+        if r["i"] in c0 and ext_t.any():
+            # v11.10: hands and feet are drawn through the landmark fit's camera, not the registered one
+            # (capture_register keeps it: it was placed by the ankle, toe and wrist keypoints)
+            R0, _ = cv2.Rodrigues(np.asarray(c0[r["i"]][0], float)); t0 = np.asarray(c0[r["i"]][1], float)
+            P0 = P @ R0.T + t0
+            x0 = P0[:, 0] / P0[:, 2] * K[0, 0] + K[0, 2]; y0 = P0[:, 1] / P0[:, 2] * K[1, 1] + K[1, 2]
+            _, _, z0 = rasterise(x0, y0, -P0[:, 2], F, W, H, K=6)
+            z0 = z0.reshape(H, W)
+            Xe = X[ext_t] @ R0.T + t0
+            ue = Xe[:, 0] / Xe[:, 2] * K[0, 0] + K[0, 2]; ve = Xe[:, 1] / Xe[:, 2] * K[1, 1] + K[1, 2]
+            uie = np.clip(np.round(ue - 0.5).astype(int), 0, W - 1); vie = np.clip(np.round(ve - 0.5).astype(int), 0, H - 1)
+            ine = (ue >= 0) & (ue < W) & (ve >= 0) & (ve < H)
+            u[ext_t], v[ext_t], ui[ext_t], vi[ext_t] = ue, ve, uie, vie
+            vis[ext_t] = ine & (np.abs(-Xe[:, 2] - z0[vie, uie]) < 0.025)
+            ve_ = -(Xe / np.linalg.norm(Xe, axis=1, keepdims=True))
+            facing[ext_t] = np.clip(((Nt[ext_t] @ R0.T) * ve_).sum(1), 0, 1)
         # grazing views stretch; mask edge = background. v11.7: the head needs a squarer view - a frontal frame
         # seen at a slant paints its eye onto the side of the head (a ghost eye by the ear)
         ok = vis & (facing > np.where(hd_t, HEAD_MIN_FACING, min_facing)) & (m[vi, ui] > 0.6)
@@ -282,8 +299,8 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
             u = np.where(bd, u + du, u); v = np.where(bd, v + dv, v)
             ui = np.clip(np.round(u - 0.5).astype(int), 0, W - 1); vi = np.clip(np.round(v - 0.5).astype(int), 0, H - 1)
             ok &= (u >= 0) & (u < W) & (v >= 0) & (v < H) & (m[vi, ui] > 0.6)
-        w = np.where(ok, facing ** pw * m[vi, ui] * (ppm / 400.0) ** 2, 0.0) * (_sharpness(img) ** 0.5)
         c = _bilinear(img, u - 0.5, v - 0.5)
+        w = np.where(ok, facing ** pw * m[vi, ui] * (ppm / 400.0) ** 2, 0.0) * (_sharpness(img) ** 0.5)
         cols.append(np.clip(np.round(c), 0, 255).astype(np.uint8)); ws.append(w.astype(np.float32)); used.append(r["i"])
         labs.append(_label_class(lab[vi, ui]) if lab is not None else np.zeros(len(u), np.int8))
     C = np.stack(cols); Wt = np.stack(ws)                                  # (frames, texels, 3), (frames, texels)
@@ -424,6 +441,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         torso_b = [bm.bi[b] for b in ("root", "spine05", "spine04", "spine03", "spine02", "spine01", "clavicle.L",
                                       "clavicle.R") if b in bm.bi]
         kw = dict(limb=limb_c, s=s_c, torso_bones=torso_b) if RINGS else {}
+        kw["foot_bones"] = [bm.bi[b] for b in bm.bi if b.startswith(("foot.", "toe"))]
         # the underside of the jaw and the neck are skin or beard: a collar seen past the chin paints them the
         # shirt's colour. Body texels there whose colour is near a garment's and far from the skin are dropped
         neck_b = [bm.bi[b] for b in ("head", "neck01") if b in bm.bi]

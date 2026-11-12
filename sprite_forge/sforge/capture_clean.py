@@ -156,13 +156,23 @@ def _ring_pass(lab, keep, cluster, want, layer, bone, limb, s, protect, torso_bo
 
 
 def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), log=print, flatten=0.5,
-          limb=None, s=None, torso_bones=(), drop=None, chroma=0.75, skin_flatten=0.8):
+          limb=None, s=None, torso_bones=(), drop=None, chroma=0.75, skin_flatten=0.8, foot_bones=()):
     """mix (N,3) blended texel colours; seen (N,) bool; X (N,3) texel positions on the rest-pose body (x = left /
     right); layer (N,) 0 body, 1 clothes, 2 skirt, 3 hair; label (N,) majority video label 0 none, 1 hair, 2 skin,
     3 clothes; bone (N,) dominant bone id; protect (N,) texels never dropped or flattened (the face);
     skin_bones: bone ids that are bare skin when unseen (hands, neck, head).
     -> (colours with every texel filled, kept mask = texels whose own samples survived, info)"""
     N = len(mix)
+    # v11.10: feet in shoes or socks - the video calls them worn or clothes more than skin, the rule that gives them a
+    # toe box (capture_layers.shod_feet) - are footwear, a material of their own: they are not pulled to the colour
+    # of whatever cluster they fell in (PR's navy socks shared a cluster with shaded skin and came out skin-pale).
+    # They stay in the ring pass, which keeps the trousers' colour off them (Declan's jeans)
+    shod = np.zeros(N, bool)
+    if len(foot_bones):
+        fo = (layer == 0) & np.isin(bone, list(foot_bones)) & ~protect
+        fs = fo & seen
+        if fs.sum() > 200 and ((label[fs] == 3) | (label[fs] == 4)).sum() > (label[fs] == 2).sum():
+            shod = fo
     lab = _lab(mix)
     keep = seen.copy()
     info = {}
@@ -205,8 +215,17 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
         flipped += int(ch.sum()); nc += k
     info["garment_relabelled"] = flipped
     if limb is not None and s is not None:
+        keep0 = keep.copy()
         info["ring_moved"] = _ring_pass(lab, keep, cluster, want, layer, bone, limb, s, protect, list(torso_bones), log,
                                        label=label)
+        if shod.any():
+            # footwear is not skin: a band the ring pass would paint a shod foot with that is mostly skin-labelled
+            # (Declan's black socks came out skin) is not used there - the foot keeps its own colour
+            cl_ = np.unique(cluster[cluster >= 0])
+            skin_cl = [c for c in cl_ if (label[cluster == c] == 2).mean() > 0.5]
+            back = shod & keep0 & ~keep & np.isin(want, skin_cl)
+            keep[back] = True; want[back] = -1
+            info["feet_not_skin"] = int(back.sum())
     # ---- 3 fill
     out = mix.astype(np.float32).copy()
     todo = ~keep
@@ -305,6 +324,9 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
             n_ = int(((label[idx] == 2) & (layer[idx] == 0)).sum())
             if n_ > best_n and n_ > 0.3 * len(idx):
                 best_n, skin_m = n_, i_
+        if shod.any():
+            info["feet_shod"] = int(shod.sum())
+            mats = [m_[~shod[m_]] for m_ in mats] + [np.nonzero(shod)[0]]
         for i_, idx in enumerate(mats):
             if len(idx) < 500:
                 continue
