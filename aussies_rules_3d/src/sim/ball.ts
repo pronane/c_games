@@ -168,3 +168,15 @@ export function launchHandball(
   ball.spin = 0;
   void dist;
 }
+
+/** Predict where a loose ball will land (y ≈ 1.5 m hand-catch height). */
+export function predictDrop(ball: BallState): { x: number; z: number; t: number } {
+  const y0 = ball.y;
+  const target = 1.5;
+  // 0.5 g t^2 - vy t + (y0 - target) = 0  → take the positive root
+  const disc = ball.vy * ball.vy + 2 * GRAVITY * (y0 - target);
+  const t = disc >= 0 ? (ball.vy + Math.sqrt(disc)) / GRAVITY : 0.6;
+  // rough drag compensation so long kicks don't overshoot wildly
+  const dragK = 1 - Math.min(0.18, AIR_DRAG * t);
+  return { x: ball.x + ball.vx * t * dragK, z: ball.z + ball.vz * t * dragK, t: Math.max(0.05, t) };
+}

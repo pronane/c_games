@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MatchSim, HumanIntent, emptyHumanIntent } from './sim/match';
+import type { PlayerState } from './rules/types';
 import { RulesEngine } from './rules/engine';
 import { AFL_SETTINGS, MatchEvent, MatchSettings, scoreString } from './rules/types';
 import { BroadcastCamera } from './render/camera';
@@ -18,6 +19,7 @@ import {
   triggerOneShot,
   PlayerView,
   Teams,
+  SWITCH_FLASH_TIME,
 } from './render/players';
 import { InputManager } from './input/input';
 import { InputFrame } from './input/mappings';
@@ -74,7 +76,6 @@ class Game {
   private lastTime = 0;
   private celebrationTimer = 0;
   private scoreboardTimer = 0;
-  private menuAngle = 0;
   private touchButtons = new Map<string, HTMLElement>();
   private playerGltf: Awaited<ReturnType<GLTFLoader['loadAsync']>> | null = null;
   private menuFocusIndex = 0;
@@ -84,6 +85,16 @@ class Game {
   private menuBackDown = false;
   private showMarkers = true;
   private hintTimer = 0;
+  // attract mode — AI vs AI behind the title menu
+  private demoSim: MatchSim | null = null;
+  private demoViews = new Map<number, PlayerView>();
+  private demoAccum = 0;
+  private demoTime = 0;
+  private menuCamT = 0;
+  // pass-assist target rings + switch flash
+  private lastSwitchCount = 0;
+  private switchFlashId = -1;
+  private switchFlashT = 0;
 
   async boot(): Promise<void> {
     this.menus.setLoading(0.1, 'Building the Melbourne arena…');
@@ -103,7 +114,18 @@ class Game {
     this.menus.setLoading(0.95, 'Ready.');
     this.setupMenus();
     this.setupTouch();
+    this.startAttract();
     this.menus.show('title');
+
+    // mouse-wheel zoom on the broadcast cam (auto-recentres after 3 s)
+    ($('game') as HTMLCanvasElement).addEventListener(
+      'wheel',
+      (e: WheelEvent) => {
+        e.preventDefault();
+        this.broadcast.addZoom(e.deltaY > 0 ? 0.11 : -0.11);
+      },
+      { passive: false }
+    );
 
     window.addEventListener('resize', () => this.onResize());
     document.addEventListener('visibilitychange', () => {
@@ -165,6 +187,9 @@ class Game {
   }
 
   startMatch(): void {
+    for (const v of this.demoViews.values()) this.world.scene.remove(v.root);
+    this.demoViews.clear();
+    this.demoSim = null;
     const hi = Number(( $('sel-home') as HTMLSelectElement).value) || 0;
     const ai = Number(( $('sel-away') as HTMLSelectElement).value) || 1;
     this.teams.home = { ...CLUBS[hi] };
@@ -190,13 +215,141 @@ class Game {
     this.hud.setHint(
       this.input.isTouchDevice
         ? 'Left: stick · Right: KICK / HAND / TACKLE'
-        : 'WASD move · Space kick · E handpass · F tackle · Q switch · C camera · V markers · Esc pause'
+        : 'WASD move · Space kick · E handpass (target ring) · F tackle · Q switch · C camera · wheel zoom · V markers · Esc pause'
     );
     this.menus.hideAll();
     this.phase = 'playing';
     this.accum = 0;
     this.celebrationTimer = 0;
     this.redrawScoreboards();
+  }
+
+  // -------------------------------------------------------- attract mode
+
+  private startAttract(): void {
+    for (const v of this.demoViews.values()) this.world.scene.remove(v.root);
+    this.demoViews.clear();
+    const seed = (Math.random() * 1e9) | 0;
+    const sim = new MatchSim(
+      { ...AFL_SETTINGS, quarterSeconds: 300, difficulty: 'afl', seed },
+      'afl',
+      0
+    );
+    sim.attract = true;
+    sim.start();
+    this.demoSim = sim;
+    this.demoAccum = 0;
+    this.demoTime = 0;
+    this.menuCamT = 0;
+    this.demoViews = createPlayerViews(this.playerGltf!, sim.state, {
+      home: { ...CLUBS[0] },
+      away: { ...CLUBS[1] },
+    });
+    for (const v of this.demoViews.values()) this.world.scene.add(v.root);
+  }
+
+  /** Run the AI-vs-AI match behind the menu and sweep broadcast cameras over it. */
+  private stepAttract(dt: number): void {
+    const sim = this.demoSim;
+    if (!sim) return;
+    const empty = emptyHumanIntent();
+    const simDt = 1 / 60;
+    this.demoAccum = Math.min(this.demoAccum + dt, 0.2);
+    while (this.demoAccum >= simDt) {
+      sim.update(simDt, empty);
+      this.demoAccum -= simDt;
+    }
+    this.demoTime += dt;
+    if (sim.state.phase === 'matchEnd' || this.demoTime > 110) {
+      this.startAttract();
+      return;
+    }
+    // cinematic sweep: broadcast → aerial → wing, 9 s each
+    this.menuCamT += dt;
+    const CYCLE: Array<'broadcast' | 'aerial' | 'wing'> = ['broadcast', 'aerial', 'wing'];
+    this.broadcast.view = CYCLE[Math.floor(this.menuCamT / 9) % CYCLE.length];
+    const b = sim.state.ball;
+    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true);
+    this.ballMesh.position.set(b.x, b.y, b.z);
+    this.broadcast.update(dt, sim.state, b.x, b.z);
+    this.world.update(dt, b);
+    this.scoreboardTimer -= dt;
+    if (this.scoreboardTimer <= 0) {
+      this.drawBoardsFor(sim, this.teamsForDemo());
+      this.scoreboardTimer = 4;
+    }
+  }
+
+  private teamsForDemo(): Teams {
+    return { home: { ...CLUBS[0] }, away: { ...CLUBS[1] } };
+  }
+
+  /** Scoreboards with an explicit match — used by the attract demo. */
+  private drawBoardsFor(sim: MatchSim, teams: Teams): void {
+    const s = sim.state;
+    for (const screen of this.world.screens) {
+      drawScoreboard(
+        screen,
+        teams.home.name,
+        teams.away.name,
+        scoreString(s.scores[0]),
+        scoreString(s.scores[1]),
+        s.clock.quarter,
+        `${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
+      );
+    }
+  }
+
+  /** White ring that shrinks around whichever player control just moved to. */
+  private updateSwitchFlash(sim: MatchSim, dt: number): void {
+    if (sim.switchCount !== this.lastSwitchCount) {
+      this.lastSwitchCount = sim.switchCount;
+      this.switchFlashT = SWITCH_FLASH_TIME;
+      this.switchFlashId = sim.controlledId;
+    }
+    if (this.switchFlashT > 0) this.switchFlashT = Math.max(0, this.switchFlashT - dt);
+  }
+
+  /** Edge arrow that points at your player when he leaves the frame. */
+  private updateOffscreenArrow(p: PlayerState | null): void {
+    const el = document.getElementById('offscreen');
+    if (!el) return;
+    if (!p) {
+      el.classList.add('hidden');
+      return;
+    }
+    const cam = this.world.camera;
+    const v = new THREE.Vector3(p.x, 1.6, p.z);
+    v.project(cam);
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const behind = v.z > 1;
+    const margin = 60;
+    const sx = behind ? -v.x : v.x;
+    const sy = behind ? v.y : -v.y;
+    const len = Math.hypot(sx, sy) || 1;
+    const dx = sx / len;
+    const dy = sy / len;
+    const onScreen =
+      !behind &&
+      ((v.x * 0.5 + 0.5) * W) >= margin &&
+      ((v.x * 0.5 + 0.5) * W) <= W - margin &&
+      ((-v.y * 0.5 + 0.5) * H) >= margin &&
+      ((-v.y * 0.5 + 0.5) * H) <= H - margin;
+    if (onScreen) {
+      el.classList.add('hidden');
+      return;
+    }
+    const tx = dx >= 0.001 ? (W - margin - W / 2) / dx : dx <= -0.001 ? (margin - W / 2) / dx : Infinity;
+    const ty = dy >= 0.001 ? (H - margin - H / 2) / dy : dy <= -0.001 ? (margin - H / 2) / dy : Infinity;
+    const t = Math.min(tx, ty);
+    el.style.left = `${W / 2 + dx * t}px`;
+    el.style.top = `${H / 2 + dy * t}px`;
+    const arrow = document.getElementById('offscreenArrow');
+    if (arrow) arrow.style.transform = `rotate(${Math.atan2(dy, dx) + Math.PI / 2}rad)`;
+    const num = document.getElementById('offscreenNum');
+    if (num) num.textContent = `#${p.number}`;
+    el.classList.remove('hidden');
   }
 
   // ------------------------------------------------------- gamepad in menus
@@ -299,6 +452,7 @@ class Game {
     for (const v of this.views.values()) this.world.scene.remove(v.root);
     this.views.clear();
     this.hud.hide();
+    this.startAttract();
     this.menus.show('title');
   }
 
@@ -316,15 +470,7 @@ class Game {
       this.updateMenuInput(this.input.poll(0));
     }
     if (this.phase === 'menu') {
-      this.menuAngle += dt * 0.06;
-      const r = 130;
-      this.world.camera.position.set(
-        Math.cos(this.menuAngle) * r,
-        52,
-        Math.sin(this.menuAngle) * r
-      );
-      this.world.camera.lookAt(0, 4, 0);
-      this.world.update(dt, { x: 0, y: 0, z: 0 });
+      this.stepAttract(dt);
     }
 
     this.world.renderer.render(this.world.scene, this.world.camera);
@@ -376,8 +522,21 @@ class Game {
       this.broadcast.setMode('broadcast');
     }
 
+    this.updateSwitchFlash(sim, dt);
     const controlled = sim.controlled();
-    syncPlayerViews(this.views, sim.state, dt, this.celebrationTimer > 0, sim.controlledId, this.showMarkers);
+    const carrierIsHuman =
+      sim.state.ball.mode === 'held' && sim.state.ball.holderId === sim.controlledId;
+    const targetMode: 'none' | 'hand' | 'kick' = carrierIsHuman
+      ? frame.kickHeld
+        ? 'kick'
+        : 'hand'
+      : 'none';
+    syncPlayerViews(
+      this.views, sim.state, dt, this.celebrationTimer > 0, sim.controlledId, this.showMarkers,
+      { mode: targetMode, handId: sim.handTargetId, kickId: sim.kickTargetId },
+      { id: this.switchFlashT > 0 ? this.switchFlashId : -1, remaining: this.switchFlashT }
+    );
+    this.updateOffscreenArrow(controlled);
 
     // ball mesh
     const b = sim.state.ball;
@@ -403,7 +562,7 @@ class Game {
     }
     this.hud.update(dt, sim.state, this.teams.home.name, this.teams.away.name);
     if (controlled) {
-      this.hud.setPlayer(controlled.number, controlled.name);
+      this.hud.setPlayer(controlled.number, controlled.name, controlled.role);
     }
     this.hud.setCharge(sim.kickCharge);
     this.hud.drawRadar(sim.state, sim.controlledId);
@@ -530,18 +689,7 @@ class Game {
 
   private redrawScoreboards(): void {
     if (!this.sim) return;
-    const s = this.sim.state;
-    for (const screen of this.world.screens) {
-      drawScoreboard(
-        screen,
-        this.teams.home.name,
-        this.teams.away.name,
-        scoreString(s.scores[0]),
-        scoreString(s.scores[1]),
-        s.clock.quarter,
-        `${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
-      );
-    }
+    this.drawBoardsFor(this.sim, this.teams);
   }
 
   /** A one-line, always-relevant coaching hint for what's happening right now. */
@@ -564,7 +712,10 @@ class Game {
       return 'BALL-UP — win the tap: F to ruck / contest, Q to switch to support';
     }
     if (hasBall) {
-      return 'YOU HAVE IT — SPACE kick (hold for power) · E handball · B bounce · Shift sprint';
+      const num = (id: number) => sim.state.players.find((p) => p.id === id)?.number ?? 0;
+      const kickTo = sim.kickTargetId >= 0 ? ` → #${num(sim.kickTargetId)}` : '';
+      const handTo = sim.handTargetId >= 0 ? ` → #${num(sim.handTargetId)}` : '';
+      return `YOU HAVE IT — SPACE kick${kickTo} (hold for power) · E handball${handTo} · B bounce · Shift sprint`;
     }
     return 'DEFENDING — F tackle · Q switch to nearest · C camera · V markers';
   }

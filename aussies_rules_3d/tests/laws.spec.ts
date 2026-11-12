@@ -28,7 +28,7 @@ function player(id: number, team: 0 | 1, x = 0, z = 0): PlayerState {
   return {
     id, team, number: id, name: `P${id}`, role: 'midfielder',
     stats: { speed: 0.8, strength: 0.8, kicking: 0.8, marking: 0.8, tackling: 0.8, endurance: 0.8 },
-    distanceRun: 0, stamina: 1,
+    distanceRun: 0, stamina: 1, sprintRamp: 0, tackleCooldown: 0,
     x, z, y: 0, vx: 0, vy: 0, vz: 0, facing: 0, onBench: false,
   };
 }

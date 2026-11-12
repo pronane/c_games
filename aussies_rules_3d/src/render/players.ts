@@ -19,6 +19,10 @@ export interface PlayerView {
   facing: number;
   /** Coloured ground ring (yellow + pulsing for the controlled player). */
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  /** Pass-assist ring: cyan = handpass target, orange = kick target, hidden otherwise. */
+  targetRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  /** White ring that shrinks and fades for ~0.7 s after control switches. */
+  flashRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
 }
 
 export interface Teams {
@@ -126,6 +130,38 @@ export function createPlayerViews(
     ring.renderOrder = 2;
     root.add(ring);
 
+    const targetRing = new THREE.Mesh(
+      new THREE.RingGeometry(1.52, 1.8, 28),
+      new THREE.MeshBasicMaterial({
+        color: 0x35e0ff,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    targetRing.rotation.x = -Math.PI / 2;
+    targetRing.position.y = 0.038;
+    targetRing.renderOrder = 3;
+    targetRing.visible = false;
+    root.add(targetRing);
+
+    const flashRing = new THREE.Mesh(
+      new THREE.RingGeometry(1.12, 1.86, 28),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    flashRing.rotation.x = -Math.PI / 2;
+    flashRing.position.y = 0.045;
+    flashRing.renderOrder = 4;
+    flashRing.visible = false;
+    root.add(flashRing);
+
     views.set(p.id, {
       root,
       mixer,
@@ -136,6 +172,8 @@ export function createPlayerViews(
       number: p.number,
       facing: p.facing,
       ring,
+      targetRing,
+      flashRing,
     });
   }
   return views;
@@ -179,13 +217,30 @@ export function chooseAnim(
   return 'idle';
 }
 
+export const SWITCH_FLASH_TIME = 0.7;
+
+export interface TargetRings {
+  /** Which assist ring to show on the human carrier's option (or none). */
+  mode: 'none' | 'hand' | 'kick';
+  handId: number;
+  kickId: number;
+}
+
+export interface SwitchFlash {
+  id: number;
+  /** Seconds REMAINING of the flash (counts down from SWITCH_FLASH_TIME). */
+  remaining: number;
+}
+
 export function syncPlayerViews(
   views: Map<number, PlayerView>,
   state: MatchState,
   dt: number,
   celebrating: boolean,
   controlledId: number | null = null,
-  markersOn = true
+  markersOn = true,
+  targets: TargetRings = { mode: 'none', handId: -1, kickId: -1 },
+  flash: SwitchFlash = { id: -1, remaining: 0 }
 ): void {
   const now = performance.now() / 1000;
   for (const p of state.players) {
@@ -211,6 +266,31 @@ export function syncPlayerViews(
         view.ring.material.opacity = 0.6;
         view.ring.scale.setScalar(1);
       }
+    }
+
+    // pass-assist target rings (cyan handpass / orange kick)
+    {
+      const wantId =
+        targets.mode === 'hand' ? targets.handId : targets.mode === 'kick' ? targets.kickId : -1;
+      if (wantId === p.id) {
+        view.targetRing.visible = true;
+        view.targetRing.material.color.setHex(targets.mode === 'hand' ? 0x35e0ff : 0xff8c1a);
+        view.targetRing.material.opacity = 0.75 + 0.25 * Math.sin(now * 6);
+        view.targetRing.scale.setScalar(1 + 0.07 * Math.sin(now * 6));
+      } else {
+        view.targetRing.visible = false;
+      }
+    }
+
+    // switch flash — a white ring that shrinks and fades over ~0.7 s
+    if (flash.id === p.id && flash.remaining > 0) {
+      const age = SWITCH_FLASH_TIME - flash.remaining;
+      const k = Math.min(1, Math.max(0, age / SWITCH_FLASH_TIME));
+      view.flashRing.visible = true;
+      view.flashRing.material.opacity = 0.9 * (1 - k);
+      view.flashRing.scale.setScalar(2.4 - 1.25 * k);
+    } else {
+      view.flashRing.visible = false;
     }
 
     const b = state.ball;

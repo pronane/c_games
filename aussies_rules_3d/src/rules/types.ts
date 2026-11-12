@@ -37,6 +37,10 @@ export interface PlayerState {
   /** Metres run since last break — used for fatigue and interchange. */
   distanceRun: number;
   stamina: number; // 0..1
+  /** 0..1 sprint build-up — ramps while sprinting, decays otherwise. */
+  sprintRamp: number;
+  /** Seconds until this player may legally attempt another tackle. */
+  tackleCooldown: number;
   /** Position on the field (x = goal-to-goal axis, z = wing axis), metres. */
   x: number;
   z: number;

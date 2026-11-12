@@ -77,9 +77,13 @@ export class Hud {
     }
   }
 
-  setPlayer(number: number, name: string): void {
+  setPlayer(number: number, name: string, role?: string): void {
     $('playerNum').textContent = `#${number}`;
     $('playerName').textContent = name;
+    const el = document.getElementById('playerRole');
+    if (el && role) {
+      el.textContent = role.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase();
+    }
   }
 
   setCharge(v: number): void {

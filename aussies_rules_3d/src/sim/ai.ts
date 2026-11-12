@@ -186,6 +186,95 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
     return intent;
   }
 
+  // ------------------------------------------------------ support runs (attack)
+  // When our carrier holds the ball, the two nearest free teammates (not the
+  // designated fullback) peel off: one a short handpass option beside him,
+  // one running ahead into space — Gaelic_Football_3d support logic.
+  if (
+    ctx.possessingTeam === p.team &&
+    ctx.carrierId !== null &&
+    ctx.carrierId !== p.id &&
+    p.role !== 'fullback'
+  ) {
+    const holder = s.players.find((q) => q.id === ctx.carrierId);
+    if (holder) {
+      let rank = 0;
+      for (const q of s.players) {
+        if (q.team !== p.team || q.id === p.id || q.id === ctx.carrierId || q.onBench) continue;
+        if (q.role === 'fullback') continue;
+        const dq = (q.x - holder.x) ** 2 + (q.z - holder.z) ** 2;
+        const dp = (p.x - holder.x) ** 2 + (p.z - holder.z) ** 2;
+        if (dq < dp) rank++;
+      }
+      if (rank < 2) {
+        const side = holder.z < 0 ? 1 : -1;
+        const tx = rank === 0 ? holder.x + dir * 3.5 : holder.x + dir * 13;
+        const tz = rank === 0 ? holder.z - side * 7 : holder.z + side * 11;
+        const dd = Math.hypot(tx - p.x, tz - p.z);
+        if (dd > 2) {
+          intent.moveX = tx - p.x;
+          intent.moveZ = tz - p.z;
+          intent.sprint = dd > 9;
+          return intent;
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------ goal-side marking
+  // Defending: backs pick up attackers goal-side, nearest first, one attacker
+  // each — the ball-relative zone alone let forwards drift free between lines.
+  if (
+    ctx.possessingTeam !== null &&
+    ctx.possessingTeam !== p.team &&
+    (p.role === 'fullback' || p.role === 'keyDefender' || p.role === 'halfBack')
+  ) {
+    const ownGoalX = defendGoalX(p.team);
+    const defenders = s.players
+      .filter(
+        (q) =>
+          q.team === p.team &&
+          !q.onBench &&
+          (q.role === 'fullback' || q.role === 'keyDefender' || q.role === 'halfBack')
+      )
+      .sort((a, b) => a.id - b.id);
+    const attackers = s.players.filter(
+      (q) => q.team !== p.team && !q.onBench && q.id !== ctx.carrierId
+    );
+    const taken = new Set<number>();
+    let mark: PlayerState | null = null;
+    for (const d of defenders) {
+      let best: PlayerState | null = null;
+      let bd = 26 * 26;
+      for (const a of attackers) {
+        if (taken.has(a.id)) continue;
+        if (Math.abs(a.x - ownGoalX) > 55) continue;
+        const dd = (a.x - d.x) ** 2 + (a.z - d.z) ** 2;
+        if (dd < bd) {
+          bd = dd;
+          best = a;
+        }
+      }
+      if (best) taken.add(best.id);
+      if (d.id === p.id) {
+        mark = best;
+        break;
+      }
+    }
+    if (mark) {
+      const gx = ownGoalX - mark.x;
+      const gz = -mark.z;
+      const gl = Math.hypot(gx, gz) || 1;
+      const tx = mark.x + (gx / gl) * 1.8;
+      const tz = mark.z + (gz / gl) * 1.8;
+      const dd = Math.hypot(tx - p.x, tz - p.z);
+      intent.moveX = tx - p.x;
+      intent.moveZ = tz - p.z;
+      intent.sprint = dd > 6;
+      return intent;
+    }
+  }
+
   // ------------------------------------------------------------- shape up
   const home = homePosition(p, b.x, b.z, s.phase);
   const hx = home.x - p.x;
