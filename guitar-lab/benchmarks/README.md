@@ -1,5 +1,12 @@
 # Accuracy benchmarks
 
+## Consolidated evaluation and next steps
+
+See [Guitar-engine findings](GUITAR_ENGINE_FINDINGS.md) for the Riley/Basic Pitch
+observations, evidence limits, running-app checks and prioritised tuning backlog.
+This is a consolidation of previously reported measurements, not a fresh run;
+the document explicitly identifies missing raw artifacts and reproduction work.
+
 Note-level regression across acoustic, clean electric, reverb, rendered, and full-band
 intro clips is `benchmarks/regression/` (`python -m benchmarks.regression`). The committed
 Basic Pitch numbers are the reference. EGSet12 and the twelve Guitar-TECHS musical
