@@ -40,6 +40,8 @@ export type DiffSummary = {
 };
 
 export type CompareReport = {
+  duration_policy?: "review_only";
+  duration_notice?: string;
   source: "stem" | "notation" | "file" | string;
   label: string;
   summary: DiffSummary;

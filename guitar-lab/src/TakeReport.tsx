@@ -35,6 +35,7 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
         ))}
       </div>
       {tempo && <p className="helper">{tempo}</p>}
+      {report.duration_policy === "review_only" && <p className="helper" role="note">{report.duration_notice}</p>}
       {worst.length ? (
         <ul className="diff-worst">
           {worst.map((line) => (

@@ -413,7 +413,7 @@ def _bar_rows(notes, bars):
     return rows, [{'bar': r['bar'], 'score': r['score'], 'messages': r['messages']} for r in worst[:5]]
 
 
-def compare_to_target(take_notes, target) -> dict:
+def compare_to_target(take_notes, target, *, duration_review=False) -> dict:
     """Per-note and per-bar diff of one take against one target note list."""
     source = target.get('source') or 'file'
     if source not in SOURCES:
@@ -489,6 +489,10 @@ def compare_to_target(take_notes, target) -> dict:
             else:
                 kind = 'correct'
         message = _describe(kind, bar, beat, take_n, target_n, delta_ms, delta_beats)
+        if duration_review and kind == 'wrong_duration':
+            message = (f'bar {bar} beat {beat}: duration estimate differs for '
+                       f'{note_name(target_n["midi"])}; review by ear. '
+                       'Sustain, noise or effect tails can affect this estimate; this is not a confirmed playing mistake.')
         bar_time = next((b['time'] for b in bars if b['number'] == bar), None)
         findings.append({
             'kind': kind,
@@ -564,7 +568,15 @@ def compare_take(take_notes, targets, transcription='notes supplied') -> dict:
     """Score one take against each target. Stem + notation also produce a combined score."""
     if not targets:
         raise ValueError('At least one target note list is required.')
-    reports = [compare_to_target(take_notes, t) for t in targets]
+    import os
+    review = (os.getenv('FRETWORK_DURATION_REVIEW', '0') == '1'
+              and transcription.startswith('clean-guitar '))
+    reports = [compare_to_target(take_notes, t, duration_review=review) for t in targets]
+    if review:
+        for report in reports:
+            report['duration_policy'] = 'review_only'
+            report['duration_notice'] = ('Duration differences are uncertain audio estimates. '
+                                         'Counts and diagnostic bar scores are unchanged, not confirmed mistake grades.')
     return {
         'take_notes': normalize_notes(take_notes),
         'transcription': transcription,
