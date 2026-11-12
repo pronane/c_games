@@ -64,7 +64,7 @@ check('production build', () => {
 
 check('3D assets are valid glTF binaries', () => {
   const details = [];
-  for (const f of ['player.glb', 'ball.glb', 'stadium.glb']) {
+  for (const f of ['player.glb', 'gaelic_player.glb', 'ball.glb', 'stadium.glb']) {
     const p = path.join(ROOT, 'public', 'assets', f);
     if (!existsSync(p)) throw new Error(`${f} missing`);
     const fd = openSync(p, 'r');

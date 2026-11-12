@@ -103,7 +103,7 @@ class Game {
 
     this.menus.setLoading(0.45, 'Rigging the players…');
     const loader = new GLTFLoader();
-    this.playerGltf = await loader.loadAsync('./assets/player.glb');
+    this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
     this.menus.setLoading(0.75, 'Inflating the Sherrin…');
     const ballGltf = await loader.loadAsync('./assets/ball.glb');
     this.ballMesh = ballGltf.scene;
@@ -717,7 +717,10 @@ class Game {
       const handTo = sim.handTargetId >= 0 ? ` → #${num(sim.handTargetId)}` : '';
       return `YOU HAVE IT — SPACE kick${kickTo} (hold for power) · E handball${handTo} · B bounce · Shift sprint`;
     }
-    return 'DEFENDING — F tackle · Q switch to nearest · C camera · V markers';
+    if (b.mode === 'loose') {
+      return 'LOOSE BALL — run at it (your best-placed player is auto-selected) · Q to switch · F tackle';
+    }
+    return 'DEFENDING — F tackle inside ~2 m · Q switch to the goal-side man · C camera';
   }
 
   private onResize(): void {
