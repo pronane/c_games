@@ -5,7 +5,9 @@ Every model in Aussie Rules 3D is authored programmatically with **Blender**
 glTF binary (`.glb`), the runtime format loaded by three.js.
 
 ```
-gen_player.py    19-bone skinned humanoid + 11 animation clips → public/assets/player.glb
+gen_player.py    legacy Blender generator for the retired player.glb
+                 (active model is now the trimmed Gaelic_Football_3d squad:
+                 public/assets/gaelic_player.glb)
 gen_ball.py      Sherrin-style oval ball with laces           → public/assets/ball.glb
 gen_stadium.py   Melbourne arena (bowl, roof, towers, screens)→ public/assets/stadium.glb
 ard_lib.py       shared helpers: armature building, deterministic FK posing,
