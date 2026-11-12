@@ -130,10 +130,16 @@ def main(argv=None):
         p_[:3] += rng2.uniform(-1, 1, 3) * rng2.uniform(1.0, 2.0); p_[3:6] += rng2.uniform(-1, 1, 3) * rng2.uniform(0.01, 0.02)
         rv_, _ = cv2.Rodrigues(CF.Cameras.rot(*p_[:3])); f.cams.par[i] = p_; f.cams.cam[i] = (rv_.reshape(3), p_[3:6].copy())
     e_knock = cam_err()
+    knocked = {i: (np.array(c[0]), np.array(c[1])) for i, c in f.cams.cam.items()}
     tk, _, _ = CT.bake(f, frames=[t.r for t in f.targets], res=R_, align=False, clean=False, log=lambda *x: None)
     tex_err_k = float(np.mean(np.abs(tk[seen].astype(float) - tex[seen].astype(float))))
     _, rsum = CRG.register(f, [t.r for t in f.targets], tk, log=print)
     e_reg = cam_err()
+    c0 = getattr(f.cams, "cam0", {}) or {}
+    moved = [i for i in f.cams.cam if not np.allclose(f.cams.cam[i][1], knocked[i][1])]
+    hands_feet_ok = bool(moved) and all(i in c0 and np.allclose(c0[i][0], knocked[i][0]) and np.allclose(c0[i][1], knocked[i][1])
+                                        for i in moved)
+    print("registration kept the camera of: %s" % sorted(set((rsum.get("refused") or {}).values())))
     tr, _, _ = CT.bake(f, frames=[t.r for t in f.targets], res=R_, align=False, clean=False, log=lambda *x: None)
     tex_err_r = float(np.mean(np.abs(tr[seen].astype(float) - tex[seen].astype(float))))
     print("cameras vs truth (median px): fitted %.2f, knocked off %.2f, registered %.2f; texture error %.1f -> %.1f" % (
@@ -151,7 +157,9 @@ def main(argv=None):
               # the true camera: the pictures' misfit must halve, the camera must come at least a third of the way back
               ("registration: misfit in the pictures halved", rsum["flow_px_after"] < 0.5 * rsum["flow_px_before"]),
               ("registration: cameras a third of the way back", e_reg < 0.67 * e_knock),
-              ("registration: texture closer to the truth", tex_err_r < tex_err_k)]
+              ("registration: texture closer to the truth", tex_err_r < tex_err_k),
+              # hands and feet are drawn through the landmark camera (they move on their own)
+              ("registration: hands/feet keep the landmark camera", hands_feet_ok)]
     bad = 0
     for name, ok in checks:
         print("%-44s %s" % (name, "PASS" if ok else "FAIL")); bad += not ok
