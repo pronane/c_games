@@ -66,7 +66,7 @@ try {
   const section = page.getByRole("region", {
     name: "Specialist analysis engine",
   });
-  await section.getByRole("checkbox").check();
+  await section.getByRole("checkbox", { name: /I agree to upload/ }).check();
   const [created] = await Promise.all([
     page.waitForResponse(
       (r) => r.url().endsWith("/api/jobs") && r.request().method() === "POST",
@@ -82,7 +82,7 @@ try {
   await section
     .getByText("Supplied piano reference · quality check")
     .waitFor({ timeout: 30000 });
-  await section.getByRole("checkbox").check();
+  await section.getByRole("checkbox", { name: /I listened to this reference/ }).check();
   await section
     .getByRole("button", { name: "Approve reference & analyse" })
     .click();

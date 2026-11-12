@@ -20,7 +20,7 @@ if (!process.env.BROWSER_EXECUTABLE_PATH)
   const section = page.getByRole("region", {
     name: "Specialist analysis engine",
   });
-  await section.getByRole("checkbox").check();
+  await section.getByRole("checkbox", { name: /I agree to upload/ }).check();
   await section
     .getByRole("button", { name: "Upload excerpts & prepare guitar" })
     .click();
@@ -28,7 +28,7 @@ if (!process.env.BROWSER_EXECUTABLE_PATH)
     .getByText("Supplied guitar reference · quality check")
     .waitFor({ timeout: 30000 });
   console.log("Review stage reached.");
-  const approval = section.getByRole("checkbox");
+  const approval = section.getByRole("checkbox", { name: /I listened to this reference/ });
   await approval.check();
   await section
     .getByRole("button", { name: "Approve reference & analyse" })
