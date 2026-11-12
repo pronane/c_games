@@ -12,6 +12,8 @@ if (!process.env.BROWSER_EXECUTABLE_PATH)
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // This legacy synthetic fixture exercises Basic Pitch, not Riley guitar accuracy.
+  await page.addInitScript(() => localStorage.setItem("guitar-lab.transcriber", "basic_pitch"));
   await page.goto(process.env.STUDIO_URL ?? "http://127.0.0.1:5173");
   await page.getByRole("button", { name: "Try a sample session" }).click();
   await page

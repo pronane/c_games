@@ -22,6 +22,8 @@ const shots = process.env.SCREENSHOT_DIR;
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // This legacy synthetic fixture exercises Basic Pitch, not Riley guitar accuracy.
+  await page.addInitScript(() => localStorage.setItem("guitar-lab.transcriber", "basic_pitch"));
   await page.goto(process.env.STUDIO_URL ?? "http://127.0.0.1:5173");
   const proc = page.getByRole("group", { name: "Processing" });
   console.log("Processing:", (await proc.innerText()).replace(/\s+/g, " "));
