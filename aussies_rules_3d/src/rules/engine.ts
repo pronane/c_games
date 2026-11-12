@@ -191,6 +191,8 @@ export class RulesEngine {
           stats: entry.stats,
           distanceRun: 0,
           stamina: 1,
+          sprintRamp: 0,
+          tackleCooldown: 0,
           x: 0,
           z: 0,
           y: 0,

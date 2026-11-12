@@ -8,6 +8,11 @@
  *   behind    — low chase cam behind the play
  *   aerial    — high chase, behind and above the ball
  *   tactical  — near top-down view of the whole shape
+ *
+ * The broadcast shot frames dynamically: it widens for spread play, long
+ * kicks and restarts, and tightens for contests — the openness model from the
+ * gaelic_football_3d broadcast work. Mouse-wheel zoom nudges it and recentres
+ * after 3 s idle.
  */
 import * as THREE from 'three';
 import { FIELD, MatchState } from '../rules/types';
@@ -35,6 +40,9 @@ export class BroadcastCamera {
   private lookAt = new THREE.Vector3();
   private celebrationT = 0;
   private chaseDir = new THREE.Vector2(1, 0);
+  private openness = 0.12;
+  private zoomOffset = 0;
+  private zoomIdleT = 0;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -60,6 +68,12 @@ export class BroadcastCamera {
     return VIEW_LABEL[this.view];
   }
 
+  /** Mouse-wheel zoom nudge. Positive zooms out (open), negative tightens. */
+  addZoom(delta: number): void {
+    this.zoomOffset = THREE.MathUtils.clamp(this.zoomOffset + delta, -0.42, 0.55);
+    this.zoomIdleT = 0;
+  }
+
   update(dt: number, state: MatchState, controlledX: number, controlledZ: number): void {
     const b = state.ball;
     this.target.set(b.x, Math.max(0, b.y), b.z);
@@ -69,6 +83,33 @@ export class BroadcastCamera {
     }
     const dirX = this.chaseDir.x;
     const dirZ = this.chaseDir.y;
+
+    // --- dynamic framing: how spread / aerial / restart-ish is the play?
+    this.zoomIdleT += dt;
+    if (this.zoomIdleT > 3) this.zoomOffset *= Math.exp(-dt * 1.5);
+    {
+      const d2: number[] = [];
+      for (const p of state.players) {
+        if (p.onBench) continue;
+        d2.push((p.x - b.x) ** 2 + (p.z - b.z) ** 2);
+      }
+      d2.sort((a, c) => a - c);
+      let sum = 0;
+      const n = Math.min(6, d2.length);
+      for (let i = 0; i < n; i++) sum += Math.sqrt(d2[i]);
+      const spread = Math.min(1, n > 0 ? sum / n / 26 : 0);
+      const flight =
+        Math.min(1, Math.max(0, (ballSpeed - 5) / 20)) * 0.4 + (b.y > 2.6 ? 0.18 : 0);
+      const ph = state.phase;
+      const restart =
+        ph === 'kickIn' || ph === 'centreBallUp' || ph === 'ballUp' || ph === 'throwIn'
+          ? 0.42
+          : ph === 'freeKick'
+            ? 0.18
+            : 0;
+      const target = THREE.MathUtils.clamp(spread * 0.45 + flight + restart + this.zoomOffset, 0, 1.15);
+      this.openness += (target - this.openness) * Math.min(1, dt * 1.9);
+    }
 
     if (this.mode === 'celebration') {
       this.celebrationT += dt;
@@ -116,9 +157,9 @@ export class BroadcastCamera {
     } else if (this.view === 'aerial') {
       // high chase — reads the whole contest
       this.desired.set(
-        b.x - dirX * 30,
-        34,
-        b.z - dirZ * 30
+        b.x - dirX * (26 + this.openness * 8),
+        30 + this.openness * 11,
+        b.z - dirZ * (26 + this.openness * 8)
       );
       this.lookAt.lerp(new THREE.Vector3(b.x, 0.5, b.z), Math.min(1, dt * 2.6));
     } else if (this.view === 'tactical') {
@@ -128,13 +169,14 @@ export class BroadcastCamera {
       this.desired.set(cx, 88, cz + 3);
       this.lookAt.lerp(new THREE.Vector3(cx, 0, cz), Math.min(1, dt * 3.4));
     } else {
-      // broadcast (default): tight TV shot — players are big enough to read
+      // broadcast (default): tight TV shot — widens when the play is spread
       const leadX = (b.vx ?? 0) * 0.55;
       const leadZ = (b.vz ?? 0) * 0.55;
+      const o = this.openness;
       this.desired.set(
-        b.x * 0.85 + leadX * 0.6 - 3.5,
-        17.5 + Math.abs(b.z) * 0.045,
-        Math.max(42, 47 - Math.abs(b.z) * 0.09)
+        b.x * 0.86 + leadX * 0.6 - 4,
+        13.5 + o * 17 + Math.abs(b.z) * 0.045,
+        Math.max(38 + o * 19 - Math.abs(b.z) * 0.09, 24)
       );
       this.lookAt.lerp(
         new THREE.Vector3(b.x + leadX, 1.4, b.z + leadZ),

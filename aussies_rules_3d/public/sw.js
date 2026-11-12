@@ -1,5 +1,5 @@
 /* Aussie Rules 3D — offline-capable service worker (PWA install on any device). */
-const CACHE = 'aussie-rules-3d-v1';
+const CACHE = 'aussie-rules-3d-v2';
 const ASSETS = [
   './',
   './index.html',
