@@ -638,18 +638,18 @@ def notation_notes(raw_notes, beats, open_strings, max_fret=24):
 
 # ---------------------------------------------------------------- clean-guitar transcription
 
-def transcribe_take(path):
+def transcribe_take(path, backend=None):
     """Transcribe a learner's take with the existing engine, on the clean-guitar thresholds.
 
-    The song may have been transcribed as distorted. A practice take is scored as clean
-    guitar: same Basic Pitch model, the GuitarSet onset/frame thresholds.
+    The requested backend is passed through explicitly; None uses the engine default.
+    Clean onset/frame presets apply only to Basic Pitch, not the optional backends.
     """
     from . import models
     from .instruments import resolve_profile
     profile = resolve_profile('guitar')
     thresholds = models.thresholds_for('clean', chosen_by_user=True)
     return models.transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'],
-                             thresholds=thresholds)
+                             thresholds=thresholds, backend=backend)
 
 
 # ---------------------------------------------------------------- uploaded charts (MusicXML, MIDI, text tab)

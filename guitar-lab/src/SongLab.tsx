@@ -555,6 +555,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     try {
       const wav = encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate);
       const comparison = await compareSongTake(song.id, wav, {
+        transcriber,
         parts: learned.parts,
         role: learned.role,
         tuning: settings.tuning,

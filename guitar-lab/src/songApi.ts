@@ -143,8 +143,9 @@ export type CompareTarget = {
 };
 
 /** Score a take against stem notes, written notation, and/or an uploaded chart. */
-export function compareTake(body: { take?: Blob; takeNotes?: unknown[]; targets?: CompareTarget[]; scoreFile?: File }) {
+export function compareTake(body: { take?: Blob; takeNotes?: unknown[]; targets?: CompareTarget[]; scoreFile?: File; transcriber?: string }) {
   const form = new FormData();
+  if (body.transcriber) form.set("transcriber", body.transcriber);
   if (body.take) form.set("take", body.take, "take.wav");
   if (body.takeNotes) form.set("take_notes", JSON.stringify(body.takeNotes));
   if (body.targets) form.set("targets", JSON.stringify(body.targets));
@@ -156,10 +157,11 @@ export function compareTake(body: { take?: Blob; takeNotes?: unknown[]; targets?
 export function compareSongTake(
   id: string,
   take: Blob,
-  body: { parts: string[]; role: string; tuning: string; capo: number; start: number; end: number; speed: number },
+  body: { parts: string[]; role: string; tuning: string; capo: number; start: number; end: number; speed: number; transcriber?: string },
 ) {
   const form = new FormData();
   form.set("take", take, "take.wav");
+  if (body.transcriber) form.set("transcriber", body.transcriber);
   form.set("parts", body.parts.join(","));
   form.set("role", body.role);
   form.set("tuning", body.tuning);

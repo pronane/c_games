@@ -16,6 +16,7 @@ import { renderFile, driveForProgram } from "./fileSound";
 import { applySound, useGuitarSound } from "./guitarTone";
 import GuitarSoundPicker from "./GuitarSoundPicker";
 import { encodeWav } from "./engineApi";
+import { useTranscriber } from "./TranscriberSelect";
 import { captureError } from "./audioInputs";
 import { Recorder } from "./recorder";
 import LatencyCheck from "./LatencyCheck";
@@ -49,6 +50,7 @@ const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
 const GP = ".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml,.mxl,.txt,.tab";
 
 export default function TabLab({ settings, onSettings, incoming, onCompare }: Props) {
+  const [transcriber] = useTranscriber();
   const profile = resolveInstrument(settings);
   const [source, setSource] = useState<TabSource | null>(null),
     [score, setScore] = useState<alphaTab.model.Score | null>(null),
@@ -416,6 +418,7 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
       const part = excerpt(piece, take.from, take.to, take.speed);
       const wav = encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate);
       const comparison = await compareTake({
+        transcriber,
         take: wav,
         targets: [
           {

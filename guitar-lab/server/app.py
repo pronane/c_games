@@ -183,14 +183,13 @@ def run_job(job, phase):
                     versions[name] = importlib.metadata.version(name)
                 except importlib.metadata.PackageNotFoundError:
                     pass
-            from .transcribers import backend_name
             if job.reference_notes is not None:
                 # This branch asked for posteriors, which stay on Basic Pitch.
                 tx_label = 'Reference: notes from the uploaded tab/score. Take: Basic Pitch ONNX (CPU).'
-            elif backend_name() == 'basic_pitch':
+            elif job.transcriber == 'basic_pitch':
                 tx_label = 'Basic Pitch ONNX (CPU provider by default)'
             else:
-                tx_label = transcription_label() + ' (CPU)'
+                tx_label = transcription_label(job.transcriber) + ' (CPU)'
             job.result = {'alignment': alignment, 'reference_notes': reference_notes, 'take_notes': take_notes,
                           'comparison': score_informed(reference_notes, take_notes, post) if job.reference_notes is not None
                           else observations(reference_notes, take_notes, alignment),
@@ -439,7 +438,8 @@ def delete_job(key: str, x_fretwork_client: str | None = Header(None)):
 @app.post('/api/compare')
 async def compare_performance(take: UploadFile | None = File(None), take_notes: str | None = Form(None),
                               targets: str | None = Form(None), score_file: UploadFile | None = File(None),
-                              bpm: float | None = Form(None), x_fretwork_client: str | None = Header(None)):
+                              bpm: float | None = Form(None), transcriber: str = Form(''),
+                              x_fretwork_client: str | None = Header(None)):
     """Score a take against one or more note-list targets (stem, notation, uploaded chart).
 
     Audio is transcribed on the clean-guitar path. ``take_notes`` skips that when the notes
@@ -496,12 +496,17 @@ async def compare_performance(take: UploadFile | None = File(None), take_notes: 
                 raise HTTPException(422, 'The take must be a WAV recording.') from exc
             if not 0.4 <= info.duration <= 600:
                 raise HTTPException(422, 'The take must be between 0.4 seconds and 10 minutes.')
+            from .transcribers import checked_backend
             try:
-                notes = await asyncio.to_thread(take_diff.transcribe_take, path)
+                chosen_backend = checked_backend(transcriber)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            try:
+                notes = await asyncio.to_thread(take_diff.transcribe_take, path, backend=chosen_backend)
             except models.ModelUnavailable as exc:
                 raise HTTPException(503, str(exc)) from exc
             from .transcribers import clean_take_label
-            transcription = clean_take_label()
+            transcription = clean_take_label(chosen_backend)
         finally:
             await take.close()
             path.unlink(missing_ok=True)

@@ -654,16 +654,17 @@ def _beats_per_bar(tempo):
         return 4
 
 
-def _score_recorded_take(path, targets):
-    notes = take_diff.transcribe_take(path)
+def _score_recorded_take(path, targets, backend=None):
+    notes = take_diff.transcribe_take(path, backend=backend)
     from .transcribers import clean_take_label
-    return take_diff.compare_take(notes, targets, transcription=clean_take_label())
+    return take_diff.compare_take(notes, targets, transcription=clean_take_label(backend))
 
 
 @router.post('/{key}/compare')
 async def compare_song_take(key: str, take: UploadFile = File(...), parts: str = Form('all'),
                             role: str = Form('any'), tuning: str = Form('standard'), capo: int = Form(0),
                             start: float = Form(0), end: float = Form(0), speed: float = Form(1),
+                            transcriber: str = Form(''),
                             x_fretwork_client: str | None = Header(None)):
     """Transcribe this take (clean guitar) and score it against the stem and the written notation.
 
@@ -676,6 +677,11 @@ async def compare_song_take(key: str, take: UploadFile = File(...), parts: str =
         raise HTTPException(422, 'This comparison is for guitar. Other instruments keep the existing check.')
     if song.status != 'complete' or not song.result:
         raise HTTPException(409, 'Wait for the breakdown to finish.')
+    from .transcribers import checked_backend
+    try:
+        chosen_backend = checked_backend(transcriber or song.transcriber)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     if role not in ('any', 'lead', 'rhythm'):
         raise HTTPException(422, 'Unknown role.')
     if not 0.25 <= speed <= 1.25:
@@ -716,7 +722,7 @@ async def compare_song_take(key: str, take: UploadFile = File(...), parts: str =
         if info.duration < 0.4:
             raise HTTPException(422, 'The take is shorter than 0.4 seconds.')
         try:
-            result = await asyncio.to_thread(_score_recorded_take, path, targets)
+            result = await asyncio.to_thread(_score_recorded_take, path, targets, backend=chosen_backend)
         except models.ModelUnavailable as exc:
             raise HTTPException(503, str(exc)) from exc
         except ValueError as exc:

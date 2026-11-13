@@ -1,4 +1,4 @@
-// Actual default Riley inference on a real bundled guitar recording; not the beep fixture.
+// Real guitar: default Riley and explicit Basic Pitch override through the browser/API.
 import { chromium } from 'playwright-core';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -13,16 +13,21 @@ try {
   await page.goto(process.env.STUDIO_URL ?? 'http://127.0.0.1:5173');
   await page.waitForFunction(()=>document.querySelectorAll('#transcriber').length &&
     [...document.querySelectorAll('#transcriber')].every(x=>x.value==='riley'));
-  const result = await page.evaluate(async ({b64,notes})=>{
-    const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
-    const form=new FormData();form.append('take',new Blob([bytes],{type:'audio/wav'}),'guitar.wav');
-    form.append('targets',JSON.stringify([{source:'file',notes}]));
-    const r=await fetch('/api/compare',{method:'POST',headers:{'X-Fretwork-Client':'studio'},body:form});
-    return {status:r.status,body:await r.json()};
-  },{b64:audio.toString('base64'),notes:truth.notes});
-  assert.equal(result.status,200);assert.match(result.body.transcription,/Riley/);
-  assert.ok(result.body.take_notes.length>0);assert.equal(errors.length,0);
-  console.log(JSON.stringify({status:result.status,transcription:result.body.transcription,
-    note_count:result.body.take_notes.length,duration_policy:result.body.reports[0].duration_policy,
-    browser_errors:errors}));
+  for (const selection of ['', 'basic_pitch']) {
+    if (selection) await page.locator('#transcriber').first().selectOption(selection);
+    const result = await page.evaluate(async ({b64,notes,selection})=>{
+      const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+      const form=new FormData();form.append('take',new Blob([bytes],{type:'audio/wav'}),'guitar.wav');
+      form.append('targets',JSON.stringify([{source:'file',notes}]));
+      if(selection) form.append('transcriber',selection);
+      const r=await fetch('/api/compare',{method:'POST',headers:{'X-Fretwork-Client':'studio'},body:form});
+      return {status:r.status,body:await r.json()};
+    },{b64:audio.toString('base64'),notes:truth.notes,selection});
+    assert.equal(result.status,200);
+    assert.match(result.body.transcription,selection ? /Basic Pitch/ : /Riley/);
+    assert.ok(result.body.take_notes.length>0);assert.equal(errors.length,0);
+    console.log(JSON.stringify({selection:selection||'engine_default',status:result.status,
+      transcription:result.body.transcription,note_count:result.body.take_notes.length,
+      duration_policy:result.body.reports[0].duration_policy,browser_errors:errors}));
+  }
 } finally { await browser.close(); }
