@@ -12,7 +12,8 @@
     "test:profiles": "node tests/profile-smoke.mjs",
     "test:song": "node tests/song-smoke.mjs",
     "test:tab": "node tests/tab-smoke.mjs",
-    "test:riley": "node tests/riley-smoke.mjs"
+    "test:riley": "node tests/riley-smoke.mjs",
+    "test:review": "node benchmarks/holdout/review-smoke.mjs"
   },
   "dependencies": {
     "@coderline/alphatab": "~1.8.4",
