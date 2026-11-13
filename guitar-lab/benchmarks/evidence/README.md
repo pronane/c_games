@@ -1,5 +1,9 @@
 # Evidence branch: fresh rerun and opt-in changes
 
+**Follow-up:** [routing verification](routing/README.md) resolves the detector routing
+and tab replay check described as outstanding below. It retains the historical
+failures here and records new results separately. See [complete branch status](../../BRANCH_STATUS.md).
+
 No merge requested or performed. All work is on `arena/23399fc5-c-games`. This Arena session cannot create/switch to a second branch; this branch is the isolated evidence workspace, not a release approval.
 
 This directory supersedes the *missing-artifacts* limitation for the **new runs below**, not for every historical observation in `../GUITAR_ENGINE_FINDINGS.md`. The new runner, raw small JSON outputs, environment and logs are versioned. No model weights, uploaded recording, decoded audio or full private note transcription is committed.

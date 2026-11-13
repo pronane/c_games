@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:profiles
+> node tests/profile-smoke.mjs
+
+Profiles: drop-D/capo, bass range, piano note-only display, profile upload/provenance, real ONNX pipeline and A0 edit passed on synthetic audio.
