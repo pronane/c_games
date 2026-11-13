@@ -1,0 +1,17 @@
+{
+  "implementation_commit": "5cdb73045aff051185100fbff143aa2130c3cd77",
+  "protocol_sha256": "92b1f0e67c536cf027f3ea007bf919a43cb6e1a901660fde271f4ba9942acb42",
+  "evaluator_sha256": "ff0e267a6c1efa57667c5658a1b04ba8fd0565c750a1708a752c2d5a0170c85c",
+  "validator_sha256": "95fe0bbaaf2a25828f2f00aa76a3e9375b4a6e0028be10c1f62fef9dfd28760e",
+  "human_labels_completed": false,
+  "new_neural_inference_run": false,
+  "versions": {
+    "pytest": "9.2.0",
+    "numpy": "1.26.4",
+    "scipy": "1.17.1",
+    "mir_eval": "0.8.2",
+    "imageio-ffmpeg": "0.8.1"
+  },
+  "scope": "Intake/mocked-metric and review-UI tests only; not a new model accuracy benchmark",
+  "review_ui_sha256": "783e7aca5578b0eba308a10d92144d91987568b42e9cf4c71b81e7a0d41b5673"
+}

@@ -4,6 +4,21 @@ Branch: `arena/23399fc5-c-games`
 Latest tested implementation: `2f084ec`  
 **No merge performed. Experimental flags remain off by default.**
 
+## New follow-up: holdout intake and human review
+
+Implementation `5cdb730` adds a frozen collection protocol, fail-closed intake/evaluator,
+and a local browser labelling tool. See [the holdout workflow](benchmarks/holdout/README.md)
+and [fresh verification](benchmarks/evidence/holdout/README.md).
+
+- **Ready:** checksum/leakage/coverage checks, paired-policy evaluator, raw sustain metrics,
+  and an unlabelled listening packet from the existing upload.
+- **Not completed:** independent holdout acquisition or actual human sustain review.
+  The real intake contains **zero approved clips**; evaluation exits 3 without inference.
+- **Fresh checks:** 37 new holdout tests, review-page browser smoke, frontend build and
+  53 frontend unit tests passed. The earlier 206-test full Python runs below were not
+  rerun in this infrastructure-only follow-up. Automated review fixtures are not human labels.
+- No new transcription-accuracy score, production policy/default change or merge.
+
 ## Does this improve transcription into tab/standard notation?
 
 Only a narrower improvement has been measured: the opt-in quiet-input guard improved pitch/onset note detection on deliberately attenuated versions of three reused real-guitar clips. Those detected notes feed notation generation, so better detection can help the resulting notation. We have **not demonstrated that the uploaded WhatsApp recording now has more accurate tab, rhythm spelling, sustain, string/fret choices or standard notation**. It has no verified score against which to measure that.

@@ -1,5 +1,8 @@
 # Evidence branch: fresh rerun and opt-in changes
 
+**Next-stage intake:** [holdout evidence](holdout/README.md) records the new human-review
+workflow and an explicitly blocked empty holdout. It contains no new accuracy claim.
+
 **Follow-up:** [routing verification](routing/README.md) resolves the detector routing
 and tab replay check described as outstanding below. It retains the historical
 failures here and records new results separately. See [complete branch status](../../BRANCH_STATUS.md).

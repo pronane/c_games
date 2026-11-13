@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:review
+> node benchmarks/holdout/review-smoke.mjs
+
+{"status":"pass","checks":["no unreviewed export","audio checksum","required note fields","review confirmation reset","JSON export","no network upload","mobile layout"],"fixture":"AUTOMATED, NOT HUMAN EVIDENCE","browser_errors":[]}

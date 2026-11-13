@@ -1,0 +1,32 @@
+{
+  "parent_sha256": "cb121e0fd26f48cec619e651fb77a9587bde54b54891e959fd879b5465b14564",
+  "role": "development_review_only_not_independent_holdout",
+  "review_status": "pending_human_review",
+  "human_review_completed": false,
+  "windows": [
+    {
+      "audio": "window-0000.wav",
+      "start_in_parent_s": 0,
+      "duration_s": 10.0,
+      "sha256": "3395a14faa2d5626b630b82bd72666bfa7f15421ef6c89710ce907884395bdae",
+      "pending_labels": "window-0000.pending-labels.json"
+    },
+    {
+      "audio": "window-0145.wav",
+      "start_in_parent_s": 145,
+      "duration_s": 10.0,
+      "sha256": "e1db2b5061b906bf194f9122c9d664287c11f05fad901f1134a59d77136e54f7",
+      "pending_labels": "window-0145.pending-labels.json"
+    },
+    {
+      "audio": "window-0290.wav",
+      "start_in_parent_s": 290,
+      "duration_s": 10.0,
+      "sha256": "5f82dee6979b8ef5cd3aca880cc1cbab9815a886dc98821a19c857a21d41e580",
+      "pending_labels": "window-0290.pending-labels.json"
+    }
+  ],
+  "warning": "No note, pitch, direct-note offset, sustain error or dry/wet condition has been inferred. Do not count this previously used recording as independent holdout data.",
+  "archive_sha256": "782fbe0ec47e39a13b413d716e8b9f7f361600ae502e481b236b5f54e1e530b6",
+  "archive_committed": false
+}
