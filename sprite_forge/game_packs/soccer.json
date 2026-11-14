@@ -154,7 +154,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "slide_tackle"
+   ]
   },
   {
    "name": "header",
@@ -199,6 +202,7 @@
    "name": "celebrate",
    "library": "wave",
    "prefer": [
+    "celebrate_jump",
     "jump_shot"
    ],
    "frames": 8,

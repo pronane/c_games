@@ -82,6 +82,7 @@
    "name": "sprint",
    "library": "run",
    "prefer": [
+    "sprint",
     "jog"
    ],
    "frames": 8,
@@ -118,7 +119,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stop_sudden"
+   ]
   },
   {
    "name": "change_direction",
@@ -139,7 +143,10 @@
      6
     ]
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "juke_feint"
+   ]
   },
   {
    "name": "pick_up_ground",
@@ -157,7 +164,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "catch_low"
+   ]
   },
   {
    "name": "pick_up_aerial",
@@ -364,7 +374,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "catch_low"
+   ]
   },
   {
    "name": "catch_aerial",
@@ -421,7 +434,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "block_high"
+   ]
   },
   {
    "name": "juke_feint",
@@ -439,7 +455,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "juke_feint"
+   ]
   },
   {
    "name": "sidestep",
@@ -460,7 +479,10 @@
      5
     ]
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "sidestep_shuffle"
+   ]
   },
   {
    "name": "spin",
@@ -580,7 +602,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "celebrate_jump"
+   ]
   },
   {
    "name": "celebrate_goal",
@@ -598,11 +623,14 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "celebrate_jump"
+   ]
   },
   {
    "name": "fall",
-   "library": "hit",
+   "library": "fall",
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -616,7 +644,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "ko_fall_back"
+   ]
   },
   {
    "name": "get_up",
@@ -691,7 +722,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "dive_left"
+   ]
   },
   {
    "name": "goalkeeper_dive_right",
@@ -709,7 +743,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "dive_right"
+   ]
   },
   {
    "name": "goalkeeper_throw_out",

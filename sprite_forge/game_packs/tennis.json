@@ -95,7 +95,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "starter has no racket swing \u2014 kick is the wide stroke"
+   "desc": "a two-handed swing (CMU swing_forehand, from a baseball swing, with a CMU library; starter kick without)",
+   "prefer": [
+    "swing_forehand"
+   ]
   },
   {
    "name": "backhand",
@@ -170,7 +173,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "stumble"
+   "desc": "stumble",
+   "prefer": [
+    "stumble"
+   ]
   }
  ],
  "notes": "Padel uses the same moves. The swing is not a tennis motion until you record forehand.mp4, backhand.mp4 and serve.mp4."

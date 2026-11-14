@@ -52,6 +52,63 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.11: the moves the game packs were missing, and a check for any clip
+
+* **12 more CMU moves** (`tools/import_cmu.py`, into your own library - CMU clips are never shipped):
+  `block_left`, `dodge_duck`, `stumble` (hit reaction), `ko_fall_back`, `stop_sudden`, `sidestep_shuffle`,
+  `juke_feint`, `swing_forehand`, `celebrate_jump`, `limp_walk`, `catch_chest`, `catch_low`.
+* **11 CC0 moves from Quaternius' Universal Animation Library 1 and 2** (`tools/import_quaternius.py`). These are
+  public domain, so unlike the CMU clips they may be shipped:
+  - `death_fall`, `roll`, `sprint`;
+  - `drive_seated` for kart;
+  - `pistol_shoot` and `pistol_reload` for the shooter;
+  - `cast_spell`, `dance`;
+  - `slide_tackle` for soccer;
+  - `throw_overhand_q`, `idle_arms_folded` (a taunt).
+
+  Each clip was looked at and passes `check_motion`. Left out: UAL2's knockback (ends upside down), its lay-to-idle
+  (runs backwards) and its hook (breaks mid-swing), plus UAL1's head and chest hits, which are too small to read
+  as hits.
+
+  Importing it needed two fixes. Rigify rigs that name their bones `DEF-hips`, `DEF-neck` and `DEF-head` now map,
+  and clip names are matched ignoring case.
+* **Keeper dives in the CC0 starter** (`dive_left`, `dive_right`): they were procedural only, so the Gaelic
+  pack's dives fell back to the standing save.
+* **Packs use them.** Soccer gets a slide tackle, shooter pistol shots and reloads, kart a seated driving loop, the
+  top-down RPG a spell cast, fighting and wrestling a folded-arms taunt, and Gaelic a sprint.
+  Boxing gets a real block, slip, stagger and knockout. Fighting gets block, stagger and a
+  victory jump. Gaelic gets the sudden stop, juke, sidestep shuffle, pick-up, celebrations, fall and both keeper
+  dives. Platformer and shooter get a fall, tennis a forehand swing, and soccer a celebration. Without a CMU
+  library, KO / fall / die now use their own procedural motions (a real fall) instead of the starter's hit.
+* **Import fixes found by the new check:**
+  - `soccer_kick` and `soccer_shoot` came in facing backwards. The strike was aimed by its furthest reach, which
+    can be the backswing; now the body must face within 90 degrees of the opponent unless it spins.
+  - `walk_casual` walked sideways: its loop was cut where the walker had turned. Clips now face forward over
+    what is kept, and the walk is a straight take (07_01).
+  - `get_up`'s standing part floated 13 cm: one floor for a take that lies and then stands. The floor now
+    follows the feet while standing and the body while lying.
+* **Sprites are drawn in place.** A move that travels more than 35 cm (a walk cycle, a stumble, a shuffle) has
+  its travel taken out of the sprite cell. The game moves the character, and 3D takes keep their root motion.
+  Sprite QA over all 12 packs, before and after: 41 fails become 6 (the 6 left are kicks and throws whose foot
+  or hand reaches the cell edge).
+* **`tools/check_motion.py`** is the gate for any clip:
+  - `check_motion.py LIBRARY_DIR` checks clips; `--pack NAME --library DIR` checks what a pack will use,
+    procedural fallbacks included.
+  - It checks size, the floor, glitches between frames, length, loops (end where they start, and go straight),
+    and facing.
+  - It also checks that the move does what its name says: a block raises the hands in front, a KO ends on the
+    ground, a dodge ducks, a celebration lifts a hand over the head, a stop slows down, a sidestep moves
+    sideways, a catch takes the hands up and forward, a dive gets low and travels, and a swing whips a hand
+    round.
+  - All 46 clips in the library pass (35 CMU, 11 Quaternius), and so do the 18 starter clips. Every pack passes with a CMU library. Without one,
+    a few Gaelic and tennis moves are flagged as stand-ins (stop, sidestep, forehand).
+* **Tests:** `tools/test_motion_gaps.py` (18 checks, synthetic, including the Rigify and Mixamo bone names). It covers a walk that turns a corner, a kick
+  peaking on its backswing, a spin kick, and a take lying lower than it stands; each fails on the old importer.
+  It also feeds the checker a broken clip of each kind and makes sure it is caught for its own reason.
+  `test_mocap_import`, `test_motion_v114` and `test_v115` still pass.
+* **Not yet:** a tackle, a header, wrestling grapples and a backhand. CMU has no takes for these; the Gaelic
+  poses you film, or `motion record`, can fill them.
+
 ## New in v11.10: every frame's camera registered to its own picture, and checks for any new video
 
 * **Registration** (`capture_register.py`, on by default, `--no-register` to skip): the landmark cameras leave

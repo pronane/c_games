@@ -39,7 +39,8 @@ TAKES = [
     ("soccer_kick", "10_01", ["--once", "--start", "4.0", "--end", "5.5", "--peak", "foot_R:0.6:0.4"]),
     ("soccer_shoot", "11_01", ["--once", "--start", "2.8", "--end", "4.3", "--peak", "foot_R:0.7:0.45"]),
     ("jog", "09_01", ["--loop"]),
-    ("walk_casual", "141_19", ["--loop", "--start", "1.5", "--end", "5"]),
+    # v11.11: 141_19's loop was cut where the walker turned (185 degrees in one cycle); 07_01 is a straight walk
+    ("walk_casual", "07_01", ["--loop"]),
     ("throw_overhand", "124_01", ["--once", "--peak", "hand_R:0.7:0.4"]),
     ("jump_hop", "16_01", ["--once", "--start", "0.5", "--end", "2.2"]),
     ("jump_vertical", "118_10", ["--once", "--start", "0.8", "--end", "2.5"]),
@@ -50,6 +51,19 @@ TAKES = [
     ("layup", "124_06", ["--once", "--start", "2.0", "--end", "4.3"]),
     ("get_up", "140_01", ["--once", "--start", "1.2", "--end", "6.0"]),
     ("dribble", "06_02", ["--loop"]),
+    # v11.11: the moves the game packs were missing - reactions, defence, footwork, celebrations, catches
+    ("block_left", "144_07", ["--once", "--start", "0.9", "--end", "2.2"]),
+    ("dodge_duck", "77_09", ["--once", "--start", "1.6", "--end", "3.8"]),
+    ("stumble", "104_13", ["--once", "--start", "0.8", "--end", "2.6"]),
+    ("ko_fall_back", "90_18", ["--once", "--start", "0.4", "--end", "2.4"]),
+    ("stop_sudden", "16_08", ["--once"]),
+    ("sidestep_shuffle", "78_29", ["--once"]),
+    ("juke_feint", "78_22", ["--once", "--start", "1.5", "--end", "4.8"]),
+    ("swing_forehand", "124_07", ["--once", "--start", "2.4", "--end", "4.0"]),
+    ("celebrate_jump", "13_29", ["--once", "--start", "0.2", "--end", "2.0"]),
+    ("limp_walk", "91_24", ["--loop", "--start", "8", "--end", "12"]),
+    ("catch_chest", "141_11", ["--once", "--start", "1.1", "--end", "2.6"]),
+    ("catch_low", "143_22", ["--once", "--start", "1.8", "--end", "3.4"]),
 ]
 ACK = ("The data used in this project was obtained from mocap.cs.cmu.edu. "
        "The database was created with funding from NSF EIA-0196217.")
@@ -82,7 +96,7 @@ def main(argv=None):
                  "in a folder of your own" % lib)
     bvh = os.path.abspath(os.path.expanduser(a.bvh_dir or os.path.join(lib, "_cmu_bvh")))
     todo = [t for t in TAKES if not a.only or t[0] in a.only]
-    fetch(bvh, sorted({t[1] for t in todo}))
+    fetch(bvh, sorted({t[1] for t in TAKES}))       # all of them: --only must not drop the others from the checkout
     bad = 0
     for name, take, opts in todo:
         f = os.path.join(bvh, _path(take))

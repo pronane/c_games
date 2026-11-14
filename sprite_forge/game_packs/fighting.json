@@ -50,7 +50,10 @@
      6
     ]
    },
-   "desc": "stance walk"
+   "desc": "stance walk",
+   "prefer": [
+    "walk_casual"
+   ]
   },
   {
    "name": "crouch",
@@ -191,7 +194,11 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "guard"
+   "desc": "guard",
+   "prefer": [
+    "block_high",
+    "block_left"
+   ]
   },
   {
    "name": "hit",
@@ -209,7 +216,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "take a hit"
+   "desc": "take a hit",
+   "prefer": [
+    "stumble"
+   ]
   },
   {
    "name": "throw",
@@ -266,7 +276,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "taunt"
+   "desc": "taunt",
+   "prefer": [
+    "idle_arms_folded"
+   ]
   },
   {
    "name": "victory",
@@ -284,7 +297,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "victory"
+   "desc": "victory",
+   "prefer": [
+    "celebrate_jump"
+   ]
   }
  ],
  "notes": "special1 and special2 share a library clip with punch and kick. The events are what make them different in the game. The old fighter14 profile still builds the procedural fighter motions if you do not pass --game."

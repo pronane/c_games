@@ -78,9 +78,10 @@ CONVENTIONS = {
         ("head", ["head"]), ("shoulder_%s", ["{S}shoulder"]), ("upperarm_%s", ["{S}upperarm"]), ("forearm_%s", ["{S}lowerarm"]),
         ("hand_%s", ["{S}hand"]), ("thigh_%s", ["{S}upperleg"]), ("shin_%s", ["{S}lowerleg"]), ("foot_%s", ["{S}foot"]), ("toe_%s", ["{S}toes"])]),
     "rigify": _side_table("l", "r", [
-        ("hips", ["(def|org)?-?spine", "hips", "pelvis"]), ("spine", ["(def|org)?-?spine\\.001", "spine"]),
+        # v11.11: rigs exported from Rigify with their own names (Quaternius: DEF-hips, DEF-neck, DEF-head)
+        ("hips", ["(def|org)?-?spine", "(def|org)?-?hips", "(def|org)?-?pelvis"]), ("spine", ["(def|org)?-?spine\\.001", "spine"]),
         ("chest", ["(def|org)?-?spine\\.002", "chest"]), ("upperchest", ["(def|org)?-?spine\\.003", "upper_chest"]),
-        ("neck", ["(def|org)?-?spine\\.004", "neck"]), ("head", ["(def|org)?-?spine\\.006", "head"]),
+        ("neck", ["(def|org)?-?spine\\.004", "(def|org)?-?neck"]), ("head", ["(def|org)?-?spine\\.006", "(def|org)?-?head"]),
         ("shoulder_%s", ["(def|org)?-?shoulder[._]{S}"]), ("upperarm_%s", ["(def|org)?-?upper_arm[._]{S}"]),
         ("forearm_%s", ["(def|org)?-?forearm[._]{S}"]), ("hand_%s", ["(def|org)?-?hand[._]{S}"]),
         ("thigh_%s", ["(def|org)?-?thigh[._]{S}"]), ("shin_%s", ["(def|org)?-?shin[._]{S}"]),
