@@ -41,13 +41,13 @@ export function emptyHumanIntent(): HumanIntent {
 }
 
 const CATCH_RADIUS = 1.45;
-const TACKLE_RADIUS = 1.55;
 const CPU_TACKLE_RANGE = 2.3;
 const CPU_TACKLE_COMMIT_TIME = 0.3;
 const CPU_TACKLE_COOLDOWN = 0.9;
+const HUMAN_TACKLE_RADIUS = 2.15;
 // Keep bodies from stacking, but stay below the tackle range (1.55 m) so the
 // contest resolves — and resolve softly so a standing player isn't bulldozed.
-const SEPARATION_RADIUS = 0.72;
+const SEPARATION_RADIUS = 0.85;
 
 
 /** Squared intent magnitude (no sqrt) — cheap ramp gate. */
@@ -350,7 +350,7 @@ export class MatchSim {
 
     // ---------------------------------------------------------- tackles
     if (b.mode === 'held' && carrier) {
-      this.tryTackles(carrier, dt);
+      this.tryTackles(carrier, dt, human);
     }
 
     // ------------------------------------------------- human disposals
@@ -439,7 +439,7 @@ export class MatchSim {
         const dz = c.z - a.z;
         const d = Math.hypot(dx, dz);
         if (d > 0.001 && d < SEPARATION_RADIUS * 2) {
-          const push = (SEPARATION_RADIUS * 2 - d) * 0.32;
+          const push = (SEPARATION_RADIUS * 2 - d) * 0.4;
           const nx = dx / d;
           const nz = dz / d;
           a.x -= nx * push;
@@ -489,7 +489,7 @@ export class MatchSim {
     void this.rng;
   }
 
-  private tryTackles(carrier: PlayerState, dt: number): void {
+  private tryTackles(carrier: PlayerState, dt: number, human: HumanIntent): void {
     const s = this.engine.state;
     const RESTART_PHASES = new Set(['kickIn', 'centreBallUp', 'ballUp', 'throwIn', 'freeKick']);
     let nearestAi: PlayerState | null = null;
@@ -498,14 +498,19 @@ export class MatchSim {
     for (const p of s.players) {
       if (p.onBench || p.team === carrier.team || p.id === carrier.id) continue;
       const d = Math.hypot(p.x - carrier.x, p.z - carrier.z);
-      if (d > TACKLE_RADIUS) continue;
+      // AI opponents get considered out to their commit range; the separation
+      // force holds bodies at ~1.7 m, so the old 1.55 m cutoff was unreachable.
+      if (d > CPU_TACKLE_RANGE) continue;
       if (p.tackleCooldown > 0) continue;
 
       if (p.id === this.controlledId) {
-        // human tackle: instant on contact, rate-limited so it can't machine-gun
-        p.tackleCooldown = 0.6;
-        this.commitTackle(p, carrier);
-        return;
+        // human tackle: only on the button — walking into a man isn't one
+        if (human.tackle && d <= HUMAN_TACKLE_RADIUS) {
+          p.tackleCooldown = 0.6;
+          this.commitTackle(p, carrier);
+          return;
+        }
+        continue;
       }
       if (d < nearestAiDist) {
         nearestAiDist = d;

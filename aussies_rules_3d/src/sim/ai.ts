@@ -166,12 +166,17 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
 
   // --------------------------------------------------------- ball contest
   const loose = b.mode === 'loose';
-  // limit the pack: only the three nearest players per team may chase the ball
-  const mayChase = teammatesCloserToBall(p, ctx) < 3;
+  const ballSpeed = Math.hypot(b.vx, b.vz);
+  // a resting loose ball gets fetched by the two nearest per team no matter
+  // the distance — otherwise a settled ball just lies there forever
+  const restingLoose = loose && ballSpeed < 1.4;
+  // limit the pack: only the two nearest players per team may chase the ball
+  const mayChase = teammatesCloserToBall(p, ctx) < 2;
   const chaseThis =
     mayChase &&
-    ((loose && distBall < 11) ||
-      (ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 8) ||
+    ((loose && distBall < 9) ||
+      (restingLoose) ||
+      (ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 6.5) ||
       (ctx.carrierId !== null && isNearestChaser(p, ctx)));
 
   if (chaseThis) {
@@ -194,7 +199,11 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
     ctx.possessingTeam === p.team &&
     ctx.carrierId !== null &&
     ctx.carrierId !== p.id &&
-    p.role !== 'fullback'
+    (p.role === 'midfielder' ||
+      p.role === 'ruck' ||
+      p.role === 'halfForward' ||
+      p.role === 'keyForward' ||
+      p.role === 'fullForward')
   ) {
     const holder = s.players.find((q) => q.id === ctx.carrierId);
     if (holder) {
