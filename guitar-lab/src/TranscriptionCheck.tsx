@@ -28,8 +28,8 @@ const PX = 30, ROW = 6, TOP = 4, STRIP = 16, AXIS = 16, LABEL = 30;
 /**
  * "Check this transcription": the part's notes played back against the audio they were
  * transcribed from, with the stretches where the two disagree marked. A stretch is marked
- * when the recording sounds but there is no note, or when the pitches match clearly worse
- * than they do in the rest of this song (see server/transcription_check.py).
+ * when the recording sounds but there is no note, or when the written notes leave out clearly
+ * more of the recording's pitches than in the rest of this song (server/transcription_check.py).
  */
 export default function TranscriptionCheck({ songId, parts }: { songId: string; parts: { id: string; label: string }[] }) {
   const [part, setPart] = useState(parts[0]?.id ?? ""),
@@ -235,8 +235,8 @@ export default function TranscriptionCheck({ songId, parts }: { songId: string; 
       </h3>
       <p className="helper">
         Plays the notes the app wrote back against the audio they came from, and marks where the two disagree: the guitar
-        is sounding with no note written, or the notes match clearly worse than in the rest of the song. Listen to the
-        marked places to judge the tab.
+        is sounding with no note written, or the written notes leave out clearly more of what is heard than in the rest of
+        the song. Listen to the marked places to judge the tab.
       </p>
       <div className="presets">
         {parts.length > 1 && (
