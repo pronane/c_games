@@ -1072,7 +1072,11 @@ def import_file(path, name=None, clip=None, library=None, licence=None, loop=Non
         if not src.clips:
             raise ValueError("%s has no animation clips" % os.path.basename(path))
         if clip and clip not in src.clips:
-            raise KeyError("no clip %r (has: %s)" % (clip, ", ".join(src.clips)))
+            # v11.11: clip names are matched ignoring case (files list "Hit_Chest", the reader keeps "hit_chest")
+            low = {c.lower(): c for c in src.clips}
+            if str(clip).lower() not in low:
+                raise KeyError("no clip %r (has: %s)" % (clip, ", ".join(src.clips)))
+            clip = low[str(clip).lower()]
         clip_name = clip or next(iter(src.clips))
         reader = ext[1:]
     else:

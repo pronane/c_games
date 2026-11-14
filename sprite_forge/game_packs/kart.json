@@ -28,7 +28,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "sitting \u2014 starter drive is the closest generic clip, not a separate seated idle"
+   "desc": "sitting \u2014 starter drive is the closest generic clip, not a separate seated idle",
+   "prefer": [
+    "drive_seated"
+   ]
   },
   {
    "name": "drive",
@@ -46,7 +49,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "drive_seated"
+   ]
   },
   {
    "name": "steer_left",

@@ -15,7 +15,9 @@ Then tools/check_motion.py, the gate for any clip, on records built to break one
   6 each broken clip fails for its own reason: a glitch jump between keys (pops), a clip floating off the floor,
     a clip turned away from the opponent, a walk loop that turns, a "block" with the hands down, a "fall" that
     stays standing, a "celebration" with no hand over the head, a "dodge" that does not duck
-  7 a game pack's clips can be checked by pack name (--pack), and a clip name like "swing" is not read as "win"."""
+  7 a game pack's clips can be checked by pack name (--pack), and a clip name like "swing" is not read as "win".
+  8 other people's rigs: a Rigify export that names its bones DEF-hips / DEF-neck / DEF-head (Quaternius' CC0
+    library) maps hips, neck and head; a Mixamo rig still maps as Mixamo"""
 from __future__ import annotations
 import copy
 import json
@@ -179,6 +181,17 @@ def main():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     rec("7 'swing' is a swing, not a win", CM.kind_of("swing_forehand") == "swing" and CM.kind_of("victory_win") == "celebrate", "")
+    # 8 bone names
+    from sforge import bonemap as BM
+    q = ["root", "DEF-hips", "DEF-spine.001", "DEF-spine.002", "DEF-spine.003", "DEF-neck", "DEF-head"] + \
+        ["DEF-%s.%s" % (b, s_) for s_ in "LR" for b in ("shoulder", "upper_arm", "forearm", "hand", "thigh", "shin", "foot", "toe")]
+    conv, m, _ = BM.detect_convention(q)
+    rec("8 a Rigify export with DEF-hips/neck/head maps them", conv == "rigify" and m.get("hips") == "DEF-hips" and
+        m.get("neck") == "DEF-neck" and m.get("head") == "DEF-head", "%s %s" % (conv, {k: m.get(k) for k in ("hips", "neck", "head")}))
+    mx = ["mixamorig:" + b for b in ("Hips", "Spine", "Spine1", "Spine2", "Neck", "Head")] + \
+        ["mixamorig:%s%s" % (s_, b) for s_ in ("Left", "Right") for b in ("Shoulder", "Arm", "ForeArm", "Hand", "UpLeg", "Leg", "Foot", "ToeBase")]
+    conv, m, _ = BM.detect_convention(mx)
+    rec("8 a Mixamo rig still maps as Mixamo", conv == "mixamo" and m.get("hips") == "mixamorig:Hips", conv)
     bad = [n for n, ok, _ in R if not ok]
     print("\n%d / %d passed" % (len(R) - len(bad), len(R)))
     return 1 if bad else 0

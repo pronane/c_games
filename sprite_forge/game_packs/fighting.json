@@ -276,7 +276,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "taunt"
+   "desc": "taunt",
+   "prefer": [
+    "idle_arms_folded"
+   ]
   },
   {
    "name": "victory",

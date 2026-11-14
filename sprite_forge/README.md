@@ -57,9 +57,26 @@ fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real pers
 * **12 more CMU moves** (`tools/import_cmu.py`, into your own library - CMU clips are never shipped):
   `block_left`, `dodge_duck`, `stumble` (hit reaction), `ko_fall_back`, `stop_sudden`, `sidestep_shuffle`,
   `juke_feint`, `swing_forehand`, `celebrate_jump`, `limp_walk`, `catch_chest`, `catch_low`.
+* **11 CC0 moves from Quaternius' Universal Animation Library 1 and 2** (`tools/import_quaternius.py`). These are
+  public domain, so unlike the CMU clips they may be shipped:
+  - `death_fall`, `roll`, `sprint`;
+  - `drive_seated` for kart;
+  - `pistol_shoot` and `pistol_reload` for the shooter;
+  - `cast_spell`, `dance`;
+  - `slide_tackle` for soccer;
+  - `throw_overhand_q`, `idle_arms_folded` (a taunt).
+
+  Each clip was looked at and passes `check_motion`. Left out: UAL2's knockback (ends upside down), its lay-to-idle
+  (runs backwards) and its hook (breaks mid-swing), plus UAL1's head and chest hits, which are too small to read
+  as hits.
+
+  Importing it needed two fixes. Rigify rigs that name their bones `DEF-hips`, `DEF-neck` and `DEF-head` now map,
+  and clip names are matched ignoring case.
 * **Keeper dives in the CC0 starter** (`dive_left`, `dive_right`): they were procedural only, so the Gaelic
   pack's dives fell back to the standing save.
-* **Packs use them.** Boxing gets a real block, slip, stagger and knockout. Fighting gets block, stagger and a
+* **Packs use them.** Soccer gets a slide tackle, shooter pistol shots and reloads, kart a seated driving loop, the
+  top-down RPG a spell cast, fighting and wrestling a folded-arms taunt, and Gaelic a sprint.
+  Boxing gets a real block, slip, stagger and knockout. Fighting gets block, stagger and a
   victory jump. Gaelic gets the sudden stop, juke, sidestep shuffle, pick-up, celebrations, fall and both keeper
   dives. Platformer and shooter get a fall, tennis a forehand swing, and soccer a celebration. Without a CMU
   library, KO / fall / die now use their own procedural motions (a real fall) instead of the starter's hit.
@@ -83,9 +100,9 @@ fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real pers
     ground, a dodge ducks, a celebration lifts a hand over the head, a stop slows down, a sidestep moves
     sideways, a catch takes the hands up and forward, a dive gets low and travels, and a swing whips a hand
     round.
-  - All 35 CMU clips pass, and so do the 18 starter clips. Every pack passes with a CMU library. Without one,
+  - All 46 clips in the library pass (35 CMU, 11 Quaternius), and so do the 18 starter clips. Every pack passes with a CMU library. Without one,
     a few Gaelic and tennis moves are flagged as stand-ins (stop, sidestep, forehand).
-* **Tests:** `tools/test_motion_gaps.py` (16 checks, synthetic). It covers a walk that turns a corner, a kick
+* **Tests:** `tools/test_motion_gaps.py` (18 checks, synthetic, including the Rigify and Mixamo bone names). It covers a walk that turns a corner, a kick
   peaking on its backswing, a spin kick, and a take lying lower than it stands; each fails on the old importer.
   It also feeds the checker a broken clip of each kind and makes sure it is caught for its own reason.
   `test_mocap_import`, `test_motion_v114` and `test_v115` still pass.

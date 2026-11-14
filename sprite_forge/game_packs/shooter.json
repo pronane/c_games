@@ -88,7 +88,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "one shot; shoot is the muzzle frame"
+   "desc": "one shot; shoot is the muzzle frame",
+   "prefer": [
+    "pistol_shoot"
+   ]
   },
   {
    "name": "reload",
@@ -106,7 +109,10 @@
     "reload": 4,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "pistol_reload"
+   ]
   },
   {
    "name": "hit",
@@ -147,7 +153,8 @@
    },
    "desc": "a fall, played once and held by the game (CMU ko_fall_back with a CMU library; the procedural die without)",
    "prefer": [
-    "ko_fall_back"
+    "ko_fall_back",
+    "death_fall"
    ]
   }
  ],

@@ -197,7 +197,8 @@
    },
    "desc": "knockdown - a fall onto the back (CMU ko_fall_back with a CMU library; the procedural fall without)",
    "prefer": [
-    "ko_fall_back"
+    "ko_fall_back",
+    "death_fall"
    ]
   },
   {

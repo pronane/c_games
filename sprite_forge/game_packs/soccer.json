@@ -154,7 +154,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "slide_tackle"
+   ]
   },
   {
    "name": "header",

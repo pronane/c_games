@@ -9,7 +9,7 @@
 Run it after `forge.py motion import`, `motion record` or `tools/import_cmu.py` (v11.11). Every clip is evaluated on
 the shared skeleton, frame by frame, and checked, with the reason when one fails:
 
-  size        a person: feet to head 1.2 - 2.1 m (a unit mix-up gives a doll or a giant); 0.7 m up for a seated move
+  size        a person: feet to head 1.2 - 2.1 m (a unit mix-up gives a doll or a giant); 0.7 m up for a seated or crouched move
   floor       the feet reach the floor (lowest ankle 0 - 15 cm up) and nothing sinks through it
   pops        no joint jumps between frames (hips over 10 m/s, hands and feet over 30 m/s: a glitch, not a move)
   length      0.25 - 15 s and at least 2 keys (hand-keyed clips are interpolated)
@@ -45,7 +45,7 @@ MOVES = [
     (r"\bko\b|^ko|knock_?out|fall|die|death|collapse", "fall"),
     (r"hit|stagger|stumble|react|hurt_react", "hit"),
     (r"duck|dodge|evade", "duck"),
-    (r"celebrat|cheer|victory|taunt|happy|(^|_)win(_|$)", "celebrate"),
+    (r"celebrat|cheer|victory|happy|(^|_)win(_|$)", "celebrate"),   # a taunt can be anything (arms folded)
     (r"^stop|sudden_stop|_stop$", "stop"),
     (r"side_?step|shuffle|strafe", "sidestep"),
     (r"catch|save", "catch"),                      # a keeper's save is a catch in front; a dive is named so
@@ -110,7 +110,7 @@ def check_clip(rec, name=None):
     h = float(np.median(head_up)) + 0.25                      # head bone to the top of the head
     # size: from the standing frames (a fall lies down)
     stand = float(np.percentile(head_up, 90)) + 0.25
-    seated = any(re.search(r"sit|seat|drive|kneel|crawl", str(x or "").lower())
+    seated = any(re.search(r"sit|seat|drive|kneel|crawl|crouch", str(x or "").lower())
                  for x in (name, rec.get("name"), rec.get("from_motion"), rec.get("category")))
     res.append(("size", (0.7 if seated else 1.2) <= stand <= 2.1, "feet to head %.2f m%s" % (stand, " (seated)" if seated else "")))
     # floor

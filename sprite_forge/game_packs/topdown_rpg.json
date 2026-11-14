@@ -113,7 +113,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "spell"
+   "desc": "spell",
+   "prefer": [
+    "cast_spell"
+   ]
   },
   {
    "name": "hit",

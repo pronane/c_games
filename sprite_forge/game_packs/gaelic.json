@@ -82,6 +82,7 @@
    "name": "sprint",
    "library": "run",
    "prefer": [
+    "sprint",
     "jog"
    ],
    "frames": 8,
