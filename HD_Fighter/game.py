@@ -72,6 +72,7 @@ def toggle_graphics():
     STAGE_DATA = META["stages"]
     EFFECTS = META["effects"]
     PORTRAITS = META["select"]
+    _sync_roster()
     return GRAPHICS_MODES[CURRENT_MODE[0]]
 
 with open(os.path.join(ASSETS, "meta.json")) as fh:
@@ -82,7 +83,12 @@ STAGE_DATA = META["stages"]
 EFFECTS = META["effects"]
 PORTRAITS = META["select"]
 
-# Fighter display names (must be defined before Fighter class uses it)
+
+
+# Fighter display names (must be defined before Fighter class uses it).
+# The Padel Wars trio only exists as HD art (egyptian_fighter/assets/char_*,
+# imported by tools/import_padel_fighters.py), so it is only listed when
+# assets_hd/meta.json actually carries their sheets.
 FIGHTER_INFO = {
     "kairo": {"name": "KAIRO", "style": "MUAY THAI"},
     "lyra": {"name": "LYRA", "style": "CAPOEIRA"},
@@ -91,6 +97,26 @@ FIGHTER_INFO = {
     "zap": {"name": "ZAP", "style": "ELECTRIC"},
     "void": {"name": "VOID", "style": "MYSTIC"},
 }
+_PADEL = {"mike": "PADEL MIKE", "daragh": "DARAGH", "dec": "DANGEROUS DEC"}
+_PADEL_STYLE = {"mike": "PADEL SMASH", "daragh": "THE FLYNN", "dec": "SUITED & BOOTED"}
+_BASE_FIGHTERS = dict(FIGHTER_INFO)
+
+
+def _sync_roster():
+    """Rebuild the select roster from what the active asset folder can draw.
+
+    CLASSIC (assets/) predates the Padel Wars trio, so F2 switches the roster
+    along with the art instead of leaving a pick that cannot be drawn.
+    """
+    FIGHTER_INFO.clear()
+    FIGHTER_INFO.update(_BASE_FIGHTERS)
+    for tag, name in _PADEL.items():
+        if tag in CHARACTERS:
+            FIGHTER_INFO[tag] = {"name": name, "style": _PADEL_STYLE[tag]}
+
+
+_sync_roster()
+
 
 # ------------------------------------------------------------------ asset cache
 _img_cache = {}
@@ -1085,14 +1111,29 @@ class CharacterSelect:
         st_txt = self.font_small.render(f"STAGE: {STAGE_DATA[self.stage_sel]['name']}", True, (200, 200, 100))
         self.screen.blit(st_txt, (SCREEN_W // 2 - st_txt.get_width() // 2, 135))
 
-        box_w, box_h = 160, 260
-        gap = 12
-        total_w = len(self.tags) * box_w + (len(self.tags) - 1) * gap
-        start_x = max(0, (SCREEN_W - total_w) // 2)
-        base_y = 160
+        # The roster is nine fighters, so the boxes shrink and wrap instead of
+        # running off the 1280 x 720 screen.
+        n = len(self.tags or [])
+        box_h = 260
+        for per_row in (n, 7, 6, 5, 4, 3, 2, 1):
+            if per_row < 1:
+                continue
+            rows = (n + per_row - 1) // per_row
+            gap = 12
+            box_w = min(160, (SCREEN_W - 48 - gap * (per_row - 1)) // per_row)
+            row_gap = 12
+            total_h = rows * box_h + (rows - 1) * row_gap
+            if total_h <= SCREEN_H - 150:
+                break
+        base_y = max(160, (SCREEN_H - total_h) // 2 + 40)
 
         for i, tag in enumerate(self.tags):
-            x = start_x + i * (box_w + gap)
+            row, col = divmod(i, per_row)
+            in_row = min(per_row, n - row * per_row)
+            row_w = in_row * box_w + (in_row - 1) * gap
+            start_x = max(0, (SCREEN_W - row_w) // 2)
+            x = start_x + col * (box_w + gap)
+            base_y_i = base_y + row * (box_h + row_gap)
             info = FIGHTER_INFO[tag]
             selected_p1 = (i == self.p1_sel)
             selected_p2 = (i == self.p2_sel)
@@ -1109,27 +1150,26 @@ class CharacterSelect:
             elif selected_p2:
                 border = (200, 60, 60)
 
-            pygame.draw.rect(self.screen, (35, 40, 55), (x, base_y, box_w, box_h), border_radius=10)
+            pygame.draw.rect(self.screen, (35, 40, 55), (x, base_y_i, box_w, box_h), border_radius=10)
             if border:
-                pygame.draw.rect(self.screen, border, (x, base_y, box_w, box_h), 5, border_radius=10)
+                pygame.draw.rect(self.screen, border, (x, base_y_i, box_w, box_h), 5, border_radius=10)
 
+            # Portrait tiles are 128 px; centre them in whatever box width fits.
             port = self.portraits[tag]
-            self.screen.blit(port, (x + (box_w - 128) // 2, base_y + 20))
+            self.screen.blit(port, (x + (box_w - port.get_width()) // 2, base_y_i + 14))
 
-            n_txt = self.font.render(info["name"], True, (255, 255, 255))
-            self.screen.blit(n_txt, (x + (box_w - n_txt.get_width()) // 2, base_y + 162))
+            n_txt = self.font_small.render(info["name"], True, (255, 255, 255))
+            self.screen.blit(n_txt, (x + (box_w - n_txt.get_width()) // 2, base_y_i + 156))
 
-            style = {"kairo": "MUAY THAI", "lyra": "CAPOEIRA", "brutus": "BRAWLER",
-                     "naomi": "KENJUTSU", "zap": "ELECTRIC", "void": "MYSTIC"}[tag]
-            s_txt = self.font_small.render(style, True, (160, 160, 170))
-            self.screen.blit(s_txt, (x + (box_w - s_txt.get_width()) // 2, base_y + 198))
+            s_txt = self.font_small.render(info["style"], True, (160, 160, 170))
+            self.screen.blit(s_txt, (x + (box_w - s_txt.get_width()) // 2, base_y_i + 184))
 
             if confirmed_p1:
                 c_txt = self.font_small.render("P1 SELECTED", True, (0, 220, 255))
-                self.screen.blit(c_txt, (x + (box_w - c_txt.get_width()) // 2, base_y + 232))
+                self.screen.blit(c_txt, (x + (box_w - c_txt.get_width()) // 2, base_y_i + 216))
             if confirmed_p2:
                 c_txt = self.font_small.render("P2 SELECTED", True, (255, 100, 100))
-                self.screen.blit(c_txt, (x + (box_w - c_txt.get_width()) // 2, base_y + 232))
+                self.screen.blit(c_txt, (x + (box_w - c_txt.get_width()) // 2, base_y_i + 216))
 
         if self.p1_confirmed and self.p2_confirmed:
             r_txt = self.font.render("PRESS ENTER TO FIGHT", True, (100, 255, 100))
