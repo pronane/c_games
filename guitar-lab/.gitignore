@@ -5,3 +5,6 @@ benchmarks/regression/reference/electric_last.json
 benchmarks/goat/private/
 node_modules
 .cache
+
+# Full-band test recordings stay on this machine
+benchmarks/fullband/data/

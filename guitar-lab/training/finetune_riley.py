@@ -92,6 +92,10 @@ def main():
     ap.add_argument('--every', type=int, default=200)
     ap.add_argument('--init', help='resume from a checkpoint written by this script')
     ap.add_argument('--start', type=int, default=0, help='step number the --init checkpoint ended at')
+    ap.add_argument('--device', default='auto', help='auto (GPU when there is one), cuda or cpu')
+    ap.add_argument('--all-layers', action='store_true',
+                    help='train every layer, not only the recurrent and output layers (needs a GPU and much more data)')
+    ap.add_argument('--workers', type=int, default=0)
     a = ap.parse_args()
     torch.manual_seed(0)
     torch.set_num_threads(max(1, torch.get_num_threads()))
@@ -99,20 +103,24 @@ def main():
     rng = np.random.default_rng(0)
     rng.shuffle(files)
     val, train = files[:60], files[60:]
+    device = torch.device('cuda' if (a.device == 'auto' and torch.cuda.is_available()) else 'cpu' if a.device == 'auto' else a.device)
+    print('device', device, flush=True)
     model = riley.load('riley')
     if a.init:
         model.load_state_dict(torch.load(a.init, map_location='cpu', weights_only=False)['model'])
     for p_name, p in model.named_parameters():
-        p.requires_grad = any(p_name.startswith(t + '.') or p_name == t for t in TRAINABLE)
+        p.requires_grad = a.all_layers or any(p_name.startswith(t + '.') or p_name == t for t in TRAINABLE)
+    model.to(device)
+    mode = (lambda m: m.train()) if a.all_layers else set_mode
     params = [p for p in model.parameters() if p.requires_grad]
     print(f'training {sum(p.numel() for p in params)/1e6:.1f}M of {sum(p.numel() for p in model.parameters())/1e6:.1f}M parameters on {len(train)} segments', flush=True)
     opt = torch.optim.Adam(params, lr=a.lr)
-    loader = torch.utils.data.DataLoader(Segments(train), batch_size=a.batch, shuffle=True, drop_last=True, num_workers=0)
+    loader = torch.utils.data.DataLoader(Segments(train), batch_size=a.batch, shuffle=True, drop_last=True, num_workers=a.workers)
     vloader = torch.utils.data.DataLoader(Segments(val), batch_size=a.batch)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
 
     def losses(batch):
-        audio, fr, on, off = batch
+        audio, fr, on, off = (t.to(device) for t in batch)
         o = model(audio)
         n = min(o['frame_output'].shape[1], fr.shape[1])
         return (bce(o['reg_onset_output'][:, :n], on[:, :n]) + bce(o['reg_offset_output'][:, :n], off[:, :n])
@@ -122,14 +130,14 @@ def main():
         model.eval()
         with torch.no_grad():
             v = float(np.mean([losses(b).item() for b in vloader]))
-        set_mode(model)
+        mode(model)
         return v
 
     print('validation loss before', round(validate(), 4), flush=True)
     step, t0, first = a.start, time.time(), a.start
     while step < a.steps:
         for batch in loader:
-            set_mode(model)
+            mode(model)
             loss = losses(batch)
             opt.zero_grad()
             loss.backward()
@@ -140,7 +148,7 @@ def main():
                 print(f'step {step} loss {loss.item():.4f} ({(time.time()-t0)/max(1, step-first):.1f} s/step)', flush=True)
             if step % a.every == 0 or step == a.steps:
                 v = validate()
-                torch.save({'model': model.state_dict()}, out / f'step_{step}.pth')
+                torch.save({'model': {k: v.cpu() for k, v in model.state_dict().items()}}, out / f'step_{step}.pth')
                 print(f'step {step} validation {v:.4f} saved', flush=True)
             if step >= a.steps:
                 break
