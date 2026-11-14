@@ -1,5 +1,8 @@
 # Fretwork — guitar comparison prototype v0.4
 
+**Evidence branch:** [what is completed, tested and outstanding](BRANCH_STATUS.md).
+The experiments are not merged or approved as validated production defaults.
+
 **On Windows:** double-click `windows\install.bat`, then use the **Guitar Lab** shortcut. See [windows/README.md](windows/README.md).
 Everything runs on your PC: the engine also serves the studio at `http://localhost:8000`.
 

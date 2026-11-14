@@ -1,0 +1,31 @@
+{
+  "source_alias": "uploaded_whatsapp_take",
+  "source_bytes": 3752456,
+  "source_sha256": "cb121e0fd26f48cec619e651fb77a9587bde54b54891e959fd879b5465b14564",
+  "decoded_seconds": 305.0173242630386,
+  "decoded_sample_rate": 22050,
+  "decoded_channels": 1,
+  "source_codec": "AAC LC",
+  "source_sample_rate": 44100,
+  "source_channels": 2,
+  "rms": 0.053472127963619095,
+  "peak": 0.388214111328125,
+  "ground_truth_available": false,
+  "windows_tested_seconds": [
+    [
+      0,
+      10
+    ],
+    [
+      145,
+      155
+    ],
+    [
+      290,
+      300
+    ]
+  ],
+  "full_recording_decoded": true,
+  "full_recording_transcribed": false,
+  "audio_committed": false
+}

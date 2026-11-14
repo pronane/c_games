@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:inputs
+> node tests/input-smoke.mjs
+
+USB-input simulation: exact-device selection, actual PCM worklet recording, level meter, disconnect, permission failure, MIDI recording/export and mobile overflow checks passed. No physical adapters were tested.

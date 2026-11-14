@@ -1,0 +1,16 @@
+{
+  "tested_implementation_commit": "2f084ec",
+  "current_commit": "2f084ec693205eb3fa3d65e58cff5a0f59876365",
+  "model_tensor_copy_sha256": "bafb7de3282a6c5079f508aeabee903cb78ff7296fd0291bea3bf33ba1d5617e",
+  "runtime": "CPU",
+  "source_flags_default": "off",
+  "browser_engine_flags": {
+    "FRETWORK_RILEY_LEVEL_GUARD": "1",
+    "FRETWORK_DURATION_REVIEW": "1"
+  },
+  "limits": [
+    "No full-band separator",
+    "No newly labelled private recording",
+    "Not a notation accuracy evaluation"
+  ]
+}

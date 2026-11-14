@@ -1,0 +1,5 @@
+test:e2e	0
+test:inputs	0
+test:profiles	0
+test:tab	0
+test:riley	0

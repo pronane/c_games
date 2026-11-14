@@ -6,6 +6,10 @@ import { chromium as pw } from "playwright-core";
 import { fileURLToPath } from "node:url";
 const fixture = (n) => fileURLToPath(new URL(`./fixtures/${n}`, import.meta.url));
 const shots = process.env.SCREENSHOT_DIR;
+// A beep/silence is not a guitar-recognition fixture. This is unrelated real guitar,
+// so this test asserts capture/replay/export, NOT correctness against the tab.
+const microphoneAudio = process.env.FAKE_AUDIO ?? fileURLToPath(new URL(
+  '../benchmarks/regression/data/guitarset/05_Rock1-90-C%23_solo_mic.wav', import.meta.url));
 (async () => {
   const browser = await pw.launch({
     args: [
@@ -13,8 +17,7 @@ const shots = process.env.SCREENSHOT_DIR;
       "--use-fake-ui-for-media-stream",
       "--use-fake-device-for-media-stream",
       "--autoplay-policy=no-user-gesture-required",
-      // FAKE_AUDIO: a WAV the fake microphone plays (e.g. a rendered take); default is a beep.
-      ...(process.env.FAKE_AUDIO ? [`--use-file-for-fake-audio-capture=${process.env.FAKE_AUDIO}`] : []),
+      `--use-file-for-fake-audio-capture=${microphoneAudio}`,
     ],
     executablePath: process.env.BROWSER_EXECUTABLE_PATH,
     headless: true,
@@ -22,6 +25,8 @@ const shots = process.env.SCREENSHOT_DIR;
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // This legacy synthetic fixture exercises Basic Pitch, not Riley guitar accuracy.
+  await page.addInitScript(() => localStorage.setItem("guitar-lab.transcriber", "basic_pitch"));
   await page.goto(process.env.STUDIO_URL ?? "http://127.0.0.1:5173");
   const proc = page.getByRole("group", { name: "Processing" });
   console.log("Processing:", (await proc.innerText()).replace(/\s+/g, " "));

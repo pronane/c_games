@@ -34,9 +34,13 @@ def test_a_transcription_of_its_own_audio_is_not_marked_and_a_dropped_stretch_is
 def test_wrong_pitches_in_a_stretch_are_marked_as_differing():
     notes = _song()
     audio = tc.playback(notes, 24.0)
-    wrong = [dict(n, midi=n['midi'] + 5) if 14 <= n['time'] < 18 else n for n in notes]
-    report, _ = tc.check(audio, tc.SR, wrong)
-    assert any(s['start'] < 18 and s['end'] > 14 for s in report['stretches'])
+    # 14-18 s written as the wrong thing entirely: a high single-note line instead of the chords.
+    wrong = [n for n in notes if not 14 <= n['time'] < 18]
+    wrong += [{'time': 14.0 + i * 0.5, 'duration': 0.45, 'midi': 79 + (i % 4)} for i in range(8)]
+    report, _ = tc.check(audio, tc.SR, sorted(wrong, key=lambda n: n['time']))
+    assert any(s['start'] < 18 and s['end'] > 14 and s['status'] == 'differs' for s in report['stretches'])
+    lack = report['missing_per_stretch']
+    assert max(lack[7:9]) == max(x for x in lack if x is not None)
     roll = report['roll']
     assert roll['frames'] > 200 and len(roll['level']) > 0
 

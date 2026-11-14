@@ -1,0 +1,38 @@
+{
+  "version": "guitar-holdout-v1",
+  "purpose": "Evaluate the existing quiet-input guard and raw sustain-error estimator without tuning on this evaluation set.",
+  "minimum_performers": 3,
+  "minimum_independent_performances": 6,
+  "required_conditions": [
+    "dry",
+    "quiet_dry",
+    "wet",
+    "quiet_wet"
+  ],
+  "minimum_independent_performances_per_condition": 6,
+  "minimum_correct_sustain_examples": 20,
+  "minimum_short_sustain_examples": 20,
+  "minimum_long_sustain_examples": 10,
+  "minimum_sustain_performances": 3,
+  "excluded_performer_ids": [
+    "05",
+    "guitarset-player-05"
+  ],
+  "excluded_source_ids": [
+    "gs_rock_solo",
+    "gs_funk_solo",
+    "gs_jazz_comp",
+    "uploaded_whatsapp_take"
+  ],
+  "capture_required": "real",
+  "policy": "Frozen baseline versus FRETWORK_RILEY_LEVEL_GUARD=1; neither condition labels nor human truth may select inference parameters.",
+  "release_policy": "Coverage is not quality approval. Report paired source-grouped results and human sustain false warnings, misses and coverage. Do not promote defaults automatically.",
+  "limitations": "Held out from this project's tuning only; Riley training-set overlap cannot be independently guaranteed. Gain variants of one performance count as one source. Simulated room responses do not count as real wet captures.",
+  "decision_rules": {
+    "guard_quiet_dry_minimum_macro_f1_gain": 0.02,
+    "guard_maximum_macro_f1_loss_other_conditions": 0.01,
+    "guard_single_clip_f1_loss_requiring_review": 0.05,
+    "correct_sustain_false_warning_goal": 0.05,
+    "rule": "Targets are preregistered review criteria, not measured achievements or automatic merge approval. Report source-grouped uncertainty and unmatched coverage; insufficient precision or coverage remains blocked."
+  }
+}

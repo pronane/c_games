@@ -1,0 +1,36 @@
+........................................................................ [ 35%]
+...........................................s............................ [ 70%]
+...................................................s.....s.              [100%]
+=============================== warnings summary ===============================
+server/tests/test_fingerprint.py::test_reference_check_is_optional_and_never_raises
+  /home/user/c_games/guitar-lab/.venv/lib/python3.11/site-packages/audioread/rawread.py:16: DeprecationWarning: 'aifc' is deprecated and slated for removal in Python 3.13
+    import aifc
+
+server/tests/test_fingerprint.py::test_reference_check_is_optional_and_never_raises
+  /home/user/c_games/guitar-lab/.venv/lib/python3.11/site-packages/audioread/rawread.py:17: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+server/tests/test_fingerprint.py::test_reference_check_is_optional_and_never_raises
+  /home/user/c_games/guitar-lab/.venv/lib/python3.11/site-packages/audioread/rawread.py:19: DeprecationWarning: 'sunau' is deprecated and slated for removal in Python 3.13
+    import sunau
+
+server/tests/test_fingerprint.py::test_reference_check_is_optional_and_never_raises
+  /home/user/c_games/guitar-lab/server/fingerprint.py:168: UserWarning: PySoundFile failed. Trying audioread instead.
+    y, sr = librosa.load(str(path), sr=None, mono=True)
+
+server/tests/test_fingerprint.py::test_reference_check_is_optional_and_never_raises
+  /home/user/c_games/guitar-lab/.venv/lib/python3.11/site-packages/librosa/core/audio.py:184: FutureWarning: librosa.core.audio.__audioread_load
+  	Deprecated as of librosa version 0.10.0.
+  	It will be removed in librosa version 1.0.
+    y, sr_native = __audioread_load(path, offset, duration, dtype)
+
+server/tests/test_tab_align.py::test_rejects_an_empty_tab_and_silence
+  /home/user/c_games/guitar-lab/.venv/lib/python3.11/site-packages/librosa/core/pitch.py:103: UserWarning: Trying to estimate tuning from empty frequency set.
+    return pitch_tuning(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] server/tests/test_regression_benchmark.py:296: EGSet12 and Guitar-TECHS are not on disk. Download with: python -m benchmarks.regression.download (see benchmarks/regression/README.md). The sets are CC BY 4.0 evaluation material and are not in git.
+SKIPPED [1] server/tests/test_transcription_integration.py:30: Set FRETWORK_RUN_SEPARATION_TEST=1 to run the heavyweight real model
+SKIPPED [1] server/tests/test_user_recordings.py:90: Private user AAC files are not on disk. They are not in git.
+200 passed, 3 skipped, 6 warnings in 120.04s (0:02:00)

@@ -418,7 +418,7 @@ def _bar_rows(notes, bars):
     return rows, [{'bar': r['bar'], 'score': r['score'], 'messages': r['messages']} for r in worst[:5]]
 
 
-def compare_to_target(take_notes, target, heard=None) -> dict:
+def compare_to_target(take_notes, target, heard=None, *, duration_review=False) -> dict:
     """Per-note and per-bar diff of one take against one target note list.
 
     heard: the take's onset map (frames at 100 fps x 88 pitches from MIDI 21, widened), when
@@ -509,6 +509,10 @@ def compare_to_target(take_notes, target, heard=None) -> dict:
             else:
                 kind = 'correct'
         message = _describe(kind, bar, beat, take_n, target_n, delta_ms, delta_beats)
+        if duration_review and kind == 'wrong_duration':
+            message = (f'bar {bar} beat {beat}: duration estimate differs for '
+                       f'{note_name(target_n["midi"])}; review by ear. '
+                       'Sustain, noise or effect tails can affect this estimate; this is not a confirmed playing mistake.')
         bar_time = next((b['time'] for b in bars if b['number'] == bar), None)
         findings.append({
             'kind': kind,
@@ -585,7 +589,15 @@ def compare_take(take_notes, targets, transcription='notes supplied', heard=None
     """Score one take against each target. Stem + notation also produce a combined score."""
     if not targets:
         raise ValueError('At least one target note list is required.')
-    reports = [compare_to_target(take_notes, t, heard=heard) for t in targets]
+    import os
+    review = (os.getenv('FRETWORK_DURATION_REVIEW', '0') == '1'
+              and transcription.startswith('clean-guitar '))
+    reports = [compare_to_target(take_notes, t, heard=heard, duration_review=review) for t in targets]
+    if review:
+        for report in reports:
+            report['duration_policy'] = 'review_only'
+            report['duration_notice'] = ('Duration differences are uncertain audio estimates. '
+                                         'Counts and diagnostic bar scores are unchanged, not confirmed mistake grades.')
     return {
         'take_notes': normalize_notes(take_notes),
         'transcription': transcription,
@@ -647,38 +659,37 @@ def notation_notes(raw_notes, beats, open_strings, max_fret=24):
 
 # ---------------------------------------------------------------- clean-guitar transcription
 
-def transcribe_take(path):
+def transcribe_take(path, backend=None):
     """Transcribe a learner's take with the existing engine, on the clean-guitar thresholds.
 
-    The song may have been transcribed as distorted. A practice take is scored as clean
-    guitar: same Basic Pitch model, the GuitarSet onset/frame thresholds.
+    The requested backend is passed through explicitly; None uses the engine default.
+    Clean onset/frame presets apply only to Basic Pitch, not the optional backends.
     """
     from . import models
     from .instruments import resolve_profile
     profile = resolve_profile('guitar')
     thresholds = models.thresholds_for('clean', chosen_by_user=True)
     return models.transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'],
-                             thresholds=thresholds)
+                             thresholds=thresholds, backend=backend)
 
 
-def transcribe_take_heard(path):
-    """(notes, onset map or None): the take's notes, plus Riley's onset map when Riley is the
-    detector, so a note the decoder dropped is not reported as a missed note."""
+def transcribe_take_heard(path, backend=None):
+    """(notes, onset map or None): the take's notes from the chosen detector (None: the engine
+    default), plus Riley's onset map when Riley is the detector, so a note the decoder dropped
+    is not reported as a missed note. The map is optional evidence: if it cannot be made the
+    comparison runs as before."""
     from .transcribers import normalize_backend
-    if normalize_backend(None) != 'riley':
-        return transcribe_take(path), None
-    import librosa
-    from . import riley
-    from .instruments import resolve_profile
-    from .tab_check import widen
-    profile = resolve_profile('guitar')
-    audio, _ = librosa.load(str(path), sr=riley.SAMPLE_RATE, mono=True)
-    out = riley.posteriors(audio)
-    notes = [n for n in riley.decode(out)[0] if profile['midi_min'] <= n['midi'] <= profile['midi_max']]
-    notes.sort(key=lambda n: (n['time'], n['midi']))
-    for i, n in enumerate(notes):
-        n['id'] = i
-    return notes, widen(out['reg_onset_output'])
+    notes = transcribe_take(path, backend=backend)
+    if normalize_backend(backend) != 'riley':
+        return notes, None
+    try:
+        import librosa
+        from . import riley
+        from .tab_check import widen
+        audio, _ = librosa.load(str(path), sr=riley.SAMPLE_RATE, mono=True)
+        return notes, widen(riley.posteriors(audio)['reg_onset_output'])
+    except Exception:
+        return notes, None
 
 
 # ---------------------------------------------------------------- uploaded charts (MusicXML, MIDI, text tab)

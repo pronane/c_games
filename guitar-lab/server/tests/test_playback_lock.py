@@ -19,8 +19,10 @@ NOTES = json.loads((FIX / 'playback_notes.json').read_text())
 def test_acoustic_and_distorted_playback_match_locked_pcm():
     acoustic = render_acoustic(NOTES, sr=22050, length_s=2.0)
     distorted = render_distorted(NOTES, sr=22050, length_s=2.0, stereo=True)
-    assert np.array_equal(acoustic, np.load(FIX / 'playback_acoustic.npy'))
-    assert np.array_equal(distorted, np.load(FIX / 'playback_distorted.npy'))
+    # Cross-platform DSP roundoff is not a changed voice. Keep the original golden
+    # arrays and a tight absolute bound; the separate repeat-render test stays bitwise.
+    np.testing.assert_allclose(acoustic, np.load(FIX / 'playback_acoustic.npy'), rtol=0, atol=1e-10)
+    np.testing.assert_allclose(distorted, np.load(FIX / 'playback_distorted.npy'), rtol=0, atol=1e-10)
 
 
 def test_playback_is_deterministic():

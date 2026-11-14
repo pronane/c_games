@@ -5,8 +5,8 @@ wrote down. This renders the notes with the engine's own guitar playback and com
 recordings pitch by pitch, ten times a second, and marks the stretches where they disagree:
 
 - **gap**: the recording is sounding but the transcription has no note at all;
-- **differs**: the pitches in the two versions match clearly worse than they do in the rest of
-  this same song.
+- **differs**: the playback lacks clearly more of the recording's pitches than it does in the
+  rest of this same song (or the two hardly match at all).
 
 The second test is relative on purpose. The playback is a generic guitar sound, so even a
 note-perfect transcription never matches the recording exactly (about 0.7 on this measure for
@@ -26,10 +26,15 @@ FPS = 10                        # analysis frames per second
 HOP = SR // FPS
 LOW_MIDI, BINS = 40, 49         # E2 .. E6: the guitar's range
 STRETCH_S = 2.0
-DIFFERS_BELOW = 0.15            # a stretch this far under the song's median match is flagged
-DIFFERS_FLOOR = 0.45            # and anything under this is flagged regardless
-MISSING_ABOVE = 0.20            # a stretch missing this much more of the recording's pitch than usual
-MISSING_FLOOR = 0.45            # (share of the recording's strong pitch the playback lacks)
+# Set with planted errors on held-out GuitarSet (benchmarks/transcription_check_eval.py):
+# a stretch is marked when it lacks much more of the recording's pitch than the song usually
+# does, or when its pitch match is very poor. A relative match test on its own marked a quarter
+# of correctly transcribed solos (single-note lines match noisily over two seconds), so it is
+# kept only as an absolute floor.
+DIFFERS_BELOW = 1.0             # (off) a stretch this far under the song's median match
+DIFFERS_FLOOR = 0.2             # pitch match under this is marked
+MISSING_ABOVE = 0.15            # lacking this much more of the recording's strong pitch than usual,
+MISSING_FLOOR = 0.3             # and at least this much of it, is marked
 GAP_MIN_S = 1.5
 NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 

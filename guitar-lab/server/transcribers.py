@@ -186,6 +186,9 @@ def _transcribe_riley_path(which: str, path: Path, midi_min: int, midi_max: int)
     except ImportError as exc:
         raise ModelUnavailable(RILEY_NOTE) from exc
     audio, _ = librosa.load(str(path), sr=riley.SAMPLE_RATE, mono=True)
+    if which == 'riley' and os.getenv('FRETWORK_RILEY_LEVEL_GUARD', '0') == '1':
+        from .evidence_policy import guarded_level
+        audio, _level_info = guarded_level(audio, riley.SAMPLE_RATE)
     out = riley.posteriors(audio, which)
     # The reverb-adaptive decoder was tuned on Riley; GAPS keeps its published thresholds.
     notes = riley.decode(out)[0] if which == 'riley' else riley.notes_from_posteriors(out)
