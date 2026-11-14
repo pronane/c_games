@@ -174,11 +174,14 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stumble"
+   ]
   },
   {
    "name": "fall",
-   "library": "hit",
+   "library": "fall",
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -192,7 +195,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "knockdown \u2014 starter has no separate fall clip"
+   "desc": "knockdown - a fall onto the back (CMU ko_fall_back with a CMU library; the procedural fall without)",
+   "prefer": [
+    "ko_fall_back"
+   ]
   },
   {
    "name": "get_up",

@@ -124,11 +124,14 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stumble"
+   ]
   },
   {
    "name": "die",
-   "library": "hit",
+   "library": "die",
    "frames": 8,
    "fps": 10,
    "loop": false,
@@ -142,7 +145,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "same hit clip, played once and held by the game"
+   "desc": "a fall, played once and held by the game (CMU ko_fall_back with a CMU library; the procedural die without)",
+   "prefer": [
+    "ko_fall_back"
+   ]
   }
  ],
  "notes": "No aim, shoot or reload clip in the starter. Record aim.mp4, shoot.mp4, reload.mp4, die.mp4 if you want those silhouettes. The events are still the frames the game should use.",

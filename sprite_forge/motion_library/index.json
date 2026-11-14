@@ -16,7 +16,9 @@
   "save",
   "drive",
   "wave",
-  "cast"
+  "cast",
+  "dive_left",
+  "dive_right"
  ],
  "licence": "licence.json"
 }

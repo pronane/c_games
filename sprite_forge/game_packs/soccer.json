@@ -199,6 +199,7 @@
    "name": "celebrate",
    "library": "wave",
    "prefer": [
+    "celebrate_jump",
     "jump_shot"
    ],
    "frames": 8,

@@ -143,7 +143,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stumble"
+   ]
   },
   {
    "name": "taunt",

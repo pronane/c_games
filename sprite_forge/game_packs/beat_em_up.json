@@ -179,7 +179,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stumble"
+   ]
   },
   {
    "name": "block",
@@ -197,7 +200,11 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "block_high",
+    "block_left"
+   ]
   },
   {
    "name": "pickup",

@@ -131,7 +131,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stumble"
+   ]
   }
  ],
  "notes": "Only idle and walk are built in all 8 directions (view_moves). Add run or punch to view_moves in the JSON if the game needs them from every angle. That render is eight cameras, so it is slower.",

@@ -245,7 +245,7 @@ def _render_mannequin_move(job):
         return _MESH[e]
     cols = sp.colours()
     mo = motion_for(m)
-    states = anim.states_for(mo, m.frames, m.loop)
+    states = anim.sprite_states(mo, m.frames, m.loop)
     if len(job) > 6 and job[6]:                     # v9 foot locking (two-bone leg IK on planted feet)
         from . import footlock
         states, _ = footlock.lock(states, m.loop, m.fps)
@@ -283,7 +283,7 @@ def _render_sculpt_move(sp, rs, m):
     ch, sm = _MESH["_sculpt_obj"]
     ss = _sculpt_settings(sp, rs)
     mo = motion_for(m)
-    return [RS.render_frame(ch, sm, st, ss) for st in anim.states_for(mo, m.frames, m.loop)]
+    return [RS.render_frame(ch, sm, st, ss) for st in anim.sprite_states(mo, m.frames, m.loop)]
 
 
 def glb_v9_extras(cfg, sp):
@@ -1175,7 +1175,7 @@ def collect_views(cfg, report, sp, frames):
                     continue
                 if mo is None:
                     continue
-                sts = list(anim.states_for(mo, n, m.loop)) if m.name in animate else list(anim.states_for(mo, n, m.loop))[:1]
+                sts = list(anim.sprite_states(mo, n, m.loop)) if m.name in animate else list(anim.sprite_states(mo, n, m.loop))[:1]
                 raw[v][m.name] = [render.render_state(T, B, M, cols, st, rs) for st in sts]
         ref_v = "front" if "front" in raw else wanted[0]
         ref_m = next((m.name for m in moves if m.name in raw[ref_v]), None)

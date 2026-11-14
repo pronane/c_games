@@ -29,7 +29,7 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "guard stance \u2014 starter idle, not a boxing guard"
+   "desc": "guard stance - CMU idle_boxing with a CMU library; starter idle without"
   },
   {
    "name": "walk",
@@ -50,7 +50,10 @@
      6
     ]
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "walk_casual"
+   ]
   },
   {
    "name": "jab",
@@ -131,7 +134,11 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "block_high",
+    "block_left"
+   ]
   },
   {
    "name": "dodge",
@@ -149,7 +156,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "slip \u2014 starter crouch"
+   "desc": "slip - a duck under the punch (CMU dodge_duck with a CMU library; starter crouch without)",
+   "prefer": [
+    "dodge_duck"
+   ]
   },
   {
    "name": "hit",
@@ -167,11 +177,14 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "stumble"
+   ]
   },
   {
    "name": "ko",
-   "library": "hit",
+   "library": "ko",
    "frames": 8,
    "fps": 10,
    "loop": false,
@@ -185,7 +198,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "knockout \u2014 same hit clip, longer"
+   "desc": "knockout - a fall onto the back (CMU ko_fall_back with a CMU library; the procedural ko without)",
+   "prefer": [
+    "ko_fall_back"
+   ]
   }
  ],
  "notes": "A recorded jab, cross and hook become three clips when you name the files jab.mp4, cross.mp4, hook.mp4. Until then they are one punch, retimed by the events."
