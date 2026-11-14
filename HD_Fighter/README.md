@@ -1,10 +1,10 @@
 # 🎮 HD Fighter 2 — Original HD Fighting Game + Online Multiplayer
 
-**Street-Fighter-style, 100% original art.** 6 fighters, 3 parallax stages, 60fps HD (192×256) — now **playable online vs anyone on any device**.
+**Street-Fighter-style, 100% original art.** 9 fighters (the six originals plus the Padel Wars trio), 3 parallax stages, 60fps HD (192×256) — now **playable online vs anyone on any device**.
 
 ### ⚡ Play Online NOW (multi-device)
 **Live:** `https://3000-itltc005egaw9tuy0yd42.e2b.app` *(this sandbox — your permanent URL comes after deploy below)*
-1. Device A: **Create Private Room** → pick KAIRO/LYRA/NAOMI/BRUTUS/VOID/ZAP → **Ready**
+1. Device A: **Create Private Room** → pick KAIRO/LYRA/NAOMI/BRUTUS/VOID/ZAP/PADEL MIKE/DARAGH/DANGEROUS DEC → **Ready**
 2. **Copy Invite Link** (`#R0001`) → send to Device B (phone/desktop/tablet)
 3. Device B: **Join by Code** → pick → both **Ready** → **Fight!** — touch joystick + gamepad on all.
 
@@ -15,6 +15,7 @@ No install. Share link = share room. `⚡ Quick Play` also auto-matches.
 
 ### 🎯 What you get
 - 6 original fighters (KAIRO full-body, LYRA, NAOMI, BRUTUS, VOID, ZAP) — 16 states each (idle5 walk7 crouch2 jump5 lp4 hp5 lk4 hk5 block2 throw5 hit3 special1/2 super7 win5 lose3)
+- **Padel Wars trio** — PADEL MIKE, DARAGH and DANGEROUS DEC — imported from `egyptian_fighter/assets/char_*` with `tools/import_padel_fighters.py` (16 states each, the same cell size and feet line as the six originals, and their own 128×128 select portraits)
 - Combat: hit-stop, screen-shake, hit sparks, combo counter, block stun, throws, super moves
 - 3 parallax stages (ROOFTOP/TEMPLE/INDUSTRIAL) with animated foreground
 - Online: Node.js WebSocket server (`multiplayer/server.js`), 60fps input relay, rooms + quick-play, ping, deployable

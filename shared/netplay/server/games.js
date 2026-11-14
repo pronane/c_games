@@ -5,7 +5,9 @@ const root = path.join(__dirname, '..', '..', '..');
 
 const hdFighter = {
   name: 'hd-fighter',
-  picks: ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap'],
+  // The six originals plus the Padel Wars trio imported by
+  // HD_Fighter/tools/import_padel_fighters.py — a pick the server rejects never reaches the fight.
+  picks: ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap', 'mike', 'daragh', 'dec'],
   pickLabel: 'fighter',
   inputKeys: [
     'left', 'right', 'up', 'down', 'jump',

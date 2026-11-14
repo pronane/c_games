@@ -3,8 +3,11 @@ import { createPacer, stepBudget } from './pace.mjs';
 import { evalStall, stallLabel, connectFailure, nextBackoff, isGameData, poorLink, CONNECT_TIMEOUT_MS, RECONNECT_HOLD_MS } from './stall.mjs';
 import { encodeTail, encodeFrames, decodeInputs, absorbContig, gapBefore, unpackInput, unpackHist, packInput } from './wire.mjs';
 
-const FIGHTERS = ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap'];
-const FNAME = { kairo: 'KAIRO', lyra: 'LYRA', naomi: 'NAOMI', brutus: 'BRUTUS', void: 'VOID', zap: 'ZAP' };
+const FIGHTERS = ['kairo', 'lyra', 'naomi', 'brutus', 'void', 'zap', 'mike', 'daragh', 'dec'];
+const FNAME = {
+  kairo: 'KAIRO', lyra: 'LYRA', naomi: 'NAOMI', brutus: 'BRUTUS', void: 'VOID', zap: 'ZAP',
+  mike: 'PADEL MIKE', daragh: 'DARAGH', dec: 'DANGEROUS DEC',
+};
 const STAGES = ['rooftop', 'temple', 'industrial'];
 const SCREEN_W = 1280, SCREEN_H = 720, GROUND_Y = 560;
 const SPEED = 240, JUMP = -520, GRAV = 1600;
@@ -450,6 +453,8 @@ function applySnapshot(m) {
 
 function fightersThumbs() {
   chargrid.innerHTML = '';
+  // Nine fighters over the grid's three columns, or two on a phone.
+  chargrid.style.setProperty('--cols', window.innerWidth <= 720 ? '2' : '3');
   for (const f of FIGHTERS) {
     const d = document.createElement('div');
     d.className = 'char';
