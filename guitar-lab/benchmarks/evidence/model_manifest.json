@@ -1,0 +1,8 @@
+{
+  "model": "Riley guitar-fl",
+  "local_tensor_only_sha256": "bafb7de3282a6c5079f508aeabee903cb78ff7296fd0291bea3bf33ba1d5617e",
+  "bytes": 98747670,
+  "loading": "Restricted globals allowlist, strict model-state match, saved tensor-only copy",
+  "publisher_authenticity_independently_verified": false,
+  "weights_committed": false
+}

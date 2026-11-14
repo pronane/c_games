@@ -300,7 +300,7 @@ def _guitar_song(tmp_path, instrument='guitar', key='cmp-song'):
 
 def test_song_compare_scores_stem_and_notation_and_keeps_five_takes(tmp_path, monkeypatch):
     song = _guitar_song(tmp_path)
-    monkeypatch.setattr('server.compare.transcribe_take', lambda path: [
+    monkeypatch.setattr('server.compare.transcribe_take', lambda path, backend=None: [
         {'time': 0.0, 'duration': 0.4, 'midi': 64},
         {'time': 0.5, 'duration': 0.4, 'midi': 64},  # F4 written, E4 played
         {'time': 1.0, 'duration': 0.4, 'midi': 67},
@@ -340,3 +340,49 @@ def _song_compare_body(client, song, tmp_path):
                           data={'parts': 'g', 'start': '0', 'end': '2'},
                           files={'take': ('take.wav', _wav(), 'audio/wav')})
     assert refused.status_code == 422 and 'guitar' in refused.json()['detail']
+
+
+@pytest.mark.parametrize('selection,expected', [('basic_pitch','basic_pitch'), ('riley','riley'), ('','riley')])
+def test_compare_routes_and_labels_selected_backend(monkeypatch, selection, expected):
+    from server import transcribers
+    monkeypatch.setenv('FRETWORK_TRANSCRIBER','riley')
+    monkeypatch.setattr(transcribers,'availability',lambda: {'basic_pitch':{'installed':True},'riley':{'installed':True}})
+    seen=[]
+    monkeypatch.setattr(module.models,'transcribe',lambda path,**kw: seen.append(kw['backend']) or [at(1,1,64)])
+    response=TestClient(module.app).post('/api/compare',headers=HEADERS,
+        data={'targets':json.dumps([target([at(1,1,64)])]),'transcriber':selection},
+        files={'take':('take.wav',_wav(),'audio/wav')})
+    assert response.status_code==200,response.text
+    assert seen==[expected]
+    assert ('Riley' in response.json()['transcription']) == (expected=='riley')
+
+
+@pytest.mark.parametrize('selection', ['unknown','riley'])
+def test_compare_rejects_unavailable_detector_without_inference(monkeypatch, selection):
+    from server import transcribers
+    monkeypatch.setattr(transcribers,'availability',lambda: {'riley':{'installed':False,'label':'Riley'}})
+    def forbidden(*args,**kwargs):
+        pytest.fail('Invalid backend must not trigger inference')
+    monkeypatch.setattr(module.models,'transcribe',forbidden)
+    response=TestClient(module.app).post('/api/compare',headers=HEADERS,
+        data={'targets':json.dumps([target([at(1,1,64)])]),'transcriber':selection},
+        files={'take':('take.wav',_wav(),'audio/wav')})
+    assert response.status_code==422,response.text
+
+
+def test_song_take_uses_session_backend_or_explicit_override(tmp_path,monkeypatch):
+    from server import transcribers
+    monkeypatch.setenv('FRETWORK_TRANSCRIBER','basic_pitch')
+    monkeypatch.setattr(transcribers,'availability',lambda: {'basic_pitch':{'installed':True},'riley':{'installed':True}})
+    song=_guitar_song(tmp_path);song.transcriber='riley'
+    seen=[]
+    monkeypatch.setattr('server.compare.transcribe_take',lambda path,backend=None: seen.append(backend) or [at(1,1,64)])
+    try:
+        for extra,expected in [({},'riley'),({'transcriber':'basic_pitch'},'basic_pitch')]:
+            response=TestClient(module.app).post(f'/api/songs/{song.id}/compare',headers=HEADERS,
+                data={'start':'0','end':'2',**extra},files={'take':('take.wav',_wav(),'audio/wav')})
+            assert response.status_code==200,response.text
+            assert seen[-1]==expected
+            assert ('Riley' in response.json()['transcription'])==(expected=='riley')
+    finally:
+        SONGS.pop(song.id,None)

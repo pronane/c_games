@@ -2074,3 +2074,31 @@ footer span:first-child {
     display: none;
   }
 }
+.transcription-check {
+  margin: 18px 0;
+  --check-bg: #ffffff;
+  --check-ink: 32, 44, 40;
+  --check-rule: #e3e7e1;
+  --check-muted: #66736d;
+  --check-note: #0f7b6c;
+  --check-missing: #e08a2c;
+  --check-extra: #8a6be8;
+  --check-gap: #e08a2c;
+  --check-differs: #c8473a;
+}
+.check-scroller {
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 6px;
+  margin: 8px 0;
+}
+.check-canvas {
+  display: block;
+  cursor: pointer;
+}
+.check-list {
+  margin: 6px 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}

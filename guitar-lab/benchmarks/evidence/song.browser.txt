@@ -1,0 +1,19 @@
+
+> guitar-lab@0.2.0 test:song
+> node tests/song-smoke.mjs
+
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+locator.waitFor: Target page, context or browser has been closed
+Call log:
+  - waiting for getByRole('region', { name: 'Break a song into its instruments' }).getByText('What\'s in this song') to be visible
+
+    at /home/user/c_games/guitar-lab/tests/song-smoke.mjs:29:46 {
+  log: [
+    "  - waiting for getByRole('region', { name: 'Break a song into its instruments' }).getByText('What\\'s in this song') to be visible"
+  ]
+}
+
+Node.js v22.22.3

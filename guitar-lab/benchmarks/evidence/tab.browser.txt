@@ -1,0 +1,56 @@
+
+> guitar-lab@0.2.0 test:tab
+> node tests/tab-smoke.mjs
+
+Processing: Separate instruments on CPU Graphics card No graphics card on the analysis server, so CPU is used. A 4-minute song takes a few minutes.
+Facts: PIECE Drop D practice riff Guitar Lab TEMPO 100 BPM LENGTH 0:19 8 bars
+Tuning prompt: Before you play: tune to the tab This tab is written for Drop D. Tune to Drop D
+Tuned: prompt gone
+Played (file's instruments) to: 0:01 · bar 1
+Played (app guitar, distorted + delay) to: 0:02 · bar 2
+Take: 42 ms reported device delay removed, then 160 ms from matching your attacks to the tab.
+Summary: ESTIMATED MATCH 42% 4 missed notes in bar 6 2 missed notes in bar 5 1 wrong note in bar 5 Next: Loop bar 6 slowly until it feels easy, then bring the speed back up. bar 5 57 bar 6 20 Checked note by n
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('.heard-take').getByRole('button', { name: 'What the app heard' })
+    - locator resolved to <button class="" disabled>…</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not enabled
+    - retrying click action
+      - waiting 100ms
+    58 × waiting for element to be visible, enabled and stable
+       - element is not enabled
+     - retrying click action
+       - waiting 500ms
+
+    at /home/user/c_games/guitar-lab/tests/tab-smoke.mjs:69:67 {
+  log: [
+    "  - waiting for locator('.heard-take').getByRole('button', { name: 'What the app heard' })",
+    '    - locator resolved to <button class="" disabled>…</button>',
+    '  - attempting click action',
+    '    2 × waiting for element to be visible, enabled and stable',
+    '      - element is not enabled',
+    '    - retrying click action',
+    '    - waiting 20ms',
+    '    2 × waiting for element to be visible, enabled and stable',
+    '      - element is not enabled',
+    '    - retrying click action',
+    '      - waiting 100ms',
+    '    58 × waiting for element to be visible, enabled and stable',
+    '       - element is not enabled',
+    '     - retrying click action',
+    '       - waiting 500ms'
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v22.22.3

@@ -1,0 +1,74 @@
+{
+  "inference_run": false,
+  "quality_approved": false,
+  "status": "blocked_missing_coverage",
+  "protocol": "guitar-holdout-v1",
+  "protocol_sha256": "92b1f0e67c536cf027f3ea007bf919a43cb6e1a901660fde271f4ba9942acb42",
+  "manifest_sha256": "0c4138256c6825eb77f262b341cb3369892abe4097d5e0ab9ddee439d6c88966",
+  "clips": 0,
+  "independent_performers": 0,
+  "independent_performances": 0,
+  "sustain_examples": {},
+  "missing": [
+    {
+      "requirement": "independent performers",
+      "available": 0,
+      "required": 3
+    },
+    {
+      "requirement": "independent performances",
+      "available": 0,
+      "required": 6
+    },
+    {
+      "requirement": "paired performances across all four conditions",
+      "available": 0,
+      "required": 6
+    },
+    {
+      "requirement": "dry performances",
+      "available": 0,
+      "required": 6
+    },
+    {
+      "requirement": "quiet_dry performances",
+      "available": 0,
+      "required": 6
+    },
+    {
+      "requirement": "wet performances",
+      "available": 0,
+      "required": 6
+    },
+    {
+      "requirement": "quiet_wet performances",
+      "available": 0,
+      "required": 6
+    },
+    {
+      "requirement": "correct human sustain examples",
+      "available": 0,
+      "required": 20
+    },
+    {
+      "requirement": "too_short human sustain examples",
+      "available": 0,
+      "required": 20
+    },
+    {
+      "requirement": "too_long human sustain examples",
+      "available": 0,
+      "required": 10
+    },
+    {
+      "requirement": "sustain-labelled performances",
+      "available": 0,
+      "required": 3
+    }
+  ],
+  "limits": [
+    "Human provenance is declared, not independently authenticated.",
+    "Held out from project tuning, not guaranteed unseen by model training.",
+    "Coverage readiness is not quality approval; no defaults are promoted."
+  ]
+}
