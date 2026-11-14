@@ -284,6 +284,50 @@ The middle of One's heavy half (about 4:30–6:30) still does not lock at any ne
 the chart there appears to have fewer bars than the recording (the map stretches it 10–23%).
 That is not confirmed.
 
+## Transcription check and take comparison: planted-error tests
+
+Both tests use recordings whose notes are known and plant errors whose place is known, so the
+scores need no human labels. GuitarSet player 05 (held out of all training; CC BY 4.0): its 30
+rhythm parts and 30 solos. EGSet12 and Guitar-TECHS amp recordings (24 clips) were not used to
+choose any threshold.
+
+**Check this transcription** (`server/transcription_check.py`, `benchmarks/transcription_check_eval.py`).
+The part's notes are rendered with the engine's playback and compared with the recording.
+Planted: four seconds of notes removed, or moved to wrong pitches. Thresholds were chosen on
+both GuitarSet halves together; the amp sets are the held-out check.
+
+| Material | Removed stretch found | Wrong-pitch stretch found | Rest of the playing marked |
+|---|---|---|---|
+| GuitarSet solos | 98% | 100% | 10% |
+| GuitarSet rhythm parts | 92% | 67% | 2% |
+| Amp solos and excerpts (held out), true notes | 21/24 | 22/24 | 7–8% |
+| Amp solos and excerpts (held out), Riley's notes | 21/24 | 21/24 | 8–10% |
+
+A relative pitch-match test alone marked a quarter of correctly transcribed solos, because
+two seconds of a single-note line match noisily; it is kept only as an absolute floor (0.2).
+Wrong pitches inside strummed chords are the weakest case: moved chord tones often still
+share pitches with the recording.
+
+**Take comparison** (`server/compare.py`, `benchmarks/take_compare_eval.py`). The take is the
+real recording transcribed by Riley; the reference is its true notes with planted mistakes
+(a note added = the player missed it, removed = played an extra note, pitch moved 1–3
+semitones, a chord moved 150 ms).
+
+| | Rhythm parts | Solos | Amp recordings (held out) |
+|---|---|---|---|
+| Missed notes caught | 78% | 71% | 75% |
+| Extra notes caught | 81% | 70% | 57% |
+| Wrong notes caught | 84% | 89% | 75% |
+| Early / late caught | 86% | 87% | 68% |
+| False mistakes per 100 correctly played notes, before | 14.2 | 12.1 | 35.0 |
+| ... after checking the recording before saying "missed" | **8.5** | **9.8** | **21.8** |
+| False note-length remarks per 100 notes | 10.3 | 5.2 | 14.3 |
+
+Most false mistakes are the detector's own errors showing through: a note it dropped looks
+like a missed note. Before reporting "missed", the comparison now looks for the note in Riley's
+onset map at its pitch and time (above 0.05). The threshold was set on the solos; the rhythm
+parts and amp recordings did not inform it.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
