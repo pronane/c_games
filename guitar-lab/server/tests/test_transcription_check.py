@@ -54,7 +54,30 @@ def test_a_note_the_detector_dropped_is_not_called_missing_when_the_recording_sh
     heard[int(round(target[4]['time'] * 100)), target[4]['midi'] - 21] = 0.4
     checked = C.compare_take(take, [{'source': 'file', 'notes': target, 'bpm': 120}], heard=heard)['reports'][0]['notes']
     assert [f['kind'] for f in checked].count('missing') == 0
-    assert any(f.get('heard_faintly') for f in checked)
+    assert any(f.get('heard_faintly') and f['kind'] == 'uncertain' for f in checked)
+    assert not any(f.get('heard_faintly') and f['kind'] == 'correct' for f in checked)
     # A note that is not in the recording at all is still reported.
     empty = C.compare_take(take, [{'source': 'file', 'notes': target, 'bpm': 120}], heard=np.zeros((600, 88), np.float32))
     assert [f['kind'] for f in empty['reports'][0]['notes']].count('missing') == 1
+
+
+def test_all_uncertain_notes_never_produce_a_perfect_score():
+    target = [{'time': i * 0.5 + 1, 'duration': 0.3, 'midi': 60 + i} for i in range(4)]
+    # Three matching notes establish alignment; one faint onset is explicitly ungraded.
+    heard = np.ones((500, 88), dtype=np.float32)
+    report = C.compare_take(target[:3], [{'source': 'file', 'notes': target, 'bpm': 120}], heard=heard)['reports'][0]
+    faint = [n for n in report['notes'] if n.get('heard_faintly')]
+    assert len(faint) == 1 and faint[0]['kind'] == 'uncertain'
+    assert report['summary']['counts']['correct'] == 3
+    assert report['summary']['counts']['uncertain'] == 1
+    counts = C._empty_counts()
+    counts['uncertain'] = 4
+    assert C._summary(counts, 1)['overall'] is None
+    bars, _ = C._bar_rows([{'bar': 1, 'bar_time': 0, 'kind': 'uncertain', 'message': 'review'}], [])
+    assert bars[0]['score'] is None
+
+
+def test_too_few_aligned_notes_requests_alignment_review():
+    target = [{'time': 1, 'duration': .3, 'midi': 60}]
+    report = C.compare_take([], [{'source': 'file', 'notes': target, 'bpm': 120}])['reports'][0]
+    assert report['alignment_warning']

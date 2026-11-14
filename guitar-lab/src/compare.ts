@@ -4,6 +4,7 @@
 import { note as noteName } from "./analysis";
 
 export type DiffKind =
+  | "uncertain"
   | "correct"
   | "wrong_pitch"
   | "wrong_string"
@@ -19,6 +20,11 @@ export type DiffNote = {
   bar: number;
   beat: number;
   message: string;
+  target_time?: number | null;
+  take_time?: number | null;
+  target_duration?: number | null;
+  heard_faintly?: boolean;
+  review_status?: string;
   target_midi?: number | null;
   target_string?: number | null;
   target_fret?: number | null;
@@ -40,6 +46,7 @@ export type DiffSummary = {
 };
 
 export type CompareReport = {
+  alignment_warning?: string | null;
   duration_policy?: "review_only";
   duration_notice?: string;
   source: "stem" | "notation" | "file" | string;

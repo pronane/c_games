@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:practice
+> node tests/practice-smoke.mjs
+
+PASS: unreviewed gate; fake-mic capture; reviewed comparison; local A/B playback; human finding review; focus phrase; retry speed; IndexedDB reload with retained audio; export; correction revision; delete. No browser exceptions. Synthetic/mocked only.

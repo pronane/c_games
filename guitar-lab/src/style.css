@@ -2102,3 +2102,13 @@ footer span:first-child {
   display: grid;
   gap: 4px;
 }
+
+/* Local-first guided practice workspace. */
+.practice-fields { border: 1px solid var(--border, #555); border-radius: 12px; padding: 1rem; min-width: 0; }
+.practice-fields > label, .practice-review details > label { display: block; margin: .8rem 0; }
+.practice-fields input:not([type=checkbox]), .practice-fields select { max-width: 100%; margin-left: .5rem; }
+.practice-fields textarea { display: block; width: 100%; box-sizing: border-box; margin: .8rem 0; font-family: monospace; }
+.practice-issues { padding-left: 1.5rem; max-height: 36rem; overflow: auto; }
+.practice-issues > li { padding: 1rem .5rem; border-bottom: 1px solid #6665; }
+.practice-studio button, .practice-studio select { margin: .25rem; }
+.diff-uncertain { outline: 1px dashed #d9ae61; }
