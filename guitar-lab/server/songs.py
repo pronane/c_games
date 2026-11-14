@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 import ipaddress
+import json
 from pathlib import Path
 import shutil
 import socket
@@ -566,6 +567,40 @@ def score(key: str, body: ScoreRequest, x_fretwork_client: str | None = Header(N
             'chords': song.result['chords'], 'key': key_info, 'tempo': {k: song.result['tempo'][k] for k in ('bpm', 'time_signature')}}
 
 
+class CheckRequest(BaseModel):
+    part: str = Field(max_length=40)
+
+
+@router.post('/{key}/check')
+async def check_transcription(key: str, body: CheckRequest, x_fretwork_client: str | None = Header(None)):
+    """Play one part's transcription back against the audio it was transcribed from, and mark
+    the stretches where the two disagree (server/transcription_check.py). The playback is
+    written as a track so the studio can play recording, playback, or both."""
+    client(x_fretwork_client)
+    song = get_song(key)
+    if song.status != 'complete' or not song.result:
+        raise HTTPException(409, 'Wait for the breakdown to finish.')
+    if body.part not in song.notes:
+        raise HTTPException(404, 'Unknown part.')
+    cached = song.folder/f'check_{body.part}.json'
+    if cached.is_file():
+        return json.loads(cached.read_text())
+
+    def work():
+        from . import transcription_check as tc
+        audio, sr = sf.read(song.folder/'tracks'/f'{body.part}.flac', dtype='float32')
+        report, played = tc.check(audio, sr, song.notes[body.part])
+        write_track(song.folder/'tracks', f'{body.part}_check', played, tc.SR)
+        return report
+
+    report = await asyncio.to_thread(work)
+    report.update(part=body.part, recording_track=body.part, playback_track=f'{body.part}_check',
+                  notes=[{'time': round(float(n['time']), 3), 'duration': round(float(n.get('duration', 0.3)), 3),
+                          'midi': int(n['midi'])} for n in song.notes[body.part]])
+    cached.write_text(json.dumps(report))
+    return report
+
+
 MUTED_ROLES = {'any': None, 'lead': ('lead', 'mixed'), 'rhythm': ('rhythm',)}
 
 
@@ -655,9 +690,9 @@ def _beats_per_bar(tempo):
 
 
 def _score_recorded_take(path, targets):
-    notes = take_diff.transcribe_take(path)
+    notes, heard = take_diff.transcribe_take_heard(path)
     from .transcribers import clean_take_label
-    return take_diff.compare_take(notes, targets, transcription=clean_take_label())
+    return take_diff.compare_take(notes, targets, transcription=clean_take_label(), heard=heard)
 
 
 @router.post('/{key}/compare')

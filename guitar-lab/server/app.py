@@ -497,7 +497,7 @@ async def compare_performance(take: UploadFile | None = File(None), take_notes: 
             if not 0.4 <= info.duration <= 600:
                 raise HTTPException(422, 'The take must be between 0.4 seconds and 10 minutes.')
             try:
-                notes = await asyncio.to_thread(take_diff.transcribe_take, path)
+                notes, heard = await asyncio.to_thread(take_diff.transcribe_take_heard, path)
             except models.ModelUnavailable as exc:
                 raise HTTPException(503, str(exc)) from exc
             from .transcribers import clean_take_label
@@ -506,6 +506,7 @@ async def compare_performance(take: UploadFile | None = File(None), take_notes: 
             await take.close()
             path.unlink(missing_ok=True)
     elif take_notes:
+        heard = None
         try:
             notes = json.loads(take_notes)
             if not isinstance(notes, list) or len(notes) > 5000:
@@ -515,7 +516,7 @@ async def compare_performance(take: UploadFile | None = File(None), take_notes: 
     else:
         raise HTTPException(422, 'Provide the take as audio or as take_notes.')
     try:
-        return take_diff.compare_take(notes, parsed, transcription=transcription)
+        return take_diff.compare_take(notes, parsed, transcription=transcription, heard=heard)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
