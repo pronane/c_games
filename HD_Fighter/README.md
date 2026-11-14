@@ -20,10 +20,28 @@ No install. Share link = share room. `⚡ Quick Play` also auto-matches.
 - 3 parallax stages (ROOFTOP/TEMPLE/INDUSTRIAL) with animated foreground
 - Online: Node.js WebSocket server (`multiplayer/server.js`), 60fps input relay, rooms + quick-play, ping, deployable
 
+### ⌨️ Local 2-Player Controls
+Two players share one keyboard. The two sets are kept fully separate, so no key
+means two things at once.
+
+| | Player 1 | Player 2 |
+|---|---|---|
+| Move / jump / crouch | `A` `D` / `W` / `S` | `←` `→` / `↑` / `↓` |
+| Light punch | `J` | `Z` |
+| Heavy punch | `K` | `X` |
+| Light kick | `L` | `C` |
+| Heavy kick | `;` | `V` |
+| Block | `Space` | `B` |
+| Throw | `T` | `N` |
+| Special 1 / 2 | `Q` / `E` | `U` / `I` |
+| Super | `R` | `O` |
+
+Gamepads work too: the first pad drives Player 1, the second drives Player 2.
+
 ### 📦 Run Locally
 ```bash
 pip install -r requirements.txt
-python game.py          # local 2P (WASD+JKL / Arrows+Pad / 2 gamepads, F2 toggles HD/CLASSIC)
+python game.py          # local 2P keyboard or 2 gamepads, F2 toggles HD/CLASSIC
 # Online server:
 cd multiplayer && npm install && npm start   # → http://localhost:3000
 ```

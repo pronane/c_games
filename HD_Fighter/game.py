@@ -155,15 +155,50 @@ class FighterAssets:
 
 
 # ------------------------------------------------------------------ input
-KEY_LEFT = {pygame.K_LEFT, pygame.K_a}
-KEY_RIGHT = {pygame.K_RIGHT, pygame.K_d}
-KEY_UP = {pygame.K_UP, pygame.K_w}
-KEY_DOWN = {pygame.K_DOWN, pygame.K_s}
-KEY_LP = {pygame.K_z, pygame.K_j}
-KEY_HP = {pygame.K_x, pygame.K_k}
-KEY_LK = {pygame.K_c, pygame.K_n}
-KEY_HK = {pygame.K_v, pygame.K_m}
-KEY_START = {pygame.K_RETURN, pygame.K_SPACE}
+# Player 1: WASD to move, J/K to punch, L to kick, Q/E for specials.
+# Every key here is disjoint from the Player 2 block below -- two people share
+# one keyboard, so a key may not mean something to both of them.
+KEY_LEFT = {pygame.K_a}
+KEY_RIGHT = {pygame.K_d}
+KEY_UP = {pygame.K_w}
+KEY_DOWN = {pygame.K_s}
+KEY_LP = {pygame.K_j}
+KEY_HP = {pygame.K_k}
+KEY_LK = {pygame.K_l}
+KEY_HK = {pygame.K_SEMICOLON}
+KEY_START = {pygame.K_RETURN}
+KEY_BLOCK = {pygame.K_SPACE}
+KEY_THROW = {pygame.K_t}
+KEY_SPECIAL1 = {pygame.K_q}
+KEY_SPECIAL2 = {pygame.K_e}
+KEY_SUPER = {pygame.K_r}
+
+# Player 2: arrow keys to move, Z/X/C/V to punch and kick, B/N/U/I/O for the
+# rest.  No overlap with Player 1 above.
+KEY_LEFT_P2 = {pygame.K_LEFT}
+KEY_RIGHT_P2 = {pygame.K_RIGHT}
+KEY_UP_P2 = {pygame.K_UP}
+KEY_DOWN_P2 = {pygame.K_DOWN}
+KEY_LP_P2 = {pygame.K_z}
+KEY_HP_P2 = {pygame.K_x}
+KEY_LK_P2 = {pygame.K_c}
+KEY_HK_P2 = {pygame.K_v}
+KEY_BLOCK_P2 = {pygame.K_b}
+KEY_THROW_P2 = {pygame.K_n}
+KEY_SPECIAL1_P2 = {pygame.K_u}
+KEY_SPECIAL2_P2 = {pygame.K_i}
+KEY_SUPER_P2 = {pygame.K_o}
+
+KEYSETS = {
+    1: dict(left=KEY_LEFT, right=KEY_RIGHT, up=KEY_UP, down=KEY_DOWN,
+            lp=KEY_LP, hp=KEY_HP, lk=KEY_LK, hk=KEY_HK,
+            block=KEY_BLOCK, throw=KEY_THROW,
+            special1=KEY_SPECIAL1, special2=KEY_SPECIAL2, super=KEY_SUPER),
+    2: dict(left=KEY_LEFT_P2, right=KEY_RIGHT_P2, up=KEY_UP_P2, down=KEY_DOWN_P2,
+            lp=KEY_LP_P2, hp=KEY_HP_P2, lk=KEY_LK_P2, hk=KEY_HK_P2,
+            block=KEY_BLOCK_P2, throw=KEY_THROW_P2,
+            special1=KEY_SPECIAL1_P2, special2=KEY_SPECIAL2_P2, super=KEY_SUPER_P2),
+}
 
 JOY_BTN_LP = 0
 JOY_BTN_HP = 1
@@ -320,24 +355,14 @@ class Fighter:
     def get_input(self, keys, joysticks):
         act = {"left": False, "right": False, "up": False, "down": False,
                "lp": False, "hp": False, "lk": False, "hk": False,
-               "throw": False, "super": False}
+               "throw": False, "super": False,
+               "block": False, "special1": False, "special2": False}
 
-        if keys_pressed(keys, KEY_LEFT):
-            act["left"] = True
-        if keys_pressed(keys, KEY_RIGHT):
-            act["right"] = True
-        if keys_pressed(keys, KEY_UP):
-            act["up"] = True
-        if keys_pressed(keys, KEY_DOWN):
-            act["down"] = True
-        if keys_pressed(keys, KEY_LP):
-            act["lp"] = True
-        if keys_pressed(keys, KEY_HP):
-            act["hp"] = True
-        if keys_pressed(keys, KEY_LK):
-            act["lk"] = True
-        if keys_pressed(keys, KEY_HK):
-            act["hk"] = True
+        bind = KEYSETS.get(self.player_id, KEYSETS[1])
+        for action in ("left", "right", "up", "down", "lp", "hp", "lk", "hk",
+                       "block", "throw", "special1", "special2", "super"):
+            if keys_pressed(keys, bind[action]):
+                act[action] = True
 
         if self.joy is not None:
             j = self.joy
@@ -382,6 +407,9 @@ class Fighter:
         self.frame_durations = sheet.durations
 
     def update(self, dt, other, keys, joysticks, projectiles, hitstop, screenshake):
+        if self.flash_timer > 0:
+            # the white damage flash is a short effect, not a permanent palette
+            self.flash_timer = max(0.0, self.flash_timer - dt)
         if self.defeated:
             self.set_state("lose")
             self.animate(dt)
@@ -402,6 +430,10 @@ class Fighter:
             self.super_meter = max(0, self.super_meter - 2 * dt)
 
         if hitstop.active():
+            # the world is frozen for a few frames on impact; the hurt fighter
+            # still needs its stun timer to expire, or it never recovers
+            if self.hitstun > 0:
+                self.hitstun -= dt
             self.animate(dt)
             return
 
@@ -413,6 +445,9 @@ class Fighter:
             self.animate(dt)
             self.apply_gravity(dt)
             return
+        if self.state == "hit":
+            # hitstun ran out; stand back up instead of holding the hit pose
+            self.set_state("idle")
 
         act = self.get_input(keys, joysticks)
 
@@ -426,30 +461,31 @@ class Fighter:
             self.attack_cooldown -= dt
 
         # --- movement states ---
+        # Block is its own button.  Holding *back* used to be read as block as
+        # well, which meant a fighter could never walk away from the opponent
+        # and the block button was cancelled the moment it was pressed.
         if self.state in ("idle", "walk", "crouch", "block"):
+            if act["block"]:
+                if self.state != "block":
+                    self.set_state("block")
+                self.blocking = True
+                self.animate(dt)
+                return
+            if self.state == "block":
+                # button released, stand back up
+                self.set_state("crouch" if act["down"] else "idle")
             if act["down"]:
                 self.set_state("crouch")
-            # block: hold back (away from opponent)
-            toward = (act["right"] if self.facing > 0 else act["left"])
-            away = (act["left"] if self.facing > 0 else act["right"])
-            if away and not toward and self.state != "block":
-                self.set_state("block")
-            elif not away and self.state == "block":
-                self.set_state("idle")
             elif act["left"] or act["right"]:
-                if not self.blocking:
-                    self.set_state("walk")
-                    spd = 140 if self.tag != "brutus" else 100
-                    if act["left"]:
-                        self.x -= spd * dt
-                    if act["right"]:
-                        self.x += spd * dt
-                    self.x = max(70, min(SCREEN_W - 70, self.x))
+                self.set_state("walk")
+                spd = 140 if self.tag != "brutus" else 100
+                if act["left"]:
+                    self.x -= spd * dt
+                if act["right"]:
+                    self.x += spd * dt
+                self.x = max(70, min(SCREEN_W - 70, self.x))
             else:
-                if self.state == "block":
-                    self.set_state("idle")
-                elif self.state != "crouch" or not act["down"]:   # stand up when down is released
-                    self.set_state("idle")
+                self.set_state("idle")
 
         self.blocking = (self.state == "block")
 
@@ -479,6 +515,14 @@ class Fighter:
                 self.attack_cooldown = 1.6
                 self.super_meter = 0
                 screenshake.trigger(10, 12)
+            elif act["special1"] and self.state != "special1":
+                self.set_state("special1", force=True)
+                self.attacking = True
+                self.attack_cooldown = 0.9
+            elif act["special2"] and self.state != "special2":
+                self.set_state("special2", force=True)
+                self.attacking = True
+                self.attack_cooldown = 0.9
             elif act["down"] and (act["lp"] or act["hp"]) and self.state != "special1":
                 self.set_state("special1", force=True)
                 self.attacking = True
@@ -527,39 +571,55 @@ class Fighter:
 
         self.x = max(70, min(SCREEN_W - 70, self.x))
 
+        # --- body collision ---
+        # keep the two fighters a body-width apart; without this they walk into
+        # each other and stand overlapped, which reads as one fighter drawn twice
+        gap = 120
+        if abs(self.x - other.x) < gap:
+            push = (gap - abs(self.x - other.x)) / 2
+            away = 1 if self.x < other.x else -1
+            self.x = max(70, min(SCREEN_W - 70, self.x - away * push))
+            other.x = max(70, min(SCREEN_W - 70, other.x + away * push))
+
         # --- attack hitboxes ---
+        # Windows are fractions of the animation, not absolute seconds.  They used
+        # to be absolute (e.g. "0.22 < st < 0.5"), but every attack anim finishes
+        # in 0.15-0.33 s, so those windows opened *after* the move had already
+        # ended and no punch could ever connect.
         self.attack_hitboxes = []
+        anim = self.assets.sheets[self.state].total or 0.001
+        atk = self.state_timer / anim     # 0 -> 1 through the current move
         if self.attacking:
             st = self.state_timer
-            if self.state == "lp" and 0.12 < st < 0.32:
+            if self.state == "lp" and 0.25 < atk < 0.85:
                 reach = 78 * SCALE
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x + (24 * self.facing) * SCALE - reach / 2),
                                 int(self.y - 90 * SCALE), reach, 70 * SCALE),
                     9, 0.4, 250))
-            elif self.state == "hp" and 0.22 < st < 0.5:
+            elif self.state == "hp" and 0.25 < atk < 0.85:
                 reach = 120 * SCALE
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x + (28 * self.facing) * SCALE - reach / 2),
                                 int(self.y - 100 * SCALE), reach, 80 * SCALE),
                     16, 0.6, 360))
-            elif self.state == "lk" and 0.12 < st < 0.32:
+            elif self.state == "lk" and 0.25 < atk < 0.85:
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x + (22 * self.facing) * SCALE - 45 * SCALE),
                                 int(self.y - 30 * SCALE), 80 * SCALE, 55 * SCALE),
                     7, 0.3, 160))
-            elif self.state == "hk" and 0.22 < st < 0.55:
+            elif self.state == "hk" and 0.25 < atk < 0.85:
                 reach = 130 * SCALE
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x + (28 * self.facing) * SCALE - reach / 2),
                                 int(self.y - 100 * SCALE), reach, 100 * SCALE),
                     14, 0.55, 330))
-            elif self.state == "throw" and 0.25 < st < 0.55:
+            elif self.state == "throw" and 0.35 < atk < 0.8:
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x + (30 * self.facing) * SCALE - 40 * SCALE),
                                 int(self.y - 40 * SCALE), 80 * SCALE, 100 * SCALE),
                     0, 1.2, 0))
-            elif self.state == "special1" and 0.35 < st < 0.6:
+            elif self.state == "special1" and 0.4 < atk < 0.85:
                 if not getattr(self, "_proj_spawned", False):
                     self._proj_spawned = True
                     kind = "elecball" if self.tag == "zap" else "fireball"
@@ -570,13 +630,13 @@ class Fighter:
                     pygame.Rect(int(self.x + (30 * self.facing) * SCALE - 50 * SCALE),
                                 int(self.y - 60 * SCALE), 100 * SCALE, 80 * SCALE),
                     10, 0.5, 280))
-            elif self.state == "special2" and 0.15 < st < 0.6:
+            elif self.state == "special2" and 0.2 < atk < 0.85:
                 self.x += self.facing * 220 * dt
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x - 40 * SCALE), int(self.y - 90 * SCALE),
                                 80 * SCALE, 160 * SCALE),
                     12, 0.5, 300))
-            elif self.state == "super" and 0.3 < st < 0.75:
+            elif self.state == "super" and 0.3 < atk < 0.9:
                 reach = 160 * SCALE
                 self.attack_hitboxes.append((
                     pygame.Rect(int(self.x + (30 * self.facing) * SCALE - reach / 2),
@@ -584,7 +644,7 @@ class Fighter:
                     24, 1.0, 450))
 
         # --- throw connect ---
-        if self.throwing and self.state == "throw" and 0.3 < self.state_timer < 0.55:
+        if self.throwing and self.state == "throw" and 0.35 < atk < 0.8:
             hurt = pygame.Rect(int(other.x - 40 * SCALE), int(other.y - 110 * SCALE),
                                80 * SCALE, 150 * SCALE)
             grab = pygame.Rect(int(self.x + (30 * self.facing) * SCALE - 40 * SCALE),
@@ -622,15 +682,15 @@ class Fighter:
     def take_damage(self, damage, stun, knockback, facing, is_blocked=False):
         if self.defeated or self.won:
             return
-        if self.state == "block" and not is_blocked:
+        if is_blocked:
             self.hp -= max(1, damage // 5)
             self.hitstun = 0.12
-            self.flash_timer = 0.1
+            self.flash_timer = 0.07
             self.super_meter = min(SUPER_METER_MAX, self.super_meter + 15)
         else:
             self.hp -= damage
             self.hitstun = stun
-            self.flash_timer = 0.15
+            self.flash_timer = 0.09
             self.vx = knockback * facing
             self.vy = -220
             self.on_ground = False
@@ -644,7 +704,7 @@ class Fighter:
             return
         self.hp -= 18
         self.hitstun = 0.9
-        self.flash_timer = 0.2
+        self.flash_timer = 0.12
         self.vx = facing * 300
         self.vy = -300
         self.on_ground = False
@@ -668,16 +728,22 @@ class Fighter:
             alpha = pygame.surfarray.pixels_alpha(img)
             # whiten where opaque
             mask = alpha > 30
-            # blend towards white 70%
-            arr[mask, 0] = np.clip(arr[mask, 0].astype(int) * 0.3 + 255 * 0.7, 0, 255).astype(np.uint8)
-            arr[mask, 1] = np.clip(arr[mask, 1].astype(int) * 0.3 + 255 * 0.7, 0, 255).astype(np.uint8)
-            arr[mask, 2] = np.clip(arr[mask, 2].astype(int) * 0.3 + 255 * 0.7, 0, 255).astype(np.uint8)
+            # blend a little towards white
+            arr[mask, 0] = np.clip(arr[mask, 0].astype(int) * 0.78 + 255 * 0.22, 0, 255).astype(np.uint8)
+            arr[mask, 1] = np.clip(arr[mask, 1].astype(int) * 0.78 + 255 * 0.22, 0, 255).astype(np.uint8)
+            arr[mask, 2] = np.clip(arr[mask, 2].astype(int) * 0.78 + 255 * 0.22, 0, 255).astype(np.uint8)
             del arr, alpha
         return img
 
+    # The sprite cell is 256 px tall but the fighter's feet sit 13 px above its
+    # bottom edge (the art keeps a margin so jump poses have room).  Anchoring
+    # the cell's bottom on the ground line therefore floats the fighter 13 px
+    # above it; anchor on the feet line instead.
+    FEET_MARGIN = 13
+
     def draw(self, surf):
         img = self.current_image()
-        rect = img.get_rect(midbottom=(int(self.x), int(self.y + 8)))
+        rect = img.get_rect(midbottom=(int(self.x), int(self.y + 8 + self.FEET_MARGIN)))
         surf.blit(img, rect)
 
 
@@ -727,6 +793,7 @@ class Match:
         self.block_sheet = SpriteSheet(os.path.join(ASSETS, EFFECTS["block_spark"][0]), 28, 28, EFFECTS["block_spark"][1], EFFECTS["block_spark"][2])
 
         self.projectiles = []
+        self.sparks = []
         self.hitstop = HitStop()
         self.screenshake = ScreenShake()
 
@@ -803,9 +870,27 @@ class Match:
                     break
 
     def spawn_spark(self, x, y, blocked):
-        sheet = self.block_sheet if blocked else self.spark_sheet
-        img = sheet.frames[0]
-        self.screen.blit(img, (int(x - img.get_width() / 2), int(y - img.get_height() / 2)))
+        self.sparks.append({
+            "x": x, "y": y, "blocked": blocked, "t": 0.0, "life": 0.18,
+        })
+
+    def update_sparks(self, dt):
+        for sp in self.sparks:
+            sp["t"] += dt
+        self.sparks = [sp for sp in self.sparks if sp["t"] < sp["life"]]
+
+    def draw_sparks(self):
+        for sp in self.sparks:
+            sheet = self.block_sheet if sp["blocked"] else self.spark_sheet
+            n = len(sheet.frames)
+            idx = min(n - 1, int((sp["t"] / sp["life"]) * n))
+            img = sheet.frames[idx]
+            # grow slightly as it burns out, like an impact pop
+            grow = 1.0 + 0.35 * (sp["t"] / sp["life"])
+            w = max(1, int(img.get_width() * grow))
+            h = max(1, int(img.get_height() * grow))
+            img = pygame.transform.scale(img, (w, h))
+            self.screen.blit(img, (int(sp["x"] - w / 2), int(sp["y"] - h / 2)))
 
     # ---------------------------------------------------------------- round flow
     def end_round(self):
@@ -891,6 +976,7 @@ class Match:
                 self.stage.update(self.p1, self.p2)
                 self.hitstop.update(dt)
                 self.screenshake.update(dt)
+                self.update_sparks(dt)
 
                 if not self.hitstop.active():
                     self.timer_acc += dt
@@ -921,6 +1007,7 @@ class Match:
         first, second = (self.p1, self.p2) if self.p1.x < self.p2.x else (self.p2, self.p1)
         first.draw(self.screen)
         second.draw(self.screen)
+        self.draw_sparks()
 
         if self.hitstop.active():
             flash = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
@@ -939,23 +1026,39 @@ class Match:
             self.screen.blit(txt2, (SCREEN_W // 2 - txt2.get_width() // 2, 300))
 
     def draw_hud(self):
+        bar = pygame.Surface((SCREEN_W, 108), pygame.SRCALPHA)
+        bar.fill((6, 8, 16, 168))
+        pygame.draw.line(bar, (255, 208, 0, 90), (0, 107), (SCREEN_W, 107), 2)
+        self.screen.blit(bar, (0, 0))
+
         p1_w = int((self.p1.hp / self.p1.max_hp) * 400)
-        pygame.draw.rect(self.screen, (40, 40, 40), (70, 24, 400, 36))
-        pygame.draw.rect(self.screen, (0, 160, 240), (70, 24, p1_w, 36))
-        n1 = self.font.render(self.p1.name, True, (0, 160, 240))
-        self.screen.blit(n1, (70, 2))
+        pygame.draw.rect(self.screen, (28, 32, 48), (70, 24, 400, 36), border_radius=6)
+        if p1_w > 0:
+            pygame.draw.rect(self.screen, (30, 190, 255), (70, 24, p1_w, 36), border_radius=6)
+            pygame.draw.rect(self.screen, (150, 235, 255), (70, 24, p1_w, 6), border_radius=3)
+        pygame.draw.rect(self.screen, (90, 120, 170), (70, 24, 400, 36), 2, border_radius=6)
+        n1 = self.font.render(self.p1.name, True, (235, 245, 255))
+        self.screen.blit(n1, (72, 2))
 
         p2_w = int((self.p2.hp / self.p2.max_hp) * 400)
-        pygame.draw.rect(self.screen, (40, 40, 40), (SCREEN_W - 70 - 400, 24, 400, 36))
-        pygame.draw.rect(self.screen, (240, 70, 70), (SCREEN_W - 70 - 400 + (400 - p2_w), 24, p2_w, 36))
-        n2 = self.font.render(self.p2.name, True, (240, 70, 70))
-        self.screen.blit(n2, (SCREEN_W - 70 - n2.get_width(), 2))
+        pygame.draw.rect(self.screen, (28, 32, 48), (SCREEN_W - 70 - 400, 24, 400, 36), border_radius=6)
+        if p2_w > 0:
+            pygame.draw.rect(self.screen, (255, 80, 90), (SCREEN_W - 70 - 400 + (400 - p2_w), 24, p2_w, 36), border_radius=6)
+            pygame.draw.rect(self.screen, (255, 175, 175), (SCREEN_W - 70 - 400 + (400 - p2_w), 24, p2_w, 6), border_radius=3)
+        pygame.draw.rect(self.screen, (170, 110, 120), (SCREEN_W - 70 - 400, 24, 400, 36), 2, border_radius=6)
+        n2 = self.font.render(self.p2.name, True, (255, 240, 240))
+        self.screen.blit(n2, (SCREEN_W - 72 - n2.get_width(), 2))
 
-        t_txt = self.font_big.render(f"{max(0, self.timer):02d}", True, (255, 255, 255))
+        plate = pygame.Rect(0, 0, 96, 74)
+        plate.centerx = SCREEN_W // 2
+        plate.y = 4
+        pygame.draw.rect(self.screen, (10, 12, 22), plate, border_radius=10)
+        pygame.draw.rect(self.screen, (255, 208, 0), plate, 2, border_radius=10)
+        t_txt = self.font_big.render(f"{max(0, self.timer):02d}", True, (255, 208, 0))
         self.screen.blit(t_txt, (SCREEN_W // 2 - t_txt.get_width() // 2, 6))
 
-        r_txt = self.font_small.render(f"ROUND {self.round}", True, (255, 255, 255))
-        self.screen.blit(r_txt, (SCREEN_W // 2 - r_txt.get_width() // 2, 78))
+        r_txt = self.font_small.render(f"ROUND {self.round}", True, (210, 215, 235))
+        self.screen.blit(r_txt, (SCREEN_W // 2 - r_txt.get_width() // 2, 82))
 
         m1 = int((self.p1.super_meter / SUPER_METER_MAX) * 200)
         pygame.draw.rect(self.screen, (60, 60, 80), (70, 70, 200, 10))
@@ -970,9 +1073,9 @@ class Match:
         if m2 > 0:
             col = (100, 200, 255) if self.p2.super_meter >= SUPER_METER_MAX else (100, 160, 255)
             pygame.draw.rect(self.screen, col, (SCREEN_W - 70 - 200 + (200 - m2), 70, m2, 10))
-        # graphics mode indicator + hint
-        mode_txt = self.font_small.render(f"F2:{GRAPHICS_MODES[CURRENT_MODE[0]]}  (toggle)", True, (160,180,200))
-        self.screen.blit(mode_txt, (SCREEN_W - mode_txt.get_width() - 12, SCREEN_H - 22))
+        # subtle graphics-mode hint (also the video's watermark area)
+        mode_txt = self.font_small.render(f"HD FIGHTER 2  ·  {GRAPHICS_MODES[CURRENT_MODE[0]]}", True, (150, 165, 190))
+        self.screen.blit(mode_txt, (SCREEN_W - mode_txt.get_width() - 12, SCREEN_H - 26))
         self.screen.blit(s_txt, (SCREEN_W - 70 - 200, 84))
 
         if self.p1.combo > 1:
