@@ -63,15 +63,56 @@ def stem_notes(track: Path, sid: str) -> list:
             for inst in pm.instruments if not inst.is_drum for n in inst.notes]
 
 
+MIN_PRESENT = 0.6
+
+
+def label_check(y, notes, shifts=(0, 12, -12)):
+    """(octave shift, share of notes present): do the stem's MIDI notes match what sounds?
+
+    Some sampler patches sound an octave away from their MIDI (harmonics patches), and a few
+    stems do not follow their MIDI at all. Checked without the note detector, so the filter
+    does not favour what the detector already reads well: a note counts as present when its
+    pitch is among the strongest in the half-tone spectrum just after its start."""
+    import librosa
+    hop = 512
+    C = np.abs(librosa.cqt(y, sr=SR, hop_length=hop, fmin=librosa.midi_to_hz(28), n_bins=72))
+    L = librosa.amplitude_to_db(C, ref=np.max)
+    best = (0, 0.0)
+    for shift in shifts:
+        if shift and best[1] >= MIN_PRESENT:
+            break               # the written octave sounds: an octave above is only its overtone
+        hit = total = 0
+        for n in notes[::max(1, len(notes) // 400)]:
+            k = n['midi'] + shift - 28
+            a = int(n['time'] * SR / hop)
+            if not 0 <= k < 72 or a + 2 >= L.shape[1]:
+                continue
+            frame = L[:, a + 1:a + 4].max(axis=1)
+            total += 1
+            hit += frame[k] >= frame.max() - 12 and frame[k] > -50
+        share = hit / total if total else 0.0
+        if share > best[1]:
+            best = (shift, share)
+    return best
+
+
+
 def load_track(track: Path):
     """(true guitar audio at SR, notes, mix at its own rate, rate) or None when no guitar plays."""
-    ids = guitar_stems(track)
-    if not ids:
-        return None
-    notes = sorted((n for sid in ids for n in stem_notes(track, sid)), key=lambda n: n['time'])
+    notes, parts = [], []
+    for sid in guitar_stems(track):
+        y = read(audio_file(track / 'stems', sid), SR)[0]
+        stem = stem_notes(track, sid)
+        shift, present = label_check(y, stem)
+        if present < MIN_PRESENT:
+            # The stem stays in the mix but its notes cannot be trusted: skip the whole track,
+            # or the guitar it adds would count as wrong notes.
+            return None
+        notes += [dict(n, midi=n['midi'] + shift) for n in stem]
+        parts.append(y)
+    notes.sort(key=lambda n: n['time'])
     if len(notes) < 20:
         return None
-    parts = [read(audio_file(track / 'stems', sid), SR)[0] for sid in ids]
     true = np.zeros(max(len(p) for p in parts), np.float32)
     for p in parts:
         true[:len(p)] += p
