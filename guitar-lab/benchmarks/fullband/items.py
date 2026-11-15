@@ -68,7 +68,13 @@ def playalong(take_path, song_path, name):
     take, song = load(take_path), load(song_path)
     stems, sr, _ = models.run_demucs(song, SR)
     assert sr == SR
-    offset, similarity = take_offset(take.mean(axis=1), stems['guitar'].mean(axis=1))
+    # Against the song's separated guitar and against the whole song; the better fit wins
+    # (separation can lose the guitar, and then the whole song is the better guide).
+    offset, similarity = max((take_offset(take.mean(axis=1), stems['guitar'].mean(axis=1)),
+                              take_offset(take.mean(axis=1), song.mean(axis=1))), key=lambda f: f[1])
+    if similarity < 0.5:
+        raise SystemExit(f'The take could not be lined up with the song (similarity {similarity:.2f}, need 0.5). '
+                         'Check it is the same song at the same tempo and tuning, and that it plays most of the time.')
     backing = sum(v for k, v in stems.items() if k != 'guitar')
     a = int(round(offset * SR))
     placed = np.zeros_like(backing)

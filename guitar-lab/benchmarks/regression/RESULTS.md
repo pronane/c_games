@@ -328,6 +328,32 @@ like a missed note. Before reporting "missed", the comparison now looks for the 
 onset map at its pitch and time (above 0.05). The threshold was set on the solos; the rhythm
 parts and amp recordings did not inform it.
 
+## Guitar inside a band mix, with exact notes (BabySlakh sample)
+
+`training/slakh_data.py eval` on the first 11 songs with guitar of BabySlakh (the 20-song,
+16 kHz sample of Slakh2100, CC BY 4.0; rendered from MIDI with sampled instruments, so the
+notes are exact). Riley's note F1 against the true guitar notes:
+
+| Riley hears | Mean F1 | Precision | Recall |
+|---|---|---|---|
+| The guitar stem on its own | .555 | .68 | .48 |
+| The guitar after separation (htdemucs_6s) | .243 | .32 | .21 |
+| The unseparated mix | .280 | .29 | .32 |
+
+- The band mix costs more than half of what Riley gets on the guitar alone, and separation is
+  no better than the raw mix. Same picture as the NIN multitrack.
+- The stem-alone score is far below GuitarSet (.94): sampled "muted" and jazz guitar patches
+  score near zero on their own, and some stems sound an octave from their MIDI.
+  `label_check` (CQT only, no detector) corrects the octave or skips the track.
+- Small sample, and 16 kHz audio upsampled for the separator; the full set is 44.1 kHz.
+
+**YourMT3+ straight on the mix** (it is built to read whole bands), NIN "1,000,000", against
+Riley's reading of the real guitar tracks: guitar-labelled notes F1 .035, all pitched notes
+.042, where separate-then-Riley gets .170. One song; not pursued.
+
+The plan for training on this material, with its frozen real-recording test, is in
+`training/FULL_BAND_PLAN.md`.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
