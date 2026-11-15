@@ -58,3 +58,17 @@ test('chart attachments are inert, bounded and optional for old projects', async
   assert.throws(() => decodeAttachment('data:application/octet-stream;base64,PHNjb3JlLz4=', 'application/octet-stream', 2));
   assert.throws(() => validateProject({ ...p, attempts: [null] }));
 });
+test('saved signal-health metadata and reviewer packet mappings are optional but bounded', async () => {
+  const { recordingQuality } = await import('./recordingQuality');
+  const p = newProject(seed);
+  p.attempts = [{ ...attempt, quality: recordingQuality([new Float32Array(100)], 100), listeningPackets: [{ id: 'anonymous-packet', sha256: 'a'.repeat(64) }] }];
+  assert.equal(validateProject(p), p);
+  assert.throws(() => validateProject({ ...p, attempts: [{ ...p.attempts[0], quality: { ...p.attempts[0].quality, peak: NaN } }] }));
+  assert.throws(() => validateProject({ ...p, attempts: [{ ...p.attempts[0], listeningPackets: [{ id: 'packet', sha256: 'bad' }] }] }));
+});
+test('signal-health cautions prevent count-based progress advice', async () => {
+  const { progressVerdict } = await import('./practiceProject');
+  const { recordingQuality } = await import('./recordingQuality');
+  const q = recordingQuality([new Float32Array(100).fill(.001)], 100);
+  assert.match(progressVerdict({ ...attempt, quality: q }, { ...attempt, quality: q }), /Recording levels need review/);
+});

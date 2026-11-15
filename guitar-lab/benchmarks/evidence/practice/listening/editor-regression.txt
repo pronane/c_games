@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:reference-editor
+> node tests/reference-editor-smoke.mjs
+
+PASS: chord and keyboard selection; bounded transpose/time/length editing; add/delete; pointer drag; undo/redo; draft audition; explicit revision/appraisal reset; historical-take guard; review-coverage-gated progress; original chart save/reload/export/import roundtrip. No browser exceptions. Synthetic workflow only.

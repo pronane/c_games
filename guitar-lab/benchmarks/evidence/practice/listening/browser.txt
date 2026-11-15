@@ -1,0 +1,5 @@
+
+> guitar-lab@0.2.0 test:listening-review
+> node tests/listening-quality-smoke.mjs
+
+PASS: silent input makes zero comparison calls; usable synthetic input comparison; local three-second input check; prediction-free packet export; isolated reviewer makes zero API calls; checksum validation; annotation/export/restore; tampering rejection. No browser exceptions. Synthetic/mocked only.

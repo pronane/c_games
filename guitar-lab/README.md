@@ -1,6 +1,6 @@
 # Guided practice projects
 
-The **Review → Practise → Retry** workspace connects imported charts and generated song tabs to reference review, phrase exercises, local saved projects, evidence playback and matched-speed retry progress. It also includes a draft-based visual piano-roll correction editor, optional original-chart backups and review-coverage-aware take history. See [the workflow and validation protocol](PRACTICE_WORKFLOW.md) for instructions, privacy limits and evidence boundaries.
+The **Review → Practise → Retry** workspace connects imported charts and generated song tabs to reference review, phrase exercises, local saved projects, evidence playback and matched-speed retry progress. It also includes a draft-based visual piano-roll correction editor, optional original-chart backups and review-coverage-aware take history. Recording input checks catch near-silence and flag low/ceiling levels; listening-only reviewer packets support prediction-free annotation in a separate local page. See [the workflow and validation protocol](PRACTICE_WORKFLOW.md) for instructions, privacy limits and evidence boundaries.
 
 # Fretwork — guitar comparison prototype v0.4
 

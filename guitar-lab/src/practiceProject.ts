@@ -1,3 +1,4 @@
+import { validateQuality, type RecordingQuality } from './recordingQuality';
 import { shownReport, type Comparison, type DiffNote } from './compare';
 
 export type PracticeNote = { time: number; duration: number; midi: number };
@@ -9,6 +10,8 @@ export type PracticeSeed = {
 };
 export type Attempt = {
   id: string; created: number; revision: number; start: number; end: number; speed: number;
+  listeningPackets?: { id: string; sha256: string }[];
+  quality?: RecordingQuality;
   audio?: Blob; comparison?: Comparison; reviews: Record<string, Review>;
   audible?: string; useful?: string; improved?: string; latencyMeasured: boolean;
 };
@@ -61,6 +64,7 @@ export function confirmedCount(a: Attempt) { return reviewCoverage(a).confirmed;
 export function progressVerdict(previous: Attempt, current: Attempt) {
   if (!comparable(previous, current)) return 'Not comparable: phrase, speed, reference revision or detector differs.';
   const before = reviewCoverage(previous), after = reviewCoverage(current);
+  if ([previous.quality, current.quality].some(q => q && q.status !== 'usable')) return 'Recording levels need review before interpreting a change in findings.';
   if (!before.complete || !after.complete) return 'Review both takes first; unresolved findings or alignment uncertainty prevent a meaningful count comparison.';
   if (after.confirmed < before.confirmed) return 'Fewer human-confirmed findings on this retry. Listen to both takes; this is not an overall accuracy measurement.';
   if (after.confirmed > before.confirmed) return 'More human-confirmed findings on this retry. Focus on one audible issue rather than chasing a score.';
@@ -87,6 +91,8 @@ export function validateProject(value: unknown): PracticeProject {
   for (const a of p.attempts) {
     audioBytes += a?.audio instanceof Blob ? a.audio.size : 0;
     if (!a || !text(a.id, 100) || !finite(a.created, 0, 1e15) || !finite(a.revision, 1, 100000) || !finite(a.start, 0, p.duration) || !finite(a.end, a.start + .1, p.duration) || !finite(a.speed, .5, 1) || typeof a.latencyMeasured !== 'boolean') fail();
+    if (a.listeningPackets && (!Array.isArray(a.listeningPackets) || a.listeningPackets.length > 20 || a.listeningPackets.some(r => !r || !text(r.id, 100) || !r.id || typeof r.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(r.sha256)))) fail();
+    if (a.quality && !validateQuality(a.quality)) fail();
     if (!a.reviews || Array.isArray(a.reviews) || typeof a.reviews !== 'object' || Object.values(a.reviews).some(x => !['confirmed', 'dismissed', 'unsure'].includes(x))) fail();
     if (a.audio && (!(a.audio instanceof Blob) || a.audio.size > 30 * 1024 * 1024)) fail();
     for (const key of ['audible', 'useful', 'improved'] as const) if (a[key] !== undefined && !['yes', 'no', 'unsure'].includes(a[key]!)) fail();
@@ -122,7 +128,7 @@ export async function projectStore(action: 'list' | 'put' | 'delete', value?: Pr
     tx.onerror = tx.onabort = () => { db.close(); reject(tx.error ?? Error('Could not save project. Storage may be full.')); };
   });
 }
-async function blobData(blob: Blob) {
+export async function blobData(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader(); reader.onload = () => resolve(reader.result as string); reader.onerror = () => reject(Error('Could not read attachment.')); reader.readAsDataURL(blob);
   });

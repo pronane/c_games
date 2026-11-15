@@ -78,3 +78,35 @@ For an actual release-quality validation:
 - `BROWSER_EXECUTABLE_PATH=/path/to/chromium npm run test:practice` with the frontend and API running
 
 Browser smoke uses an actual browser/fake microphone and **mocked comparison responses**. It verifies chart entry, reference/exclusion gates, capture, review playback, focus/retry, IndexedDB reload including audio, portable export, correction revision and deletion. It is not a transcription or real-guitar accuracy test.
+
+## Recording readiness and listening-only reviews
+
+### Signal checks, not technique judgements
+
+Use **Check recording input before practising → Check input for 3 seconds**. Play normally, wearing headphones. This captures a short local test, plays no guide, sends no audio to the Python engine and retains no test recording. It reports peak, average RMS level (dBFS) and fraction of samples reaching ±0.999. The microphone is released afterwards.
+
+Every new recorded/uploaded take also stores the same signal-health summary:
+
+- `no_signal`: peak below 0.0002 and RMS below −75 dBFS. The take is **not sent for comparison**; check input selection/cable/gain and retry. It can still be retained for inspection if audio retention was enabled.
+- `low_level`: RMS below −45 dBFS (excluding no-signal). This is a caution, not a hard gate: rests, intentional quiet playing and capture distance also affect it.
+- `ceiling`: at least 2% of samples at absolute amplitude ≥0.999. This is a caution, not proof of ADC clipping: intentional effects may create the same waveform.
+- `usable`: no basic level problem detected. This does not prove clean capture, correct tuning, successful separation, calibrated latency or accurate transcription.
+
+Low-level/ceiling takes may still be compared, but automatic focus suggestions and count-based progress commentary are suppressed pending listening review. Old takes without metadata are explicitly labelled “not checked”. These thresholds are transparent engineering heuristics, not independently calibrated guitar-quality metrics. No denoiser, noise-floor estimator or new detector tuning is implied.
+
+### Prediction-free reviewer packets
+
+1. Enable audio retention **before** recording/uploading a take. Its reference revision must still match the current project.
+2. Under **Listening-only teacher/reviewer packet**, choose **Export listening-only packet**. Get permission before sharing recordings.
+3. Save the project to retain its packet-ID/checksum-to-take audit mapping. At most 20 packets can be exported per take; reuse an existing packet file for multiple reviewers. The packet deliberately omits project title/goal, other takes, app predictions, scores and existing finding labels.
+4. Ask a reviewer who has not seen the app findings to open **Open listening-only reviewer** (the separate `?listening-review` entry point) and load the packet. This entry point does not mount the practice app or make model/API requests.
+5. The reviewer hears the retained take and a synthesized reference-note guide, declares a pseudonym and whether they have seen app predictions, then annotates time intervals as pitch/timing/missing/extra/sustain/noise/correct-region/uncertain. They can mark whether they listened through the whole take.
+6. Export the labels before closing; there is no autosave. Saved labels can be restored only for the matching packet ID and checksum. Match returned labels to the saved take mapping before external evaluation.
+
+The packet is whitelist-only and SHA-256 binds its audio, note reference and timing map. A checksum detects changes; it is **not** proof of authenticity, reviewer expertise or independence. Full original-song audio is not supplied: the reference guide may contain transcription errors and is clearly labelled as such. An unreviewed reference remains labelled unreviewed. No predictions are revealed after annotation.
+
+Review exports always keep `independent_ground_truth: false` and include self-declared exposure, whole-take coverage, reviewer pseudonym and packet checksum. A separate audit must establish consent, performer/source independence, reference validity and annotation quality. No accuracy metric is calculated by this tool, and returned labels do not automatically alter app findings or count as holdout approval. Use the existing fail-closed holdout protocol for any engine-quality claims.
+
+Limits: packet ≤45 MB, WAV take ≤30 MB, take ≤120 seconds, reference ≤5,000 notes, ≤1,000 annotations, comment ≤1,000 characters. Packets and labels stay local unless explicitly downloaded/shared. Neither the preflight nor the reviewer workflow was validated with physical USB hardware or independent human participants in this feature follow-up.
+
+Verification: `npm run test:listening-review` uses synthetic silent/tone WAVs, a fake microphone and a mocked comparison response. It verifies that silent input makes zero inference requests, packet export contains no predictions, the isolated reviewer makes zero API calls, labels export/restore correctly and modified packets fail checksum checks. This is workflow verification, not transcription accuracy evidence.

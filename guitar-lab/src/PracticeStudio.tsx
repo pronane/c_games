@@ -6,6 +6,8 @@ import { Recorder } from './recorder';
 import { synthesize } from './tabScore';
 import { addClicks, loadLatency } from './practice';
 import LatencyCheck from './LatencyCheck';
+import { recordingQuality, qualityMessage, type RecordingQuality } from './recordingQuality';
+import { makeListeningPacket } from './listeningReview';
 import VisualReferenceEditor from './VisualReferenceEditor';
 import { useTranscriber } from './TranscriberSelect';
 import { MEDIA_ACCEPT } from './audioFiles';
@@ -20,6 +22,7 @@ export default function PracticeStudio({ seed }: Props) {
   const [selected, setSelected] = useState('');
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [inputCheck, setInputCheck] = useState<RecordingQuality | null>(null);
   const [loop, setLoop] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -85,19 +88,19 @@ export default function PracticeStudio({ seed }: Props) {
     if (take && mode !== 'expected') playBuffer(take, mode === 'sequence' ? at + Math.min(length, ref.duration - start) + .5 : at, n ? takeStart : 0, length);
     if (!take && mode !== 'expected') setNotice('No retained audio for this take. Enable recording retention before the next take.');
   }
-  async function analyse(audio: Blob, s: Section, sp: number, measured: boolean) {
+  async function analyse(audio: Blob, s: Section, sp: number, measured: boolean, quality: RecordingQuality) {
     if (!project) return;
     if (project.attempts.length >= 50) throw Error('Project has 50 takes. Delete an older take before adding another.');
     if (retain && audio.size + project.attempts.reduce((sum, a) => sum + (a.audio?.size ?? 0), 0) > 50 * 1024 * 1024) throw Error('Retained audio exceeds 50 MB. Remove old take audio or turn off retention.');
-    const a: Attempt = { id: crypto.randomUUID(), created: Date.now(), revision: project.revision, start: s.start, end: s.end, speed: sp, reviews: {}, latencyMeasured: measured, audio: retain ? audio : undefined };
-    if (project.trust === 'reviewed' && !excludedPhrase(project, s)) {
+    const a: Attempt = { id: crypto.randomUUID(), created: Date.now(), revision: project.revision, start: s.start, end: s.end, speed: sp, reviews: {}, latencyMeasured: measured, quality, audio: retain ? audio : undefined };
+    if (quality.status !== 'no_signal' && project.trust === 'reviewed' && !excludedPhrase(project, s)) {
       const notes = phraseNotes(project, s, sp);
       if (!notes.length) throw Error('No reference notes in this phrase. Correct the reference or choose another phrase.');
       a.comparison = await compareTake({ take: audio, transcriber, targets: [{ source: 'file', label: `${project.title} · ${s.name}`, notes, bpm: project.bpm * sp }] });
     }
     if (!mounted.current) return;
     patch({ attempts: [...project.attempts, a].slice(-50) }); setSelected(a.id);
-    setNotice(a.comparison ? 'Review the findings by ear, then practise one phrase and retry. Save project to keep this take.' : 'Take captured without a grade: reference unreviewed or phrase excluded.');
+    setNotice(a.comparison ? 'Review the findings by ear, then practise one phrase and retry. Save project to keep this take.' : quality.status === 'no_signal' ? 'Take captured without a grade: almost no input signal. Check your recording setup and retry.' : 'Take captured without a grade: reference unreviewed or phrase excluded.');
   }
   async function record() {
     if (!project || !section || !activeSection) return;
@@ -113,7 +116,7 @@ export default function PracticeStudio({ seed }: Props) {
       const lead = Math.round((at + count - captureAt + recorder().delay(latency)) * c.sampleRate);
       const take = raw.slice(lead, lead + Math.round(ref.duration * c.sampleRate));
       if (take.length < Math.round(ref.duration * c.sampleRate) * .95) throw Error('Recording stopped before the phrase. No take was graded.');
-      await analyse(encodeWav([take], c.sampleRate), section, speed, !!latency?.ok);
+      await analyse(encodeWav([take], c.sampleRate), section, speed, !!latency?.ok, recordingQuality([take], c.sampleRate));
     });
     rec.current?.release();
   }
@@ -133,7 +136,7 @@ export default function PracticeStudio({ seed }: Props) {
   async function download(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  const suggestions = !report?.alignment_warning && project?.trust === 'reviewed' && attempt?.revision === project.revision ? issues.filter(n => !['dismissed', 'unsure'].includes(attempt.reviews[issueKey(n)]) && ['wrong_pitch', 'missing', 'extra', ...(attempt.latencyMeasured ? ['early','late'] : [])].includes(n.kind)).sort((a,b) => Number(attempt.reviews[issueKey(b)] === 'confirmed') - Number(attempt.reviews[issueKey(a)] === 'confirmed')).slice(0, 2) : [];
+  const suggestions = (!attempt?.quality || attempt.quality.status === 'usable') && !report?.alignment_warning && project?.trust === 'reviewed' && attempt?.revision === project.revision ? issues.filter(n => !['dismissed', 'unsure'].includes(attempt.reviews[issueKey(n)]) && ['wrong_pitch', 'missing', 'extra', ...(attempt.latencyMeasured ? ['early','late'] : [])].includes(n.kind)).sort((a,b) => Number(attempt.reviews[issueKey(b)] === 'confirmed') - Number(attempt.reviews[issueKey(a)] === 'confirmed')).slice(0, 2) : [];
   const previous = project && attempt ? project.attempts.filter(a => a.created < attempt.created && comparable(a, attempt)).at(-1) : undefined;
   return <section className="panel practice-studio" id="practice-studio" aria-labelledby="practice-title">
     <h2 id="practice-title">Review → Practise → Retry</h2>
@@ -176,6 +179,15 @@ export default function PracticeStudio({ seed }: Props) {
       <label>Practice speed <select value={speed} onChange={e => setSpeed(Number(e.target.value))}>{[.5,.6,.7,.75,.8,.9,1].map(s => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}</select></label>
       {!activeSection && <p role="alert">Choose a phrase between 0.1 and 60 seconds.</p>}
       <label><input type="checkbox" checked={retain} onChange={e => setRetain(e.target.checked)} /> Keep new take audio in this project (off by default). Saved/exported projects will include it.</label>
+      <details><summary>Check recording input before practising</summary>
+        <p>Play normally for three seconds. This local check does not send audio to the engine or retain the test recording. Wear headphones; no guide is played.</p>
+        <button type="button" onClick={() => run(async () => {
+          stop(); await context().resume();
+          try { await recorder().ensure(); setRecording(true); const samples = await recorder().capture(context().sampleRate * 3, 8); setInputCheck(recordingQuality([samples], context().sampleRate)); }
+          finally { rec.current?.release(); }
+        })}>Check input for 3 seconds</button>
+        {inputCheck && <p role="status">{qualityMessage(inputCheck)} RMS {inputCheck.rmsDb.toFixed(1)} dBFS · peak {inputCheck.peak.toFixed(3)} · ceiling samples {(inputCheck.clippedFraction * 100).toFixed(1)}%.</p>}
+      </details>
       <LatencyCheck recorder={recorder} latency={latency} disabled={busy} onBefore={stop} onMeasured={setLatency} />
       <label><input type="checkbox" checked={loop} onChange={e => setLoop(e.target.checked)} /> Loop phrase when listening (stop playback below)</label>
       <button type="button" onClick={stop}>Stop phrase playback</button>
@@ -187,7 +199,7 @@ export default function PracticeStudio({ seed }: Props) {
       <details><summary>Upload an earlier phrase recording</summary>
         <p>Fallback when automatic song location is unclear: set its original-song start timestamp and the speed you played. Audio must begin at the phrase (trim count-in first); duration determines the end.</p>
         <label>Reference start (seconds) <input type="number" min={0} max={project.duration} value={manualStart} onChange={e => setManualStart(Number(e.target.value))} /></label>
-        <input aria-label="Upload phrase take" type="file" accept={MEDIA_ACCEPT} onChange={e => { const f = e.target.files?.[0]; if (f) run(async () => { if (f.size > 30 * 1024 * 1024) throw Error('Choose audio smaller than 30 MB.'); const b = await context().decodeAudioData(await f.arrayBuffer()); if (b.duration > 120 || b.duration < .2 || manualStart < 0 || manualStart + b.duration * speed > project.duration + .05) throw Error('Recording must fit the reference and be at most 120 seconds.'); await analyse(encodeWav(Array.from({ length: b.numberOfChannels }, (_, i) => b.getChannelData(i)), b.sampleRate), { ...section, start: manualStart, end: Math.min(project.duration, manualStart + b.duration * speed) }, speed, false); }); e.target.value = ''; }} />
+        <input aria-label="Upload phrase take" type="file" accept={MEDIA_ACCEPT} onChange={e => { const f = e.target.files?.[0]; if (f) run(async () => { if (f.size > 30 * 1024 * 1024) throw Error('Choose audio smaller than 30 MB.'); const b = await context().decodeAudioData(await f.arrayBuffer()); if (b.duration > 120 || b.duration < .2 || manualStart < 0 || manualStart + b.duration * speed > project.duration + .05) throw Error('Recording must fit the reference and be at most 120 seconds.'); await analyse(encodeWav(Array.from({ length: b.numberOfChannels }, (_, i) => b.getChannelData(i)), b.sampleRate), { ...section, start: manualStart, end: Math.min(project.duration, manualStart + b.duration * speed) }, speed, false, recordingQuality(Array.from({ length: b.numberOfChannels }, (_, i) => b.getChannelData(i)), b.sampleRate)); }); e.target.value = ''; }} />
       </details>
       <details><summary>Keep an original reference chart with this project</summary>
         <p>Optional: attach a chart you own or have permission to store (up to 8 MB). Its original bytes are saved/exported only with this project. The file is a backup, not proof that the editable notes match it; visual corrections do not rewrite the attachment.</p>
@@ -219,13 +231,14 @@ export default function PracticeStudio({ seed }: Props) {
       <button onClick={stop}>Stop playback</button>
       <button disabled={busy || !attempt.audio} onClick={() => { patch({ attempts: project.attempts.map(a => a.id === attempt.id ? { ...a, audio: undefined } : a) }); setNotice('Audio removed from working project. Save to remove it from the stored copy.'); }}>Remove this take’s audio</button>
       <button disabled={busy} onClick={() => { patch({ attempts: project.attempts.filter(a => a.id !== attempt.id) }); setSelected(''); }}>Delete take</button>
+      {attempt.quality ? <p role="note">Recording check: {qualityMessage(attempt.quality)} RMS {attempt.quality.rmsDb.toFixed(1)} dBFS · peak {attempt.quality.peak.toFixed(3)} · ceiling samples {(attempt.quality.clippedFraction * 100).toFixed(1)}%.</p> : <p>Recording levels were not checked for this older take.</p>}
       <p>Findings are diagnostic candidates, not confirmed mistakes. {attempt.latencyMeasured ? 'Device delay was measured.' : 'Device delay was not independently calibrated for this take.'} Sustain, distortion, separation and alignment can cause errors.</p>
       {report?.alignment_warning && <p role="alert">{report.alignment_warning} Findings may reflect alignment rather than your playing. Check the timestamp and reference passage.</p>}
       {report && !issues.length && <p>No issues detected in the aligned notes. This does not verify every note or technique.</p>}
       {issues.length > 0 && <p><b>Next action:</b> listen to a pitch or timing candidate below, confirm whether it is audible, then choose “Practise this phrase”. Work on one change at a time. Dismissed findings are never recommended.</p>}
       {suggestions.length > 0 && <div aria-label="Suggested focus phrases"><h4>Start with one of these</h4><p>Human-confirmed findings come first. Other suggestions still need a listening check.</p>{suggestions.map(n => <div key={issueKey(n)}><p>{n.message}</p><p>{exercise(n.kind)}</p><button disabled={busy} onClick={() => practise(n)}>Focus on {n.kind.replaceAll('_', ' ')} at bar {n.bar}</button></div>)}</div>}
       <ol className="practice-issues">{[...issues].sort((a,b) => Number(attempt.reviews[issueKey(b)] === 'confirmed') - Number(attempt.reviews[issueKey(a)] === 'confirmed')).slice(0, 100).map(n => <li key={issueKey(n)}>
-        <b>{report?.alignment_warning ? 'Alignment unclear — review by ear' : issueStatus(n, project.trust, attempt.latencyMeasured)}</b><p>{n.message}</p><p className="helper">{exercise(n.kind)}</p>
+        <b>{attempt.quality && attempt.quality.status !== 'usable' ? 'Recording levels need review — listen first' : report?.alignment_warning ? 'Alignment unclear — review by ear' : issueStatus(n, project.trust, attempt.latencyMeasured)}</b><p>{n.message}</p><p className="helper">{exercise(n.kind)}</p>
         <div className="presets">
           <button disabled={busy || attempt.revision !== project.revision} onClick={() => run(() => listen('sequence', n))}>Hear expected → yours here</button>
           <button disabled={busy || attempt.revision !== project.revision} onClick={() => run(() => listen('both', n))}>Hear both here</button>
@@ -237,8 +250,8 @@ export default function PracticeStudio({ seed }: Props) {
       <h3>Retry progress</h3>
       <p>{previous ? `Same phrase, speed, reference revision and detector: ${confirmedCount(previous)} → ${confirmedCount(attempt)} human-confirmed issues (review coverage: ${reviewCoverage(previous).reviewed}/${reviewCoverage(previous).total} → ${reviewCoverage(attempt).reviewed}/${reviewCoverage(attempt).total} findings). Only compare after reviewing both takes; fewer unreviewed flags does not prove improvement.` : 'No earlier take at this exact phrase, speed and reference revision. Record another to compare like for like.'}</p>
       {previous && <p role="status">{progressVerdict(previous, attempt)}</p>}
-      <div className="practice-progress"><table aria-label="Comparable phrase take history"><thead><tr><th>Take</th><th>Reviewed findings</th><th>Confirmed</th><th>Dismissed</th><th>Unsure</th></tr></thead><tbody>
-        {project.attempts.filter(a => comparable(a, attempt)).map(a => { const coverage = reviewCoverage(a); return <tr key={a.id}><td><button disabled={busy} onClick={() => { stop(); setSelected(a.id); }}>{new Date(a.created).toLocaleString()}</button></td><td>{a.comparison ? `${coverage.reviewed}/${coverage.total}` : 'Not analysed'}</td><td>{coverage.confirmed}</td><td>{coverage.dismissed}</td><td>{coverage.unsure}</td></tr>; })}
+      <div className="practice-progress"><table aria-label="Comparable phrase take history"><thead><tr><th>Take</th><th>Input check</th><th>Reviewed findings</th><th>Confirmed</th><th>Dismissed</th><th>Unsure</th></tr></thead><tbody>
+        {project.attempts.filter(a => comparable(a, attempt)).map(a => { const coverage = reviewCoverage(a); return <tr key={a.id}><td><button disabled={busy} onClick={() => { stop(); setSelected(a.id); }}>{new Date(a.created).toLocaleString()}</button></td><td>{a.quality?.status ?? 'not checked'}</td><td>{a.comparison ? `${coverage.reviewed}/${coverage.total}` : 'Not analysed'}</td><td>{coverage.confirmed}</td><td>{coverage.dismissed}</td><td>{coverage.unsure}</td></tr>; })}
       </tbody></table></div>
       {previous?.audio && attempt.audio && <button disabled={busy} onClick={() => run(async () => {
         await context().resume(); stop();
@@ -247,6 +260,18 @@ export default function PracticeStudio({ seed }: Props) {
         const at = context().currentTime + .05; playBuffer(before, at); playBuffer(after, at + before.duration + .5);
       })}>Hear previous take → this take</button>}
       <button disabled={busy || attempt.revision !== project.revision || project.sections.length >= 100} onClick={() => { const s = { id: crypto.randomUUID(), name: 'Retry same phrase', start: attempt.start, end: attempt.end }; patch({ sections: [...project.sections, s] }); setSectionId(s.id); setSpeed(attempt.speed); setNotice('Same phrase and speed selected. Use count in, practise & record above.'); }}>Retry same phrase & speed</button>
+      <details><summary>Listening-only teacher/reviewer packet</summary>
+        <p>Export this retained take and the current reference notes without predictions or your finding labels. Ask a reviewer who has not seen the app findings to open it in the listening-review page. Use a pseudonym; get permission before sharing recordings. Export is disabled after reference edits because old reference notes are not retained.</p>
+        <a href="?listening-review" target="_blank" rel="noreferrer">Open listening-only reviewer</a>
+        <button disabled={busy || !attempt.audio || attempt.revision !== project.revision} onClick={() => run(async () => {
+          if ((attempt.listeningPackets?.length ?? 0) >= 20) throw Error('This take already has 20 exported reviewer packets. Reuse an existing packet file.');
+          const packet = await makeListeningPacket(project, attempt);
+          patch({ attempts: project.attempts.map(a => a.id === attempt.id ? { ...a, listeningPackets: [...(a.listeningPackets ?? []), { id: packet.id, sha256: packet.sha256 }] } : a) });
+          await download(new Blob([JSON.stringify(packet)], { type: 'application/json' }), 'listening-only-packet.json');
+          setNotice('Listening packet exported. Save this project to preserve the packet-to-take checksum mapping; keep returned reviewer labels separately for audit.');
+        })}>Export listening-only packet</button>
+        {!!attempt.listeningPackets?.length && <details><summary>Packet-to-take audit mapping ({attempt.listeningPackets.length})</summary><p>Returned labels carry this packet ID and checksum. Match both before using them in an external evaluation. These records do not certify reviewer independence.</p><ul>{attempt.listeningPackets.map(p => <li key={p.id}><code>{p.id}</code> · <code>{p.sha256}</code></li>)}</ul></details>}
+      </details>
       <details><summary>Human validation: was this useful?</summary>
         <p>These are your review labels, not independent ground truth. Export them for a teacher/reviewer to check. No accuracy claim is calculated from unreviewed recordings.</p>
         {([['audible','Were the highlighted issues audible?'],['useful','Did the suggested exercise address them?'],['improved','Did the retry sound better?']] as const).map(([key,label]) => <label key={key}>{label}<select disabled={busy} value={attempt[key] ?? ''} onChange={e => patch({ attempts: project.attempts.map(a => a.id === attempt.id ? { ...a, [key]: e.target.value } : a) })}><option value="" disabled>Not reviewed</option><option value="yes">Yes</option><option value="no">No</option><option value="unsure">Unsure</option></select></label>)}

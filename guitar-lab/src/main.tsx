@@ -22,6 +22,7 @@ import MidiInput from "./MidiInput";
 import InstrumentSetup from "./InstrumentSetup";
 import SongLab from "./SongLab";
 import PracticeStudio from "./PracticeStudio";
+import ListeningReviewer from "./ListeningReviewer";
 import type { PracticeSeed } from "./practiceProject";
 import { MEDIA_ACCEPT } from "./audioFiles";
 import TabLab, { type TabSource } from "./TabLab";
@@ -761,4 +762,4 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(new URLSearchParams(window.location.search).has("listening-review") ? <ListeningReviewer /> : <App />);

@@ -2122,3 +2122,9 @@ footer span:first-child {
 .practice-progress { overflow-x: auto; }
 .practice-progress table { width: 100%; border-collapse: collapse; }
 .practice-progress th, .practice-progress td { padding: .6rem; border-bottom: 1px solid #64748b55; text-align: left; }
+.listening-reviewer label { display: block; margin: .8rem 0; }
+.listening-reviewer audio { display: block; width: min(100%, 38rem); margin: .6rem 0; }
+.listening-reviewer input, .listening-reviewer select { margin-left: .5rem; max-width: 100%; }
+.listening-reviewer textarea { display: block; width: 100%; min-height: 5rem; box-sizing: border-box; }
+.listening-reviewer fieldset { margin: 1rem 0; padding: 1rem; border: 1px solid #64748b88; border-radius: 8px; }
+.listening-reviewer button { margin: .3rem; }
