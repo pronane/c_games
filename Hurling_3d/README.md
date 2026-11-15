@@ -1,26 +1,31 @@
-# Hurling 3D: rigged hurler assets (first pass)
+# Hurling 3D
 
-A hurling counterpart to `Gaelic_Football_3d`. So far this folder holds the **art and motion assets only**, not a game.
+A playable 3D hurling prototype built with C and raylib. The game uses a 15-player side, a regulation-sized pitch, the supplied rigged hurler/helmet/hurley models, a 7.3 cm sliotar, and hurling-specific striking and scoring.
 
-Regenerate with `python3 tools/gen_hurling_assets.py assets --sheet` (needs numpy and Pillow).
+## Build and run
 
-| File | What |
-|---|---|
-| `assets/hurler_home.glb`, `hurler_away.glb` | skinned hurler (690 verts, 1276 tris): helmet with faceguard, glove, kit colours as vertex colours, hurley skinned to its own `hurley` joint. 18 joints, 16 animations at 30 fps. |
-| `assets/sliotar.glb` | sliotar, 7.3 cm, with the raised seam. Attach it to the `hurley` joint for solo-running, or to a hand joint. |
-| `assets/clips.json` | clip names, lengths, loop flags and the **contact time** in seconds for each strike (use it as the release time, like `game_set_action_timing` in the football game). |
-| `assets/clip_*.png` | contact sheets (6 frames per clip) rendered by the generator, so you can check the motion without a game. |
+- Windows/MSYS2 UCRT64: install `mingw-w64-ucrt-x86_64-gcc`, `mingw-w64-ucrt-x86_64-raylib`, and `mingw-w64-ucrt-x86_64-glfw`, then run `build_release.bat`.
+- Other platforms: `make`, or `make test` for the rules-engine tests. Set `RAYLIB_DIR` if raylib is not in the compiler's default paths.
 
-Clips: `idle`, `jog`, `sprint`, `solo_run` (hurley out front, ball balanced on the bas), `strike_overhead`, `strike_ground`, `puckout`, `pickup_flick` (rolling lift), `handpass`, `catch_high`, `block_hook`, `shoulder_charge`, `hit_react`, `knocked_down`, `get_up`, `celebrate`.
+## Hurling rules represented
 
-In two-handed clips the left hand is solved onto the handle with 2-bone IK at bake time, so the grip stays on the stick through the swing.
+- A goal is 3 points and a point over the crossbar is 1 point. There is no two-point arc.
+- A player may carry the sliotar in the hand for at most four steps, then must play it or balance it on the hurley.
+- Players can strike the sliotar with the hurley, hand-pass it with a striking action (not throw it), catch it in flight, or lift it from the ground with the hurley.
+- A hand-pass can score a point over the bar but cannot score a goal.
+- Restarts include puck-outs, frees, sideline cuts, 65-metre frees, and penalties. A puck-out must reach 20 metres before a teammate can play it.
+- The team taking a long puck-out may claim a mark on an eligible clean catch.
+- Legal defensive actions include a shoulder challenge and hooking/blocking with the hurley; fouls, cards, and penalties are handled by the match engine.
+- Every player model includes a helmet with faceguard and a hurley. The sliotar model has a raised seam.
 
-## Checked
-- Each glb was parsed back: sizes, accessor bounds, index range, weights sum to 1, joint indices, sampler lengths. `gltf-validator` was **not** run (it needs a download).
-- Motion was checked by software-rendering the skinned frames (the `clip_*.png`). It has **not** been loaded in raylib or Blender here.
+This is a playable simulation, not a certified rules implementation. Competition-specific playing time, substitution, disciplinary, and local-rule variations may differ; the official rule book takes precedence.
 
-## Limits (be honest about realism)
-- The motion is **hand-keyed poses with smooth interpolation**, not motion capture. It reads as the right action and timing, but it is stiffer than the Mixamo clips used in the football game. For true realism, record or buy real hurling mocap, retarget it to this skeleton (names are in `clips.json`), and keep these clips as placeholders.
-- The body is low-poly built from tapered tubes. For a final look, replace the mesh but keep the joint names and the generator's keys.
-- The rig is **not** the 52-bone Mixamo rig the football game's GPU skinning path expects; a hurling game loads these files with their own 18-bone skin. No separate goalkeeper clips yet beyond `puckout`.
-- Not done: the game itself (sliotar physics, the H-shaped goal, 1 point over / 3 under the bar, 15-a-side, hand pass and striking rules). The football engine would need the two-input refactor from `Gaelic_Football_3d/ANALYSIS_2026-10-31.md` first.
+## Controls
+
+Move with WASD or the left stick. Sprint with Shift/right trigger. Aim and strike with the strike button; use the pass button for a hand-pass, the lift button to pick the sliotar, and the tackle button to challenge. Press `H` to show the in-game controls.
+
+## Assets and sources
+
+The generated hurler models and animation clips are in `assets/`; regenerate them with `python tools/gen_hurling_assets.py assets --sheet` (requires NumPy and Pillow).
+
+Rules reference: [GAA Official Guide Part 2 — Playing Rules](https://www.gaa.ie/the-gaa/rules-regulations) and the [GAA Coaching & Games Development rules resources](https://learning.gaa.ie/CoachingResources).

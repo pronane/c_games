@@ -1,0 +1,276 @@
+#ifndef HURLING_GAME_H
+#define HURLING_GAME_H
+
+#define GAME_PITCH_LENGTH 140.0f
+#define GAME_PITCH_WIDTH 85.0f
+#define GAME_GOAL_WIDTH 6.4f
+#define GAME_CROSSBAR_HEIGHT 2.44f
+#define GAME_KICKOUT_LINE 20.0f
+#define GAME_KICKOUT_ARC_RADIUS 13.0f
+#define GAME_65M_LINE 65.0f
+#define GAME_LARGE_RECT_DEPTH 13.0f
+#define GAME_LARGE_RECT_HALF 9.5f
+#define GAME_PENALTY_SPOT 20.0f
+#define GAME_BALL_REST 0.0365f          /* regulation sliotar diameter is about 7.3 cm */
+#define GAME_STEP_LENGTH 1.9f           /* metres per running step */
+#define GAME_CARRY_STEPS 4              /* a player must play the sliotar before taking a fifth step */
+#define GAME_BALL_GRAVITY 9.8f
+#define GAME_TEAM_SIZE 15
+#define GAME_TEAM_COUNT 4
+
+typedef enum GameEvent {
+    GAME_EVENT_NONE,
+    GAME_EVENT_KICKED,
+    GAME_EVENT_HANDPASSED,
+    GAME_EVENT_SOLOED,
+    GAME_EVENT_FOUR_STEPS,
+    GAME_EVENT_POINT,
+    GAME_EVENT_GOAL,
+    GAME_EVENT_BALL_OUT,
+    GAME_EVENT_TACKLE,
+    GAME_EVENT_SHORT_KICKOUT,
+    GAME_EVENT_HIGH_FIELD,
+    GAME_EVENT_PICKUP,
+    GAME_EVENT_WIDE,
+    GAME_EVENT_FREE,
+    GAME_EVENT_FOUL_TACKLE,
+    GAME_EVENT_SIDELINE,
+    GAME_EVENT_65M_FREE,
+    GAME_EVENT_KICKOUT,
+    GAME_EVENT_KICKOUT_SHORT,
+    GAME_EVENT_KICKOUT_TOUCHED,
+    GAME_EVENT_PENALTY,
+    GAME_EVENT_PENALTY_SAVED,
+    GAME_EVENT_THROW_IN,
+    GAME_EVENT_SOLO_AND_GO,
+    /* --- v3: discipline and marks --- */
+    GAME_EVENT_YELLOW_CARD,
+    GAME_EVENT_BLACK_CARD,
+    GAME_EVENT_RED_CARD,
+    GAME_EVENT_SECOND_YELLOW,
+    GAME_EVENT_BLACK_PENALTY,     /* cynical foul denied a goal chance: black + penalty */
+    GAME_EVENT_KICKOUT_MARK,
+    GAME_EVENT_DISSENT,           /* free brought forward 50m */
+    GAME_EVENT_SIN_BIN_OVER,
+    GAME_EVENT_BREAKING_BALL, /* high catch spilled: a scramble */
+    GAME_EVENT_TACKLE_BEHIND,   /* free: tackle came from behind */
+    GAME_EVENT_TACKLE_SHOULDER, /* free: tackle came over the shoulder */
+    GAME_EVENT_COUNT
+} GameEvent;
+
+/* Colour of the step ring around the carrier's feet. */
+typedef enum GameStepRing {
+    GAME_RING_NONE = 0,
+    GAME_RING_NORMAL,    /* steps 1 and 2 */
+    GAME_RING_ORANGE,    /* step 3 */
+    GAME_RING_RED        /* step 4: final legal hand-carry step */
+} GameStepRing;
+
+/* Where a tackle comes from, relative to the carrier. */
+typedef enum GameTackleCall {
+    GAME_TACKLE_OK = 0,
+    GAME_TACKLE_BEHIND,
+    GAME_TACKLE_SHOULDER
+} GameTackleCall;
+
+/* Timed player actions: the renderer plays the matching clip and the ball is
+ * released on the clip's contact frame (see game_set_action_timing). */
+typedef enum GameAction {
+    GAME_ACT_NONE,
+    GAME_ACT_KICK,          /* hurley strike in play                      */
+    GAME_ACT_FREE_KICK,     /* strike for a free or sideline cut           */
+    GAME_ACT_KICKOUT,       /* goalkeeper puck-out                         */
+    GAME_ACT_GROUND_KICK,   /* penalty: struck off the ground             */
+    GAME_ACT_HANDPASS,
+    GAME_ACT_SOLO,
+    GAME_ACT_PICKUP,
+    GAME_ACT_TACKLE,
+    GAME_ACT_DIVE,
+    GAME_ACT_CATCH,
+    GAME_ACT_HOOK,          /* special move: swinging punch - straight red   */
+    GAME_ACT_HEAD_HIT,      /* special move: head butt - straight red        */
+    GAME_ACT_TRIP,          /* cynical trip / pull-down (black card)         */
+    GAME_ACT_FALL,          /* fouled player knocked to the ground           */
+    GAME_ACT_COUNT
+} GameAction;
+
+typedef enum GameRestart {
+    GAME_RESTART_NONE,
+    GAME_RESTART_KICKOUT,
+    GAME_RESTART_FREE,
+    GAME_RESTART_SIDELINE,
+    GAME_RESTART_65M,
+    GAME_RESTART_PENALTY,
+    GAME_RESTART_THROW_IN
+} GameRestart;
+
+typedef enum GameSignal {
+    GAME_SIGNAL_NONE, GAME_SIGNAL_FREE, GAME_SIGNAL_POINT,
+    GAME_SIGNAL_GOAL, GAME_SIGNAL_WIDE, GAME_SIGNAL_THROW, GAME_SIGNAL_CARD,
+    GAME_SIGNAL_MARK
+} GameSignal;
+
+typedef enum GameCard { GAME_CARD_NONE, GAME_CARD_YELLOW, GAME_CARD_BLACK, GAME_CARD_RED } GameCard;
+
+typedef enum GameFoul {
+    GAME_FOUL_NONE,
+    GAME_FOUL_TECHNICAL,    /* hold / push / mistimed tackle: free (3rd = yellow) */
+    GAME_FOUL_PULL_DOWN,    /* cynical (rule 5.41): black card                   */
+    GAME_FOUL_TRIP,         /* cynical (rule 5.41): black card                   */
+    GAME_FOUL_STRIKE        /* hook / head hit: red card, sent off                */
+} GameFoul;
+
+typedef struct GameInput {
+    float move_x;
+    float move_z;
+    int kick;
+    int kick_high;
+    int kick_low;
+    int kick_long;
+    int high_field;
+    int pickup;
+    int handpass;
+    int solo;
+    int tackle;
+    float curve;
+    int sprint;
+    float power;            /* 0..1 kick power (charge) */
+    int special;            /* hook / head hit on the carrier (straight red!) */
+    int pass_target;        /* v3.2 pass assist: teammate index + 1 (0 = engine picks) */
+    int jockey;             /* v3.4: hold to shadow the carrier, goal-side, without sprinting in */
+    int kickout_plan;       /* 0 keep, 1 short, 2 long middle, 3 wing */
+    int press_height;       /* 0 keep, 1 drop off, 2 zonal, 3 press up on a kick-out */
+} GameInput;
+
+typedef struct GamePlayer {
+    float x;
+    float z;
+    float facing_x;
+    float facing_z;
+    float movement;
+    float jump_time;
+    int action;             /* GameAction */
+    float action_time;
+    int action_released;
+    float release_dx, release_dz, release_speed, release_lift, release_curve;
+    int release_event;
+    float tackle_cooldown;
+    /* --- v3 discipline --- */
+    int yellow, black;      /* cards received */
+    int off;                /* 0 on the pitch, 1 sin bin, 2 sent off */
+    float sin_bin;          /* real seconds left in the sin bin */
+    int fouls_committed;
+    float stamina;          /* v3.4: 0..1, drained by sprinting */
+} GamePlayer;
+
+typedef struct GameOfficial {
+    float x, z, facing_x, facing_z, movement;
+    int signal;             /* GameSignal */
+    float signal_time;
+    float signal_dir;       /* +1 / -1 direction of a free */
+} GameOfficial;
+
+typedef struct GameBall {
+    float x;
+    float z;
+    float height;
+    float velocity_x;
+    float velocity_z;
+    float velocity_y;
+    float curve;
+    int in_flight;
+} GameBall;
+
+typedef struct GameState {
+    GamePlayer players[2][GAME_TEAM_SIZE];
+    int selected_player;
+    int home_team;
+    int away_team;
+    int ball_team;
+    int ball_player;
+    int team_goals[2];
+    int team_points[2];
+    float player_x;
+    float player_z;
+    float facing_x;
+    float facing_z;
+    float step_time;
+    float event_time;
+    float pickup_delay;
+    float cpu_possession_time;
+    float cpu_tackle_time;
+    float pickup_time;
+    int steps_carried;
+    int has_ball;
+    int last_touch_team;
+    int restart_pending;
+    int kickout_in_progress;
+    int kickout_team;
+    int pickup_team;
+    int pickup_player;
+    int last_release_team;
+    int last_release_player;
+    int last_release_action;
+    int ball_on_hurley;
+    int points;
+    int goals;
+    int fouls;
+    GameEvent event;
+    GameBall ball;
+    /* --- 2025/26 rules additions --- */
+    int restart_type;       /* GameRestart while restart_pending */
+    float restart_time;
+    int prev_ball_team, prev_ball_player;
+    float protect_time;     /* solo & go: 4m protection */
+    int penalty_active, keeper_guess;
+    int half;
+    int event_team;         /* team the last event favours */
+    unsigned int rng;
+    GameOfficial referee;
+    /* --- v3: cards, marks, dissent --- */
+    int card_type, card_team, card_player, card_second_yellow;  /* card being shown */
+    float card_time;        /* referee showing a card: play held until 0 */
+    float sin_bin_seconds;  /* real seconds a black card lasts (600 = 10 min) */
+    float dissent_chance;   /* per foul free; 0 in unit tests */
+    int last_foul_type;     /* GameFoul */
+    int from_kickout;       /* ball in flight straight from a kick-out */
+    int mark_play_on;       /* free came from a mark: may play on (solo & go) */
+    int cards_given[2][4];  /* per team, per GameCard */
+    /* --- v3.2 gameplay assists (set by the 3D frontend; off in unit tests) --- */
+    int ai_support;         /* AI support runs for the carrier + goal-side marking */
+    int assist_target;      /* this frame's pass-assist receiver, -1 none */
+    /* --- v3.4: mark clock, kick-out plan, high-ball grade, stamina is per player --- */
+    float mark_clock;       /* seconds left to play on from a mark (15) */
+    int kickout_plan;       /* 1 short, 2 long, 3 wing */
+    int press_height;       /* 0 drop, 1 zonal, 2 press */
+    int contest_grade;      /* 0 none, 1 early, 2 perfect, 3 late, 4 break */
+    float contest_time;
+    /* CPU defender closing from behind: 0 not chosen, 1 dive in, 2 get in front. */
+    int cpu_tackle_plan;
+    void (*on_release)(struct GameState *game, int team, int player, int action, void *user);
+    void *user;
+} GameState;
+
+void game_init(GameState *game);
+void game_start_half(GameState *game, int half);
+void game_set_action_timing(int action, float contact, float duration);
+float game_action_duration(int action);
+float game_action_contact(int action);
+int game_carrier_steps(const GameState *game);
+int game_step_ring(const GameState *game);
+int game_tackle_call(float cx, float cz, float fx, float fz,
+                     float tx, float tz, float tfx, float tfz);
+float game_distance_to_goal(int team, float x, float z);
+void game_set_teams(GameState *game, int home_team, int away_team, int starting_player);
+void game_select_player(GameState *game, int player_index);
+void game_select_next_player(GameState *game, int direction);
+void game_select_nearest_player(GameState *game);
+void game_update(GameState *game, GameInput input, float delta_time);
+const char *game_event_text(GameEvent event);
+int game_players_on(const GameState *game, int team);
+void game_force_foul(GameState *game, int off_team, int off_idx, int foul);  /* scripted scenes */
+int game_goal_chance_zone(int attacking_team, float x, float z);
+const char *game_team_name(int team_index);
+const char *game_player_role(int player_index);
+
+#endif
