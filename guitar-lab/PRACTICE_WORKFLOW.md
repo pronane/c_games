@@ -110,3 +110,7 @@ Review exports always keep `independent_ground_truth: false` and include self-de
 Limits: packet ≤45 MB, WAV take ≤30 MB, take ≤120 seconds, reference ≤5,000 notes, ≤1,000 annotations, comment ≤1,000 characters. Packets and labels stay local unless explicitly downloaded/shared. Neither the preflight nor the reviewer workflow was validated with physical USB hardware or independent human participants in this feature follow-up.
 
 Verification: `npm run test:listening-review` uses synthetic silent/tone WAVs, a fake microphone and a mocked comparison response. It verifies that silent input makes zero inference requests, packet export contains no predictions, the isolated reviewer makes zero API calls, labels export/restore correctly and modified packets fail checksum checks. This is workflow verification, not transcription accuracy evidence.
+
+## Actual accuracy evaluation
+
+The [practice-feedback accuracy suite](benchmarks/practice_feedback/README.md) runs the real comparison API and Basic Pitch on the bundled unchanged GuitarSet recordings, with dataset-note F1 and real-audio transcription-self-check diagnostics. This is development regression evidence, not a new independent holdout. The same suite can audit/import listening-only reviewer exports and run independent issue-event metrics only after the frozen coverage and separate human-audit gates pass. Current independent intake is empty and exits 3 without importing a model. See the linked protocol and recorded results before describing any pass as independent accuracy.

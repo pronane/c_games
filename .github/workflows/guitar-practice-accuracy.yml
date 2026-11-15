@@ -1,0 +1,55 @@
+name: Guitar practice real-audio regression (not independent holdout)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'guitar-lab/server/**'
+      - 'guitar-lab/benchmarks/practice_feedback/**'
+      - 'guitar-lab/benchmarks/regression/metrics.py'
+      - 'guitar-lab/benchmarks/heard_metrics.py'
+      - 'guitar-lab/benchmarks/holdout/**'
+      - 'guitar-lab/benchmarks/regression/data/guitarset/**'
+      - '.github/workflows/guitar-practice-accuracy.yml'
+permissions:
+  contents: read
+jobs:
+  real-audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    defaults:
+      run:
+        working-directory: guitar-lab
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: guitar-lab/benchmarks/practice_feedback/requirements.txt
+      - name: Install real CPU inference runtime (no TensorFlow or model mocks)
+        run: |
+          python -m pip install -r benchmarks/practice_feedback/requirements.txt
+          python -m pip install --no-deps basic-pitch==0.4.0
+      - name: Real model and real audio through comparison API
+        env:
+          FRETWORK_RUN_REAL_PRACTICE: '1'
+          FRETWORK_REAL_PRACTICE_EVIDENCE: accuracy-results/api
+        run: python -m pytest server/tests/test_practice_feedback_accuracy.py -q --junitxml=accuracy-results/tests.xml
+      - name: Record complete real-audio regression and provenance
+        run: python -m benchmarks.practice_feedback regression --backend basic_pitch --out accuracy-results/regression.json
+      - name: Verify absent independent intake stays blocked without inference
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          r = subprocess.run([sys.executable, '-m', 'benchmarks.practice_feedback', 'evaluate', '--out', 'accuracy-results/independent-status.json'])
+          report = json.load(open('accuracy-results/independent-status.json'))
+          assert r.returncode == 3 and report['inference_run'] is False and report['quality_approved'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: development-real-audio-not-independent-holdout
+          path: guitar-lab/accuracy-results/
