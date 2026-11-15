@@ -810,12 +810,16 @@ needs --replace. The game can load the scratch file without installing it:
 
     ./gaelic_football --model /tmp/gf_fit/fitted.glb
 
-fitted.parts is one line, "0 0 body". The game then draws that one mesh with the texture embedded
-in the GLB. It does not apply assets/textures/kit_*.png. Those atlases are for the squad, which
-splits jersey, shorts, socks and boots into separate meshes (left half of the atlas is jersey /
-socks / boots, right half is shorts). A single full-body texture from Meshy or Rodin will not
-recolour per team. Keep the candidate local until you know the mesh's licence. The manifest stores
-sha256, the exact command, and paths relative to the repository when the file is inside it.
+fitted.parts lists one body mesh and kit shells (jersey, shorts, socks, boots). The game swaps
+assets/textures/kit_*.png onto every mesh tagged kit. Shorts UVs sit in the right half of that
+atlas; jersey, socks and boots sit in the left half. The body keeps the source texture (head,
+hands, lower arms). fitted.grip is one line, "clearance_m 0.0xx". The game reads it only when the
+file is next to the model, and uses it so the fingertip skin stays about 1.2 cm off a 0.11 m ball.
+Without the file the game's old 1.2 cm bone clearance is unchanged.
+
+The Studio has a Gaelic tab with the same two commands and the preview image. Keep the candidate
+local until you know the mesh's licence. The manifest stores sha256, the exact command, and paths
+relative to the repository when the file is inside it.
 
 The fit stands the mesh up (+Y, facing the template's forward, feet on the ground, metres) using
 the same orient pass as forge.py library --orient auto, then detects a T-pose, an A-pose, or arms

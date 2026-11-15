@@ -14,10 +14,13 @@ python3 forge.py gaelic-fit MESH.obj --out /tmp/gf_fit --preview --replace
 
 Run those from `sprite_forge/` (or pass a path to `sprite_forge/forge.py`). `--out` is a directory:
 
-* `fitted.glb` — one skinned mesh, the template skeleton, all 32 clips
-* `fitted.parts` — one row, `0 0 body`
-* `manifest.json` — sha256 of the mesh and the template, the exact command, repo-relative paths when the file is inside the repo, weight stats, and a deformation check
-* `preview/deform_sheet.png` — only with `--preview`
+* `fitted.glb` — body mesh plus kit shells, the template skeleton, all 32 clips
+* `fitted.parts` — `0 0 body`, then one `kit` row per shell (jersey, shorts, socks, boots)
+* `fitted.grip` — `clearance_m <metres>`. The game reads it only if the file is beside the model
+* `manifest.json` — sha256, the exact command, repo-relative paths, chest and elbow measurements, grip, kit UV ranges
+* `preview/deform_sheet.png`, `preview/kit_home.png`, `preview/kit_away.png` — only with `--preview`
+
+The same form is the Gaelic tab in Sprite Forge Studio (`forge.py` with no arguments). Fit and merge run the commands above and show the preview.
 
 A second write into the same directory needs `--replace`. The game loads a candidate without installing it, from the `Gaelic_Football_3d` directory:
 
@@ -43,9 +46,9 @@ python3 forge.py gaelic-fit testdata/gaelic_fit_humanoid.obj --out /tmp/gf_fit_b
 
 ## Kit atlas and `.parts`
 
-The squad file `gaelic_player.parts` has many meshes per look. Roles are `body`, `kit`, `hair`, `brows`, `lashes`, `eyes`. The game puts `kit_*.png` only on meshes tagged `kit`. Each atlas is split: the left half is jersey, socks and boots, the right half is shorts.
+The game puts `kit_*.png` only on meshes tagged `kit`. The atlas is split: the left half is jersey, socks and boots, the right half is shorts. `gaelic-fit` keeps the whole skinned body as mesh 0 (`body`) and adds a shell, pushed 4 mm out along the normal, for each garment it can see from the bone weights. Those shells take their UVs from the nearest point on the template body, then `kit_uv` parks shorts in the right half and the other garments in the left half. Team colours swap. The head, the hands and the lower arms stay on the body mesh, so a source texture there is not recolored.
 
-`fitted.parts` tags the single mesh as `body`, so the embedded texture is what you see. A Meshy or Rodin full-body texture does not line up with that split atlas, and this command does not rebuild one. Team colours will not swap. Hair, eyes, brows and lashes are not split out of the source mesh.
+`fitted.grip` is the distance from the ball centre to the finger-bone targets. It is `0.012` (the game's own leather clearance) plus how far the fingertip mesh sticks past the last finger bone. The game uses it only when the file is present, so the shipped player is unchanged.
 
 ## Make the mesh in Meshy or Rodin
 
@@ -104,3 +107,29 @@ Read `manifest.json`. `deform_flags` lists clips where the body collapsed or a v
 * Poses other than a standing T-pose, A-pose, or arms-down stance are refused.
 
 The manifest does not invent a licence for the source mesh. Keep the candidate on the machine that built it until the author and the terms are known. The template skeleton and clips are the repository's CC0 MakeHuman player.
+
+## Build the game and look at a candidate
+
+Run the game from `Gaelic_Football_3d/`, because `assets/` is loaded relative to the executable. `--model` points at `fitted.glb`. If `fitted.grip` and `fitted.parts` sit beside it, the game picks them up. F4 switches skinning in the window. `--cpu-skin` forces the CPU path for that launch.
+
+Linux, raylib 5.5 built from source (this VM had headers for X11 but not GL, so the binary was not produced here):
+
+```
+git clone --depth 1 --branch 5.5 https://github.com/raysan5/raylib.git
+sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxi-dev libxcursor-dev
+make -C raylib/src PLATFORM=PLATFORM_DESKTOP -j$(nproc)
+cd Gaelic_Football_3d
+make RAYLIB_DIR=$PWD/../raylib/src
+xvfb-run -a ./gaelic_football --model /tmp/gf_fit/fitted.glb --cpu-skin --no-intro
+xvfb-run -a ./gaelic_football --model /tmp/gf_fit/fitted.glb --no-intro
+```
+
+Windows, MSYS2 UCRT64 (from `Gaelic_Football_3d/README.md`):
+
+```
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-raylib mingw-w64-ucrt-x86_64-glfw
+make && ./gaelic_football.exe --model C:/tmp/gf_fit/fitted.glb --cpu-skin --no-intro
+./gaelic_football.exe --model C:/tmp/gf_fit/fitted.glb --no-intro
+```
+
+`build_release.bat` is the double-click build. It starts the shipped player. Pass `--model` yourself after it has linked.

@@ -114,7 +114,8 @@ def build(sk: Skeleton, musc=0.8):
     b.ell("spine_01", (0, 1.045, zc + 0.008), (0.134, 0.125, 0.094), **K)                          # abdomen / waist
     b.ell("spine_03", (0, 1.265, zc), (0.162, 0.165, 0.112), **K)                                  # ribcage
     for s in (1, -1):
-        b.ell("spine_03", (0.072 * s, 1.335, 0.095), (0.080, 0.058, 0.044), M=_rz(-8 * s), **K)     # pecs
+        # Flat male pec. A rounder ellipsoid set further forward read as a breast.
+        b.ell("spine_03", (0.070 * s, 1.330, 0.078), (0.072, 0.046, 0.026), M=_rz(-8 * s), **K)
         b.ell("spine_03", (0.106 * s, 1.262, -0.012), (0.056, 0.11, 0.062), M=_rz(10 * s), **K)     # lats
         for y in (1.175, 1.115, 1.055):                                                            # abs
             b.ell("spine_02" if y > 1.09 else "spine_01", (0.029 * s, y, 0.112), (0.027, 0.024, 0.016 * (0.6 + 0.6 * musc)), **K)

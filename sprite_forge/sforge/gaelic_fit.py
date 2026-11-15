@@ -21,10 +21,11 @@ from .glbpack import _acc_bytes
 
 CLIP_CHECK = ("idle", "run", "kick_run", "catch", "solo")
 GAPS = [
-    "Fingers are not solved on their own. They inherit the nearest hand surface, so a fist, a spread hand, or long fingers will not match the template's grip.",
-    "Loose clothing, hair, a skirt, a cape, or a prop is weighted to the nearest body surface and can candy-wrap or collapse when the limb moves.",
-    "The face is not retargeted. Expression, eyes, teeth, and ears stay whatever the source mesh modelled, and they ride with the head bone.",
-    "One mesh, one embedded texture. The squad kit atlas (kit_*.png, jersey/socks/boots on the left half, shorts on the right) is not applied. Team colours will not swap.",
+    "Fingers are still the template hand. fitted.grip pushes the bone targets out by the fingertip pad so the skin clears a 0.11 m ball by about 1.2 cm. The game reads that file only when it sits beside the model.",
+    "Loose clothing, hair, a skirt, a cape, or a prop is weighted to the nearest body surface and can candy-wrap.",
+    "The face is not retargeted. It rides with the head bone.",
+    "Kit shells use the squad atlas (left half jersey/socks/boots, right half shorts). Hands, the head and the lower arms stay on the body mesh and are not recolored per team.",
+    "The chest apex is flattened on both sides. The rest mesh was already symmetric; the right side was the one that read as a breast.",
     "The source is scaled to the template height (about 1.74 m). Limb lengths are only approximately matched.",
     "Poses other than a standing T-pose, A-pose, or arms-down stance are rejected (arms raised, arms reaching forward, a knee bend, a sit).",
 ]
@@ -91,12 +92,13 @@ def load_body(path):
     jc = j["accessors"][pr["attributes"]["JOINTS_0"]]["componentType"]
     J = np.frombuffer(_acc_bytes(j, buf, pr["attributes"]["JOINTS_0"]), {5121: np.uint8, 5123: np.uint16}[jc]).astype(np.int32).reshape(-1, 4)
     W = np.frombuffer(_acc_bytes(j, buf, pr["attributes"]["WEIGHTS_0"]), np.float32).astype(np.float64).reshape(-1, 4)
+    UV = np.frombuffer(_acc_bytes(j, buf, pr["attributes"]["TEXCOORD_0"]), np.float32).astype(np.float64).reshape(-1, 2)
     idx = {n: i for i, n in enumerate(names)}
     v = P[idx["hand_l"]] - P[idx["upperarm_l"]]
     drop = float(np.degrees(np.arctan2(-v[1], np.linalg.norm(v[[0, 2]]) + 1e-12)))
     fwd = float(v[2] / (np.linalg.norm(v) + 1e-12))
     return {"path": path, "doc_names": names, "joints": P, "names": names, "index": idx,
-            "V": V, "F": F, "J": J, "W": W, "height": float(V[:, 1].ptp()), "ymin": float(V[:, 1].min()),
+            "V": V, "F": F, "J": J, "W": W, "UV": UV, "height": float(V[:, 1].ptp()), "ymin": float(V[:, 1].min()),
             "arm_drop": drop, "arm_fwd": fwd, "dense": _dense(J, W, len(names))}
 
 
@@ -641,6 +643,254 @@ def orient_file(path):
     return rig, lm, notes, rec
 
 
+def _chest_apex(V, sel):
+    if sel.sum() < 12:
+        return None
+    return float(np.percentile(V[sel, 2], 95))
+
+
+def flatten_male_chest(V, joints, names):
+    """Pull the pointed front of each pec back toward the ribcage.
+
+    The MakeHuman rest mesh is left-right symmetric. The apex still reads as a breast,
+    and that is what showed on the right chest in game. Both sides are flattened the
+    same way. This is a fit step, not a list of vertex indices for one file.
+    """
+    V = np.array(V, float, copy=True)
+    sp = joints[names.index("spine_03")]
+    band = ((np.abs(V[:, 0]) < 0.14) & (V[:, 1] > sp[1] + 0.04) & (V[:, 1] < sp[1] + 0.30)
+            & (V[:, 2] > sp[2] + 0.04))
+    before, after = {}, {}
+    for sign, lab in ((1, "left"), (-1, "right")):
+        sel = band & (V[:, 0] * sign > 0.02)
+        before[lab] = _chest_apex(V, sel)
+        if before[lab] is None:
+            continue
+        z = V[sel, 2]
+        base = float(np.percentile(z, 30))
+        V[sel, 2] = z - 0.85 * np.clip(z - base, 0, None)
+        after[lab] = _chest_apex(V, sel)
+    return V, {"before_p95_m": before, "after_p95_m": after}
+
+
+def _elbow_inside(V, wf, E, au, af):
+    crook = au + af
+    n = np.linalg.norm(crook)
+    if n < 1e-8:
+        return np.zeros(len(V), bool), None
+    crook = crook / n
+    bend = np.cross(au, af)
+    bn = np.linalg.norm(bend)
+    if bn < 1e-8:
+        return np.zeros(len(V), bool), None
+    bend = bend / bn
+    rel = V - E
+    inside = (np.linalg.norm(rel, axis=1) < 0.065) & ((rel @ crook) > 0.0) & (wf > 0.12) & (wf < 0.88)
+    return inside, bend
+
+
+def _bend_radius(V, E, bend, mask, wf, ang):
+    ca, sa = np.cos(ang), np.sin(ang)
+    rel = V - E
+    swung = rel * ca + np.cross(bend, rel) * sa + np.outer(rel @ bend, bend) * (1 - ca)
+    posed = (1 - wf)[:, None] * V + wf[:, None] * (E + swung)
+    r = posed - E
+    along = r @ bend
+    return np.linalg.norm(r - along[:, None] * bend, axis=1)[mask]
+
+
+def preserve_elbows(V, J, W, joints, names, bend_deg=100.0):
+    """Rest-pose radial correction so a hard elbow bend keeps its cross-section under linear blend skinning.
+
+    The game only has linear blend skinning. A 100 degree bend (a carry, a catch) otherwise
+    pinches the inner elbow. Three small outward steps on the rest mesh recover that radius.
+    """
+    V = np.array(V, float, copy=True)
+    ang = np.radians(bend_deg)
+    stats = {}
+    for side in ("l", "r"):
+        fore = [i for i, n in enumerate(names) if n.endswith("_" + side) and n.startswith(
+            ("lowerarm", "hand", "index", "middle", "pinky", "ring", "thumb"))]
+        if "lowerarm_" + side not in names:
+            continue
+        wf = np.zeros(len(V))
+        fore_a = np.array(fore, int)
+        for k in range(4):
+            wf += W[:, k] * np.isin(J[:, k], fore_a)
+        E = joints[names.index("lowerarm_" + side)]
+        U = joints[names.index("upperarm_" + side)]
+        H = joints[names.index("hand_" + side)]
+        au = U - E; af = H - E
+        au = au / (np.linalg.norm(au) + 1e-12); af = af / (np.linalg.norm(af) + 1e-12)
+        inside, bend = _elbow_inside(V, wf, E, au, af)
+        if bend is None or inside.sum() < 8:
+            continue
+        rest = np.linalg.norm((V - E) - np.outer((V - E) @ bend, bend), axis=1)
+        before = _bend_radius(V, E, bend, inside, wf, ang)
+        target = rest[inside]
+        for _ in range(3):
+            now = _bend_radius(V, E, bend, inside, wf, ang)
+            deficit = np.clip(target - now, 0, 0.012)
+            rel = V[inside] - E
+            along = rel @ bend
+            radial = rel - along[:, None] * bend
+            ln = np.linalg.norm(radial, axis=1, keepdims=True)
+            radial = np.where(ln > 1e-6, radial / np.maximum(ln, 1e-6), 0)
+            V[inside] += radial * deficit[:, None] * 0.85
+        after = _bend_radius(V, E, bend, inside, wf, ang)
+        stats[side] = {
+            "before_ratio": round(float(np.mean(before / np.maximum(target, 1e-4))), 3),
+            "after_ratio": round(float(np.mean(after / np.maximum(target, 1e-4))), 3),
+            "verts": int(inside.sum()),
+        }
+    return V, stats
+
+
+def finger_pad(V, J, W, names, joints):
+    """How far the mesh sticks past the last finger bone, along that bone. Metres."""
+    pads = []
+    for n in names:
+        if not (n.endswith("_03_l") or n.endswith("_03_r")):
+            continue
+        parent = n.replace("_03", "_02")
+        if parent not in names:
+            continue
+        i = names.index(n)
+        w = np.zeros(len(V))
+        for k in range(4):
+            w += W[:, k] * (J[:, k] == i)
+        sel = w > 0.5
+        if sel.sum() < 4:
+            continue
+        A = joints[names.index(parent)]; B = joints[i]
+        direction = B - A
+        direction = direction / (np.linalg.norm(direction) + 1e-12)
+        along = (V[sel] - B) @ direction
+        pads.append(float(np.percentile(along, 90)))
+    if not pads:
+        return 0.02
+    return float(np.clip(np.median(pads), 0.0, 0.045))
+
+
+def grip_clearance(pad):
+    """Bone targets must sit this far outside the ball centre so the skin is still 1.2 cm clear.
+
+    The game's outsideBall already keeps the bone 1.2 cm off a 0.11 m ball. The fingertip
+    mesh continues past that bone, which is why the fingers sank into the leather.
+    """
+    clearance = 0.012 + float(pad)
+    return float(np.clip(clearance, 0.012, 0.06)), {
+        "pad_m": round(float(pad), 4),
+        "clearance_m": round(float(np.clip(clearance, 0.012, 0.06)), 4),
+        "penetration_before_m": round(float(pad - 0.012), 4),
+        "clearance_after_m": 0.012,
+        "ball_radius_m": 0.11,
+    }
+
+
+def _face_bone(F, J, W, nb):
+    acc = np.zeros((len(F), nb), np.float64)
+    ii = np.arange(len(F))
+    for k in range(3):
+        for c in range(4):
+            np.add.at(acc, (ii, np.clip(J[F[:, k], c], 0, nb - 1)), W[F[:, k], c])
+    return np.argmax(acc, 1)
+
+
+def _submesh(V, F, J, W, N, faces):
+    used = np.unique(F[faces])
+    remap = -np.ones(len(V), np.int32)
+    remap[used] = np.arange(len(used), dtype=np.int32)
+    return V[used].copy(), remap[F[faces]], J[used].copy(), W[used].copy(), N[used].copy()
+
+
+def sample_uv(Vq, tmpl):
+    """Barycentric template UVs at the nearest surface point. Used to land kit shells on the squad atlas."""
+    TV, TF, UV = tmpl["V"], tmpl["F"], tmpl["UV"]
+    adj = _tri_adj(TF, len(TV))
+    out = np.zeros((len(Vq), 2), np.float64)
+    Vt = TV.astype(np.float32)
+    k = 8
+    for i0 in range(0, len(Vq), 400):
+        q = Vq[i0:i0 + 400].astype(np.float32)
+        d2 = ((q[:, None, :] - Vt[None, :, :]) ** 2).sum(-1)
+        nn = np.argpartition(d2, min(k, d2.shape[1] - 1), axis=1)[:, :k]
+        for r in range(len(q)):
+            cand = []
+            for v in nn[r]:
+                cand.extend(adj[int(v)])
+            if not cand:
+                continue
+            cand = list(set(cand))
+            tri = TF[cand]
+            bc, dd = _closest_on_triangles(Vq[i0 + r], TV[tri[:, 0]], TV[tri[:, 1]], TV[tri[:, 2]])
+            t = int(np.argmin(dd))
+            f = cand[t]
+            out[i0 + r] = bc[t, 0] * UV[TF[f, 0]] + bc[t, 1] * UV[TF[f, 1]] + bc[t, 2] * UV[TF[f, 2]]
+    return out
+
+
+def split_kit(V, F, J, W, N, tmpl, uv=None):
+    """Body mesh plus jersey / shorts / socks / boots shells whose UVs sit on the squad kit atlas.
+
+    Left half of kit_*.png is jersey, socks and boots. Right half is shorts. The game
+    replaces the texture on every mesh tagged kit in the .parts file.
+    """
+    from .mhchar import kit_uv
+    names = tmpl["names"]
+    P = tmpl["joints"]
+    bone = _face_bone(F, J, W, len(names))
+    nm = np.array(names)[bone]
+    cen = V[F].mean(1)
+    y = cen[:, 1]
+    jersey = (np.char.startswith(nm, "spine_") | np.isin(nm, ["clavicle_l", "clavicle_r", "neck_01"])
+              | ((nm == "pelvis") & (y > 1.02)))
+    jersey |= np.isin(nm, ["upperarm_l", "upperarm_r"]) & (cen[:, 1] > 1.15)
+    shorts = (nm == "pelvis") | np.isin(nm, ["thigh_l", "thigh_r"])
+    shorts &= y < 1.05
+    socks = np.isin(nm, ["calf_l", "calf_r"]) & (y < 0.42) & (y > 0.12)
+    boots = np.isin(nm, ["foot_l", "foot_r", "ball_l", "ball_r"]) | (np.isin(nm, ["calf_l", "calf_r"]) & (y < 0.16))
+    role = np.full(len(F), "body", object)
+    role[jersey] = "jersey"
+    role[shorts] = "shorts"
+    role[socks] = "socks"
+    role[boots] = "boots"
+    parts = []
+
+    class _P:
+        pass
+
+    body = _P()
+    body.name, body.role, body.image = "body", "body", "skin"
+    body.V, body.F, body.J, body.W, body.N = V, F, J, W, N
+    if uv is not None and len(uv) == len(V):
+        body.UV = np.asarray(uv, np.float32)
+    else:
+        body.UV = np.zeros((len(V), 2), np.float32)
+        span = np.ptp(V[:, :2], axis=0); span[span < 1e-6] = 1
+        body.UV[:, 0] = ((V[:, 0] - V[:, 0].min()) / span[0]).astype(np.float32)
+        body.UV[:, 1] = ((V[:, 1] - V[:, 1].min()) / span[1]).astype(np.float32)
+    body.C = None
+    parts.append(body)
+    report = []
+    for gname in ("jersey", "shorts", "socks", "boots"):
+        faces = np.nonzero(role == gname)[0]
+        if len(faces) < 8:
+            continue
+        sv, sf, sj, sw, sn = _submesh(V, F, J, W, N, faces)
+        sn = sn.copy()
+        ln = np.linalg.norm(sn, axis=1, keepdims=True)
+        sv = sv + np.where(ln > 1e-6, sn / np.maximum(ln, 1e-6), 0) * 0.004
+        uv = kit_uv(gname, sample_uv(sv, tmpl)).astype(np.float32)
+        p = _P()
+        p.name, p.role, p.image = gname, "kit", "kit"
+        p.V, p.F, p.J, p.W, p.N, p.UV, p.C = sv.astype(np.float32), sf, sj, sw, sn.astype(np.float32), uv, None
+        parts.append(p)
+        report.append({"name": gname, "tris": int(len(sf)),
+                       "u_min": round(float(uv[:, 0].min()), 3), "u_max": round(float(uv[:, 0].max()), 3)})
+    return parts, report
+
+
 def fit_arrays(V, F, tmpl, fuv=None, landmarks=None, orient_notes=None, smooth=4, stand=True):
     V = np.asarray(V, float)
     F = np.asarray(F, np.int32)
@@ -660,6 +910,7 @@ def fit_arrays(V, F, tmpl, fuv=None, landmarks=None, orient_notes=None, smooth=4
     V, lm, scale = place_on_template(V, lm, tmpl)
     if info["warp_arms"]:
         V = warp_arms(V, lm, tmpl)
+    V, chest = flatten_male_chest(V, tmpl["joints"], tmpl["names"])
     # drop degenerate faces so they do not pollute the smooth
     area = np.linalg.norm(np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]), axis=1)
     keep = area > 1e-12
@@ -667,6 +918,7 @@ def fit_arrays(V, F, tmpl, fuv=None, landmarks=None, orient_notes=None, smooth=4
     if fuv is not None:
         fuv = np.asarray(fuv, float)[keep]
     J, W, dist = transfer_weights(V, tmpl, F, smooth=smooth)
+    V, elbow = preserve_elbows(V, J, W, tmpl["joints"], tmpl["names"])
     N = _normals(V, F)
     V, F, UV, J, W, N, seams = _explode_uv(V, F, fuv, J, W, N)
     far = float((dist > 0.08 * tmpl["height"]).mean()) if len(dist) else 0.0
@@ -682,6 +934,8 @@ def fit_arrays(V, F, tmpl, fuv=None, landmarks=None, orient_notes=None, smooth=4
         "surface_dist_p90_m": round(float(np.percentile(dist, 90)), 4),
         "far_fraction": round(far, 4),
         "poly_warning": int(len(F)) > 22000,
+        "chest": chest,
+        "elbow": elbow,
     }
     return {"V": V.astype(np.float32), "N": N.astype(np.float32), "UV": UV, "F": F, "J": J, "W": W, "report": report, "dist": dist}
 
@@ -863,6 +1117,68 @@ def deform_report(glb_path):
                     name, frac, float(np.median(ratio)), float(np.percentile(ratio, 95))))
         clips[name] = samples
     return {"rest_height_m": round(rest_h, 3), "clips": clips, "flags": flags}
+
+
+def _mesh_arrays(doc, buf, prim):
+    V = np.frombuffer(_acc_bytes(doc, buf, prim["attributes"]["POSITION"]), np.float32).astype(np.float64).reshape(-1, 3)
+    N = np.frombuffer(_acc_bytes(doc, buf, prim["attributes"]["NORMAL"]), np.float32).astype(np.float64).reshape(-1, 3)
+    UV = np.frombuffer(_acc_bytes(doc, buf, prim["attributes"]["TEXCOORD_0"]), np.float32).astype(np.float64).reshape(-1, 2)
+    return V, N, UV
+
+
+def render_kits(glb_path, out_dir):
+    """Front views with kit_home.png and kit_away.png on the kit shells. Proves the atlas swap."""
+    from PIL import Image
+    root = gaelic_clip._repo_root()
+    if not root:
+        return None
+    texdir = os.path.join(root, "Gaelic_Football_3d", "assets", "textures")
+    doc, buf = _read(glb_path)
+    meshes = []
+    for i, mesh in enumerate(doc.get("meshes", [])):
+        pr = mesh["primitives"][0]
+        V, N, UV = _mesh_arrays(doc, buf, pr)
+        meshes.append((mesh.get("name", "m%d" % i), V, N, UV))
+    if not meshes:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    paths = []
+    # one frame for both kits so the difference is the texture, not the pose
+    body_col = np.array([196, 150, 120])
+    for kit in ("home", "away"):
+        atlas = np.asarray(Image.open(os.path.join(texdir, "kit_%s.png" % kit)).convert("RGB"))
+        h, w = atlas.shape[:2]
+        acc_v, acc_c, acc_n = [], [], []
+        for name, V, N, UV in meshes:
+            step = max(1, len(V) // 4000)
+            Vs, Ns, UVs = V[::step], N[::step], UV[::step]
+            if name == "body":
+                col = np.tile(body_col, (len(Vs), 1))
+            else:
+                x = np.clip((UVs[:, 0] * (w - 1)).astype(int), 0, w - 1)
+                y = np.clip(((1 - UVs[:, 1]) * (h - 1)).astype(int), 0, h - 1)
+                col = atlas[y, x]
+            acc_v.append(Vs); acc_c.append(col); acc_n.append(Ns)
+        V = np.concatenate(acc_v); C = np.concatenate(acc_c); N = np.concatenate(acc_n)
+        xy, z = _view_xy(V, "front")
+        project = _projector((xy.min(0), xy.max(0)), (240, 400))
+        px, py = project(xy)
+        shade = np.clip(N @ np.array([0.15, 0.55, 0.75]), 0.35, 1.0)
+        col = np.clip(C * shade[:, None], 0, 255).astype(np.uint8)
+        Wd, Hd = 240, 400
+        zbuf = np.full((Hd, Wd), -1e9)
+        img = np.zeros((Hd, Wd, 3), np.uint8); img[:] = (18, 22, 28)
+        xi = np.clip(px.astype(int), 0, Wd - 1); yi = np.clip(py.astype(int), 0, Hd - 1)
+        for i in np.argsort(z):
+            x, y = int(xi[i]), int(yi[i])
+            if z[i] >= zbuf[y, x]:
+                zbuf[y, x] = z[i]; img[y, x] = col[i]
+        im = Image.fromarray(img, "RGB")
+        dest = os.path.join(out_dir, "kit_%s.png" % kit)
+        im.save(dest)
+        paths.append(dest)
+    a = np.asarray(Image.open(paths[0])); b = np.asarray(Image.open(paths[1]))
+    return {"home": paths[0], "away": paths[1], "mean_abs_diff": round(float(np.abs(a.astype(int) - b.astype(int)).mean()), 2)}
 
 
 def render_previews(glb_path, out_dir):
@@ -1068,8 +1384,11 @@ def _source_png(rig):
     return bio.getvalue(), "embedded-source"
 
 
-def _parts_text():
-    return "# mesh variant role  (gaelic-fit: one body mesh. Not a squad kit split.)\n0 0 body\n"
+def _parts_text(parts):
+    lines = ["# mesh variant role  (gaelic-fit: body plus kit shells. Kit UVs use the squad atlas.)"]
+    for i, p in enumerate(parts):
+        lines.append("%d 0 %s" % (i, p.role))
+    return "\n".join(lines) + "\n"
 
 
 def _command_line(src, template, out, preview, smooth):
@@ -1104,13 +1423,18 @@ def write_candidate(src, template, out_dir, preview=False, smooth=4, replace=Fal
     fitted = fit_arrays(rig.V, rig.F, body, fuv=getattr(rig, "fuv", None), landmarks=landmarks,
                         orient_notes=notes, smooth=smooth, stand=False)
     png, tex_note = _source_png(rig)
+    parts, kit_report = split_kit(fitted["V"], fitted["F"], fitted["J"], fitted["W"], fitted["N"], body, fitted["UV"])
+    pad = finger_pad(fitted["V"], fitted["J"], fitted["W"], body["names"], body["joints"])
+    clearance, grip = grip_clearance(pad)
     os.makedirs(out_dir, exist_ok=True)
-    glbpack.pack(template, out_glb, fitted["V"], fitted["N"], fitted["UV"], fitted["F"],
-                 fitted["J"], fitted["W"], png, name="gaelic_fit",
-                 extras={"generator": "sprite_forge gaelic-fit", "role": "local candidate only",
-                         "source": os.path.basename(src)})
+    images = {"skin": png, "kit": _png((230, 230, 230))}
+    glbpack.pack_parts(template, out_glb, parts, images,
+                       extras={"generator": "sprite_forge gaelic-fit", "role": "local candidate only",
+                               "source": os.path.basename(src), "kit": [p["name"] for p in kit_report]})
     with open(os.path.join(out_dir, "fitted.parts"), "w", encoding="utf-8") as f:
-        f.write(_parts_text())
+        f.write(_parts_text(parts))
+    with open(os.path.join(out_dir, "fitted.grip"), "w", encoding="utf-8") as f:
+        f.write("clearance_m %.4f\n" % clearance)
     if gaelic_clip._sha(src) != before_src or gaelic_clip._sha(template) != before_tmpl:
         raise RuntimeError("an input file changed while fitting")
     joints, sig = animation_signature(out_glb)
@@ -1141,8 +1465,10 @@ def write_candidate(src, template, out_dir, preview=False, smooth=4, replace=Fal
         "fit": rep,
         "deform": deform,
         "texture": tex_note,
-        "parts": "fitted.parts is one row, '0 0 body'. The game draws that mesh with its embedded texture and does not apply kit_*.png.",
-        "kit_atlas": "Not compatible. The squad atlas is a split texture on role=kit meshes (left half jersey/socks/boots, right half shorts). This candidate is a single body mesh.",
+        "parts": "fitted.parts lists body then kit. The game swaps kit_*.png onto every kit mesh. Shorts UVs are in the right half; jersey, socks and boots are in the left half.",
+        "kit": kit_report,
+        "grip": grip,
+        "kit_atlas": "Compatible. fitted.parts tags the shells as kit, and their UVs use the squad split (left jersey/socks/boots, right shorts). The body mesh keeps the source texture.",
         "gaps": GAPS,
         "provenance": "external mesh, skinned by barycentric transfer from the CC0 MakeHuman template. The source mesh's licence is not established by this file.",
         "rights": "Not established for the source mesh. A tool name in a filename is not a licence. Keep the candidate local until the mesh's author and terms are known. The template skeleton and clips are the repository's CC0 MakeHuman player.",
@@ -1151,8 +1477,12 @@ def write_candidate(src, template, out_dir, preview=False, smooth=4, replace=Fal
         json.dump(manifest, f, indent=1)
         f.write("\n")
     preview_path = None
+    kit_diff = None
     if preview:
         preview_path = render_previews(out_glb, os.path.join(out_dir, "preview"))
+        kits = render_kits(out_glb, os.path.join(out_dir, "preview"))
+        if kits:
+            kit_diff = kits["mean_abs_diff"]
     weights_ok = rep["unweighted"] == 0 and abs(rep["weight_sum_min"] - 1) < 0.02 and abs(rep["weight_sum_max"] - 1) < 0.02
     summary = {"ok": bool(weights_ok and manifest["channels_match_template"] and manifest["joint_order_matches_template"]),
                "out": manifest["output"]["path"] or out_glb,
@@ -1160,7 +1490,7 @@ def write_candidate(src, template, out_dir, preview=False, smooth=4, replace=Fal
                "weight_sum": [rep["weight_sum_min"], rep["weight_sum_max"]],
                "unweighted": rep["unweighted"], "max_influences": rep["max_influences"],
                "channels_match_template": manifest["channels_match_template"], "joints": len(joints),
-               "deform_flags": deform["flags"], "preview": preview_path,
+               "deform_flags": deform["flags"], "preview": preview_path, "kit_mean_abs_diff": kit_diff,
                "poly_warning": rep["poly_warning"], "far_fraction": rep["far_fraction"]}
     return summary
 

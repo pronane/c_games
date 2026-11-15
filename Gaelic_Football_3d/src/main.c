@@ -556,12 +556,29 @@ static void orientHand(Transform *pose, int hand, float side, Vector3 wrist,
     pose[hand].rotation = QuaternionNormalize(QuaternionMultiply(twist, QuaternionMultiply(q, bindOf(hand).rotation)));
     pose[hand].translation = wrist;
 }
+/* 1.2 cm off the leather unless a sibling <model>.grip says otherwise.
+ * gaelic-fit writes clearance_m so the fingertip mesh, which sticks past the
+ * last finger bone, still clears a 0.11 m ball. No file: this stays 0.012. */
+static float ballClear = 0.012f;
+static void loadGrip(const char *glb)
+{
+    char path[512];
+    FILE *f;
+    float c = 0;
+    if (!glb || strlen(glb) < 5) return;
+    snprintf(path, sizeof path, "%.*s.grip", (int)(strlen(glb) - 4), glb);
+    f = fopen(path, "r");
+    if (!f) return;
+    if (fscanf(f, "clearance_m %f", &c) == 1 && c >= 0.012f && c <= 0.06f) ballClear = c;
+    fclose(f);
+    TraceLog(LOG_INFO, "GAME: ball clearance %.3f m (%s)", ballClear, path);
+}
 static Vector3 outsideBall(Vector3 ball, Vector3 p)
 {
     Vector3 d = Vector3Subtract(p, ball);
     float len = Vector3Length(d);
-    if (len < 1e-4f) return Vector3Add(ball, (Vector3){ 0, BALL_R + 0.012f, 0 });
-    if (len < BALL_R + 0.012f) return Vector3Add(ball, Vector3Scale(d, (BALL_R + 0.014f) / len));
+    if (len < 1e-4f) return Vector3Add(ball, (Vector3){ 0, BALL_R + ballClear, 0 });
+    if (len < BALL_R + ballClear) return Vector3Add(ball, Vector3Scale(d, (BALL_R + ballClear + 0.002f) / len));
     return p;
 }
 static void wrapHand(Transform *pose, int side, Vector3 ball)
@@ -3167,6 +3184,7 @@ int main(int argc, char **argv)
         }
         haveModel = model.meshCount > 0 && MODEL_BONECOUNT(model) <= MAX_BONES;
         loadParts(playerGlb);
+        loadGrip(playerGlb);
         for (int k = 0; k < C_COUNT; k++) if (clipIdx[k] < 0) { haveModel = 0; TraceLog(LOG_WARNING, "GAME: clip '%s' missing", CLIP_NAMES[k]); }
     }
     stadiumInit();

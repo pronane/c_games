@@ -62,7 +62,7 @@ def main():
         assert abs(info["weight_sum"][0] - 1) < 0.02 and abs(info["weight_sum"][1] - 1) < 0.02
         assert info["deform_flags"] == []
         doc, _buf = read_glb(os.path.join(out_dir, "fitted.glb"))
-        assert len(doc["meshes"]) == 1
+        assert len(doc["meshes"]) >= 2
         assert len(doc["skins"][0]["joints"]) == 52
         names = _anim_names(doc)
         for clip in CLIP_NAMES:
@@ -80,10 +80,16 @@ def main():
         assert man["squad"]["channels_match"] and man["squad"]["joints_match"]
         assert man["command"].startswith("python3 forge.py gaelic-fit")
         assert "makehuman_template.glb" in man["command"]
-        assert "Not compatible" in man["kit_atlas"]
+        assert "Compatible" in man["kit_atlas"]
+        assert man["grip"]["clearance_after_m"] == 0.012
+        assert man["grip"]["penetration_before_m"] > 0
         assert any("Fingers" in g for g in man["gaps"])
-        parts = open(os.path.join(out_dir, "fitted.parts"), encoding="utf-8").read().strip().splitlines()
-        assert parts[-1] == "0 0 body"
+        parts = [ln for ln in open(os.path.join(out_dir, "fitted.parts"), encoding="utf-8") if ln.strip() and not ln.startswith("#")]
+        assert parts[0].strip() == "0 0 body"
+        assert any(ln.strip().endswith(" kit") for ln in parts)
+        grip = open(os.path.join(out_dir, "fitted.grip"), encoding="utf-8").read().strip()
+        assert grip.startswith("clearance_m")
+        assert float(grip.split()[1]) > 0.012
         # a second write is refused; the shipped files stay put
         code, out = run(FIXTURE, "--out", out_dir)
         assert code == 2 and "replace" in out, out
@@ -125,6 +131,11 @@ def main():
     assert ident["report"]["pose"] == "A" and ident["report"]["warp_arms"] is False
     all_a, _arm = _agree(body, ident)
     assert all_a >= 0.90, all_a
+    chest = ident["report"]["chest"]
+    assert chest["after_p95_m"]["right"] < chest["before_p95_m"]["right"] - 0.004
+    assert abs(chest["after_p95_m"]["right"] - chest["after_p95_m"]["left"]) < 0.005
+    elbow = ident["report"]["elbow"]["l"]
+    assert elbow["after_ratio"] > elbow["before_ratio"] + 0.05, elbow
     assert sha(PLAYER) == before_p and sha(TEMPLATE) == before_t and sha(PARTS) == before_parts
     print("gaelic fit: ok")
     return 0
