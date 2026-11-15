@@ -52,6 +52,13 @@ STARTER = [
     ("drive", "kart_drive"), ("wave", "wave"), ("cast", "cast"),
     # v11.11: the keeper dives were procedural only, so packs fell back to the standing "save" (a chest catch)
     ("dive_left", "gk_dive_left"), ("dive_right", "gk_dive_right"),
+    # Fighter and kart moves that packs had aliased onto punch, kick, wave or drive.
+    ("special1", "special_1"), ("special2", "special_2"), ("throw", "throw"),
+    ("jumpattack", "jump_attack"), ("jump_attack", "jump_attack"),
+    ("taunt", "taunt"), ("victory", "victory"), ("uppercut", "uppercut"),
+    ("kart_idle", "kart_idle"), ("steer_left", "steer_left"), ("steer_right", "steer_right"),
+    ("boost", "boost"), ("item_throw", "item_throw"), ("kart_victory", "kart_victory"),
+    ("kart_hit", "kart_hit"), ("gk_throw_out", "gk_throw_out"),
 ]
 
 _SKIP = {"licence.json", "index.json", "set.json", "session_report.json"}

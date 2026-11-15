@@ -90,7 +90,7 @@
   },
   {
    "name": "throw",
-   "library": "punch",
+   "library": "throw",
    "prefer": [
     "throw_overhand"
    ],
@@ -150,7 +150,7 @@
   },
   {
    "name": "taunt",
-   "library": "wave",
+   "library": "taunt",
    "frames": 8,
    "fps": 8,
    "loop": false,

@@ -725,10 +725,13 @@ A) RECORD YOURSELF  (skeleton only)
     forge.py motion sets
     forge.py build --mannequin --game soccer --motion-set owner
     forge.py build --mannequin --game soccer --motion-set off
-  Order for each move: the set, then a clip you imported on its own, then the shipped starter,
-  then the live procedural motion if the library has no clip of that name.
-  The build report has a line "motion source: punch=set:owner, kick=starter, ...".
-  With no set saved and no --motion-set, a build is unchanged from v11.4.
+  Order for each move: a clip of that exact move in your set, then a clip you imported
+  on its own, then a starter clip of that same move, then the move's own procedural
+  animation. A pack's generic library name (punch, kick, wave, ...) is used only when
+  the move has no animation of its own, or the move sets "alias": true.
+  The build report has a line "motion source: punch=set:owner, kick=starter, ..."
+  and, when two moves still share a clip, "shared clips: jab+cross+hook=lib:punch (explicit alias)".
+  With no set saved and no --motion-set, a profile build is unchanged from v11.4.
 
   Studio: Library tab > Recording session... (folder, check results, shot list, default set).
   Build tab and Start > What to make have the Motion set dropdown.
@@ -752,10 +755,12 @@ B) GAME-TYPE PACKS  (data, not code)
   No code change. Character types apply on every pack: the pack chooses the moves, the type
   chooses timing, stance, reach and weight.
 
-  Honest limits of the starter library: several game moves share one clip (a jab and a cross are
-  both "punch" until you record jab.mp4 and cross.mp4). header, dribble, aim, reload and the kart
-  steer clips are the nearest generic motion, not a bespoke animation. The events are what the
-  game should trust. profiles/kart_racer.json is still the 8-angle driver sheet. tools/gaelic_forge.py
+  Honest limits of the starter library: a move with no animation of its own still shares a
+  generic clip until you record one (boxing's jab, cross and hook share punch; a header shares
+  jump; aim and reload share the nearest generic). The build report's "shared clips:" line names
+  them. Fighter specials, throw, jump attack, taunt and victory each have their own clip, and so
+  do the kart steer / boost / item throw. The events are what the game should trust.
+  profiles/kart_racer.json is still the 8-angle driver sheet. tools/gaelic_forge.py
   is still the 3D sculpted player and does not read the pack.
 
 C) ONE GAME FILE
@@ -915,8 +920,10 @@ BUILD
   lib:punch in a profile move ("motion": "lib:punch") is the same switch for one move.
 
   Game packs (v11.6): a move may list "prefer": ["jab"] before its generic "library": "punch". The first
-  clip found in your motion set or library is used, else the generic one. A clip from your own library or a
-  set is used before the rig's own clips; the shipped starter is not.
+  specific clip found in your motion set or library is used. If there is none, the move's own animation
+  is used. The generic library name is the fallback only when the move has no animation of its own
+  (or "alias": true). A clip from your own library or a set is used before the rig's own clips; the
+  shipped starter is not.
 
 CHARACTER TYPES
   A type is data: timing, stance, reach, weight. 1.0 leaves that axis alone.

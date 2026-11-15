@@ -1,0 +1,174 @@
+{
+ "name": "steer_left",
+ "category": "Kart",
+ "desc": "steer left (lean in)",
+ "loop": false,
+ "source": "procedural:steer_left",
+ "origin": "builtin",
+ "from_motion": "steer_left",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "ground": false,
+    "lift": -0.58,
+    "flat": 0.0,
+    "leg_L": [
+     84.0,
+     8.0,
+     0.0
+    ],
+    "leg_R": [
+     84.0,
+     8.0,
+     0.0
+    ],
+    "knee_L": 28.0,
+    "knee_R": 28.0,
+    "ankle_L": -10.0,
+    "ankle_R": -10.0,
+    "arm_L": [
+     55.0,
+     6.0,
+     0.0
+    ],
+    "arm_R": [
+     55.0,
+     6.0,
+     0.0
+    ],
+    "elbow_L": 45.0,
+    "elbow_R": 45.0,
+    "spine": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -4.0,
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  [
+   0.5,
+   {
+    "ground": false,
+    "lift": -0.58,
+    "flat": 0.0,
+    "leg_L": [
+     84.0,
+     8.0,
+     0.0
+    ],
+    "leg_R": [
+     84.0,
+     8.0,
+     0.0
+    ],
+    "knee_L": 28.0,
+    "knee_R": 28.0,
+    "ankle_L": -10.0,
+    "ankle_R": -10.0,
+    "arm_L": [
+     45.0,
+     10.0,
+     0.0
+    ],
+    "arm_R": [
+     62.0,
+     0.0,
+     0.0
+    ],
+    "elbow_L": 45.0,
+    "elbow_R": 45.0,
+    "spine": [
+     4.0,
+     6.0,
+     8.0
+    ],
+    "neck": [
+     -4.0,
+     10.0,
+     6.0
+    ],
+    "chest": [
+     2.0,
+     8.0,
+     14.0
+    ],
+    "hips": [
+     0.0,
+     10.0,
+     0.0
+    ]
+   }
+  ],
+  [
+   1.0,
+   {
+    "ground": false,
+    "lift": -0.58,
+    "flat": 0.0,
+    "leg_L": [
+     84.0,
+     8.0,
+     0.0
+    ],
+    "leg_R": [
+     84.0,
+     8.0,
+     0.0
+    ],
+    "knee_L": 28.0,
+    "knee_R": 28.0,
+    "ankle_L": -10.0,
+    "ankle_R": -10.0,
+    "arm_L": [
+     45.0,
+     10.0,
+     0.0
+    ],
+    "arm_R": [
+     62.0,
+     0.0,
+     0.0
+    ],
+    "elbow_L": 45.0,
+    "elbow_R": 45.0,
+    "spine": [
+     4.0,
+     6.0,
+     8.0
+    ],
+    "neck": [
+     -4.0,
+     10.0,
+     6.0
+    ],
+    "chest": [
+     2.0,
+     8.0,
+     14.0
+    ],
+    "hips": [
+     0.0,
+     10.0,
+     0.0
+    ]
+   }
+  ]
+ ],
+ "cleanup": null
+}

@@ -407,6 +407,12 @@ M("jump_attack", "Fighter", "flying kick", keys=K(
              arm_L=(40, 40, 0), arm_R=(20, 50, 0))),
     (0.85, P(FIGHT, leg_L=(40, 5, 0), knee_L=60, leg_R=(30, 5, 0), knee_R=60, lift=0.15)),
     (1, P(FIGHT))))
+M("uppercut", "Fighter", "crouching rear uppercut", keys=K(
+    (0, P(FIGHT)),
+    (0.22, P(CROUCH, hips=(20, -30, 0), leg_L=(55, 8, 0), knee_L=90, arm_R=(15, 28, 0), elbow_R=115, arm_L=(50, 20, 0), elbow_L=100)),
+    (0.48, P(CROUCH, hips=(6, 18, 0), leg_L=(40, 8, 0), knee_L=50, arm_R=(100, 10, 0), elbow_R=75)),
+    (0.68, P(FIGHT, hips=(2, 22, 0), arm_R=(145, 6, 0), elbow_R=45, lift=0.04)),
+    (1, P(FIGHT))))
 
 ALIASES = {
     "pickup_ground": "pick_up_ground", "pickup_aerial": "pick_up_aerial", "pick_up": "pick_up_ground",
@@ -415,6 +421,8 @@ ALIASES = {
     "special1": "special_1", "special2": "special_2", "jumpattack": "jump_attack", "jump_kick": "jump_attack",
     "getup": "get_up", "injured": "injured_idle", "gk_throw": "gk_throw_out", "dive_left": "gk_dive_left",
     "dive_right": "gk_dive_right", "save": "gk_save", "celebrate": "celebrate_point", "knockout": "ko", "ko": "ko",
+    "goalkeeper_save": "gk_save", "goalkeeper_dive_left": "gk_dive_left", "goalkeeper_dive_right": "gk_dive_right",
+    "goalkeeper_throw_out": "gk_throw_out",
     "high_kick": "high_kick_pass", "low_kick": "low_kick_pass", "kick_pass": "low_kick_pass", "stance": "fight_idle",
 }
 

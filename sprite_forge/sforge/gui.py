@@ -933,6 +933,9 @@ class Studio:
                     m.want_library = True
                     m.pack_frames = src["frames"]
                     m.library_name = src["library"]
+                    m.library_prefer = list(src.get("prefer") or [])
+                    m.own_clips = list(src.get("own") or [])
+                    m.force_alias = bool(src.get("alias"))
                     if not (m.motion or "").startswith("lib:"):
                         m.motion = "lib:" + src["library"]
             except Exception:

@@ -18,7 +18,23 @@
   "wave",
   "cast",
   "dive_left",
-  "dive_right"
+  "dive_right",
+  "special1",
+  "special2",
+  "throw",
+  "jumpattack",
+  "jump_attack",
+  "taunt",
+  "victory",
+  "uppercut",
+  "kart_idle",
+  "steer_left",
+  "steer_right",
+  "boost",
+  "item_throw",
+  "kart_victory",
+  "kart_hit",
+  "gk_throw_out"
  ],
  "licence": "licence.json"
 }

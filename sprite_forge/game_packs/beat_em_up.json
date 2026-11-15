@@ -144,7 +144,7 @@
   },
   {
    "name": "jumpattack",
-   "library": "kick",
+   "library": "jumpattack",
    "prefer": [
     "jump_kick"
    ],
@@ -226,7 +226,7 @@
   },
   {
    "name": "throw",
-   "library": "punch",
+   "library": "throw",
    "frames": 8,
    "fps": 12,
    "loop": false,
