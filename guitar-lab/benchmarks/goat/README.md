@@ -9,6 +9,7 @@ The files live outside this tree. From `guitar-lab/`:
 ```sh
 python -m benchmarks.goat --root /path/to/GOAT-parent --split train
 python -m benchmarks.goat --root /path/to/GOAT-parent --split train --frame-join
+python -m benchmarks.goat --root /path/to/GOAT-parent --split train --sustain
 python -m benchmarks.goat --root /path/to/GOAT-parent --split test
 ```
 
@@ -29,11 +30,13 @@ cabinet impulse, with a room-reverb send on about a quarter of them. They are
 not chorus, phaser, delay, or wah.
 
 `--frame-join` repeats a same-pitch frame-dip comparison (cut 0.85, gap 0.20 s).
-It is not the app decoder. See the result below.
+`--sustain` repeats an earlier ungated 0.12 s sustain comparison. Neither flag
+is the app decoder. The app decoder's own sustain rule is below: distorted
+audio only, gap 0.10 s.
 
-## What the default decoder scored
+## What the decoder scored before the sustain rule
 
-Riley was not changed. Note F1 is exact pitch with offsets ignored. `offset_f1`
+Note F1 is exact pitch with offsets ignored. `offset_f1`
 also requires the offset within 20% of the reference duration. Each item's DI
 and five NAM amplifier renders are averaged together. The Guitar Pro render is
 not in the mean. These are the files on disk for this pass: six 30 s crops and
@@ -62,9 +65,45 @@ Item 35's DI is 0.122 at 50 ms and 0.875 at 100 ms, with pitch recall 0.873
 inside 300 ms. Four of its five amplifiers also lose pitch at 300 ms (0.22 to
 0.37). The crop's own alignment is 0.793. The reference was not shifted.
 
-Train items 4, 5, 46, and 101, same metric, default decoder: mean F1@50 0.577,
-F1@100 0.598, offset F1 0.279 across 24 signals. That split is for development.
-It is not a second test score.
+The held-out table above is the decoder from before the sustain rule. It has
+not been re-scored since that rule was added. Train items 4, 5, 46, and 101
+were re-measured. Before the rule, mean F1@50 was 0.577 and F1@100 was 0.598
+across 24 signals. That split is for development. It is not a second test score.
+
+## Sustain rule in the decoder
+
+The rule runs only when `tone_estimate` calls the audio distorted. Clean,
+crunch and uncertain audio, including EGSet12 clip 04 and the locked current
+upload, are unchanged. On distorted audio, two things happen. A same-pitch
+onset inside 0.10 s is joined when the frame posterior between the onsets
+falls below 0.80 and the new onset peak is at least 0.05 weaker than the
+first. A 20 s stretch uses onset 0.65 when at least 70% of the notes present
+at 0.5 and missing at 0.65 are same-pitch neighbours, and it keeps onset 0.5
+when the reverb ratio said wet but fewer than 40% of those notes are.
+
+The cuts were read off the train items only. The five real repeats the wider
+0.12 s join removed on EGSet12 clip 04 are 115–118 ms apart, so 0.10 s leaves
+them. That wider ungated rule is what `--sustain` still repeats. It is not
+the app path: it dropped clip 04 pitch recall from 0.8765 to 0.8471 and moved
+the user-recording lock (current upload 238 → 261 notes, take B 565 → 536).
+
+Note F1, exact pitch, offsets ignored, this narrower rule versus the previous
+decoder:
+
+| | F1@50 before | after | F1@100 before | after |
+| --- | ---: | ---: | ---: | ---: |
+| DI (4) | 0.877 | 0.877 | 0.908 | 0.908 |
+| amplifiers (20) | 0.517 | 0.588 | 0.536 | 0.609 |
+| all 24 | 0.577 | 0.636 | 0.598 | 0.659 |
+
+No train file's F1@50 or F1@100 fell. The gains are item 4 amplifiers 2 and 3
+(0.876 to 0.919, 0.736 to 0.955), item 46 amplifiers 3 and 4 (0.233 to 0.432,
+0.448 to 0.517), and item 101 amplifiers 2 to 5 (0.296 to 0.456, 0.328 to
+0.590, 0.270 to 0.665, 0.498 to 0.583). Item 5 did not move. Those false
+onsets keep the frame posterior up (median floor about 0.92), and a join that
+requires the frame to stay that high and the second onset to be much weaker
+removed only a handful of them. Matched notes on item 5 DI stay about 0.63 s
+short, because the note was never split.
 
 ## Frame-dip join, measured and not adopted
 
@@ -76,4 +115,5 @@ F1 0.9313 to 0.8742, clip 12 F1@100 0.9818 to 0.9434, Guitar-TECHS excerpt 02
 pitch recall 0.9375 to 0.9107, and the amp-solo category F1@100 0.9136 to
 0.9027. With the join left out, the electric gate and the rest of
 `server/tests` pass (182 passed; the heavyweight separation test stays
-skipped). Playback and the locked floors are unchanged.
+skipped). That 0.20 s join is still not the decoder. The distorted-only 0.10 s
+rule above is a different cut.

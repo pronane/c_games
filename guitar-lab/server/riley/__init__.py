@@ -93,26 +93,52 @@ def notes_from_posteriors(out: dict, onset=None, offset=None, frame=None):
 DRY_ONSET, WET_ONSET, WET_RATIO = 0.5, 0.65, 1.5
 
 
-def decode(out: dict, window_s: float = 20.0):
+def decode(out: dict, window_s: float = 20.0, audio=None, sr=None):
     """Notes with the onset threshold chosen for how reverberant the audio is, decided per
     20 s stretch so a song with a dry intro and a wet (or heavy) section gets each right.
     Short files (one stretch) behave exactly as a single per-file decision.
+
+    When ``audio`` is passed and the automatic tone guess says distorted, a
+    sustain correction from ``server.riley.sustain`` also runs. Clean, crunch
+    and uncertain audio, and a call with no audio, keep the reverb rule alone.
     Returns (notes, info): info gives the share of the audio decoded as heavy reverb."""
+    from .sustain import (
+        REPEAT_KEEP_DRY, REPEAT_STRICT, join_short_dips, same_pitch_repeat_fraction, tone_is_distorted,
+    )
     loose = notes_from_posteriors(out)
     strict = notes_from_posteriors(out, onset=WET_ONSET)
     dry = notes_from_posteriors(out, onset=DRY_ONSET)
+    distorted = audio is not None and tone_is_distorted(audio, sr or SAMPLE_RATE)
     end = max([n['time'] + n['duration'] for n in loose] + [window_s])
     edges = np.arange(0.0, end + window_s, window_s)
     count = lambda notes, a, b: sum(1 for n in notes if a <= n['time'] < b)
-    notes, wet_windows, ratios = [], 0, []
+
+    def _in(notes, a, b):
+        return [n for n in notes if a <= n['time'] < b]
+
+    notes, wet_windows, ratios, strict_windows = [], 0, [], 0
     for a, b in zip(edges[:-1], edges[1:]):
         ratio = count(loose, a, b) / max(count(strict, a, b), 1)
         wet = ratio > WET_RATIO and count(loose, a, b) >= 8   # a near-empty stretch decides nothing
         ratios.append(ratio)
         wet_windows += wet
-        notes += [n for n in (strict if wet else dry) if a <= n['time'] < b]
+        use_strict = wet
+        if distorted:
+            fraction = same_pitch_repeat_fraction(_in(dry, a, b), _in(strict, a, b))
+            if fraction is not None and fraction >= REPEAT_STRICT:
+                use_strict = True
+            elif wet and fraction is not None and fraction < REPEAT_KEEP_DRY:
+                use_strict = False
+        strict_windows += use_strict
+        notes += _in(strict if use_strict else dry, a, b)
+    n_joined = 0
+    if distorted:
+        notes, n_joined = join_short_dips(notes, out.get('frame_output'), out.get('reg_onset_output'))
     total = len(edges) - 1
     whole = len(loose) / max(len(strict), 1)
-    return notes, {'reverb': 'heavy' if wet_windows > total / 2 else 'light' if not wet_windows else 'mixed',
-                   'wet_share': round(wet_windows / max(total, 1), 2), 'onset_ratio': round(whole, 2),
-                   'onset_threshold': WET_ONSET if wet_windows > total / 2 else DRY_ONSET}
+    info = {'reverb': 'heavy' if wet_windows > total / 2 else 'light' if not wet_windows else 'mixed',
+            'wet_share': round(wet_windows / max(total, 1), 2), 'onset_ratio': round(whole, 2),
+            'onset_threshold': WET_ONSET if strict_windows > total / 2 else DRY_ONSET}
+    if distorted:
+        info['sustain_joins'] = n_joined
+    return notes, info

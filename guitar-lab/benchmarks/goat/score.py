@@ -9,10 +9,9 @@ The fine MIDI's 120 BPM and 220 ticks per quarter are the file's timebase.
 They are not the musical tempo. Note F1 ignores offsets. ``offset_f1`` also
 requires the offset to land within 20% of the reference duration.
 
-``--split train`` refuses official test ids. ``--frame-join`` applies
-``frame_join.join_frame_dips`` after the published decoder so that comparison
-can be repeated. The app decoder does not call it: the rule drops EGSet12
-below the locked floor.
+``--split train`` refuses official test ids. ``--frame-join`` and ``--sustain``
+repeat comparisons that are not in the app decoder. Both drop a locked floor
+when they are put into ``server.riley.decode``.
 """
 from __future__ import annotations
 
@@ -24,6 +23,7 @@ import numpy as np
 import soundfile as sf
 
 from benchmarks.goat.frame_join import join_frame_dips
+from benchmarks.goat.sustain import experimental_decode
 from benchmarks.goat.split import DIAGNOSTIC_TEST, primary, require_development, split_of
 from benchmarks.regression.metrics import score_notes
 
@@ -123,7 +123,8 @@ def _signals(folder: Path, item: int, include_rse: bool):
     return found
 
 
-def score_item(item: int, folder: Path, midi: Path, frame_join: bool, include_rse: bool = False):
+def score_item(item: int, folder: Path, midi: Path, frame_join: bool, include_rse: bool = False,
+               sustain: bool = False):
     import librosa
     from server import riley
 
@@ -137,8 +138,12 @@ def score_item(item: int, folder: Path, midi: Path, frame_join: bool, include_rs
         if sr != riley.SAMPLE_RATE:
             y = librosa.resample(y, orig_sr=sr, target_sr=riley.SAMPLE_RATE)
         post = riley.posteriors(y, 'riley')
-        notes, info = riley.decode(post)
-        joined = 0
+        if sustain:
+            # The rejected ungated 0.12 s comparison. Not what the app runs.
+            notes, info = experimental_decode(post)
+        else:
+            notes, info = riley.decode(post, audio=y, sr=riley.SAMPLE_RATE)
+        joined = info.get('sustain_joins', 0) if sustain else 0
         if frame_join:
             notes, joined = join_frame_dips(notes, post['frame_output'])
         onset = score_notes(notes, ref, onset_tol=0.05)
@@ -150,6 +155,7 @@ def score_item(item: int, folder: Path, midi: Path, frame_join: bool, include_rs
             'signal': name,
             'synthetic': synthetic,
             'frame_join': frame_join,
+            'sustain_experiment': sustain,
             'audio_s': round(duration, 3),
             'n_ref': len(ref),
             'n_est': len(notes),
@@ -175,7 +181,7 @@ def mean_primary(rows):
     return {'f1_50': avg(kept), 'f1_100': avg(wide), 'offset_f1_50': avg(off), 'n': len(kept)}
 
 
-def score_split(root: Path, which: str, frame_join: bool, include_rse: bool = False):
+def score_split(root: Path, which: str, frame_join: bool, include_rse: bool = False, sustain: bool = False):
     chosen = [
         (item, folder, midi) for item, folder, midi in discover(root)
         if which == 'all' or split_of(item) == which
@@ -184,7 +190,8 @@ def score_split(root: Path, which: str, frame_join: bool, include_rse: bool = Fa
         require_development(item for item, _folder, _midi in chosen)
     rows = []
     for item, folder, midi in chosen:
-        rows.extend(score_item(item, folder, midi, frame_join=frame_join, include_rse=include_rse))
+        rows.extend(score_item(item, folder, midi, frame_join=frame_join, include_rse=include_rse,
+                               sustain=sustain))
     return rows
 
 
@@ -194,6 +201,8 @@ def main(argv=None):
     parser.add_argument('--split', choices=('train', 'test', 'all'), default='train')
     parser.add_argument('--frame-join', action='store_true',
                         help='Repeat the rejected frame-dip comparison. Does not change the app decoder.')
+    parser.add_argument('--sustain', action='store_true',
+                        help='Repeat the rejected sustain comparison. Does not change the app decoder.')
     parser.add_argument('--include-rse', action='store_true',
                         help='Also score the Guitar Pro synthetic render. It is not a real amplifier.')
     parser.add_argument('--out', type=Path, default=None)
@@ -201,8 +210,10 @@ def main(argv=None):
     if args.split == 'test':
         print('Held-out evaluation. Do not choose a threshold from this output.')
         print(f'Diagnostic item(s) left out of the primary mean: {DIAGNOSTIC_TEST}')
-    rows = score_split(args.root, args.split, frame_join=args.frame_join, include_rse=args.include_rse)
-    summary = {'split': args.split, 'frame_join': args.frame_join, 'primary': mean_primary(rows), 'rows': rows}
+    rows = score_split(args.root, args.split, frame_join=args.frame_join, include_rse=args.include_rse,
+                       sustain=args.sustain)
+    summary = {'split': args.split, 'frame_join': args.frame_join, 'sustain_experiment': args.sustain,
+               'primary': mean_primary(rows), 'rows': rows}
     text = json.dumps(summary, indent=2)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
