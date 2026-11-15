@@ -5,13 +5,9 @@ benchmarks/regression/reference/electric_last.json
 benchmarks/goat/private/
 node_modules
 .cache
-<<<<<<< HEAD
-
-# Full-band test recordings stay on this machine
-benchmarks/fullband/data/
-=======
 # Independent practice-feedback recordings and reviewer identities stay local.
 benchmarks/practice_feedback/private/
 # Runtime reports uploaded as CI artifacts, never private data in Git.
 accuracy-results/
->>>>>>> arena/23399fc5-c-games
+# Full-band test recordings stay on this machine
+benchmarks/fullband/data/
