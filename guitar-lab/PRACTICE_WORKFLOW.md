@@ -12,7 +12,16 @@ Help a guitarist hear a problem, choose a useful exercise and improve the next a
 
 Projects start **unverified**, including imported charts. Check the arrangement, song passage, tuning/capo and rhythm/lead part. Grading is gated on explicit reference approval. Unreviewed projects can still be heard and recorded without a grade.
 
-The correction editor accepts a bounded JSON list of `{time, duration, midi}` rows, in reference seconds. Simultaneous notes represent chord tones. Applying corrections creates a new reference revision and revokes approval. Historical reports remain historical; their expected-audio comparisons and focus/retry actions are disabled against a changed reference.
+Open **Visual reference editor — notes and chord tones** to edit the current section in a piano roll:
+
+- Click a note to select it; Shift-click adds to a selection. Optionally select chord tones together (attacks within 30 ms).
+- Drag to change time/pitch; Alt-drag to resize duration. Keyboard arrows move notes; Alt-left/right changes length. Numeric fields offer precise timing, pitch and length edits.
+- Choose beat/eighth/sixteenth snapping or no snapping. Add/delete notes, transpose a chord, or duplicate the selection one beat later. Group transforms preserve intervals/spacing and stay within MIDI/time bounds.
+- Audition the draft phrase or selected notes; stop playback with **Stop phrase playback**. The audition uses the selected practice speed and generic guitar sound, not the original amp.
+- Undo/redo keeps up to 40 draft edit states. **Apply visual corrections** is the only action that changes the live reference. Unapplied drafts are not saved/exported; apply before switching projects.
+- Source note tails are bounded to the reference end in the visual draft. At most 2,000 overlapping notes are drawn; use shorter sections for dense material.
+
+An advanced JSON editor remains available for `{time, duration, midi}` rows in reference seconds. Simultaneous notes represent chord tones. Either editor's Apply creates a new reference revision and revokes approval. Historical reports remain historical; their expected-audio comparisons and focus/retry actions are disabled against a changed reference. This is a pitch/timing editor, not a complete notation/fingering editor.
 
 Named sections support verse, chorus, solo or any other label. Exclude an unreliable section to disable grading for every overlapping phrase, even if a retry is given a different name. This is a conservative interval-overlap check, not just a section-name check.
 
@@ -37,10 +46,10 @@ Expected audio uses a generic plucked guitar, not the original amp. Finding snip
 - Explicit **Save project on this device** uses IndexedDB. No accounts or cloud storage.
 - Save title, goal, part, tuning/capo, editable reference notes/revision, sections/exclusions, speed/active section, take comparisons, user review labels and optionally take audio.
 - **Audio retention is off by default.** Enable it before capturing to enable later A/B listening. Retention controls local project audio, not temporary engine storage.
-- Projects preserve reference *notes*, not the original full song/stems or complete chart file. Keep originals separately. The notes remain playable and editable after the temporary song session expires.
+- Projects preserve reference *notes* and optionally an original chart attachment (Guitar Pro, MusicXML, MIDI or text tab, up to 8 MB). Attach under **Keep an original reference chart with this project**. The attachment is an inert byte-for-byte backup, is never executed, and can be downloaded/removed; corrections do not rewrite it. Full songs/stems are not retained; keep original audio separately. Notes remain playable/editable after the temporary song session expires.
 - Changes are not autosaved. Explicitly save after removing audio/takes to update the saved copy. Delete project removes its saved IndexedDB copy; exported downloads are not deleted.
-- Portable JSON export includes retained WAV audio. Imports are size/schema bounded, never executed, and get a new ID rather than overwriting an existing project. Maximum 600-second reference, 30,000 reference notes, 100 sections, 50 takes, 50 MB retained audio, 80 MB import.
-- Progress is compared only across identical phrase boundaries, practice speed and reference revision. Counts are human-confirmed issues, with review coverage shown—not a universal ability/accuracy score. With retained audio, play previous → current take directly.
+- Portable JSON export includes retained WAV audio. Imports are size/schema bounded, never executed, and get a new ID rather than overwriting an existing project. Maximum 600-second reference, 30,000 reference notes, 100 sections, 50 takes, 50 MB retained audio plus an optional 8 MB chart, 80 MB import/export. Export fails explicitly if the complete JSON exceeds 80 MB; remove older audio before retrying.
+- Progress is compared only across identical phrase boundaries, practice speed, reference revision and detector label. The history table shows review coverage and confirmed/dismissed/unsure counts. Unrelated imported review keys do not count. Count-based change commentary is withheld until both reports have no unresolved findings or alignment warnings. Counts concern detected findings, not false negatives or a universal ability/accuracy score. With retained audio, play previous → current take directly.
 - Browser storage can be evicted or fail for quota/privacy reasons. Errors are surfaced; export backups before clearing browser data.
 
 Recordings are sent to the configured Python analysis API for comparison. Existing engine consent/temporary-storage limits still apply. CPU functionality remains; this feature does not introduce a GPU-only path or claim that heavyweight models are provisioned in every environment.
@@ -65,6 +74,7 @@ For an actual release-quality validation:
 - `npm run build`
 - `npm test` (including project schema, phrase timing, reference revision/speed comparability, uncertainty and exclusion-overlap tests)
 - `.venv/bin/python -m pytest server/tests/test_transcription_check.py server/tests/test_compare.py -q`
+- `BROWSER_EXECUTABLE_PATH=/path/to/chromium npm run test:reference-editor` (synthetic fixture; editor, portable chart and coverage-aware progress checks)
 - `BROWSER_EXECUTABLE_PATH=/path/to/chromium npm run test:practice` with the frontend and API running
 
 Browser smoke uses an actual browser/fake microphone and **mocked comparison responses**. It verifies chart entry, reference/exclusion gates, capture, review playback, focus/retry, IndexedDB reload including audio, portable export, correction revision and deletion. It is not a transcription or real-guitar accuracy test.

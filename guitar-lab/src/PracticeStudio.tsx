@@ -6,9 +6,10 @@ import { Recorder } from './recorder';
 import { synthesize } from './tabScore';
 import { addClicks, loadLatency } from './practice';
 import LatencyCheck from './LatencyCheck';
+import VisualReferenceEditor from './VisualReferenceEditor';
 import { useTranscriber } from './TranscriberSelect';
 import { MEDIA_ACCEPT } from './audioFiles';
-import { comparable, confirmedCount, exportProject, importProject, issueKey, issueStatus, newProject, validateProject, excludedPhrase, exercise, phraseNotes, projectStore, type Attempt, type PracticeProject, type PracticeSeed, type Review, type Section } from './practiceProject';
+import { comparable, confirmedCount, reviewCoverage, progressVerdict, exportProject, importProject, issueKey, issueStatus, newProject, validateProject, excludedPhrase, exercise, phraseNotes, projectStore, type Attempt, type PracticeProject, type PracticeSeed, type Review, type Section } from './practiceProject';
 
 type Props = { seed: PracticeSeed | null };
 export default function PracticeStudio({ seed }: Props) {
@@ -47,6 +48,13 @@ export default function PracticeStudio({ seed }: Props) {
   function changeSection(values: Partial<Section>) {
     if (!project || !section) return;
     patch({ sections: project.sections.map(s => s.id === section.id ? { ...s, ...values } : s) });
+  }
+  function applyReference(notes: PracticeSeed['notes']) {
+    if (!project) return;
+    try {
+      const next = validateProject({ ...project, notes, revision: project.revision + 1, trust: 'unverified', updated: Date.now() });
+      stop(); setProject(next); setSelected(''); setNotice('Reference corrected. Review and approve the new revision before grading.');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
   async function run(fn: () => Promise<void>) {
     setBusy(true); setError(''); setNotice('');
@@ -144,11 +152,16 @@ export default function PracticeStudio({ seed }: Props) {
       <label>Practice goal <input value={project.goal} maxLength={2000} onChange={e => patch({ goal: e.target.value })} /></label>
       <p><b>Before judging your playing:</b> confirm the correct song passage, rhythm/lead part and tuning. Listen to the original in Song Lab and compare the written notes. No detected disagreement is not proof of accuracy.</p>
       <label><input type="checkbox" checked={project.trust === 'reviewed'} onChange={e => patch({ trust: e.target.checked ? 'reviewed' : 'unverified' })} /> I reviewed this reference and arrangement; allow diagnostic comparison</label>
+      <VisualReferenceEditor key={`${project.id}:${project.revision}`} notes={project.notes} duration={project.duration} bpm={project.bpm} section={section} disabled={busy}
+        onApply={applyReference} onAudition={(notes, start, end) => run(async () => {
+          if (end - start > 60) throw Error('Choose a phrase at most 60 seconds long to audition.');
+          await context().resume(); stop(); playBuffer(expected({ ...project, notes }, { id: '', name: 'Draft', start, end }, speed));
+        })} />
       <details><summary>Correct reference notes / chord tones</summary>
         <p>Edit JSON rows with time (seconds), duration and MIDI pitch. A chord is several notes at the same time. Saving creates a new revision, clears reference approval and keeps old takes separate.</p>
         <button type="button" onClick={() => setEditor(JSON.stringify(project.notes, null, 2))}>Load notes into editor</button>
         <textarea aria-label="Reference note editor" rows={8} value={editor} onChange={e => setEditor(e.target.value)} />
-        <button type="button" onClick={() => run(async () => { const next = validateProject({ ...project, notes: JSON.parse(editor), revision: project.revision + 1, trust: 'unverified' }); setProject(next); setSelected(''); setNotice('Reference corrected. Review and approve the new revision before grading.'); })}>Apply reference corrections</button>
+        <button type="button" onClick={() => run(async () => { applyReference(JSON.parse(editor)); })}>Apply reference corrections</button>
       </details>
       <div className="presets">
         <select aria-label="Song section" value={section.id} onChange={e => setSectionId(e.target.value)}>{project.sections.map(s => <option key={s.id} value={s.id}>{s.name} ({s.start.toFixed(1)}–{s.end.toFixed(1)}s)</option>)}</select>
@@ -176,12 +189,26 @@ export default function PracticeStudio({ seed }: Props) {
         <label>Reference start (seconds) <input type="number" min={0} max={project.duration} value={manualStart} onChange={e => setManualStart(Number(e.target.value))} /></label>
         <input aria-label="Upload phrase take" type="file" accept={MEDIA_ACCEPT} onChange={e => { const f = e.target.files?.[0]; if (f) run(async () => { if (f.size > 30 * 1024 * 1024) throw Error('Choose audio smaller than 30 MB.'); const b = await context().decodeAudioData(await f.arrayBuffer()); if (b.duration > 120 || b.duration < .2 || manualStart < 0 || manualStart + b.duration * speed > project.duration + .05) throw Error('Recording must fit the reference and be at most 120 seconds.'); await analyse(encodeWav(Array.from({ length: b.numberOfChannels }, (_, i) => b.getChannelData(i)), b.sampleRate), { ...section, start: manualStart, end: Math.min(project.duration, manualStart + b.duration * speed) }, speed, false); }); e.target.value = ''; }} />
       </details>
+      <details><summary>Keep an original reference chart with this project</summary>
+        <p>Optional: attach a chart you own or have permission to store (up to 8 MB). Its original bytes are saved/exported only with this project. The file is a backup, not proof that the editable notes match it; visual corrections do not rewrite the attachment.</p>
+        <label>Attach original chart <input type="file" accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml,.mxl,.txt,.tab,.mid,.midi" onChange={e => {
+          const f = e.target.files?.[0]; if (f) run(async () => {
+            if (f.size > 8 * 1024 * 1024) throw Error('Choose a reference chart smaller than 8 MB.');
+            const reference = { name: f.name, file: new Blob([await f.arrayBuffer()], { type: 'application/octet-stream' }) };
+            validateProject({ ...project, reference }); patch({ reference }); setNotice('Original reference chart attached. Save the project to keep it.');
+          }); e.target.value = '';
+        }} /></label>
+        {project.reference && <div><p>{project.reference.name} · {(project.reference.file.size / 1024).toFixed(1)} KB</p>
+          <button type="button" onClick={() => download(project.reference!.file, project.reference!.name)}>Download original chart</button>
+          <button type="button" onClick={() => { patch({ reference: undefined }); setNotice('Original chart removed from working project. Save to update the stored copy.'); }}>Remove attached chart</button>
+        </div>}
+      </details>
       <div className="presets">
         <button type="button" onClick={() => run(async () => { const saved = { ...project, practiceSpeed: speed, activeSection: section.id }; await projectStore('put', saved); setLibrary(await projectStore('list')); setNotice('Saved on this device. Export a backup before clearing browser data.'); })}>Save project on this device</button>
         <button type="button" onClick={() => run(async () => download(await exportProject({ ...project, practiceSpeed: speed, activeSection: section.id }), `${project.title}.practice.json`))}>Export project & takes</button>
         <button type="button" onClick={() => run(async () => { if (!confirm('Delete this saved project and its retained recordings from this device? Exported copies are not deleted.')) return; await projectStore('delete', project.id); setLibrary(await projectStore('list')); setProject(null); })}>Delete project</button>
       </div>
-      <p className="helper">Projects preserve the editable reference notes, not the original song/stems or the complete chart file. Keep your original files separately. Changes are not autosaved. Browser storage may be evicted; keep an export. Delete removes the local saved project, not previously downloaded copies or temporary engine files.</p>
+      <p className="helper">Projects preserve editable reference notes and an optional attached original chart, not the original song/stems. Keep your original audio separately. Changes are not autosaved. Browser storage may be evicted; keep an export. Delete removes the local saved project, not previously downloaded copies or temporary engine files.</p>
     </fieldset>}
     {recording && <button className="primary" onClick={() => { recorder().stop(); stop(); }}>Stop recording</button>}
     {busy && <p role="status">{recording ? 'Count-in / recording…' : 'Working…'}</p>}
@@ -208,7 +235,11 @@ export default function PracticeStudio({ seed }: Props) {
       </li>)}</ol>
       {issues.length > 100 && <p>Showing the first 100 findings. Choose a shorter phrase to review the rest.</p>}
       <h3>Retry progress</h3>
-      <p>{previous ? `Same phrase, speed and reference revision: ${confirmedCount(previous)} → ${confirmedCount(attempt)} human-confirmed issues (review coverage: ${Object.keys(previous.reviews).length} → ${Object.keys(attempt.reviews).length} findings). Only compare after reviewing both takes; fewer unreviewed flags does not prove improvement.` : 'No earlier take at this exact phrase, speed and reference revision. Record another to compare like for like.'}</p>
+      <p>{previous ? `Same phrase, speed, reference revision and detector: ${confirmedCount(previous)} → ${confirmedCount(attempt)} human-confirmed issues (review coverage: ${reviewCoverage(previous).reviewed}/${reviewCoverage(previous).total} → ${reviewCoverage(attempt).reviewed}/${reviewCoverage(attempt).total} findings). Only compare after reviewing both takes; fewer unreviewed flags does not prove improvement.` : 'No earlier take at this exact phrase, speed and reference revision. Record another to compare like for like.'}</p>
+      {previous && <p role="status">{progressVerdict(previous, attempt)}</p>}
+      <div className="practice-progress"><table aria-label="Comparable phrase take history"><thead><tr><th>Take</th><th>Reviewed findings</th><th>Confirmed</th><th>Dismissed</th><th>Unsure</th></tr></thead><tbody>
+        {project.attempts.filter(a => comparable(a, attempt)).map(a => { const coverage = reviewCoverage(a); return <tr key={a.id}><td><button disabled={busy} onClick={() => { stop(); setSelected(a.id); }}>{new Date(a.created).toLocaleString()}</button></td><td>{a.comparison ? `${coverage.reviewed}/${coverage.total}` : 'Not analysed'}</td><td>{coverage.confirmed}</td><td>{coverage.dismissed}</td><td>{coverage.unsure}</td></tr>; })}
+      </tbody></table></div>
       {previous?.audio && attempt.audio && <button disabled={busy} onClick={() => run(async () => {
         await context().resume(); stop();
         const before = await context().decodeAudioData(await previous.audio!.arrayBuffer());

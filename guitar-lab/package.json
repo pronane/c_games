@@ -13,6 +13,7 @@
     "test:song": "node tests/song-smoke.mjs",
     "test:tab": "node tests/tab-smoke.mjs",
     "test:riley": "node tests/riley-smoke.mjs",
+    "test:reference-editor": "node tests/reference-editor-smoke.mjs",
     "test:practice": "node tests/practice-smoke.mjs",
     "test:review": "node benchmarks/holdout/review-smoke.mjs"
   },
