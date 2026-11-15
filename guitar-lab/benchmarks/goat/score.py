@@ -139,9 +139,10 @@ def score_item(item: int, folder: Path, midi: Path, frame_join: bool, include_rs
             y = librosa.resample(y, orig_sr=sr, target_sr=riley.SAMPLE_RATE)
         post = riley.posteriors(y, 'riley')
         if sustain:
+            # The rejected ungated 0.12 s comparison. Not what the app runs.
             notes, info = experimental_decode(post)
         else:
-            notes, info = riley.decode(post)
+            notes, info = riley.decode(post, audio=y, sr=riley.SAMPLE_RATE)
         joined = info.get('sustain_joins', 0) if sustain else 0
         if frame_join:
             notes, joined = join_frame_dips(notes, post['frame_output'])

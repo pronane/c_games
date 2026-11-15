@@ -1,4 +1,9 @@
-"""Amp-sustain experiment. It is not part of the app decoder.
+"""Rejected ungated sustain experiment. It is not the app decoder.
+
+The app rule is ``server.riley.sustain``: distorted audio only, gap 0.10 s,
+and the second onset must be at least 0.05 weaker. This module is the wider
+0.12 s comparison that missed the EGSet12 and user-recording floors.
+``--sustain`` repeats it.
 
 On GOAT train, two different mistakes were mixed together by the reverb rule.
 

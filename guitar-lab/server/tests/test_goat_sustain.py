@@ -1,6 +1,4 @@
-"""The sustain comparison is repeatable and is not the app decoder."""
-import inspect
-
+"""Distorted-guitar sustain handling, and the rejected ungated comparison."""
 import numpy as np
 
 from benchmarks.goat.sustain import experimental_decode, join_short_dips, same_pitch_repeat_fraction
@@ -35,17 +33,62 @@ def test_repeat_fraction_sees_a_pile_and_ignores_other_pitches():
     assert same_pitch_repeat_fraction(other, other[:2]) == 0.0
 
 
-def test_the_app_decoder_does_not_run_the_experiment(monkeypatch):
-    assert 'sustain' not in inspect.getsource(riley.decode)
-    assert 'join_short_dips' not in inspect.getsource(riley.decode)
-    frame = np.zeros((20, 88), np.float32)
+def _post(frame, onset):
+    return {'frame_output': frame, 'reg_onset_output': onset}
+
+
+def test_the_decoder_joins_only_a_distorted_short_weak_dip(monkeypatch):
+    frame = np.ones((20, 88), np.float32)
+    frame[0:12, 19] = 0.2  # MIDI 40, column 19
+    onset = np.zeros((20, 88), np.float32)
+    onset[0, 19] = 0.90
+    onset[9, 19] = 0.50
     pair = [_note(0.0, 40, 0.04), _note(0.09, 40, 0.04)]
+    late = [_note(0.0, 40, 0.04), _note(0.115, 40, 0.04)]
+    strong = [_note(0.0, 40, 0.04), _note(0.09, 40, 0.04)]
+    strong_onset = onset.copy()
+    strong_onset[9, 19] = 0.88
 
     def fake(out, onset=None, offset=None, frame=None):
         return list(pair)
 
     monkeypatch.setattr(riley, 'notes_from_posteriors', fake)
-    notes, info = riley.decode({'frame_output': frame})
-    assert len(notes) == 2 and 'sustain_joins' not in info
-    experimental, exp = experimental_decode({'frame_output': frame})
-    assert len(experimental) == 1 and exp['sustain_joins'] == 1 and exp['experimental'] is True
+    # No audio: the reverb rule alone, so a 90 ms dip is not joined.
+    plain, info = riley.decode(_post(frame, onset))
+    assert len(plain) == 2 and 'sustain_joins' not in info
+
+    def distorted(audio, sr):
+        return {'tone': 'distorted'}
+
+    def clean(audio, sr):
+        return {'tone': 'clean'}
+
+    monkeypatch.setattr('server.song_analysis.tone_estimate', distorted)
+    audio = np.zeros(1600, np.float32)
+    joined, jinfo = riley.decode(_post(frame, onset), audio=audio, sr=16000)
+    assert len(joined) == 1 and jinfo['sustain_joins'] == 1
+    monkeypatch.setattr('server.song_analysis.tone_estimate', clean)
+    kept, cinfo = riley.decode(_post(frame, onset), audio=audio, sr=16000)
+    assert len(kept) == 2 and 'sustain_joins' not in cinfo
+
+    # 115 ms is a real repeat on EGSet12 clip 04. Distorted or not, it stays.
+    def fake_late(out, onset=None, offset=None, frame=None):
+        return list(late)
+
+    monkeypatch.setattr(riley, 'notes_from_posteriors', fake_late)
+    monkeypatch.setattr('server.song_analysis.tone_estimate', distorted)
+    kept_late, _ = riley.decode(_post(frame, onset), audio=audio, sr=16000)
+    assert len(kept_late) == 2
+
+    # A second onset almost as strong as the first is a re-pick, not a dip.
+    def fake_strong(out, onset=None, offset=None, frame=None):
+        return list(strong)
+
+    monkeypatch.setattr(riley, 'notes_from_posteriors', fake_strong)
+    kept_strong, sinfo = riley.decode(_post(frame, strong_onset), audio=audio, sr=16000)
+    assert len(kept_strong) == 2 and sinfo['sustain_joins'] == 0
+
+    # The old ungated 0.12 s comparison still joins a 90 ms dip. It is not the app path.
+    monkeypatch.setattr(riley, 'notes_from_posteriors', fake)
+    experimental, exp = experimental_decode({'frame_output': np.zeros((20, 88), np.float32)})
+    assert len(experimental) == 1 and exp['experimental'] is True

@@ -191,7 +191,11 @@ def _transcribe_riley_path(which: str, path: Path, midi_min: int, midi_max: int)
         audio, _level_info = guarded_level(audio, riley.SAMPLE_RATE)
     out = riley.posteriors(audio, which)
     # The reverb-adaptive decoder was tuned on Riley; GAPS keeps its published thresholds.
-    notes = riley.decode(out)[0] if which == 'riley' else riley.notes_from_posteriors(out)
+    # Distorted audio also gets the sustain correction. The tone guess reads this waveform.
+    if which == 'riley':
+        notes = riley.decode(out, audio=audio, sr=riley.SAMPLE_RATE)[0]
+    else:
+        notes = riley.notes_from_posteriors(out)
     notes = [n for n in notes if midi_min <= n['midi'] <= midi_max]
     notes.sort(key=lambda n: (n['time'], n['midi']))
     for i, n in enumerate(notes):
