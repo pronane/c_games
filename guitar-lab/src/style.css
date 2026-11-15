@@ -2102,3 +2102,29 @@ footer span:first-child {
   display: grid;
   gap: 4px;
 }
+
+/* Local-first guided practice workspace. */
+.practice-fields { border: 1px solid var(--border, #555); border-radius: 12px; padding: 1rem; min-width: 0; }
+.practice-fields > label, .practice-review details > label { display: block; margin: .8rem 0; }
+.practice-fields input:not([type=checkbox]), .practice-fields select { max-width: 100%; margin-left: .5rem; }
+.practice-fields textarea { display: block; width: 100%; box-sizing: border-box; margin: .8rem 0; font-family: monospace; }
+.practice-issues { padding-left: 1.5rem; max-height: 36rem; overflow: auto; }
+.practice-issues > li { padding: 1rem .5rem; border-bottom: 1px solid #6665; }
+.practice-studio button, .practice-studio select { margin: .25rem; }
+.diff-uncertain { outline: 1px dashed #d9ae61; }
+
+.visual-editor { margin-block: 1rem; padding: .8rem; border: 1px solid #64748b66; border-radius: 10px; }
+.piano-scroll { overflow: auto; max-height: 430px; border: 1px solid #64748b88; background: #111827; }
+.piano-scroll svg { display: block; max-width: none; touch-action: none; user-select: none; }
+.piano-scroll rect[role=button] { cursor: grab; }
+.piano-scroll rect[role=button]:focus { stroke: white; stroke-width: 3px; outline: none; }
+.piano-scroll rect[aria-disabled=true] { cursor: wait; }
+.practice-progress { overflow-x: auto; }
+.practice-progress table { width: 100%; border-collapse: collapse; }
+.practice-progress th, .practice-progress td { padding: .6rem; border-bottom: 1px solid #64748b55; text-align: left; }
+.listening-reviewer label { display: block; margin: .8rem 0; }
+.listening-reviewer audio { display: block; width: min(100%, 38rem); margin: .6rem 0; }
+.listening-reviewer input, .listening-reviewer select { margin-left: .5rem; max-width: 100%; }
+.listening-reviewer textarea { display: block; width: 100%; min-height: 5rem; box-sizing: border-box; }
+.listening-reviewer fieldset { margin: 1rem 0; padding: 1rem; border: 1px solid #64748b88; border-radius: 8px; }
+.listening-reviewer button { margin: .3rem; }

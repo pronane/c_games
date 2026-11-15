@@ -21,6 +21,9 @@ import AudioInput from "./AudioInput";
 import MidiInput from "./MidiInput";
 import InstrumentSetup from "./InstrumentSetup";
 import SongLab from "./SongLab";
+import PracticeStudio from "./PracticeStudio";
+import ListeningReviewer from "./ListeningReviewer";
+import type { PracticeSeed } from "./practiceProject";
 import { MEDIA_ACCEPT } from "./audioFiles";
 import TabLab, { type TabSource } from "./TabLab";
 import ProcessingToggle, { type Processing } from "./ProcessingToggle";
@@ -42,6 +45,7 @@ type Result = {
 function App() {
   const [settings, setSettings] =
     useState<InstrumentSettings>(defaultSettings());
+  const [practiceSeed, setPracticeSeed] = useState<PracticeSeed | null>(null);
   const profile = resolveInstrument(settings);
   const [reference, setReference] = useState<Clip | null>(null),
     [take, setTake] = useState<Clip | null>(null),
@@ -311,6 +315,7 @@ function App() {
         <ProcessingToggle value={processing} onChange={setProcessing} disabled={recording || busy} />
         <TranscriberSelect disabled={recording || busy} />
         <SongLab
+          onPracticeProject={setPracticeSeed}
           settings={settings}
           onSettings={(next) => {
             setSettings(next);
@@ -338,6 +343,7 @@ function App() {
           }}
         />
         <TabLab
+          onPracticeProject={setPracticeSeed}
           settings={settings}
           incoming={tabIncoming}
           onSettings={(next) => {
@@ -358,6 +364,7 @@ function App() {
             document.getElementById("compare")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
         />
+        <PracticeStudio seed={practiceSeed} />
         <div className="step-line" id="compare">
           <span className="step selected">
             1 <b>Set up your session</b>
@@ -755,4 +762,4 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(new URLSearchParams(window.location.search).has("listening-review") ? <ListeningReviewer /> : <App />);

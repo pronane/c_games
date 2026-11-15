@@ -1,0 +1,29 @@
+{
+  "actual_api_and_model": true,
+  "mocked": false,
+  "independent_holdout": false,
+  "audio_sha256": "2e969753898c731a7e4e46935ff5f315d31acdaddf0a4ab9afa855a96307a9d8",
+  "note_metrics": {
+    "note_f1": 0.8730964467005075,
+    "note_precision": 0.8775510204081632,
+    "note_recall": 0.8686868686868687,
+    "onset_f1": 0.8832487309644671,
+    "pitch_recall_300ms": 0.898989898989899,
+    "n_ref": 99,
+    "n_est": 98,
+    "n_pitch_match_300ms": 89,
+    "onset_tol_s": 0.05,
+    "loose_s": 0.3
+  },
+  "comparison_counts": {
+    "uncertain": 0,
+    "correct": 67,
+    "wrong_pitch": 12,
+    "wrong_string": 0,
+    "early": 6,
+    "late": 5,
+    "missing": 4,
+    "extra": 3,
+    "wrong_duration": 5
+  }
+}

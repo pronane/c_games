@@ -1,0 +1,24 @@
+{
+  "schema": "practice-development-regression-baseline-v1",
+  "independent_holdout": false,
+  "basis": "Freeze measured Basic Pitch on three previously-used GuitarSet recordings; not a new independent quality target.",
+  "allowed_absolute_f1_regression": 0.02,
+  "clips": {
+    "05_Funk1-114-Ab_solo_mic.wav": {
+      "audio_sha256": "1bc53f0d2132e1d40efe3db88ae7c74ef53d256ed60a98dbed77270537307a1f",
+      "note_f1": 0.7610619469026548,
+      "annotation_sha256": "96897eede0cc3b58ec46cb66d78571e914a9adc7ac1450922f1a397bd182fe07"
+    },
+    "05_Jazz2-110-Bb_comp_mic.wav": {
+      "audio_sha256": "0ff82f67a72707cfa4f263aac890baeb9a11f50d0e1487c8f187a2e614b6bd9d",
+      "note_f1": 0.810126582278481,
+      "annotation_sha256": "abee5acf9c391d2c7d023304478fd5dd6675fbcdc6056c63594924c4a91267b2"
+    },
+    "05_Rock1-90-C#_solo_mic.wav": {
+      "audio_sha256": "2e969753898c731a7e4e46935ff5f315d31acdaddf0a4ab9afa855a96307a9d8",
+      "note_f1": 0.8730964467005075,
+      "annotation_sha256": "0e3b0ae2ff70cb65439f3ae59cd81a6d46360212f28511338cab200617e1bd87"
+    }
+  },
+  "model_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec"
+}

@@ -1,3 +1,9 @@
+# Guided practice projects
+
+**Accuracy testing:** [real-audio/API regression and independent human-feedback evaluation](benchmarks/practice_feedback/README.md) now keep actual model measurements separate from workflow tests. The independent intake remains blocked until new audited recordings and labels are supplied.
+
+The **Review → Practise → Retry** workspace connects imported charts and generated song tabs to reference review, phrase exercises, local saved projects, evidence playback and matched-speed retry progress. It also includes a draft-based visual piano-roll correction editor, optional original-chart backups and review-coverage-aware take history. Recording input checks catch near-silence and flag low/ceiling levels; listening-only reviewer packets support prediction-free annotation in a separate local page. See [the workflow and validation protocol](PRACTICE_WORKFLOW.md) for instructions, privacy limits and evidence boundaries.
+
 # Fretwork — guitar comparison prototype v0.4
 
 **Evidence branch:** [what is completed, tested and outstanding](BRANCH_STATUS.md).
