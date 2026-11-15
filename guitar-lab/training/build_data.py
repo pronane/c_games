@@ -72,14 +72,14 @@ def main():
         style = 'clean' if r < 0.25 else 'crunch' if r < 0.55 else 'high_gain'
         z = y / (np.abs(y).max() + 1e-9) * 0.7 if style == 'clean' else amp.reamp(y, SR, rng, style)
         for seg, ns in segments(z, notes, rng):
-            save(out, k, seg, ns, f'guitarset:{style}'); k += 1
+            save(out, k, seg, ns, f'guitarset:{style}:{Path(wav).stem}'); k += 1
     for i in range(a.riffs):
         bpm, notes, length = riffs.riff(rng, bars=int(rng.integers(3, 7)))
         y = riffs.render(notes, length, rng, takes=int(rng.choice([1, 2, 2, 3])))
         y = amp.reamp(y, SR, rng, 'high_gain' if rng.random() < 0.75 else 'crunch')
         ns = [{'time': t, 'duration': d, 'midi': int(round(m))} for t, d, m, _ in notes]
         for seg, sn in segments(y, ns, rng):
-            save(out, k, seg, sn, 'riff'); k += 1
+            save(out, k, seg, sn, f'riff:{i}'); k += 1
     print(k, 'segments')
 
 

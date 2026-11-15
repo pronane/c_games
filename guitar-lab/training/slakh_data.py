@@ -64,60 +64,92 @@ def stem_notes(track: Path, sid: str) -> list:
 
 
 MIN_PRESENT = 0.6
+# A pitch this far below the file's loudest bin is the noise floor, not a quiet fundamental.
+NOISE_DB = -50.0
+
+
+def _presence(level, notes, shift, hop):
+    hit = total = 0
+    for note in notes[::max(1, len(notes) // 400)]:
+        bin_index = note['midi'] + shift - 28
+        frame = int(note['time'] * SR / hop)
+        if not 0 <= bin_index < level.shape[0] or frame + 2 >= level.shape[1]:
+            continue
+        column = level[:, frame + 1:frame + 4].max(axis=1)
+        total += 1
+        # Above the noise floor counts, even when a harmonic is the loudest partial.
+        hit += column[bin_index] > NOISE_DB
+    return (hit / total) if total else 0.0
 
 
 def label_check(y, notes, shifts=(0, 12, -12)):
     """(octave shift, share of notes present): do the stem's MIDI notes match what sounds?
 
-    Some sampler patches sound an octave away from their MIDI (harmonics patches), and a few
-    stems do not follow their MIDI at all. Checked without the note detector, so the filter
-    does not favour what the detector already reads well: a note counts as present when its
-    pitch is among the strongest in the half-tone spectrum just after its start."""
+    Some sampler patches sound an octave away from their MIDI, and a few stems do not follow
+    their MIDI at all. Checked without the note detector. The written octave is kept whenever
+    that pitch is above the noise floor. An octave shift is tried only when the written pitch
+    itself is near the noise floor, so a strong second harmonic does not relabel the note.
+    """
     import librosa
     hop = 512
-    C = np.abs(librosa.cqt(y, sr=SR, hop_length=hop, fmin=librosa.midi_to_hz(28), n_bins=72))
-    L = librosa.amplitude_to_db(C, ref=np.max)
-    best = (0, 0.0)
+    spectrum = np.abs(librosa.cqt(y, sr=SR, hop_length=hop, fmin=librosa.midi_to_hz(28), n_bins=72))
+    level = librosa.amplitude_to_db(spectrum, ref=np.max)
+    written = _presence(level, notes, 0, hop)
+    if written >= MIN_PRESENT:
+        return (0, written)
+    best = (0, written)
     for shift in shifts:
-        if shift and best[1] >= MIN_PRESENT:
-            break               # the written octave sounds: an octave above is only its overtone
-        hit = total = 0
-        for n in notes[::max(1, len(notes) // 400)]:
-            k = n['midi'] + shift - 28
-            a = int(n['time'] * SR / hop)
-            if not 0 <= k < 72 or a + 2 >= L.shape[1]:
-                continue
-            frame = L[:, a + 1:a + 4].max(axis=1)
-            total += 1
-            hit += frame[k] >= frame.max() - 12 and frame[k] > -50
-        share = hit / total if total else 0.0
+        if shift == 0:
+            continue
+        share = _presence(level, notes, shift, hop)
         if share > best[1]:
             best = (shift, share)
     return best
 
 
+def _subtract_stem(mix, stem_path, mix_sr):
+    """Remove one stem from the mix so a skipped guitar is not left unlabeled in the audio."""
+    import librosa
+    import soundfile as sf
+    stem, stem_sr = sf.read(stem_path, dtype='float32', always_2d=True)
+    if stem_sr != mix_sr:
+        stem = np.stack([librosa.resample(stem[:, channel], orig_sr=stem_sr, target_sr=mix_sr)
+                         for channel in range(stem.shape[1])], axis=1)
+    width = min(mix.shape[1], stem.shape[1])
+    count = min(len(mix), len(stem))
+    mix[:count, :width] -= stem[:count, :width]
+    if mix.shape[1] == 2 and stem.shape[1] == 1:
+        mix[:count, 1] -= stem[:count, 0]
+    return mix
+
 
 def load_track(track: Path):
-    """(true guitar audio at SR, notes, mix at its own rate, rate) or None when no guitar plays."""
-    notes, parts = [], []
+    """(true guitar audio at SR, notes, mix at its own rate, rate) or None when no guitar plays.
+
+    A stem whose MIDI does not match the audio is left out. Other guitar stems on the same
+    track are kept. The skipped stem is removed from the mix so its unlabeled notes are not trained.
+    """
+    notes, parts, skipped = [], [], []
     for sid in guitar_stems(track):
-        y = read(audio_file(track / 'stems', sid), SR)[0]
+        path = audio_file(track / 'stems', sid)
+        audio = read(path, SR)[0]
         stem = stem_notes(track, sid)
-        shift, present = label_check(y, stem)
+        shift, present = label_check(audio, stem)
         if present < MIN_PRESENT:
-            # The stem stays in the mix but its notes cannot be trusted: skip the whole track,
-            # or the guitar it adds would count as wrong notes.
-            return None
-        notes += [dict(n, midi=n['midi'] + shift) for n in stem]
-        parts.append(y)
-    notes.sort(key=lambda n: n['time'])
-    if len(notes) < 20:
+            skipped.append(path)
+            continue
+        notes += [dict(note, midi=note['midi'] + shift) for note in stem]
+        parts.append(audio)
+    notes.sort(key=lambda note: note['time'])
+    if len(notes) < 20 or not parts:
         return None
-    true = np.zeros(max(len(p) for p in parts), np.float32)
-    for p in parts:
-        true[:len(p)] += p
+    true = np.zeros(max(len(part) for part in parts), np.float32)
+    for part in parts:
+        true[:len(part)] += part
     import soundfile as sf
     mix, sr = sf.read(audio_file(track, 'mix'), dtype='float32', always_2d=True)
+    for path in skipped:
+        mix = _subtract_stem(mix, path, sr)
     return true, notes, mix, sr
 
 

@@ -12,6 +12,7 @@ import glob
 import json
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -82,6 +83,80 @@ def bce(pred, target):
     return F.binary_cross_entropy(pred, target)
 
 
+def song_id(source: str) -> str:
+    """Song key for a segment source tag.
+
+    ``slakh:<kind>:<track>`` and ``guitarset:<style>:<clip>`` share a song across every
+    segment of that track. A tag with no song field (``riff``, ``guitarset:clean``) is one group.
+    """
+    parts = str(source).split(':')
+    if len(parts) >= 3 and parts[-1]:
+        return parts[-1]
+    return str(source)
+
+
+def assign_songs(groups: dict, val_target: int = 60, order=None):
+    """Hold out whole songs until validation has ``val_target`` segments.
+
+    No song is split. At least one song stays in training. Returns ``(val_files, train_files)``.
+    """
+    songs = list(order) if order is not None else list(groups)
+    if len(songs) < 2:
+        raise SystemExit('Need segments from at least two songs so validation does not share a song with training.')
+    unknown = [song for song in songs if song not in groups]
+    if unknown or len(songs) != len(groups):
+        raise SystemExit('Song order must list each song once.')
+    val_songs = []
+    count = 0
+    index = 0
+    while index < len(songs) - 1 and count < val_target:
+        song = songs[index]
+        val_songs.append(song)
+        count += len(groups[song])
+        index += 1
+    train_songs = songs[index:]
+    if not val_songs or not train_songs:
+        raise SystemExit('Could not hold out a whole song and still leave a training song.')
+    val = [path for song in val_songs for path in groups[song]]
+    train = [path for song in train_songs for path in groups[song]]
+    return val, train
+
+
+def split_files(files, read_source, val_target: int = 60, rng=None):
+    groups = defaultdict(list)
+    for path in files:
+        groups[song_id(read_source(path))].append(path)
+    songs = list(groups)
+    if rng is not None:
+        rng.shuffle(songs)
+    return assign_songs(groups, val_target, songs)
+
+
+def require_trainable(train, batch: int):
+    if batch < 1:
+        raise SystemExit('Batch size must be at least 1.')
+    if len(train) < batch:
+        raise SystemExit(
+            f'Training set has {len(train)} segments, fewer than the batch size ({batch}). '
+            'Nothing to train; the run stops instead of spinning on an empty loader.'
+        )
+
+
+def prepare_workers(workers: int):
+    """DataLoader workers must spawn. Forking after CUDA is initialized hangs or errors."""
+    if workers <= 0:
+        return
+    import torch.multiprocessing as mp
+    current = mp.get_start_method(allow_none=True)
+    if current == 'spawn':
+        return
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError as exc:
+        found = mp.get_start_method(allow_none=True)
+        raise SystemExit(f'workers={workers} needs the spawn start method (found {found}): {exc}') from exc
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', required=True)
@@ -97,12 +172,18 @@ def main():
                     help='train every layer, not only the recurrent and output layers (needs a GPU and much more data)')
     ap.add_argument('--workers', type=int, default=0)
     a = ap.parse_args()
+    prepare_workers(a.workers)
     torch.manual_seed(0)
     torch.set_num_threads(max(1, torch.get_num_threads()))
     files = sorted(glob.glob(f'{a.data}/seg_*.npz'))
+
+    def read_source(path):
+        with np.load(path) as data:
+            return str(data['source']) if 'source' in data.files else Path(path).name
+
     rng = np.random.default_rng(0)
-    rng.shuffle(files)
-    val, train = files[:60], files[60:]
+    val, train = split_files(files, read_source, rng=rng)
+    require_trainable(train, a.batch)
     device = torch.device('cuda' if (a.device == 'auto' and torch.cuda.is_available()) else 'cpu' if a.device == 'auto' else a.device)
     print('device', device, flush=True)
     model = riley.load('riley')
@@ -135,6 +216,8 @@ def main():
 
     print('validation loss before', round(validate(), 4), flush=True)
     step, t0, first = a.start, time.time(), a.start
+    if len(loader) == 0:
+        raise SystemExit('The training loader is empty. Refusing to wait on a loader that yields no batches.')
     while step < a.steps:
         for batch in loader:
             mode(model)

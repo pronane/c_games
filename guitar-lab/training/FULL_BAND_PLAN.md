@@ -30,7 +30,7 @@ python -m benchmarks.fullband.items multitrack <mix audio> nin_1000000 <guitar t
 # b) Play-along items, one per song (see "Recording a play-along take" below):
 python -m benchmarks.fullband.items playalong <your take> <the song> <name>
 
-# c) Fix the bar. Run once, then leave data/baseline.json alone.
+# c) Fix the bar. The command refuses to overwrite data/baseline.json.
 python -m benchmarks.fullband.gate baseline
 ```
 
