@@ -50,6 +50,8 @@ STARTER = [
     ("punch", "punch"), ("kick", "kick"), ("block", "block"), ("hit", "hit"),
     ("tackle", "tackle"), ("shoot", "shoot_goal"), ("pass", "hand_pass"), ("save", "gk_save"),
     ("drive", "kart_drive"), ("wave", "wave"), ("cast", "cast"),
+    # v11.11: the keeper dives were procedural only, so packs fell back to the standing "save" (a chest catch)
+    ("dive_left", "gk_dive_left"), ("dive_right", "gk_dive_right"),
 ]
 
 _SKIP = {"licence.json", "index.json", "set.json", "session_report.json"}
@@ -978,13 +980,47 @@ def canonical_keys(rig, Wf, fps, start=None, end=None, cycle=False, out_fps=30.0
         W = W[i:j + 1]
         info["cycle_s"] = [round(info["cut_s"][0] + i / fps2, 3), round(info["cut_s"][0] + j / fps2, 3)]
         info["cycle_mismatch"] = round(sc, 4)
+    if face and len(W) > 1:
+        # v11.11: face forward over what is kept, not over the longer stretch it was cut from - a walk's loop could
+        # be the part where the walker had turned (walk_casual walked sideways). A strike is aimed by its peak, which
+        # can be the backswing as well as the follow-through (soccer_kick, soccer_shoot came in facing backwards): the
+        # body must face within 90 degrees of the opponent, or the clip is turned round
+        h = np.array([_heading(W[f, hi]) for f in range(len(W))])
+        th3 = math.degrees(math.atan2(np.sin(np.radians(h)).mean(), np.cos(np.radians(h)).mean()))
+        if peak:
+            # a spinning kick turns the body through the strike and may face away on average: leave those
+            spin = float(np.ptp(np.degrees(np.unwrap(np.radians(h)))))
+            th3 = 180.0 if abs(th3) > 90.0 and spin < 150.0 else 0.0
+            info["spin_deg"] = round(spin, 1)
+        if abs(th3) > 1e-6:
+            from .mathutil import ry
+            M = np.eye(4); M[:3, :3] = ry(-th3)
+            W = np.einsum("ij,fbjk->fbik", M, W)
+            info["turned_deg"] = round(info["turned_deg"] - th3, 1)
     W = W.copy()
     W[:, :, 0, 3] -= W[0, hi, 0, 3]
     W[:, :, 2, 3] -= W[0, hi, 2, 3]
     names = rig.bones
     low = np.array([min(_pt(dict(zip(names, W[f])), j, o)[1] for j, o in _CONTACT if j in names) for f in range(len(W))])
+    lowf = np.array([min(_pt(dict(zip(names, W[f])), j, o)[1] for j, o in _CONTACT if j in names and j.startswith("foot"))
+                     for f in range(len(W))])
     floor = float(np.percentile(low, 3))
-    W[:, :, 1, 3] -= floor
+    floor_t = np.full(len(W), floor)
+    # v11.11: a take that lies down and stands up may lie on a mat. With one floor for the whole clip the standing
+    # part floated (get_up: 13 cm). Where the person stands (the feet are the lowest contact) the floor is under the
+    # feet; where they lie, under the body; in between it eases over 0.3 s.
+    # standing: the feet are the lowest contact and the hips are well above them (lying on the back, the heels
+    # can be the lowest point too)
+    stand = (lowf <= low + 0.02) & (W[:, hi, 1, 3] - lowf > 0.6)
+    if stand.any() and (~stand).any():
+        fs = float(np.percentile(lowf[stand], 10))
+        if fs - floor > 0.04:
+            k_ = max(1, int(round(0.3 * fps2)))
+            w_ = np.convolve(np.pad(stand.astype(float), k_, mode="edge"), np.ones(2 * k_ + 1) / (2 * k_ + 1), "same")[k_:-k_]
+            floor_t = floor + (fs - floor) * w_
+            info["floor_mat_m"] = round(fs - floor, 3)
+    W[:, :, 1, 3] -= floor_t[:, None]
+    floor = floor_t
     if "root" in names:                      # the semantic pose measures every bone from an unmoved root
         W[:, names.index("root")] = np.eye(4)
     n = len(W)
@@ -993,7 +1029,7 @@ def canonical_keys(rig, Wf, fps, start=None, end=None, cycle=False, out_fps=30.0
         Wd = {names[k]: W[f, k] for k in range(rig.nb)}
         pose = _refine_arms(pose_from_world(Wd), Wd)
         pose["pos"] = (float(W[f, hi, 0, 3]), float(W[f, hi, 2, 3]))
-        pose["lift"] = max(0.0, float(low[f] - floor))
+        pose["lift"] = max(0.0, float(low[f] - floor[f]))
         pose["ground"] = True
         keys.append((0.0 if n == 1 else f / (n - 1), pose))
     info["duration"] = round((n - 1) / fps2, 4)
@@ -1036,7 +1072,11 @@ def import_file(path, name=None, clip=None, library=None, licence=None, loop=Non
         if not src.clips:
             raise ValueError("%s has no animation clips" % os.path.basename(path))
         if clip and clip not in src.clips:
-            raise KeyError("no clip %r (has: %s)" % (clip, ", ".join(src.clips)))
+            # v11.11: clip names are matched ignoring case (files list "Hit_Chest", the reader keeps "hit_chest")
+            low = {c.lower(): c for c in src.clips}
+            if str(clip).lower() not in low:
+                raise KeyError("no clip %r (has: %s)" % (clip, ", ".join(src.clips)))
+            clip = low[str(clip).lower()]
         clip_name = clip or next(iter(src.clips))
         reader = ext[1:]
     else:

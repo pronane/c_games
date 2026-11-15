@@ -1,0 +1,255 @@
+{
+ "name": "dive_right",
+ "category": "Goalkeeper",
+ "desc": "dive right",
+ "loop": false,
+ "source": "procedural:gk_dive_right",
+ "origin": "builtin",
+ "from_motion": "gk_dive_right",
+ "licence": {
+  "spdx": "CC0-1.0",
+  "custom_text": "",
+  "author": "Sprite Forge Studio",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "",
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+ },
+ "duration": 0.8,
+ "keys": [
+  [
+   0.0,
+   {
+    "hips": [
+     12.0,
+     0.0,
+     0.0
+    ],
+    "spine": [
+     6.0,
+     0.0,
+     0.0
+    ],
+    "chest": [
+     4.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -16.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     32.0,
+     6.0,
+     0.0
+    ],
+    "leg_R": [
+     24.0,
+     6.0,
+     0.0
+    ],
+    "knee_L": 48.0,
+    "knee_R": 42.0,
+    "arm_L": [
+     40.0,
+     35.0,
+     0.0
+    ],
+    "arm_R": [
+     40.0,
+     35.0,
+     0.0
+    ],
+    "elbow_L": 55.0,
+    "elbow_R": 55.0
+   }
+  ],
+  [
+   0.2,
+   {
+    "hips": [
+     15.0,
+     0.0,
+     -15.0
+    ],
+    "spine": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "neck": [
+     -22.0,
+     0.0,
+     0.0
+    ],
+    "leg_L": [
+     70.0,
+     20.0,
+     0.0
+    ],
+    "leg_R": [
+     70.0,
+     20.0,
+     0.0
+    ],
+    "knee_L": 125.0,
+    "knee_R": 118.0,
+    "arm_L": [
+     35.0,
+     14.0,
+     0.0
+    ],
+    "arm_R": [
+     35.0,
+     14.0,
+     0.0
+    ],
+    "elbow_L": 60.0,
+    "elbow_R": 60.0
+   }
+  ],
+  [
+   0.45,
+   {
+    "arm_L": [
+     170.0,
+     0.0,
+     0.0
+    ],
+    "arm_R": [
+     170.0,
+     0.0,
+     0.0
+    ],
+    "elbow_L": 5.0,
+    "elbow_R": 5.0,
+    "leg_L": [
+     10.0,
+     15.0,
+     0.0
+    ],
+    "leg_R": [
+     -5.0,
+     10.0,
+     0.0
+    ],
+    "knee_L": 5.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "hips": [
+     0.0,
+     0.0,
+     -65.0
+    ],
+    "lift": 0.45,
+    "pos": [
+     -0.6,
+     0.0
+    ],
+    "flat": 0.0,
+    "ankle_L": 40.0,
+    "ankle_R": 40.0
+   }
+  ],
+  [
+   0.7,
+   {
+    "arm_L": [
+     170.0,
+     0.0,
+     0.0
+    ],
+    "arm_R": [
+     170.0,
+     0.0,
+     0.0
+    ],
+    "elbow_L": 12.0,
+    "elbow_R": 12.0,
+    "leg_L": [
+     15.0,
+     15.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 20.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "hips": [
+     0.0,
+     0.0,
+     -85.0
+    ],
+    "lift": 0.25,
+    "pos": [
+     -1.0,
+     0.0
+    ],
+    "flat": 0.0,
+    "ankle_L": 40.0,
+    "ankle_R": 40.0
+   }
+  ],
+  [
+   1.0,
+   {
+    "arm_L": [
+     165.0,
+     -8.0,
+     0.0
+    ],
+    "arm_R": [
+     165.0,
+     -8.0,
+     0.0
+    ],
+    "elbow_L": 20.0,
+    "elbow_R": 20.0,
+    "leg_L": [
+     30.0,
+     10.0,
+     0.0
+    ],
+    "leg_R": [
+     -2.0,
+     3.0,
+     0.0
+    ],
+    "knee_L": 50.0,
+    "knee_R": 4.0,
+    "neck": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "hips": [
+     0.0,
+     0.0,
+     -88.0
+    ],
+    "pos": [
+     -1.1,
+     0.0
+    ],
+    "flat": 0.0,
+    "ankle_L": 40.0,
+    "ankle_R": 40.0
+   }
+  ]
+ ],
+ "cleanup": null
+}

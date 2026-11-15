@@ -1,0 +1,15 @@
+gs_rock_solo original done
+gs_rock_solo quiet_minus24db done
+gs_rock_solo hard_clipped done
+gs_rock_solo synthetic_room_rt60_2s done
+gs_funk_solo original done
+gs_funk_solo quiet_minus24db done
+gs_funk_solo hard_clipped done
+gs_funk_solo synthetic_room_rt60_2s done
+gs_jazz_comp original done
+gs_jazz_comp quiet_minus24db done
+gs_jazz_comp hard_clipped done
+gs_jazz_comp synthetic_room_rt60_2s done
+private window 0 done
+private window 145 done
+private window 290 done

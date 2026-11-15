@@ -1,0 +1,345 @@
+
+> guitar-lab@0.2.0 build
+> tsc && vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 1617 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              0.45 kB │ gzip:   0.31 kB
+dist/assets/capture.worklet-DJBDz1gT.js      1.69 kB
+dist/assets/analysis.worker-D0eE2J0C.js      2.02 kB
+dist/assets/Bravura-BVtSfpnN.woff2         313.35 kB
+dist/assets/Bravura-029JyKns.woff          550.39 kB
+dist/assets/sonivox-Q5HH-G68.sf2         1,351.90 kB
+dist/assets/index-DzKOp1na.css              27.37 kB │ gzip:   6.59 kB
+dist/assets/Notation-Di1L3ScS.js             2.26 kB │ gzip:   1.22 kB
+dist/assets/index-D50WPRTz.js            1,650.42 kB │ gzip: 424.34 kB
+✓ built in 7.73s
+
+> guitar-lab@0.2.0 test
+> tsx --test src/*.test.ts
+
+TAP version 13
+# Subtest: silence yields no invented notes or chord
+ok 1 - silence yields no invented notes or chord
+  ---
+  duration_ms: 10.044035
+  type: 'test'
+  ...
+# Subtest: detects a sustained A3
+ok 2 - detects a sustained A3
+  ---
+  duration_ms: 59.306602
+  type: 'test'
+  ...
+# Subtest: identical features match and silence has unavailable timing
+ok 3 - identical features match and silence has unavailable timing
+  ---
+  duration_ms: 1.312146
+  type: 'test'
+  ...
+# Subtest: explicit USB selection never silently falls back to another device
+ok 4 - explicit USB selection never silently falls back to another device
+  ---
+  duration_ms: 1.523485
+  type: 'test'
+  ...
+# Subtest: PCM capture retains separate channels and rejects missing frames
+ok 5 - PCM capture retains separate channels and rejects missing frames
+  ---
+  duration_ms: 0.643273
+  type: 'test'
+  ...
+# Subtest: permission and disconnect errors are actionable
+ok 6 - permission and disconnect errors are actionable
+  ---
+  duration_ms: 0.3071
+  type: 'test'
+  ...
+# Subtest: worklet enforces sample-based stop and preserves stereo PCM
+ok 7 - worklet enforces sample-based stop and preserves stereo PCM
+  ---
+  duration_ms: 2.070608
+  type: 'test'
+  ...
+# Subtest: worklet flushes partial buffers on manual stop and handles another take
+ok 8 - worklet flushes partial buffers on manual stop and handles another take
+  ---
+  duration_ms: 7.187997
+  type: 'test'
+  ...
+# Subtest: score cards list stem, notation, and the combined score
+ok 9 - score cards list stem, notation, and the combined score
+  ---
+  duration_ms: 1.716635
+  type: 'test'
+  ...
+# Subtest: note chips color wrong, missing, and extra notes and keep the plain-language title
+ok 10 - note chips color wrong, missing, and extra notes and keep the plain-language title
+  ---
+  duration_ms: 0.291944
+  type: 'test'
+  ...
+# Subtest: bar feedback names the worst bar and a clean bar
+ok 11 - bar feedback names the worst bar and a clean bar
+  ---
+  duration_ms: 0.21444
+  type: 'test'
+  ...
+# Subtest: a slower tempo is explained and not treated as a mistake list
+ok 12 - a slower tempo is explained and not treated as a mistake list
+  ---
+  duration_ms: 0.166955
+  type: 'test'
+  ...
+# Subtest: take history keeps the last five
+ok 13 - take history keeps the last five
+  ---
+  duration_ms: 0.449622
+  type: 'test'
+  ...
+# Subtest: WAV encoder writes interleaved PCM with valid sizes and clipping
+ok 14 - WAV encoder writes interleaved PCM with valid sizes and clipping
+  ---
+  duration_ms: 1.616486
+  type: 'test'
+  ...
+# Subtest: summary names the bar and kind of each mistake, worst first
+ok 15 - summary names the bar and kind of each mistake, worst first
+  ---
+  duration_ms: 2.325153
+  type: 'test'
+  ...
+# Subtest: a clean take says so and suggests moving on
+ok 16 - a clean take says so and suggests moving on
+  ---
+  duration_ms: 0.240807
+  type: 'test'
+  ...
+# Subtest: extra notes count against the section; no bars falls back to 4-second slices
+ok 17 - extra notes count against the section; no bars falls back to 4-second slices
+  ---
+  duration_ms: 0.448462
+  type: 'test'
+  ...
+# Subtest: profiles specify range, stem, method, notation and feedback policy
+ok 18 - profiles specify range, stem, method, notation and feedback policy
+  ---
+  duration_ms: 0.927845
+  type: 'test'
+  ...
+# Subtest: drop D and capo affect actual tab and pitch bounds
+ok 19 - drop D and capo affect actual tab and pitch bounds
+  ---
+  duration_ms: 1.092135
+  type: 'test'
+  ...
+# Subtest: bass has four strings and E1; piano has no tab
+ok 20 - bass has four strings and E1; piano has no tab
+  ---
+  duration_ms: 0.241567
+  type: 'test'
+  ...
+# Subtest: invalid combinations fail rather than silently changing instrument settings
+ok 21 - invalid combinations fail rather than silently changing instrument settings
+  ---
+  duration_ms: 0.522693
+  type: 'test'
+  ...
+# Subtest: note-on velocity zero is note-off and MIDI channels stay distinct
+ok 22 - note-on velocity zero is note-off and MIDI channels stay distinct
+  ---
+  duration_ms: 1.353132
+  type: 'test'
+  ...
+# Subtest: sustain holds released notes and pedal release ends them
+ok 23 - sustain holds released notes and pedal release ends them
+  ---
+  duration_ms: 0.20406
+  type: 'test'
+  ...
+# Subtest: restrikes and all-notes-off finalise pending notes without hanging
+ok 24 - restrikes and all-notes-off finalise pending notes without hanging
+  ---
+  duration_ms: 1.134913
+  type: 'test'
+  ...
+# Subtest: MIDI export has valid header, explicit tempo and track length
+ok 25 - MIDI export has valid header, explicit tempo and track length
+  ---
+  duration_ms: 0.638064
+  type: 'test'
+  ...
+# Subtest: truncated and non-note MIDI messages are ignored
+ok 26 - truncated and non-note MIDI messages are ignored
+  ---
+  duration_ms: 0.204415
+  type: 'test'
+  ...
+# Subtest: clicks follow the beat grid, accent on beat one, inside the range
+ok 27 - clicks follow the beat grid, accent on beat one, inside the range
+  ---
+  duration_ms: 1.796513
+  type: 'test'
+  ...
+# Subtest: clicks land at stretched positions when slowed down
+ok 28 - clicks land at stretched positions when slowed down
+  ---
+  duration_ms: 9.415398
+  type: 'test'
+  ...
+# Subtest: speaker loopback: a steady 112 ms delay is measured and trusted
+ok 29 - speaker loopback: a steady 112 ms delay is measured and trusted
+  ---
+  duration_ms: 33.205319
+  type: 'test'
+  ...
+# Subtest: play-along: loose human timing still gives the median; silence is rejected
+ok 30 - play-along: loose human timing still gives the median; silence is rejected
+  ---
+  duration_ms: 13.596488
+  type: 'test'
+  ...
+# Subtest: uneven clicks defeat a regular noise that would fake a steady delay
+ok 31 - uneven clicks defeat a regular noise that would fake a steady delay
+  ---
+  duration_ms: 12.621846
+  type: 'test'
+  ...
+# Subtest: offset estimation finds a late take (recording latency)
+ok 32 - offset estimation finds a late take (recording latency)
+  ---
+  duration_ms: 32.299749
+  type: 'test'
+  ...
+# Subtest: offset estimation abstains on silence
+ok 33 - offset estimation abstains on silence
+  ---
+  duration_ms: 1.335332
+  type: 'test'
+  ...
+# Subtest: lead-only muting silences lead bars and keeps rhythm bars
+ok 34 - lead-only muting silences lead bars and keeps rhythm bars
+  ---
+  duration_ms: 0.288653
+  type: 'test'
+  ...
+# Subtest: loop range follows the bar grid
+ok 35 - loop range follows the bar grid
+  ---
+  duration_ms: 0.779442
+  type: 'test'
+  ...
+# Subtest: mixing places a take at an offset
+ok 36 - mixing places a take at an offset
+  ---
+  duration_ms: 0.280983
+  type: 'test'
+  ...
+# Subtest: tuner reference follows a recording that is 30 cents sharp
+ok 37 - tuner reference follows a recording that is 30 cents sharp
+  ---
+  duration_ms: 0.239486
+  type: 'test'
+  ...
+# Subtest: targets offer each guitar, every lead passage and all guitars
+ok 38 - targets offer each guitar, every lead passage and all guitars
+  ---
+  duration_ms: 0.539543
+  type: 'test'
+  ...
+# Subtest: a guitar that plays lead and rhythm can be taken over in either role
+ok 39 - a guitar that plays lead and rhythm can be taken over in either role
+  ---
+  duration_ms: 0.300145
+  type: 'test'
+  ...
+# Subtest: taking over every lead mutes each lead in its bars and the bleed copies too
+ok 40 - taking over every lead mutes each lead in its bars and the bleed copies too
+  ---
+  duration_ms: 0.617343
+  type: 'test'
+  ...
+# Subtest: whole-part target silences that part only
+ok 41 - whole-part target silences that part only
+  ---
+  duration_ms: 7.602405
+  type: 'test'
+  ...
+# Subtest: slowing down keeps the pitch and stretches the length
+ok 42 - slowing down keeps the pitch and stretches the length
+  ---
+  duration_ms: 35.983357
+  type: 'test'
+  ...
+# Subtest: Guitar Pro / alphaTex notes become timed tab notes
+ok 43 - Guitar Pro / alphaTex notes become timed tab notes
+  ---
+  duration_ms: 16.50397
+  type: 'test'
+  ...
+# Subtest: Guitar Pro round trip keeps strings and frets
+ok 44 - Guitar Pro round trip keeps strings and frets
+  ---
+  duration_ms: 66.016333
+  type: 'test'
+  ...
+# Subtest: tuning match, track choice and excerpts
+ok 45 - tuning match, track choice and excerpts
+  ---
+  duration_ms: 2.550838
+  type: 'test'
+  ...
+# Subtest: the app's rendition plays the written pitch, slowed without changing pitch
+ok 46 - the app's rendition plays the written pitch, slowed without changing pitch
+  ---
+  duration_ms: 77.446789
+  type: 'test'
+  ...
+# Subtest: repeats are played out in playing order, with bar numbers as played
+ok 47 - repeats are played out in playing order, with bar numbers as played
+  ---
+  duration_ms: 2.85419
+  type: 'test'
+  ...
+# Subtest: palm mutes are short and bends move the pitch
+ok 48 - palm mutes are short and bends move the pitch
+  ---
+  duration_ms: 52.898136
+  type: 'test'
+  ...
+# Subtest: the amp compresses like a driven amp without changing the note
+ok 49 - the amp compresses like a driven amp without changing the note
+  ---
+  duration_ms: 36.464856
+  type: 'test'
+  ...
+# Subtest: tuner detects guitar E2, bass E1 and detuned A4
+ok 50 - tuner detects guitar E2, bass E1 and detuned A4
+  ---
+  duration_ms: 37.905155
+  type: 'test'
+  ...
+# Subtest: tuner rejects silence and unpitched random noise
+ok 51 - tuner rejects silence and unpitched random noise
+  ---
+  duration_ms: 10.43041
+  type: 'test'
+  ...
+# Subtest: cents and target reflect explicit string or chromatic mode
+ok 52 - cents and target reflect explicit string or chromatic mode
+  ---
+  duration_ms: 0.435256
+  type: 'test'
+  ...
+1..52
+# tests 52
+# suites 0
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4649.021399

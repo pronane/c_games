@@ -1,7 +1,8 @@
 /**
- * Players — the rigged, skinned, animated Aussie rules footballers from
- * Blender (`assets/player.glb`), cloned for both teams with kit colours and
- * squad numbers, driven by an animation state machine.
+ * Players — the rigged, skinned, animated footballers from Gaelic_Football_3d
+ * (`assets/gaelic_player.glb`, Sprite Forge squad, 3 appearance variants),
+ * trimmed to the outfield body meshes, cloned per player with AFL club kit
+ * colours and squad numbers, driven by an animation state machine.
  */
 import * as THREE from 'three';
 import { GLTF } from 'three/addons/loaders/GLTFLoader.js';
@@ -23,6 +24,8 @@ export interface PlayerView {
   targetRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   /** White ring that shrinks and fades for ~0.7 s after control switches. */
   flashRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  /** Always-on overhead marker for the controlled player — visible in a scrum. */
+  chevron: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
 }
 
 export interface Teams {
@@ -34,16 +37,45 @@ export type PlayerAnim =
   | 'idle' | 'walk' | 'run' | 'sprint' | 'run_ball' | 'kick' | 'handball'
   | 'tackle' | 'mark_jump' | 'celebrate' | 'hit_deck';
 
-const KIT_MATERIALS = ['jersey', 'shorts', 'socks'];
+/** Appearance variants kept in the trimmed GLB (v0 short-hair, v2 beard, v6 afro). */
+const VARIANT_PREFIXES = ['v0_', 'v2_', 'v6_'];
 
-function numberTexture(number: number, team: TeamId): THREE.CanvasTexture {
+/** Game-facing anim name → Gaelic_Football_3d clip. */
+const CLIP_ALIASES: Record<string, string> = {
+  idle: 'idle',
+  walk: 'jog',
+  run: 'run',
+  sprint: 'run',
+  run_ball: 'run_ball',
+  kick: 'kick_run',
+  handball: 'hand_pass',
+  tackle: 'tackle_reach',
+  mark_jump: 'catch',
+  celebrate: 'celebrate_jump',
+  hit_deck: 'knocked_down',
+};
+
+/** Per-anim default playback rate (sprint plays the run clip faster). */
+const ANIM_TIMESCALE: Record<string, number> = {
+  sprint: 1.18,
+  walk: 0.9,
+};
+
+function luminance(hex: string): number {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+function numberTexture(number: number, primary: string): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 128;
   c.height = 128;
   const g = c.getContext('2d')!;
-  g.fillStyle = team === 0 ? '#14213d' : '#111111';
+  g.fillStyle = primary;
   g.fillRect(0, 0, 128, 128);
-  g.fillStyle = team === 0 ? '#f5f5f5' : '#f5f5f5';
+  const ink = luminance(primary) > 0.6 ? '#101010' : '#f5f5f5';
+  g.fillStyle = ink;
   g.font = 'bold 92px system-ui, sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
@@ -59,17 +91,20 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
     if (!(obj instanceof THREE.Mesh)) return;
     const wasSingle = !Array.isArray(obj.material);
     const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]) as THREE.MeshStandardMaterial[];
+    const meshName = (obj.name ?? '').toLowerCase();
     const cloned = mats.map((m) => {
       const mat = m.clone();
-      const name = mat.name ?? '';
-      if (KIT_MATERIALS.includes(name)) {
-        mat.color = new THREE.Color(name === 'jersey' ? kit.primary : kit.secondary);
-        if (name === 'jersey') {
-          mat.map = numberTexture(number, team);
-          mat.color = new THREE.Color(0xffffff);
-        }
+      // The Gaelic GLB ships one shared 'kit' material; AFL club colours are
+      // flat tints per kit piece, identified by the vN_* mesh names.
+      if (meshName.endsWith('jersey')) {
+        mat.map = numberTexture(number, kit.primary);
+        mat.color = new THREE.Color(0xffffff);
+      } else if (meshName.endsWith('shorts') || meshName.endsWith('socks')) {
+        mat.color = new THREE.Color(kit.secondary);
+      } else if (meshName.endsWith('boots')) {
+        mat.color = new THREE.Color(0x151515);
       }
-      mat.roughness = 0.78;
+      mat.roughness = 0.82;
       mat.metalness = 0.02;
       return mat;
     });
@@ -77,9 +112,9 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
     // material is an array, and these geometries have no groups — an array
     // here would render NOTHING at all.
     obj.material = wasSingle ? cloned[0] : cloned;
+    obj.castShadow = true;
+    obj.receiveShadow = false;
     if (obj instanceof THREE.SkinnedMesh) {
-      obj.castShadow = true;
-      obj.receiveShadow = false;
       obj.frustumCulled = false;
     }
   });
@@ -94,8 +129,22 @@ export function createPlayerViews(
   const clips = new Map<string, THREE.AnimationClip>();
   for (const clip of gltf.animations) clips.set(clip.name, clip);
 
+  // Pre-build one pruned template per appearance variant so per-player clones
+  // don't carry the other variants' meshes around.
+  const templates = VARIANT_PREFIXES.map((prefix) => {
+    const t = skeletonClone(gltf.scene) as THREE.Group;
+    const drop: THREE.Object3D[] = [];
+    t.traverse((o) => {
+      const m = /^v\d+_/.exec(o.name ?? '');
+      if (m && !o.name.startsWith(prefix)) drop.push(o);
+    });
+    for (const o of drop) o.removeFromParent();
+    return t;
+  });
+
   for (const p of state.players) {
-    const root = skeletonClone(gltf.scene) as THREE.Group;
+    const template = templates[p.id % templates.length];
+    const root = skeletonClone(template) as THREE.Group;
     tintKits(root, p.team, teams, p.number);
     root.scale.setScalar(1.0);
     root.position.set(p.x, 0, p.z);
@@ -103,13 +152,15 @@ export function createPlayerViews(
 
     const mixer = new THREE.AnimationMixer(root);
     const actions = new Map<string, THREE.AnimationAction>();
-    for (const [name, clip] of clips) {
+    for (const [gameName, clipName] of Object.entries(CLIP_ALIASES)) {
+      const clip = clips.get(clipName);
+      if (!clip) continue;
       const action = mixer.clipAction(clip);
-      if (name === 'kick' || name === 'handball' || name === 'tackle' || name === 'mark_jump' || name === 'hit_deck') {
+      if (gameName === 'kick' || gameName === 'handball' || gameName === 'tackle' || gameName === 'mark_jump' || gameName === 'hit_deck') {
         action.setLoop(THREE.LoopOnce, 1);
         action.clampWhenFinished = true;
       }
-      actions.set(name, action);
+      actions.set(gameName, action);
     }
     const idle = actions.get('idle');
     idle?.play();
@@ -162,6 +213,21 @@ export function createPlayerViews(
     flashRing.visible = false;
     root.add(flashRing);
 
+    const chevron = new THREE.Mesh(
+      new THREE.ConeGeometry(0.34, 0.66, 4),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd23f,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: false,
+      })
+    );
+    chevron.rotation.x = Math.PI; // apex down
+    chevron.position.y = 2.42;
+    chevron.renderOrder = 10;
+    chevron.visible = false;
+    root.add(chevron);
+
     views.set(p.id, {
       root,
       mixer,
@@ -174,6 +240,7 @@ export function createPlayerViews(
       ring,
       targetRing,
       flashRing,
+      chevron,
     });
   }
   return views;
@@ -187,7 +254,7 @@ export function playAnim(view: PlayerView, anim: PlayerAnim, fade = 0.18): void 
   if (!next) return;
   next.enabled = true;
   next.reset();
-  next.setEffectiveTimeScale(1);
+  next.setEffectiveTimeScale(ANIM_TIMESCALE[anim] ?? 1);
   next.setEffectiveWeight(1);
   next.play();
   if (prev && prev !== next) prev.crossFadeTo(next, fade, false);
@@ -291,6 +358,13 @@ export function syncPlayerViews(
       view.flashRing.scale.setScalar(2.4 - 1.25 * k);
     } else {
       view.flashRing.visible = false;
+    }
+
+    // overhead chevron on YOUR man — readable even inside a scrum
+    view.chevron.visible = controlledId !== null && p.id === controlledId;
+    if (view.chevron.visible) {
+      view.chevron.position.y = 2.42 + 0.09 * Math.sin(now * 4);
+      view.chevron.rotation.y = now * 2.2;
     }
 
     const b = state.ball;

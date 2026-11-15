@@ -1,0 +1,2 @@
+test:e2e	1
+test:profiles	1

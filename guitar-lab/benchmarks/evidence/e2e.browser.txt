@@ -1,0 +1,16 @@
+
+> guitar-lab@0.2.0 test:e2e
+> node tests/browser-smoke.mjs
+
+locator.check: Error: strict mode violation: getByRole('region', { name: 'Specialist analysis engine' }).getByRole('checkbox') resolved to 2 elements:
+    1) <input type="checkbox"/> aka getByRole('checkbox', { name: 'I agree to upload these two' })
+    2) <input disabled type="checkbox" id="refine-until-match"/> aka getByRole('region', { name: 'Specialist analysis engine' }).getByRole('checkbox', { name: 'Refine until it matches' })
+
+Call log:
+  - waiting for getByRole('region', { name: 'Specialist analysis engine' }).getByRole('checkbox')
+
+    at /home/user/c_games/guitar-lab/tests/browser-smoke.mjs:23:39 {
+  log: [
+    "  - waiting for getByRole('region', { name: 'Specialist analysis engine' }).getByRole('checkbox')"
+  ]
+}

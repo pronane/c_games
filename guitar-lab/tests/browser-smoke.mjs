@@ -12,6 +12,8 @@ if (!process.env.BROWSER_EXECUTABLE_PATH)
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // This legacy synthetic fixture exercises Basic Pitch, not Riley guitar accuracy.
+  await page.addInitScript(() => localStorage.setItem("guitar-lab.transcriber", "basic_pitch"));
   await page.goto(process.env.STUDIO_URL ?? "http://127.0.0.1:5173");
   await page.getByRole("button", { name: "Try a sample session" }).click();
   await page
@@ -20,7 +22,7 @@ if (!process.env.BROWSER_EXECUTABLE_PATH)
   const section = page.getByRole("region", {
     name: "Specialist analysis engine",
   });
-  await section.getByRole("checkbox").check();
+  await section.getByRole("checkbox", { name: /I agree to upload/ }).check();
   await section
     .getByRole("button", { name: "Upload excerpts & prepare guitar" })
     .click();
@@ -28,7 +30,7 @@ if (!process.env.BROWSER_EXECUTABLE_PATH)
     .getByText("Supplied guitar reference · quality check")
     .waitFor({ timeout: 30000 });
   console.log("Review stage reached.");
-  const approval = section.getByRole("checkbox");
+  const approval = section.getByRole("checkbox", { name: /I listened to this reference/ });
   await approval.check();
   await section
     .getByRole("button", { name: "Approve reference & analyse" })

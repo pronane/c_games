@@ -1,12 +1,12 @@
 /* Aussie Rules 3D — offline-capable service worker (PWA install on any device). */
-const CACHE = 'aussie-rules-3d-v2';
+const CACHE = 'aussie-rules-3d-v3';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './manifest.webmanifest',
   './icon.svg',
-  './assets/player.glb',
+  './assets/gaelic_player.glb',
   './assets/ball.glb',
   './assets/stadium.glb',
 ];

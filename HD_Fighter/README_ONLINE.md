@@ -4,6 +4,15 @@ Two browsers share a room on the Node server in `multiplayer/`. The server relay
 
 The room/relay code now lives in [`shared/netplay/server`](../shared/netplay/README.md) so Egyptian Fighter and TurboTumble64 use the same protocol. `multiplayer/server.js` only adds HD Fighter's settings and web client. `npm install` here also installs the shared package (`postinstall`).
 
+## Roster
+
+Nine fighters: the six originals (KAIRO, LYRA, NAOMI, BRUTUS, VOID, ZAP) plus the Padel Wars
+trio (PADEL MIKE, DARAGH, DANGEROUS DEC). The trio's sheets are imported from
+`egyptian_fighter/assets/char_*` by `HD_Fighter/tools/import_padel_fighters.py`; re-run that
+script to rebuild them. The pick ids (`mike`, `daragh`, `dec`) must also be present in
+`shared/netplay/server/games.js`, otherwise the relay rejects the pick before the fight starts.
+The select grid is `FIGHTERS` in `public/game.js`.
+
 ## Play
 
 1. One player chooses **Create Private Room** or **Quick Play**. A private room gets a 5-character code such as `K7Q2M` (not a counter like `R0001`).

@@ -1,0 +1,2 @@
+flags_0	0
+flags_1	0

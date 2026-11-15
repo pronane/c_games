@@ -491,6 +491,252 @@
         3,
         8
       ]
+    },
+    "mike": {
+      "idle": [
+        "sprites/mike_idle.png",
+        6,
+        6
+      ],
+      "walk": [
+        "sprites/mike_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/mike_crouch.png",
+        4,
+        8
+      ],
+      "jump": [
+        "sprites/mike_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/mike_lp.png",
+        3,
+        3
+      ],
+      "hp": [
+        "sprites/mike_hp.png",
+        3,
+        4
+      ],
+      "lk": [
+        "sprites/mike_lk.png",
+        3,
+        3
+      ],
+      "hk": [
+        "sprites/mike_hk.png",
+        3,
+        4
+      ],
+      "block": [
+        "sprites/mike_block.png",
+        4,
+        8
+      ],
+      "throw": [
+        "sprites/mike_throw.png",
+        5,
+        4
+      ],
+      "hit": [
+        "sprites/mike_hit.png",
+        4,
+        5
+      ],
+      "special1": [
+        "sprites/mike_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/mike_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/mike_super.png",
+        5,
+        4
+      ],
+      "win": [
+        "sprites/mike_win.png",
+        6,
+        6
+      ],
+      "lose": [
+        "sprites/mike_lose.png",
+        4,
+        8
+      ]
+    },
+    "daragh": {
+      "idle": [
+        "sprites/daragh_idle.png",
+        4,
+        6
+      ],
+      "walk": [
+        "sprites/daragh_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/daragh_crouch.png",
+        4,
+        8
+      ],
+      "jump": [
+        "sprites/daragh_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/daragh_lp.png",
+        3,
+        3
+      ],
+      "hp": [
+        "sprites/daragh_hp.png",
+        3,
+        4
+      ],
+      "lk": [
+        "sprites/daragh_lk.png",
+        3,
+        3
+      ],
+      "hk": [
+        "sprites/daragh_hk.png",
+        3,
+        4
+      ],
+      "block": [
+        "sprites/daragh_block.png",
+        3,
+        8
+      ],
+      "throw": [
+        "sprites/daragh_throw.png",
+        5,
+        4
+      ],
+      "hit": [
+        "sprites/daragh_hit.png",
+        4,
+        5
+      ],
+      "special1": [
+        "sprites/daragh_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/daragh_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/daragh_super.png",
+        5,
+        4
+      ],
+      "win": [
+        "sprites/daragh_win.png",
+        6,
+        6
+      ],
+      "lose": [
+        "sprites/daragh_lose.png",
+        4,
+        8
+      ]
+    },
+    "dec": {
+      "idle": [
+        "sprites/dec_idle.png",
+        5,
+        6
+      ],
+      "walk": [
+        "sprites/dec_walk.png",
+        7,
+        4
+      ],
+      "crouch": [
+        "sprites/dec_crouch.png",
+        4,
+        8
+      ],
+      "jump": [
+        "sprites/dec_jump.png",
+        5,
+        5
+      ],
+      "lp": [
+        "sprites/dec_lp.png",
+        3,
+        3
+      ],
+      "hp": [
+        "sprites/dec_hp.png",
+        3,
+        4
+      ],
+      "lk": [
+        "sprites/dec_lk.png",
+        3,
+        3
+      ],
+      "hk": [
+        "sprites/dec_hk.png",
+        3,
+        4
+      ],
+      "block": [
+        "sprites/dec_block.png",
+        2,
+        8
+      ],
+      "throw": [
+        "sprites/dec_throw.png",
+        5,
+        4
+      ],
+      "hit": [
+        "sprites/dec_hit.png",
+        4,
+        5
+      ],
+      "special1": [
+        "sprites/dec_special1.png",
+        6,
+        4
+      ],
+      "special2": [
+        "sprites/dec_special2.png",
+        5,
+        3
+      ],
+      "super": [
+        "sprites/dec_super.png",
+        5,
+        4
+      ],
+      "win": [
+        "sprites/dec_win.png",
+        6,
+        6
+      ],
+      "lose": [
+        "sprites/dec_lose.png",
+        4,
+        8
+      ]
     }
   },
   "stages": [
@@ -554,6 +800,9 @@
     "brutus": "select/portrait_brutus.png",
     "naomi": "select/portrait_naomi.png",
     "zap": "select/portrait_zap.png",
-    "void": "select/portrait_void.png"
+    "void": "select/portrait_void.png",
+    "mike": "select/portrait_mike.png",
+    "daragh": "select/portrait_daragh.png",
+    "dec": "select/portrait_dec.png"
   }
 }
