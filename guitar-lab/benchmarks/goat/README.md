@@ -9,6 +9,7 @@ The files live outside this tree. From `guitar-lab/`:
 ```sh
 python -m benchmarks.goat --root /path/to/GOAT-parent --split train
 python -m benchmarks.goat --root /path/to/GOAT-parent --split train --frame-join
+python -m benchmarks.goat --root /path/to/GOAT-parent --split train --sustain
 python -m benchmarks.goat --root /path/to/GOAT-parent --split test
 ```
 
@@ -65,6 +66,38 @@ inside 300 ms. Four of its five amplifiers also lose pitch at 300 ms (0.22 to
 Train items 4, 5, 46, and 101, same metric, default decoder: mean F1@50 0.577,
 F1@100 0.598, offset F1 0.279 across 24 signals. That split is for development.
 It is not a second test score.
+
+## Sustain rule, measured and not adopted
+
+A same-pitch onset inside 0.12 s is joined when the frame posterior between the
+two onsets falls below 0.80. Separately, a 20 s stretch uses onset 0.65 when at
+least 70% of the notes present at 0.5 and missing at 0.65 are same-pitch
+neighbours, and it keeps onset 0.5 when the reverb ratio said wet but fewer
+than 40% of those notes are. Both cuts were read off the train items only
+(4, 5, 46, 101). Held-out items were not scored and were not used to choose
+the cuts. `--sustain` repeats the comparison. The app decoder does not call it.
+
+Note F1, exact pitch, offsets ignored:
+
+| | F1@50 before | after | F1@100 before | after |
+| --- | ---: | ---: | ---: | ---: |
+| DI (4) | 0.877 | 0.877 | 0.908 | 0.908 |
+| amplifiers (20) | 0.517 | 0.589 | 0.536 | 0.610 |
+| all 24 | 0.577 | 0.637 | 0.598 | 0.660 |
+
+No train file's F1@50 or F1@100 fell. The gains are item 4 amplifiers 2 and 3
+(0.876 to 0.919, 0.736 to 0.955), item 46 amplifiers 3 and 4 (0.233 to 0.432,
+0.448 to 0.517), and item 101 amplifiers 2 to 5 (0.296 to 0.462, 0.328 to
+0.590, 0.270 to 0.673, 0.498 to 0.588). Item 5 did not move: those false
+onsets keep the frame up (median floor about 0.92), and 0.65 is already the
+better list there. Matched notes on item 5 DI stay about 0.63 s short. Joining
+onsets does not lengthen a note that was never split.
+
+It is not in the decoder. EGSet12 clip 04 pitch recall inside 300 ms fell from
+0.8765 to 0.8471. The user-recording lock moved the other way too: the current
+upload and take C went from 238 notes to 261, and take B from 565 to 536
+(median duration 0.211 s to 0.259 s). Take A stayed inside the lock. With the
+rule left out, those gates are unchanged.
 
 ## Frame-dip join, measured and not adopted
 
