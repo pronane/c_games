@@ -1,5 +1,6 @@
 """Metric/intake tests use synthetic fixtures. Opt-in API tests below run real audio/model."""
 import base64
+from contextlib import contextmanager
 from copy import deepcopy
 import io
 import json
@@ -124,6 +125,50 @@ def test_preparation_never_approves_and_never_overwrites_a_review(tmp_path):
     with pytest.raises(ValueError,match='Duplicate'): prepare(a,b,out,'declared-source','declared-player','dry_di','lead')
 
 
+@contextmanager
+def keep_shared_runtime():
+    """A TestClient lifespan deletes the process-wide temp root and shuts down the audio executor.
+
+    Later tests in the same process still need both. This puts the destructive shutdown aside
+    for the duration of one client and leaves the shared objects in place afterwards.
+    """
+    from server import app as app_module
+    from server import runtime
+    root = runtime.ROOT
+    executor = runtime.EXECUTOR
+    real_rmtree = app_module.shutil.rmtree
+    real_shutdown = executor.shutdown
+
+    def rmtree(path, *args, **kwargs):
+        if Path(path) == Path(root):
+            return None
+        return real_rmtree(path, *args, **kwargs)
+
+    def shutdown(*args, **kwargs):
+        return None
+
+    app_module.shutil.rmtree = rmtree
+    executor.shutdown = shutdown
+    try:
+        yield
+    finally:
+        app_module.shutil.rmtree = real_rmtree
+        executor.shutdown = real_shutdown
+        root.mkdir(parents=True, exist_ok=True)
+
+
+def test_api_lifespan_leaves_the_shared_runtime_usable():
+    from fastapi.testclient import TestClient
+    from server.app import app
+    from server import runtime
+    root = runtime.ROOT
+    with keep_shared_runtime():
+        with TestClient(app) as client:
+            client.get('/api/not-a-route')
+    assert root.is_dir()
+    assert runtime.EXECUTOR.submit(lambda: 'still-running').result(timeout=5) == 'still-running'
+
+
 @pytest.mark.skipif(os.getenv('FRETWORK_RUN_REAL_PRACTICE') != '1', reason='Opt-in actual Basic Pitch inference on real GuitarSet, not a mock')
 def test_real_audio_api_against_dataset_annotations():
     from fastapi.testclient import TestClient
@@ -131,8 +176,7 @@ def test_real_audio_api_against_dataset_annotations():
     from benchmarks.regression.metrics import score_notes
     root = ROOT/'benchmarks/regression/data/guitarset'
     baseline = json.loads((ROOT/'benchmarks/practice_feedback/regression-baseline.json').read_text())
-    # One real server lifespan: shutdown intentionally removes shared temporary storage.
-    with TestClient(app) as client:
+    with keep_shared_runtime(), TestClient(app) as client:
         for stem in ('05_Funk1-114-Ab_solo','05_Jazz2-110-Bb_comp','05_Rock1-90-C#_solo'):
             truth = json.loads((root/f'{stem}.notes.json').read_text())
             assert sha((root/truth['file']).read_bytes()) == baseline['clips'][truth['file']]['audio_sha256']

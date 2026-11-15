@@ -11,7 +11,7 @@ import { makeListeningPacket } from './listeningReview';
 import VisualReferenceEditor from './VisualReferenceEditor';
 import { useTranscriber } from './TranscriberSelect';
 import { MEDIA_ACCEPT } from './audioFiles';
-import { comparable, confirmedCount, reviewCoverage, progressVerdict, exportProject, importProject, issueKey, issueStatus, newProject, validateProject, excludedPhrase, exercise, phraseNotes, projectStore, type Attempt, type PracticeProject, type PracticeSeed, type Review, type Section } from './practiceProject';
+import { comparable, confirmedCount, reviewCoverage, progressVerdict, exportProject, importProject, issueKey, issueStatus, newProject, validateProject, excludedPhrase, exercise, phraseNotes, projectStore, findingPage, findingPageCount, type Attempt, type PracticeProject, type PracticeSeed, type Review, type Section } from './practiceProject';
 
 type Props = { seed: PracticeSeed | null };
 export default function PracticeStudio({ seed }: Props) {
@@ -19,6 +19,7 @@ export default function PracticeStudio({ seed }: Props) {
   const [library, setLibrary] = useState<PracticeProject[]>([]);
   const [sectionId, setSectionId] = useState('');
   const [speed, setSpeed] = useState(.7);
+  const [findingPageIndex, setFindingPageIndex] = useState(0);
   const [selected, setSelected] = useState('');
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -226,7 +227,7 @@ export default function PracticeStudio({ seed }: Props) {
     {busy && <p role="status">{recording ? 'Count-in / recording…' : 'Working…'}</p>}
     {project && attempt && <div className="practice-review">
       <h3>Review this take</h3>
-      <select aria-label="Practice takes" disabled={busy} value={attempt.id} onChange={e => { stop(); setSelected(e.target.value); }}>{project.attempts.map((a, i) => <option key={a.id} value={a.id}>Take {i + 1} · {Math.round(a.speed * 100)}% · {a.start.toFixed(1)}–{a.end.toFixed(1)}s · rev {a.revision}</option>)}</select>
+      <select aria-label="Practice takes" disabled={busy} value={attempt.id} onChange={e => { stop(); setFindingPageIndex(0); setSelected(e.target.value); }}>{project.attempts.map((a, i) => <option key={a.id} value={a.id}>Take {i + 1} · {Math.round(a.speed * 100)}% · {a.start.toFixed(1)}–{a.end.toFixed(1)}s · rev {a.revision}</option>)}</select>
       {attempt.revision !== project.revision ? <p>Reference changed. This is a historical report; retry using the current revision. Expected-audio comparisons are disabled.</p> : <div className="presets">{(['expected','take','both','sequence'] as const).map(m => <button disabled={busy} key={m} onClick={() => run(() => listen(m))}>{m === 'sequence' ? 'Expected → your take' : m === 'expected' ? 'Expected' : m === 'take' ? 'Your take' : 'Both'}</button>)}</div>}
       <button onClick={stop}>Stop playback</button>
       <button disabled={busy || !attempt.audio} onClick={() => { patch({ attempts: project.attempts.map(a => a.id === attempt.id ? { ...a, audio: undefined } : a) }); setNotice('Audio removed from working project. Save to remove it from the stored copy.'); }}>Remove this take’s audio</button>
@@ -237,7 +238,7 @@ export default function PracticeStudio({ seed }: Props) {
       {report && !issues.length && <p>No issues detected in the aligned notes. This does not verify every note or technique.</p>}
       {issues.length > 0 && <p><b>Next action:</b> listen to a pitch or timing candidate below, confirm whether it is audible, then choose “Practise this phrase”. Work on one change at a time. Dismissed findings are never recommended.</p>}
       {suggestions.length > 0 && <div aria-label="Suggested focus phrases"><h4>Start with one of these</h4><p>Human-confirmed findings come first. Other suggestions still need a listening check.</p>{suggestions.map(n => <div key={issueKey(n)}><p>{n.message}</p><p>{exercise(n.kind)}</p><button disabled={busy} onClick={() => practise(n)}>Focus on {n.kind.replaceAll('_', ' ')} at bar {n.bar}</button></div>)}</div>}
-      <ol className="practice-issues">{[...issues].sort((a,b) => Number(attempt.reviews[issueKey(b)] === 'confirmed') - Number(attempt.reviews[issueKey(a)] === 'confirmed')).slice(0, 100).map(n => <li key={issueKey(n)}>
+      <ol className="practice-issues">{findingPage([...issues].sort((a,b) => Number(attempt.reviews[issueKey(b)] === 'confirmed') - Number(attempt.reviews[issueKey(a)] === 'confirmed')), findingPageIndex).map(n => <li key={issueKey(n)}>
         <b>{attempt.quality && attempt.quality.status !== 'usable' ? 'Recording levels need review — listen first' : report?.alignment_warning ? 'Alignment unclear — review by ear' : issueStatus(n, project.trust, attempt.latencyMeasured)}</b><p>{n.message}</p><p className="helper">{exercise(n.kind)}</p>
         <div className="presets">
           <button disabled={busy || attempt.revision !== project.revision} onClick={() => run(() => listen('sequence', n))}>Hear expected → yours here</button>
@@ -246,7 +247,11 @@ export default function PracticeStudio({ seed }: Props) {
           <select aria-label={`Review finding ${n.id}`} disabled={busy} value={attempt.reviews[issueKey(n)] ?? ''} onChange={e => review(issueKey(n), e.target.value as Review)}><option value="" disabled>My review…</option><option value="confirmed">Yes, audible playing issue</option><option value="dismissed">No, incorrect warning</option><option value="unsure">Unsure / reference unclear</option></select>
         </div>
       </li>)}</ol>
-      {issues.length > 100 && <p>Showing the first 100 findings. Choose a shorter phrase to review the rest.</p>}
+      {issues.length > 100 && <div className="presets">
+        <button type="button" disabled={findingPageIndex <= 0} onClick={() => setFindingPageIndex(page => Math.max(0, page - 1))}>Previous findings</button>
+        <p>Findings {findingPageIndex * 100 + 1}–{Math.min(issues.length, (findingPageIndex + 1) * 100)} of {issues.length}. Review every page; retry progress counts findings on later pages too.</p>
+        <button type="button" disabled={findingPageIndex >= findingPageCount(issues.length) - 1} onClick={() => setFindingPageIndex(page => Math.min(findingPageCount(issues.length) - 1, page + 1))}>Next findings</button>
+      </div>}
       <h3>Retry progress</h3>
       <p>{previous ? `Same phrase, speed, reference revision and detector: ${confirmedCount(previous)} → ${confirmedCount(attempt)} human-confirmed issues (review coverage: ${reviewCoverage(previous).reviewed}/${reviewCoverage(previous).total} → ${reviewCoverage(attempt).reviewed}/${reviewCoverage(attempt).total} findings). Only compare after reviewing both takes; fewer unreviewed flags does not prove improvement.` : 'No earlier take at this exact phrase, speed and reference revision. Record another to compare like for like.'}</p>
       {previous && <p role="status">{progressVerdict(previous, attempt)}</p>}

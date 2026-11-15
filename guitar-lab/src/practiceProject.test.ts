@@ -66,6 +66,23 @@ test('saved signal-health metadata and reviewer packet mappings are optional but
   assert.throws(() => validateProject({ ...p, attempts: [{ ...p.attempts[0], quality: { ...p.attempts[0].quality, peak: NaN } }] }));
   assert.throws(() => validateProject({ ...p, attempts: [{ ...p.attempts[0], listeningPackets: [{ id: 'packet', sha256: 'bad' }] }] }));
 });
+test('findings past the first hundred stay reviewable and still count toward completion', async () => {
+  const { findingPage, findingPageCount, reviewCoverage, progressVerdict } = await import('./practiceProject');
+  const notes = Array.from({ length: 150 }, (_, i) => ({ id: i, bar: 1, beat: 1, kind: 'wrong_pitch' as const, message: 'pitch' }));
+  const comparison = { reports: [{ source: 'file', label: 'Chart', summary: { overall: 10, pitch_accuracy: .1, timing_accuracy: 1, completeness: 1 }, notes, bars: [], worst_bars: [] }], combined: null };
+  const reviews = Object.fromEntries(notes.map(n => [issueKey(n), 'dismissed' as const]));
+  const full: Attempt = { ...attempt, comparison, reviews };
+  assert.equal(findingPageCount(notes.length), 2);
+  assert.equal(findingPage(notes, 0).length, 100);
+  assert.equal(findingPage(notes, 1).length, 50);
+  assert.equal(findingPage(notes, 9).length, 50);
+  assert.equal(reviewCoverage(full).total, 150);
+  assert.equal(reviewCoverage(full).complete, true);
+  const partial = { ...full, reviews: Object.fromEntries(notes.slice(0, 100).map(n => [issueKey(n), 'dismissed' as const])) };
+  assert.equal(reviewCoverage(partial).complete, false);
+  assert.match(progressVerdict(full, partial), /Review both/);
+  assert.match(progressVerdict(full, full), /Same number/);
+});
 test('signal-health cautions prevent count-based progress advice', async () => {
   const { progressVerdict } = await import('./practiceProject');
   const { recordingQuality } = await import('./recordingQuality');

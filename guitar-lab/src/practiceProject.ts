@@ -52,6 +52,14 @@ export function exercise(kind: string) {
   if (kind === 'extra') return 'Listen for unwanted open strings and practise muting through the transition.';
   return 'Listen first. Sustain, effects and inferred fingering are uncertain; do not change technique based on this estimate alone.';
 }
+export const FINDING_PAGE = 100;
+export function findingPageCount(count: number) {
+  return Math.max(1, Math.ceil(Math.max(0, count) / FINDING_PAGE));
+}
+export function findingPage<T>(findings: T[], page: number) {
+  const safe = Math.min(Math.max(0, page), findingPageCount(findings.length) - 1);
+  return findings.slice(safe * FINDING_PAGE, safe * FINDING_PAGE + FINDING_PAGE);
+}
 export function reviewCoverage(a: Attempt) {
   const report = a.comparison && shownReport(a.comparison);
   const findings = report?.notes.filter(n => n.kind !== 'correct') ?? [];
