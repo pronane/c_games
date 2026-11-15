@@ -1,7 +1,7 @@
 {
  "name": "kart",
  "label": "Kart racer",
- "description": "Driver motions for a kart the game draws itself. The shared library has one drive clip; steer and boost are that clip with their own events.",
+ "description": "Driver motions for a kart the game draws itself. Idle, steer, boost, throw and victory each have their own seated clip.",
  "camera": "three_quarter",
  "prop": "none",
  "props": [
@@ -14,7 +14,10 @@
  "moves": [
   {
    "name": "idle",
-   "library": "drive",
+   "library": "kart_idle",
+   "own": [
+    "kart_idle"
+   ],
    "frames": 6,
    "fps": 8,
    "loop": true,
@@ -28,7 +31,7 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "sitting \u2014 starter drive is the closest generic clip, not a separate seated idle",
+   "desc": "sitting in the kart",
    "prefer": [
     "drive_seated"
    ]
@@ -56,7 +59,7 @@
   },
   {
    "name": "steer_left",
-   "library": "drive",
+   "library": "steer_left",
    "frames": 4,
    "fps": 10,
    "loop": false,
@@ -74,7 +77,7 @@
   },
   {
    "name": "steer_right",
-   "library": "drive",
+   "library": "steer_right",
    "frames": 4,
    "fps": 10,
    "loop": false,
@@ -92,7 +95,7 @@
   },
   {
    "name": "boost",
-   "library": "drive",
+   "library": "boost",
    "frames": 6,
    "fps": 12,
    "loop": true,
@@ -110,7 +113,10 @@
   },
   {
    "name": "hit",
-   "library": "hit",
+   "library": "kart_hit",
+   "own": [
+    "kart_hit"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -128,7 +134,10 @@
   },
   {
    "name": "throw",
-   "library": "punch",
+   "library": "item_throw",
+   "own": [
+    "item_throw"
+   ],
    "frames": 6,
    "fps": 12,
    "loop": false,
@@ -146,7 +155,10 @@
   },
   {
    "name": "victory",
-   "library": "wave",
+   "library": "kart_victory",
+   "own": [
+    "kart_victory"
+   ],
    "frames": 8,
    "fps": 8,
    "loop": true,

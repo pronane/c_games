@@ -3,8 +3,10 @@
 A pack is one JSON file. It does not replace profiles (fighter14, gaelic36, ... still
 build exactly as before). A pack says:
 
-  moves     the names the game uses, each mapped to a generic motion-library clip
-            (punch, kick, walk, ...). Frame count, fps and loop are per move.
+  moves     the names the game uses. "library" is a generic clip. It is used only when
+            that move has no animation of its own, or the move sets "alias": true.
+            "prefer" is a specific clip to try first. "own" names the procedural motion
+            when the move's name would hit a different one (kart idle -> kart_idle).
   camera    side | three_quarter | topdown8
   props     things the GAME draws (a ball, a kart). Sprite Forge does not draw them.
   events    gameplay frames: hit_start / hit_end, ball_contact, footsteps, throw_release,
@@ -108,6 +110,12 @@ def load(name_or_path):
         if not isinstance(pref, list):
             raise ValueError("%s: move '%s' prefer must be a list of library names" % (p, nm))
         pref = [slug(x) for x in pref if str(x).strip() and slug(x) != lib]
+        own = m.get("own") or []
+        if isinstance(own, str):
+            own = [own]
+        if not isinstance(own, list):
+            raise ValueError("%s: move '%s' own must be a motion name or a list" % (p, nm))
+        own = [slug(x) for x in own if str(x).strip()]
         try:
             frames = int(m.get("frames", 6))
             fps = int(m.get("fps", 12))
@@ -120,6 +128,8 @@ def load(name_or_path):
             "label": str(m.get("label") or nm.replace("_", " ").title()),
             "library": lib,
             "prefer": pref,
+            "own": own,
+            "alias": bool(m.get("alias", False)),
             "frames": frames,
             "fps": fps,
             "loop": bool(m.get("loop", False)),
@@ -180,6 +190,8 @@ def moves_of(pack):
         spec.pack_frames = m["frames"]
         spec.library_name = m["library"]
         spec.library_prefer = list(m["prefer"])
+        spec.own_clips = list(m.get("own") or [])
+        spec.force_alias = bool(m.get("alias"))
         out.append(spec)
     return out
 
@@ -250,6 +262,8 @@ def shotlist(name_or_path):
     L.append("Start with about 1 second of a T-pose (arms straight out at shoulder height), then do the move about 3 times.")
     L.append("Optional: a front-on clip of idle, walk and run, named idle_front.mp4, walk_front.mp4, run_front.mp4.")
     L.append("Sprite Forge stores the skeleton only. The video, the frames, your face and your body shape are deleted after the fit.")
+    L.append("A move you do not film keeps its own animation. A generic clip is used only when that move has none,")
+    L.append("or the pack sets \"alias\": true. The build report lists any clips that are still shared.")
     L.append("")
     L.append("%-22s %-6s %-16s %s" % ("file", "play", "library clip", "what the game reads"))
     for m in pack["moves"]:

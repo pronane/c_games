@@ -97,6 +97,10 @@ def write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names):
             "hitboxes": hits,
             "hurtboxes": hurts,
         })
+    from .motionset import shared_note
+    shared = shared_note(cfg.moves)
+    if shared:
+        notes.append("shared clips: " + shared)
     views = []
     for v, inf in (view_info or {}).items():
         views.append({"name": v, "angle": inf.get("angle"), "file": (inf.get("images") or [""])[0],
@@ -131,6 +135,7 @@ def write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names):
             "Hitboxes and hurtboxes are estimated from the sprite silhouette (the v9 framedata pass), not authored collision.",
             "Events are frame indices into the animation that was built. A Quick preview uses fewer frames, so indices are scaled.",
             "The motion source is set:<name>, library, starter, or procedural.",
+            "A generic library clip is used only when the move has no animation of its own, or the pack sets alias.",
             "This file has no photo, no video and no body mesh.",
         ],
     }

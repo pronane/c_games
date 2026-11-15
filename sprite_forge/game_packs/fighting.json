@@ -1,7 +1,7 @@
 {
  "name": "fighting",
  "label": "Fighting",
- "description": "Side-on fighter. The 14 move names match the existing fighter14 profile; each one plays a generic library clip.",
+ "description": "Side-on fighter. The 14 move names match the existing fighter14 profile. Each move plays its own clip.",
  "camera": "side",
  "prop": "none",
  "props": [],
@@ -138,7 +138,7 @@
   },
   {
    "name": "special1",
-   "library": "punch",
+   "library": "special1",
    "prefer": [
     "punch_power"
    ],
@@ -155,11 +155,11 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "rising strike \u2014 same library clip as punch, later active frames"
+   "desc": "rising uppercut"
   },
   {
    "name": "special2",
-   "library": "kick",
+   "library": "special2",
    "prefer": [
     "side_kick"
    ],
@@ -176,7 +176,7 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": "spinning kick \u2014 same library clip as kick, later active frames"
+   "desc": "spinning kick"
   },
   {
    "name": "block",
@@ -223,7 +223,7 @@
   },
   {
    "name": "throw",
-   "library": "punch",
+   "library": "throw",
    "frames": 8,
    "fps": 12,
    "loop": false,
@@ -241,7 +241,7 @@
   },
   {
    "name": "jumpattack",
-   "library": "kick",
+   "library": "jumpattack",
    "prefer": [
     "jump_kick"
    ],
@@ -262,7 +262,7 @@
   },
   {
    "name": "taunt",
-   "library": "wave",
+   "library": "taunt",
    "frames": 8,
    "fps": 8,
    "loop": false,
@@ -283,7 +283,7 @@
   },
   {
    "name": "victory",
-   "library": "wave",
+   "library": "victory",
    "frames": 10,
    "fps": 8,
    "loop": true,
@@ -303,5 +303,5 @@
    ]
   }
  ],
- "notes": "special1 and special2 share a library clip with punch and kick. The events are what make them different in the game. The old fighter14 profile still builds the procedural fighter motions if you do not pass --game."
+ "notes": "Each of the 14 moves has its own clip (special1, special2, throw, jump attack, taunt, victory included). A generic clip is used only when a move has no animation of its own, or alias is true. prefer still wins when that file is in your library. The old fighter14 profile still builds the procedural fighter motions if you do not pass --game."
 }

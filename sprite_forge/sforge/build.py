@@ -1524,6 +1524,9 @@ def build(cfg: BuildConfig, log=print, progress=None):
     if getattr(cfg, "motion_set_resolved", "") or getattr(cfg, "game_pack", "") or any(
             (getattr(m, "motion_source", "") or "") not in ("", "procedural") for m in cfg.moves):
         report.note("motion source: " + _src_line)
+    _shared = motionset.shared_note(cfg.moves)
+    if _shared:
+        report.note("shared clips: " + _shared)
     if cfg.blend:
         from . import blend as BL
         added = BL.add_moves(cfg, report)

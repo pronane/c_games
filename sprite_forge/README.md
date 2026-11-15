@@ -34,8 +34,10 @@ same commands and the same limits.
   * Shipped: fighting, gaelic, platformer, topdown_rpg, kart, soccer, basketball, boxing,
     wrestling, tennis, beat_em_up, shooter. Drop another JSON file in `game_packs/` to add one.
   * Character types from v11.4 apply on every pack. The old profiles still build unchanged.
-  * Several moves share one starter clip until you record a file with that move's name. The
-    events are the part the game should trust. See `forge.py game show boxing`.
+  * A move uses a clip of its own name when the set or the starter has one, otherwise its own
+    procedural animation. A generic clip (jab and cross sharing punch, a header sharing jump)
+    is only the fallback when that move has no animation of its own. The build report lists
+    any clips that are still shared. See `forge.py game show boxing`.
 * **One game file** (`out/<name>/game_character.json`, written by every build):
   * Character, type, pack, camera, animations (strip and sheet, frames, fps, loop, pivot and
     ground line), events, and hit / hurt boxes when the framedata pass can measure them.
@@ -230,7 +232,9 @@ swung with the leg in a kick. v11.7 treats a garment edge as what it is - a ring
   of the repo. Build with `--motion-library`.
 * **Packs prefer specific clips** (`"prefer": ["jab"]` before `"library": "punch"`): boxing's jab, cross and
   hook, fighting's roundhouse and side kick, soccer's kick and shot, gaelic's fist pass and leap catch, basketball's
-  dribble, shot and layup no longer all share one punch or kick. Without the clips the starter is used as before.
+  dribble, shot and layup use that clip when you have imported it. Without it, a move that has its own
+  animation (a special, a throw, a jump attack) plays that animation. A move that does not (jab, header)
+  still uses the generic clip, and the build report says so.
 * **Recording real footage** (`motion record --folder`): no T-pose is a note, not a reshoot (`--strict` for the
   old rule); a take where tracking drops out keeps its longest well-tracked stretch; sets go to `--library`.
 * `tools/to_egyptian_fighter.py` is gone: `tools/export_ef.py` does the same job.
