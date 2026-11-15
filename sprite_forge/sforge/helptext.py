@@ -795,6 +795,52 @@ Studio: the Game type dropdown lists the packs. The Build step says the manifest
 are part of the output.
 """)
 
+T("gaelic-fit", "Fit a mesh onto the Gaelic skeleton", r"""
+forge.py gaelic-fit takes a GLB or OBJ you already have (a T-pose or an A-pose, rigged or not) and
+skins it to the 52-joint Gaelic skeleton. The skeleton, inverse binds and all 32 clips stay the ones
+in Gaelic_Football_3d/assets/source/makehuman_template.glb, which match the shipped squad. The result
+is a scratch GLB. It is not copied onto assets/models, and the shipped player is not modified.
+
+    python3 forge.py gaelic-fit MESH.glb --out /tmp/gf_fit
+    python3 forge.py gaelic-fit MESH.obj --out /tmp/gf_fit --preview
+
+--out is a directory. It receives fitted.glb, fitted.parts and manifest.json. --preview adds
+preview/deform_sheet.png (a software skin of idle, run, kick_run, catch and solo). A second run
+needs --replace. The game can load the scratch file without installing it:
+
+    ./gaelic_football --model /tmp/gf_fit/fitted.glb
+
+fitted.parts is one line, "0 0 body". The game then draws that one mesh with the texture embedded
+in the GLB. It does not apply assets/textures/kit_*.png. Those atlases are for the squad, which
+splits jersey, shorts, socks and boots into separate meshes (left half of the atlas is jersey /
+socks / boots, right half is shorts). A single full-body texture from Meshy or Rodin will not
+recolour per team. Keep the candidate local until you know the mesh's licence. The manifest stores
+sha256, the exact command, and paths relative to the repository when the file is inside it.
+
+The fit stands the mesh up (+Y, facing the template's forward, feet on the ground, metres) using
+the same orient pass as forge.py library --orient auto, then detects a T-pose, an A-pose, or arms
+hanging down and turns the arms onto the template's rest pose. Anything else (an arm raised, hands
+in front of the chest, a sit) is refused with a reason. Weights are copied from the nearest point
+on the template body (barycentric), smoothed, and kept to 4 influences that sum to 1.
+
+What this does not fix: fingers, loose clothes, hair, the face, and a kit-atlas swap. A laptop-
+friendly mesh is about 22000 triangles (the same budget as tools/gaelic_forge.py --tris 22000).
+
+MAKE THE MESH SOMEWHERE ELSE (this tool does not generate a person and does not call a web API).
+In Meshy or Rodin, use a text prompt, not a photo of a real person. Example prompt:
+
+  Full body of a generic adult Gaelic footballer standing in a strict T-pose, arms straight out
+  to the sides, palms down, legs straight, feet a shoulder width apart, facing the camera.
+  Plain jersey and shorts, no logos, no text, no helmet. Neutral face. Even studio lighting.
+  Not a real person. No photograph. No celebrity.
+
+A-pose is also accepted (arms down about 30 to 45 degrees, still out from the body). Ask for one
+pose and stick to it. If you have several views, they must be the same generic character in that
+same pose: front, left side, right side, back, full body in frame, feet included. Export glTF
+binary (.glb) or OBJ, with UVs, Y-up if the exporter has the switch, under about 22000 triangles.
+Do not send the file back into assets/models. Full notes: tools/GAELIC_FIT.md.
+""")
+
 T("python", "Is Python fast enough? (how the engine is built)", r"""
 Python is the glue; the heavy lifting runs in native code:
   ffmpeg (C)            decoding / encoding video          ~500 frames/s at 640x360 on an 8-core CPU (imageio-ffmpeg)
@@ -1031,7 +1077,8 @@ ALIASES = {"sheet": "sprite-sheet", "spritesheet": "sprite-sheet", "sprite_sheet
            "colours": "v9", "colors": "v9", "recolor": "v9", "variants": "v9", "npc": "v9", "batch": "v9", "atlas": "v9", "qa": "v9", "framedata": "v9", "raylib": "engines", "unreal": "engines", "snes": "engines", "gba": "engines",
            "motions": "motion", "character-type": "motion", "character_type": "motion", "retarget-motion": "motion",
            "v115": "game", "pack": "game", "packs": "game", "shotlist": "game", "session": "game",
-           "manifest": "game", "game_character": "game"}
+           "manifest": "game", "game_character": "game",
+           "gaelic-fit": "gaelic-fit", "gaelic_fit": "gaelic-fit"}
 
 
 def render(topic=""):

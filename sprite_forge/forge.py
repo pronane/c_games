@@ -592,6 +592,9 @@ def main(argv=None):
     if argv and argv[0] == "gaelic-clip":  # merge one retargeted clip into a *copy* of the Gaelic player
         from sforge import gaelic_clip
         return gaelic_clip.main(argv[1:])
+    if argv and argv[0] == "gaelic-fit":  # fit an external mesh onto the Gaelic skeleton; scratch GLB only
+        from sforge import gaelic_fit
+        return gaelic_fit.main(argv[1:])
     if argv and argv[0] == "doctor":
         from sforge import doctor
         return doctor.run(argv[1:])
@@ -613,6 +616,7 @@ def main(argv=None):
   summary     one-page pipeline summary image
   cache       build cache: cache stats | clear | prune
   gaelic-clip check a Gaelic player GLB, or merge one retargeted clip into a copy (never --install)
+  gaelic-fit  fit an external T/A-pose mesh onto the Gaelic skeleton (scratch GLB, never assets/models)
 v9:
 """ + "\n".join("  %-11s %s" % kv for kv in v9_cli.HELP.items()))
     sub = p.add_subparsers(dest="cmd")
