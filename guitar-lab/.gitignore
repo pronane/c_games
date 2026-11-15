@@ -5,3 +5,7 @@ benchmarks/regression/reference/electric_last.json
 benchmarks/goat/private/
 node_modules
 .cache
+# Independent practice-feedback recordings and reviewer identities stay local.
+benchmarks/practice_feedback/private/
+# Runtime reports uploaded as CI artifacts, never private data in Git.
+accuracy-results/

@@ -1,0 +1,142 @@
+{
+  "inference_run": true,
+  "inference_attempted": true,
+  "inference_completed": true,
+  "quality_approved": false,
+  "schema": "practice-real-regression-v1",
+  "status": "measured",
+  "mocked": false,
+  "independent_holdout": false,
+  "limitations": "Previously used development clips; one performer, acoustic microphone only. Dataset notes are transcription references, not human playing-fault labels. Self-check uses true note playback vs real audio, not an independent correctness certificate.",
+  "rows": [
+    {
+      "clip": "05_Funk1-114-Ab_solo_mic.wav",
+      "performer_id": "guitarset-player-05",
+      "source_id": "05_Funk1-114-Ab_solo_mic",
+      "part": "lead",
+      "audio_sha256": "1bc53f0d2132e1d40efe3db88ae7c74ef53d256ed60a98dbed77270537307a1f",
+      "annotation_sha256": "96897eede0cc3b58ec46cb66d78571e914a9adc7ac1450922f1a397bd182fe07",
+      "seconds": 25.258390022675737,
+      "note_metrics": {
+        "note_f1": 0.7610619469026548,
+        "note_precision": 0.8113207547169812,
+        "note_recall": 0.7166666666666667,
+        "onset_f1": 0.8141592920353983,
+        "pitch_recall_300ms": 0.7833333333333333,
+        "n_ref": 60,
+        "n_est": 53,
+        "n_pitch_match_300ms": 47,
+        "onset_tol_s": 0.05,
+        "loose_s": 0.3
+      },
+      "comparison_counts": {
+        "wrong_duration": 8,
+        "correct": 35,
+        "missing": 8,
+        "wrong_pitch": 8,
+        "late": 1,
+        "extra": 1
+      },
+      "annotation_consistency_flags_per_100_notes": 43.333333333333336,
+      "uncertain_findings": 0,
+      "heard_map_used": false,
+      "transcription_selfcheck_flagged_share_on_true_notes": 0.0,
+      "wall_seconds": 4.241389007000066
+    },
+    {
+      "clip": "05_Jazz2-110-Bb_comp_mic.wav",
+      "performer_id": "guitarset-player-05",
+      "source_id": "05_Jazz2-110-Bb_comp_mic",
+      "part": "rhythm",
+      "audio_sha256": "0ff82f67a72707cfa4f263aac890baeb9a11f50d0e1487c8f187a2e614b6bd9d",
+      "annotation_sha256": "abee5acf9c391d2c7d023304478fd5dd6675fbcdc6056c63594924c4a91267b2",
+      "seconds": 34.90319727891156,
+      "note_metrics": {
+        "note_f1": 0.810126582278481,
+        "note_precision": 0.8648648648648649,
+        "note_recall": 0.7619047619047619,
+        "onset_f1": 0.860759493670886,
+        "pitch_recall_300ms": 0.7936507936507936,
+        "n_ref": 252,
+        "n_est": 222,
+        "n_pitch_match_300ms": 200,
+        "onset_tol_s": 0.05,
+        "loose_s": 0.3
+      },
+      "comparison_counts": {
+        "missing": 58,
+        "correct": 133,
+        "wrong_duration": 15,
+        "late": 14,
+        "early": 13,
+        "wrong_pitch": 19,
+        "extra": 28
+      },
+      "annotation_consistency_flags_per_100_notes": 58.333333333333336,
+      "uncertain_findings": 0,
+      "heard_map_used": false,
+      "transcription_selfcheck_flagged_share_on_true_notes": 0.0,
+      "wall_seconds": 2.819363783999961
+    },
+    {
+      "clip": "05_Rock1-90-C#_solo_mic.wav",
+      "performer_id": "guitarset-player-05",
+      "source_id": "05_Rock1-90-C#_solo_mic",
+      "part": "lead",
+      "audio_sha256": "2e969753898c731a7e4e46935ff5f315d31acdaddf0a4ab9afa855a96307a9d8",
+      "annotation_sha256": "0e3b0ae2ff70cb65439f3ae59cd81a6d46360212f28511338cab200617e1bd87",
+      "seconds": 32.0,
+      "note_metrics": {
+        "note_f1": 0.8730964467005075,
+        "note_precision": 0.8775510204081632,
+        "note_recall": 0.8686868686868687,
+        "onset_f1": 0.8832487309644671,
+        "pitch_recall_300ms": 0.898989898989899,
+        "n_ref": 99,
+        "n_est": 98,
+        "n_pitch_match_300ms": 89,
+        "onset_tol_s": 0.05,
+        "loose_s": 0.3
+      },
+      "comparison_counts": {
+        "correct": 67,
+        "wrong_duration": 5,
+        "wrong_pitch": 12,
+        "missing": 4,
+        "early": 6,
+        "late": 5,
+        "extra": 3
+      },
+      "annotation_consistency_flags_per_100_notes": 35.35353535353536,
+      "uncertain_findings": 0,
+      "heard_map_used": false,
+      "transcription_selfcheck_flagged_share_on_true_notes": 0.145,
+      "wall_seconds": 1.7643708189999643
+    }
+  ],
+  "macro_note_f1": 0.8147616586272144,
+  "independent_performers": 1,
+  "provenance": {
+    "backend_requested": "basic_pitch",
+    "git_head": "ef4313ee4eab2391f9023577b78be6e69dc2eade",
+    "packages": {
+      "basic-pitch": "0.4.0",
+      "onnxruntime": "1.32.0",
+      "numpy": "2.2.6",
+      "librosa": "0.11.0",
+      "mir-eval": "0.8.2"
+    },
+    "model_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+    "model_hash_scope": "Basic Pitch ONNX only; other backends must supply their own model provenance before external publication",
+    "environment_flags": {},
+    "code_sha256": {
+      "server/models.py": "787b7160b4492227e222e3571c84fb67de33cc4fdab1da66b581637733b97484",
+      "server/compare.py": "e243cc0ea43a00594deb35486feaaceae0c163b542910313053ee13d353913be",
+      "server/transcription_check.py": "405cb74130810060f309bd7ce93f9f11ba27f4e10146df4788f47c2eb7612752",
+      "benchmarks/practice_feedback/core.py": "5aec2317ea5aaeaab69d6b185aaa30d443482602c2c020e9309866a4bb523ba2",
+      "benchmarks/practice_feedback/__main__.py": "29c4386118535835818811b445079d06e4d5bde8a36baad5d066f718a56d36b7",
+      "benchmarks/practice_feedback/protocol.json": "878e73b7c76213b21c700eea6e792f873af8d99e58f93c96dccb139841b50fe6"
+    },
+    "working_tree_dirty": true
+  }
+}

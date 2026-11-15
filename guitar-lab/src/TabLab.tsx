@@ -30,6 +30,7 @@ const Notation = lazy(() => import("./Notation"));
 type Clip = { name: string; buffer: AudioBuffer };
 export type TabSource = { name: string; musicxml?: string; bytes?: Uint8Array };
 type Props = {
+  onPracticeProject?: (seed: import("./practiceProject").PracticeSeed) => void;
   settings: InstrumentSettings;
   onSettings: (next: InstrumentSettings) => void;
   /** A tab handed over from elsewhere in the app (e.g. the song breakdown's own tab). */
@@ -49,7 +50,7 @@ type TakeCheck = { id: string; label: string; comparison: Comparison };
 const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
 const GP = ".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml,.mxl,.txt,.tab";
 
-export default function TabLab({ settings, onSettings, incoming, onCompare }: Props) {
+export default function TabLab({ settings, onSettings, incoming, onCompare, onPracticeProject }: Props) {
   const [transcriber] = useTranscriber();
   const profile = resolveInstrument(settings);
   const [source, setSource] = useState<TabSource | null>(null),
@@ -650,6 +651,9 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
             <span className="helper">{fmt(range.start)}–{fmt(range.end)}</span>
           </div>
 
+          {onPracticeProject && <button disabled={recording || duration > 600 || !piece.notes.length} onClick={() => {
+            stop(); onPracticeProject({ title: piece.title, part: piece.tracks.find(t => t.index === piece.track)?.name ?? "Selected chart track", tuning: piece.tuning.map(noteName).join(" "), capo: piece.capo, bpm: piece.bpm, duration, notes: piece.notes, origin: "chart" });
+          }}>Review → practise → retry this chart</button>}
           <LatencyCheck recorder={recorder} latency={latency} disabled={recording} onBefore={stop} onMeasured={setLatency} />
           <label className="consent">
             <input id="tab-guide" type="checkbox" checked={guide} onChange={(e) => setGuide(e.target.checked)} />
@@ -678,7 +682,7 @@ export default function TabLab({ settings, onSettings, incoming, onCompare }: Pr
                 <button className="primary" onClick={compare}>Check my take against the tab</button>
                 {settings.instrument === "guitar" && (
                   <button disabled={checking} onClick={checkChart}>
-                    {checking ? "Checking the take…" : "What I played wrong"}
+                    {checking ? "Checking the take…" : "Review my take"}
                   </button>
                 )}
               </div>

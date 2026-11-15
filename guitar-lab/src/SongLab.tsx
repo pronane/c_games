@@ -66,6 +66,7 @@ const Notation = lazy(() => import("./Notation"));
 
 type Clip = { name: string; buffer: AudioBuffer };
 type Props = {
+  onPracticeProject?: (seed: import("./practiceProject").PracticeSeed) => void;
   settings: InstrumentSettings;
   onSettings: (next: InstrumentSettings) => void;
   onCompare: (reference: Clip, take: Clip, start: number, length: number, bars?: BarMark[]) => void;
@@ -83,7 +84,7 @@ type Listen = "mixer" | "only" | "without";
 const GUIDE_LEVEL = 0.25;
 const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
 
-export default function SongLab({ settings, onSettings, onCompare, processing = "cpu", onPracticeTab }: Props) {
+export default function SongLab({ settings, onSettings, onCompare, processing = "cpu", onPracticeTab, onPracticeProject }: Props) {
   const profile = resolveInstrument(settings);
   const [mode, setMode] = useState<"file" | "url">("file"),
     [file, setFile] = useState<File | null>(null),
@@ -1035,6 +1036,9 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                   </button>
                 </div>
               )}
+              {score && onPracticeProject && <button disabled={recording || duration > 600 || !score.notes.length} onClick={() => {
+                stop(); onPracticeProject({ title: song!.name, part: score.label, tuning: settings.tuning, capo: settings.capo, bpm: score.tempo.bpm, duration, notes: score.notes, origin: "transcription" });
+              }}>Review → practise → retry this part</button>}
               <p className="helper">
                 Notes look wrong? Download the MusicXML, fix it in MuseScore or Guitar Pro, then load it under "Learn from a tab
                 or score" below. Or use a tab you already have.
@@ -1117,7 +1121,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                 <button onClick={compareTake}>Compare with the original part</button>
                 {song?.instrument === "guitar" && (
                   <button className="primary" disabled={checking} onClick={checkTake}>
-                    {checking ? "Checking the take…" : "What I played wrong"}
+                    {checking ? "Checking the take…" : "Review my take"}
                   </button>
                 )}
               </div>

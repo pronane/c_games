@@ -256,7 +256,7 @@ export default function TranscriptionCheck({ songId, parts }: { songId: string; 
         <>
           <p>
             {report.stretches.length === 0
-              ? "The playback follows the recording throughout: nothing was marked."
+              ? "No major disagreements detected; this does not verify every note."
               : `${report.stretches.length} stretch${report.stretches.length > 1 ? "es" : ""} marked, ${report.summary.flagged_seconds.toFixed(0)} s of ${report.summary.sounding_seconds.toFixed(0)} s of playing (${share}%).`}
             {report.most_missing.length > 0 && ` Most often heard but not written: ${report.most_missing.slice(0, 3).map((m) => m.note).join(", ")}.`}
           </p>

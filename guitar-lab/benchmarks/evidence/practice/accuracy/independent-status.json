@@ -1,0 +1,30 @@
+{
+  "schema": "practice-feedback-audit-result-v1",
+  "status": "blocked_missing_coverage",
+  "reasons": [
+    "Need six independent performances",
+    "Need three independent performers",
+    "Missing real DI, microphone or real-effects coverage",
+    "Need two independent sources for condition: dry_di",
+    "Need two independent sources for condition: microphone",
+    "Need two independent sources for condition: real_effects",
+    "Need both rhythm and lead",
+    "Need at least 120 explicitly reviewed correct seconds",
+    "Insufficient independent fault coverage: pitch",
+    "Insufficient independent fault coverage: timing",
+    "Insufficient independent fault coverage: missing",
+    "Insufficient independent fault coverage: extra",
+    "Insufficient independent fault coverage: sustain"
+  ],
+  "independent_sources": 0,
+  "performers": 0,
+  "audited_records": 0,
+  "fault_counts": {},
+  "correct_seconds": 0,
+  "protocol_sha256": "878e73b7c76213b21c700eea6e792f873af8d99e58f93c96dccb139841b50fe6",
+  "inference_run": false,
+  "quality_approved": false,
+  "independence": "Externally declared, checksum-bound, not authenticated; model-training overlap is unknown.",
+  "inference_attempted": false,
+  "inference_completed": false
+}

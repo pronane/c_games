@@ -25,6 +25,7 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
   }
   return (
     <div className="take-diff" aria-label="Take compared with the target">
+      <p className="helper" role="note">Diagnostic estimates, not confirmed playing mistakes. Reference errors, separation, sustain and alignment can cause false warnings. Use Review → Practise → Retry to review the reference and confirm findings by ear.</p>
       <div className="diff-scores">
         {cards.map((card) => (
           <div key={card.key} className={"diff-score" + (card.key === "combined" ? " combined" : "")}>
@@ -34,6 +35,8 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
           </div>
         ))}
       </div>
+      {report.notes.some(n => n.kind === "uncertain") && <p role="note">{report.notes.filter(n => n.kind === "uncertain").length} note(s) are uncertain and excluded from the diagnostic scores. A high score on assessed notes does not confirm those notes.</p>}
+      {report.alignment_warning && <p role="alert">{report.alignment_warning}</p>}
       {tempo && <p className="helper">{tempo}</p>}
       {report.duration_policy === "review_only" && <p className="helper" role="note">{report.duration_notice}</p>}
       {worst.length ? (
@@ -43,7 +46,7 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
           ))}
         </ul>
       ) : (
-        <p className="helper">Every note we could line up matches this target.</p>
+        <p className="helper">No issues detected in the notes we could line up. This does not verify every note.</p>
       )}
       <div className="diff-legend" aria-hidden="true">
         <span className="diff-note diff-wrong-pitch">Wrong pitch</span>

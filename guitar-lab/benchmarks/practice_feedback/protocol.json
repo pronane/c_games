@@ -1,0 +1,20 @@
+{
+  "schema": "practice-feedback-protocol-v1",
+  "minimum_sources": 6,
+  "minimum_performers": 3,
+  "conditions": [
+    "dry_di",
+    "microphone",
+    "real_effects"
+  ],
+  "parts": [
+    "rhythm",
+    "lead"
+  ],
+  "minimum_events_per_kind": 5,
+  "minimum_correct_seconds": 120,
+  "event_tolerance_seconds": 0.15,
+  "policy": "One packet per physical performance; five localized events per issue type across at least two sources; reviewer unexposed to predictions; separate checksum-bound audit. No tuning on this intake.",
+  "interpretation": "Localized audible issue events, not per-note transcription truth. Same-kind predicted note findings within 150 ms are clustered. Only explicitly reviewed coverage is used for precision. Noise/uncertain labels are unscored. No automatic quality approval or threshold changes.",
+  "minimum_sources_per_condition": 2
+}
