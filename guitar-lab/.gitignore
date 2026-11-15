@@ -9,3 +9,5 @@ node_modules
 benchmarks/practice_feedback/private/
 # Runtime reports uploaded as CI artifacts, never private data in Git.
 accuracy-results/
+# Full-band test recordings stay on this machine
+benchmarks/fullband/data/
