@@ -158,6 +158,10 @@ class Studio:
         self.look = AppearanceTab(self, self.looktab)
         self.nb.add(buildtab, text=" Build (advanced)  ", image=tk_icon("build"), compound=tk.LEFT)
         self.nb.add(self.libtab_frame, text=" Library  ", image=tk_icon("library"), compound=tk.LEFT)
+        self.gaelictab = ttk.Frame(self.nb)
+        self.nb.add(self.gaelictab, text=" Gaelic  ", image=tk_icon("build"), compound=tk.LEFT)
+        from .gui_gaelic import GaelicTab
+        self.gaelic = GaelicTab(self, self.gaelictab)
         self.nb.add(helptab, text=" Help  ", image=tk_icon("help"), compound=tk.LEFT)
         self._build_help(helptab)
         main = ttk.Frame(buildtab); main.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)

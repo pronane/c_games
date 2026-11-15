@@ -593,6 +593,11 @@ Use it three ways:
   --glb me.glb --sprites out/ --clips run,kick_run` (`forge.py look --keys` lists every key).
 * **Squads:** a file with one `[variant]` block per look. `tools/gaelic_squad.py` builds all of them into one GLB
   for Gaelic Football 3D (each player gets a look; skeleton and 32 clips unchanged).
+* **An external mesh on that skeleton:** `forge.py gaelic-fit MESH.glb --out /tmp/gf_fit` (also the Gaelic
+  tab in the Studio) stands a T-pose or A-pose GLB/OBJ up and skins it to the 52-joint template, keeping
+  all 32 clips. Kit shells use the squad atlas so `kit_*.png` still swaps teams. The scratch files are not
+  written into `assets/models`. Prompts for Meshy or Rodin are in `tools/GAELIC_FIT.md`. This command does
+  not generate a person.
 
 Sprites come from the same character: the 3D model is posed with the template's clips and drawn by a software
 renderer (`sforge/mhrender.py`: textured, lit, alpha-tested strands), 192x256 cells facing right with the feet on

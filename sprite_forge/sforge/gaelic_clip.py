@@ -8,7 +8,8 @@ materials or the other clips, and without writing over the file it read.
     python3 forge.py gaelic-clip check PLAYER.glb --parts gaelic_player.parts --textures assets/textures
     python3 forge.py gaelic-clip merge PLAYER.glb CLIP.glb --source jog --name bounce --out /tmp/gf_candidate --parts gaelic_player.parts
 
-There is no photo-to-Gaelic command. Do not run gaelic_squad.py --install from here.
+`forge.py gaelic-fit` fits an external mesh onto this skeleton. It does not merge clips.
+Do not run gaelic_squad.py --install from here.
 """
 from __future__ import annotations
 import argparse, hashlib, json, os, shutil, struct, sys
