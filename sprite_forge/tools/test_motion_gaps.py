@@ -16,6 +16,9 @@ Then tools/check_motion.py, the gate for any clip, on records built to break one
     a clip turned away from the opponent, a walk loop that turns, a "block" with the hands down, a "fall" that
     stays standing, a "celebration" with no hand over the head, a "dodge" that does not duck
   7 a game pack's clips can be checked by pack name (--pack), and a clip name like "swing" is not read as "win".
+  9 a get-up must end standing the right way up (Mixamo's "Standing Up" came in upside down and was caught);
+    Mixamo file names map to the moves the packs look for, "(1)" copies included; Gaelic moves built from key
+    poses face forward, the high catch leaves the ground, and a move whose poses are missing is skipped
   8 other people's rigs: a Rigify export that names its bones DEF-hips / DEF-neck / DEF-head (Quaternius' CC0
     library) maps hips, neck and head; a Mixamo rig still maps as Mixamo"""
 from __future__ import annotations
@@ -192,6 +195,21 @@ def main():
         ["mixamorig:%s%s" % (s_, b) for s_ in ("Left", "Right") for b in ("Shoulder", "Arm", "ForeArm", "Hand", "UpLeg", "Leg", "Foot", "ToeBase")]
     conv, m, _ = BM.detect_convention(mx)
     rec("8 a Mixamo rig still maps as Mixamo", conv == "mixamo" and m.get("hips") == "mixamorig:Hips", conv)
+    # 9 get-up, Mixamo names, key-pose moves
+    lying = mutate(stand, lambda i, p: (p.__setitem__("hips", [-85.0 * (1 - i / 9.0), 0.0, 0.0]), p.__setitem__("ground", True)))
+    ok_up = not [x for x in CM.check_clip(record("get_up_test", lying), "get_up") if x[1] is False]
+    upside = mutate(stand, lambda i, p: (p.__setitem__("hips", [180.0 * i / 9.0, 0.0, 0.0]), p.__setitem__("ground", True)))
+    bad_up = [x[0] for x in CM.check_clip(record("stand_up_test", upside), "stand_up") if x[1] is False]
+    rec("9 a get-up passes; one that ends upside down is caught", ok_up and "move" in bad_up, "caught on %s" % bad_up)
+    import import_mixamo as IMX
+    rec("9 Mixamo names map to pack moves", IMX.base_name("x/Goalkeeper Diving Save (1).fbx") == "goalkeeper diving save" and
+        IMX.MOVES["soccer header"][0] == "header_jump" and IMX.MOVES["receive punch to the face"][0] == "hit_face", "")
+    import build_gaelic_moves as BG
+    kp = {n: dict(pose=dict(starter.load("idle")["keys"][0][1], hips=[0.0, 40.0, 0.0])) for n in BG.KEYS}
+    hc = BG.build(kp, "gaa_high_catch", BG.MOVES["gaa_high_catch"])
+    rec("9 key-pose moves face forward and the high catch leaves the ground",
+        all(abs(k[1]["hips"][1]) < 1e-6 for k in hc["keys"]) and max(k[1].get("lift", 0) for k in hc["keys"]) > 0.3, "")
+    rec("9 a move with no key poses is skipped", BG.build({}, "gaa_kick", BG.MOVES["gaa_kick"]) is None, "")
     bad = [n for n, ok, _ in R if not ok]
     print("\n%d / %d passed" % (len(R) - len(bad), len(R)))
     return 1 if bad else 0

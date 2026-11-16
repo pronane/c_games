@@ -19,8 +19,8 @@ the shared skeleton, frame by frame, and checked, with the reason when one fails
   move        what the move is, read from its name (or its library entry): a block brings the hands up in front,
               a hit knocks the chest back, a fall or KO ends on the ground, a duck or dodge drops the head, a
               celebration lifts a hand over the head, a stop slows the hips, a sidestep moves sideways, a catch
-              (or a keeper's save) takes the hands up and forward, a dive gets low and travels, a swing whips a
-              hand through an arc
+              (or a keeper's save) takes the hands up, in front or overhead, a dive gets low and travels, a swing
+              whips a hand through an arc, a get-up ends standing
 Planted feet that slide are a warning, not a failure (mocap clean-up: `forge.py motion clean`).
 Exit 1 when anything fails."""
 from __future__ import annotations
@@ -42,7 +42,8 @@ JOINTS = ("hips", "chest", "head", "hand_L", "hand_R", "foot_L", "foot_R")
 # what a move must do, keyed by words in its name: the first pattern that matches applies
 MOVES = [
     (r"block|guard|parry", "block"),
-    (r"\bko\b|^ko|knock_?out|fall|die|death|collapse", "fall"),
+    (r"get_?up|stand_?up|rise", "get_up"),          # before "fall": a get-up ends standing
+    (r"\bko\b|^ko|knock_?out|fall(?!en)|die|death|collapse", "fall"),
     (r"hit|stagger|stumble|react|hurt_react", "hit"),
     (r"duck|dodge|evade", "duck"),
     (r"celebrat|cheer|victory|happy|(^|_)win(_|$)", "celebrate"),   # a taunt can be anything (arms folded)
@@ -110,7 +111,7 @@ def check_clip(rec, name=None):
     h = float(np.median(head_up)) + 0.25                      # head bone to the top of the head
     # size: from the standing frames (a fall lies down)
     stand = float(np.percentile(head_up, 90)) + 0.25
-    seated = any(re.search(r"sit|seat|drive|kneel|crawl|crouch", str(x or "").lower())
+    seated = any(re.search(r"sit|seat|drive|kart|kneel|crawl|crouch", str(x or "").lower())
                  for x in (name, rec.get("name"), rec.get("from_motion"), rec.get("category")))
     res.append(("size", (0.7 if seated else 1.2) <= stand <= 2.1, "feet to head %.2f m%s" % (stand, " (seated)" if seated else "")))
     # floor
@@ -169,6 +170,13 @@ def signature(k, X, rel, h):
         tilt = np.abs(chest[:, 0] - chest[0, 0]).max()
         ok = back > 0.05 or moved > 0.10 or tilt > 0.08
         return bool(ok), "hit: chest back %.2f m, hips back %.2f m, sway %.2f m" % (back, moved, tilt)
+    if k == "get_up":
+        # starts low, ends standing with the head above the hips
+        n8 = max(1, len(hip_y) // 8)
+        start, end = float(hip_y[:n8].mean()), float(hip_y[-n8:].mean())
+        head_up = bool((X[-n8:, J("head"), 1] > X[-n8:, J("hips"), 1] + 0.3).all())
+        return bool(end > start + 0.25 and end > 0.7 and head_up), \
+            "get up: hips %.2f -> %.2f m, head above the hips at the end: %s" % (start, end, head_up)
     if k == "fall":
         end = float(hip_y[-max(1, len(hip_y) // 8):].mean()); top = float(np.percentile(hip_y, 90))
         return bool(end < 0.5 * top), "fall: hips end at %.2f m (standing %.2f m)" % (end, top)
@@ -188,9 +196,10 @@ def signature(k, X, rel, h):
         span = float(np.ptp(X[:, J("hips"), 0]))
         return bool(span > 0.3), "sidestep: hips move %.2f m sideways" % span
     if k == "catch":
-        up = (hands[:, :, 1] > chest[:, None, 1] - 0.1) & (hands[:, :, 2] > 0.2)
+        # in front of the chest, or overhead (a high catch takes the ball above the head)
+        up = (hands[:, :, 1] > chest[:, None, 1] - 0.1) & ((hands[:, :, 2] > 0.2) | (hands[:, :, 1] > chest[:, None, 1] + 0.45))
         n = int(up.all(1).sum())
-        return bool(n >= 2), "catch: both hands up and forward for %d frames" % n
+        return bool(n >= 2), "catch: both hands up, in front or overhead, for %d frames" % n
     if k == "dive":
         low = float(hip_y.min()); top = float(np.percentile(hip_y, 90))
         trav = float(np.linalg.norm(np.ptp(X[:, J("hips"), :][:, [0, 2]], axis=0)))

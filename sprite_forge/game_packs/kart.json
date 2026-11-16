@@ -172,7 +172,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "victory_2"
+   ]
   }
  ],
  "notes": "profiles/kart_racer.json is still the 8-angle driver sheet (sprite.png, portrait, character.ini) for TurboTumble64. This pack does not draw a kart. prop is none so the mannequin is the driver only.",

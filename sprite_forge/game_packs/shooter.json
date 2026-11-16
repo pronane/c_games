@@ -132,6 +132,7 @@
    },
    "desc": "",
    "prefer": [
+    "hit_body",
     "stumble"
    ]
   },
