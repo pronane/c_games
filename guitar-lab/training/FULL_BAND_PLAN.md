@@ -105,7 +105,7 @@ that shows nothing at 150 songs.
 
 ### Pilot result (17 Nov 2026)
 
-Run on a rented A40 ($0.59/hour, 5 hours, $3.01): 147 songs gave 6,032 segments in 45 minutes
+Run on a rented A40 ($0.59/hour, 5 hours, about $3): 147 songs gave 6,032 segments in 45 minutes
 of building; 3,000 steps took 39 minutes (0.8 s/step). Scored on 29 validation songs:
 
 | | guitar alone | separated | band mix |

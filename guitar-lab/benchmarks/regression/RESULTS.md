@@ -407,7 +407,7 @@ What this does and does not show:
   have its threshold chosen on validation songs first, or it will be misjudged, as this one was
   for the first hour. The earlier "fine-tune made One worse" result was judged at the fixed
   thresholds and may be partly this effect; it has not been re-checked.
-- Cost: one A40 at $0.59/hour for 5 hours, $3.01. About 50 minutes of that was a slow
+- Cost: one A40 at $0.59/hour for 5 hours, about $3. About 50 minutes of that was a slow
   single-connection download and two set-up faults (separation and scoring on processors,
   thread over-subscription), now fixed in the plan and in `training/slakh_data.py`.
 
