@@ -21,9 +21,13 @@ islands. Here, on the texels of the atlas (their colours, where they sit on the 
     clean(mix, seen, X, layer, label, bone, protect, skin_bones, log) -> (colours, filled mask, info)
 """
 from __future__ import annotations
+import os
+
 import numpy as np
 
 W_LAB = np.array([0.6, 1.0, 1.0])
+HAIR_CHROMA_MIN = 12.0          # a hair / scalp texel this close in (a, b) to its material's median is never dropped
+SCALP_SPREAD = 2.0              # ... nor one within this many times the material's median distance
 
 
 def _lab(rgb):
@@ -156,7 +160,7 @@ def _ring_pass(lab, keep, cluster, want, layer, bone, limb, s, protect, torso_bo
 
 
 def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), log=print, flatten=0.5,
-          limb=None, s=None, torso_bones=(), drop=None, chroma=0.75, skin_flatten=0.8, foot_bones=()):
+          limb=None, s=None, torso_bones=(), drop=None, chroma=0.75, skin_flatten=0.8, foot_bones=(), hair_chroma=None, scalp=None):
     """mix (N,3) blended texel colours; seen (N,) bool; X (N,3) texel positions on the rest-pose body (x = left /
     right); layer (N,) 0 body, 1 clothes, 2 skirt, 3 hair; label (N,) majority video label 0 none, 1 hair, 2 skin,
     3 clothes; bone (N,) dominant bone id; protect (N,) texels never dropped or flattened (the face);
@@ -189,6 +193,62 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
         bad |= seen & (layer == 0) & np.isin(bone, list(hand_bones)) & (d > lim)
         keep &= ~bad
         info["skin_dropped"] = int(bad.sum())
+    # ---- 1c v11.13: hair is one material. Its shell is painted by whichever frame saw that part of the head best,
+    # and the back of a head is often seen only in frames lit by a window (Tmon: a blue crown on brown stubble):
+    # hair texels far in colour (a, b) from the hair's own median are dropped and filled from the hair round them
+    if hair_chroma is None:
+        hair_chroma = 0.0 if os.environ.get("SF_HAIR_EVEN", "1") == "0" else 0.75
+    hair = seen & (layer == 3) & ~protect
+    hair_med = None
+    if hair_chroma and hair.sum() > 500:
+        hair_med = np.median(lab[hair], 0)
+        dc = np.linalg.norm(lab[:, 1:] - hair_med[1:], axis=1)
+        lim = max(HAIR_CHROMA_MIN, SCALP_SPREAD * float(np.median(dc[hair])))
+        bad = hair & (dc > lim)
+        # where the shell lies over the hairline, sideburns and the ears the video shows skin through it: a texel
+        # near the skin's colour is not off-colour (dropped and filled from the hair, it left dark specks on Mike's
+        # cheek)
+        sk_ = seen & (layer == 0) & (label == 2)
+        if sk_.sum() > 300:
+            ms = np.median(lab[sk_], 0)
+            ds = np.linalg.norm(lab[:, 1:] - ms[1:], axis=1)
+            bad &= ds > max(HAIR_CHROMA_MIN, SCALP_SPREAD * float(np.median(ds[sk_])))
+        keep &= ~bad
+        info["hair_dropped"] = int(bad.sum())
+    # the bare scalp and the sides of the head (body layer, not the face - the caller says which, as `scalp`): a
+    # texel is dropped when its colour (a, b) is far from both the head's skin and its hair (each the median of the
+    # texels the video labelled so); a fringe and the ear by it keep their own colours. Texels the video called
+    # neither (worn, clothes, none) are a colour of their own too when they are a good part of the head (a hat)
+    scalp_fill = None
+    if hair_chroma and scalp is not None:
+        sc = scalp & seen
+        refs = {}
+        for lb in (1, 2):
+            g_ = sc & (label == lb)
+            if g_.sum() >= 300:
+                m_ = np.median(lab[g_], 0)
+                dc = np.linalg.norm(lab[g_, 1:] - m_[1:], axis=1)
+                refs[lb] = (m_, max(HAIR_CHROMA_MIN, SCALP_SPREAD * float(np.median(dc))))
+        other = sc & (label != 1) & (label != 2)
+        if other.sum() > 0.4 * max(1, sc.sum()) and other.sum() >= 300:
+            m_ = np.median(lab[other], 0)
+            refs[0] = (m_, max(HAIR_CHROMA_MIN, SCALP_SPREAD * float(np.median(np.linalg.norm(lab[other, 1:] - m_[1:], axis=1)))))
+        nd = 0
+        if refs:
+            keys = list(refs)
+            D = np.stack([np.linalg.norm(lab[:, 1:] - refs[k][0][1:], axis=1) for k in keys], 1)
+            lim = np.array([refs[k][1] for k in keys])
+            # dropped only when far from every one of them: a shadowed cheek beside a sideburn is near the hair, and
+            # filled from round it would take the hair's colour (dark specks on Mike's cheek); a window's blue is
+            # near neither
+            bad = sc & np.all(D > lim[None, :], 1)
+            keep &= ~bad; nd = int(bad.sum())
+            # each is filled from kept scalp texels of its own kind: what the video called it, or (called neither)
+            # the nearer of skin and hair - not from whatever is nearest (a pale patch at the temple filled from
+            # the hair beside it came out as dark specks)
+            kind = np.where(np.isin(label, keys), label, np.array(keys)[np.argmin(D, 1)])
+            scalp_fill = (np.nonzero(bad)[0], kind, {k: refs[k][0] for k in keys})
+        info["scalp_dropped"] = nd
     # ---- 1b texels the caller knows are wrong (v11.7: garment colour under the chin / on the neck)
     if drop is not None and drop.any():
         info["dropped_given"] = int((keep & drop).sum())
@@ -230,6 +290,19 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
     out = mix.astype(np.float32).copy()
     todo = ~keep
     done = keep.copy()
+    if scalp_fill is not None:
+        # lightness from the kept scalp of the same kind round it, colour (a, b) that kind's own median: the kept
+        # texels next to a dropped patch are often tinted by the same light, only less (a purple rim round a blue
+        # patch)
+        q_all, kind, ref_lab = scalp_fill
+        for k in np.unique(kind[q_all]):
+            q = q_all[kind[q_all] == k]
+            src = np.nonzero(keep & scalp & ((label == k) if k in (1, 2) else ~np.isin(label, (1, 2))))[0]
+            Lq = np.tile(ref_lab[k], (len(q), 1))
+            if len(src):
+                col, ok = _knn_fill(X[src], out[src], X[q], k=6, max_d=0.05)
+                Lq[ok, 0] = _lab(col[ok])[:, 0]
+            out[q] = _rgb(Lq); done[q] = True
     Xm = X * [-1, 1, 1]
     for L in np.unique(layer):
         src = np.nonzero(keep & (layer == L))[0]
@@ -365,7 +438,17 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
                     lab2[hi_, 0] = med[0] + 0.5 * dL
                     lab2[hi_, 1:] = med[1:] + 0.15 * (lab2[hi_, 1:] - med[1:])
                     info["hands_evened"] = int(len(hi_))
+        # v11.13: the hair's colour pulled most of the way to its median (as a garment's is); lightness - the
+        # strands, the parting - is left
+        if hair_med is not None:
+            hi_ = np.nonzero((layer == 3) & ~protect)[0]
+            hm = np.median(lab2[hair], 0)
+            lab2[hi_, 1:] = hm[1:] + (1.0 - hair_chroma) * (lab2[hi_, 1:] - hm[1:])
+            info["hair_evened"] = int(len(hi_))
         out = np.where(np.any(np.abs(lab2 - _lab(out)) > 0.5, 1)[:, None], _rgb(lab2), out)
     log("texture clean: %d skin texels off-colour and %d garment texels relabelled, dropped; %d texels filled on the "
         "body in 3D (%d from their mirror image)" % (info.get("skin_dropped", 0), flipped, info["filled"], info["mirror_filled"]))
+    if "hair_dropped" in info:
+        log("texture clean: hair off-colour on %d texels and scalp on %d, dropped and filled from round them; hair "
+            "colour evened" % (info["hair_dropped"], info.get("scalp_dropped", 0)))
     return np.clip(out, 0, 255), keep, info

@@ -54,6 +54,38 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.13: heads - no ghost face in profile, no window-blue scalp
+
+* **The head follows the camera.** In a turnaround people turn their head towards the phone. The face tracker
+  only gives the head's own pose up to about 60 degrees; past that the bake used the body's camera, so a face
+  turned to the camera was painted on the side or back of the head (a second face in profile on Declan, PR and
+  Tmon).
+  - `capture_texture.head_turn_model` fits how far the person turns their head against the body's angle in the
+    frames the tracker covers.
+  - `turned_head_poses` carries that turn into the other frames, rotating the head about the neck.
+  - It holds the end of the tracked range to 90 degrees and fades to no turn by 150 degrees (from behind, the head
+    cannot face the camera). `SF_HEAD_TURN=0` switches it off.
+  - A frame given a turned head (a guess) paints only the sides and back of the head, never the face itself; when
+    it painted the cheeks too, Declan's face came out grey.
+* **Hair and scalp are checked for patches of the wrong colour.** The back of a head is often seen only in frames
+  lit by a window, so Tmon's crown came out brown with blue patches. In `capture_clean`:
+  - A hair texel far in colour (a, b) from the hair's median is dropped, unless it is close to the skin's colour
+    (the hairline, sideburns and ears show skin through the shell). Dropped texels are filled from the hair round
+    them.
+  - The hair's colour is pulled most of the way to its median. The light and dark of the strands are kept.
+  - Scalp and the sides of the head (not the face) are dropped only when far from both the head's skin and its
+    hair. They are refilled from scalp of their own kind: lightness from round them, colour from that kind's
+    median.
+  - Dyed, red and blonde hair keep their own colour. `SF_HAIR_EVEN=0` switches it off.
+* **`tools/test_head_look.py`** runs 11 checks with no assets: the turn model inside and past the tracked range,
+  the fade with no jump, the pivot at the neck, an off-colour patch filled, each hair colour kept, strands kept,
+  and a fringe beside skin kept.
+* **On the five sample captures:**
+  - Declan's profile ghost face is gone, and his face keeps its colour.
+  - Tmon's blue crown is mostly gone. A small purple patch behind one ear is left.
+  - Mike and PR are unchanged apart from more even hair.
+  - The blotchy, tiled look of a head painted from many frames is not fixed yet; that is next.
+
 ## New in v11.12: Mixamo moves, and Gaelic football moves from key poses
 
 * **`tools/import_mixamo.py FOLDER_OR_ZIP --library DIR`** imports Mixamo FBX downloads.
