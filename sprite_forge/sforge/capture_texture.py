@@ -8,6 +8,7 @@ in practice means "the best one or two views", so the result stays sharp. Exposu
 Texels no frame saw (under the arms, the soles, the top of the head) are filled from their neighbours in UV space.
 """
 from __future__ import annotations
+import math
 import os
 import numpy as np
 from PIL import Image
@@ -104,6 +105,11 @@ def face_balance(col, X, face, log=print, strength=0.5, radius=0.02):
 
 RINGS = os.environ.get("SF_RINGS", "1") != "0"
 HEAD_MIN_FACING = float(os.environ.get("SF_HEAD_FACING", "0.4"))
+# v11.13: people turn their head to follow the camera round them (Declan by 25 degrees). The face tracker gives the
+# head's own pose only where it sees the face (within about 60 degrees); beyond that the head was drawn with the
+# body's camera, so a face turned towards the camera was painted on the side of the head - a ghost face in profile
+HEAD_TURN = os.environ.get("SF_HEAD_TURN", "1") != "0"
+HEAD_TURN_FULL_DEG, HEAD_TURN_ZERO_DEG = 90.0, 150.0
 
 
 ALIGN = os.environ.get("SF_ALIGN", "1") != "0"
@@ -168,6 +174,62 @@ def align_flows(fitter, frames, tex, mesh=None, log=print, max_frac=0.03):
     return flows
 
 
+
+def head_turn_model(yaw_turn):
+    """[(body yaw, head turn)] from the frames with a face pose (degrees, signed) -> turn(yaw) for any frame: the
+    straight line through them inside their range; beyond it the line's value at that end of the range (so
+    there is no jump) held to HEAD_TURN_FULL_DEG and faded out by HEAD_TURN_ZERO_DEG (seen from behind, the
+    head cannot be turned to the camera)"""
+    a = np.array(sorted(yaw_turn), float)
+    if len(a) < 4:
+        return lambda y: 0.0
+    k, c = np.polyfit(a[:, 0], a[:, 1], 1)
+    lo, hi = a[0, 0], a[-1, 0]
+    end_lo, end_hi = float(k * lo + c), float(k * hi + c)
+
+    def turn(y):
+        y = (float(y) + 180.0) % 360.0 - 180.0
+        if lo <= y <= hi:
+            return float(k * y + c)
+        e = end_lo if y < lo else end_hi
+        fade = np.clip((HEAD_TURN_ZERO_DEG - abs(y)) / (HEAD_TURN_ZERO_DEG - HEAD_TURN_FULL_DEG), 0.0, 1.0)
+        return float(e * fade)
+    return turn
+
+
+def turned_head_poses(fitter, P, Jm, poses, frames):
+    """head poses for the frames the face tracker did not cover: the body camera, with the head turned about the
+    neck by the person's own turn-towards-the-camera (head_turn_model)"""
+    import cv2
+    bm = fitter.bm
+    cams = fitter.cams
+    yt = []
+    for i, (rv, t) in poses.items():
+        if i not in cams.par:
+            continue
+        Rh, _ = cv2.Rodrigues(np.asarray(rv, float))
+        Rw = cams.rot(*cams.par[i][:3]).T @ Rh
+        yt.append((cams.par[i][0], math.degrees(math.atan2(Rw[0, 2], Rw[2, 2]))))
+    yt = [((y + 180.0) % 360.0 - 180.0, th) for y, th in yt]
+    turn = head_turn_model(yt)
+    neck = (np.asarray(Jm)[:, 0] == bm.bi["neck01"])
+    c = P[neck].mean(0) if neck.any() else P[:, :].mean(0)
+    out = {}
+    for r in frames:
+        i = r["i"]
+        if i in poses or i not in cams.par:
+            continue
+        th = math.radians(turn(cams.par[i][0]))
+        if abs(th) < math.radians(2.0):
+            continue
+        Ry = np.array([[math.cos(th), 0, math.sin(th)], [0, 1, 0], [-math.sin(th), 0, math.cos(th)]])
+        R = cams.rot(*cams.par[i][:3]); t = np.asarray(cams.par[i][3:6], float)
+        Rh = R @ Ry
+        th_ = R @ (c - Ry @ c) + t
+        rv, _ = cv2.Rodrigues(Rh)
+        out[i] = (rv.reshape(3), th_)
+    return out
+
 def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, mesh=None, delight=False, clean=True,
          flows=None, align=None):
     """-> (texture RGB uint8 (res,res,3), coverage (res,res) float, stats)
@@ -213,7 +275,11 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     # v11.2: frames that see the face carry the head's own pose (capture_face): the head's texels (face, scalp, hair
     # shell) are projected through it - the body camera puts the face 10-50 px off in a phone turnaround
     face = getattr(fitter, "face", None) or {}
-    poses = face.get("poses", {})
+    poses = dict(face.get("poses", {}))
+    turned = {}
+    if HEAD_TURN and poses:
+        turned = turned_head_poses(fitter, P, Jm, poses, frames)
+        poses.update(turned)
     hv = (Jm[:, 0] == bm.bi["head"]) & (Wm[:, 0] > 0.5)
     hd_t = hv[F[ti]].all(1)
     hd_F = F[hv[F].all(1)]
@@ -352,6 +418,11 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     # squarely and how close); head texels are weighted by (score / best)^10, so one good frontal frame paints the
     # face instead of a patchwork of slightly misaligned ones (double eyes)
     face_t = head_t & (Nr[:, 2] > 0.35) & (Xr[:, 1] < Xr[head_t, 1].max() - 0.05)   # front of the head, not the crown
+    if face_t.any() and turned:
+        # the face itself comes from the frames whose head pose was tracked: a frame given a turned head (a guess)
+        # only paints the sides and back of the head (it greyed Declan's face when it painted the cheeks too)
+        tk = np.isin(np.array(used), list(turned))
+        Wt[np.ix_(tk, np.nonzero(face_t)[0])] = 0.0
     if face_t.any():
         hs = (Wt[:, face_t]).sum(1)
         hs = hs / (hs.max() + 1e-9)
@@ -435,6 +506,9 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         # the neck is skin to clean like any other (only the head itself - the face - is protected)
         prot_c = head_t & (bone_c != bm.bi.get("neck01", -1))
         args = (Xr, lay_c, lab_c, bone_c, prot_c, skin_b, skin_b[:2])
+        # v11.13: the scalp and the sides of the head (not the face) are checked for off-colour patches like the hair
+        # (a crown seen only under a window's blue light)
+        scalp_c = head_t & (lay_c == 0) & (bone_c == bm.bi.get("head", -1)) & ~face_t
         # v11.7: garment edges on the limbs are rings (capture_rings)
         from . import capture_rings as CR
         limb_c, s_c = CR.limb_coords(sh.head, Xr, bone_c, bm.bi)
@@ -442,6 +516,7 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
                                       "clavicle.R") if b in bm.bi]
         kw = dict(limb=limb_c, s=s_c, torso_bones=torso_b) if RINGS else {}
         kw["foot_bones"] = [bm.bi[b] for b in bm.bi if b.startswith(("foot.", "toe"))]
+        kw["scalp"] = scalp_c
         # the underside of the jaw and the neck are skin or beard: a collar seen past the chin paints them the
         # shirt's colour. Body texels there whose colour is near a garment's and far from the skin are dropped
         neck_b = [bm.bi[b] for b in ("head", "neck01") if b in bm.bi]
