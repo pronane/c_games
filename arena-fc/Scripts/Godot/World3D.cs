@@ -281,6 +281,8 @@ public static class RigAnimator
     public static void Pose(CharacterRig rig, PlayerState p, float dt, float time, System.Numerics.Vector3 ballPos)
     {
         if (rig.Skeleton == null) return;
+        // Sprite Forge soccer player: clips drive the bones, not the gait curve.
+        if (rig.Soccer != null) { rig.Soccer.Update(p, dt); return; }
         float speed = Mx.Flat(p.Vel).Length();
         // Close control has visible quick feet even when the player is standing.
         if (p.Dribbling) speed = MathF.Max(speed, 2.4f);

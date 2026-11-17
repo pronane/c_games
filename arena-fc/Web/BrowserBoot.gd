@@ -112,8 +112,10 @@ var away_cols := [Color("#1d4ed8"), Color("#f8fafc"), Color("#1e3a8a")]
 # ---------------------------------------------------------------- lifecycle
 func _ready() -> void:
 	rng.seed = 2026
-	# user://rig_override.json (e.g. exported from Sprite Forge) wins if it validates, else the shipped rig.
-	rig_data = RigBuilder.load_rig_data()
+	# Sculpted Sprite Forge soccer rig (Tools/build_soccer_player.py) wins if it
+	# validates, then user://rig_override.json, else the shipped procedural rig.
+	# Same 18-bone schema, so animate_rig() below works unchanged.
+	rig_data = RigBuilder.load_rig_data("res://Data/soccer_rig.json")
 	setup_modules()
 	var bones: Array = rig_data["bones"]
 	for i in range(bones.size()):
