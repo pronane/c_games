@@ -14,6 +14,7 @@
    "name": "idle",
    "library": "idle",
    "prefer": [
+    "idle_fighting",
     "idle_boxing"
    ],
    "frames": 6,
@@ -140,6 +141,7 @@
    "name": "special1",
    "library": "special1",
    "prefer": [
+    "combo_punch",
     "punch_power"
    ],
    "frames": 8,
@@ -196,6 +198,7 @@
    },
    "desc": "guard",
    "prefer": [
+    "block_center",
     "block_high",
     "block_left"
    ]
@@ -218,6 +221,7 @@
    },
    "desc": "take a hit",
    "prefer": [
+    "hit_face",
     "stumble"
    ]
   },
@@ -278,6 +282,7 @@
    },
    "desc": "taunt",
    "prefer": [
+    "taunt_gesture",
     "idle_arms_folded"
    ]
   },
@@ -299,6 +304,7 @@
    },
    "desc": "victory",
    "prefer": [
+    "victory_2",
     "celebrate_jump"
    ]
   }

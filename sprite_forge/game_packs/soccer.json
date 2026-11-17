@@ -156,6 +156,7 @@
    },
    "desc": "",
    "prefer": [
+    "slide_tackle_mx",
     "slide_tackle"
    ]
   },
@@ -163,6 +164,7 @@
    "name": "header",
    "library": "jump",
    "prefer": [
+    "header_jump",
     "jump_vertical"
    ],
    "frames": 8,
@@ -196,12 +198,16 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "keeper_catch"
+   ]
   },
   {
    "name": "celebrate",
    "library": "wave",
    "prefer": [
+    "victory_2",
     "celebrate_jump",
     "jump_shot"
    ],

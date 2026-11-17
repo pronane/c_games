@@ -54,6 +54,47 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.12: Mixamo moves, and Gaelic football moves from key poses
+
+* **`tools/import_mixamo.py FOLDER_OR_ZIP --library DIR`** imports Mixamo FBX downloads.
+  - Download them from mixamo.com as FBX Binary, Without Skin, 30 fps, with no keyframe reduction and In Place
+    unticked.
+  - Known Mixamo names get the names the packs look for, e.g. `Receive Punch To The Face` becomes `hit_face`.
+  - Goalkeeper dives are sorted into left and right by measuring which way the hips travel.
+  - Every clip goes through `check_motion`. Mixamo files may be used in games but not redistributed, so they go
+    only to your own library.
+* **First batch (57 files, 56 kept):**
+  - punches, blocks, hit reactions, a knockdown and a fighting idle;
+  - headers, slide tackles and a trip;
+  - goalkeeper dives (both ways) and a goalkeeper catch;
+  - taunts and victories.
+
+  `Standing Up` came in upside down, with the old importer too. The new get-up rule caught it and it is left out.
+* **`tools/pose_from_image.py`** gives a key pose from a still picture. It uses the same MediaPipe model and solver
+  as `motion record`, and `--sheet` draws each picture beside the solved pose.
+* **`tools/build_gaelic_moves.py`** builds six Gaelic moves from key poses: `gaa_hand_pass`, `gaa_kick`,
+  `gaa_solo`, `gaa_high_catch`, `gaa_toe_lift` and `gaa_carry`. They keep only joint angles, are turned to face
+  forward, and are written to your own library.
+* **Packs:**
+  - Gaelic: hand and fist pass, kick passes and points, solo, high and leap catches, toe-lift pick-up, carry,
+    keeper catch and dives, a trip for the fall, spin, keeper throw-out, and an arms-up victory.
+  - Boxing: idle, jab, cross, hook, block, hit and knockdown.
+  - Fighting: idle, combo special, block, hit, taunt and victory.
+  - Soccer: header, keeper save, slide tackle and celebration.
+  - Hit reactions in the other packs.
+* **`check_motion`:**
+  - a get-up must end standing the right way up;
+  - a catch may be overhead;
+  - seated kart clips are sized as seated.
+
+  All 109 library clips pass except 3: a lying idle and two small flinches.
+* **Sprite QA across the 12 packs:**
+  - 3 fails, down from 6. Gaelic now has none, with its score up from 33 to 67.
+  - Tried and dropped: Mixamo's idle. It stands 4 px lower than the other clips, so every other move then looked
+    like it floated.
+* **Tests:** `test_motion_gaps` is now 22 checks. It adds the get-up rule, the Mixamo name mapping, key-pose moves
+  facing forward with the high catch leaving the ground, and a move with missing poses being skipped.
+
 ## New in v11.11: the moves the game packs were missing, and a check for any clip
 
 * **12 more CMU moves** (`tools/import_cmu.py`, into your own library - CMU clips are never shipped):

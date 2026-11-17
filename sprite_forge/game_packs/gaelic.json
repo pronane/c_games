@@ -166,6 +166,7 @@
    },
    "desc": "",
    "prefer": [
+    "gaa_toe_lift",
     "catch_low"
    ]
   },
@@ -227,12 +228,16 @@
      5
     ]
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "gaa_carry"
+   ]
   },
   {
    "name": "bounce_solo",
    "library": "run",
    "prefer": [
+    "gaa_solo",
     "dribble"
    ],
    "frames": 8,
@@ -257,6 +262,7 @@
    "name": "hand_pass",
    "library": "pass",
    "prefer": [
+    "gaa_hand_pass",
     "punch_straight"
    ],
    "frames": 6,
@@ -278,6 +284,7 @@
    "name": "low_kick_pass",
    "library": "kick",
    "prefer": [
+    "gaa_kick",
     "soccer_kick"
    ],
    "frames": 8,
@@ -299,6 +306,7 @@
    "name": "high_kick_pass",
    "library": "kick",
    "prefer": [
+    "gaa_kick",
     "soccer_shoot"
    ],
    "frames": 8,
@@ -320,6 +328,7 @@
    "name": "shoot_point",
    "library": "shoot",
    "prefer": [
+    "gaa_kick",
     "soccer_shoot"
    ],
    "frames": 8,
@@ -383,6 +392,8 @@
    "name": "catch_aerial",
    "library": "jump",
    "prefer": [
+    "gaa_high_catch",
+    "keeper_catch",
     "jump_shot"
    ],
    "frames": 8,
@@ -500,7 +511,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "pivot_left"
+   ]
   },
   {
    "name": "jump",
@@ -527,6 +541,8 @@
    "name": "leap_catch",
    "library": "jump",
    "prefer": [
+    "gaa_high_catch",
+    "keeper_catch",
     "jump_shot"
    ],
    "frames": 8,
@@ -548,6 +564,7 @@
    "name": "fist_pass",
    "library": "punch",
    "prefer": [
+    "gaa_hand_pass",
     "punch_straight"
    ],
    "frames": 6,
@@ -625,6 +642,7 @@
    },
    "desc": "",
    "prefer": [
+    "victory_2",
     "celebrate_jump"
    ]
   },
@@ -646,6 +664,7 @@
    },
    "desc": "",
    "prefer": [
+    "trip_fall",
     "ko_fall_back"
    ]
   },
@@ -704,7 +723,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "keeper_catch"
+   ]
   },
   {
    "name": "goalkeeper_dive_left",
@@ -724,6 +746,7 @@
    },
    "desc": "",
    "prefer": [
+    "keeper_dive_left",
     "dive_left"
    ]
   },
@@ -745,6 +768,7 @@
    },
    "desc": "",
    "prefer": [
+    "keeper_dive_right",
     "dive_right"
    ]
   },
@@ -764,7 +788,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "throw_overhand"
+   ]
   }
  ],
  "notes": "This is the sprite move list. tools/gaelic_forge.py still builds the 3D sculpted player from the game skeleton and does not read this pack. profiles/gaelic36.json still builds the procedural sports motions if you do not pass --game. A shared clip (both dives use 'save') is a limit of the starter library, not a second dive animation.",

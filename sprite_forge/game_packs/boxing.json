@@ -14,6 +14,7 @@
    "name": "idle",
    "library": "idle",
    "prefer": [
+    "idle_fighting",
     "idle_boxing"
    ],
    "frames": 6,
@@ -59,6 +60,7 @@
    "name": "jab",
    "library": "punch",
    "prefer": [
+    "jab_lead",
     "jab"
    ],
    "frames": 6,
@@ -80,6 +82,7 @@
    "name": "cross",
    "library": "punch",
    "prefer": [
+    "jab_cross",
     "cross"
    ],
    "frames": 6,
@@ -101,6 +104,7 @@
    "name": "hook",
    "library": "punch",
    "prefer": [
+    "hook_punch",
     "punch_power"
    ],
    "frames": 8,
@@ -136,6 +140,7 @@
    },
    "desc": "",
    "prefer": [
+    "block_center",
     "block_high",
     "block_left"
    ]
@@ -179,6 +184,7 @@
    },
    "desc": "",
    "prefer": [
+    "hit_face",
     "stumble"
    ]
   },
@@ -201,6 +207,7 @@
    "desc": "knockout - a fall onto the back (CMU ko_fall_back with a CMU library; the procedural ko without)",
    "prefer": [
     "ko_fall_back",
+    "knockdown",
     "death_fall"
    ]
   }
