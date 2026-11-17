@@ -26,7 +26,8 @@ import numpy as np
 
 MODEL = 'BS-Roformer-SW.ckpt'
 NAME = 'BS-RoFormer SW'
-EXPECTED_SHA256 = os.getenv('FRETWORK_ROFORMER_SHA256', '')
+# The file audio-separator 0.48 downloads; byte-identical to the BS-Rofo-SW-Fixed.ckpt mirrors.
+EXPECTED_SHA256 = '24e7d35ee9c64415673d3fd33e06a67cac2c103c5df6267ba1576459c775916e'
 SAMPLE_RATE = 44100
 
 
