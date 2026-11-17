@@ -134,12 +134,15 @@ def separate(work):
     mixes = sorted(p for p in (work / 'mixes').glob('*.wav'))
     sw_out = work / 'sw'
     sw_out.mkdir(exist_ok=True)
-    todo = [str(p) for p in mixes if not list(sw_out.glob(f'{p.stem}_(Guitar)_*.wav'))]
+    def guitar_of(p):
+        found = [f for f in sw_out.glob(f'{p.stem}_(*') if f.name[len(p.stem) + 2:].lower().startswith('guitar)')]
+        return found[0] if found else None
+    todo = [str(p) for p in mixes if guitar_of(p) is None]
     for i in range(0, len(todo), 20):
         subprocess.run(['audio-separator', *todo[i:i + 20], '-m', 'BS-Roformer-SW.ckpt', '--model_file_dir', str(work / 'models'),
                         '--output_dir', str(sw_out), '--output_format', 'WAV', '--single_stem', 'Guitar'], check=True)
     for p in mixes:
-        sw = next(sw_out.glob(f'{p.stem}_(Guitar)_*.wav'))
+        sw = guitar_of(p)
         target = work / 'mixes' / f'{p.stem}.sw16.npy'
         if not target.is_file():
             y, sr = sf.read(sw, dtype='float32', always_2d=True)
