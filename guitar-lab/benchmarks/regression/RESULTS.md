@@ -354,6 +354,36 @@ Riley's reading of the real guitar tracks: guitar-labelled notes F1 .035, all pi
 The plan for training on this material, with its frozen real-recording test, is in
 `training/FULL_BAND_PLAN.md`.
 
+## Training Riley on real recordings (MoisesDB): not adopted (17 Nov 2026)
+
+The real-recording version of the band-mix training (`training/moises_data.py`,
+`training/runpod/moises_run.sh`): 146 MoisesDB songs with electric guitar (CC BY-NC-SA 4.0),
+split 106 train / 15 validation / 25 test (the frozen MoisesDB test above). Input: the mix
+separated with BS-RoFormer SW and with Demucs, plus the guitar alone; labels: Riley's reading
+of each song's own guitar tracks. 6,325 segments, 6,000 steps on a rented RTX 4090. The model
+and threshold were to be chosen on the validation songs; the test songs and the user's seven
+tabbed songs were scored once at the end.
+
+Mean note F1, guitar separated with BS-RoFormer SW:
+
+| | released, app decoding | released, 0.6 | trained step 1,000, 0.4 |
+| --- | --- | --- | --- |
+| validation (15 songs) | **0.723** | 0.707 | 0.702 |
+| MoisesDB test (17 of 24 songs scored) | 0.764 | 0.770 | 0.759 |
+| user's 7 songs (tab references) | 0.261 | 0.266 | 0.272 |
+
+Validation loss was lowest at step 1,000 and rose after it. The validation songs choose the
+released model, and the tests agree there is nothing to gain: the trained model is level on
+MoisesDB and 0.011 ahead on the user's songs (ahead on 3 of 7). Not adopted.
+
+Note on the MoisesDB references: they are the released model's own reading of the true guitar,
+which favours the released model at its own decoding. The user's tabbed songs carry no such
+bias and show the same picture.
+
+With the earlier Slakh runs this closes the question for now: retraining the note detector,
+on synthetic or on real band material, has not improved real recordings. The separator change
+(BS-RoFormer SW, above) is the gain that holds up.
+
 ## Separators compared on real recordings (17 Nov 2026)
 
 The same released Riley model, given the guitar from different separators. Two real-recording
