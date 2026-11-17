@@ -354,6 +354,43 @@ Riley's reading of the real guitar tracks: guitar-labelled notes F1 .035, all pi
 The plan for training on this material, with its frozen real-recording test, is in
 `training/FULL_BAND_PLAN.md`.
 
+## Separators compared on real recordings (17 Nov 2026)
+
+The same released Riley model, given the guitar from different separators. Two real-recording
+tests:
+
+- **The user's seven songs** (`benchmarks/fullband`: six scored against lined-up tabs, one
+  multitrack). Mean note F1.
+- **24 MoisesDB songs** (CC BY-NC-SA 4.0; real multitrack recordings with separate guitar
+  tracks: 13 rock, 11 other styles; 15 with distorted guitar). Reference: Riley's reading of the
+  song's own guitar tracks, so this measures how much each separator costs, as the NIN item
+  does. Mean note F1 at onset threshold 0.5.
+
+| guitar given to Riley | 7 songs, app decoding | 7 songs, 0.5 | MoisesDB, 0.5 |
+| --- | --- | --- | --- |
+| Demucs htdemucs_6s guitar (the app today) | 0.229 | 0.247 | 0.566 |
+| Demucs guitar + other | | | 0.540 |
+| **BS-RoFormer SW guitar** | **0.261** | **0.271** | **0.718** |
+| BS-RoFormer SW guitar + other | 0.251 | 0.253 | 0.632 |
+| becruily Mel-RoFormer guitar | | | 0.590 |
+| no separation (whole mix) | 0.175 | 0.208 | 0.385 |
+
+On MoisesDB, BS-RoFormer SW beats the current separator on all 24 songs (rock 0.592 to 0.678,
+other styles 0.536 to 0.765). The ranking is the same at every threshold from 0.1 to 0.6. On the
+user's songs it is ahead too, by a smaller margin (the tab references are coarse).
+
+**This is the largest real-recording gain found so far, and it needs no retraining.**
+Caveats before adopting it in the app:
+
+- Licence: the BS-RoFormer SW checkpoint is published without a stated licence (the original
+  author's account was removed; mirrors list it as unknown). Fine for private use; a problem for
+  distributing it with the app.
+- Speed: on processors alone it took about 27 minutes for a 4-minute song in an earlier test
+  (two cores), several times slower than Demucs. With a graphics card it takes seconds.
+- Run with `audio-separator` 0.48 (`-m BS-Roformer-SW.ckpt`); MSST's requirements downgrade
+  `rotary-embedding-torch`, `beartype` and `librosa`, which breaks it and the engine. Keep them
+  in separate environments.
+
 ## Training Riley on band mixes: full run, judged on real recordings (17 Nov 2026)
 
 The full run of `training/FULL_BAND_PLAN.md` (`training/runpod/full_run.sh`): all 1,289
