@@ -354,6 +354,59 @@ Riley's reading of the real guitar tracks: guitar-labelled notes F1 .035, all pi
 The plan for training on this material, with its frozen real-recording test, is in
 `training/FULL_BAND_PLAN.md`.
 
+## Training Riley on band mixes: full run, judged on real recordings (17 Nov 2026)
+
+The full run of `training/FULL_BAND_PLAN.md` (`training/runpod/full_run.sh`): all 1,289
+Slakh2100 training songs (CC BY 4.0) separated with the app's own separation, 79,008 ten-second
+segments of separated guitar, raw mix and guitar alone; 20,000 steps of the recurrent and
+output layers on a rented L40S (3.5 hours of training, about 7 hours and $7.80 in all).
+The checkpoint and its onset threshold were chosen on Slakh validation songs only
+(`training/runpod/pick.py`), before the real-recording test was run.
+
+**Slakh validation (38 songs; threshold chosen on half, F1 on the other half):**
+
+| model (threshold) | guitar alone | separated guitar | band mix |
+| --- | --- | --- | --- |
+| released (0.4 / 0.5 / 0.5) | 0.872 | 0.335 | 0.370 |
+| step 12,500 (0.3 / 0.25 / 0.25) | 0.921 | 0.433 | 0.512 |
+| step 20,000 (0.25 / 0.2 / 0.25) | 0.924 | 0.439 | 0.531 |
+
+Step 20,000 was ahead of the released model on 37 of 38 songs, separated and mix alike.
+
+**Real recordings (the frozen test, `benchmarks/fullband`):** seven commercial recordings, six
+scored against the user's tabs lined up with the recording (`tabbed.py`) and one against its
+own separate guitar tracks. Same separated guitar for both models; note F1 at 50 ms.
+
+| song | released, app decoding | released, 0.5 | step 20,000, 0.2 |
+| --- | --- | --- | --- |
+| 18 and Life | 0.246 | 0.227 | 0.199 |
+| Down in a Hole | 0.379 | 0.401 | 0.368 |
+| Every Rose | 0.190 | 0.245 | 0.219 |
+| Home Sweet Home | 0.179 | 0.176 | 0.183 |
+| multitrack (NIN) | 0.169 | 0.191 | 0.122 |
+| November Rain | 0.126 | 0.168 | 0.098 |
+| One | 0.311 | 0.333 | 0.330 |
+| **mean** | **0.229** | **0.249** | **0.217** |
+
+**Not adopted.** Training on Slakh made the model much better on Slakh and slightly worse on
+real records. On real recordings it becomes cautious: precision 0.36, recall 0.17 at its
+chosen threshold, and the threshold that suits Slakh (0.2) is too high for real audio (its
+mean rises to 0.244 at 0.1, still below the released model, and choosing 0.1 would be tuning
+on the test). The early checkpoint at step 2,500 scored 0.251 at 0.2, level with the released
+model: the longer the training on sampled instruments, the further it drifted from real
+recordings. Validation loss on Slakh bottomed at step 12,500 and rose after it.
+
+This is the same pattern as the amp-render fine-tune above, now on 1,289 songs and confirmed on
+a test built before training. More synthetic data for the note detector is not the way to
+better full-band transcription. What the numbers point to instead:
+
+- The released detector loses most of its accuracy in separation (0.87 on the guitar alone,
+  0.34 separated, on Slakh). The separator, not the detector, is where the loss is.
+- Training material has to be real recordings: real guitars through real amps in real mixes,
+  with notes known (tabs lined up with recordings, or multitracks).
+
+Cost of the whole exercise (pilot and full run): about $10.80 of rented machines.
+
 ## Training Riley on band mixes: pilot on a rented graphics card (17 Nov 2026)
 
 The pilot of `training/FULL_BAND_PLAN.md`: 147 Slakh2100 training songs (CC BY 4.0) separated
