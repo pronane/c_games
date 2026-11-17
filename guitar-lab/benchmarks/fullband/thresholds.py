@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-THRESHOLDS = [0.2, 0.25, 0.3, 0.4, 0.5, 0.6]
+THRESHOLDS = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6]
 
 
 def main():
