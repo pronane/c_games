@@ -62,9 +62,22 @@ git clone https://github.com/pronane/c_games && cd c_games/guitar-lab
 pip install -r server/requirements.txt -r server/requirements-models.txt -r server/requirements-transcription.txt \
     -r server/requirements-transcription-extras.txt pretty_midi pyyaml
 python -m server.model_store                # the separation weights, checksum-verified (server/README.md)
+
+# Both of these matter (found in the pilot, 17 Nov 2026):
+export FRETWORK_DEVICE=cuda                 # separation runs on processors unless told otherwise
+export OMP_NUM_THREADS=3 MKL_NUM_THREADS=3 OPENBLAS_NUM_THREADS=3 NUMBA_NUM_THREADS=3
 ```
 
+The thread limits are needed on rented machines that show far more processors than the
+container may use (the pilot machine showed 96 and allowed 7.65): without them each process
+starts hundreds of threads and runs at under half speed. Two or three `build` processes on
+separate halves of the songs (separate output folders, merged afterwards) keep the card busy.
+
 ## Step 3: get the training material
+
+One connection to Zenodo gave 7 to 13 MB a second in the pilot; 16 ranged connections gave 33
+(104 GB in 52 minutes). The files inside the archive are in no useful order, so the whole
+archive has to arrive even when only some songs are wanted.
 
 ```bash
 # Slakh2100-redux, CC BY 4.0 (credit: Manilow, Wichern, Seetharaman, Le Roux, WASPAA 2019)
@@ -89,6 +102,26 @@ Write down seconds per song for `build` and seconds per step for training: they 
 cost of step 5. **Stop here if the pilot checkpoint is not clearly better than the released
 model on the "separated" column** of the validation songs. More data rarely rescues a method
 that shows nothing at 150 songs.
+
+### Pilot result (17 Nov 2026)
+
+Run on a rented A40 ($0.59/hour, 5 hours, about $3): 147 songs gave 6,032 segments in 45 minutes
+of building; 3,000 steps took 39 minutes (0.8 s/step). Scored on 29 validation songs:
+
+| | guitar alone | separated | band mix |
+| --- | --- | --- | --- |
+| released model, the app's decoding | 0.814 | 0.374 | 0.348 |
+| pilot model, the app's decoding | 0.728 | 0.271 | 0.311 |
+| released model, its best onset threshold (0.5) | 0.856 | 0.342 | 0.357 |
+| pilot model, its best onset threshold (0.25 to 0.3) | 0.857 | 0.401 | 0.419 |
+
+The last two rows choose the threshold on half the songs and report the other half. **The
+trained model needs a lower onset threshold than the released one** (it is more cautious: far
+fewer false notes, fewer notes found). Judged at the app's fixed thresholds it looks worse;
+judged fairly it is ahead on 25 of 29 songs on separated guitar and unchanged on guitar alone.
+So step 6 must choose the checkpoint's threshold on the Slakh validation songs before the gate
+is run, and the gate must be given that threshold. Details in
+`benchmarks/regression/RESULTS.md`.
 
 ## Step 5: full run
 

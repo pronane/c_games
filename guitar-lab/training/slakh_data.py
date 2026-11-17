@@ -153,6 +153,12 @@ def load_track(track: Path):
     return true, notes, mix, sr
 
 
+def _device():
+    """The graphics card when there is one: scoring on processors alone takes minutes per song."""
+    import torch
+    return 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
 def separated_guitar(mix, sr):
     """The guitar stem as the app makes it (htdemucs_6s at 44.1 kHz), mono at SR."""
     import librosa
@@ -182,7 +188,7 @@ def evaluate(folder, limit):
                    'mix': librosa.resample(mix.mean(axis=1), orig_sr=sr, target_sr=SR)}
         row = {'track': track.name, 'notes': len(notes)}
         for name, y in sources.items():
-            m = S.score_notes(riley.decode(riley.posteriors(y))[0], notes)
+            m = S.score_notes(riley.decode(riley.posteriors(y, device=_device()))[0], notes)
             row[name] = {'f1': round(m['note_f1'], 3), 'precision': round(m['note_precision'], 3), 'recall': round(m['note_recall'], 3)}
         rows.append(row)
         print(json.dumps(row), flush=True)
@@ -191,41 +197,68 @@ def evaluate(folder, limit):
     return summary
 
 
-def build(folder, out, limit, also_mix):
+def build(folder, out, limit, also_mix, also_stem=False, shard=(0, 1)):
+    """Write training segments. Safe to stop and start again: finished songs are listed in
+    built_<shard>.txt and skipped, and segments of a half-finished song are removed first.
+
+    ``shard`` (i, n) takes every n-th song starting at i, so n processes can share one folder.
+    """
     import librosa
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    k = len(list(out.glob('seg_*.npz')))
-    for track in tracks_in(folder, limit):
-        got = load_track(track)
-        if got is None:
+    i, n = shard
+    log = out / f'built_{i}.txt'
+    done, k = set(), 0
+    if log.is_file():
+        for line in log.read_text().split('\n'):
+            if line.strip():
+                name, count = line.split()
+                done.add(name)
+                k = int(count)
+    for stale in out.glob(f'seg_s{i}_*.npz'):
+        if int(stale.stem.rsplit('_', 1)[1]) >= k:
+            stale.unlink()
+    for track in tracks_in(folder, limit)[i::n]:
+        if track.name in done:
             continue
-        _, notes, mix, sr = got
-        versions = {'separated': separated_guitar(mix, sr)}
-        if also_mix:
-            versions['mix'] = librosa.resample(mix.mean(axis=1), orig_sr=sr, target_sr=SR)
-        times = np.array([n['time'] for n in notes])
-        for name, y in versions.items():
-            peak = float(np.abs(y).max()) or 1.0
-            for a in np.arange(0, len(y) / SR - SEG_S, SEG_S):
-                inside = [n for n in notes if a <= n['time'] < a + SEG_S]
-                if len(inside) < 4:
-                    continue
-                seg = y[int(a * SR):int((a + SEG_S) * SR)] / peak * 0.9
-                np.savez_compressed(out / f'seg_{k:05d}.npz', audio=(np.clip(seg, -1, 1) * 32767).astype(np.int16),
-                                    notes=json.dumps([[n['time'] - a, n['duration'], n['midi']] for n in inside]),
-                                    source=f'slakh:{name}:{track.name}')
-                k += 1
+        got = load_track(track)
+        if got is not None:
+            true, notes, mix, sr = got
+            versions = {'separated': separated_guitar(mix, sr)}
+            if also_mix:
+                versions['mix'] = librosa.resample(mix.mean(axis=1), orig_sr=sr, target_sr=SR)
+            if also_stem:
+                versions['stem'] = true
+            for name, y in versions.items():
+                peak = float(np.abs(y).max()) or 1.0
+                for a in np.arange(0, len(y) / SR - SEG_S, SEG_S):
+                    inside = [note for note in notes if a <= note['time'] < a + SEG_S]
+                    if len(inside) < 4:
+                        continue
+                    seg = y[int(a * SR):int((a + SEG_S) * SR)] / peak * 0.9
+                    np.savez_compressed(out / f'seg_s{i}_{k:06d}.npz', audio=(np.clip(seg, -1, 1) * 32767).astype(np.int16),
+                                        notes=json.dumps([[note['time'] - a, note['duration'], note['midi']] for note in inside]),
+                                        source=f'slakh:{name}:{track.name}')
+                    k += 1
+        with open(log, 'a') as f:
+            f.write(f'{track.name} {k}\n')
         print(track.name, 'segments so far', k, flush=True)
     return k
 
 
-if __name__ == '__main__':
+def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mode', choices=['eval', 'build'])
     ap.add_argument('slakh')
     ap.add_argument('out', nargs='?')
     ap.add_argument('--tracks', type=int, default=0)
     ap.add_argument('--also-mix', action='store_true')
+    ap.add_argument('--also-stem', action='store_true', help='also the guitar on its own, so solo guitar is not forgotten')
+    ap.add_argument('--shard', default='0/1', help='i/n: every n-th song starting at i (run n processes into one folder)')
     a = ap.parse_args()
-    evaluate(a.slakh, a.tracks) if a.mode == 'eval' else build(a.slakh, a.out, a.tracks, a.also_mix)
+    i, n = (int(x) for x in a.shard.split('/'))
+    evaluate(a.slakh, a.tracks) if a.mode == 'eval' else build(a.slakh, a.out, a.tracks, a.also_mix, a.also_stem, (i, n))
+
+
+if __name__ == '__main__':
+    main()

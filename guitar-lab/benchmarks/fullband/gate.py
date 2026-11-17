@@ -1,7 +1,7 @@
 """The frozen full-band test: does a candidate model read guitar inside a band mix better?
 
     python -m benchmarks.fullband.gate baseline                 # score the current model, save it
-    python -m benchmarks.fullband.gate check <checkpoint.pth>   # score a candidate against it
+    python -m benchmarks.fullband.gate check <checkpoint.pth> [--onset T]   # score a candidate against it
 
 Every item (benchmarks/fullband/items.py) is separated exactly as the app does it. The guitar
 stem is transcribed with the app's Riley path and the guitar MIDI range, and the notes are
@@ -60,15 +60,35 @@ def separated(folder: Path):
     return cache
 
 
-def transcribe_guitar(path):
-    """Notes from the app's Riley path, limited to the guitar profile's MIDI range."""
+def transcribe_guitar(path, onset=None):
+    """Notes from the app's Riley path, limited to the guitar profile's MIDI range.
+
+    ``onset`` replaces the app's decoding with one fixed onset threshold. A retrained model
+    can need a different threshold from the released one; choose it on the Slakh validation
+    songs (training/runpod/pick.py), never on these items.
+    """
     from server.instruments import resolve_profile
-    from server.models import transcribe
     profile = resolve_profile('guitar')
-    return transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'], backend='riley')
+    if onset is None:
+        from server.models import transcribe
+        return transcribe(path, midi_min=profile['midi_min'], midi_max=profile['midi_max'], backend='riley')
+    import librosa
+    from server import riley
+    y, _ = librosa.load(str(path), sr=riley.SAMPLE_RATE, mono=True)
+    device = 'cuda' if _cuda() else 'cpu'
+    notes = riley.notes_from_posteriors(riley.posteriors(y, device=device), onset=onset)
+    return [n for n in notes if profile['midi_min'] <= n['midi'] <= profile['midi_max']]
 
 
-def score_items(checkpoint=None, data: Path | None = None):
+def _cuda():
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
+def score_items(checkpoint=None, data: Path | None = None, onset=None):
     if checkpoint:
         os.environ['FRETWORK_RILEY_CHECKPOINT'] = str(Path(checkpoint).resolve())
     else:
@@ -79,7 +99,7 @@ def score_items(checkpoint=None, data: Path | None = None):
     for folder in sorted(p for p in root.iterdir() if p.is_dir() and (p / 'reference.json').is_file()):
         ref = json.loads((folder / 'reference.json').read_text())
         lo, hi = ref.get('scored_from_s', 0.0), ref.get('scored_to_s', 1e9)
-        heard = [n for n in transcribe_guitar(separated(folder)) if lo <= n['time'] < hi]
+        heard = [n for n in transcribe_guitar(separated(folder), onset) if lo <= n['time'] < hi]
         target = [n for n in ref['notes'] if lo <= n['time'] < hi]
         metrics = S.score_notes(heard, target)
         rows[folder.name] = {
@@ -97,6 +117,7 @@ def score_items(checkpoint=None, data: Path | None = None):
         'items': rows,
         'mean_f1': round(float(np.mean([row['f1'] for row in rows.values()])), 4),
         'model_sha256': model_sha256(),
+        'onset': onset,
     }
 
 
@@ -150,7 +171,7 @@ def write_baseline(result, path: Path = BASELINE):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        raise SystemExit('Usage: python -m benchmarks.fullband.gate baseline | check <checkpoint.pth>')
+        raise SystemExit('Usage: python -m benchmarks.fullband.gate baseline | check <checkpoint.pth> [--onset T]')
     if sys.argv[1] == 'baseline':
         if BASELINE.is_file():
             raise SystemExit(
@@ -163,11 +184,12 @@ if __name__ == '__main__':
         }))
     elif sys.argv[1] == 'check':
         if len(sys.argv) < 3:
-            raise SystemExit('Usage: python -m benchmarks.fullband.gate check <checkpoint.pth>')
+            raise SystemExit('Usage: python -m benchmarks.fullband.gate check <checkpoint.pth> [--onset T]')
+        onset = float(sys.argv[sys.argv.index('--onset') + 1]) if '--onset' in sys.argv else None
         if not BASELINE.is_file():
             raise SystemExit('Run `baseline` first: the bar is fixed before any candidate is scored.')
         base = json.loads(BASELINE.read_text())
-        cand = score_items(sys.argv[2])
+        cand = score_items(sys.argv[2], onset=onset)
         decision = verdict(base, cand)
         print('VERDICT', json.dumps(decision))
         sys.exit(0 if decision['passes'] else 1)
