@@ -39,9 +39,43 @@ def capabilities():
                           'alternatives': _transcription_alternatives(),
                           'detail': 'Requires Basic Pitch and ONNX Runtime; uses bundled nmp.onnx or FRETWORK_BASIC_PITCH_MODEL. '
                                     'Optional guitar backends (riley, gaps) stay off unless FRETWORK_TRANSCRIBER is set.'},
+        'separators': _separators(),
         'device_policy': default_policy(),
         'gpu': gpu_info(),
     }
+
+
+def _separators():
+    from . import roformer
+    ok, detail = roformer.status()
+    return {'demucs': {'name': 'Demucs htdemucs_6s', 'used': 'on CPU (and on the graphics card when BS-RoFormer is not installed)'},
+            'roformer': {'name': roformer.NAME, 'installed': ok, 'detail': detail,
+                         'used': 'on the graphics card (more accurate on real recordings, slow on CPU)'},
+            'choice': os.getenv('FRETWORK_SEPARATOR', 'auto')}
+
+
+def choose_separator(policy=None):
+    """'roformer' or 'demucs' for a separation request.
+
+    FRETWORK_SEPARATOR=demucs|roformer forces one. The default ('auto') uses BS-RoFormer SW when
+    the request asks for the graphics card, one is usable and the model is installed: it gives
+    the transcriber a much better guitar on real recordings (RESULTS.md) but is slow on CPU.
+    """
+    choice = os.getenv('FRETWORK_SEPARATOR', 'auto')
+    if choice in ('demucs', 'roformer'):
+        return choice
+    from . import roformer
+    if (policy or default_policy()) != 'cpu' and gpu_info()['available'] and roformer.status()[0]:
+        return 'roformer'
+    return 'demucs'
+
+
+def run_separator(audio, sr, policy=None):
+    """Six sources from the chosen separator: ({stem: (n, 2)}, rate, provenance)."""
+    if choose_separator(policy) == 'roformer':
+        from . import roformer
+        return roformer.separate(audio, sr)
+    return run_demucs(audio, sr, policy)
 
 
 def separate_guitar(audio, sr, policy=None):
@@ -107,7 +141,7 @@ def run_demucs(audio, sr, policy=None):
 def separate_stem(audio, sr, stem, policy=None):
     if stem not in ('guitar', 'bass', 'piano'):
         raise ValueError('Unsupported separation stem.')
-    stems, rate, provenance = run_demucs(audio, sr, policy)
+    stems, rate, provenance = run_separator(audio, sr, policy)
     if stem not in stems:
         raise ModelUnavailable(f'Configured model has no dedicated {stem} output. An other stem is not accepted.')
     return stems[stem], rate, dict(provenance, stem=stem)

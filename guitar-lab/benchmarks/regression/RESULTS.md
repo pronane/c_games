@@ -354,6 +354,126 @@ Riley's reading of the real guitar tracks: guitar-labelled notes F1 .035, all pi
 The plan for training on this material, with its frozen real-recording test, is in
 `training/FULL_BAND_PLAN.md`.
 
+## Training Riley on real recordings (MoisesDB): not adopted (17 Nov 2026)
+
+The real-recording version of the band-mix training (`training/moises_data.py`,
+`training/runpod/moises_run.sh`): 146 MoisesDB songs with electric guitar (CC BY-NC-SA 4.0),
+split 106 train / 15 validation / 25 test (the frozen MoisesDB test above). Input: the mix
+separated with BS-RoFormer SW and with Demucs, plus the guitar alone; labels: Riley's reading
+of each song's own guitar tracks. 6,325 segments, 6,000 steps on a rented RTX 4090. The model
+and threshold were to be chosen on the validation songs; the test songs and the user's seven
+tabbed songs were scored once at the end.
+
+Mean note F1, guitar separated with BS-RoFormer SW:
+
+| | released, app decoding | released, 0.6 | trained step 1,000, 0.4 |
+| --- | --- | --- | --- |
+| validation (15 songs) | **0.723** | 0.707 | 0.702 |
+| MoisesDB test (17 of 24 songs scored) | 0.764 | 0.770 | 0.759 |
+| user's 7 songs (tab references) | 0.261 | 0.266 | 0.272 |
+
+Validation loss was lowest at step 1,000 and rose after it. The validation songs choose the
+released model, and the tests agree there is nothing to gain: the trained model is level on
+MoisesDB and 0.011 ahead on the user's songs (ahead on 3 of 7). Not adopted.
+
+Note on the MoisesDB references: they are the released model's own reading of the true guitar,
+which favours the released model at its own decoding. The user's tabbed songs carry no such
+bias and show the same picture.
+
+With the earlier Slakh runs this closes the question for now: retraining the note detector,
+on synthetic or on real band material, has not improved real recordings. The separator change
+(BS-RoFormer SW, above) is the gain that holds up.
+
+## Separators compared on real recordings (17 Nov 2026)
+
+The same released Riley model, given the guitar from different separators. Two real-recording
+tests:
+
+- **The user's seven songs** (`benchmarks/fullband`: six scored against lined-up tabs, one
+  multitrack). Mean note F1.
+- **24 MoisesDB songs** (CC BY-NC-SA 4.0; real multitrack recordings with separate guitar
+  tracks: 13 rock, 11 other styles; 15 with distorted guitar). Reference: Riley's reading of the
+  song's own guitar tracks, so this measures how much each separator costs, as the NIN item
+  does. Mean note F1 at onset threshold 0.5.
+
+| guitar given to Riley | 7 songs, app decoding | 7 songs, 0.5 | MoisesDB, 0.5 |
+| --- | --- | --- | --- |
+| Demucs htdemucs_6s guitar (the app today) | 0.229 | 0.247 | 0.566 |
+| Demucs guitar + other | | | 0.540 |
+| **BS-RoFormer SW guitar** | **0.261** | **0.271** | **0.718** |
+| BS-RoFormer SW guitar + other | 0.251 | 0.253 | 0.632 |
+| becruily Mel-RoFormer guitar | | | 0.590 |
+| no separation (whole mix) | 0.175 | 0.208 | 0.385 |
+
+On MoisesDB, BS-RoFormer SW beats the current separator on all 24 songs (rock 0.592 to 0.678,
+other styles 0.536 to 0.765). The ranking is the same at every threshold from 0.1 to 0.6. On the
+user's songs it is ahead too, by a smaller margin (the tab references are coarse).
+
+**This is the largest real-recording gain found so far, and it needs no retraining.**
+Caveats before adopting it in the app:
+
+- Licence: the BS-RoFormer SW checkpoint is published without a stated licence (the original
+  author's account was removed; mirrors list it as unknown). Fine for private use; a problem for
+  distributing it with the app.
+- Speed: on processors alone it took about 27 minutes for a 4-minute song in an earlier test
+  (two cores), several times slower than Demucs. With a graphics card it takes seconds.
+- Run with `audio-separator` 0.48 (`-m BS-Roformer-SW.ckpt`); MSST's requirements downgrade
+  `rotary-embedding-torch`, `beartype` and `librosa`, which breaks it and the engine. Keep them
+  in separate environments.
+
+## Training Riley on band mixes: full run, judged on real recordings (17 Nov 2026)
+
+The full run of `training/FULL_BAND_PLAN.md` (`training/runpod/full_run.sh`): all 1,289
+Slakh2100 training songs (CC BY 4.0) separated with the app's own separation, 79,008 ten-second
+segments of separated guitar, raw mix and guitar alone; 20,000 steps of the recurrent and
+output layers on a rented L40S (3.5 hours of training, about 7 hours and $7.80 in all).
+The checkpoint and its onset threshold were chosen on Slakh validation songs only
+(`training/runpod/pick.py`), before the real-recording test was run.
+
+**Slakh validation (38 songs; threshold chosen on half, F1 on the other half):**
+
+| model (threshold) | guitar alone | separated guitar | band mix |
+| --- | --- | --- | --- |
+| released (0.4 / 0.5 / 0.5) | 0.872 | 0.335 | 0.370 |
+| step 12,500 (0.3 / 0.25 / 0.25) | 0.921 | 0.433 | 0.512 |
+| step 20,000 (0.25 / 0.2 / 0.25) | 0.924 | 0.439 | 0.531 |
+
+Step 20,000 was ahead of the released model on 37 of 38 songs, separated and mix alike.
+
+**Real recordings (the frozen test, `benchmarks/fullband`):** seven commercial recordings, six
+scored against the user's tabs lined up with the recording (`tabbed.py`) and one against its
+own separate guitar tracks. Same separated guitar for both models; note F1 at 50 ms.
+
+| song | released, app decoding | released, 0.5 | step 20,000, 0.2 |
+| --- | --- | --- | --- |
+| 18 and Life | 0.246 | 0.227 | 0.199 |
+| Down in a Hole | 0.379 | 0.401 | 0.368 |
+| Every Rose | 0.190 | 0.245 | 0.219 |
+| Home Sweet Home | 0.179 | 0.176 | 0.183 |
+| multitrack (NIN) | 0.169 | 0.191 | 0.122 |
+| November Rain | 0.126 | 0.168 | 0.098 |
+| One | 0.311 | 0.333 | 0.330 |
+| **mean** | **0.229** | **0.249** | **0.217** |
+
+**Not adopted.** Training on Slakh made the model much better on Slakh and slightly worse on
+real records. On real recordings it becomes cautious: precision 0.36, recall 0.17 at its
+chosen threshold, and the threshold that suits Slakh (0.2) is too high for real audio (its
+mean rises to 0.244 at 0.1, still below the released model, and choosing 0.1 would be tuning
+on the test). The early checkpoint at step 2,500 scored 0.251 at 0.2, level with the released
+model: the longer the training on sampled instruments, the further it drifted from real
+recordings. Validation loss on Slakh bottomed at step 12,500 and rose after it.
+
+This is the same pattern as the amp-render fine-tune above, now on 1,289 songs and confirmed on
+a test built before training. More synthetic data for the note detector is not the way to
+better full-band transcription. What the numbers point to instead:
+
+- The released detector loses most of its accuracy in separation (0.87 on the guitar alone,
+  0.34 separated, on Slakh). The separator, not the detector, is where the loss is.
+- Training material has to be real recordings: real guitars through real amps in real mixes,
+  with notes known (tabs lined up with recordings, or multitracks).
+
+Cost of the whole exercise (pilot and full run): about $10.80 of rented machines.
+
 ## Training Riley on band mixes: pilot on a rented graphics card (17 Nov 2026)
 
 The pilot of `training/FULL_BAND_PLAN.md`: 147 Slakh2100 training songs (CC BY 4.0) separated

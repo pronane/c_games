@@ -55,6 +55,23 @@ Full-band Demucs defaults favour quality: `FRETWORK_DEMUCS_SHIFTS=2` and `FRETWO
 - Auto retries on CPU only for known memory/unsupported-operation RuntimeErrors, with the **same model, float32, overlap and shift settings**. Other errors fail visibly. Real GPU/MPS inference remains untested in this sandbox; unit tests cover routing and fallback semantics.
 - Basic Pitch currently uses its ONNX **CPU provider**, including on GPU-equipped servers. It retains full functionality, but this stage is not GPU-accelerated in v0.2. This is disclosed in provenance. Adding an ONNX GPU provider is a separate benchmarked optimization.
 
+### Better separation with a graphics card (optional)
+
+With a graphics card the server can separate with BS-RoFormer SW instead of Demucs. On real
+recordings it gives the guitar transcriber a much cleaner guitar (24 MoisesDB songs: note F1
+0.566 to 0.718; `benchmarks/regression/RESULTS.md`). It is too slow for processors alone, so it is
+used only for requests that choose **Graphics card**.
+
+```bash
+pip install 'audio-separator[gpu]==0.48.0'
+python -m server.roformer install     # downloads the checkpoint and checks its SHA-256
+```
+
+`FRETWORK_SEPARATOR=demucs` or `roformer` forces one separator. The checkpoint is published
+without a stated licence: fine for your own use, check before distributing it. Keep
+`audio-separator` out of environments that also install Music-Source-Separation-Training: its
+requirements downgrade `librosa`, `beartype` and `rotary-embedding-torch`.
+
 ## Instrument profiles
 
 See [INSTRUMENT_PROFILES.md](../INSTRUMENT_PROFILES.md). Multipart jobs now accept `instrument`, `tuning`, `capo` and `notation` (standard guitar by default). Both languages read `shared/instruments.json`; jobs snapshot and validate the resolved profile, use its dedicated stem and transcription bounds, and validate edits against its range/tuning/capo. Bass and piano are experimental; no real-world accuracy claim or piano pedal grading is made. The existing `/guitar` endpoint is retained alongside a generic `/stem` alias.

@@ -1,5 +1,10 @@
 # Teaching the note detector to read guitar inside a band mix
 
+> **Outcome (17 Nov 2026): run in full and not adopted.** Much better on Slakh, slightly worse
+> on the frozen real-recording test (mean F1 0.217 against 0.229 for the released model). See
+> `benchmarks/regression/RESULTS.md`. Kept as a record of the method and as the procedure for
+> any future attempt with real training recordings.
+
 **Goal:** Riley reads solo guitar well (about 94% of notes on clean guitar) but loses most of
 the guitar once it is inside a band mix and has been through separation. This plan trains it
 on exactly that material, on a rented graphics card, and accepts the result only if it wins

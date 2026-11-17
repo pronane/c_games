@@ -235,7 +235,7 @@ def run_song(song: Song):
         write_track(tracks, 'mix', audio, sr)
         check(song)
         song.status, song.stage = 'separating', 'Separating every instrument (htdemucs_6s, six stems)'
-        stems, sr_s, provenance = models.run_demucs(audio, sr, song.policy)
+        stems, sr_s, provenance = models.run_separator(audio, sr, song.policy)
         check(song)
         song.stage = 'Finding which instruments play'
         peak = float(np.max(np.abs(audio)))
