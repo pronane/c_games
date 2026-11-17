@@ -153,6 +153,12 @@ def load_track(track: Path):
     return true, notes, mix, sr
 
 
+def _device():
+    """The graphics card when there is one: scoring on processors alone takes minutes per song."""
+    import torch
+    return 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
 def separated_guitar(mix, sr):
     """The guitar stem as the app makes it (htdemucs_6s at 44.1 kHz), mono at SR."""
     import librosa
@@ -182,7 +188,7 @@ def evaluate(folder, limit):
                    'mix': librosa.resample(mix.mean(axis=1), orig_sr=sr, target_sr=SR)}
         row = {'track': track.name, 'notes': len(notes)}
         for name, y in sources.items():
-            m = S.score_notes(riley.decode(riley.posteriors(y))[0], notes)
+            m = S.score_notes(riley.decode(riley.posteriors(y, device=_device()))[0], notes)
             row[name] = {'f1': round(m['note_f1'], 3), 'precision': round(m['note_precision'], 3), 'recall': round(m['note_recall'], 3)}
         rows.append(row)
         print(json.dumps(row), flush=True)

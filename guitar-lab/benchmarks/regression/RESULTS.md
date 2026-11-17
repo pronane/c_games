@@ -354,6 +354,63 @@ Riley's reading of the real guitar tracks: guitar-labelled notes F1 .035, all pi
 The plan for training on this material, with its frozen real-recording test, is in
 `training/FULL_BAND_PLAN.md`.
 
+## Training Riley on band mixes: pilot on a rented graphics card (17 Nov 2026)
+
+The pilot of `training/FULL_BAND_PLAN.md`: 147 Slakh2100 training songs (CC BY 4.0) separated
+with the app's own separation, 6,032 ten-second segments of separated guitar and raw mix with
+exact notes, 3,000 training steps of the recurrent and output layers. Scored on 29 Slakh
+validation songs the training never saw. Note F1 at 50 ms.
+
+At the app's own decoding (onset threshold 0.5, or 0.65 on reverberant audio):
+
+| model | guitar alone | separated guitar | band mix |
+| --- | --- | --- | --- |
+| released | 0.814 | 0.374 | 0.348 |
+| pilot, step 1500 | 0.659 | 0.238 | 0.247 |
+| pilot, step 3000 | 0.728 | 0.271 | 0.311 |
+
+The pilot model is worse here, but for one reason: on separated guitar its precision rose from
+0.47 to 0.63 while its recall fell from 0.33 to 0.18. It reports fewer notes at the same
+threshold. With the onset threshold swept (mean F1 over all 29 songs):
+
+| onset threshold | 0.1 | 0.15 | 0.2 | 0.25 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| released, separated | 0.344 | 0.358 | 0.370 | 0.378 | 0.386 | 0.396 | 0.401 | 0.368* | 0.316* |
+| pilot, separated | 0.433 | 0.444 | 0.451 | 0.453 | 0.446 | 0.416 | 0.369 | | |
+| released, mix | 0.310 | 0.325 | 0.337 | 0.348 | 0.357 | 0.373 | 0.383 | 0.332* | 0.270* |
+| pilot, mix | 0.457 | 0.468 | 0.474 | 0.475 | 0.473 | 0.459 | 0.427 | | |
+| released, guitar alone | 0.802 | 0.815 | 0.824 | 0.828 | 0.831 | 0.835 | 0.832 | 0.804* | 0.754* |
+| pilot, guitar alone | 0.827 | 0.838 | 0.843 | 0.845 | 0.843 | 0.833 | 0.806 | | |
+
+\* 22 of the 29 songs (the machine was deleted before the last seven finished); on those 22 the
+released model scored 0.376 separated at 0.5, so it does not improve above 0.5.
+
+Threshold chosen on every second song, score reported on the others:
+
+| model (chosen threshold) | guitar alone | separated guitar | band mix |
+| --- | --- | --- | --- |
+| released (0.4 / 0.5 / 0.5) | 0.856 | 0.342 | 0.357 |
+| pilot step 3000 (0.25 / 0.25 / 0.3) | 0.857 | 0.401 | 0.419 |
+
+At 0.25 the pilot model beats the released one on 25 of 29 songs on separated guitar and 26 of
+29 on the mix.
+
+What this does and does not show:
+
+- Training on separated band material helps on held-out songs of the same kind: about +0.06 on
+  separated guitar and on the mix, with no loss on guitar alone, from 147 songs and 39 minutes.
+- It is **not** evidence about real records. Slakh is sampled instruments; the earlier
+  amp-render fine-tune also improved on its own kind of material and made a real record worse.
+  The pilot checkpoint was not kept (the machine had no route to copy it out), so it was not
+  run against the frozen real-recording test.
+- The app's fixed onset thresholds are tuned to the released model. Any retrained model must
+  have its threshold chosen on validation songs first, or it will be misjudged, as this one was
+  for the first hour. The earlier "fine-tune made One worse" result was judged at the fixed
+  thresholds and may be partly this effect; it has not been re-checked.
+- Cost: one A40 at $0.59/hour for 5 hours, $3.01. About 50 minutes of that was a slow
+  single-connection download and two set-up faults (separation and scoring on processors,
+  thread over-subscription), now fixed in the plan and in `training/slakh_data.py`.
+
 ## CPU time
 
 Seconds of wall clock per minute of audio, around the transcribe call, on this CPU. The first clip of Riley and of GAPS includes the weight load.
