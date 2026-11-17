@@ -11,7 +11,7 @@ The dataset is one 89 GB zip. Songs are read out of it with HTTP range requests
 (training/runpod/moises_zip.py), so only the songs used are downloaded. The download link is
 personal and expires: pass it in a file, never commit it.
 
-    python -m training.moises_data prepare <link file> <test songs.json> <work dir> [--val 15]
+    python -m training.moises_data prepare <link file> <test songs.json> <work dir> [--val 15] [--shard i/n]
     python -m training.moises_data separate <work dir>            # BS-RoFormer SW and Demucs guitar
     python -m training.moises_data segments <work dir> <out dir>  # training segments, train split only
     python -m training.moises_data items <work dir> <split> <sep> <out dir>   # frozen-test items
@@ -59,7 +59,7 @@ def songs_with_electric_guitar(z):
     return out
 
 
-def prepare(link_file, test_file, work, n_val):
+def prepare(link_file, test_file, work, n_val, shard=(0, 1)):
     import librosa
     import soundfile as sf
     from server import riley
@@ -73,9 +73,9 @@ def prepare(link_file, test_file, work, n_val):
     split = {r: 'test' for r in test_roots}
     split.update({r: 'val' for r in others[:n_val]})
     split.update({r: 'train' for r in others[n_val:]})
-    manifest_path = work / 'songs.json'
+    manifest_path = work / f'songs_{shard[0]}.json'
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
-    for root, d in songs:
+    for root, d in songs[shard[0]::shard[1]]:
         name = root.rsplit('/', 1)[1][:8]
         if name in manifest:
             continue
@@ -109,6 +109,14 @@ def prepare(link_file, test_file, work, n_val):
                           'notes': len(notes), 'guitar_types': sorted({t['trackType'] for s in d['stems'] if s['stemName'] == 'guitar' for t in s['tracks']})}
         manifest_path.write_text(json.dumps(manifest, indent=1))
         print(name, manifest[name]['split'], manifest[name]['seconds'], 's', len(notes), 'notes', flush=True)
+
+
+def load_manifest(work):
+    """All songs prepared so far (one manifest file per prepare shard)."""
+    out = {}
+    for f in sorted(Path(work).glob('songs_*.json')):
+        out.update(json.loads(f.read_text()))
+    return out
 
 
 def _device():
@@ -147,7 +155,7 @@ def separate(work):
 def segments(work, out):
     work, out = Path(work), Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    manifest = json.loads((work / 'songs.json').read_text())
+    manifest = load_manifest(work)
     k = 0
     for name, info in sorted(manifest.items()):
         if info['split'] != 'train':
@@ -172,7 +180,7 @@ def items(work, split, sep, out):
     """benchmarks/fullband items (reference.json + guitar.wav) for one split, from one separator."""
     import soundfile as sf
     work, out = Path(work), Path(out)
-    manifest = json.loads((work / 'songs.json').read_text())
+    manifest = load_manifest(work)
     for name, info in sorted(manifest.items()):
         if info['split'] != split or info['notes'] < 50:
             continue
@@ -194,6 +202,7 @@ def main():
     p.add_argument('test')
     p.add_argument('work')
     p.add_argument('--val', type=int, default=15)
+    p.add_argument('--shard', default='0/1', help='i/n: every n-th song starting at i (run n processes)')
     p = sub.add_parser('separate')
     p.add_argument('work')
     p = sub.add_parser('segments')
@@ -206,7 +215,7 @@ def main():
     p.add_argument('out')
     a = ap.parse_args()
     if a.mode == 'prepare':
-        prepare(a.link, a.test, a.work, a.val)
+        prepare(a.link, a.test, a.work, a.val, tuple(int(x) for x in a.shard.split('/')))
     elif a.mode == 'separate':
         separate(a.work)
     elif a.mode == 'segments':

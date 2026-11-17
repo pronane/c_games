@@ -12,7 +12,12 @@ mkdir -p "$W"; cd "$(dirname "$0")/../.." || exit 1
 S=$W/status
 step() { echo "$(date -u +%FT%T) $1" >> "$S"; }
 fail() { step "FAILED $1"; exit 1; }
-[ -f "$W/prepare_done" ] || { step prepare; python -m training.moises_data prepare "$LINK" "$TEST" "$W" >> "$W/prepare.log" 2>&1 || fail prepare; touch "$W/prepare_done"; }
+if [ ! -f "$W/prepare_done" ]; then
+  step prepare; pids=()
+  for i in 0 1 2 3; do python -m training.moises_data prepare "$LINK" "$TEST" "$W" --shard $i/4 >> "$W/prepare_$i.log" 2>&1 & pids+=($!); done
+  for p in "${pids[@]}"; do wait "$p" || fail prepare; done
+  touch "$W/prepare_done"
+fi
 [ -f "$W/separate_done" ] || { step separate; python -m training.moises_data separate "$W" >> "$W/separate.log" 2>&1 || fail separate; touch "$W/separate_done"; }
 [ -f "$W/segments_done" ] || { step segments; rm -rf "$W/data"; python -m training.moises_data segments "$W" "$W/data" >> "$W/segments.log" 2>&1 || fail segments; touch "$W/segments_done"; }
 for split in val test; do for sep in sw demucs; do
