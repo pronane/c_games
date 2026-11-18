@@ -16,6 +16,10 @@ public enum EventKind { Info, Pass, Shot, Save, Goal, Tackle, Foul, Offside, Out
 /// Competitive = faster pace, more forgiving tackles, arcade feel.</summary>
 public enum MatchPreset { Authentic, Competitive }
 
+/// <summary>Phase 3.7 quality preset: Low/Med/High + auto-detect.
+/// Controls post FX, shadows, crowd density and shader detail.</summary>
+public enum QualityPreset { Low, Medium, High, Auto }
+
 public sealed class MatchOptions
 {
     public int TeamSize = 11;                 // 5, 7 or 11 per side
@@ -37,6 +41,8 @@ public sealed class MatchOptions
     /// <summary>Phase 2.9: gameplay preset.  Scales pace, tackle accuracy,
     /// stamina effect and first-touch quality.</summary>
     public MatchPreset Preset = MatchPreset.Competitive;
+    /// <summary>Phase 3.7: quality preset.  Auto-detects from device.</summary>
+    public QualityPreset Quality = QualityPreset.Auto;
 }
 
 public struct PlayerCommand

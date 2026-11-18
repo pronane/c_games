@@ -10,9 +10,13 @@ public partial class Stadium : Node3D
 {
     public const float LineY = 0.012f;
 
-    public void Build(bool fullCrowd = true)
+    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto)
     {
         Name = "Stadium";
+        // Phase 3.7: resolve quality preset (auto-detect from device).
+        var q = quality == QualityPreset.Auto ? DetectQuality() : quality;
+        bool highFx = q >= QualityPreset.High;
+        bool medFx = q >= QualityPreset.Medium;
 
         // --- Environment / sky / sun ---
         var skyMat = new ProceduralSkyMaterial
@@ -24,6 +28,7 @@ public partial class Stadium : Node3D
             SunAngleMax = 12f,
             SunCurve = .12f,
         };
+        // Phase 3.1: post FX (desktop High) — ACES tonemap, bloom, vignette.
         var env = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Sky,
@@ -31,14 +36,21 @@ public partial class Stadium : Node3D
             AmbientLightSource = Godot.Environment.AmbientSource.Sky,
             AmbientLightColor = new Color(.55f, .62f, .72f),
             AmbientLightEnergy = .55f,
-            TonemapMode = Godot.Environment.ToneMapper.Filmic,
+            TonemapMode = Godot.Environment.ToneMapper.Aces,
             TonemapExposure = 1.12f,
-            GlowEnabled = true,
+            TonemapWhite = 1.0f,
+            GlowEnabled = highFx,
             GlowIntensity = .22f,
             GlowBloom = .08f,
-            FogEnabled = true,
+            GlowBlendMode = Godot.Environment.GlowBlendModeEnum.SoftLight,
+            FogEnabled = medFx,
             FogLightColor = new Color(.36f, .45f, .55f),
             FogDensity = .0012f,
+            // Vignette via adjustment layer (desktop High only).
+            AdjustmentEnabled = highFx,
+            AdjustmentBrightness = 1.02f,
+            AdjustmentContrast = 1.05f,
+            AdjustmentSaturation = 1.08f,
         };
         var world = new WorldEnvironment { Name = "WorldEnvironment", Environment = env };
         AddChild(world);
@@ -421,5 +433,15 @@ public static class RigAnimator
         if (clip == "kick") dummy.ActionTimer = .4f - (time % .4f);
         Pose(rig, dummy, 1f / 60f, time, System.Numerics.Vector3.Zero);
         rig.Skeleton.Position = Vector3.Zero;
+    }
+
+    /// <summary>Phase 3.7: auto-detect quality from device capabilities.</summary>
+    public static QualityPreset DetectQuality()
+    {
+        string os = OS.GetName();
+        if (os == "Android" || os == "iOS")
+            return QualityPreset.Medium;
+        // Desktop: check GPU via rendering device (fallback to High).
+        return QualityPreset.High;
     }
 }

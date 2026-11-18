@@ -100,6 +100,9 @@ func render(sfx: String) -> PackedFloat32Array:
 			out = _noise(1.2, 0.35, 2000.0, 5, true)
 		"net":
 			out = _mix([_noise(0.25, 0.3, 1500.0, 6), _tone(95.0, 0.2, 0.3, 10.0)])
+		"ambience":
+			# Continuous crowd murmur: filtered noise with slow swell.
+			out = _noise(4.0, 0.12, 800.0, 7, true)
 		_:
 			out = _silence(0.01)
 	_cache[sfx] = out
@@ -184,6 +187,19 @@ func play_ball_bounce() -> void: _play("bounce", 0.6, 90)
 func play_post() -> void: _play("post", 0.9, 200)
 func play_net() -> void: _play("net", 0.8, 300)
 func play_crowd_cheer(_duration_sec: float = 1.2) -> void: _play("cheer", 0.7, 500)
+
+# Phase 3.4: crowd ambience — continuous background murmur.
+var _ambience_on := false
+func set_crowd_ambience(on: bool) -> void:
+	_ambience_on = on
+	if on:
+		_play("ambience", 0.15, 0)
+	else:
+		_voices = _voices.filter(func(v): return v.get("sfx", "") != "ambience")
+
+func play_crowd_reaction(intensity: float) -> void:
+	# intensity 0..1: louder cheer for goals, softer for near-misses.
+	_play("cheer", 0.3 + intensity * 0.7, 200)
 
 ## Map a match event name (the C# EventKind names, or the browser edition's own) to a sound.
 func play_for_event(kind: String) -> void:

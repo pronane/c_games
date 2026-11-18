@@ -261,6 +261,15 @@ def main():
     check("browser shot types", '"placement"' in boot and '"volley"' in boot and '"power"' in boot)
     check("browser jockey", '"jockey"' in boot)
     check("browser keeper punch", '"punch"' in boot)
+    # Phase 3: presentation and platform.
+    check("C# quality presets", "QualityPreset" in match_cs and "DetectQuality" in open(os.path.join(ROOT, "Scripts", "Godot", "World3D.cs")).read())
+    check("C# replay recorder", "ReplayRecorder" in open(os.path.join(ROOT, "Scripts", "Core", "ReplayRecorder.cs")).read())
+    check("C# game modes", "GameMode" in open(os.path.join(ROOT, "Scripts", "Godot", "GameApp.cs")).read())
+    check("C# match analysis", "MatchAnalysis" in open(os.path.join(ROOT, "Scripts", "Core", "MatchAnalysis.cs")).read())
+    check("pitch shader has wear/wet", "wear_amount" in open(os.path.join(ROOT, "Shaders", "pitch.gdshader")).read())
+    check("ball shader has spin blur", "spin_blur" in open(os.path.join(ROOT, "Shaders", "ball.gdshader")).read())
+    check("net shader has ripple", "ripple" in open(os.path.join(ROOT, "Shaders", "net.gdshader")).read())
+    check("audio has crowd ambience", "ambience" in open(os.path.join(ROOT, "Scripts", "Core", "Audio", "ProceduralAudio.gd")).read())
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))

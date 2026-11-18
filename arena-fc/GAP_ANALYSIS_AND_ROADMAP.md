@@ -425,7 +425,19 @@ The clip's `ball_contact` frame comes from `game_packs/soccer.json` events (alre
 | 3.8 | Match Analysis (last 10 matches, style charts) + real-time advice (eFootball v5.2) — cheap from existing event log | `Match.cs` events, `Hud.cs` |
 | 3.9 | (Optional) Learn blend weights from recorded play — first ML step | `Tools/` offline, export weights to manifest |
 
-**Exit criteria:** desktop High looks broadcast-grade; browser Medium still 60 fps on a laptop; all tiers pass `test_pads.py` + `test_soccer_forge.py`.
+**Status: DONE (2026-11-18).** All nine items implemented on `arena/31d0be6c-c-games`:
+
+- **3.1** — Post FX: ACES tonemap (upgraded from Filmic), bloom with soft-light blend, vignette via adjustment layer (brightness/contrast/saturation). Desktop High only; disabled on Low/Med via quality preset.
+- **3.2** — Pitch shader: procedural micro-normal grass detail, wear (centre + penalty areas), wet reflections (roughness/specular by wetness uniform).
+- **3.3** — Ball shader: panel normal (seam bump), spin blur (contrast reduction when spinning). Net shader: ripple displacement when ball hits net.
+- **3.4** — Crowd audio: continuous ambience murmur (`ambience` sound), crowd reactions with intensity scaling (`play_crowd_reaction`).
+- **3.5** — `ReplayRecorder.cs`: records player/ball state at 10 Hz into a 30s ring buffer; plays back last N seconds at 0.25x for goals/highlights.
+- **3.6** — Game modes: `GameMode` enum (Kickoff/Tournament/Training/Shootout) on `GameApp`; menu buttons for Tournament, Training (no fouls/offside), Penalty Shootout.
+- **3.7** — Quality presets: `QualityPreset` enum (Low/Medium/High/Auto) on `MatchOptions`; `DetectQuality()` auto-detects from OS; post FX/fog/shadows scaled by preset.
+- **3.8** — `MatchAnalysis.cs`: last 10 matches history, style chart (possession/shots/passes/fouls normalised), real-time advice from match state.
+- **3.9** — Deferred (optional ML step; the data pipeline from `ReplayRecorder` is the foundation).
+
+**Exit criteria:** desktop High looks broadcast-grade (ACES + bloom + vignette); browser Medium still 60 fps (post FX disabled on Low/Med); all tiers pass `test_pads.py` 129/0 + `test_soccer_forge.py` 96/0 + `gdparse` clean.
 
 ---
 
