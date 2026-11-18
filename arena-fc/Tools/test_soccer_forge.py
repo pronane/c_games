@@ -92,10 +92,26 @@ def main():
               str([m.get("name") for m in j.get("materials", [])]))
         check("GLB mesh has 6 primitives (one per layer)",
               len(j["meshes"][0]["primitives"]) == 6)
-        prim = j["meshes"][0]["primitives"][0]
-        pos_acc = j["accessors"][prim["attributes"]["POSITION"]]
-        check("mesh stands on the ground (min y ~ 0)", abs(pos_acc["min"][1]) < 0.01, str(pos_acc["min"]))
-        check("mesh height ~1.77 m", 1.6 < pos_acc["max"][1] < 1.95, str(pos_acc["max"]))
+        prims = j["meshes"][0]["primitives"]
+        prim = prims[0]
+        pos_accs = [j["accessors"][p["attributes"]["POSITION"]] for p in prims]
+        gmin = [min(a["min"][k] for a in pos_accs) for k in range(3)]
+        gmax = [max(a["max"][k] for a in pos_accs) for k in range(3)]
+        check("mesh stands on the ground (min y ~ 0)", abs(gmin[1]) < 0.01, str(gmin))
+        check("mesh height ~1.77 m", 1.6 < gmax[1] < 1.95, str(gmax))
+        # Regression: fmat was once fed per-vertex layers, truncating the GLB
+        # to a half-body mesh with scrambled materials.  Guard the full body,
+        # the tri budget, and regional kit layers.
+        check("GLB mesh is full-body (x spans both sides)",
+              gmin[0] < -0.2 and gmax[0] > 0.2, "%s..%s" % (gmin[0], gmax[0]))
+        glb_tris = sum(a["count"] for a in pos_accs) // 3
+        check("GLB carries the full tri budget", 14000 <= glb_tris <= 18000, str(glb_tris))
+        jersey_acc = pos_accs[1]
+        check("jersey layer sits on the torso",
+              jersey_acc["min"][1] > 0.5 and jersey_acc["max"][1] < 1.65,
+              "%s..%s" % (jersey_acc["min"][1], jersey_acc["max"][1]))
+        boots_acc = pos_accs[4]
+        check("boots layer sits at the feet", boots_acc["max"][1] < 0.3, str(boots_acc["max"][1]))
         wraw, wn, _ = acc_bytes(j, buf, prim["attributes"]["WEIGHTS_0"])
         import array
         w = array.array("f")

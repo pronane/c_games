@@ -183,7 +183,14 @@ def main() -> int:
         tgt.F = lo.F
         tgt.J = J18
         tgt.W = W18
-        tgt.fmat = np.array([LAYER_ORDER.index(l) for l in layer_of_vert], int)
+        # Per-FACE material: write_glb indexes fmat by face, but layer_of_vert
+        # is per-vertex.  Take the majority layer of each face's 3 corners
+        # (same vote the rig-JSON path uses for slots).  Feeding the
+        # per-vertex array straight in truncated the GLB to the first len(V)
+        # faces -- a half-body mesh with scrambled kit materials.
+        layer_idx = np.array([LAYER_ORDER.index(l) for l in layer_of_vert], int)
+        face_votes = np.eye(len(LAYER_ORDER))[layer_idx][lo.F].sum(axis=1)
+        tgt.fmat = face_votes.argmax(axis=1).astype(int)
         tgt.materials = [{"name": l, "color": LAYER_COLOR[l]} for l in LAYER_ORDER]
         tgt.fuv = None
         tgt.fcol = None

@@ -9,12 +9,12 @@ soccer move.
 
 | Artifact | Path | What it is |
 | --- | --- | --- |
-| Desktop player | `Data/models/soccer_player.glb` (2.0 MB) | Sculpted skinned mesh (16,000 tris) on Arena's 18-bone skeleton, 6 flat kit materials, **67 animation clips** |
+| Desktop player | `Data/models/soccer_player.glb` (3.1 MB) | Sculpted skinned mesh (16,000 tris) on Arena's 18-bone skeleton, 6 flat kit materials, **67 animation clips** |
 | Browser player | `Data/soccer_rig.json` (1.2 MB) | Same mesh in the `rig_default.json` schema (10,488 verts), so the GDScript edition uses it with no glTF module |
 | Manifest | `Data/soccer_player_manifest.json` | Clip list + loop flags, 75 action aliases, material order, build stats |
 | Motion library | `Tools/soccer_motions.py` | 67 named clips: shipped Sprite Forge motions + 13 soccer-specific poses (shield, slide tackle, volley, header, chest control, trap, throw-in, shoulder charge, keeper ready/punch, toe lift, dribble, idle-ready) |
 | Builder | `Tools/build_soccer_player.py` | Reproducible pipeline (below) |
-| Tests | `Tools/test_soccer_forge.py` | 32 checks (stdlib-only GLB/JSON parsing; motion checks need `sprite_forge` on `PYTHONPATH`) |
+| Tests | `Tools/test_soccer_forge.py` | 36 checks (stdlib-only GLB/JSON parsing; motion checks need `sprite_forge` on `PYTHONPATH`) |
 
 ## Pipeline
 
@@ -50,7 +50,7 @@ soccer move.
 
 | Check | Result |
 | --- | --- |
-| `Tools/build_soccer_player.py` | 122 shapes → 16,000 tris, 67 clips retargeted, GLB 2.0 MB, JSON 1.2 MB |
+| `Tools/build_soccer_player.py` | 122 shapes → 16,000 tris, 67 clips retargeted, GLB 3.1 MB, JSON 1.2 MB |
 | `Tools/test_soccer_forge.py` (full, with Sprite Forge venv) | **32 passed, 0 failed** |
 | `Tools/test_soccer_forge.py` (system python, stdlib only) | **27 passed, 0 failed** (motion section skips) |
 | `Tools/test_pads.py` regression | **129 passed, 0 failed** |
