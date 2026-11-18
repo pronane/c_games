@@ -262,12 +262,13 @@ public sealed partial class SoccerClipRig : Node3D
             if (fwd.LengthSquared() > 0.001f)
             {
                 float dot = Math.Clamp(_prevFacing.X * fwd.X + _prevFacing.Z * fwd.Z, -1f, 1f);
-                float turnRate = Math.Acos(dot) * 60f; // rad/s at 60 Hz
+                float turnRate = (float)Math.Acos(dot) * 60f; // rad/s at 60 Hz
                 if (turnRate > 2.2f)
                 {
                     _turnCooldown = 0.6f;
-                    float cross = _prevFacing.X * fwd.Z - _prevFacing.Z * fwd.X;
-                    return cross > 0f ? "soccer_turn_left" : "soccer_turn_right";
+                    // Directional turn variants are Phase 1.4; the single
+                    // turn/cut clip covers both directions for now.
+                    return "soccer_turn";
                 }
             }
         }

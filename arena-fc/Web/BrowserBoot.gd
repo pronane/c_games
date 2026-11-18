@@ -1302,8 +1302,9 @@ func clip_select_locomotion(p: Dictionary, speed: float) -> String:
 			var turn_rate := acos(dot) * 60.0
 			if turn_rate > 2.2:
 				p["turn_cd"] = 0.6
-				var cross := pf.x * fwd.z - pf.z * fwd.x
-				return "soccer_turn_left" if cross > 0.0 else "soccer_turn_right"
+				# Directional turn variants are Phase 1.4; the single
+				# turn/cut clip covers both directions for now.
+				return "soccer_turn"
 	var has_ball: bool = int(ball.get("owner", -1)) == players.find(p)
 	if has_ball and speed > 0.8:
 		return "soccer_run_ball" if prev == "soccer_run_ball" else "soccer_dribble"

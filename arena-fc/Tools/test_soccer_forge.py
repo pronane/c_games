@@ -229,7 +229,7 @@ def main():
     check("desktop syncs one-shot contact",
           "_contactFrac" in soccer_cs and "clipDur / p.ActionDuration" in soccer_cs)
     check("desktop selects turns by turn rate",
-          "soccer_turn_left" in soccer_cs and "turnRate" in soccer_cs)
+          '"soccer_turn"' in soccer_cs and "turnRate" in soccer_cs)
     check("browser syncs ball release to the contact frame",
           "fire_pending" in boot and "pending" in boot)
     check("browser selects first-touch by ball height/speed",
@@ -239,7 +239,7 @@ def main():
     check("browser parries hot shots",
           '"parry"' in boot and "spd > 18.0" in boot)
     check("browser selects turns by turn rate",
-          "soccer_turn_left" in boot and "turn_rate" in boot)
+          '"soccer_turn"' in boot and "turn_rate" in boot)
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))
