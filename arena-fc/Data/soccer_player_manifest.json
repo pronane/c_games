@@ -853,6 +853,78 @@
    }
   },
   {
+   "name": "soccer_strafe_l",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "soccer_motions.CUSTOM",
+   "frames": 31,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_strafe_r",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "soccer_motions.CUSTOM",
+   "frames": 31,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_backpedal",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "soccer_motions.CUSTOM",
+   "frames": 31,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_jockey",
+   "loop": true,
+   "category": "Defence",
+   "source": "soccer_motions.CUSTOM",
+   "frames": 31,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
    "name": "soccer_sidestep",
    "loop": false,
    "category": "Locomotion",
@@ -1140,11 +1212,15 @@
   "penalty_kick": "soccer_penalty_kick",
   "goal_kick": "soccer_goal_kick",
   "sidestep": "soccer_sidestep",
+  "strafe_l": "soccer_strafe_l",
+  "strafe_r": "soccer_strafe_r",
+  "strafe": "soccer_sidestep",
+  "backpedal": "soccer_backpedal",
+  "jockey": "soccer_jockey",
   "juke_feint": "soccer_juke_feint",
   "stop": "soccer_stop",
   "turn": "soccer_turn",
   "cut": "soccer_change_direction",
-  "strafe": "soccer_sidestep",
   "change_direction": "soccer_change_direction",
   "spin": "soccer_spin",
   "celebrate": "soccer_celebrate",
@@ -1171,6 +1247,6 @@
    0.3775
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 7.7
+  "seconds": 8.0
  }
 }

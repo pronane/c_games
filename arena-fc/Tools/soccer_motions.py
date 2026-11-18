@@ -64,6 +64,79 @@ def _keeper_ready(t: float):
     return p
 
 
+# ---------------------------------------------------------------------------
+# Phase 1.3 archetype locomotion presets (FC 26-style movement types).
+# Each preset is a `loco()` parameter set; the runtime rig applies the same
+# biases (stride/cadence/lean) via CharacterSpec.Archetype.  Keeping the
+# generation presets and the runtime biases in sync is what makes the three
+# archetypes visibly distinct.
+# ---------------------------------------------------------------------------
+
+ARCHETYPE_PRESETS = {
+    # Explosive: short stride, high cadence, forward lean, quick accel.
+    "explosive": dict(stride=14, knee=58, arm=30, elbow=62, lean=18, air=0.0,
+                      carry=0.0, guard=0.0, bounce=0.10),
+    # Lengthy: long stride, low cadence, upright, covers ground.
+    "lengthy": dict(stride=26, knee=44, arm=22, elbow=50, lean=10, air=0.0,
+                    carry=0.0, guard=0.0, bounce=0.04),
+    # Controlled: balanced stride/cadence/lean.
+    "controlled": dict(stride=20, knee=50, arm=26, elbow=56, lean=12, air=0.0,
+                       carry=0.0, guard=0.0, bounce=0.06),
+}
+
+
+def archetype_loco(archetype: str):
+    """Return a loco() motion function for the named archetype (Phase 1.3)."""
+    p = ARCHETYPE_PRESETS[archetype]
+    return loco(p["stride"], p["knee"], p["arm"], p["elbow"], p["lean"],
+                p["air"], p["carry"], p["guard"], p["bounce"])
+
+
+# ---------------------------------------------------------------------------
+# Phase 1.4 directional locomotion: strafe (sideways), backpedal (backwards)
+# and jockey (defensive shuffle).  These are in-place loops; the match engine
+# moves the root, the clip provides the leg/arm pattern.  Built from loco()
+# with guard/carry offsets so the body faces one way while travelling
+# another — the core of the blend-space directional set.
+# ---------------------------------------------------------------------------
+
+def _strafe(side: int):
+    """Sideways shuffle: body faces forward, feet step laterally."""
+    def f(t: float):
+        p = loco(12, 54, 34, 66, 6, 0.0, 0.0, 0.0, 0.05)(t)
+        s = math.sin(2 * math.pi * t)
+        # Lateral weight shift + arms out for balance.
+        p.update(hips=(4, side * 6 * s, side * 4), chest=(2, side * 4 * s, 0),
+                 arm_L=(30, 44, 0), arm_R=(30, 44, 0), elbow_L=58, elbow_R=58)
+        return p
+    return f
+
+
+def _backpedal(t: float):
+    """Backwards run: high knees, upright, arms pumping in reverse."""
+    p = loco(16, 56, 30, 60, -4, 0.0, 0.0, 0.0, 0.05)(t)
+    p.update(hips=(-6, 0, 0), chest=(-4, 0, 0), neck=(8, 0, 0))
+    return p
+
+
+def _jockey(t: float):
+    """Defensive jockey: low, wide stance, short choppy steps, arms ready."""
+    s = math.sin(2 * math.pi * t)
+    p = P(CROUCH)
+    p.update(
+        hips=(18, 0, side_sign(s) * 4), spine=(8, 0, 0), chest=(4, 0, 0),
+        neck=(-12, 0, 0),
+        leg_L=(38, 14, 0), leg_R=(38, -14, 0), knee_L=96, knee_R=96,
+        arm_L=(52, 30, 0), arm_R=(52, 30, 0), elbow_L=70, elbow_R=70,
+        flat=1.0,
+    )
+    return p
+
+
+def side_sign(x: float) -> int:
+    return 1 if x >= 0 else -1
+
+
 CUSTOM = {
     "soccer_idle_ready": dict(category="Soccer", desc="athletic ready stance", loop=True,
                               func=idle_func(P(READY, knee_L=30, knee_R=28), 0.8)),
@@ -73,6 +146,15 @@ CUSTOM = {
                            func=_dribble),
     "soccer_shield": dict(category="Ball", desc="shield the ball with the body", loop=True,
                           func=_shield),
+    # Phase 1.4 directional locomotion set.
+    "soccer_strafe_l": dict(category="Locomotion", desc="strafe left", loop=True,
+                            func=_strafe(-1)),
+    "soccer_strafe_r": dict(category="Locomotion", desc="strafe right", loop=True,
+                            func=_strafe(1)),
+    "soccer_backpedal": dict(category="Locomotion", desc="backpedal", loop=True,
+                             func=_backpedal),
+    "soccer_jockey": dict(category="Defence", desc="defensive jockey", loop=True,
+                          func=_jockey),
     "soccer_volley": dict(category="Ball", desc="first-time volley", loop=False, keys=K(
         (0.0, P(READY, ball=("world", 0, 0.55, 0.45))),
         (0.25, P(READY, hips=(-8, 0, 0), leg_R=(-52, 6, 0), knee_R=95,
@@ -210,6 +292,10 @@ CLIP_SPECS = [
     ("soccer_free_kick", "shoot_goal", False, "Restart", "free kick"),
     ("soccer_penalty_kick", "shoot_goal", False, "Restart", "penalty"),
     ("soccer_goal_kick", "high_kick_pass", False, "Restart", "goal kick"),
+    ("soccer_strafe_l", None, True, "Locomotion", "strafe left"),
+    ("soccer_strafe_r", None, True, "Locomotion", "strafe right"),
+    ("soccer_backpedal", None, True, "Locomotion", "backpedal"),
+    ("soccer_jockey", None, True, "Defence", "defensive jockey"),
     ("soccer_sidestep", "sidestep", False, "Locomotion", "sidestep"),
     ("soccer_juke_feint", "juke_feint", False, "Locomotion", "feint"),
     ("soccer_stop", "stop", False, "Locomotion", "stop"),
@@ -292,6 +378,11 @@ ACTION_ALIASES = {
     "penalty_kick": "soccer_penalty_kick",
     "goal_kick": "soccer_goal_kick",
     "sidestep": "soccer_sidestep",
+    "strafe_l": "soccer_strafe_l",
+    "strafe_r": "soccer_strafe_r",
+    "strafe": "soccer_sidestep",
+    "backpedal": "soccer_backpedal",
+    "jockey": "soccer_jockey",
     "juke_feint": "soccer_juke_feint",
     "stop": "soccer_stop",
     "turn": "soccer_turn",
@@ -339,6 +430,10 @@ CLIP_EVENTS = {
     "soccer_run_ball": _ev(footsteps=_LOCO_STEPS),
     "soccer_dribble": _ev(footsteps=_LOCO_STEPS),
     "soccer_shield": _ev(),
+    "soccer_strafe_l": _ev(footsteps=_LOCO_STEPS),
+    "soccer_strafe_r": _ev(footsteps=_LOCO_STEPS),
+    "soccer_backpedal": _ev(footsteps=_LOCO_STEPS),
+    "soccer_jockey": _ev(footsteps=_LOCO_STEPS),
     "soccer_short_pass": _ev(ball_contact=0.50),
     "soccer_long_pass": _ev(ball_contact=0.50),
     "soccer_through_ball": _ev(ball_contact=0.50),

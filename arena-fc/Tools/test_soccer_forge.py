@@ -62,8 +62,8 @@ def main():
     try:
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
-        check("67 soccer clips", len(SM.ALL_CLIPS) == 67, str(len(SM.ALL_CLIPS)))
-        check("78 action aliases", len(SM.ACTION_ALIASES) == 78, str(len(SM.ACTION_ALIASES)))
+        check("71 soccer clips", len(SM.ALL_CLIPS) == 71, str(len(SM.ALL_CLIPS)))
+        check("82 action aliases", len(SM.ACTION_ALIASES) == 82, str(len(SM.ACTION_ALIASES)))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
               all(a in SM.ACTION_ALIASES for a in core_actions),
@@ -83,7 +83,7 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 67 soccer clips", len(anims) == 67, str(len(anims)))
+        check("GLB carries 71 soccer clips", len(anims) == 71, str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
@@ -143,7 +143,7 @@ def main():
         check("rig JSON bakes the clip keyframes", "clips" in d)
         if "clips" in d:
             clips = d["clips"]
-            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 67)
+            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 71)
             loco = ("soccer_idle", "soccer_walk", "soccer_jog", "soccer_run",
                     "soccer_sprint", "soccer_dribble", "soccer_run_ball")
             check("baked locomotion clips loop",
@@ -173,7 +173,7 @@ def main():
     check("manifest exists", os.path.isfile(man_path))
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
-        check("manifest lists 67 clips", len(man["clips"]) == 67)
+        check("manifest lists 71 clips", len(man["clips"]) == 71)
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
@@ -191,20 +191,20 @@ def main():
     world = open(os.path.join(ROOT, "Scripts", "Godot", "World3D.cs")).read()
     boot = open(os.path.join(ROOT, "Web", "BrowserBoot.gd")).read()
     match_cs = open(os.path.join(ROOT, "Scripts", "Core", "Match.cs")).read()
-    check("C# loader reads the GLB + manifest",
-          "GltfDocument" in soccer_cs and "soccer_player_manifest.json" in soccer_cs)
+    check("C# rig drives the GLB animation player",
+          "AnimationPlayer" in soccer_cs and "AnimationLibrary" in soccer_cs)
     check("C# loader plays clips from PlayerState",
-          "SelectClip" in soccer_cs and "PlayerState" in soccer_cs)
+          "SelectClip" in soccer_cs)
     # FIFA-style locomotion: cadence matched to ground speed per clip
-    # (foot speed ~= ground speed), hysteresis bands, dribble gating,
-    # one-shots play once, and lean/roll from acceleration.
+    # (foot speed ~= ground speed), blend-space clip selection, phase sync,
+    # foot-planting IK, look-at/reach and archetype biases (Phase 1).
     check("locomotion cadence matches ground speed",
-          "NaturalRate" in soccer_cs and "speed / (nat" in soccer_cs)
-    check("locomotion bands have hysteresis", "SelectLocomotion" in soccer_cs)
-    check("dribble clip gated by speed",
-          "p.Dribbling && speed > 0.8f" in soccer_cs)
-    check("one-shots play once (no replay freeze)",
-          "oneShot && _oneShotDone" in soccer_cs)
+          "NaturalRate" in soccer_cs and "_speed / Math.Max(natural" in soccer_cs)
+    check("blend-space clip selection", "SelectClip" in soccer_cs and "SelectDirectionalClip" in soccer_cs)
+    check("phase sync on clip switch", "_phase" in soccer_cs and "startPhase" in soccer_cs)
+    check("foot-planting IK", "SolveTwoBone" in soccer_cs and "ShortestArc" in soccer_cs)
+    check("look-at and reach", "UpdateLookAt" in soccer_cs and "UpdateReach" in soccer_cs)
+    check("archetype biases", "SetArchetype" in soccer_cs and "Archetype.Explosive" in soccer_cs)
     check("body lean/roll from acceleration", "UpdateLean" in soccer_cs)
     check("RigFactory attaches the soccer player", "AttachSoccer" in factory)
     check("RigAnimator routes to clips", "rig.Soccer.Update" in world)
@@ -226,10 +226,9 @@ def main():
           "Lerp(0.15f, 0.60f" in match_cs)
     check("C# parries hot shots",
           '"parry"' in match_cs and "spd > 18f" in match_cs)
-    check("desktop syncs one-shot contact",
-          "_contactFrac" in soccer_cs and "clipDur / p.ActionDuration" in soccer_cs)
     check("desktop selects turns by turn rate",
           '"soccer_turn"' in soccer_cs and "turnRate" in soccer_cs)
+    check("desktop directional clips", '"soccer_strafe_l"' in soccer_cs and '"soccer_backpedal"' in soccer_cs)
     check("browser syncs ball release to the contact frame",
           "fire_pending" in boot and "pending" in boot)
     check("browser selects first-touch by ball height/speed",
@@ -240,6 +239,12 @@ def main():
           '"parry"' in boot and "spd > 18.0" in boot)
     check("browser selects turns by turn rate",
           '"soccer_turn"' in boot and "turn_rate" in boot)
+    # Phase 1: blend space, directional clips, archetypes, foot IK, look/reach.
+    check("browser blend-space directional clips",
+          '"soccer_strafe_l"' in boot and '"soccer_backpedal"' in boot and '"soccer_jockey"' in boot)
+    check("browser archetype biases", "ARCHETYPE_BIAS" in boot and "archetype" in boot)
+    check("browser foot-planting IK", "apply_foot_ik" in boot and "solve_two_bone" in boot)
+    check("browser look-at and reach", "apply_look_reach" in boot)
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))

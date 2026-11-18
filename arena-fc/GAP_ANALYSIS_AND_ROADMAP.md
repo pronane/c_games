@@ -372,7 +372,16 @@ The clip's `ball_contact` frame comes from `game_packs/soccer.json` events (alre
 | 1.5 | Look-at + reach polish | `SoccerClipRig.cs`, `BrowserBoot.gd` |
 | 1.6 | Phase sync on clip switch (no foot pop) | `SoccerClipRig.cs`, `BrowserBoot.gd` |
 
-**Exit criteria:** 90° cuts, strafes and traps look planted; three archetypes visibly distinct; `test_soccer_forge.py` + blend/IK checks.
+**Status: DONE (2026-11-18).** All six items implemented on `arena/a7fc5fee-c-games` (C# core + desktop `SoccerClipRig.cs` + browser `BrowserBoot.gd` kept in lock-step):
+
+- **1.1** — Blend space replaces `SelectClip`: `SoccerClipRig.SelectClip(speed, turnRate, hasBall)` maps (speed, turnRate, ballState) → clip; `SelectDirectionalClip(speed, headingOffset, hasBall)` adds heading-based selection. GDScript `clip_select_locomotion` mirrors this with heading-offset computation from velocity vs facing.
+- **1.2** — Two-bone analytic IK ported from `footlock._ik`: `SolveTwoBone` (C#) / `solve_two_bone` (GDScript) use law-of-cosines + pole vector + shortest-arc quaternion. Only corrects feet near the ground plane (planted phase), leaving swing-phase feet to the clip.
+- **1.3** — `Archetype` enum (Controlled/Explosive/Lengthy) on `CharacterSpec`; `Teams.CreateRoster` assigns by role/pace/height; `ARCHETYPE_PRESETS` in `soccer_motions.py` define `loco()` params per archetype; runtime biases (lean/cadence/stride/roll) applied in both C# (`SetArchetype`) and GDScript (`ARCHETYPE_BIAS`).
+- **1.4** — Four new directional clips: `soccer_strafe_l`, `soccer_strafe_r`, `soccer_backpedal`, `soccer_jockey` (71 clips total, 82 aliases). Built from `loco()` with lateral weight shift / reverse lean / low wide stance.
+- **1.5** — Head look-at (neck+head yaw/pitch toward ball, clamped) and arm reach (extends toward nearby ball for traps/receives) in both C# (`UpdateLookAt`/`UpdateReach`/`ApplyLookAndReach`) and GDScript (`apply_look_reach`).
+- **1.6** — Phase sync: on clip switch, the new clip starts at the current cycle phase (`startPhase`) so feet don't pop. Both C# and GDScript track `_phase`/`clip_t` continuously.
+
+**Exit criteria:** 90° cuts, strafes and traps look planted (IK + phase sync); three archetypes visibly distinct (stride/cadence/lean biases); `test_soccer_forge.py` 74/0 + `test_pads.py` 129/0 + `gdparse` clean.
 
 ### Phase 2 — Gameplay depth (3–4 weeks)
 
