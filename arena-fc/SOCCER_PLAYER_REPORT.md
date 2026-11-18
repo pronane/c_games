@@ -37,10 +37,20 @@ soccer move.
 - **Desktop (C#)** — `Scripts/Godot/SoccerClipRig.cs` loads the GLB with
   `GltfDocument`, sets loop modes from the manifest, and plays clips from
   `PlayerState`: one-shots (`kick`, `tackle`, `slide`, `dive`, `catch`,
-  `foul`, `celebrate`) while their `ActionTimer` runs, otherwise locomotion
-  by speed (`idle` / `walk` / `run` / `sprint`), `dribble` / `shield` when
-  close-controlling, `keeper_ready` for keepers. `RigFactory` attaches it
-  (editor/self-test stay procedural); `RigAnimator.Pose` routes to it.
+  `foul`, `celebrate`) play once while their `ActionTimer` runs, otherwise
+  locomotion by speed (`idle` / `walk` / `jog` / `run` / `sprint`),
+  `dribble` / `shield` when close-controlling, `keeper_ready` for keepers.
+  `RigFactory` attaches it (editor/self-test stay procedural);
+  `RigAnimator.Pose` routes to it.
+- **Locomotion (FIFA-style)** — cadence is matched to ground speed per clip:
+  each clip's foot travel per 1 s cycle was measured from the GLB
+  (walk 0.74 m, jog/run 1.01 m, sprint 1.22 m, dribble 0.60 m) and
+  `SpeedScale = speed / natural rate` (clamped, smoothed) keeps foot speed
+  ~= ground speed, so players no longer run on the spot or slide backwards.
+  Bands have hysteresis (no threshold flicker), the dribble clip only plays
+  while moving, one-shots never replay, and the body leans forward with
+  speed/acceleration and rolls into turns. Each player has a stable style
+  (stride ±7%, lean variation) seeded from their spec.
 - **Browser (GDScript)** — `BrowserBoot` loads `Data/soccer_rig.json` first
   (same 18-bone schema), so the sculpted mesh is used with the existing
   procedural gait. The WASM template has no glTF module, so the GLB itself
@@ -51,8 +61,8 @@ soccer move.
 | Check | Result |
 | --- | --- |
 | `Tools/build_soccer_player.py` | 122 shapes → 16,000 tris, 67 clips retargeted, GLB 3.1 MB, JSON 1.2 MB |
-| `Tools/test_soccer_forge.py` (full, with Sprite Forge venv) | **32 passed, 0 failed** |
-| `Tools/test_soccer_forge.py` (system python, stdlib only) | **27 passed, 0 failed** (motion section skips) |
+| `Tools/test_soccer_forge.py` (full, with Sprite Forge venv) | **41 passed, 0 failed** |
+| `Tools/test_soccer_forge.py` (system python, stdlib only) | **36 passed, 0 failed** (motion section skips) |
 | `Tools/test_pads.py` regression | **129 passed, 0 failed** |
 | `gdparse` (BrowserBoot) + tree-sitter C# (3 changed files) | clean |
 | WASM preview rebuilt + served | 35 staged files incl. `soccer_rig.json`; `/`, `godot.mjs`, `godot.wasm`, manifest all HTTP 200 |
