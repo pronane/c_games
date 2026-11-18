@@ -74,17 +74,15 @@ public partial class MatchView : Node3D
         {
             Name = name,
             Text = text,
-            FontSize = 44,
-            PixelSize = .010f,
-            OutlineSize = 10,
+            FontSize = 16,
+            PixelSize = .004f,
+            OutlineSize = 4,
             Modulate = color,
             DoubleSided = true,
         };
-        // String property names avoid depending on generated C# enum spellings
-        // for billboard / draw flags, while keeping the labels readable and on top.
+        // Billboard so labels face the camera. No fixed_size/no_depth_test —
+        // those made labels render huge and on top of everything.
         l.Set("billboard", 1);
-        l.Set("no_depth_test", true);
-        l.Set("fixed_size", true);
         l.Set("outline_modulate", new Color(0f, 0f, 0f, .92f));
         return l;
     }
@@ -303,7 +301,7 @@ public partial class MatchView : Node3D
                 ? $"YOU · BALL · {o.Spec.DisplayName}"
                 : $"BALL · {o.Spec.DisplayName}");
             OwnerName.Modulate = owner == ctrl ? new Color(.2f, 1f, .55f) : new Color(1f, .72f, .18f);
-            OwnerName.Position = new Vector3(o.Pos.X, 3.15f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
+            OwnerName.Position = new Vector3(o.Pos.X, 2.2f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
         }
         OwnerName.Visible = hasOwner;
         BallName.Visible = !hasOwner;
@@ -324,7 +322,7 @@ public partial class MatchView : Node3D
             if (ControlName.Visible)
             {
                 SetText(ControlName, $"YOU · {c.Spec.DisplayName}");
-                ControlName.Position = new Vector3(c.Pos.X, 3.15f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
+                ControlName.Position = new Vector3(c.Pos.X, 2.2f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
             }
 
             // Nearest opponent to the ball: a blue ring + OPP tag makes the
