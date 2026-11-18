@@ -772,7 +772,7 @@ func try_tackle(tackler: int, victim: int, sliding := false) -> void:
 		return
 	# Jockey bonus: staying goal-side improves the chance.
 	var jockey_bonus: float = 0.06 if int(t.get("jockey", 0)) >= 1 else 0.0
-	var base_chance: float = 0.55 + jockey_bonus
+	var base_chance: float = 0.75 + jockey_bonus
 	if rng.randf() > base_chance:
 		return  # missed tackle (less automatic)
 	ball["owner"] = tackler
@@ -877,11 +877,11 @@ func keeper_saves() -> void:
 			continue
 		var spd: float = ball["vel"].length()
 		# Phase 2.6: punch vs catch vs parry by ball height/speed.
-		# High balls are punched, fast balls parried, slow balls caught.
+		# Very high balls are punched, fast balls parried, slow balls caught.
 		var ball_h: float = ball["pos"].y
 		var diving: bool = str(k["action"]) == "dive"
-		if ball_h > 1.8 and spd > 8.0:
-			# Punch clear (high ball).
+		if ball_h > 2.2 and spd > 12.0:
+			# Punch clear (very high ball).
 			ball["vel"] = Vector3(-sign * spd * 0.4, 5.0, rng.randf_range(-4.0, 4.0))
 			set_action(k, "punch", 0.50, 0.25)
 			say("Punched clear!")
