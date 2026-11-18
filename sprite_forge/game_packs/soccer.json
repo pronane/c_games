@@ -227,5 +227,138 @@
    "desc": ""
   }
  ],
- "notes": "There is no header clip in the starter. header plays the jump clip and the game uses ball_contact. A recorded header (forge.py motion record) replaces it when that move is in the default set."
+ "notes": "There is no header clip in the starter. header plays the jump clip and the game uses ball_contact. A recorded header (forge.py motion record) replaces it when that move is in the default set.",
+ "version": 2,
+ "v2_moves": [
+  {
+   "name": "dribble_touch",
+   "library": "dribble",
+   "frames": 6,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 2,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [1, 4]
+   },
+   "desc": "close-control dribble touch"
+  },
+  {
+   "name": "first_touch_trap",
+   "library": "trap",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "kill a rolling ball under the boot"
+  },
+  {
+   "name": "chest_control",
+   "library": "chest",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "cushion an aerial ball on the chest"
+  },
+  {
+   "name": "keeper_parry",
+   "library": "save",
+   "prefer": ["keeper_parry", "gk_save"],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "parry a hot shot away"
+  },
+  {
+   "name": "keeper_rush",
+   "library": "run",
+   "prefer": ["keeper_rush", "sprint"],
+   "frames": 6,
+   "fps": 14,
+   "loop": true,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [1, 4]
+   },
+   "desc": "rush out for a 1v1"
+  },
+  {
+   "name": "skill_elastico",
+   "library": "juke",
+   "prefer": ["elastico", "juke_feint"],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [4]
+   },
+   "desc": "elastico skill move"
+  },
+  {
+   "name": "skill_rainbow",
+   "library": "flick",
+   "prefer": ["rainbow_flick", "toe_lift"],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "rainbow flick over a defender"
+  }
+ ]
 }

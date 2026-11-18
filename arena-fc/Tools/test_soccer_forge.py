@@ -270,6 +270,8 @@ def main():
     check("ball shader has spin blur", "spin_blur" in open(os.path.join(ROOT, "Shaders", "ball.gdshader")).read())
     check("net shader has ripple", "ripple" in open(os.path.join(ROOT, "Shaders", "net.gdshader")).read())
     check("audio has crowd ambience", "ambience" in open(os.path.join(ROOT, "Scripts", "Core", "Audio", "ProceduralAudio.gd")).read())
+    # Phase 3.9: ML blend weights.
+    check("C# blend learner", "BlendLearner" in open(os.path.join(ROOT, "Scripts", "Core", "BlendLearner.cs")).read())
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))
