@@ -160,6 +160,10 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
         from . import capture_face as CFA
         sl0 = dict(f.sl)
         finfo = CFA.fit_face(f, train, log=log)
+        # v11.15: the head's length from the side-on frames (the face fit sees it mostly from the front)
+        hdinfo = CFA.fit_head_depth(f, train, log=log)
+        if finfo is not None and hdinfo:
+            finfo["head_depth"] = hdinfo
         if finfo:
             corr = f.face["corr"]
             sl1 = dict(f.sl); f.sl = sl0

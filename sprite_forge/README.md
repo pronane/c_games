@@ -54,6 +54,45 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.15: the face joins the head - no "transplanted" face from the side
+
+The face is painted almost from one frame, so its eyes don't double. The sides of the head are blended from many
+frames. Switched at a hard line, the face kept its frame's own light and white balance, and from the side it
+looked set into the head: a seam ran from the temple to the jaw (Mike, Tmon).
+
+* **Gradual blend (`capture_texture.face_weight`).** How much a texel is "face" now rises gradually: 0..1 as the
+  head turns forward, and fading out towards the crown. The face's single-frame weighting, its colour gain and the
+  rule that keeps guessed head turns off the face all follow that gradual weight. `SF_FACE_FEATHER=0` gives the
+  old hard line.
+* **Colours meet halfway (`capture_texture.face_join`).** Along the face's edge, the colour difference between
+  face and head is measured and smoothed over 2 cm. The face and the sides each take half of it at the edge,
+  fading to nothing 3.5 cm away. The middle of the face, the back of the head and fine detail (eyes, stubble)
+  don't change. `SF_FACE_JOIN=0` switches it off.
+* **The head's length from the side (`capture_face.fit_head_depth`).**
+  - The face fit sees the head mostly from the front, so it left the head's length at MakeHuman's average. For
+    most people that is too long: the cheek between the ear and the nose looked stretched.
+  - In the side-on frames (70-110 degrees round), the width of the person's silhouette along the row through the
+    nose is compared with the fitted body drawn through the same camera. `head_depth` is then set to match.
+  - It only ever shortens, by up to 15% (the slider itself gives about 7%), because the video's silhouette
+    includes the hair.
+  - It changes nothing if there are fewer than 4 side-on frames or they disagree.
+  - Sample captures:
+    - Mike: x1.12 too long; changed head_depth 0 -> -1 (nose to back 22.8 -> 21.2 cm).
+    - PR: x1.14 too long; changed head_depth 0 -> -1.
+    - Declan: x1.05 too long; changed head_depth 0.05 -> -0.59.
+    - Tmon: frames disagree; left alone.
+  - `SF_HEAD_DEPTH=0` switches it off.
+* **Tests: `tools/test_head_look.py` checks 12-21.**
+  - No step anywhere in the face weight.
+  - A pale face set into a warm head: the edge step more than halves.
+  - The face middle and back unchanged.
+  - Detail kept.
+  - A matching face is left alone.
+  - The head length: the silhouette row through the nose is measured; a long head is shortened; one shorter than
+    the video's is left alone; disagreeing or too few frames are left alone.
+* **Still left on the heads:** a shirt collar reaching up under the jaw (white under Mike's chin when his layers
+  are rebuilt), the hairline's hard steps, and Tmon's face colour from his mixed lamp and window light.
+
 ## New in v11.14: no more tiled heads - the hair shell's texture map
 
 * **The cause.** The hair shell's texture map was a straight top-down view of the head.
