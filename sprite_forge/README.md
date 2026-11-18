@@ -54,6 +54,40 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.17: white balance from a neutral garment; the face's colour matched to the skin
+
+* **The problem.** A video's colour is the room's light as much as the clothes'. Tmon's video has lamps and a
+  window, and the phone's white balance swings between them: his hoodie is blue-grey by the window and
+  orange-brown under the lamps. Most frames are lamp-lit, so the model came out brown.
+  - Taking out the frames' bias doesn't help. The blend already gives every frame about the same say (it leant by
+    1-3%). The colour is what the video shows.
+  - Automatic white balance can't tell a warm room from a warm jumper. On these videos, grey-world and grey-edge
+    disagree, so the person has to say.
+* **`forge.py capture VIDEO --neutral upper|lower|shoes`.** Name a garment that is white, grey or black. The
+  exported texture is white-balanced so that garment comes out neutral, with its lightness kept and everything
+  else corrected the same way.
+  - `capture_texture.neutral_gain` / `white_balance`.
+  - Blown-out and black texels (a print, a shadow) don't steer it.
+  - Under 200 texels of the garment seen: nothing is changed.
+  - The held-out check and the lighting file still use the texture as filmed.
+* **The face's colour matched to the person's other skin (`capture_texture.face_to_skin`).**
+  - The face is painted from the frames that saw it front-on, often under a different light from the ones that
+    saw the neck and hands.
+  - Its colour (a, b, not its lightness) moves 80% of the way to the median of the person's other skin, weighted
+    by how much each texel is face, at most 15.
+  - A step under 3 is left. `SF_FACE_SKIN=0` switches it off.
+  - On the sample captures the step is small (3-4).
+* **`tools/test_white_balance.py`**: 8 checks, no assets:
+  - the named garment comes out grey with its lightness kept, and the other parts are corrected the same way;
+  - lower and shoes work, and an unknown part is refused;
+  - too little seen: nothing changes;
+  - a white print doesn't steer it;
+  - a cool face moves to the skin's colour with its lightness kept; the move follows the face weight; a matching
+    face is left alone; a huge step is capped.
+* **Tmon.** His face's frames and his neck and hands' frames both come out grey-pale, because his video is dim
+  and mixed. White-balancing to any of his garments makes him cooler, not warmer. The footage limits him; a
+  close-up face photo in even daylight (`--face-photo`) or a re-film in even light would do more.
+
 ## New in v11.16: no white band under the chin; the collar stays below the jaw
 
 * **The white band under the jaw (Mike).** The video sees his white shirt collar past the chin. Each frame's

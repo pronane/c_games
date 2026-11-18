@@ -87,7 +87,8 @@ def turntable(P, F, fuv, tex, path, yaws=(0, 45, 90, 135, 180, 225, 270, 315), s
 
 
 def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0, tex_res=1024, track_dir=None,
-        fit_iters=3, gender=None, log=print, layers=True, face=True, delight=True, face_photo=None, register=True):
+        fit_iters=3, gender=None, log=print, layers=True, face=True, delight=True, face_photo=None, register=True,
+        neutral=None):
     t0 = time.time()
     d = os.path.join(out_root, name)
     os.makedirs(d, exist_ok=True)
@@ -106,7 +107,7 @@ def run(video=None, name="captured", out_root="captures", height_m=1.75, fps=4.0
                      fit=dict(iou=res["iou"], iou_start=res["iou_start"], frames=len(res["iou_frames"]))),
                 open(os.path.join(d, "fit.pkl"), "wb"))
     rep = finish(d, name, height_m, tex_res, log=log, fitter=f, layers=layers, face=face, delight=delight,
-                 face_photo=face_photo, register=register)
+                 face_photo=face_photo, register=register, neutral=neutral)
     rep["video"] = os.path.basename(video) if video else None
     rep["seconds"] = round(time.time() - t0)
     json.dump(rep, open(os.path.join(d, "out", "report.json"), "w"), indent=1)
@@ -130,7 +131,7 @@ def _save_pairs(f, frames, renders, out_dir):
 
 
 def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=True, out_name="out", face=True,
-           delight=True, face_photo=None, register=True):
+           delight=True, face_photo=None, register=True, neutral=None):
     """cameras for every usable frame, texture (checked on held-out frames), exports. Re-runnable from fit.pkl
     (`forge.py capture --rebuild NAME`) when the texture or export code improves - no refit needed."""
     import cv2
@@ -216,6 +217,19 @@ def finish(d, name, height_m=None, tex_res=1024, log=print, fitter=None, layers=
         tex, st["face_photo"] = CFA.paint_photo(f, tex, mesh, face_photo, log=log)
         if lit is not None:
             lit, _ = CFA.paint_photo(f, lit, mesh, face_photo, log=lambda *a: None)
+    if neutral:
+        # v11.17: white balance from a garment the user says is neutral (white, grey or black)
+        if mesh is not None:
+            Fw, uvw, layw, Jw = mesh[0].F, mesh[0].fuv, mesh[0].layer, mesh[0].J
+        else:
+            Fw, uvw, layw, Jw = f.bm.F, f.bm.fuv, np.zeros(len(f.bm.V), int), f.bm.J
+        g_, st["white_balance"] = CT.neutral_gain(tex, Fw, uvw, layw, Jw, f.bm.bi, neutral)
+        if st["white_balance"].get("applied"):
+            tex = CT.white_balance(tex, g_)
+            log("capture: white balance from the %s garment (neutral): R/G/B x%.2f/%.2f/%.2f" % ((neutral,) + tuple(g_)))
+        else:
+            log("capture: --neutral %s: too little of that garment seen (%d texels) - colour kept as filmed" % (
+                neutral, st["white_balance"]["texels"]))
     outd = os.path.join(d, out_name)
     os.makedirs(outd, exist_ok=True)
     sh = f.bm.shape(f.mac, f.sl, height_m)
@@ -289,12 +303,15 @@ def main(argv):
                     help="leave the room's light in the texture (default: divided out; see NAME_lighting.json)")
     ap.add_argument("--no-register", action="store_true",
                     help="keep the landmark cameras (default: each frame's camera is moved to where its picture says)")
+    ap.add_argument("--neutral", choices=["upper", "lower", "shoes"],
+                    help="this garment is white, grey or black: white-balance the capture so it comes out neutral "
+                         "(a video under lamps or a window has their colour in everything)")
     ap.add_argument("--rebuild", action="store_true", help="redo texture + exports of an existing capture (OUT/NAME) from its fit")
     a = ap.parse_args(argv)
     if a.rebuild:
         finish(os.path.join(a.out, a.name), a.name, a.height_cm / 100.0 if a.height_cm != 175.0 else None, a.texture,
                layers=not a.no_layers, face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo,
-               register=not a.no_register)
+               register=not a.no_register, neutral=a.neutral)
         return 0
     if a.setup:
         CTR.setup(); return 0
@@ -306,5 +323,6 @@ def main(argv):
         CPH.run_photo(a.video, a.name, a.out, a.height_cm / 100.0, a.texture, gender=g)
         return 0
     run(a.video, a.name, a.out, a.height_cm / 100.0, a.fps, a.texture, gender=g, layers=not a.no_layers,
-        face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo, register=not a.no_register)
+        face=not a.no_face, delight=not a.keep_light, face_photo=a.face_photo, register=not a.no_register,
+        neutral=a.neutral)
     return 0
