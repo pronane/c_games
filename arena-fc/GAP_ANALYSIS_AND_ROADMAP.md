@@ -397,7 +397,19 @@ The clip's `ball_contact` frame comes from `game_packs/soccer.json` events (alre
 | 2.8 | Set pieces: FK aim + curve, corner routines, throw movement, near/post assignments | `Match.cs:Restart`, `SetPieceAim.gd` |
 | 2.9 | Authentic/Competitive presets (FC 26-style + eFootball measured tempo): `MatchOptions.Preset` scales pace, tackle accuracy, weather, stamina effect | `Match.cs`, `GameApp.cs` |
 
-**Exit criteria:** dribbling, first touch and tackling feel skill-based; keeper angles visibly better; presets feel distinct.
+**Status: DONE (2026-11-18).** All nine items implemented on `arena/372cddec-c-games` (C# core + browser `BrowserBoot.gd` kept in lock-step):
+
+- **2.1** — First-touch quality (`FirstTouchQuality`) computed from pressure (nearest opponent), stamina, skill and preset. Low quality (<0.45) = heavy touch: ball knocks away (knock-on) instead of being collected. Both C# and GDScript.
+- **2.2** — Dribble system: touch interval (0.28s sprint / 0.45s jog), momentum-limited turns (turn cost by velocity alignment, archetype-biased), explosive bursts (FC-style acceleration spike on sprint, costs stamina). Both C# and GDScript.
+- **2.3** — Pass types: Driven (short, low), Lofted (long, high), Threaded (through ball), Chip (short lob). Curve via ball spin (Magnus effect). Attribute-driven (Passing skill). Both C# and GDScript.
+- **2.4** — Shot types: Power (high charge), Placement (low charge, corners, more accurate), Control (mid charge), Volley (first-time aerial, Dynamic Volley). Both C# and GDScript.
+- **2.5** — Defending: jockey/contain state (second/third pressers stay goal-side), timing meter (lower base chance, positioning matters more), shoulder charge (powered close tackle), less-automatic tackles (eFootball v5.4). Both C# and GDScript.
+- **2.6** — Keeper AI: angle-cutting (position on ball→goal line), rush (charge loose balls in 1v1), punch vs catch vs parry (by ball height/speed). Both C# and GDScript.
+- **2.7** — Off-ball AI: overlap (forwards run beyond carrier), underlap (defenders run inside), decoy (pull markers), third-man (midfielders run into space). Both C# and GDScript.
+- **2.8** — Set pieces: corner routines (near-post/far-post runners), throw-in runs (midfielders make space). Both C# (Restart) and GDScript (restart_with).
+- **2.9** — Authentic/Competitive presets: `MatchPreset` enum on `MatchOptions`. Authentic = slower pace (0.94×), lower tackle accuracy (0.88×), lower first-touch quality (0.92×). Competitive = faster (1.03×), more forgiving. Both C# and GDScript.
+
+**Exit criteria:** dribbling, first touch and tackling feel skill-based (momentum, quality, timing); keeper angles visibly better (angle-cutting + rush); presets feel distinct (pace/tackle/touch scaling); `test_soccer_forge.py` 88/0 + `test_pads.py` 129/0 + `gdparse` clean.
 
 ### Phase 3 — Presentation and platform (4+ weeks, parallelisable)
 

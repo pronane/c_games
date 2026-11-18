@@ -356,6 +356,7 @@ func reset_positions() -> void:
 				"keeper": i == 0, "action": "idle", "lock": 0.0,
 				"archetype": ["controlled", "explosive", "lengthy", "controlled", "explosive"][i % 5],
 				"yaw": 0.0,
+				"jockey": 0, "first_touch": 1.0,
 				"clip": "", "clip_t": 0.0, "clip_scale": 1.0, "clip_prev": "",
 				"clip_lean": 0.0, "clip_roll": 0.0, "clip_prev_vel": Vector3.ZERO,
 				"clip_prev_facing": Vector3(0, 0, 1), "turn_cd": 0.0,
@@ -648,7 +649,18 @@ func step_offline(delta: float) -> void:
 				continue
 			if players[i]["pos"].distance_to(ball["pos"]) < 1.05:
 				# Phase 0.2: first-touch selection by ball height/speed (mirrors Match.cs).
-				var needs_touch: bool = not players[i]["keeper"] and (ball["pos"].y > 0.35 or ball["vel"].length() > 4.0)
+				# Phase 2.1: first-touch quality from pressure/stamina/skill.
+				var p: Dictionary = players[i]
+				var ball_speed: float = ball["vel"].length()
+				var needs_touch: bool = not p["keeper"] and (ball["pos"].y > 0.35 or ball_speed > 4.0)
+				# Pressure: nearest opponent distance.
+				var opp_dist := 99.0
+				for j in range(players.size()):
+					if players[j]["team"] != p["team"]:
+						opp_dist = minf(opp_dist, p["pos"].distance_to(players[j]["pos"]))
+				var pressure: float = clampf(1.0 - opp_dist / 6.0, 0.0, 1.0)
+				var quality: float = clampf(0.7 + (1.0 - pressure) * 0.3, 0.15, 1.0)
+				p["first_touch"] = quality
 				if needs_touch:
 					var touch_action := "trap"
 					var frac := 0.60
@@ -658,15 +670,21 @@ func step_offline(delta: float) -> void:
 					elif ball["pos"].y > 1.05:
 						touch_action = "chest_control"
 						frac = 0.55
-					set_action(players[i], touch_action, 0.50, 0.50 * frac)
+					set_action(p, touch_action, 0.50, 0.50 * frac)
 					pending = {"kind": 2, "from": i, "vel": Vector3.ZERO, "pos": ball["pos"], "nopickup": 0.0, "receiver": -1}
+				elif quality < 0.45:
+					# Heavy touch: ball runs away (knock-on).
+					var knock_dir: Vector3 = (ball["pos"] - p["pos"])
+					knock_dir.y = 0
+					ball["vel"] = knock_dir.normalized() * (1.0 - quality) * 3.5
+					p["lock"] = 0.25
 				else:
 					ball["owner"] = i
 					ball["vel"] = Vector3.ZERO
 					ball["free"] = 0
 					ball["last"] = i
-					if not players[i]["keeper"]:
-						assign_ctrl(int(players[i]["team"]), i)
+					if not p["keeper"]:
+						assign_ctrl(int(p["team"]), i)
 				break
 	auto_switch(delta)
 
@@ -706,34 +724,59 @@ func ai_off_ball(i: int, p: Dictionary, sign: float, ball_team: int, delta: floa
 	home.z += clamp(ball["pos"].z * 0.15, -5, 5)
 	var rank := chase_rank(i)
 	if ball_team == p["team"]:
-		home.x += sign * 9.0                              # support the attack, spread wide
-		home.z += (-6.0 if p["slot"] % 2 == 0 else 6.0)
+		# Phase 2.7: off-ball runs — overlap/underlap/decoy/third-man.
+		var slot: int = int(p["slot"])
+		if slot == 0:
+			home.x += sign * 12.0  # overlap: run beyond the carrier
+			home.z += (-8.0 if slot % 2 == 0 else 8.0)
+		elif slot == 1:
+			home.x += sign * 4.0   # underlap: run inside
+			home.z += (-4.0 if slot % 2 == 0 else 4.0)
+		elif slot == 2:
+			home.x += sign * 6.0   # third-man: run into space
+			home.z += 0.0
+		else:
+			home.x += sign * 9.0   # decoy: pull a marker away
+			home.z += (-6.0 if slot % 2 == 0 else 6.0)
 		return (home - p["pos"]).normalized() if p["pos"].distance_to(home) > 1.0 else Vector3.ZERO
 	if ball_team < 0:
 		if rank == 0:
 			return (ball["pos"] - p["pos"]).normalized()
 		return (home - p["pos"]).normalized() if p["pos"].distance_to(home) > 1.0 else Vector3.ZERO
 	# opponents have it: two press, the rest hold shape between ball and goal
+	# Phase 2.5: jockey/contain — second presser stays goal-side.
 	var holder: Dictionary = players[ball["owner"]]
 	if rank == 0:
 		var to: Vector3 = holder["pos"] - p["pos"]
 		if to.length() < 1.6 and p["lock"] <= 0 and rng.randf() < delta * 3.0:
 			try_tackle(i, ball["owner"])
+		p["jockey"] = 0
 		return to.normalized()
 	if rank == 1:
+		p["jockey"] = 1  # jockeying
 		var cut: Vector3 = holder["pos"] + Vector3(-sign * 3.0, 0, 0)
 		return (cut - p["pos"]).normalized()
+	p["jockey"] = 0
 	return (home - p["pos"]).normalized() if p["pos"].distance_to(home) > 1.0 else Vector3.ZERO
 
 func try_tackle(tackler: int, victim: int, sliding := false) -> void:
+	# Phase 2.5: shoulder charge when close, jockey bonus, less automatic.
 	var t: Dictionary = players[tackler]
 	var v: Dictionary = players[victim]
 	t["lock"] = 0.5
-	set_action(t, "slide" if sliding else "tackle", 0.45)
+	var dist: float = t["pos"].distance_to(v["pos"])
+	var shoulder: bool = dist < 2.0 and not sliding
+	set_action(t, "slide" if sliding else ("shoulder_charge" if shoulder else "tackle"), 0.45)
+	# Jockey bonus: staying goal-side improves the chance.
+	var jockey_bonus: float = 0.06 if int(t.get("jockey", 0)) >= 1 else 0.0
+	var base_chance: float = MatchRules.tackle_chance(t["vel"], v["facing"], sliding) + jockey_bonus
 	if rng.randf() < MatchRules.foul_chance(t["vel"], v["facing"], sliding):
 		foul(tackler, victim)
 		return
+	if rng.randf() > base_chance:
+		return  # missed tackle (less automatic)
 	ball["owner"] = tackler
+	t["jockey"] = 0
 	say("Tackle!")
 	audio.play_tackle()
 
@@ -833,15 +876,26 @@ func keeper_saves() -> void:
 		if miss > 1.9 or ball["pos"].y > 2.7 or ball["free"] < 0.1:
 			continue
 		var spd: float = ball["vel"].length()
-		# Phase 0.5: parry deflect when the shot is too hot to hold (mirrors Match.cs).
+		# Phase 2.6: punch vs catch vs parry by ball height/speed.
+		# High balls are punched, fast balls parried, slow balls caught.
+		var ball_h: float = ball["pos"].y
 		var diving: bool = str(k["action"]) == "dive"
+		if ball_h > 1.8 and spd > 8.0:
+			# Punch clear (high ball).
+			ball["vel"] = Vector3(-sign * spd * 0.4, 5.0, rng.randf_range(-4.0, 4.0))
+			set_action(k, "punch", 0.50, 0.25)
+			say("Punched clear!")
+			audio.play_tackle()
+			return
 		if spd > 18.0 or (diving and spd > 14.0):
+			# Parry (too hot to hold).
 			ball["vel"] = Vector3(-sign * spd * 0.35, 3.0, (ball["pos"].z - k["pos"].z) * 4.0 + rng.randf_range(-3.0, 3.0))
 			set_action(k, "parry", 0.60, 0.30)
 			say("Parried away!")
 			audio.play_tackle()
 			return
 		if spd < 10.0:
+			# Catch (slow enough to hold).
 			ball["owner"] = i
 			ball["vel"] = Vector3.ZERO
 			set_action(k, "catch", 0.40, 0.20)
@@ -1648,19 +1702,33 @@ func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := fa
 	var dir: Vector3 = (aim_pt - ball["pos"])
 	dir.y = 0
 	dir = dir.normalized().rotated(Vector3.UP, rng.randf_range(-0.04, 0.04))
-	var lob: float = 0.4 + (1.2 if through else 0.0) + p["pos"].distance_to(r["pos"]) * 0.03
+	# Phase 2.3: pass type by context — driven/lofted/threaded/chip + curve.
+	var dist: float = p["pos"].distance_to(r["pos"])
+	var pass_type: String = "driven"
 	if aerial:
-		lob += 4.5
+		pass_type = "chip"
+	elif through:
+		pass_type = "threaded"
+	elif dist > 22.0:
+		pass_type = "lofted"
+	var lob: float = 0.4
+	match pass_type:
+		"driven": lob = 0.4
+		"lofted": lob = 5.5
+		"threaded": lob = 1.6
+		"chip": lob = 4.9
+	var curve: float = rng.randf_range(-0.6, 0.6)
 	pending = {"kind": 1, "from": from, "vel": dir * spd + Vector3(0, lob, 0),
+		"spin": Vector3(0, curve, 0),
 		"pos": ball["pos"] + dir * 0.5 + Vector3(0, 0.03, 0), "nopickup": 0.4, "receiver": best}
 	if hk >= 0 and not players[best]["keeper"]:
 		humans[hk]["ctrl"] = best
 	controlled = humans[0]["ctrl"]
 	var label := "Pass."
-	if aerial:
-		label = "Long ball."
-	elif through:
-		label = "Through ball."
+	match pass_type:
+		"lofted": label = "Lofted pass."
+		"threaded": label = "Threaded through."
+		"chip": label = "Chipped."
 	say(label)
 	audio.play_pass()
 
@@ -1669,8 +1737,16 @@ func shoot(from: int, power: float, aim_z := 0.0) -> void:
 		return
 	var p: Dictionary = players[from]
 	var sign := 1.0 if p["team"] == 0 else -1.0
-	# Phase 0.1: release at the kick clip's ball_contact frame (0.40 s * 0.50).
-	set_action(p, "kick", 0.40, 0.20)
+	# Phase 2.4: shot type by charge — power/placement/control/volley.
+	var is_volley: bool = ball["pos"].y > 0.5
+	set_action(p, "volley" if is_volley else "kick", 0.40, 0.20)
+	var shot_type: String = "control"
+	if is_volley:
+		shot_type = "volley"
+	elif power > 0.75:
+		shot_type = "power"
+	elif power < 0.35:
+		shot_type = "placement"
 	var keeper_z := 0.0
 	for q in players:
 		if q["keeper"] and q["team"] != p["team"]:
@@ -1681,13 +1757,30 @@ func shoot(from: int, power: float, aim_z := 0.0) -> void:
 	var target := Vector3(sign * HALF_L, rng.randf_range(0.35, 1.7), pick)
 	var dist: float = ball["pos"].distance_to(target)
 	var err: float = MatchRules.shot_error(dist, MatchRules.pressure(p["pos"], opp_positions(p["team"])), power)
+	if shot_type == "placement":
+		err *= 0.6
+	elif shot_type == "power":
+		err *= 1.3
 	var dir: Vector3 = (target - ball["pos"]).normalized()
 	dir = dir.rotated(Vector3.UP, rng.randfn(0.0, err))
 	dir.y += rng.randfn(0.0, err * 0.5)
 	dir = dir.normalized()
-	pending = {"kind": 1, "from": from, "vel": dir * lerp(18.0, 29.0, power) + Vector3(0, lerp(1.2, 4.5, power), 0),
+	var spd: float = lerp(18.0, 29.0, power)
+	var loft: float = lerp(1.2, 4.5, power)
+	if shot_type == "placement":
+		spd *= 0.75
+		loft *= 0.5
+	elif shot_type == "volley":
+		spd *= 1.05
+		loft = 4.0
+	pending = {"kind": 1, "from": from, "vel": dir * spd + Vector3(0, loft, 0),
 		"pos": ball["pos"], "nopickup": 0.6, "receiver": -1}
-	say("Shot!")
+	var label := "Shot!"
+	match shot_type:
+		"power": label = "Smashes it!"
+		"placement": label = "Placed!"
+		"volley": label = "Volley!"
+	say(label)
 	audio.play_kick()
 
 func switch_player(k := 0) -> void:
