@@ -15,7 +15,9 @@ const TEAM := 5
 # matched to ground speed per clip so feet plant instead of sliding.
 const CLIP_ALIASES := {"idle": "soccer_idle", "run": "soccer_run", "kick": "soccer_kick_place",
 	"tackle": "soccer_tackle", "slide": "soccer_slide_tackle", "dive": "soccer_keeper_dive_left",
-	"catch": "soccer_keeper_catch", "foul": "soccer_foul", "celebrate": "soccer_celebrate"}
+	"catch": "soccer_keeper_catch", "foul": "soccer_foul", "celebrate": "soccer_celebrate",
+	"volley": "soccer_volley", "header": "soccer_header", "chest_control": "soccer_chest_control",
+	"trap": "soccer_trap", "parry": "soccer_keeper_save"}
 const CLIP_NATURAL := {"soccer_walk": 0.74, "soccer_jog": 1.01, "soccer_run": 1.01,
 	"soccer_sprint": 1.22, "soccer_dribble": 0.60, "soccer_run_ball": 0.98, "soccer_shield": 0.30}
 const CLIP_MAXRATE := {"soccer_walk": 2.2, "soccer_jog": 2.6, "soccer_run": 2.6,
@@ -344,6 +346,8 @@ func reset_positions() -> void:
 				"keeper": i == 0, "action": "idle", "lock": 0.0,
 				"clip": "", "clip_t": 0.0, "clip_scale": 1.0, "clip_prev": "",
 				"clip_lean": 0.0, "clip_roll": 0.0, "clip_prev_vel": Vector3.ZERO,
+				"clip_prev_facing": Vector3(0, 0, 1), "turn_cd": 0.0,
+				"adur": 0.0, "acontact": -1.0, "arel": false,
 			}
 			players.append(p)
 			var r := make_rig(cols)
@@ -431,6 +435,7 @@ func goal(side: int) -> void:
 	if stadium != null:
 		stadium.celebrate(0)
 	audio.play_goal()
+	pending = {}
 	for q in players:
 		if q["team"] == side and not q["keeper"]:
 			q["action"] = "celebrate"
@@ -468,9 +473,43 @@ func chase_rank(i: int) -> int:
 				rank += 1
 	return rank
 
-func set_action(p: Dictionary, a: String, dur: float) -> void:
+func set_action(p: Dictionary, a: String, dur: float, contact := -1.0) -> void:
 	p["action"] = a
 	p["atime"] = dur
+	p["adur"] = dur
+	p["acontact"] = contact
+	p["arel"] = false
+
+# Phase 0.1: pending ball release/capture, fired when the actor's clip
+# reaches its ball_contact frame (mirrors Match.cs FirePending).
+var pending: Dictionary = {}
+
+func fire_pending() -> void:
+	if pending.is_empty():
+		return
+	var kind := int(pending["kind"])
+	var actor: Dictionary = players[int(pending["from"])]
+	var elapsed := float(actor["adur"]) - float(actor["atime"])
+	if elapsed < float(actor["acontact"]):
+		return
+	if kind == 1:
+		ball["owner"] = -1
+		ball["vel"] = pending["vel"]
+		ball["pos"] = pending["pos"]
+		ball["free"] = 0.0
+		ball["last"] = int(pending["from"])
+		actor["lock"] = float(pending["nopickup"])
+		if int(pending["receiver"]) >= 0:
+			assign_ctrl(int(actor["team"]), int(pending["receiver"]))
+	elif kind == 2:
+		ball["owner"] = int(pending["from"])
+		ball["vel"] = Vector3.ZERO
+		ball["free"] = 0.0
+		ball["last"] = int(pending["from"])
+		actor["lock"] = 0.25
+		if not actor["keeper"]:
+			assign_ctrl(int(actor["team"]), int(pending["from"]))
+	pending = {}
 
 func step_offline(delta: float) -> void:
 	var cmds := read_inputs(delta)
@@ -480,8 +519,13 @@ func step_offline(delta: float) -> void:
 		var f: Vector3 = Vector3(o["facing"].x, 0, o["facing"].z).normalized()
 		if f.length() < 0.1:
 			f = Vector3(1, 0, 0)
-		var run: float = clampf(o["vel"].length() / 5.0, 0.0, 1.0)
-		var touch: float = 0.5 + 0.18 * sin(float(o["phase"]) * 3.0) * run     # ball runs ahead, then is re-taken
+		# Phase 0.3: dribble touch interval scales with speed (0.15-0.60 m lead),
+		# with a sprint knock-on (mirrors Match.cs).
+		var spd: float = o["vel"].length()
+		var run: float = clampf(spd / 5.0, 0.0, 1.0)
+		var touch: float = lerpf(0.15, 0.60, run) + 0.18 * sin(float(o["phase"]) * 3.0) * run
+		if spd > 4.5:
+			touch += 0.08
 		ball["pos"] = o["pos"] + f * touch + Vector3(0, BALL_R, 0)
 		ball["vel"] = o["vel"]
 		ball["last"] = ball["owner"]
@@ -519,6 +563,8 @@ func step_offline(delta: float) -> void:
 		p["atime"] = float(p.get("atime", 0.0)) - delta
 		if p["atime"] <= 0.0 and p["action"] != "celebrate":
 			p["action"] = "idle"
+		# Phase 0.1: fire the pending release/capture at the contact frame.
+		fire_pending()
 		# Clip playback state (baked clips; falls back to procedural gait).
 		p["clip_t"] = float(p["clip_t"]) + delta * float(p["clip_scale"])
 		if str(p["clip"]) != "" and not bool(clips_data[str(p["clip"])].get("loop", false)):
@@ -570,6 +616,9 @@ func step_offline(delta: float) -> void:
 			if ball_team != p["team"] and chase_rank(i) < 2:
 				speed = 5.9
 		p["vel"] = p["vel"].lerp(wish * speed, min(1, delta * 8))
+		# Phase 0.2: plant feet while trapping a high/fast ball (mirrors Match.cs).
+		if str(p["action"]) in ["trap", "chest_control", "header"]:
+			p["vel"] *= 0.30
 		p["pos"] += p["vel"] * delta
 		p["pos"].y = 0
 		p["pos"].x = clamp(p["pos"].x, -HALF_L - 2, HALF_L + 2)
@@ -581,17 +630,31 @@ func step_offline(delta: float) -> void:
 	keeper_saves()
 
 	# --- free ball pickup ---
-	if ball["owner"] < 0 and ball["free"] > 0.1 and ball["pos"].y < 1.4:
+	if ball["owner"] < 0 and ball["free"] > 0.1 and ball["pos"].y < 1.4 and pending.is_empty():
 		for i in range(players.size()):
 			if players[i]["lock"] > 0:
 				continue
 			if players[i]["pos"].distance_to(ball["pos"]) < 1.05:
-				ball["owner"] = i
-				ball["vel"] = Vector3.ZERO
-				ball["free"] = 0
-				ball["last"] = i
-				if not players[i]["keeper"]:
-					assign_ctrl(int(players[i]["team"]), i)
+				# Phase 0.2: first-touch selection by ball height/speed (mirrors Match.cs).
+				var needs_touch: bool = not players[i]["keeper"] and (ball["pos"].y > 0.35 or ball["vel"].length() > 4.0)
+				if needs_touch:
+					var touch_action := "trap"
+					var frac := 0.60
+					if ball["pos"].y > 1.05 and ball["vel"].y < -1.5:
+						touch_action = "header"
+						frac = 0.55
+					elif ball["pos"].y > 1.05:
+						touch_action = "chest_control"
+						frac = 0.55
+					set_action(players[i], touch_action, 0.50, 0.50 * frac)
+					pending = {"kind": 2, "from": i, "vel": Vector3.ZERO, "pos": ball["pos"], "nopickup": 0.0, "receiver": -1}
+				else:
+					ball["owner"] = i
+					ball["vel"] = Vector3.ZERO
+					ball["free"] = 0
+					ball["last"] = i
+					if not players[i]["keeper"]:
+						assign_ctrl(int(players[i]["team"]), i)
 				break
 	auto_switch(delta)
 
@@ -715,6 +778,7 @@ func restart_with(team: int, spot: Vector3, label: String) -> void:
 	var taker := nearest_outfield(team, spot)
 	if label == "Goal kick":
 		taker = team * TEAM                             # the keeper
+	pending = {}
 	for p in players:
 		p["vel"] = Vector3.ZERO
 	players[taker]["pos"] = Vector3(spot.x, 0, spot.z) - Vector3(clampf(spot.x, -1, 1) * 0.0, 0, 0)
@@ -757,9 +821,18 @@ func keeper_saves() -> void:
 		if miss > 1.9 or ball["pos"].y > 2.7 or ball["free"] < 0.1:
 			continue
 		var spd: float = ball["vel"].length()
+		# Phase 0.5: parry deflect when the shot is too hot to hold (mirrors Match.cs).
+		var diving: bool = str(k["action"]) == "dive"
+		if spd > 18.0 or (diving and spd > 14.0):
+			ball["vel"] = Vector3(-sign * spd * 0.35, 3.0, (ball["pos"].z - k["pos"].z) * 4.0 + rng.randf_range(-3.0, 3.0))
+			set_action(k, "parry", 0.60, 0.30)
+			say("Parried away!")
+			audio.play_tackle()
+			return
 		if spd < 10.0:
 			ball["owner"] = i
 			ball["vel"] = Vector3.ZERO
+			set_action(k, "catch", 0.40, 0.20)
 			say("Keeper claims it.")
 			return
 		k["lock"] = 0.6
@@ -768,7 +841,7 @@ func keeper_saves() -> void:
 			set_action(k, "dive", 0.6)
 			say("Great save!")
 			audio.play_tackle()
-		return
+			return
 
 func auto_switch(delta: float) -> void:
 	switch_cd = max(0.0, switch_cd - delta)
@@ -1219,6 +1292,18 @@ func clip_played(p: Dictionary) -> bool:
 
 func clip_select_locomotion(p: Dictionary, speed: float) -> String:
 	var prev := str(p.get("clip_prev", ""))
+	# Phase 0.4: sharp turns at speed select the cut / turn clips by turn rate.
+	p["turn_cd"] = maxf(0.0, float(p.get("turn_cd", 0.0)) - 1.0 / 60.0)
+	if speed > 1.2 and float(p["turn_cd"]) <= 0.0:
+		var fwd: Vector3 = Vector3(p["facing"].x, 0, p["facing"].z).normalized()
+		var pf: Vector3 = p["clip_prev_facing"]
+		if fwd.length() > 0.001 and pf.length() > 0.001:
+			var dot := clampf(pf.x * fwd.x + pf.z * fwd.z, -1.0, 1.0)
+			var turn_rate := acos(dot) * 60.0
+			if turn_rate > 2.2:
+				p["turn_cd"] = 0.6
+				var cross := pf.x * fwd.z - pf.z * fwd.x
+				return "soccer_turn_left" if cross > 0.0 else "soccer_turn_right"
 	var has_ball: bool = int(ball.get("owner", -1)) == players.find(p)
 	if has_ball and speed > 0.8:
 		return "soccer_run_ball" if prev == "soccer_run_ball" else "soccer_dribble"
@@ -1250,6 +1335,13 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 			p["clip_t"] = 0.0
 			p["clip_scale"] = 1.0
 			cur = alias
+		# Phase 0.1: speed-match so contact aligns with the sim (mirrors SoccerClipRig.cs).
+		var cd0: Dictionary = clips_data[cur]
+		var ev0: Dictionary = cd0.get("events", {})
+		var bc := float(ev0.get("ball_contact_frac", -1.0))
+		if bc >= 0.0 and float(p["adur"]) > 0.01:
+			var clip_dur := float(cd0["frames"]) / float(cd0["fps"])
+			p["clip_scale"] = clampf(clip_dur / float(p["adur"]), 0.6, 1.8)
 	# Locomotion with hysteresis.
 	if action == "idle":
 		var want := clip_select_locomotion(p, speed)
@@ -1276,6 +1368,8 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 	p["clip_lean"] = lerpf(float(p["clip_lean"]), lean_target, clampf(delta * 5.0, 0.0, 1.0))
 	p["clip_roll"] = lerpf(float(p["clip_roll"]), roll_target, clampf(delta * 5.0, 0.0, 1.0))
 	p["clip_prev_vel"] = vel
+	var pf: Vector3 = Vector3(p["facing"].x, 0, p["facing"].z).normalized()
+	p["clip_prev_facing"] = pf if pf.length() > 0.001 else Vector3(0, 0, 1)
 	# Sample the baked keyframes.
 	var cd: Dictionary = clips_data[cur]
 	var fps := float(cd["fps"])
@@ -1403,7 +1497,7 @@ func pose_bone(sk: Skeleton3D, name: String, euler: Vector3) -> void:
 		sk.set_bone_pose_rotation(int(bone_index[name]), Quaternion.from_euler(euler))
 
 func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := false) -> void:
-	if ball["owner"] != from:
+	if ball["owner"] != from or not pending.is_empty():
 		return
 	var p: Dictionary = players[from]
 	var sign := 1.0 if p["team"] == 0 else -1.0
@@ -1423,9 +1517,8 @@ func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := fa
 			best = j
 	if best < 0:
 		return
-	ball["owner"] = -1
-	p["lock"] = 0.4
-	set_action(p, "kick", 0.3)
+	# Phase 0.1: release at the kick clip's ball_contact frame (0.30 s * 0.50).
+	set_action(p, "kick", 0.30, 0.15)
 	var r: Dictionary = players[best]
 	var spd: float = MatchRules.pass_speed(p["pos"].distance_to(r["pos"]), through)
 	var aim_pt: Vector3 = MatchRules.lead_point(ball["pos"], r["pos"], r["vel"], spd, 0.9 if through else 0.15)
@@ -1437,13 +1530,11 @@ func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := fa
 	var lob: float = 0.4 + (1.2 if through else 0.0) + p["pos"].distance_to(r["pos"]) * 0.03
 	if aerial:
 		lob += 4.5
-	ball["vel"] = dir * spd + Vector3(0, lob, 0)
-	ball["pos"] += dir * 0.5 + Vector3(0, 0.03, 0)
-	ball["free"] = 0
-	ball["last"] = from
+	pending = {"kind": 1, "from": from, "vel": dir * spd + Vector3(0, lob, 0),
+		"pos": ball["pos"] + dir * 0.5 + Vector3(0, 0.03, 0), "nopickup": 0.4, "receiver": best}
 	if hk >= 0 and not players[best]["keeper"]:
 		humans[hk]["ctrl"] = best
-		controlled = humans[0]["ctrl"]
+	controlled = humans[0]["ctrl"]
 	var label := "Pass."
 	if aerial:
 		label = "Long ball."
@@ -1453,13 +1544,12 @@ func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := fa
 	audio.play_pass()
 
 func shoot(from: int, power: float, aim_z := 0.0) -> void:
-	if ball["owner"] != from:
+	if ball["owner"] != from or not pending.is_empty():
 		return
 	var p: Dictionary = players[from]
 	var sign := 1.0 if p["team"] == 0 else -1.0
-	ball["owner"] = -1
-	p["lock"] = 0.6
-	set_action(p, "kick", 0.4)
+	# Phase 0.1: release at the kick clip's ball_contact frame (0.40 s * 0.50).
+	set_action(p, "kick", 0.40, 0.20)
 	var keeper_z := 0.0
 	for q in players:
 		if q["keeper"] and q["team"] != p["team"]:
@@ -1474,9 +1564,8 @@ func shoot(from: int, power: float, aim_z := 0.0) -> void:
 	dir = dir.rotated(Vector3.UP, rng.randfn(0.0, err))
 	dir.y += rng.randfn(0.0, err * 0.5)
 	dir = dir.normalized()
-	ball["vel"] = dir * lerp(18.0, 29.0, power) + Vector3(0, lerp(1.2, 4.5, power), 0)
-	ball["free"] = 0
-	ball["last"] = from
+	pending = {"kind": 1, "from": from, "vel": dir * lerp(18.0, 29.0, power) + Vector3(0, lerp(1.2, 4.5, power), 0),
+		"pos": ball["pos"], "nopickup": 0.6, "receiver": -1}
 	say("Shot!")
 	audio.play_kick()
 
@@ -1986,6 +2075,7 @@ func start_practice() -> void:
 func setup_practice() -> void:
 	var keep: Array = score.duplicate()
 	reset_positions()
+	pending = {}
 	score = keep
 	var spot := Vector3(HALF_L - rng.randf_range(20.0, 28.0), BALL_R, rng.randf_range(-12.0, 12.0))
 	var taker := TEAM - 1

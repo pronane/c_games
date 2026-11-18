@@ -270,6 +270,7 @@ ACTION_ALIASES = {
     "hit_react": "soccer_hit_react",
     "dive": "soccer_keeper_dive_left",
     "save": "soccer_keeper_save",
+    "parry": "soccer_keeper_save",
     "keeper_idle": "soccer_keeper_idle",
     "keeper_ready": "soccer_keeper_ready",
     "keeper_catch": "soccer_keeper_catch",
@@ -294,6 +295,8 @@ ACTION_ALIASES = {
     "juke_feint": "soccer_juke_feint",
     "stop": "soccer_stop",
     "turn": "soccer_turn",
+    "cut": "soccer_change_direction",
+    "strafe": "soccer_sidestep",
     "change_direction": "soccer_change_direction",
     "spin": "soccer_spin",
     "celebrate": "soccer_celebrate",
@@ -311,6 +314,93 @@ LOOP_CLIPS = {c[0] for c in CLIP_SPECS if c[2]}
 CLIP_CATEGORIES = {c[0]: c[3] for c in CLIP_SPECS}
 CLIP_DESCRIPTIONS = {c[0]: c[4] for c in CLIP_SPECS}
 CLIP_SOURCES = {c[0]: (c[1] or "soccer_motions.CUSTOM") for c in CLIP_SPECS}
+
+# ---------------------------------------------------------------------------
+# Phase 0 event frames (fractions of clip duration, 0..1; -1 = none).
+# Mirrors sprite_forge/game_packs/soccer.json events (ball_contact frame,
+# footsteps) but as fractions so they survive the 31-frame @30fps bake.
+# The sim (Match.cs) releases/captures the ball at ball_contact * ActionDuration;
+# the animation layer speeds the clip so visual contact aligns.
+# ---------------------------------------------------------------------------
+
+def _ev(ball_contact=-1.0, footsteps=(), hit_start=-1.0, hit_end=-1.0):
+    return {"ball_contact": float(ball_contact), "footsteps": [float(x) for x in footsteps],
+            "hit_start": float(hit_start), "hit_end": float(hit_end)}
+
+
+_LOCO_STEPS = (0.25, 0.75)
+CLIP_EVENTS = {
+    "soccer_idle": _ev(),
+    "soccer_idle_ready": _ev(),
+    "soccer_walk": _ev(footsteps=_LOCO_STEPS),
+    "soccer_jog": _ev(footsteps=_LOCO_STEPS),
+    "soccer_run": _ev(footsteps=_LOCO_STEPS),
+    "soccer_sprint": _ev(footsteps=_LOCO_STEPS),
+    "soccer_run_ball": _ev(footsteps=_LOCO_STEPS),
+    "soccer_dribble": _ev(footsteps=_LOCO_STEPS),
+    "soccer_shield": _ev(),
+    "soccer_short_pass": _ev(ball_contact=0.50),
+    "soccer_long_pass": _ev(ball_contact=0.50),
+    "soccer_through_ball": _ev(ball_contact=0.50),
+    "soccer_cross": _ev(ball_contact=0.50),
+    "soccer_shoot": _ev(ball_contact=0.50),
+    "soccer_volley": _ev(ball_contact=0.50),
+    "soccer_header": _ev(ball_contact=0.55),
+    "soccer_chest_control": _ev(ball_contact=0.55),
+    "soccer_trap": _ev(ball_contact=0.60),
+    "soccer_toe_lift": _ev(ball_contact=0.40),
+    "soccer_pickup": _ev(ball_contact=0.60),
+    "soccer_tackle": _ev(hit_start=0.30, hit_end=0.60),
+    "soccer_slide_tackle": _ev(hit_start=0.30, hit_end=0.65),
+    "soccer_shoulder_charge": _ev(hit_start=0.35, hit_end=0.60),
+    "soccer_dispossess": _ev(hit_start=0.30, hit_end=0.60),
+    "soccer_block": _ev(ball_contact=0.50),
+    "soccer_foul": _ev(hit_start=0.30, hit_end=0.60),
+    "soccer_stumble": _ev(),
+    "soccer_trip": _ev(),
+    "soccer_fall": _ev(),
+    "soccer_get_up": _ev(),
+    "soccer_knocked_down": _ev(),
+    "soccer_pushed": _ev(),
+    "soccer_hit_react": _ev(),
+    "soccer_keeper_idle": _ev(),
+    "soccer_keeper_ready": _ev(),
+    "soccer_keeper_catch": _ev(ball_contact=0.50),
+    "soccer_keeper_ground_catch": _ev(ball_contact=0.50),
+    "soccer_keeper_save": _ev(ball_contact=0.50),
+    "soccer_keeper_dive_left": _ev(ball_contact=0.50),
+    "soccer_keeper_dive_right": _ev(ball_contact=0.50),
+    "soccer_keeper_dive_high": _ev(ball_contact=0.50),
+    "soccer_keeper_punch": _ev(ball_contact=0.50),
+    "soccer_keeper_throw": _ev(ball_contact=0.50),
+    "soccer_keeper_kick": _ev(ball_contact=0.50),
+    "soccer_kick_place": _ev(ball_contact=0.50),
+    "soccer_kick_run": _ev(ball_contact=0.50),
+    "soccer_kick_out": _ev(ball_contact=0.50),
+    "soccer_drop_kick": _ev(ball_contact=0.50),
+    "soccer_throw_in": _ev(ball_contact=0.52),
+    "soccer_corner_kick": _ev(ball_contact=0.50),
+    "soccer_free_kick": _ev(ball_contact=0.50),
+    "soccer_penalty_kick": _ev(ball_contact=0.50),
+    "soccer_goal_kick": _ev(ball_contact=0.50),
+    "soccer_sidestep": _ev(footsteps=(0.50,)),
+    "soccer_juke_feint": _ev(),
+    "soccer_stop": _ev(footsteps=(0.50,)),
+    "soccer_turn": _ev(footsteps=(0.50,)),
+    "soccer_change_direction": _ev(footsteps=(0.50,)),
+    "soccer_spin": _ev(footsteps=(0.50,)),
+    "soccer_celebrate": _ev(),
+    "soccer_celebrate_jump": _ev(),
+    "soccer_taunt": _ev(),
+    "soccer_victory": _ev(),
+    "soccer_hand_pass": _ev(ball_contact=0.50),
+    "soccer_solo": _ev(footsteps=_LOCO_STEPS),
+    "soccer_fist_pass": _ev(ball_contact=0.50),
+    "soccer_fist_shoot": _ev(ball_contact=0.50),
+}
+# Every clip must have an event entry (default: no events).
+for _n in ALL_CLIPS:
+    CLIP_EVENTS.setdefault(_n, _ev())
 
 
 def register() -> None:
@@ -349,4 +439,18 @@ def validate() -> list[str]:
     for name in LOOP_CLIPS:
         if not LIB[name].loop:
             errors.append("loop clip %s is marked non-looping" % name)
+    for name, ev in CLIP_EVENTS.items():
+        if name not in ALL_CLIPS:
+            errors.append("event for unknown clip " + name)
+        bc = ev.get("ball_contact", -1.0)
+        if not (-1.0 <= bc <= 1.0):
+            errors.append("clip %s ball_contact out of range" % name)
+        for s in ev.get("footsteps", []):
+            if not (0.0 <= s <= 1.0):
+                errors.append("clip %s footsteps out of range" % name)
+    # Ball clips must carry a contact frame so the sim can sync release.
+    for name in ("soccer_short_pass", "soccer_shoot", "soccer_volley",
+                 "soccer_header", "soccer_chest_control", "soccer_trap"):
+        if CLIP_EVENTS[name]["ball_contact"] < 0:
+            errors.append("ball clip %s missing ball_contact" % name)
     return errors

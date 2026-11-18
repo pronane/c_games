@@ -62,6 +62,12 @@ public sealed class PlayerState
     public Vector3 Pos, Vel, Facing, Home, Target;
     public float Stamina = 1f, AnimPhase, ActionTimer, DecisionTimer, PossessionLock, TackleLock;
     public string Action = "idle";
+    /// <summary>Phase 0 event sync: total duration of the current one-shot and the
+    /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
+    /// The sim releases/captures the ball at that moment; the animation layer
+    /// speeds the clip so visual contact aligns. See BallState pending fields.</summary>
+    public float ActionDuration, ActionContactAt;
+    public bool ActionReleased = true;
     public bool IsKeeper;
     /// <summary>Actively closing down an opponent who has the ball (extra pace + acceleration).</summary>
     public bool Pressing;
@@ -80,6 +86,15 @@ public sealed class BallState
     public int LastTouch = -1, LastTouchSide = -1, PassFrom = -1, PassReceiver = -1;
     public Vector3 LastTouchPos;
     public float FreeTime, NoPickup;
+    /// <summary>Phase 0 pending ball action (event-synced release or capture).
+    /// Kind 1 = release (pass/shoot wind-up), Kind 2 = capture (first-touch trap).
+    /// While HasPending, the ball stays with its current owner (release) or
+    /// loose (capture) until the actor's ActionContactAt elapses.</summary>
+    public bool HasPending;
+    public int PendingKind, PendingFrom = -1;
+    public Vector3 PendingVel, PendingSpin, PendingPos, PendingTarget;
+    public float PendingNoPickup;
+    public int PendingReceiver = -1;
 }
 
 public sealed class MatchState
@@ -153,6 +168,63 @@ public sealed partial class MatchEngine
         State.Commentary = text;
     }
 
+    /// <summary>Phase 0: start a one-shot action with event-synced contact.
+    /// contactFrac is the clip's ball_contact fraction (see soccer_motions.CLIP_EVENTS).
+    /// The ball is released/captured when elapsed time reaches ActionContactAt.</summary>
+    private static void SetAction(PlayerState p, string action, float duration, float contactFrac = 0.5f)
+    {
+        p.Action = action;
+        p.ActionTimer = duration;
+        p.ActionDuration = duration;
+        p.ActionContactAt = duration * Mx.Clamp(contactFrac, 0f, 1f);
+        p.ActionReleased = false;
+    }
+
+    /// <summary>Fire a pending ball release/capture whose contact time has elapsed.</summary>
+    private void FirePending()
+    {
+        var b = State.Ball;
+        if (!b.HasPending || b.PendingFrom < 0 || b.PendingFrom >= State.Players.Length) { b.HasPending = false; return; }
+        var actor = State.Players[b.PendingFrom];
+        float elapsed = actor.ActionDuration - actor.ActionTimer;
+        if (elapsed < actor.ActionContactAt) return;
+        if (b.PendingKind == 1)
+        {
+            // Release: ball leaves the foot now (pass/shoot contact).
+            b.Owner = -1;
+            b.Vel = b.PendingVel;
+            b.Spin = b.PendingSpin;
+            b.Pos = b.PendingPos;
+            b.FreeTime = 0;
+            b.NoPickup = b.PendingNoPickup;
+            b.LastTouch = b.PendingFrom;
+            b.LastTouchSide = actor.Team;
+            b.LastTouchPos = b.Pos;
+            b.PassFrom = b.PendingFrom;
+            b.PassReceiver = b.PendingReceiver;
+            b.PassTarget = b.PendingTarget;
+        }
+        else if (b.PendingKind == 2)
+        {
+            // Capture: first touch completes (trap/chest/header).
+            b.Owner = b.PendingFrom;
+            b.Vel = Vector3.Zero;
+            b.Spin = Vector3.Zero;
+            b.FreeTime = 0;
+            actor.PossessionLock = .12f;
+            b.LastTouch = b.PendingFrom;
+            b.LastTouchSide = actor.Team;
+            b.LastTouchPos = b.Pos;
+            if (actor.Team == 0) State.Controlled = b.PendingFrom;
+            if (b.PassFrom >= 0 && b.PassReceiver == b.PendingFrom && b.PassFrom / Options.TeamSize == actor.Team)
+                b.PassFrom = -1;
+        }
+        actor.ActionReleased = true;
+        b.HasPending = false;
+        b.PendingKind = 0;
+        b.PendingFrom = -1;
+    }
+
     public int SideSign(int side) => (side == 0 ? 1 : -1) * (State.Half == 1 ? 1 : -1);
     public Vector3 GoalPos(int side) => new(SideSign(side) * Mx.HalfLength, 0, 0); // goal being attacked by side
     public Vector3 OwnGoalPos(int side) => new(-SideSign(side) * Mx.HalfLength, 0, 0);
@@ -163,6 +235,7 @@ public sealed partial class MatchEngine
         State.Ball.Vel = Vector3.Zero;
         State.Ball.Spin = Vector3.Zero;
         State.Ball.Owner = -1;
+        State.Ball.HasPending = false; State.Ball.PendingKind = 0; State.Ball.PendingFrom = -1;
         State.Ball.FreeTime = 0;
         State.Ball.NoPickup = 0;
         for (int s = 0; s < 2; s++)
@@ -361,6 +434,8 @@ public sealed partial class MatchEngine
 
         // ---- Ball ----
         S.Ball.NoPickup = MathF.Max(0, S.Ball.NoPickup - dt);
+        // Phase 0: fire event-synced release/capture at ball_contact time.
+        FirePending();
         if (S.Ball.Owner >= 0 && S.Ball.Owner < S.Players.Length)
         {
             var owner = S.Players[S.Ball.Owner];
@@ -370,7 +445,7 @@ public sealed partial class MatchEngine
             // so the old `owner.PossessionLock > 0` check dropped the ball on the very next
             // tick and produced an endless "X wins the ball!" scrum with no dribbling,
             // shots or goals.
-            if (Mx.FlatDist(owner.Pos, S.Ball.Pos) > 2.2f)
+            if (Mx.FlatDist(owner.Pos, S.Ball.Pos) > 2.2f && !S.Ball.HasPending)
             {
                 S.Ball.Owner = -1;
             }
@@ -379,14 +454,22 @@ public sealed partial class MatchEngine
                 Vector3 f = Mx.Norm(Mx.Flat(owner.Facing));
                 if (f.LengthSquared() < .1f) f = new Vector3(1, 0, 0);
                 float bob = MathF.Sin(_globalTime * 13f) * .012f;
-                // Close control keeps the ball under the boot and adds alternating
-                // inside/outside touches; normal dribbling pushes it further ahead.
-                float lead = owner.Dribbling ? .30f + MathF.Sin(owner.AnimPhase * 2f) * .06f : .46f;
+                // Phase 0.3 dribble touch interval: lead grows with speed
+                // (0.15m close control -> 0.60m sprint) with alternating touches.
+                // Sprinting adds a knock-on (ball pushed ahead faster than the runner).
+                float planar = Mx.Flat(owner.Vel).Length();
+                float speedT = Mx.Clamp(planar / 6f, 0f, 1f);
+                float touch = MathF.Sin(owner.AnimPhase * 2f) * (0.03f + speedT * 0.05f);
+                float lead = owner.Dribbling
+                    ? Mx.Lerp(0.12f, 0.35f, speedT) + touch * 0.6f
+                    : Mx.Lerp(0.15f, 0.60f, speedT) + touch;
+                if (owner.Sprinting && planar > 4.5f) lead += 0.08f; // knock-on
                 Vector3 side = owner.Dribbling
                     ? new Vector3(-f.Z, 0, f.X) * MathF.Sin(owner.AnimPhase) * .14f
                     : Vector3.Zero;
                 S.Ball.Pos = owner.Pos + f * lead + side + new Vector3(0, Mx.BallRadius + bob, 0);
-                S.Ball.Vel = owner.Vel;
+                // Knock-on: sprinting pushes the ball slightly ahead of the runner.
+                S.Ball.Vel = owner.Sprinting && planar > 4.5f ? owner.Vel * 1.12f : owner.Vel;
                 S.Ball.Spin = Vector3.Zero;
                 S.Ball.LastTouch = owner.Index;
                 S.Ball.LastTouchSide = owner.Team;
@@ -395,7 +478,8 @@ public sealed partial class MatchEngine
             }
         }
         if (S.Ball.Owner < 0) BallPhysics(dt);
-        TryPossession(dt);
+        // While a first-touch capture is pending, nobody else may steal the ball.
+        if (!S.Ball.HasPending) TryPossession(dt);
         ClampAll();
     }
 
@@ -522,11 +606,11 @@ public sealed partial class MatchEngine
             float tx = gx + attack * (1.3f + Mx.Clamp((MathF.Abs(ball.Pos.X - gx) - 8f) * .10f, 0f, 3.2f));
             float tz = Mx.Clamp(ball.Pos.Z * .62f, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
             p.Target = new Vector3(tx, 0, tz);
-            p.Action = "idle";
+            if (p.ActionTimer <= 0f) p.Action = "idle";
             float danger = Mx.FlatDist(ball.Pos, OwnGoalPos(p.Team));
             if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f && p.ActionTimer <= 0)
             {
-                p.Action = "dive"; p.ActionTimer = .65f;
+                SetAction(p, "dive", .65f, .50f);
                 p.Target += Mx.FlatDir(p.Pos, ball.Pos) * 1.6f;
             }
             return;
@@ -701,9 +785,10 @@ public sealed partial class MatchEngine
     {
         var b = State.Ball;
         if (b.Owner != from.Index && b.Owner >= 0) return;
-        b.Owner = -1;
+        if (b.HasPending) return;
         from.PossessionLock = .35f;
-        from.Action = "kick"; from.ActionTimer = .34f;
+        // Phase 0.1: wind-up, then release at ball_contact (0.5 * 0.34s).
+        SetAction(from, "kick", .34f, .50f);
         Vector3 aim = to.Pos + Mx.Flat(to.Vel) * (through ? .55f : .22f);
         if (through) aim += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * 4f;
         Vector3 dir = Mx.FlatDir(b.Pos, aim);
@@ -712,13 +797,12 @@ public sealed partial class MatchEngine
         dir = Mx.Norm(dir + new Vector3(Rng.Signed() * err * .12f, 0, Rng.Signed() * err * .12f));
         float dist = Mx.FlatDist(b.Pos, aim);
         float speed = Mx.Clamp(power + dist * .25f, 8f, 27f);
-        b.Vel = dir * speed + new Vector3(0, lob ? 5.5f : (through ? .9f : .45f), 0);
-        b.Spin = new Vector3(0, Rng.Signed() * .5f, 0);
-        b.Pos = from.Pos + dir * .55f + new Vector3(0, Mx.BallRadius + .03f, 0);
-        b.FreeTime = 0;
-        b.NoPickup = .10f;
-        b.LastTouch = from.Index; b.LastTouchSide = from.Team; b.LastTouchPos = b.Pos;
-        b.PassFrom = from.Index; b.PassReceiver = to.Index; b.PassTarget = aim;
+        b.HasPending = true; b.PendingKind = 1; b.PendingFrom = from.Index;
+        b.PendingVel = dir * speed + new Vector3(0, lob ? 5.5f : (through ? .9f : .45f), 0);
+        b.PendingSpin = new Vector3(0, Rng.Signed() * .5f, 0);
+        b.PendingPos = from.Pos + dir * .55f + new Vector3(0, Mx.BallRadius + .03f, 0);
+        b.PendingNoPickup = .10f;
+        b.PendingReceiver = to.Index; b.PendingTarget = aim;
         State.Passes[from.Team]++;
         Add(EventKind.Pass, $"{from.Spec.DisplayName} → {to.Spec.DisplayName}");
         if (Options.Offside && IsOffside(to, from))
@@ -733,9 +817,10 @@ public sealed partial class MatchEngine
         var b = State.Ball;
         if (b.Owner != p.Index && !volley) return;
         if (volley && Mx.FlatDist(p.Pos, b.Pos) > 1.6f) return;
-        b.Owner = -1;
+        if (b.HasPending) return;
         p.PossessionLock = .55f;
-        p.Action = "kick"; p.ActionTimer = .4f;
+        // Phase 0.2: volley plays the volley clip; release at ball_contact.
+        SetAction(p, volley ? "volley" : "kick", .40f, .50f);
         int attack = SideSign(p.Team);
         Vector3 target = new(GoalPos(p.Team).X, Rng.Range(.4f, 2.0f), Rng.Range(-Mx.GoalHalfWidth * .78f, Mx.GoalHalfWidth * .78f));
         // Aim for the corners when skill is high.
@@ -746,13 +831,12 @@ public sealed partial class MatchEngine
         dir = Mx.Norm(dir + new Vector3(0, 0, Rng.Signed() * err * .16f));
         float power = Mx.Lerp(17f, 31f, charge) * Mx.Lerp(.82f, 1.12f, p.Spec.Shooting);
         float loft = Mx.Lerp(.08f, .30f, charge) + (dist > 20f ? .06f : 0f);
-        b.Vel = dir * power + new Vector3(0, power * loft, 0);
-        b.Spin = new Vector3(0, Rng.Signed() * (1f + p.Spec.Shooting * 2.2f), 0);
-        b.Pos += new Vector3(0, .05f, 0);
-        b.FreeTime = 0;
-        b.NoPickup = .22f;
-        b.LastTouch = p.Index; b.LastTouchSide = p.Team; b.LastTouchPos = b.Pos;
-        b.PassReceiver = -1;
+        b.HasPending = true; b.PendingKind = 1; b.PendingFrom = p.Index;
+        b.PendingVel = dir * power + new Vector3(0, power * loft, 0);
+        b.PendingSpin = new Vector3(0, Rng.Signed() * (1f + p.Spec.Shooting * 2.2f), 0);
+        b.PendingPos = b.Pos + new Vector3(0, .05f, 0);
+        b.PendingNoPickup = .22f;
+        b.PendingReceiver = -1; b.PendingTarget = target;
         State.Shots[p.Team]++;
         Add(EventKind.Shot, $"{p.Spec.DisplayName} shoots!");
     }
@@ -761,8 +845,7 @@ public sealed partial class MatchEngine
     private void AttemptTackle(PlayerState p, bool slide = false, bool powered = false)
     {
         p.TackleLock = slide ? 1.35f : .8f;
-        p.Action = slide ? "slide" : "tackle";
-        p.ActionTimer = slide ? .60f : .45f;
+        SetAction(p, slide ? "slide" : "tackle", slide ? .60f : .45f, .40f);
         var b = State.Ball;
         if (b.Owner < 0) return;
         var carrier = State.Players[b.Owner];
@@ -799,6 +882,8 @@ public sealed partial class MatchEngine
         chance = Mx.Clamp(chance, .08f, .88f);
         if (Rng.Next() < chance)
         {
+            // A successful tackle cancels any wind-up the carrier had started.
+            b.HasPending = false; b.PendingKind = 0; b.PendingFrom = -1;
             b.Owner = p.Index;
             p.PossessionLock = .12f;
             carrier.PossessionLock = .45f;
@@ -813,7 +898,7 @@ public sealed partial class MatchEngine
             // nothing happened.  Give the victim a visible stumble too.
             State.Fouls[p.Team]++;
             p.Cards += Rng.Next() < .12f ? 1 : 0;
-            carrier.Action = "foul"; carrier.ActionTimer = 1.1f;
+            SetAction(carrier, "foul", 1.1f, .40f);
             carrier.Vel *= .2f;
             float ownGoalX = OwnGoalPos(p.Team).X;
             bool inBox = MathF.Abs(b.Pos.X - ownGoalX) < 16.5f && MathF.Abs(b.Pos.Z) < 20.16f;
@@ -828,6 +913,7 @@ public sealed partial class MatchEngine
     private void AwardFreeKick(int side, Vector3 pos, bool penalty)
     {
         State.Ball.Owner = -1;
+        State.Ball.HasPending = false; State.Ball.PendingKind = 0; State.Ball.PendingFrom = -1;
         State.Ball.Vel = Vector3.Zero;
         State.RestartSide = side;
         State.RestartPos = pos;
@@ -861,7 +947,7 @@ public sealed partial class MatchEngine
             if (q.Team != side && Mx.FlatDist(q.Pos, State.Ball.Pos) < 4f)
                 q.Pos += Mx.FlatDir(State.Ball.Pos, q.Pos) * (4f - Mx.FlatDist(q.Pos, State.Ball.Pos));
         State.Phase = Phase.Play;
-        if (penalty) { taker.Action = "kick"; Shoot(taker, .9f); }
+        if (penalty) { Shoot(taker, .9f); }
         Add(EventKind.Info, penalty ? "Penalty!" : "Back under way.");
     }
 
@@ -889,6 +975,9 @@ public sealed partial class MatchEngine
         float speed = p.MaxSpeed * fatigue * (sprint ? 1.42f : 1f) * (p.Pressing ? 1.12f : 1f);
         if (p.Action == "tackle") speed *= 1.35f;
         if (p.Dribbling) speed *= .88f;
+        // Phase 0.2: plant feet while trapping/controlling (first touch).
+        if (p.ActionTimer > 0f && (p.Action == "trap" || p.Action == "chest_control" || p.Action == "header"))
+            speed *= .30f;
         Vector3 targetVel = wish * speed;
         float accel = (human ? 18f : p.Pressing ? 16f : 12f) * dt;
         if (sprint) accel *= 1.25f;
@@ -982,16 +1071,31 @@ public sealed partial class MatchEngine
             return;
         }
 
-        // --- Goalkeeper save ---
+        // --- Goalkeeper save / parry (Phase 0.5) ---
+        // Fast shots are parried (deflected), slow ones are caught. Mirrors the
+        // browser keeper_saves() threshold so desktop and web agree.
         foreach (var p in State.Players)
         {
             if (!p.IsKeeper) continue;
             float d = (p.Pos - b.Pos).Length();
             if (d < (p.Action == "dive" ? 1.65f : 1.15f) && b.Pos.Y < 2.5f && b.FreeTime > .1f)
             {
+                float spd = b.Vel.Length();
+                bool diving = p.Action == "dive";
+                if (spd > 18f || (diving && spd > 14f))
+                {
+                    // Parry: deflect away from goal, ball stays loose.
+                    float sign = SideSign(p.Team);
+                    b.Vel = new Vector3(-sign * spd * .35f, 3.0f,
+                        (b.Pos.Z - p.Pos.Z) * 4.0f + Rng.Signed() * 3f);
+                    b.NoPickup = .15f;
+                    SetAction(p, "parry", .60f, .50f);
+                    Add(EventKind.Save, $"{p.Spec.DisplayName} parries it away!");
+                    return;
+                }
                 b.Owner = p.Index;
                 p.PossessionLock = .15f;
-                p.Action = "catch"; p.ActionTimer = .4f;
+                SetAction(p, "catch", .40f, .50f);
                 Add(EventKind.Save, $"{p.Spec.DisplayName} makes the save!");
                 return;
             }
@@ -1043,10 +1147,10 @@ public sealed partial class MatchEngine
         State.Phase = Phase.Goal;
         State.PhaseTimer = 3.4f;
         State.Ball.Vel = Vector3.Zero;
+        State.Ball.HasPending = false; State.Ball.PendingKind = 0; State.Ball.PendingFrom = -1;
         foreach (var p in State.Players)
         {
-            p.Action = p.Team == side ? "celebrate" : "idle";
-            p.ActionTimer = 2.5f;
+            SetAction(p, p.Team == side ? "celebrate" : "idle", 2.5f, .50f);
         }
     }
 
@@ -1066,11 +1170,33 @@ public sealed partial class MatchEngine
         }
         if (best >= 0)
         {
+            var p = State.Players[best];
+            // Phase 0.2 first touch: aerial/fast balls play a trap/chest/header
+            // clip and possession completes at ball_contact. Slow ground balls
+            // are collected instantly so the game keeps flowing.
+            float ballSpeed = b.Vel.Length();
+            bool needsTouch = !p.IsKeeper && (b.Pos.Y > 0.35f || ballSpeed > 4f);
+            if (needsTouch)
+            {
+                string touchAction;
+                float contactFrac;
+                if (b.Pos.Y > 1.05f)
+                {
+                    // Falling from height -> header; otherwise cushion on chest.
+                    if (b.Vel.Y < -1.5f) { touchAction = "header"; contactFrac = .55f; }
+                    else { touchAction = "chest_control"; contactFrac = .55f; }
+                }
+                else { touchAction = "trap"; contactFrac = .60f; }
+                SetAction(p, touchAction, .50f, contactFrac);
+                p.Target = b.Pos; // plant feet on the spot
+                b.HasPending = true; b.PendingKind = 2; b.PendingFrom = best;
+                b.PendingReceiver = b.PassReceiver; b.PendingTarget = b.PassTarget;
+                return;
+            }
             b.Owner = best;
             b.Vel = Vector3.Zero;
             b.Spin = Vector3.Zero;
             b.FreeTime = 0;
-            var p = State.Players[best];
             p.PossessionLock = .12f;
             b.LastTouch = best; b.LastTouchSide = p.Team; b.LastTouchPos = b.Pos;
             if (p.Team == 0) State.Controlled = best;

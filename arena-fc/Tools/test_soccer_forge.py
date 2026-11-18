@@ -63,7 +63,7 @@ def main():
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
         check("67 soccer clips", len(SM.ALL_CLIPS) == 67, str(len(SM.ALL_CLIPS)))
-        check("75 action aliases", len(SM.ACTION_ALIASES) == 75, str(len(SM.ACTION_ALIASES)))
+        check("78 action aliases", len(SM.ACTION_ALIASES) == 78, str(len(SM.ACTION_ALIASES)))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
               all(a in SM.ACTION_ALIASES for a in core_actions),
@@ -157,6 +157,16 @@ def main():
                   clips["soccer_run"]["fps"] == 30.0 and clips["soccer_run"]["frames"] == 31)
             check("baked clips carry Hips translation",
                   "t" in clips["soccer_run"]["bones"]["Hips"])
+            # Phase 0.1: every baked clip carries its event frames.
+            check("baked clips carry event frames",
+                  all("events" in c and "ball_contact_frac" in c["events"] for c in clips.values()))
+            check("ball clips carry a contact frame",
+                  all(clips[c]["events"]["ball_contact"] >= 0 for c in
+                      ("soccer_short_pass", "soccer_shoot", "soccer_volley",
+                       "soccer_header", "soccer_chest_control", "soccer_trap")))
+            check("locomotion clips carry footsteps",
+                  all(clips[c]["events"]["footsteps"] for c in
+                      ("soccer_walk", "soccer_run", "soccer_sprint")))
 
     section("Manifest")
     man_path = os.path.join(ROOT, "Data", "soccer_player_manifest.json")
@@ -169,12 +179,18 @@ def main():
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
         check("manifest material order matches GLB",
               man["materials"] == ["skin", "jersey", "shorts", "socks", "boots", "hair"])
+        check("manifest clips carry event frames",
+              all("events" in c and "ball_contact_frac" in c["events"] for c in man["clips"]))
+        check("manifest aliases include Phase 0 actions",
+              all(a in man["action_aliases"] for a in
+                  ("volley", "header", "chest_control", "trap", "parry", "cut")))
 
     section("Runtime wiring (static checks)")
     soccer_cs = open(os.path.join(ROOT, "Scripts", "Godot", "SoccerClipRig.cs")).read()
     factory = open(os.path.join(ROOT, "Scripts", "Godot", "RigFactory.cs")).read()
     world = open(os.path.join(ROOT, "Scripts", "Godot", "World3D.cs")).read()
     boot = open(os.path.join(ROOT, "Web", "BrowserBoot.gd")).read()
+    match_cs = open(os.path.join(ROOT, "Scripts", "Core", "Match.cs")).read()
     check("C# loader reads the GLB + manifest",
           "GltfDocument" in soccer_cs and "soccer_player_manifest.json" in soccer_cs)
     check("C# loader plays clips from PlayerState",
@@ -200,6 +216,30 @@ def main():
     check("browser locomotion bands have hysteresis",
           "clip_select_locomotion" in boot)
     check("browser falls back to procedural gait", "animate_rig(r" in boot)
+    # Phase 0: event-synced ball release/capture, first-touch selection,
+    # speed-scaled dribble lead, turn-rate clip selection and keeper parry.
+    check("C# syncs ball release to the contact frame",
+          "FirePending" in match_cs and "ActionContactAt" in match_cs)
+    check("C# selects first-touch by ball height/speed",
+          '"chest_control"' in match_cs and '"trap"' in match_cs and '"header"' in match_cs)
+    check("C# scales dribble lead by speed",
+          "Lerp(0.15f, 0.60f" in match_cs)
+    check("C# parries hot shots",
+          '"parry"' in match_cs and "spd > 18f" in match_cs)
+    check("desktop syncs one-shot contact",
+          "_contactFrac" in soccer_cs and "clipDur / p.ActionDuration" in soccer_cs)
+    check("desktop selects turns by turn rate",
+          "soccer_turn_left" in soccer_cs and "turnRate" in soccer_cs)
+    check("browser syncs ball release to the contact frame",
+          "fire_pending" in boot and "pending" in boot)
+    check("browser selects first-touch by ball height/speed",
+          '"chest_control"' in boot and '"trap"' in boot and '"header"' in boot)
+    check("browser scales dribble lead by speed",
+          "lerpf(0.15, 0.60" in boot)
+    check("browser parries hot shots",
+          '"parry"' in boot and "spd > 18.0" in boot)
+    check("browser selects turns by turn rate",
+          "soccer_turn_left" in boot and "turn_rate" in boot)
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))

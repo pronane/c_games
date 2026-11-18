@@ -101,6 +101,8 @@ public sealed class FullPlayerDto
     [JsonPropertyName("st")] public float St { get; set; }
     [JsonPropertyName("ap")] public float Ap { get; set; }
     [JsonPropertyName("at")] public float At { get; set; }
+    [JsonPropertyName("ad")] public float Ad { get; set; }
+    [JsonPropertyName("ac")] public float Ac { get; set; }
     [JsonPropertyName("dt")] public float Dt { get; set; }
     [JsonPropertyName("pl")] public float Pl { get; set; }
     [JsonPropertyName("tl")] public float Tl { get; set; }
@@ -118,7 +120,8 @@ public sealed class FullPlayerDto
         X = p.Pos.X, Z = p.Pos.Z, Vx = p.Vel.X, Vz = p.Vel.Z,
         Fx = p.Facing.X, Fz = p.Facing.Z, Hx = p.Home.X, Hz = p.Home.Z,
         Tx = p.Target.X, Tz = p.Target.Z, St = p.Stamina, Ap = p.AnimPhase,
-        At = p.ActionTimer, Dt = p.DecisionTimer, Pl = p.PossessionLock, Tl = p.TackleLock,
+        At = p.ActionTimer, Ad = p.ActionDuration, Ac = p.ActionContactAt,
+        Dt = p.DecisionTimer, Pl = p.PossessionLock, Tl = p.TackleLock,
         A = p.Action, Ik = p.IsKeeper, C = p.Cards, Pr = p.Pressing, Sh = p.Shielding,
         Team = p.Team, Slot = p.Slot, Role = (int)p.Role,
     };
@@ -147,6 +150,17 @@ public sealed class FullBallDto
     [JsonPropertyName("pz")] public float Pz { get; set; }
     [JsonPropertyName("ft")] public float Ft { get; set; }
     [JsonPropertyName("np")] public float Np { get; set; }
+    [JsonPropertyName("hp")] public bool Hp { get; set; }
+    [JsonPropertyName("pk")] public int Pk { get; set; }
+    [JsonPropertyName("pfm")] public int Pfm { get; set; } = -1;
+    [JsonPropertyName("pvx")] public float Pvx { get; set; }
+    [JsonPropertyName("pvy")] public float Pvy { get; set; }
+    [JsonPropertyName("pvz")] public float Pvz { get; set; }
+    [JsonPropertyName("ppx")] public float Ppx { get; set; }
+    [JsonPropertyName("ppy")] public float Ppy { get; set; }
+    [JsonPropertyName("ppz")] public float Ppz { get; set; }
+    [JsonPropertyName("pnp")] public float Pnp { get; set; }
+    [JsonPropertyName("prec")] public int Prec { get; set; } = -1;
 
     public static FullBallDto From(BallState b) => new()
     {
@@ -156,6 +170,10 @@ public sealed class FullBallDto
         O = b.Owner, Lt = b.LastTouch, Lts = b.LastTouchSide, Pf = b.PassFrom, Pr = b.PassReceiver,
         Lx = b.LastTouchPos.X, Ly = b.LastTouchPos.Y, Lz = b.LastTouchPos.Z,
         Px = b.PassTarget.X, Pz = b.PassTarget.Z, Ft = b.FreeTime, Np = b.NoPickup,
+        Hp = b.HasPending, Pk = b.PendingKind, Pfm = b.PendingFrom,
+        Pvx = b.PendingVel.X, Pvy = b.PendingVel.Y, Pvz = b.PendingVel.Z,
+        Ppx = b.PendingPos.X, Ppy = b.PendingPos.Y, Ppz = b.PendingPos.Z,
+        Pnp = b.PendingNoPickup, Prec = b.PendingReceiver,
     };
 }
 

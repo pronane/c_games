@@ -355,7 +355,7 @@ def main() -> int:
     check("auto-select keeps the controlled player near the ball",
           "ControlLock" in match_cs and "FindNearestHome(S.Ball.Pos, true)" in match_cs)
     check("fouls are rarer and now visible",
-          "carrier.Action = \"foul\"" in match_cs and "FOUL · FREE KICK" in hud_cs
+          'SetAction(carrier, "foul"' in match_cs and "FOUL · FREE KICK" in hud_cs
           and 'p.Action == "slide"' in world3d)
     check("player spacing avoids scrums",
           "1.05f - dd) * .60f" in match_cs and "State.Ball.Owner >= 0 && p.Index != State.Ball.Owner" in match_cs)

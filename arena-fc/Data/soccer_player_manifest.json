@@ -45,7 +45,14 @@
    "category": "Locomotion",
    "source": "idle",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_idle_ready",
@@ -53,7 +60,14 @@
    "category": "Soccer",
    "source": "soccer_motions.CUSTOM",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_walk",
@@ -61,7 +75,17 @@
    "category": "Locomotion",
    "source": "walk",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_jog",
@@ -69,7 +93,17 @@
    "category": "Locomotion",
    "source": "run",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_run",
@@ -77,7 +111,17 @@
    "category": "Locomotion",
    "source": "run",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_sprint",
@@ -85,7 +129,17 @@
    "category": "Locomotion",
    "source": "sprint",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_run_ball",
@@ -93,7 +147,17 @@
    "category": "Ball",
    "source": "carry",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_dribble",
@@ -101,7 +165,17 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_shield",
@@ -109,7 +183,14 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_short_pass",
@@ -117,7 +198,14 @@
    "category": "Ball",
    "source": "low_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_long_pass",
@@ -125,7 +213,14 @@
    "category": "Ball",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_through_ball",
@@ -133,7 +228,14 @@
    "category": "Ball",
    "source": "low_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_cross",
@@ -141,7 +243,14 @@
    "category": "Ball",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_shoot",
@@ -149,7 +258,14 @@
    "category": "Ball",
    "source": "shoot_goal",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_volley",
@@ -157,7 +273,14 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_header",
@@ -165,7 +288,14 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 13,
+    "ball_contact_frac": 0.55,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_chest_control",
@@ -173,7 +303,14 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 13,
+    "ball_contact_frac": 0.55,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_trap",
@@ -181,7 +318,14 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 14,
+    "ball_contact_frac": 0.6,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_toe_lift",
@@ -189,7 +333,14 @@
    "category": "Ball",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 10,
+    "ball_contact_frac": 0.4,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_pickup",
@@ -197,7 +348,14 @@
    "category": "Ball",
    "source": "pick_up_ground",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 14,
+    "ball_contact_frac": 0.6,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_tackle",
@@ -205,7 +363,14 @@
    "category": "Defence",
    "source": "tackle",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 7,
+    "hit_end": 14
+   }
   },
   {
    "name": "soccer_slide_tackle",
@@ -213,7 +378,14 @@
    "category": "Defence",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 7,
+    "hit_end": 16
+   }
   },
   {
    "name": "soccer_shoulder_charge",
@@ -221,7 +393,14 @@
    "category": "Defence",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 8,
+    "hit_end": 14
+   }
   },
   {
    "name": "soccer_dispossess",
@@ -229,7 +408,14 @@
    "category": "Defence",
    "source": "tackle",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 7,
+    "hit_end": 14
+   }
   },
   {
    "name": "soccer_block",
@@ -237,7 +423,14 @@
    "category": "Defence",
    "source": "block",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_foul",
@@ -245,7 +438,14 @@
    "category": "Contact",
    "source": "hit",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 7,
+    "hit_end": 14
+   }
   },
   {
    "name": "soccer_stumble",
@@ -253,7 +453,14 @@
    "category": "Contact",
    "source": "fall",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_trip",
@@ -261,7 +468,14 @@
    "category": "Contact",
    "source": "fall",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_fall",
@@ -269,7 +483,14 @@
    "category": "Contact",
    "source": "fall",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_get_up",
@@ -277,7 +498,14 @@
    "category": "Contact",
    "source": "get_up",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_knocked_down",
@@ -285,7 +513,14 @@
    "category": "Contact",
    "source": "ko",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_pushed",
@@ -293,7 +528,14 @@
    "category": "Contact",
    "source": "hit",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_hit_react",
@@ -301,7 +543,14 @@
    "category": "Contact",
    "source": "hit",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_idle",
@@ -309,7 +558,14 @@
    "category": "Goalkeeper",
    "source": "idle",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_ready",
@@ -317,7 +573,14 @@
    "category": "Goalkeeper",
    "source": "soccer_motions.CUSTOM",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_catch",
@@ -325,7 +588,14 @@
    "category": "Goalkeeper",
    "source": "catch_aerial",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_ground_catch",
@@ -333,7 +603,14 @@
    "category": "Goalkeeper",
    "source": "catch_ground",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_save",
@@ -341,7 +618,14 @@
    "category": "Goalkeeper",
    "source": "gk_save",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_dive_left",
@@ -349,7 +633,14 @@
    "category": "Goalkeeper",
    "source": "gk_dive_left",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_dive_right",
@@ -357,7 +648,14 @@
    "category": "Goalkeeper",
    "source": "gk_dive_right",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_dive_high",
@@ -365,7 +663,14 @@
    "category": "Goalkeeper",
    "source": "leap_catch",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_punch",
@@ -373,7 +678,14 @@
    "category": "Goalkeeper",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_throw",
@@ -381,7 +693,14 @@
    "category": "Goalkeeper",
    "source": "gk_throw_out",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_keeper_kick",
@@ -389,7 +708,14 @@
    "category": "Goalkeeper",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_kick_place",
@@ -397,7 +723,14 @@
    "category": "Restart",
    "source": "low_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_kick_run",
@@ -405,7 +738,14 @@
    "category": "Restart",
    "source": "shoot_goal",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_kick_out",
@@ -413,7 +753,14 @@
    "category": "Restart",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_drop_kick",
@@ -421,7 +768,14 @@
    "category": "Restart",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_throw_in",
@@ -429,7 +783,14 @@
    "category": "Restart",
    "source": "soccer_motions.CUSTOM",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.52,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_corner_kick",
@@ -437,7 +798,14 @@
    "category": "Restart",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_free_kick",
@@ -445,7 +813,14 @@
    "category": "Restart",
    "source": "shoot_goal",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_penalty_kick",
@@ -453,7 +828,14 @@
    "category": "Restart",
    "source": "shoot_goal",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_goal_kick",
@@ -461,7 +843,14 @@
    "category": "Restart",
    "source": "high_kick_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_sidestep",
@@ -469,7 +858,16 @@
    "category": "Locomotion",
    "source": "sidestep",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_juke_feint",
@@ -477,7 +875,14 @@
    "category": "Locomotion",
    "source": "juke_feint",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_stop",
@@ -485,7 +890,16 @@
    "category": "Locomotion",
    "source": "stop",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_turn",
@@ -493,7 +907,16 @@
    "category": "Locomotion",
    "source": "change_direction",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_change_direction",
@@ -501,7 +924,16 @@
    "category": "Locomotion",
    "source": "change_direction",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_spin",
@@ -509,7 +941,16 @@
    "category": "Locomotion",
    "source": "spin",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_celebrate",
@@ -517,7 +958,14 @@
    "category": "Celebration",
    "source": "celebrate_goal",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_celebrate_jump",
@@ -525,7 +973,14 @@
    "category": "Celebration",
    "source": "jump",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_taunt",
@@ -533,7 +988,14 @@
    "category": "Celebration",
    "source": "taunt",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_victory",
@@ -541,7 +1003,14 @@
    "category": "Celebration",
    "source": "victory",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_hand_pass",
@@ -549,7 +1018,14 @@
    "category": "Ball",
    "source": "hand_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_solo",
@@ -557,7 +1033,17 @@
    "category": "Ball",
    "source": "bounce_solo",
    "frames": 31,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_fist_pass",
@@ -565,7 +1051,14 @@
    "category": "Ball",
    "source": "fist_pass",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   },
   {
    "name": "soccer_fist_shoot",
@@ -573,7 +1066,14 @@
    "category": "Ball",
    "source": "fist_shoot",
    "frames": 25,
-   "fps": 30.0
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   }
  ],
  "action_aliases": {
@@ -618,6 +1118,7 @@
   "hit_react": "soccer_hit_react",
   "dive": "soccer_keeper_dive_left",
   "save": "soccer_keeper_save",
+  "parry": "soccer_keeper_save",
   "keeper_idle": "soccer_keeper_idle",
   "keeper_ready": "soccer_keeper_ready",
   "keeper_catch": "soccer_keeper_catch",
@@ -642,6 +1143,8 @@
   "juke_feint": "soccer_juke_feint",
   "stop": "soccer_stop",
   "turn": "soccer_turn",
+  "cut": "soccer_change_direction",
+  "strafe": "soccer_sidestep",
   "change_direction": "soccer_change_direction",
   "spin": "soccer_spin",
   "celebrate": "soccer_celebrate",
@@ -668,6 +1171,6 @@
    0.3775
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 5.7
+  "seconds": 7.7
  }
 }

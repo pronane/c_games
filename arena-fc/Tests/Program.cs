@@ -146,6 +146,8 @@ s.State.Phase = Phase.Play;
 s.State.Ball.Owner = 3;
 s.State.Players[3].Pos = new Vector3(20, 0, 0);
 Invoke(s, "Shoot", s.State.Players[3], .9f, false);
+// Phase 0: the ball is released at the clip's ball_contact frame (0.20 s), not instantly.
+for (int i = 0; i < 20; i++) s.Step(1f / 60f, PlayerCommand.None);
 Check("shot gives ball velocity", s.State.Ball.Vel.Length() > 12f, $"v={s.State.Ball.Vel.Length():F1}");
 Check("shot counted in stats", s.State.Shots[0] == 1);
 var o = new MatchEngine(new MatchOptions { Seed = 8 });
