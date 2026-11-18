@@ -9,6 +9,7 @@
 // be compiled standalone for verification.
 using System;
 using System.Collections.Generic;
+using ArenaFC.Core;
 using Godot;
 
 public sealed class SoccerClipRig : Node3D
@@ -133,17 +134,16 @@ public sealed class SoccerClipRig : Node3D
     }
 
     /// <summary>Set the player's movement archetype (Phase 1.3).  Called by
-    /// the world when the character spec is known.  0=Controlled,
-    /// 1=Explosive, 2=Lengthy (matches Core.Archetype enum order).</summary>
-    public void SetArchetype(int archetype)
+    /// the world when the character spec is known.</summary>
+    public void SetArchetype(Archetype archetype)
     {
         switch (archetype)
         {
-            case 1: // Explosive
+            case Archetype.Explosive:
                 _archetypeLean = .16f; _archetypeCadence = 1.12f;
                 _archetypeStride = .92f; _archetypeRoll = .05f;
                 break;
-            case 2: // Lengthy
+            case Archetype.Lengthy:
                 _archetypeLean = .10f; _archetypeCadence = .88f;
                 _archetypeStride = 1.14f; _archetypeRoll = .03f;
                 break;
@@ -152,6 +152,20 @@ public sealed class SoccerClipRig : Node3D
                 _archetypeStride = 1f; _archetypeRoll = .04f;
                 break;
         }
+    }
+
+    /// <summary>Bridge from the sim's PlayerState (called by RigAnimator.Pose).
+    /// Extracts position, yaw, speed, ball state and drives the blend space.</summary>
+    public void Update(PlayerState p, float dt)
+    {
+        var worldPos = new Vector3(p.Pos.X, p.Pos.Y, p.Pos.Z);
+        float yaw = Mathf.Atan2(-p.Facing.X, -p.Facing.Z);
+        float speed = Mx.Flat(p.Vel).Length();
+        bool hasBall = p.Dribbling || p.Action == "shield";
+        // Ball world position: if the player has it, it's at their feet;
+        // otherwise use the last known ball position from the rig's parent.
+        var ballWorld = hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero;
+        Drive(worldPos, yaw, speed, hasBall, ballWorld);
     }
 
     /// <summary>Drive the rig.  Call once per physics frame with the player's
@@ -168,7 +182,7 @@ public sealed class SoccerClipRig : Node3D
             _speed = speed;
         }
         // Measured ground speed + yaw rate (smoothed).
-        float dt = Math.Max(GetPhysicsProcessDeltaTime(), 1e-4f);
+        float dt = Mathf.Max(GetPhysicsProcessDeltaTime(), 1e-4f);
         var delta = worldPos - _prevPos;
         float measured = speed > 0f ? speed : delta.Length() / dt;
         _speed = Mathf.Lerp(_speed, measured, .25f);
@@ -195,16 +209,11 @@ public sealed class SoccerClipRig : Node3D
         // ---- cadence: match clip rate to ground speed (archetype-biased) -
         float natural = NaturalRate.TryGetValue(want, out var n) ? n : 1f;
         float maxRate = MaxRate.TryGetValue(want, out var m) ? m : 3f;
-        float target = Mathf.Clamp(_speed / Math.Max(natural, .01f), .25f, 1.6f);
+        float target = Mathf.Clamp(_speed / Mathf.Max(natural, .01f), .25f, 1.6f);
         target *= _archetypeCadence;
-        // Blend-space weight: how much of the new clip to show during the
-        // crossfade (1.1).  Phase sync keeps the feet continuous.
-        float weight = _blend;
-        _player.SetCurrentAnimation(LibraryName + "/" + want);
-        _player.SetCurrentAnimationPosition(
-            (_phase * _lib.GetAnimation(want).Length) % _lib.GetAnimation(want).Length);
         _player.SpeedScale = Mathf.Lerp(_player.SpeedScale, target, .12f);
-        _phase = (_phase + dt * _player.SpeedScale / _lib.GetAnimation(want).Length) % 1f;
+        float clipLen = _lib.GetAnimation(want).Length;
+        _phase = (_phase + dt * _player.SpeedScale / clipLen) % 1f;
 
         // ---- 1.5 lean / roll / look-at / reach ---------------------------
         UpdateLean(_speed, _turnRate);
@@ -224,7 +233,7 @@ public sealed class SoccerClipRig : Node3D
     public string SelectClip(float speed, float turnRate, bool hasBall)
     {
         // Sharp turn at speed -> turn clip (Phase 0.4, kept in blend space).
-        if (Math.Abs(turnRate) > 2.2f && speed > 1.2f) return "soccer_turn";
+        if (Mathf.Abs(turnRate) > 2.2f && speed > 1.2f) return "soccer_turn";
         if (hasBall)
         {
             if (speed < .35f) return "soccer_shield";
@@ -244,7 +253,7 @@ public sealed class SoccerClipRig : Node3D
     /// player's movement direction differs from their facing.</summary>
     public string SelectDirectionalClip(float speed, float headingOffset, bool hasBall)
     {
-        float a = Math.Abs(Mathf.AngleDifference(headingOffset, 0f));
+        float a = Mathf.Abs(Mathf.AngleDifference(headingOffset, 0f));
         if (hasBall) return SelectClip(speed, 0f, true);
         if (a < .5f) return SelectClip(speed, 0f, false);          // forward
         if (a > 2.6f) return "soccer_backpedal";                  // backwards
@@ -357,11 +366,11 @@ public sealed class SoccerClipRig : Node3D
         {
             var axis = from.Cross(Vector3.Up);
             if (axis.LengthSquared() < 1e-6f) axis = from.Cross(Vector3.Right);
-            return Quaternion.FromAxisAngle(axis.Normalized(), Mathf.Pi);
+            return new Quaternion(axis.Normalized(), Mathf.Pi);
         }
         var axis2 = from.Cross(to).Normalized();
         float angle = Mathf.Acos(dot);
-        return Quaternion.FromAxisAngle(axis2, angle);
+        return new Quaternion(axis2, angle);
     }
 
     /// <summary>Apply look-at (neck/head) and reach (arm) as bone pose
@@ -371,21 +380,21 @@ public sealed class SoccerClipRig : Node3D
         if (!_bones.TryGetValue("L", out var b)) return;
         if (b.Neck >= 0 && b.Head >= 0)
         {
-            var neckQ = Quaternion.FromAxisAngle(Vector3.Up, _lookYaw) *
-                        Quaternion.FromAxisAngle(Vector3.Right, _lookPitch);
+            var neckQ = new Quaternion(Vector3.Up, _lookYaw) *
+                        new Quaternion(Vector3.Right, _lookPitch);
             _skeleton.SetBonePoseRotation(b.Neck, neckQ);
-            var headQ = Quaternion.FromAxisAngle(Vector3.Up, _lookYaw * .5f) *
-                        Quaternion.FromAxisAngle(Vector3.Right, _lookPitch * .5f);
+            var headQ = new Quaternion(Vector3.Up, _lookYaw * .5f) *
+                        new Quaternion(Vector3.Right, _lookPitch * .5f);
             _skeleton.SetBonePoseRotation(b.Head, headQ);
         }
         if (_reach > .01f)
         {
             // Extend the nearer arm toward the ball (simple pitch forward).
-            var armQ = Quaternion.FromAxisAngle(Vector3.Right, -_reach * 1.1f);
+            var armQ = new Quaternion(Vector3.Right, -_reach * 1.1f);
             if (b.UpperArmR >= 0) _skeleton.SetBonePoseRotation(b.UpperArmR, armQ);
             if (b.LowerArmR >= 0)
                 _skeleton.SetBonePoseRotation(b.LowerArmR,
-                    Quaternion.FromAxisAngle(Vector3.Right, -_reach * .4f));
+                    new Quaternion(Vector3.Right, -_reach * .4f));
         }
     }
 }
