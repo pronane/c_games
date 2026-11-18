@@ -1,8 +1,8 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
-uniform vec3 grass_a : source_color = vec3(0.075, 0.30, 0.125);
-uniform vec3 grass_b : source_color = vec3(0.105, 0.375, 0.165);
+uniform vec3 grass_a : source_color = vec3(0.085, 0.32, 0.135);
+uniform vec3 grass_b : source_color = vec3(0.095, 0.345, 0.145);
 uniform float line_width = 0.11;
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.25;
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;
@@ -27,8 +27,11 @@ void fragment() {
 	float w = line_width;
 	float stripe = mod(floor((x + 52.5) / 6.56), 2.0);
 	vec3 grass = mix(grass_a, grass_b, stripe);
-	float n = fract(sin(dot(floor(world_pos.xz * 7.0), vec2(12.9898, 78.233))) * 43758.5453);
-	grass *= 0.93 + 0.13 * n;
+	// Multi-scale noise for natural grass variation (breaks up flat stripes).
+	float n1 = fract(sin(dot(floor(world_pos.xz * 7.0), vec2(12.9898, 78.233))) * 43758.5453);
+	float n2 = fract(sin(dot(floor(world_pos.xz * 23.0), vec2(39.346, 11.135))) * 24634.6345);
+	float n3 = fract(sin(dot(floor(world_pos.xz * 61.0), vec2(73.156, 32.819))) * 31543.1234);
+	grass *= 0.88 + 0.10 * n1 + 0.08 * n2 + 0.06 * n3;
 
 	// Phase 3.2: normal-mapped grass detail (procedural micro-normal).
 	vec2 micro = world_pos.xz * 28.0;

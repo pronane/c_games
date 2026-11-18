@@ -1315,7 +1315,10 @@ public sealed partial class MatchEngine
             v.X += Weather.WindX * dt * 0.5f;
             v.Z += Weather.WindZ * dt * 0.5f;
         }
-        v *= 1f - (v.Y > 0f || b.Pos.Y > Mx.BallRadius + .05f ? .045f : 0f) * dt;
+        // Air drag when airborne; rolling friction when on ground (stops gliding).
+        bool airborne = v.Y > 0f || b.Pos.Y > Mx.BallRadius + .05f;
+        float friction = airborne ? .045f : .85f; // ground: strong rolling resistance
+        v *= 1f - friction * dt;
         b.Pos += v * dt;
 
         if (b.Pos.Y < Mx.BallRadius)
