@@ -18,7 +18,7 @@ public class PlayerRanking
 
     public void RecordResult(bool won, bool draw, int opponentRating)
     {
-        int expected = 1 / (1 + Math.Pow(10, (opponentRating - Rating) / 400.0));
+        double expected = 1.0 / (1.0 + Math.Pow(10.0, (opponentRating - Rating) / 400.0));
         int actual = won ? 1 : draw ? 0 : 0;
         if (draw) actual = 0; // simplified
         int k = 32;

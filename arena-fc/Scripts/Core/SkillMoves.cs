@@ -59,7 +59,8 @@ public static class SkillMoves
     }
 
     /// <summary>Calculate success chance for a skill move.</summary>
-    public static float SuccessChance(SkillMove move, int dribbling, float pressure)
+    /// <param name="dribbling">Player dribbling skill (0.0–1.0 scale, e.g. Pace).</param>
+    public static float SuccessChance(SkillMove move, float dribbling, float pressure)
     {
         float baseChance = move switch
         {
@@ -73,8 +74,8 @@ public static class SkillMoves
             _ => 0f,
         };
 
-        // Dribbling skill bonus
-        float skillBonus = (dribbling - 50) * 0.004f;
+        // Dribbling skill bonus (0.5 = neutral, 1.0 = +0.2, 0.0 = -0.2)
+        float skillBonus = (dribbling - 0.5f) * 0.4f;
 
         // Pressure penalty (closer opponent = harder)
         float pressurePenalty = pressure < 2f ? (2f - pressure) * 0.15f : 0f;
