@@ -40,7 +40,6 @@ public sealed partial class SoccerClipRig : Node3D
     private readonly HashSet<string> _loops = new();
     private readonly Dictionary<string, float> _clipDuration = new();
     private readonly Dictionary<string, float> _contactFrac = new();
-    private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
     private bool _oneShotDone = true;
@@ -154,7 +153,6 @@ public sealed partial class SoccerClipRig : Node3D
     private void LoadManifest()
     {
         foreach (var kv in FallbackAliases) _aliases[kv.Key] = kv.Value;
-        _materialOrder.AddRange(new[] { "skin", "jersey", "shorts", "socks", "boots", "hair" });
         try
         {
             string text = Godot.FileAccess.GetFileAsString(ManifestPath);
@@ -175,11 +173,6 @@ public sealed partial class SoccerClipRig : Node3D
                         && ev.TryGetProperty("ball_contact_frac", out var bc) && bc.ValueKind != JsonValueKind.Null)
                         _contactFrac[clipName] = bc.GetSingle();
                 }
-            if (root.TryGetProperty("materials", out var mats))
-            {
-                _materialOrder.Clear();
-                foreach (var m in mats.EnumerateArray()) _materialOrder.Add(m.GetString() ?? "");
-            }
             if (root.TryGetProperty("stats", out var stats) && stats.TryGetProperty("height_m", out var h))
                 _height = h.GetSingle();
         }
@@ -187,11 +180,12 @@ public sealed partial class SoccerClipRig : Node3D
     }
 
     /// <summary>Show one realistic identity (v0/v2/v6) per player, derived from the
-    /// character's stable Id. All three ship inside the GLB; the hidden ones cost nothing.</summary>
+    /// character's display name so the same squad looks the same across runs. All
+    /// three ship inside the GLB; the hidden ones cost nothing.</summary>
     private void ApplyVariant(Node3D scene, CharacterSpec spec)
     {
         int h = 7;
-        foreach (char c in spec.Id ?? spec.Name ?? "") h = h * 31 + c;
+        foreach (char c in spec.Name ?? "") h = h * 31 + c;
         string prefix = VariantPrefixes[Math.Abs(h) % VariantPrefixes.Length];
         foreach (var mi in _meshes)
         {
@@ -229,7 +223,15 @@ public sealed partial class SoccerClipRig : Node3D
             {
                 var src = mi.GetSurfaceOverrideMaterial(i) ?? mi.Mesh.SurfaceGetMaterial(i);
                 if (src is not StandardMaterial3D std) continue;
-                string layer = std.ResourceName ?? "";   // glTF material name ("skin_v0", "jersey", ...)
+                // glTF material name ("skin_v0", "jersey", ...). Godot sets it as
+                // resource_name; fall back to the sub-resource path suffix just in case.
+                string layer = std.ResourceName ?? "";
+                if (layer.Length == 0)
+                {
+                    string path = std.ResourcePath ?? "";
+                    int at = path.LastIndexOf("::", StringComparison.Ordinal);
+                    if (at >= 0) layer = path.Substring(at + 2);
+                }
                 string? hex = TintHexFor(layer, spec);
                 if (hex == null) continue;
                 var mat = (StandardMaterial3D)std.Duplicate();

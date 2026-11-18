@@ -23,9 +23,6 @@ const MH_MAP := {"Hips": "pelvis", "Spine": "spine_01", "Chest": "spine_03", "Ne
 	"LUpperArm": "upperarm_l", "RUpperArm": "upperarm_r",
 	"LForearm": "lowerarm_l", "RForearm": "lowerarm_r",
 	"LHand": "hand_l", "RHand": "hand_r"}
-func bname(n: String) -> String:
-	return n if bone_index.has(n) else MH_MAP.get(n, n)
-
 const CLIP_ALIASES := {"idle": "soccer_idle", "run": "soccer_run", "kick": "soccer_kick_place",
 	"tackle": "soccer_tackle", "slide": "soccer_slide_tackle", "dive": "soccer_keeper_dive_left",
 	"catch": "soccer_keeper_catch", "foul": "soccer_foul", "celebrate": "soccer_celebrate",
@@ -146,6 +143,9 @@ var touch_down: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var home_cols := [Color("#d7263d"), Color("#f8fafc"), Color("#14213d")]
 var away_cols := [Color("#1d4ed8"), Color("#f8fafc"), Color("#1e3a8a")]
+
+func bname(n: String) -> String:
+	return n if bone_index.has(n) else MH_MAP.get(n, n)
 
 # ---------------------------------------------------------------- lifecycle
 func _ready() -> void:

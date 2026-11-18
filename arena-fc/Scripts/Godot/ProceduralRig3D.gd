@@ -22,7 +22,10 @@ const OVERRIDE_RIG := "user://rig_override.json"
 ## Either the Arena 18-bone skeleton or the MakeHuman-52 one shipped by the realistic rig.
 const REQUIRED_BONES := ["Hips", "Spine", "Chest", "Head"]
 const REQUIRED_ALT := ["pelvis", "spine_01", "spine_03", "head"]
-const REQUIRED_SETS := [["Hips", "Spine", "Chest", "Head"], ["pelvis", "spine_01", "spine_03", "head"]]
+const REQUIRED_SETS := [
+	["Hips", "Spine", "Chest", "Head"],
+	["pelvis", "spine_01", "spine_03", "head"],
+]
 
 @export var kit_primary: Color = Color("#d7263d")
 @export var kit_secondary: Color = Color("#f8fafc")
@@ -90,9 +93,9 @@ static func validate(d: Dictionary) -> String:
 			return "bone %d head must be [x,y,z]" % i
 		names[str(b["n"])] = true
 	var any_set := false
-	for set_ in REQUIRED_SETS:
+	for required_set in REQUIRED_SETS:
 		var all_here := true
-		for r in set_:
+		for r in required_set:
 			if not names.has(r):
 				all_here = false
 				break
@@ -278,9 +281,9 @@ static func report_glb(scene: Node) -> Dictionary:
 		out["bones"].append(sk.get_bone_name(i))
 	out["map"] = bone_map(sk)
 	var any_set := false
-	for set_ in REQUIRED_SETS:
+	for required_set in REQUIRED_SETS:
 		var all_here := true
-		for r in set_:
+		for r in required_set:
 			if not out["map"].has(r):
 				all_here = false
 				break
@@ -288,8 +291,8 @@ static func report_glb(scene: Node) -> Dictionary:
 			any_set = true
 			break
 	if not any_set:
-		for set_ in REQUIRED_SETS:
-			for r in set_:
+		for required_set in REQUIRED_SETS:
+			for r in required_set:
 				if not out["map"].has(r):
 					if not out["missing"].has(r):
 						out["missing"].append(r)
