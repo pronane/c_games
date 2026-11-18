@@ -1501,16 +1501,17 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 	var f1 := minf(f0 + 1.0, float(frames - 1))
 	var frac := f - float(f0)
 	var bones: Dictionary = cd["bones"]
-	for bname in bones.keys():
-		var bi: int = bone_index.get(bname, -1)
+	var root_name := bname("Hips")
+	for bone_name in bones.keys():
+		var bi: int = bone_index.get(bone_name, -1)
 		if bi < 0:
 			continue
-		var entry: Dictionary = bones[bname]
+		var entry: Dictionary = bones[bone_name]
 		var rarr: Array = entry["r"]
 		var q0 := Quaternion(float(rarr[f0 * 4]), float(rarr[f0 * 4 + 1]), float(rarr[f0 * 4 + 2]), float(rarr[f0 * 4 + 3]))
 		var q1 := Quaternion(float(rarr[f1 * 4]), float(rarr[f1 * 4 + 1]), float(rarr[f1 * 4 + 2]), float(rarr[f1 * 4 + 3]))
 		var q := q0.slerp(q1, frac)
-		if bname == root_name:
+		if bone_name == root_name:
 			var tarr: Array = entry["t"]
 			var tp0 := Vector3(float(tarr[f0 * 3]), float(tarr[f0 * 3 + 1]), float(tarr[f0 * 3 + 2]))
 			var tp1 := Vector3(float(tarr[f1 * 3]), float(tarr[f1 * 3 + 1]), float(tarr[f1 * 3 + 2]))
