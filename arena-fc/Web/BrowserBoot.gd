@@ -767,12 +767,12 @@ func try_tackle(tackler: int, victim: int, sliding := false) -> void:
 	var dist: float = t["pos"].distance_to(v["pos"])
 	var shoulder: bool = dist < 2.0 and not sliding
 	set_action(t, "slide" if sliding else ("shoulder_charge" if shoulder else "tackle"), 0.45)
-	# Jockey bonus: staying goal-side improves the chance.
-	var jockey_bonus: float = 0.06 if int(t.get("jockey", 0)) >= 1 else 0.0
-	var base_chance: float = MatchRules.tackle_chance(t["vel"], v["facing"], sliding) + jockey_bonus
 	if rng.randf() < MatchRules.foul_chance(t["vel"], v["facing"], sliding):
 		foul(tackler, victim)
 		return
+	# Jockey bonus: staying goal-side improves the chance.
+	var jockey_bonus: float = 0.06 if int(t.get("jockey", 0)) >= 1 else 0.0
+	var base_chance: float = 0.55 + jockey_bonus
 	if rng.randf() > base_chance:
 		return  # missed tackle (less automatic)
 	ball["owner"] = tackler
