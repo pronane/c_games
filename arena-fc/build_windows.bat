@@ -44,13 +44,27 @@ if "%GODOT%"=="" (
     echo         Or pass the path: build_windows.bat "C:\path\to\Godot.exe"
     exit /b 1
 )
+if not exist "%GODOT%" (
+    echo [ERROR] Godot path does not exist: %GODOT%
+    echo         Check the path and try again.
+    exit /b 1
+)
 echo [OK] Godot: %GODOT%
 
-REM --- Check .NET ---
+REM --- Check .NET SDK (not just runtime) ---
 where dotnet >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] .NET SDK not found.
-    echo         Install from: https://dotnet.microsoft.com/download/dotnet/9.0
+    echo [ERROR] .NET not found in PATH.
+    echo         Install the .NET 9 SDK from: https://dotnet.microsoft.com/download/dotnet/9.0
+    echo         Make sure to install the SDK, not just the Runtime.
+    exit /b 1
+)
+dotnet --version >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] .NET SDK not found ^(Runtime only^).
+    echo         The 'dotnet' command exists but no SDK is installed.
+    echo         Install the .NET 9 SDK from: https://dotnet.microsoft.com/download/dotnet/9.0
+    echo         Choose "SDK" not "Runtime" in the download table.
     exit /b 1
 )
 for /f "tokens=*" %%V in ('dotnet --version') do echo [OK] .NET SDK: %%V
