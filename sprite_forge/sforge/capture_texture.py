@@ -593,7 +593,9 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
         args = (Xr, lay_c, lab_c, bone_c, prot_c, skin_b, skin_b[:2])
         # v11.13: the scalp and the sides of the head (not the face) are checked for off-colour patches like the hair
         # (a crown seen only under a window's blue light)
-        scalp_c = head_t & (lay_c == 0) & (bone_c == bm.bi.get("head", -1)) & ~face_t
+        # (v11.16: not the underside of the jaw - that is skin or beard, handled with the neck below; as scalp its
+        # pale collar-lit texels were refilled with the brightness round them and came out white)
+        scalp_c = head_t & (lay_c == 0) & (bone_c == bm.bi.get("head", -1)) & ~face_t & (Nr[:, 1] >= -0.2)
         # v11.7: garment edges on the limbs are rings (capture_rings)
         from . import capture_rings as CR
         limb_c, s_c = CR.limb_coords(sh.head, Xr, bone_c, bm.bi)
@@ -619,7 +621,15 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
                 dsk = np.linalg.norm((L_ - skm) * W_LAB, axis=1)
                 dg = np.min(np.linalg.norm((L_ * W_LAB)[:, None, :] - gc[None], axis=2), 1)
                 kw["drop"] = cand & (dg < dsk) & (dg < 30)
-                stats["chin_dropped"] = int(kw["drop"].sum())
+        # v11.16: and whatever the video itself calls clothes there, whatever its colour - a white collar caught
+        # in the light past Mike's chin came out brighter than any garment texel (over 255 after the frame's
+        # exposure gain) and was kept: a white band under the jaw
+        if cand.any():
+            kw["drop"] = kw.get("drop", np.zeros(len(mix), bool)) | (cand & (lab_c == 3))
+            stats["chin_dropped"] = int(kw["drop"].sum())
+        mix = np.clip(mix, 0, 255)
+        if light is not None and light.get("applied"):
+            alb = np.clip(alb, 0, 255)
         mix_raw = mix.copy(); alb_raw = alb.copy() if (light is not None and light.get("applied")) else None
         mix, _, stats["clean"] = CC.clean(mix, seen_t, *args, log=log, **kw)
         if light is not None and light.get("applied"):

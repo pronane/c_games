@@ -301,7 +301,10 @@ def clean(mix, seen, X, layer, label, bone, protect, skin_bones, hand_bones=(), 
             Lq = np.tile(ref_lab[k], (len(q), 1))
             if len(src):
                 col, ok = _knn_fill(X[src], out[src], X[q], k=6, max_d=0.05)
-                Lq[ok, 0] = _lab(col[ok])[:, 0]
+                # lightness from round them, inside the range that kind has (v11.16: a pale neighbour lit by a
+                # white collar made the refill white)
+                lo_, hi_ = np.percentile(lab[src, 0], [5, 95])
+                Lq[ok, 0] = np.clip(_lab(col[ok])[:, 0], lo_, hi_)
             out[q] = _rgb(Lq); done[q] = True
     Xm = X * [-1, 1, 1]
     for L in np.unique(layer):
