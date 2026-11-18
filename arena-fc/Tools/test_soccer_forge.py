@@ -204,7 +204,7 @@ def main():
     check("phase sync on clip switch", "_phase" in soccer_cs and "startPhase" in soccer_cs)
     check("foot-planting IK", "SolveTwoBone" in soccer_cs and "ShortestArc" in soccer_cs)
     check("look-at and reach", "UpdateLookAt" in soccer_cs and "UpdateReach" in soccer_cs)
-    check("archetype biases", "SetArchetype" in soccer_cs and "Archetype.Explosive" in soccer_cs)
+    check("archetype biases", "SetArchetype" in soccer_cs and "Explosive" in soccer_cs)
     check("body lean/roll from acceleration", "UpdateLean" in soccer_cs)
     check("RigFactory attaches the soccer player", "AttachSoccer" in factory)
     check("RigAnimator routes to clips", "rig.Soccer.Update" in world)

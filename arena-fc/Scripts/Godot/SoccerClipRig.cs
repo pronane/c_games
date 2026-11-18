@@ -133,16 +133,17 @@ public sealed class SoccerClipRig : Node3D
     }
 
     /// <summary>Set the player's movement archetype (Phase 1.3).  Called by
-    /// the world when the character spec is known.</summary>
-    public void SetArchetype(Archetype archetype)
+    /// the world when the character spec is known.  0=Controlled,
+    /// 1=Explosive, 2=Lengthy (matches Core.Archetype enum order).</summary>
+    public void SetArchetype(int archetype)
     {
         switch (archetype)
         {
-            case Archetype.Explosive:
+            case 1: // Explosive
                 _archetypeLean = .16f; _archetypeCadence = 1.12f;
                 _archetypeStride = .92f; _archetypeRoll = .05f;
                 break;
-            case Archetype.Lengthy:
+            case 2: // Lengthy
                 _archetypeLean = .10f; _archetypeCadence = .88f;
                 _archetypeStride = 1.14f; _archetypeRoll = .03f;
                 break;
