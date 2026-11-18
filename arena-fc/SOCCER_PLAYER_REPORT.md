@@ -52,16 +52,19 @@ soccer move.
   speed/acceleration and rolls into turns. Each player has a stable style
   (stride ±7%, lean variation) seeded from their spec.
 - **Browser (GDScript)** — `BrowserBoot` loads `Data/soccer_rig.json` first
-  (same 18-bone schema), so the sculpted mesh is used with the existing
-  procedural gait. The WASM template has no glTF module, so the GLB itself
-  cannot load in the preview — the JSON is the browser path.
+  (same 18-bone schema). The WASM template has no glTF module, so the GLB
+  itself cannot load in the preview — the JSON is the browser path, and it
+  now carries the same 67 clips baked as keyframes (2.0 MB). `BrowserBoot`
+  plays them with the same cadence matching as desktop (per-clip natural
+  rates, hysteresis bands, one-shots once, lean/roll from acceleration),
+  falling back to the procedural gait if clips are absent.
 
 ## Verification
 
 | Check | Result |
 | --- | --- |
-| `Tools/build_soccer_player.py` | 122 shapes → 16,000 tris, 67 clips retargeted, GLB 3.1 MB, JSON 1.2 MB |
-| `Tools/test_soccer_forge.py` (full, with Sprite Forge venv) | **41 passed, 0 failed** |
+| `Tools/build_soccer_player.py` | 122 shapes → 16,000 tris, 67 clips retargeted, GLB 3.1 MB, JSON 2.0 MB (mesh + baked clips) |
+| `Tools/test_soccer_forge.py` (full, with Sprite Forge venv) | **52 passed, 0 failed** |
 | `Tools/test_soccer_forge.py` (system python, stdlib only) | **36 passed, 0 failed** (motion section skips) |
 | `Tools/test_pads.py` regression | **129 passed, 0 failed** |
 | `gdparse` (BrowserBoot) + tree-sitter C# (3 changed files) | clean |
@@ -70,9 +73,8 @@ soccer move.
 
 ## Limits / next steps
 
-- The browser edition animates the sculpted mesh with the procedural gait;
-  clip playback in GDScript (sample `soccer_*` clips from JSON) is the
-  natural follow-up if both editions should play identical moves.
+- The browser edition now plays the same baked clips as desktop; the
+  procedural gait remains as a fallback when clips are absent.
 - Kit detail is flat colours (no baked texture/face paint), matching Arena's
   per-club kit system. A baked texture variant can be added with
   `gamemesh.bake` + `footballer.paints` without changing the skeleton/clips.
