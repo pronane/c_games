@@ -13,6 +13,19 @@ const TEAM := 5
 
 # Baked-clip locomotion (mirrors Scripts/Godot/SoccerClipRig.cs): cadence is
 # matched to ground speed per clip so feet plant instead of sliding.
+# The shipped realistic rig is the MakeHuman 52-joint skeleton; clips and bones
+# are looked up by MH names there and by Arena names on the procedural fallback
+# rig. Resolve either to what bone_index actually holds.
+const MH_MAP := {"Hips": "pelvis", "Spine": "spine_01", "Chest": "spine_03", "Neck": "neck_01",
+	"Head": "head",
+	"LThigh": "thigh_l", "RThigh": "thigh_r", "LShin": "calf_l", "RShin": "calf_r",
+	"LFoot": "foot_l", "RFoot": "foot_r",
+	"LUpperArm": "upperarm_l", "RUpperArm": "upperarm_r",
+	"LForearm": "lowerarm_l", "RForearm": "lowerarm_r",
+	"LHand": "hand_l", "RHand": "hand_r"}
+func bname(n: String) -> String:
+	return n if bone_index.has(n) else MH_MAP.get(n, n)
+
 const CLIP_ALIASES := {"idle": "soccer_idle", "run": "soccer_run", "kick": "soccer_kick_place",
 	"tackle": "soccer_tackle", "slide": "soccer_slide_tackle", "dive": "soccer_keeper_dive_left",
 	"catch": "soccer_keeper_catch", "foul": "soccer_foul", "celebrate": "soccer_celebrate",
@@ -324,11 +337,30 @@ func mat_for(idx: int, cols: Array) -> StandardMaterial3D:
 func make_rig(cols: Array) -> Node3D:
 	return RigBuilder.build(rig_data, cols)
 
+func assign_variant(r: Node3D, vi: int) -> void:
+	# Realistic rig ships v0 (base mesh) plus variant_sets for v2 / v6.
+	var want := ["v0", "v2", "v6"][clampi(vi, 0, 2)]
+	var base_mi := r.get_meta("mi") as MeshInstance3D
+	if base_mi != null:
+		base_mi.visible = want == "v0"
+	var vs: Dictionary = r.get_meta("variant_meshes", {})
+	for k in vs.keys():
+		(vs[k] as MeshInstance3D).visible = str(k) == want
+
 func recolor(r: Node3D, cols: Array) -> void:
-	var am := (r.get_meta("mi") as MeshInstance3D).mesh as ArrayMesh
 	var mats: Array = rig_data["mats"]
-	for s in range(am.get_surface_count()):
-		am.surface_set_material(s, mat_for(int(mats[s]), cols))
+	var targets: Array = [r.get_meta("mi")]
+	var vs: Dictionary = r.get_meta("variant_meshes", {})
+	for k in vs.keys():
+		targets.append(vs[k])
+	for mi in targets:
+		if mi == null:
+			continue
+		var am := (mi as MeshInstance3D).mesh as ArrayMesh
+		if am == null:
+			continue
+		for s in range(am.get_surface_count()):
+			am.surface_set_material(s, mat_for(int(mats[s]), cols))
 	r.set_meta("cols", cols)
 
 # ---------------------------------------------------------------- match
@@ -364,6 +396,7 @@ func reset_positions() -> void:
 			}
 			players.append(p)
 			var r := make_rig(cols)
+			assign_variant(r, (side * TEAM + i) % 3)
 			r.position = p["pos"]
 			world.add_child(r)
 			rigs.append(r)
@@ -1477,16 +1510,16 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 		var q0 := Quaternion(float(rarr[f0 * 4]), float(rarr[f0 * 4 + 1]), float(rarr[f0 * 4 + 2]), float(rarr[f0 * 4 + 3]))
 		var q1 := Quaternion(float(rarr[f1 * 4]), float(rarr[f1 * 4 + 1]), float(rarr[f1 * 4 + 2]), float(rarr[f1 * 4 + 3]))
 		var q := q0.slerp(q1, frac)
-		if bname == "Hips":
+		if bname == root_name:
 			var tarr: Array = entry["t"]
 			var tp0 := Vector3(float(tarr[f0 * 3]), float(tarr[f0 * 3 + 1]), float(tarr[f0 * 3 + 2]))
 			var tp1 := Vector3(float(tarr[f1 * 3]), float(tarr[f1 * 3 + 1]), float(tarr[f1 * 3 + 2]))
 			sk.set_bone_pose_position(bi, tp0.lerp(tp1, frac))
 		sk.set_bone_pose_rotation(bi, q)
 	# Lean / roll / look on top of the clip.
-	var hips_i: int = bone_index.get("Hips", -1)
-	var chest_i: int = bone_index.get("Chest", -1)
-	var neck_i: int = bone_index.get("Neck", -1)
+	var hips_i: int = bone_index.get(bname("Hips"), -1)
+	var chest_i: int = bone_index.get(bname("Chest"), -1)
+	var neck_i: int = bone_index.get(bname("Neck"), -1)
 	if hips_i >= 0:
 		var hq := sk.get_bone_pose_rotation(hips_i)
 		var lean_q := Quaternion(Vector3.RIGHT, float(p["clip_lean"]))
@@ -1508,9 +1541,9 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 func apply_foot_ik(sk: Skeleton3D, p: Dictionary, r: Node3D) -> void:
 	var ground_y := float(r.position.y)
 	for side in ["L", "R"]:
-		var thigh_i: int = bone_index.get("Thigh" + side, -1)
-		var shin_i: int = bone_index.get("Shin" + side, -1)
-		var foot_i: int = bone_index.get("Foot" + side, -1)
+		var thigh_i: int = bone_index.get(bname("Thigh" + side), -1)
+		var shin_i: int = bone_index.get(bname("Shin" + side), -1)
+		var foot_i: int = bone_index.get(bname("Foot" + side), -1)
 		if thigh_i < 0 or shin_i < 0 or foot_i < 0:
 			continue
 		var foot_global := sk.get_bone_global_pose(foot_i).origin
@@ -1565,8 +1598,8 @@ func apply_look_reach(sk: Skeleton3D, p: Dictionary, r: Node3D) -> void:
 	var dist := to_ball.length()
 	if dist < 0.01:
 		return
-	var neck_i: int = bone_index.get("Neck", -1)
-	var head_i: int = bone_index.get("Head", -1)
+	var neck_i: int = bone_index.get(bname("Neck"), -1)
+	var head_i: int = bone_index.get(bname("Head"), -1)
 	if neck_i >= 0:
 		var ball_yaw := atan2(-to_ball.x, -to_ball.z)
 		var yaw_diff := clampf(wrapf(ball_yaw - float(p.get("yaw", 0.0)), -PI, PI), -0.9, 0.9)
@@ -1579,8 +1612,8 @@ func apply_look_reach(sk: Skeleton3D, p: Dictionary, r: Node3D) -> void:
 	# Arm reach when the ball is close (trapping/receiving).
 	var reach := clampf(1.0 - (dist - 0.4) / 1.2, 0.0, 1.0)
 	if reach > 0.01:
-		var ua_i: int = bone_index.get("UpperArmR", -1)
-		var la_i: int = bone_index.get("LowerArmR", -1)
+		var ua_i: int = bone_index.get(bname("RUpperArm"), -1)
+		var la_i: int = bone_index.get(bname("RForearm"), -1)
 		if ua_i >= 0:
 			sk.set_bone_pose_rotation(ua_i, Quaternion(Vector3.RIGHT, -reach * 1.1))
 		if la_i >= 0:
@@ -1668,8 +1701,9 @@ func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw 
 	pose_bone(sk, "RForearm", rfa)
 
 func pose_bone(sk: Skeleton3D, name: String, euler: Vector3) -> void:
-	if bone_index.has(name):
-		sk.set_bone_pose_rotation(int(bone_index[name]), Quaternion.from_euler(euler))
+	var key := bname(name)
+	if bone_index.has(key):
+		sk.set_bone_pose_rotation(int(bone_index[key]), Quaternion.from_euler(euler))
 
 func pass_ball(from: int, through: bool, input_dir := Vector3.ZERO, aerial := false) -> void:
 	if ball["owner"] != from or not pending.is_empty():

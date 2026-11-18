@@ -88,12 +88,12 @@ func _run() -> void:
 	ok(not rd.is_empty() and PR.validate(rd) == "", "shipped rig validates: " + PR.validate(rd))
 	var rig := PR.build(rd, [Color.RED, Color.WHITE, Color.BLUE])
 	var sk: Skeleton3D = rig.get_meta("sk")
-	ok(sk.get_bone_count() == 18, "18 bones built: %d" % sk.get_bone_count())
+	ok(sk.get_bone_count() == 52, "52 bones built: %d" % sk.get_bone_count())
 	var mi: MeshInstance3D = rig.get_meta("mi")
-	ok((mi.mesh as ArrayMesh).get_surface_count() == 9, "9 surfaces (skin, shirt, shorts, socks, trim, badge, hair, eyes, boots)")
+	ok((mi.mesh as ArrayMesh).get_surface_count() == 7, "7 surfaces (skin, shirt, shorts, socks, hair/eyes-family, eyes, boots)")
 	var bad := rd.duplicate(true); bad["bi"][0] = 99
 	ok(PR.validate(bad) != "", "bad bone index rejected: " + PR.validate(bad))
-	var bad2 := rd.duplicate(true); bad2["bones"][3]["n"] = "X"; bad2["bones"][2]["n"] = "Y"
+	var bad2 := rd.duplicate(true); bad2["bones"][0]["n"] = "X"; bad2["bones"][1]["n"] = "Y"
 	ok(PR.validate(bad2) != "", "missing required bone rejected")
 	var node := PR.new(); root.add_child(node); await process_frame
 	ok(node.skeleton != null and node.get_child_count() >= 1, "node-style rig builds itself")

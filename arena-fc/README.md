@@ -1,11 +1,14 @@
 # Arena FC — 3D football + in‑game rigged character studio
 
 **Arena FC** is an original 3D football game written in **C# / Godot 4.7.2 (.NET 9)**.
-Every player is a procedurally generated, **skeleton‑rigged, skinned 3D mesh** (18 bones,
-four bone weights per vertex, nine PBR material surfaces). A **character editor inside the
-game** lets you change proportions, kit, face, attributes and individual bone poses of
-every squad member before taking that squad into a match, save/load them as JSON, or
-export them as a standard **`.glb`** file.
+Match players on the pitch are the **Sprite Forge realistic footballer**: a MakeHuman‑derived
+mesh with baked skin/eye/hair atlases on the full **52‑joint skeleton**, three identities
+(v0/v2/v6) picked per character, 71 soccer animation clips, and flat per‑club kit slots so
+every club still gets its own colours. The 18‑bone procedural rig remains for the in‑game
+editor preview and as a fallback when the realistic rig is unavailable. A **character editor
+inside the game** lets you change proportions, kit, face and attributes of every squad
+member before taking that squad into a match, save/load them as JSON, or export them as a
+standard **`.glb`** file. See `SOCCER_PLAYER_REPORT.md` for the build pipeline.
 
 No FIFA, PES, eFootball or other copyrighted assets, branding, likenesses, kits, audio or
 proprietary code are used. All clubs, players, meshes, shaders and UI are original and
@@ -186,8 +189,11 @@ Scripts/Core/      pure C#, zero Godot references — testable outside the engin
   RigDefinition.cs  RigBuilder → 18 bones, mesh, 4 weights/vertex, 9 surfaces
   Teams.cs          fictional clubs, formations, roster generation
   Match.cs          fixed-step deterministic match engine + rules + AI + events
+Data/models/soccer_player.glb   Sprite Forge realistic player (52-joint MH, 71 clips, v0/v2/v6)
+Data/soccer_rig.json            browser edition: same player baked for the GDScript runtime
 Scripts/Godot/     Godot glue
   RigFactory.cs     Skeleton3D + Skin + skinned ArrayMesh + PBR materials
+  SoccerClipRig.cs  plays the 71 clips from PlayerState (IK, look-at, archetypes)
   World3D.cs        stadium, goals, nets, crowd, ball, cameras, skeletal animation
   MatchView.cs      simulation → 3D transforms/HUD each physics tick
   CharacterEditor.cs, Hud.cs, Controls.cs, Ui.cs, GameApp.cs, GlbExporter.cs

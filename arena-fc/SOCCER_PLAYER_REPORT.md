@@ -77,14 +77,60 @@ soccer move.
 | WASM preview rebuilt + served | 35 staged files incl. `soccer_rig.json`; `/`, `godot.mjs`, `godot.wasm`, manifest all HTTP 200 |
 | CI (`arena-fc-tests.yml`) | new `Sprite Forge soccer player checks` step; `dotnet-core` builds the C# loader |
 
+## Option 2 (2026-11-18) — the realistic player
+
+Pulling the latest `main` (`49be53a`) made the "sculpted mannequin" route a
+known quantity: rebuilding it with the newest Sprite Forge (**v11.17**) yields a
+byte-identical GLB — v11.14–v11.17 only touched the capture/scan head path, not
+the `sforge.footballer` sculpt. So the visible step-change is a new build:
+
+| Artifact | Path | What it is |
+| --- | --- | --- |
+| Realistic GLB | `Data/models/soccer_player.glb` (12.8 MB) | **MakeHuman-derived footballer** from `Gaelic_Football_3d/assets/models/gaelic_player.glb` (same source GAA/AFL/Hurling use): real anatomy mesh, baked skin/eye/hair/beard atlases, smooth normals, **52-joint MH skeleton** incl. fingers, ball-of-foot, neck |
+| Browser rig | `Data/soccer_rig.json` (12.1 MB) | Same player in the `rig_default.json` schema (v0 base, `variant_sets` for v2/v6) + all 71 clips baked for the GDScript runtime |
+| Manifest | `Data/soccer_player_manifest.json` | Clip list + events + aliases, `look: "realistic"`, `skeleton: "makehuman-52"`, `variants: [v0, v2, v6]` |
+| Builder | `Tools/build_soccer_realistic.py` | Reproducible: extracts the three identities from the source, swaps the GAA `kit` material for flat per-club jersey/shorts/socks/boots slots (white PNGs the engine multiplies), retargets the 71 mannequin soccer clips onto the MH skeleton twice (rest-matched for desktop, identity-rest for the browser) |
+
+**Identities:** v0 (clean-shaven), v2 (beard + blue-green eyes), v6 (afro,
+brownlight eyes). Desktop picks per character from the stable `CharacterSpec.Id`;
+the three sets share one skeleton, one skin and one animation bank — only the
+visible mesh toggles. The browser edition ships all three as well (three meshes
+per rig, one visible) — this is what costs the 12 MB JSON; gzip on the static
+host mitigates most of it.
+
+**Runtime changes:** the C# loader (`SoccerClipRig.cs`) now resolves bones by
+MakeHuman names (`thigh_l`, `calf_l`, … — the old `shin_L` lookup never matched,
+so foot-planting IK and look-at were silently dead), hides the two unpicked
+identity meshes per player, and tints by material **name** so all three
+identities follow club colours. Skin, eyes and facial atlases are left natural
+(multiply-tinting them would corrupt the baked shading). GDScript
+(`ProceduralRig3D.gd`, `BrowserBoot.gd`) validates either skeleton family
+(Arena-18 or MakeHuman-52), builds the extra identity meshes sharing the one
+skin, poses bones by MH names when present, and recolours every identity mesh.
+The foot IK / reach arm bug where the browser looked up `UpperArmR` (never a
+real bone name) is fixed as well.
+
+**Verification** (all local, CI re-runs the same):
+`Tools/build_soccer_realistic.py` 108,375 tris total; GLB round-trips through a
+strict glTF reader (`gltfread`): 52 joints, 71 clips × 53 channels, pelvis
+translation present, weights sum to 1, pose ranges sane (idle hips 0.93 m, keeper
+dive head at 0.26 m, header apex 1.91 m). `test_soccer_forge.py` **101 passed**
+(stdlib python: **99**, motion section needs the venv), `test_pads.py` **129
+passed**, GDScript parses via `gdparse` (Godot CI job compiles it for real).
+
 ## Limits / next steps
 
 - The browser edition now plays the same baked clips as desktop; the
   procedural gait remains as a fallback when clips are absent.
-- Kit detail is flat colours (no baked texture/face paint), matching Arena's
-  per-club kit system. A baked texture variant can be added with
-  `gamemesh.bake` + `footballer.paints` without changing the skeleton/clips.
-- All players share the 1.77 m base height; the C# loader scales the rig
-  node by `CharacterSpec.Height`, so editor height edits still work.
-- Native Windows rebuild + physical gameplay recording remain user-side
-  checks (no `dotnet`/`godot` in the sandbox); CI compiles the C# loader.
+- The realistic rig ignores `SkinHex`, `HairStyle` etc. — faces come from the
+  three shipped identities (v0/v2/v6); extending to more (e.g. v1/v4/v6) is
+  "extract more variants", a one-line change in the builder.
+- In-game visual check remains user-side: no Godot/.NET in the sandbox, so
+  renders/screenshots must come from CI artifacts or the host machine.
+- `soccer_rig.json` is **12.1 MB** — heavy; the browser could ship only v0
+  (drops ~8 MB) if the transfer cost matters on slow connections.
+- Kit detail is flat colours (no fabric weave), matching Arena's per-club kit
+  system; the realistic body/face still carries the original MH textures.
+- All players share one 1.77 m mesh; the C# loader scales the rig node by
+  `CharacterSpec.Height`, so editor height edits still work.
+- Editor preview/`rig_default.json` stays the 18-bone procedural rig.
