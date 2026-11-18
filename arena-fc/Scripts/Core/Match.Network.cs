@@ -154,6 +154,7 @@ public sealed partial class MatchEngine
             p.Home = new Vector3(d.Hx, 0f, d.Hz);
             p.Target = new Vector3(d.Tx, 0f, d.Tz);
             p.Stamina = d.St; p.AnimPhase = d.Ap; p.ActionTimer = d.At;
+            p.ActionDuration = d.Ad; p.ActionContactAt = d.Ac;
             p.DecisionTimer = d.Dt; p.PossessionLock = d.Pl; p.TackleLock = d.Tl;
             p.Action = d.A; p.IsKeeper = d.Ik; p.Cards = d.C;
             p.Pressing = d.Pr; p.Shielding = d.Sh;
@@ -169,6 +170,10 @@ public sealed partial class MatchEngine
         s.Ball.PassTarget = new Vector3(b.Px, 0f, b.Pz);
         s.Ball.LastTouchPos = new Vector3(b.Lx, b.Ly, b.Lz);
         s.Ball.FreeTime = b.Ft; s.Ball.NoPickup = b.Np;
+        s.Ball.HasPending = b.Hp; s.Ball.PendingKind = b.Pk; s.Ball.PendingFrom = b.Pfm;
+        s.Ball.PendingVel = new Vector3(b.Pvx, b.Pvy, b.Pvz);
+        s.Ball.PendingPos = new Vector3(b.Ppx, b.Ppy, b.Ppz);
+        s.Ball.PendingNoPickup = b.Pnp; s.Ball.PendingReceiver = b.Prec;
         if (f.Score.Length >= 2) s.Score = (int[])f.Score.Clone();
         if (f.Shots.Length >= 2) s.Shots = (int[])f.Shots.Clone();
         if (f.Sot.Length >= 2) s.ShotsOnTarget = (int[])f.Sot.Clone();
@@ -199,6 +204,8 @@ public sealed partial class MatchEngine
         Spec = p.Spec, Index = p.Index, Team = p.Team, Slot = p.Slot, Role = p.Role,
         Pos = p.Pos, Vel = p.Vel, Facing = p.Facing, Home = p.Home, Target = p.Target,
         Stamina = p.Stamina, AnimPhase = p.AnimPhase, ActionTimer = p.ActionTimer,
+        ActionDuration = p.ActionDuration, ActionContactAt = p.ActionContactAt,
+        ActionReleased = p.ActionReleased,
         DecisionTimer = p.DecisionTimer, PossessionLock = p.PossessionLock,
         TackleLock = p.TackleLock, Action = p.Action, IsKeeper = p.IsKeeper,
         Cards = p.Cards, Pressing = p.Pressing, Shielding = p.Shielding,
@@ -211,6 +218,10 @@ public sealed partial class MatchEngine
         Owner = b.Owner, LastTouch = b.LastTouch, LastTouchSide = b.LastTouchSide,
         PassFrom = b.PassFrom, PassReceiver = b.PassReceiver,
         LastTouchPos = b.LastTouchPos, FreeTime = b.FreeTime, NoPickup = b.NoPickup,
+        HasPending = b.HasPending, PendingKind = b.PendingKind, PendingFrom = b.PendingFrom,
+        PendingVel = b.PendingVel, PendingSpin = b.PendingSpin, PendingPos = b.PendingPos,
+        PendingTarget = b.PendingTarget, PendingNoPickup = b.PendingNoPickup,
+        PendingReceiver = b.PendingReceiver,
     };
 
     internal static MatchState CloneState(MatchState s)

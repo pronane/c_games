@@ -54,13 +54,15 @@ float avgNearBall = nearBallTotal / 3600f;
 // Before the possession fix: flips=653, longestHold=376.
 // Before the pressing fix: tackles=7, nearTicks=579.
 // Before the spacing/foul fix: avgNearBall=2.62, fouls=4 with no visible contact.
+// Phase 0 first-touch delay (ball loose ~0.25 s during trap) draws players in
+// slightly, so the baseline moved 2.55 -> 2.58; 2.60 stays below the 2.62 bad mark.
 Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
 Check("a carrier can dribble for several seconds", longestHold > 180,
       $"longest={longestHold} ticks");
 Check("opposition closes down the carrier", nearTicks > 400, $"nearTicks={nearTicks}");
 Check("opposition wins the ball back", tackles >= 10, $"tackles={tackles}");
 Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={fouls}");
-Check("players keep personal space around the ball", avgNearBall < 2.55f,
+Check("players keep personal space around the ball", avgNearBall < 2.60f,
       $"avgWithin4m={avgNearBall:F3}");
 
 Section("Gait joint sign convention");
@@ -194,6 +196,8 @@ Check("through ball fires on the first tick", through.State.Passes[0] > 0,
 
 var longBall = Playable(0, 18f);
 longBall.Step(1f / 60f, new PlayerCommand { Lob = true });
+// Phase 0: the ball is released at the clip's ball_contact frame, not instantly.
+for (int i = 0; i < 15; i++) longBall.Step(1f / 60f, PlayerCommand.None);
 Check("long ball is an aerial pass to a distant target",
       longBall.State.Passes[0] > 0 && longBall.State.Ball.Vel.Y > 1f,
       $"passes={longBall.State.Passes[0]} vy={longBall.State.Ball.Vel.Y:F2}");

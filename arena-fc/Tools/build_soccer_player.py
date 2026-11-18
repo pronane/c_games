@@ -224,6 +224,19 @@ def main() -> int:
         # JSON.  The Web template has no glTF module, so the browser cannot
         # read the GLB at runtime -- BrowserBoot plays these instead, with
         # the same cadence matching as the desktop SoccerClipRig.
+        def _events_for(cname, frames):
+            ev = SM.CLIP_EVENTS.get(cname, {"ball_contact": -1.0, "footsteps": [],
+                                            "hit_start": -1.0, "hit_end": -1.0})
+            def _fr(frac):
+                return int(round(frac * (frames - 1))) if frac >= 0 else -1
+            return {
+                "ball_contact": _fr(ev["ball_contact"]),
+                "ball_contact_frac": float(ev["ball_contact"]),
+                "footsteps": [_fr(f) for f in ev.get("footsteps", [])],
+                "hit_start": _fr(ev.get("hit_start", -1.0)),
+                "hit_end": _fr(ev.get("hit_end", -1.0)),
+            }
+
         clips_out = {}
         for cname, cl in tgt.clips.items():
             t_stripped = RR.strip_root_motion(tgt, cl)
@@ -236,6 +249,7 @@ def main() -> int:
             clips_out[cname] = {
                 "fps": float(cl.fps), "frames": int(cl.frames),
                 "loop": bool(cname in SM.LOOP_CLIPS), "bones": bones_out,
+                "events": _events_for(cname, int(cl.frames)),
             }
         data["clips"] = clips_out
         with open(json_path, "w") as f:
@@ -243,6 +257,20 @@ def main() -> int:
         print("  wrote %s (%.1f MB, %d verts, %d tris)" % (json_path, os.path.getsize(json_path) / 1e6, len(m.V), len(m.F)))
 
     # ---- 5. manifest ----------------------------------------------------------
+    def _manifest_events(n):
+        ev = SM.CLIP_EVENTS.get(n, {"ball_contact": -1.0, "footsteps": [],
+                                    "hit_start": -1.0, "hit_end": -1.0})
+        frames = int(tgt.clips[n].frames)
+        def _fr(frac):
+            return int(round(frac * (frames - 1))) if frac >= 0 else -1
+        return {
+            "ball_contact": _fr(ev["ball_contact"]),
+            "ball_contact_frac": float(ev["ball_contact"]),
+            "footsteps": [_fr(f) for f in ev.get("footsteps", [])],
+            "hit_start": _fr(ev.get("hit_start", -1.0)),
+            "hit_end": _fr(ev.get("hit_end", -1.0)),
+        }
+
     manifest = {
         "generator": "ArenaFC soccer rig (Tools/build_soccer_player.py)",
         "sprite_forge": "v11.13 (main 891facd)",
@@ -252,7 +280,8 @@ def main() -> int:
         "layer_slots": LAYER_SLOT,
         "clips": [
             {"name": n, "loop": bool(SM.LOOP_CLIPS.__contains__(n)), "category": SM.CLIP_CATEGORIES[n],
-             "source": SM.CLIP_SOURCES[n], "frames": int(tgt.clips[n].frames), "fps": float(tgt.clips[n].fps)}
+             "source": SM.CLIP_SOURCES[n], "frames": int(tgt.clips[n].frames), "fps": float(tgt.clips[n].fps),
+             "events": _manifest_events(n)}
             for n in SM.ALL_CLIPS
         ],
         "action_aliases": SM.ACTION_ALIASES,

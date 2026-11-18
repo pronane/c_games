@@ -28,6 +28,8 @@ public sealed partial class SoccerClipRig : Node3D
 
     private readonly Dictionary<string, string> _aliases = new();
     private readonly HashSet<string> _loops = new();
+    private readonly Dictionary<string, float> _clipDuration = new();
+    private readonly Dictionary<string, float> _contactFrac = new();
     private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
@@ -40,6 +42,9 @@ public sealed partial class SoccerClipRig : Node3D
     private float _lean, _roll;
     private float _styleStride = 1f, _styleLean = 1f;
     private System.Numerics.Vector3 _prevVel = System.Numerics.Vector3.Zero;
+    // Phase 0.4 turn detection: previous facing + cooldown so cuts play once.
+    private System.Numerics.Vector3 _prevFacing = new(0, 0, 1);
+    private float _turnCooldown;
 
     // Foot travel per 1 s clip cycle, measured from the GLB (metres).  At
     // SpeedScale 1.0 the feet move at this rate, so SpeedScale =
@@ -116,8 +121,16 @@ public sealed partial class SoccerClipRig : Node3D
                 foreach (var p in aliases.EnumerateObject()) _aliases[p.Name] = p.Value.GetString() ?? p.Name;
             if (root.TryGetProperty("clips", out var clips))
                 foreach (var c in clips.EnumerateArray())
-                    if (c.TryGetProperty("loop", out var loop) && loop.GetBoolean()
-                        && c.TryGetProperty("name", out var nm)) _loops.Add(nm.GetString() ?? "");
+                {
+                    if (!c.TryGetProperty("name", out var nm)) continue;
+                    string clipName = nm.GetString() ?? "";
+                    if (c.TryGetProperty("loop", out var loop) && loop.GetBoolean()) _loops.Add(clipName);
+                    if (c.TryGetProperty("fps", out var fps) && c.TryGetProperty("frames", out var frames))
+                        _clipDuration[clipName] = frames.GetSingle() / Math.Max(1f, fps.GetSingle());
+                    if (c.TryGetProperty("events", out var ev)
+                        && ev.TryGetProperty("ball_contact_frac", out var bc) && bc.ValueKind != JsonValueKind.Null)
+                        _contactFrac[clipName] = bc.GetSingle();
+                }
             if (root.TryGetProperty("materials", out var mats))
             {
                 _materialOrder.Clear();
@@ -164,7 +177,11 @@ public sealed partial class SoccerClipRig : Node3D
     /// FIFA-style locomotion: cadence is matched to ground speed per clip
     /// (foot speed ~= ground speed, no treadmill sliding), bands have
     /// hysteresis, one-shots play once, and the body leans with speed,
-    /// acceleration and turns.</summary>
+    /// acceleration and turns.  Phase 0.1: one-shot clips are speed-matched
+    /// so the ball_contact frame lands at the sim's contact time (the sim
+    /// releases/captures the ball at ActionContactAt, which is derived from
+    /// the same clip fraction).  Phase 0.4: sharp turns select the cut /
+    /// turn clips by turn rate.</summary>
     public void Update(PlayerState p, float dt)
     {
         if (Player == null) return;
@@ -188,7 +205,16 @@ public sealed partial class SoccerClipRig : Node3D
         if (oneShot && !Player.IsPlaying()) _oneShotDone = true;
         if (oneShot)
         {
-            Player.SpeedScale = 1f;
+            // Speed-match so contact aligns with the sim: the sim fires at
+            // ActionContactAt = duration * frac, the clip hits contact at
+            // clipDuration * frac, so SpeedScale = clipDuration / duration
+            // puts both on the same frame.  No contact event -> natural play.
+            float scale = 1f;
+            if (_contactFrac.TryGetValue(clip, out float frac) && frac >= 0f
+                && _clipDuration.TryGetValue(clip, out float clipDur)
+                && p.ActionDuration > 0.01f)
+                scale = Math.Clamp(clipDur / p.ActionDuration, 0.6f, 1.8f);
+            Player.SpeedScale = scale;
         }
         else
         {
@@ -204,6 +230,8 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = _speedScale;
         }
         UpdateLean(p, dt, speed);
+        _prevFacing = Mx.Norm(Mx.Flat(p.Facing));
+        if (_prevFacing.LengthSquared() < 0.001f) _prevFacing = new System.Numerics.Vector3(0, 0, 1);
     }
 
     private string SelectClip(PlayerState p, float speed, out bool oneShot)
@@ -224,6 +252,26 @@ public sealed partial class SoccerClipRig : Node3D
 
     private string SelectLocomotion(PlayerState p, float speed)
     {
+        // Phase 0.4: sharp turns at speed select the cut / turn clips by
+        // turn rate (rad/s between previous and current facing).  A 0.6 s
+        // cooldown stops the cut replaying every frame of a long turn.
+        _turnCooldown = Math.Max(0f, _turnCooldown - 1f / 60f);
+        if (speed > 1.2f && _turnCooldown <= 0f)
+        {
+            var fwd = Mx.Norm(Mx.Flat(p.Facing));
+            if (fwd.LengthSquared() > 0.001f)
+            {
+                float dot = Math.Clamp(_prevFacing.X * fwd.X + _prevFacing.Z * fwd.Z, -1f, 1f);
+                float turnRate = (float)Math.Acos(dot) * 60f; // rad/s at 60 Hz
+                if (turnRate > 2.2f)
+                {
+                    _turnCooldown = 0.6f;
+                    // Directional turn variants are Phase 1.4; the single
+                    // turn/cut clip covers both directions for now.
+                    return "soccer_turn";
+                }
+            }
+        }
         // Hysteresis: stay in the current band until speed clearly leaves
         // it, so hovering at a threshold doesn't flicker clips.
         string cur = _current;
