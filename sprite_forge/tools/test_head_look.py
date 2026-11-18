@@ -100,6 +100,18 @@ def hair_checks():
     e_fr = float(np.linalg.norm(np.median(lo[fringe], 0) - fr_ref))
     rec("11 scalp: a blue patch on skin is filled, a fringe keeps its colour", e_patch < 6.0 and e_fr < 3.0,
         "patch off by %.1f, fringe moved %.1f" % (e_patch, e_fr))
+    # 22 a blue patch ringed by a few near-white texels (a white collar's light): the refill keeps skin lightness
+    mix = np.tile([[190.0, 140, 115]], (N, 1)) + rng.normal(0, 3, (N, 3))
+    patch = back & ~fringe
+    ring = ~patch & (np.min(np.linalg.norm(X[:, None, :] - X[patch][None, ::40], axis=2), 1) < 0.006)
+    mix[patch] = mix[patch] * [0.6, 0.75, 1.6]
+    mix[ring] = [248.0, 236, 222]
+    o, _, _ = CC.clean(np.clip(mix, 0, 255), seen, X, layer0, np.full(N, 2), bone, protect, [], (),
+                       log=lambda *a: None, scalp=np.ones(N, bool), flatten=0)
+    Lp = CC._lab(o[patch])[:, 0]; Ls = CC._lab(mix[~patch & ~ring])[:, 0]
+    rec("22 a refilled scalp patch beside bright texels keeps the skin's lightness",
+        np.percentile(Lp, 95) <= np.percentile(Ls, 95) + 1.0 and ring.sum() < 0.05 * N,
+        "patch lightness up to %.0f, skin's up to %.0f (%d bright texels)" % (np.percentile(Lp, 95), np.percentile(Ls, 95), ring.sum()))
 
 
 def face_edge_checks(CT):

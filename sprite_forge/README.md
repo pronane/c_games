@@ -54,6 +54,26 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.16: no white band under the chin; the collar stays below the jaw
+
+* **The white band under the jaw (Mike).** The video sees his white shirt collar past the chin. Each frame's
+  exposure gain pushed those colours above pure white. The chin rule only dropped texels near a garment's
+  average colour, so these over-bright ones were kept.
+  - Body texels under the chin and on the neck that the video labels clothes are now dropped whatever their
+    colour, and refilled from the skin round them.
+  - Colours are clipped to 0-255 before the cleanup.
+* **The scalp step leaves the underside of the jaw alone.** v11.13's scalp check had counted the underside of
+  the jaw as scalp. That part is now left to the chin rule. A refilled scalp patch also keeps the lightness range
+  of its own kind, so a collar-lit neighbour can't make it white.
+* **The collar stays below the jaw (`capture_layers.under_jaw`).** The collar's height is measured from the
+  bottom of the neck, which at the front is close under the chin. Each worn neck vertex now stays `JAW_GAP`
+  (1.5 cm) below the head's surface above it. At the back, the collar still goes up as far as the neck allows.
+* **Tests:**
+  - New `tools/test_collar.py` (MakeHuman assets, no videos): 18 checks on a man, a woman and a smaller body,
+    with clothes voted up the whole neck and only at its base. Nothing is worn under the jaw; the collar still
+    goes up the back; a low collar stays low; the head, hands and feet are never worn.
+  - `tools/test_head_look.py` check 22: a refilled scalp patch next to bright texels keeps the skin's lightness.
+
 ## New in v11.15: the face joins the head - no "transplanted" face from the side
 
 The face is painted almost from one frame, so its eyes don't double. The sides of the head are blended from many

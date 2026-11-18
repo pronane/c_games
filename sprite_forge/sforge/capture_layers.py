@@ -119,6 +119,28 @@ def garment_offsets(bm, J, W, off):
 HEMS = {}
 
 
+JAW_GAP = 0.015                    # a collar stays this far below the head's surface above it (m)
+
+
+def under_jaw(V, bm, sel, gap=JAW_GAP, reach=0.02):
+    """mask: vertices of `sel` within `gap` below the head's surface (head-bone vertices within `reach` across,
+    above them) - under the chin and the jaw"""
+    from scipy.spatial import cKDTree
+    out = np.zeros(len(V), bool)
+    if "head" not in bm.bi or not sel.any():
+        return out
+    hv = np.nonzero((bm.J[:, 0] == bm.bi["head"]) & (bm.W[:, 0] > 0.5))[0]
+    if not len(hv):
+        return out
+    t = cKDTree(V[hv][:, [0, 2]])
+    idx = np.nonzero(sel)[0]
+    for k, nb in zip(idx, t.query_ball_point(V[idx][:, [0, 2]], r=reach)):
+        if nb:
+            jaw = V[hv[nb], 1].min()
+            out[k] = V[k, 1] > jaw - gap
+    return out
+
+
 def clothes_faces(bm, votes, min_share=0.5, shape=None, log=print):
     """body faces worn by clothes: their vertices are voted clothes, grown by one ring to close small gaps; hands,
     feet and the head never (a sleeve stops at the wrist, a collar at the neck).
@@ -175,6 +197,10 @@ def clothes_faces(bm, votes, min_share=0.5, shape=None, log=print):
                 off = np.nonzero(lab != 1)[0]
                 h = min(0.06, (off[0] if len(off) else nb) * 0.005)
             collar = nk & (y < h)
+            # v11.16: never up under the jaw. The ring's height is measured from the bottom of the neck, which at the
+            # front is close under the chin: 6 cm there ran the collar up under the jaw (white under Mike's chin,
+            # where no frame sees). Each collar vertex stays JAW_GAP below the head's surface above it
+            collar &= ~under_jaw(shape.V, bm, nk)
             hard &= ~collar
             cl[collar] = True
             if h > 0:
