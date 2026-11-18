@@ -19,9 +19,19 @@ const CLIP_ALIASES := {"idle": "soccer_idle", "run": "soccer_run", "kick": "socc
 	"volley": "soccer_volley", "header": "soccer_header", "chest_control": "soccer_chest_control",
 	"trap": "soccer_trap", "parry": "soccer_keeper_save"}
 const CLIP_NATURAL := {"soccer_walk": 0.74, "soccer_jog": 1.01, "soccer_run": 1.01,
-	"soccer_sprint": 1.22, "soccer_dribble": 0.60, "soccer_run_ball": 0.98, "soccer_shield": 0.30}
+	"soccer_sprint": 1.22, "soccer_dribble": 0.60, "soccer_run_ball": 0.98, "soccer_shield": 0.30,
+	"soccer_turn": 0.62, "soccer_strafe_l": 0.55, "soccer_strafe_r": 0.55,
+	"soccer_backpedal": 0.58, "soccer_jockey": 0.66}
 const CLIP_MAXRATE := {"soccer_walk": 2.2, "soccer_jog": 2.6, "soccer_run": 2.6,
-	"soccer_sprint": 2.8, "soccer_dribble": 1.8, "soccer_run_ball": 2.6, "soccer_shield": 1.2}
+	"soccer_sprint": 2.8, "soccer_dribble": 1.8, "soccer_run_ball": 2.6, "soccer_shield": 1.2,
+	"soccer_turn": 1.6, "soccer_strafe_l": 1.6, "soccer_strafe_r": 1.6,
+	"soccer_backpedal": 1.6, "soccer_jockey": 1.8}
+# Phase 1.3 archetype biases (mirrors SoccerClipRig.cs SetArchetype).
+const ARCHETYPE_BIAS := {
+	"explosive": {"lean": 0.16, "cadence": 1.12, "stride": 0.92, "roll": 0.05},
+	"lengthy": {"lean": 0.10, "cadence": 0.88, "stride": 1.14, "roll": 0.03},
+	"controlled": {"lean": 0.12, "cadence": 1.0, "stride": 1.0, "roll": 0.04},
+}
 
 var rig_data: Dictionary = {}
 var bone_index: Dictionary = {}
@@ -344,6 +354,8 @@ func reset_positions() -> void:
 				"home": Vector3(sign * formation[i].x * HALF_L * 0.94, 0, formation[i].y * HALF_W * 0.88),
 				"vel": Vector3.ZERO, "facing": Vector3(sign, 0, 0), "phase": rng.randf() * 6.28,
 				"keeper": i == 0, "action": "idle", "lock": 0.0,
+				"archetype": ["controlled", "explosive", "lengthy", "controlled", "explosive"][i % 5],
+				"yaw": 0.0,
 				"clip": "", "clip_t": 0.0, "clip_scale": 1.0, "clip_prev": "",
 				"clip_lean": 0.0, "clip_roll": 0.0, "clip_prev_vel": Vector3.ZERO,
 				"clip_prev_facing": Vector3(0, 0, 1), "turn_cd": 0.0,
@@ -1291,23 +1303,43 @@ func clip_played(p: Dictionary) -> bool:
 	return str(p.get("clip", "")) != ""
 
 func clip_select_locomotion(p: Dictionary, speed: float) -> String:
+	# Phase 1.1 blend space: (speed, turnRate, ballState, headingOffset) ->
+	# clip.  Directional clips (strafe/backpedal/jockey) are chosen when the
+	# velocity heading differs from facing (Phase 1.4).
 	var prev := str(p.get("clip_prev", ""))
-	# Phase 0.4: sharp turns at speed select the cut / turn clips by turn rate.
+	var has_ball: bool = int(ball.get("owner", -1)) == players.find(p)
+	# Heading offset: angle between velocity and facing (0 = forward).
+	var vel: Vector3 = p["vel"]
+	var fwd: Vector3 = Vector3(p["facing"].x, 0, p["facing"].z).normalized()
+	var heading_off := 0.0
+	if vel.length() > 0.3 and fwd.length() > 0.001:
+		var vh := Vector3(vel.x, 0, vel.z).normalized()
+		heading_off = atan2(vh.x * fwd.z - vh.z * fwd.x, vh.x * fwd.x + vh.z * fwd.z)
+	var a := absf(heading_off)
+	# Sharp turn at speed -> turn clip (Phase 0.4, kept in blend space).
 	p["turn_cd"] = maxf(0.0, float(p.get("turn_cd", 0.0)) - 1.0 / 60.0)
 	if speed > 1.2 and float(p["turn_cd"]) <= 0.0:
-		var fwd: Vector3 = Vector3(p["facing"].x, 0, p["facing"].z).normalized()
 		var pf: Vector3 = p["clip_prev_facing"]
 		if fwd.length() > 0.001 and pf.length() > 0.001:
 			var dot := clampf(pf.x * fwd.x + pf.z * fwd.z, -1.0, 1.0)
 			var turn_rate := acos(dot) * 60.0
 			if turn_rate > 2.2:
 				p["turn_cd"] = 0.6
-				# Directional turn variants are Phase 1.4; the single
-				# turn/cut clip covers both directions for now.
 				return "soccer_turn"
-	var has_ball: bool = int(ball.get("owner", -1)) == players.find(p)
-	if has_ball and speed > 0.8:
-		return "soccer_run_ball" if prev == "soccer_run_ball" else "soccer_dribble"
+	# Directional locomotion (Phase 1.4): sideways/backwards movement.
+	if not has_ball and speed > 0.4:
+		if a > 2.6:
+			return "soccer_backpedal"
+		if a > 0.5:
+			return "soccer_strafe_l" if heading_off > 0.0 else "soccer_strafe_r"
+	# Ball-state locomotion.
+	if has_ball:
+		if speed < 0.35:
+			return "soccer_shield"
+		if speed < 1.8:
+			return "soccer_dribble"
+		return "soccer_run_ball"
+	# Speed bands (forward).
 	if speed < 0.5:
 		return "soccer_idle_ready" if prev == "soccer_idle_ready" else "soccer_idle"
 	if speed < 1.7:
@@ -1352,11 +1384,12 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 			p["clip_scale"] = 1.0
 			cur = want
 		p["clip_prev"] = cur
-	# Cadence matched to ground speed (no treadmill).
+	# Cadence matched to ground speed (no treadmill), archetype-biased (1.3).
+	var arch: Dictionary = ARCHETYPE_BIAS.get(str(p.get("archetype", "controlled")), ARCHETYPE_BIAS["controlled"])
 	if CLIP_NATURAL.has(cur):
 		var nat := float(CLIP_NATURAL[cur])
 		var maxr := float(CLIP_MAXRATE[cur])
-		var target := clampf(speed / nat, 0.5, maxr)
+		var target := clampf(speed / nat, 0.5, maxr) * float(arch["cadence"])
 		p["clip_scale"] = lerpf(float(p["clip_scale"]), target, clampf(delta * 6.0, 0.0, 1.0))
 	# Forward lean from speed + acceleration, roll from lateral acceleration.
 	var prev_vel: Vector3 = p["clip_prev_vel"]
@@ -1364,8 +1397,8 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 	var fwd := Vector3(p["facing"].x, 0, p["facing"].z).normalized()
 	var a_fwd := acc.dot(fwd)
 	var a_lat := acc.dot(Vector3(-fwd.z, 0, fwd.x))
-	var lean_target := clampf(speed * 0.035 + maxf(a_fwd, 0.0) * 0.02, 0.0, 0.32)
-	var roll_target := clampf(-a_lat * 0.02, -0.18, 0.18)
+	var lean_target := clampf(speed * 0.035 + maxf(a_fwd, 0.0) * 0.02 + float(arch["lean"]) * 0.5, 0.0, 0.32)
+	var roll_target := clampf(-a_lat * 0.02 + float(arch["roll"]) * 0.3, -0.18, 0.18)
 	p["clip_lean"] = lerpf(float(p["clip_lean"]), lean_target, clampf(delta * 5.0, 0.0, 1.0))
 	p["clip_roll"] = lerpf(float(p["clip_roll"]), roll_target, clampf(delta * 5.0, 0.0, 1.0))
 	p["clip_prev_vel"] = vel
@@ -1411,6 +1444,93 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 	if neck_i >= 0:
 		var nq := sk.get_bone_pose_rotation(neck_i)
 		sk.set_bone_pose_rotation(neck_i, Quaternion(Vector3.UP, look_yaw * 0.7) * nq)
+	# Phase 1.2 foot-planting IK + 1.5 look-at/reach (mirrors SoccerClipRig.cs).
+	apply_foot_ik(sk, p, r)
+	apply_look_reach(sk, p, r)
+
+# Two-bone foot-planting IK (port of footlock._ik): plants the feet on the
+# ground plane so they don't skate during turns/cuts.  Only corrects feet
+# that are near the ground (planted phase).
+func apply_foot_ik(sk: Skeleton3D, p: Dictionary, r: Node3D) -> void:
+	var ground_y := float(r.position.y)
+	for side in ["L", "R"]:
+		var thigh_i: int = bone_index.get("Thigh" + side, -1)
+		var shin_i: int = bone_index.get("Shin" + side, -1)
+		var foot_i: int = bone_index.get("Foot" + side, -1)
+		if thigh_i < 0 or shin_i < 0 or foot_i < 0:
+			continue
+		var foot_global := sk.get_bone_global_pose(foot_i).origin
+		var height := foot_global.y - ground_y
+		if height > 0.18:
+			continue  # foot is in the air; leave the clip pose alone
+		var target := Vector3(foot_global.x, ground_y, foot_global.z)
+		solve_two_bone(sk, thigh_i, shin_i, target, r.position, float(p.get("yaw", 0.0)))
+
+func solve_two_bone(sk: Skeleton3D, thigh_i: int, shin_i: int, target: Vector3, root: Vector3, yaw: float) -> void:
+	var hip := sk.get_bone_global_pose(thigh_i).origin
+	var l1 := sk.get_bone_rest(thigh_i).origin.length()
+	var l2 := sk.get_bone_rest(shin_i).origin.length()
+	var to_target := target - hip
+	var dist := clampf(to_target.length(), 0.01, l1 + l2 - 0.001)
+	var dir := to_target.normalized()
+	var cos_a := (l1 * l1 + dist * dist - l2 * l2) / (2.0 * l1 * dist)
+	var ang_a := acos(clampf(cos_a, -1.0, 1.0))
+	var fwd := Vector3(-sin(yaw), 0, -cos(yaw))
+	var axis := dir.cross(fwd)
+	if axis.length_squared() < 1e-6:
+		axis = Vector3.UP
+	axis = axis.normalized()
+	var knee_dir := dir.rotated(axis, ang_a)
+	var knee := hip + knee_dir * l1
+	var thigh_q := shortest_arc(sk.get_bone_rest(thigh_i).origin.normalized(), knee_dir)
+	var shin_dir := (target - knee).normalized()
+	var shin_q := shortest_arc(sk.get_bone_rest(shin_i).origin.normalized(), shin_dir)
+	sk.set_bone_pose_rotation(thigh_i, thigh_q)
+	sk.set_bone_pose_rotation(shin_i, shin_q)
+
+func shortest_arc(from: Vector3, to: Vector3) -> Quaternion:
+	from = from.normalized()
+	to = to.normalized()
+	var dot := clampf(from.dot(to), -1.0, 1.0)
+	if dot > 0.999999:
+		return Quaternion.IDENTITY
+	if dot < -0.999999:
+		var axis := from.cross(Vector3.UP)
+		if axis.length_squared() < 1e-6:
+			axis = from.cross(Vector3.RIGHT)
+		return Quaternion(axis.normalized(), PI)
+	var axis2 := from.cross(to).normalized()
+	return Quaternion(axis2, acos(dot))
+
+# Head look-at + arm reach toward the ball (Phase 1.5).
+func apply_look_reach(sk: Skeleton3D, p: Dictionary, r: Node3D) -> void:
+	var ball_pos: Vector3 = ball.get("pos", Vector3.ZERO)
+	if ball_pos == Vector3.ZERO:
+		return
+	var to_ball := ball_pos - (r.position + Vector3.UP * 1.6)
+	var dist := to_ball.length()
+	if dist < 0.01:
+		return
+	var neck_i: int = bone_index.get("Neck", -1)
+	var head_i: int = bone_index.get("Head", -1)
+	if neck_i >= 0:
+		var ball_yaw := atan2(-to_ball.x, -to_ball.z)
+		var yaw_diff := clampf(wrapf(ball_yaw - float(p.get("yaw", 0.0)), -PI, PI), -0.9, 0.9)
+		var pitch := clampf(atan2(to_ball.y, Vector2(to_ball.x, to_ball.z).length()), -0.5, 0.5)
+		var nq := sk.get_bone_pose_rotation(neck_i)
+		sk.set_bone_pose_rotation(neck_i, Quaternion(Vector3.UP, yaw_diff) * Quaternion(Vector3.RIGHT, pitch) * nq)
+		if head_i >= 0:
+			var hq := sk.get_bone_pose_rotation(head_i)
+			sk.set_bone_pose_rotation(head_i, Quaternion(Vector3.UP, yaw_diff * 0.5) * Quaternion(Vector3.RIGHT, pitch * 0.5) * hq)
+	# Arm reach when the ball is close (trapping/receiving).
+	var reach := clampf(1.0 - (dist - 0.4) / 1.2, 0.0, 1.0)
+	if reach > 0.01:
+		var ua_i: int = bone_index.get("UpperArmR", -1)
+		var la_i: int = bone_index.get("LowerArmR", -1)
+		if ua_i >= 0:
+			sk.set_bone_pose_rotation(ua_i, Quaternion(Vector3.RIGHT, -reach * 1.1))
+		if la_i >= 0:
+			sk.set_bone_pose_rotation(la_i, Quaternion(Vector3.RIGHT, -reach * 0.4))
 
 func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw := 0.0) -> void:
 	var sk := r.get_meta("sk") as Skeleton3D

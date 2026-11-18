@@ -115,6 +115,16 @@ public static class Clubs
                 Goalkeeping = i == 0 ? Mx.Clamp(club.Strength + .12f, .5f, .99f) : .12f,
                 StaminaMax = rng.Range(.76f, .95f),
             };
+            // Phase 1.3 archetype: pacy forwards are Explosive, tall defenders
+            // are Lengthy, everyone else Controlled (FC 26-style movement types).
+            p.Archetype = p.Role switch
+            {
+                Role.Goalkeeper => Archetype.Controlled,
+                Role.Forward => p.Pace > .78f ? Archetype.Explosive : Archetype.Controlled,
+                Role.Defender => p.Height > 1.88f ? Archetype.Lengthy : Archetype.Controlled,
+                Role.Midfielder => p.Pace > .82f ? Archetype.Explosive : Archetype.Controlled,
+                _ => Archetype.Controlled,
+            };
             p.Sanitize();
             list.Add(p);
         }

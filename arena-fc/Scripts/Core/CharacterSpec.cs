@@ -11,6 +11,13 @@ namespace ArenaFC.Core;
 
 public enum Role { Goalkeeper, Defender, Midfielder, Forward }
 
+/// <summary>Movement archetype (Phase 1.3, AME): how a player strides, leans
+/// and turns.  Explosive = short stride / high cadence / quick accel;
+/// Lengthy = long stride / low cadence / covers ground; Controlled = balanced.
+/// Drives the runtime style in SoccerClipRig (stride, lean, cadence bias) and
+/// the loco() generation presets in Tools/soccer_motions.py.</summary>
+public enum Archetype { Controlled, Explosive, Lengthy }
+
 public sealed class CharacterSpec
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..10];
@@ -18,6 +25,7 @@ public sealed class CharacterSpec
     public string DisplayName { get; set; } = "A. PLAYER";
     public int Number { get; set; } = 10;
     public Role Role { get; set; } = Role.Midfielder;
+    public Archetype Archetype { get; set; } = Archetype.Controlled;
 
     // --- Rig proportions (all editable in-game, live on the skinned mesh) ---
     public float Height { get; set; } = 1.82f;       // metres
