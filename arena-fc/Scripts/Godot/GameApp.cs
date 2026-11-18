@@ -9,11 +9,15 @@ using Godot;
 
 namespace ArenaFC.GodotGame;
 
+/// <summary>Phase 3.6 game mode.</summary>
+public enum GameMode { Kickoff, Tournament, Training, Shootout }
+
 public partial class GameApp : Node3D
 {
     public static GameApp? Instance;
     public MatchOptions Options = new();
     public List<CharacterSpec>? CustomHome;
+    public GameMode Mode = GameMode.Kickoff;
 
     private Node3D _menuWorld = null!;
     private Camera3D _menuCam = null!;
@@ -103,6 +107,9 @@ public partial class GameApp : Node3D
 
         var menu = Ui.VBox(10);
         menu.AddChild(Ui.Btn("PLAY MATCH", StartMatch, true));
+        menu.AddChild(Ui.Btn("TOURNAMENT", () => StartTournament()));
+        menu.AddChild(Ui.Btn("TRAINING", () => StartTraining()));
+        menu.AddChild(Ui.Btn("PENALTY SHOOTOUT", () => StartShootout()));
         menu.AddChild(Ui.Btn("PLAY WITH FRIENDS", ShowOnline));
         menu.AddChild(Ui.Btn("CHARACTER EDITOR", ShowEditor));
         menu.AddChild(Ui.Btn("MATCH SETTINGS", ShowSettings));
@@ -155,6 +162,35 @@ public partial class GameApp : Node3D
 
     public void StartMatch()
     {
+        Mode = GameMode.Kickoff;
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 3.6: tournament mode (up to 8 teams, single elimination).</summary>
+    public void StartTournament()
+    {
+        Mode = GameMode.Tournament;
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 3.6: training mode (no fouls, no offside, infinite stamina).</summary>
+    public void StartTraining()
+    {
+        Mode = GameMode.Training;
+        Options.Fouls = false;
+        Options.Offside = false;
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 3.6: penalty shootout (alternating penalties).</summary>
+    public void StartShootout()
+    {
+        Mode = GameMode.Shootout;
+        StartMatchInternal();
+    }
+
+    private void StartMatchInternal()
+    {
         Clear();
         PadMenuNavigator.Active = false;
         var view = new MatchView();
@@ -165,6 +201,8 @@ public partial class GameApp : Node3D
             HomeClub = Options.HomeClub, AwayClub = Options.AwayClub, Seed = Options.Seed,
             HomeFormation = Options.HomeFormation, AwayFormation = Options.AwayFormation,
             CustomHome = CustomHome?.Select(x => x.Clone()).ToList(),
+            Preset = Options.Preset,
+            Quality = Options.Quality,
         };
         view.Init(opts, CustomHome, ShowMenu);
         AddChild(view);
