@@ -309,6 +309,251 @@ def build_skirt(shape, hem_drop, flare, top_y=None, n_ang=40, n_rows=12, extra=N
 
 
 # ------------------------------------------------------------------ hair
+def _pieces(F):
+    """piece id per face, faces joined only through shared edges (two caps touching at one vertex are two
+    pieces); ids by size, 0 the largest"""
+    import scipy.sparse as sp
+    from scipy.sparse.csgraph import connected_components
+    nf = len(F)
+    if nf < 2:
+        return np.zeros(nf, int)
+    e = np.sort(np.r_[F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]], 1)
+    fid = np.tile(np.arange(nf), 3)
+    key = e[:, 0].astype(np.int64) * (int(F.max()) + 1) + e[:, 1]
+    o = np.argsort(key, kind="stable"); key, fid = key[o], fid[o]
+    same = np.nonzero(key[1:] == key[:-1])[0]
+    G = sp.coo_matrix((np.ones(len(same)), (fid[same], fid[same + 1])), (nf, nf))
+    _, comp = connected_components(G, directed=False)
+    order = np.argsort(-np.bincount(comp), kind="stable")
+    rank = np.empty_like(order); rank[order] = np.arange(len(order))
+    return rank[comp]
+
+
+def _main_piece(F):
+    """mask of the faces in the largest edge-joined piece"""
+    return _pieces(F) == 0
+
+
+def _clean_piece(F, keep):
+    """keep (a mask of F) less the triangles at any vertex where the rim touches itself (two rims through one
+    point cannot both be laid round one circle), and less anything that cuts off"""
+    from collections import Counter
+    keep = keep.copy()
+    for _ in range(6):
+        idx = np.nonzero(keep)[0]
+        if len(idx) < 2:
+            break
+        cnt = Counter(tuple(sorted(e)) for f in F[idx] for e in ((f[0], f[1]), (f[1], f[2]), (f[2], f[0])))
+        deg = Counter(v for e, c in cnt.items() if c == 1 for v in e)
+        pinch = [v for v, k in deg.items() if k > 2]
+        if not pinch:
+            break
+        keep[idx[np.isin(F[idx], pinch).any(1)]] = False
+        sub = np.nonzero(keep)[0]
+        if len(sub) < 2:
+            break
+        keep[:] = False; keep[sub[_main_piece(F[sub])]] = True
+    return keep
+
+
+def _cap(F, min_faces=20, min_share=0.05):
+    """mask of the shell's faces worth keeping: each edge-joined piece of at least min_faces triangles and
+    min_share of the shell, cleaned of rim pinches. A shell can come in two pieces (the crown and the back of the
+    head, with a row of skin votes between): both are kept, each laid out on its own"""
+    pid = _pieces(F)
+    keep = np.zeros(len(F), bool)
+    for k in range(int(pid.max()) + 1 if len(pid) else 0):
+        m = pid == k
+        if m.sum() < max(min_faces, min_share * len(F)):
+            break
+        keep |= _clean_piece(F, m)
+    return keep
+
+
+def _boundary_loop(F):
+    """the longest boundary loop of a triangle mesh (vertex ids in order), or None"""
+    from collections import Counter, defaultdict
+    cnt = Counter(tuple(sorted(e)) for f in F for e in ((f[0], f[1]), (f[1], f[2]), (f[2], f[0])))
+    nxt = defaultdict(list)
+    for (i, j), c in cnt.items():
+        if c == 1:
+            nxt[i].append(j); nxt[j].append(i)
+    seen, best = set(), None
+    for s0 in list(nxt):
+        if s0 in seen:
+            continue
+        loop, prev, cur = [s0], None, s0
+        seen.add(s0)
+        while True:
+            cand = [v for v in nxt[cur] if v != prev and (v not in seen or (v == s0 and len(loop) > 2))]
+            if not cand:
+                break
+            prev, cur = cur, cand[0]
+            if cur == s0:
+                break
+            loop.append(cur); seen.add(cur)
+        if best is None or len(loop) > len(best):
+            best = loop
+    return best if best is not None and len(best) >= 3 else None
+
+
+def _azimuthal(Vs, c):
+    """the head's own angles as a disc: the angle down from the top of the head is the distance from the centre,
+    the direction round it the angle round the head (0 = the front, at the top of the map)"""
+    d = Vs - c
+    ph = np.arctan2(d[:, 0], d[:, 2])
+    th = np.arccos(np.clip(d[:, 1] / (np.linalg.norm(d, axis=1) + 1e-12), -1, 1))
+    r = th / max(float(th.max()) * 1.02, 1e-6)
+    return np.c_[r * np.sin(ph), r * np.cos(ph)]
+
+
+def _lay_piece(Vs, Fp, c):
+    """one piece of the shell (faces Fp, a disc topologically) -> per-vertex positions in the unit disc (NaN
+    off the piece), no triangle folded. Starts from the head's own angles, so the texels spread about as they do
+    on the head; where that folds (the hollow over an ear, the back of the head below its widest point) the
+    vertices round the fold are laid out again with mean-value weights (Floater - all positive), the rest held,
+    the patch growing until nothing folds. A piece that still folds has its rim laid on a circle and everything
+    inside by the mean-value weights: always one-to-one"""
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import spsolve
+    n = len(Vs)
+    onv = np.zeros(n, bool); onv[np.unique(Fp)] = True
+    xy = np.full((n, 2), np.nan)
+    az = _azimuthal(Vs, c)
+    loop = _boundary_loop(Fp)
+    ii, jj, ww = [], [], []
+    for k in range(3):
+        i, j, l = Fp[:, k], Fp[:, (k + 1) % 3], Fp[:, (k + 2) % 3]
+        e1 = Vs[j] - Vs[i]; e2 = Vs[l] - Vs[i]
+        n1 = np.linalg.norm(e1, axis=1) + 1e-12; n2 = np.linalg.norm(e2, axis=1) + 1e-12
+        t = np.tan(0.5 * np.arccos(np.clip((e1 * e2).sum(1) / (n1 * n2), -1, 1)))
+        ii += [i, i]; jj += [j, l]; ww += [t / n1, t / n2]
+    W = sp.coo_matrix((np.concatenate(ww), (np.concatenate(ii), np.concatenate(jj))), (n, n)).tocsr()
+    L = (sp.diags(np.asarray(W.sum(1)).ravel()) - W).tocsr()
+
+    def solve(base, free_):
+        out = base.copy()
+        if len(free_):
+            hold = np.nonzero(onv & ~np.isin(np.arange(n), free_))[0]
+            rhs = -(L[free_][:, hold] @ out[hold])
+            Lff = L[free_][:, free_].tocsc()
+            out[free_] = np.c_[spsolve(Lff, rhs[:, 0]), spsolve(Lff, rhs[:, 1])]
+        return out
+
+    def folded(p):
+        u = p[Fp]
+        ar = (u[:, 1, 0] - u[:, 0, 0]) * (u[:, 2, 1] - u[:, 0, 1]) - (u[:, 2, 0] - u[:, 0, 0]) * (u[:, 1, 1] - u[:, 0, 1])
+        bad = ~np.isfinite(ar)
+        ar = np.nan_to_num(ar)
+        return bad | (np.sign(ar) != np.sign(np.median(ar))) | (np.abs(ar) < 1e-14)
+
+    rim = np.zeros(n, bool)
+    if loop is not None:
+        rim[loop] = True
+    base = np.full((n, 2), np.nan)
+    base[onv] = az[onv]
+    out, bad = base, folded(base)
+    region = np.zeros(n, bool)
+    for it in range(8):
+        if not bad.any():
+            break
+        region[np.unique(Fp[bad])] = True
+        for _ in range(2):
+            region[np.unique(Fp[region[Fp].any(1)])] = True
+        fr_ = np.nonzero(region & onv & (~rim if it < 4 else True))[0]       # the rim too, if need be
+        if len(fr_) >= onv.sum() - 2:
+            break
+        out = solve(base, fr_); bad = folded(out)
+    if bad.any() and loop is not None:
+        loop = np.array(loop)
+        seg = np.linalg.norm(np.diff(Vs[np.r_[loop, loop[:1]]], axis=0), axis=1)
+        ang = np.r_[0.0, np.cumsum(seg)[:-1]] / max(seg.sum(), 1e-12) * 2 * np.pi
+        # the rim the same way round as the head's angles, starting nearest the front
+        ph = np.arctan2(az[loop, 0], az[loop, 1])
+        if np.sum(np.diff(np.unwrap(ph))) < 0:
+            ang = -ang
+        circ = np.full((n, 2), np.nan); circ[loop] = np.c_[np.sin(ang), np.cos(ang)]
+        out = solve(circ, np.nonzero(onv & ~rim)[0])
+    xy[onv] = out[onv]
+    # the front of the head at the top and the figure's left on the map's right (a turn and a mirror move no
+    # triangle over another)
+    on = np.nonzero(onv)[0]
+    d = Vs[on] - c
+    fr = on[d[:, 2] > 0.02]; lf = on[d[:, 0] > 0.02]; rt = on[d[:, 0] < -0.02]
+    if len(lf) and len(rt) and xy[lf, 0].mean() < xy[rt, 0].mean():
+        xy[on, 0] = -xy[on, 0]
+    if len(fr) and np.linalg.norm(xy[fr].mean(0) - xy[on].mean(0)) > 1e-6:
+        f_ = xy[fr].mean(0) - xy[on].mean(0)
+        rot = np.arctan2(f_[0], f_[1])
+        cR, sR = np.cos(rot), np.sin(rot)
+        xy[on] = xy[on] @ np.array([[cR, -sR], [sR, cR]]).T
+        if len(lf) and len(rt) and xy[lf, 0].mean() < xy[rt, 0].mean():
+            xy[on, 0] = -xy[on, 0]
+    # into the unit disc
+    ctr = 0.5 * (np.nanmax(xy[on], 0) + np.nanmin(xy[on], 0))
+    xy[on] = (xy[on] - ctr) / (np.linalg.norm(xy[on] - ctr, axis=1).max() + 1e-12) * 0.98
+    return xy
+
+
+def shell_uv(Vs, head_pts, F=None):
+    """hair shell UVs in the hair quarter's left half (v11.14). Before, the shell was projected straight down onto
+    (x, z): below the widest part of the head the back and sides fold under the top in that view, so a fifth of the
+    shell's texels were claimed by two triangles in different places - each painted the other's colour, the tiled
+    head. Now each piece of the shell (usually one cap) is flattened onto a disc with no triangle folded
+    (_lay_piece), the biggest piece given most of the half, the others stacked below it. Faces left off (a sliver
+    of a few triangles) are folded into a point in the map's corner.
+    -> per-face UVs (len(F), 3, 2); per-vertex UVs from the head's angles alone when F is None"""
+    c = np.median(head_pts, 0)
+    if F is None:
+        xy = _azimuthal(Vs, c)
+        return np.c_[0.25 + 0.235 * xy[:, 0], 0.5 + 0.47 * xy[:, 1]]
+    fuv = np.zeros((len(F), 3, 2)); fuv[:] = [0.25 - 0.24, 0.5 - 0.49]    # the corner
+    keep = _cap(F)
+    pid = _pieces(F)
+    ids = [k for k in np.unique(pid[keep])]
+    if not ids:
+        return fuv
+    A = np.array([0.5 * np.linalg.norm(np.cross(Vs[F[pid == k][:, 1]] - Vs[F[pid == k][:, 0]],
+                                                 Vs[F[pid == k][:, 2]] - Vs[F[pid == k][:, 0]]), axis=1).sum()
+                  for k in ids])
+    # the half (0.48 wide x 0.95 high in the quarter) cut into bands, one per piece, by area
+    h = 0.95 * A / A.sum()
+    y0 = 0.975
+    for k, hk in zip(ids, h):
+        m = keep & (pid == k)
+        xy = _lay_piece(Vs, F[m], c)
+        rx, ry = 0.235, min(0.47, 0.45 * hk)                               # a gap of a tenth between bands
+        cy = y0 - 0.5 * hk
+        fuv[m] = np.c_[0.25 + rx * xy[:, 0], cy + ry * xy[:, 1]][F[m]]
+        y0 -= hk
+    return fuv
+
+
+def uv_overlap(F, fuv, res=1024):
+    """the number of atlas texels claimed by two or more triangles (v11.14). Every texel must belong to one place
+    on the body, or the bake paints one place's colour on two"""
+    tx = fuv[:, :, 0] * res; ty = (1.0 - fuv[:, :, 1]) * res
+    x0 = np.floor(tx.min(1)).astype(int); y0 = np.floor(ty.min(1)).astype(int)
+    x1 = np.ceil(tx.max(1)).astype(int); y1 = np.ceil(ty.max(1)).astype(int)
+    d = (ty[:, 1] - ty[:, 2]) * (tx[:, 0] - tx[:, 2]) + (tx[:, 2] - tx[:, 1]) * (ty[:, 0] - ty[:, 2])
+    ok = np.abs(d) > 1e-12
+    cov = np.zeros(res * res, np.int32)
+    idx = np.nonzero(ok)[0]
+    span = int(max(1, (x1 - x0)[idx].max(initial=1), (y1 - y0)[idx].max(initial=1)))
+    for dy in range(span + 1):
+        for dx in range(span + 1):
+            px = x0[idx] + dx; py = y0[idx] + dy
+            m = (px <= x1[idx]) & (py <= y1[idx]) & (px >= 0) & (px < res) & (py >= 0) & (py < res)
+            t, px, py = idx[m], px[m], py[m]
+            gx, gy = px + 0.5, py + 0.5
+            X, Y, dd = tx[t], ty[t], d[t]
+            a = ((Y[:, 1] - Y[:, 2]) * (gx - X[:, 2]) + (X[:, 2] - X[:, 1]) * (gy - Y[:, 2])) / dd
+            b = ((Y[:, 2] - Y[:, 0]) * (gx - X[:, 2]) + (X[:, 0] - X[:, 2]) * (gy - Y[:, 2])) / dd
+            inside = (a > 1e-6) & (b > 1e-6) & (1 - a - b > 1e-6)          # strictly inside: shared edges are fine
+            np.add.at(cov, py[inside] * res + px[inside], 1)
+    return int((cov > 1).sum())
+
+
 def build_hair(shape, votes, thick, length, min_share=0.35, n_ang=28, n_rows=10):
     """scalp shell (+ a curtain when `length` reaches below the ears)"""
     bm = shape.m
@@ -316,6 +561,16 @@ def build_hair(shape, votes, thick, length, min_share=0.35, n_ang=28, n_rows=10)
     head = (bm.J[:, 0] == hi) & (bm.W[:, 0] > 0.6)
     tot = votes[:, 1:5].sum(1) + 1e-6
     hairy = head & (votes[:, 1] / tot > min_share)
+    # v11.14: one-vertex gaps in the votes (a glint, a frame that saw skin through the hair) closed: a head vertex
+    # whose neighbours are mostly hair is hair. A hole in the cap would be a second rim the map cannot lay out
+    import scipy.sparse as sp
+    e_ = np.r_[bm.F[:, [0, 1]], bm.F[:, [1, 2]], bm.F[:, [2, 0]]]
+    A_ = sp.coo_matrix((np.ones(len(e_) * 2), (np.r_[e_[:, 0], e_[:, 1]], np.r_[e_[:, 1], e_[:, 0]])),
+                       (len(votes), len(votes))).tocsr()
+    A_.data[:] = 1.0
+    nd = np.asarray(A_.sum(1)).ravel() + 1e-9
+    for _ in range(2):
+        hairy = hairy | (head & ((A_ @ hairy.astype(float)) / nd > 0.5))
     V0 = shape.V
     if hairy.sum() < 30:
         # no hair seen (short / shaved): a thin cap over the top of the skull keeps the silhouette honest
@@ -323,16 +578,18 @@ def build_hair(shape, votes, thick, length, min_share=0.35, n_ang=28, n_rows=10)
         hairy = head & (V0[:, 1] > top - 0.06)
     N = vertex_normals(V0, bm.F)
     fsel = hairy[bm.F].all(1)
+    # v11.14: one cap - stray islands of hair-voted triangles (a few by an ear, or touching the cap at one vertex)
+    # are left off the shell
+    if fsel.sum() > 3:
+        keep = np.zeros(len(bm.F), bool); keep[np.nonzero(fsel)[0][_cap(bm.F[fsel])]] = True
+        fsel = keep
     F = bm.F[fsel]
     used = np.unique(F)
     remap = -np.ones(len(V0), int); remap[used] = np.arange(len(used))
     Vs = V0[used] + N[used] * (thick + 0.002)
-    hb = bm.fuv[fsel]
-    # shell UVs: planar from above (x, z) into the hair quarter's left half
-    xz = Vs[:, [0, 2]]
-    lo, hi_ = xz.min(0), xz.max(0)
-    uv = (xz - lo) / np.maximum(hi_ - lo, 1e-6) * [0.48, 0.95] + [0.01, 0.025]
-    shell = Mesh(Vs, remap[F], to_quarter(uv[remap[F]], "hair"), bm.J[used], bm.W[used], np.full(len(used), 3))
+    # v11.14: the shell flattened onto a disc (shell_uv) - planar from above folded the back under the top
+    shell = Mesh(Vs, remap[F], to_quarter(shell_uv(Vs, V0[head], remap[F]), "hair"), bm.J[used], bm.W[used],
+                 np.full(len(used), 3))
     parts = [shell]
     ear_y = float(np.median(V0[head, 1])) - 0.02
     if length > 0.06:
