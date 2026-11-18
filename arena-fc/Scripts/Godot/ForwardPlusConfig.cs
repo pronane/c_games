@@ -1,5 +1,5 @@
 // Arena FC — Forward+ renderer configuration for desktop.
-// Enables SSGI, SDFGI, and volumetric fog on desktop only.
+// Enables SDFGI and volumetric fog on desktop only.
 // Browser stays on Compatibility renderer.
 using Godot;
 
@@ -21,32 +21,18 @@ public static class ForwardPlusConfig
         env.SdfgiCascades = 4;
         env.SdfgiMinCellSize = 0.2f;
         env.SdfgiMaxDistance = 100f;
-        env.SdfgiYScaleEnabled = true;
-        env.SdfgiYScale = 0.2f;
-
-        // SSGI (Screen Space Global Illumination)
-        env.SsgiEnabled = true;
-        env.SsgiQuality = Godot.Environment.SSGIQuality.High;
+        env.SdfgiYScale = Godot.Environment.SdfgiyScale.Scale10;
 
         // SSIL (Screen Space Indirect Lighting)
         env.SsilEnabled = true;
-        env.SsilQuality = Godot.Environment.SSILQuality.High;
 
         // Volumetric fog
         env.VolumetricFogEnabled = true;
         env.VolumetricFogEmissionEnergy = 1.0f;
         env.VolumetricFogAnisotropy = 0.2f;
-        env.VolumetricFogTemporalReprojection = true;
-        env.VolumetricFogTemporalReprojectionMix = 0.1f;
-        env.VolumetricFogTemporalReprojectionEmission = 1.0f;
 
         // Glow (bloom) — already configured in World3D, ensure enabled
         env.GlowEnabled = true;
-        env.GlowLevels1 = 0.8f;
-        env.GlowLevels2 = 0.6f;
-        env.GlowLevels3 = 0.4f;
-        env.GlowLevels4 = 0.2f;
-        env.GlowLevels5 = 0.1f;
         env.GlowIntensity = 0.8f;
         env.GlowStrength = 1.2f;
         env.GlowBloom = 0.1f;
