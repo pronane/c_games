@@ -138,6 +138,25 @@ def main():
         check("rig JSON material slots are Arena slots", set(d["mats"]) <= {0, 1, 2, 3, 6, 8}, str(d["mats"]))
         tris = sum(len(t) for t in d["idx"]) // 3
         check("rig JSON triangle budget", 8000 < tris <= 20000, str(tris))
+        # Baked clips: the Web template has no glTF module, so the browser
+        # plays these keyframes instead of the GLB.
+        check("rig JSON bakes the clip keyframes", "clips" in d)
+        if "clips" in d:
+            clips = d["clips"]
+            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 67)
+            loco = ("soccer_idle", "soccer_walk", "soccer_jog", "soccer_run",
+                    "soccer_sprint", "soccer_dribble", "soccer_run_ball")
+            check("baked locomotion clips loop",
+                  all(clips[c]["loop"] for c in loco if c in clips))
+            check("baked one-shots do not loop",
+                  not clips["soccer_kick_place"]["loop"] and not clips["soccer_celebrate"]["loop"])
+            check("baked clip quaternions are normalized",
+                  all(abs(sum(x * x for x in clips["soccer_run"]["bones"]["Hips"]["r"][:4]) - 1) < 0.01
+                      for _ in [0]))
+            check("baked clips carry fps/frames",
+                  clips["soccer_run"]["fps"] == 30.0 and clips["soccer_run"]["frames"] == 31)
+            check("baked clips carry Hips translation",
+                  "t" in clips["soccer_run"]["bones"]["Hips"])
 
     section("Manifest")
     man_path = os.path.join(ROOT, "Data", "soccer_player_manifest.json")
@@ -174,6 +193,13 @@ def main():
     check("RigFactory attaches the soccer player", "AttachSoccer" in factory)
     check("RigAnimator routes to clips", "rig.Soccer.Update" in world)
     check("browser loads the sculpted rig", "soccer_rig.json" in boot)
+    # Browser clip playback mirrors the desktop cadence matching.
+    check("browser plays baked clips", "animate_clip" in boot and "clips_data" in boot)
+    check("browser cadence matches ground speed",
+          "CLIP_NATURAL" in boot and "speed / nat" in boot)
+    check("browser locomotion bands have hysteresis",
+          "clip_select_locomotion" in boot)
+    check("browser falls back to procedural gait", "animate_rig(r" in boot)
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))

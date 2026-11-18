@@ -11,8 +11,21 @@ const GOAL_H := 2.44
 const BALL_R := 0.11
 const TEAM := 5
 
+# Baked-clip locomotion (mirrors Scripts/Godot/SoccerClipRig.cs): cadence is
+# matched to ground speed per clip so feet plant instead of sliding.
+const CLIP_ALIASES := {"idle": "soccer_idle", "run": "soccer_run", "kick": "soccer_kick_place",
+	"tackle": "soccer_tackle", "slide": "soccer_slide_tackle", "dive": "soccer_keeper_dive_left",
+	"catch": "soccer_keeper_catch", "foul": "soccer_foul", "celebrate": "soccer_celebrate"}
+const CLIP_NATURAL := {"soccer_walk": 0.74, "soccer_jog": 1.01, "soccer_run": 1.01,
+	"soccer_sprint": 1.22, "soccer_dribble": 0.60, "soccer_run_ball": 0.98, "soccer_shield": 0.30}
+const CLIP_MAXRATE := {"soccer_walk": 2.2, "soccer_jog": 2.6, "soccer_run": 2.6,
+	"soccer_sprint": 2.8, "soccer_dribble": 1.8, "soccer_run_ball": 2.6, "soccer_shield": 1.2}
+
 var rig_data: Dictionary = {}
 var bone_index: Dictionary = {}
+# Baked Sprite Forge clips from soccer_rig.json (same keyframes as the GLB).
+# The Web template has no glTF module, so the browser plays these instead.
+var clips_data: Dictionary = {}
 var players: Array = []
 var rigs: Array = []
 var ball: Dictionary = {}
@@ -116,6 +129,8 @@ func _ready() -> void:
 	# validates, then user://rig_override.json, else the shipped procedural rig.
 	# Same 18-bone schema, so animate_rig() below works unchanged.
 	rig_data = RigBuilder.load_rig_data("res://Data/soccer_rig.json")
+	if rig_data.has("clips"):
+		clips_data = rig_data["clips"]
 	setup_modules()
 	var bones: Array = rig_data["bones"]
 	for i in range(bones.size()):
@@ -327,6 +342,8 @@ func reset_positions() -> void:
 				"home": Vector3(sign * formation[i].x * HALF_L * 0.94, 0, formation[i].y * HALF_W * 0.88),
 				"vel": Vector3.ZERO, "facing": Vector3(sign, 0, 0), "phase": rng.randf() * 6.28,
 				"keeper": i == 0, "action": "idle", "lock": 0.0,
+				"clip": "", "clip_t": 0.0, "clip_scale": 1.0, "clip_prev": "",
+				"clip_lean": 0.0, "clip_roll": 0.0, "clip_prev_vel": Vector3.ZERO,
 			}
 			players.append(p)
 			var r := make_rig(cols)
@@ -502,6 +519,12 @@ func step_offline(delta: float) -> void:
 		p["atime"] = float(p.get("atime", 0.0)) - delta
 		if p["atime"] <= 0.0 and p["action"] != "celebrate":
 			p["action"] = "idle"
+		# Clip playback state (baked clips; falls back to procedural gait).
+		p["clip_t"] = float(p["clip_t"]) + delta * float(p["clip_scale"])
+		if str(p["clip"]) != "" and not bool(clips_data[str(p["clip"])].get("loop", false)):
+			var dur := float(clips_data[str(p["clip"])]["frames"]) / float(clips_data[str(p["clip"])]["fps"])
+			if float(p["clip_t"]) >= dur:
+				p["clip"] = ""
 		var sign := 1.0 if p["team"] == 0 else -1.0
 		var goal_pos := Vector3(sign * HALF_L, 0, 0)
 		var own_goal := Vector3(-sign * HALF_L, 0, 0)
@@ -771,7 +794,9 @@ func update_visuals(delta: float) -> void:
 		var pi_: Dictionary = players[i]
 		var tb: Vector3 = ball["pos"] - pi_["pos"]
 		var yaw_rel: float = clampf(wrapf(atan2(tb.x, tb.z) - atan2(pi_["facing"].x, pi_["facing"].z), -PI, PI), -0.9, 0.9)
-		animate_rig(r, pi_["vel"].length(), pi_["phase"], pi_["action"], yaw_rel)
+		animate_clip(r, pi_, delta, yaw_rel)
+		if not clip_played(pi_):
+			animate_rig(r, pi_["vel"].length(), pi_["phase"], pi_["action"], yaw_rel)
 		var hop := 0.0
 		if pi_["action"] == "celebrate":
 			hop = absf(sin(t * 7.0 + float(i))) * 0.3
@@ -1188,6 +1213,109 @@ func update_browser_camera(delta: float) -> void:
 		var a := clampf(d / 18.0, 0.5, 3.8)
 		arrow_mesh.position = Vector3(ppos.x, 2.15 + a * 0.18 + sin(t * 3.2) * 0.1, ppos.z)
 		arrow_mesh.scale = Vector3(a, a, a)
+
+func clip_played(p: Dictionary) -> bool:
+	return str(p.get("clip", "")) != ""
+
+func clip_select_locomotion(p: Dictionary, speed: float) -> String:
+	var prev := str(p.get("clip_prev", ""))
+	var has_ball: bool = int(ball.get("owner", -1)) == players.find(p)
+	if has_ball and speed > 0.8:
+		return "soccer_run_ball" if prev == "soccer_run_ball" else "soccer_dribble"
+	if speed < 0.5:
+		return "soccer_idle_ready" if prev == "soccer_idle_ready" else "soccer_idle"
+	if speed < 1.7:
+		return "soccer_walk" if prev == "soccer_walk" else "soccer_jog"
+	if speed < 2.9:
+		return "soccer_jog" if prev == "soccer_jog" else "soccer_run"
+	if speed < 4.3:
+		return "soccer_run" if prev == "soccer_run" else "soccer_sprint"
+	return "soccer_sprint"
+
+func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> void:
+	if clips_data.is_empty():
+		return
+	var sk := r.get_meta("sk") as Skeleton3D
+	if sk == null:
+		return
+	var vel: Vector3 = p["vel"]
+	var speed := vel.length()
+	var action := str(p["action"])
+	var cur := str(p["clip"])
+	# One-shots: play once, then locomotion.
+	if action != "idle" and CLIP_ALIASES.has(action):
+		var alias := str(CLIP_ALIASES[action])
+		if cur != alias:
+			p["clip"] = alias
+			p["clip_t"] = 0.0
+			p["clip_scale"] = 1.0
+			cur = alias
+	# Locomotion with hysteresis.
+	if action == "idle":
+		var want := clip_select_locomotion(p, speed)
+		if cur != want:
+			p["clip"] = want
+			p["clip_t"] = 0.0
+			p["clip_scale"] = 1.0
+			cur = want
+		p["clip_prev"] = cur
+	# Cadence matched to ground speed (no treadmill).
+	if CLIP_NATURAL.has(cur):
+		var nat := float(CLIP_NATURAL[cur])
+		var maxr := float(CLIP_MAXRATE[cur])
+		var target := clampf(speed / nat, 0.5, maxr)
+		p["clip_scale"] = lerpf(float(p["clip_scale"]), target, clampf(delta * 6.0, 0.0, 1.0))
+	# Forward lean from speed + acceleration, roll from lateral acceleration.
+	var prev_vel: Vector3 = p["clip_prev_vel"]
+	var acc := (vel - prev_vel) / maxf(delta, 0.001)
+	var fwd := Vector3(p["facing"].x, 0, p["facing"].z).normalized()
+	var a_fwd := acc.dot(fwd)
+	var a_lat := acc.dot(Vector3(-fwd.z, 0, fwd.x))
+	var lean_target := clampf(speed * 0.035 + maxf(a_fwd, 0.0) * 0.02, 0.0, 0.32)
+	var roll_target := clampf(-a_lat * 0.02, -0.18, 0.18)
+	p["clip_lean"] = lerpf(float(p["clip_lean"]), lean_target, clampf(delta * 5.0, 0.0, 1.0))
+	p["clip_roll"] = lerpf(float(p["clip_roll"]), roll_target, clampf(delta * 5.0, 0.0, 1.0))
+	p["clip_prev_vel"] = vel
+	# Sample the baked keyframes.
+	var cd: Dictionary = clips_data[cur]
+	var fps := float(cd["fps"])
+	var frames := int(cd["frames"])
+	var t := float(p["clip_t"])
+	var f := fmod(t * fps, float(frames)) if bool(cd["loop"]) else minf(t * fps, float(frames - 1))
+	var f0 := int(floor(f))
+	var f1 := minf(f0 + 1.0, float(frames - 1))
+	var frac := f - float(f0)
+	var bones: Dictionary = cd["bones"]
+	for bname in bones.keys():
+		var bi: int = bone_index.get(bname, -1)
+		if bi < 0:
+			continue
+		var entry: Dictionary = bones[bname]
+		var rarr: Array = entry["r"]
+		var q0 := Quaternion(float(rarr[f0 * 4]), float(rarr[f0 * 4 + 1]), float(rarr[f0 * 4 + 2]), float(rarr[f0 * 4 + 3]))
+		var q1 := Quaternion(float(rarr[f1 * 4]), float(rarr[f1 * 4 + 1]), float(rarr[f1 * 4 + 2]), float(rarr[f1 * 4 + 3]))
+		var q := q0.slerp(q1, frac)
+		if bname == "Hips":
+			var tarr: Array = entry["t"]
+			var tp0 := Vector3(float(tarr[f0 * 3]), float(tarr[f0 * 3 + 1]), float(tarr[f0 * 3 + 2]))
+			var tp1 := Vector3(float(tarr[f1 * 3]), float(tarr[f1 * 3 + 1]), float(tarr[f1 * 3 + 2]))
+			sk.set_bone_pose_position(bi, tp0.lerp(tp1, frac))
+		sk.set_bone_pose_rotation(bi, q)
+	# Lean / roll / look on top of the clip.
+	var hips_i: int = bone_index.get("Hips", -1)
+	var chest_i: int = bone_index.get("Chest", -1)
+	var neck_i: int = bone_index.get("Neck", -1)
+	if hips_i >= 0:
+		var hq := sk.get_bone_pose_rotation(hips_i)
+		var lean_q := Quaternion(Vector3.RIGHT, float(p["clip_lean"]))
+		var roll_q := Quaternion(Vector3.BACK, float(p["clip_roll"]))
+		sk.set_bone_pose_rotation(hips_i, lean_q * roll_q * hq)
+	if chest_i >= 0:
+		var cq := sk.get_bone_pose_rotation(chest_i)
+		sk.set_bone_pose_rotation(chest_i, Quaternion(Vector3.RIGHT, float(p["clip_lean"]) * 0.6) * cq)
+	if neck_i >= 0:
+		var nq := sk.get_bone_pose_rotation(neck_i)
+		sk.set_bone_pose_rotation(neck_i, Quaternion(Vector3.UP, look_yaw * 0.7) * nq)
 
 func animate_rig(r: Node3D, speed: float, time: float, action: String, look_yaw := 0.0) -> void:
 	var sk := r.get_meta("sk") as Skeleton3D

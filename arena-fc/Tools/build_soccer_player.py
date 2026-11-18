@@ -220,6 +220,24 @@ def main() -> int:
             "idx": idx, "mats": mats,
             "height": round(float(m.V[:, 1].max()), 4),
         }
+        # Baked animation clips: the same keyframes the GLB carries, as plain
+        # JSON.  The Web template has no glTF module, so the browser cannot
+        # read the GLB at runtime -- BrowserBoot plays these instead, with
+        # the same cadence matching as the desktop SoccerClipRig.
+        clips_out = {}
+        for cname, cl in tgt.clips.items():
+            t_stripped = RR.strip_root_motion(tgt, cl)
+            bones_out = {}
+            for bi, bname in enumerate(tgt.bones):
+                entry = {"r": r4(cl.R[:, bi])}
+                if bname == "Hips":
+                    entry["t"] = r4(t_stripped[:, bi])
+                bones_out[bname] = entry
+            clips_out[cname] = {
+                "fps": float(cl.fps), "frames": int(cl.frames),
+                "loop": bool(cname in SM.LOOP_CLIPS), "bones": bones_out,
+            }
+        data["clips"] = clips_out
         with open(json_path, "w") as f:
             json.dump(data, f, separators=(",", ":"))
         print("  wrote %s (%.1f MB, %d verts, %d tris)" % (json_path, os.path.getsize(json_path) / 1e6, len(m.V), len(m.F)))
