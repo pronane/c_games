@@ -252,7 +252,10 @@ public static class BallFactory
 {
     public static MeshInstance3D Create()
     {
-        var mesh = new SphereMesh { Radius = Mx.BallRadius, Height = Mx.BallRadius * 2f, RadialSegments = 24, Rings = 16 };
+        // Visual size 1.6x physics radius for TV-camera visibility.
+        // Physics uses Mx.BallRadius (0.11m); visual is larger so players can see it.
+        float visualRadius = Mx.BallRadius * 1.6f;
+        var mesh = new SphereMesh { Radius = visualRadius, Height = visualRadius * 2f, RadialSegments = 24, Rings = 16 };
         var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://Shaders/ball.gdshader") };
         return new MeshInstance3D
         {
