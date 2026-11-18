@@ -67,6 +67,9 @@ jobs:
       - name: Portable pad / gameplay static checks
         working-directory: arena-fc
         run: python3 Tools/test_pads.py
+      - name: Sprite Forge soccer player checks
+        working-directory: arena-fc
+        run: python3 Tools/test_soccer_forge.py
 
   node-hub:
     runs-on: ubuntu-latest

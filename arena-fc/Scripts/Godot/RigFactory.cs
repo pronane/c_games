@@ -23,6 +23,9 @@ public partial class CharacterRig : Node3D
     public GaitPose SmoothPose;
     public bool PoseReady;
     public readonly Dictionary<string, int> BoneIndex = new();
+    /// <summary>Sprite Forge sculpted player (GLB + clips) when available; the
+    /// procedural mesh above is hidden and RigAnimator drives this instead.</summary>
+    public SoccerClipRig? Soccer;
 
     public void Rebuild(CharacterSpec spec)
     {
@@ -149,9 +152,21 @@ public partial class CharacterRig : Node3D
         };
     }
 
+    /// <summary>Attach the Sprite Forge soccer player (GLB + clips) if present.
+    /// The procedural skeleton/mesh stay as a fallback (and for the name label).</summary>
+    public void AttachSoccer(CharacterSpec spec)
+    {
+        if (EditorMode || !SoccerClipRig.Available) return;
+        Soccer = new SoccerClipRig { Name = "SoccerPlayer" };
+        AddChild(Soccer);
+        if (Soccer.Load(spec)) Mesh.Visible = false;
+        else { Soccer.QueueFree(); Soccer = null; }
+    }
+
     public void ApplyAppearance()
     {
         Spec.Sanitize();
+        Soccer?.Tint(Spec);
         for (int i = 0; i < Materials.Length; i++) if (Materials[i] != null) Materials[i].AlbedoColor = C(MaterialHex((RigMat)i));
         if (NameLabel != null)
         {
@@ -165,7 +180,7 @@ public partial class CharacterRig : Node3D
 
     public void ApplyPoseOverrides()
     {
-        if (Skeleton == null) return;
+        if (Skeleton == null || Soccer != null) return;
         for (int i = 0; i < Geo.Bones.Length; i++)
         {
             var v = Spec.GetBoneRotation(Geo.Bones[i].Name);
@@ -211,6 +226,7 @@ public static class RigFactory
     {
         var rig = new CharacterRig { Name = "Rig_" + spec.DisplayName, EditorMode = editorMode };
         rig.Rebuild(spec);
+        rig.AttachSoccer(spec);
         return rig;
     }
 }
