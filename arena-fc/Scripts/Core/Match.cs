@@ -589,9 +589,9 @@ public sealed partial class MatchEngine
                 return;
             }
             if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge)); return; }
-            if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
-            if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
-            if (cmd.Lob) { int t = FindBestPassTarget(p, true, true); if (t >= 0) PassTo(p, S.Players[t], 20f, true, true); return; }
+            if (cmd.Pass) { int t = FindBestPassTarget(p, false, false, cmd.Move); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
+            if (cmd.Through) { int t = FindBestPassTarget(p, true, false, cmd.Move); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
+            if (cmd.Lob) { int t = FindBestPassTarget(p, true, true, cmd.Move); if (t >= 0) PassTo(p, S.Players[t], 20f, true, true); return; }
         }
         else
         {
@@ -602,9 +602,9 @@ public sealed partial class MatchEngine
         if (ball.Owner < 0 && Mx.FlatDist(p.Pos, ball.Pos) < 1.6f && ball.Pos.Y < 1.6f)
         {
             if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge), true); return; }
-            if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
-            if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
-            if (cmd.Lob) { int t = FindBestPassTarget(p, true, true); if (t >= 0) PassTo(p, S.Players[t], 20f, true, true); return; }
+            if (cmd.Pass) { int t = FindBestPassTarget(p, false, false, cmd.Move); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
+            if (cmd.Through) { int t = FindBestPassTarget(p, true, false, cmd.Move); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
+            if (cmd.Lob) { int t = FindBestPassTarget(p, true, true, cmd.Move); if (t >= 0) PassTo(p, S.Players[t], 20f, true, true); return; }
         }
         // Shoulder charge: sprinting into a carrier without pressing tackle still
         // contests possession, so "use your power to dispossess" has an effect.
@@ -855,10 +855,15 @@ public sealed partial class MatchEngine
         return rank < list.Length ? list[rank].Index : (list.Length > 0 ? list[0].Index : -1);
     }
 
-    private int FindBestPassTarget(PlayerState from, bool through, bool longPass = false)
+    private int FindBestPassTarget(PlayerState from, bool through, bool longPass = false, Vector2 aimDir = default)
     {
         int best = -1; float bestScore = float.MinValue;
         int attack = SideSign(from.Team);
+        // FIFA/PES-style: bias target toward stick aim direction.
+        // If stick is centered, use facing direction. Aim alignment is the
+        // dominant factor so passes go where the player points.
+        bool hasAim = aimDir.LengthSquared() > 0.15f;
+        Vector2 aim = hasAim ? Vector2.Normalize(aimDir) : new Vector2(from.Facing.X, from.Facing.Z);
         foreach (var q in State.Players)
         {
             if (q.Team != from.Team || q.Index == from.Index || q.IsKeeper) continue;
@@ -866,6 +871,10 @@ public sealed partial class MatchEngine
             if (d < 2.5f || d > 42f) continue;
             if (longPass && d < 12f) continue;
             float forward = (q.Pos.X - from.Pos.X) * attack;
+            // Aim alignment: dot product of (teammate direction) with aim.
+            // 1.0 = directly where aiming, -1.0 = opposite. Weighted heavily.
+            Vector2 toMate = new Vector2(q.Pos.X - from.Pos.X, q.Pos.Z - from.Pos.Z);
+            float aimAlign = d > 0.01f ? Vector2.Dot(Vector2.Normalize(toMate), aim) : 0f;
             float openness = NearestOpponent(q, out float od) is null ? 8f : MathF.Min(od, 8f);
             bool laneBlocked = false;
             foreach (var o in State.Players)
@@ -874,7 +883,9 @@ public sealed partial class MatchEngine
                 float proj = Mx.Clamp(Vector3.Dot(Mx.Flat(o.Pos - from.Pos), Mx.Flat(q.Pos - from.Pos)) / MathF.Max(.01f, d * d), 0f, 1f);
                 if (Mx.FlatDist(o.Pos, Mx.Lerp(from.Pos, q.Pos, proj)) < 1.5f && proj > .1f && proj < .9f) { laneBlocked = true; break; }
             }
-            float score = forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? 6f : 0f);
+            // Aim alignment dominates (weight 8.0) so stick direction controls
+            // the pass. AI factors (forward/openness) break ties.
+            float score = aimAlign * 8.0f + forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? 6f : 0f);
             // A long pass wants a distant, advanced target; a short pass prefers
             // the safe nearby option instead of always hitting the furthest man.
             if (longPass) score += MathF.Min(d, 38f) * .16f + forward * .18f;
