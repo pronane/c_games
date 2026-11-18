@@ -1,7 +1,10 @@
 # Arena FC — gameplay videos & screenshots
 
-Everything in this folder was produced from the **running game** on 27 October 2026.
-Nothing here is a mockup, a still of a static scene, or a third-party asset.
+Everything in this folder was produced from the **running game** on 27 October 2026,
+except `08_soccer_player.mp4` / `18_soccer_player.png` (18 November 2026), which
+were rendered from the shipped Sprite Forge GLB with a Python CPU
+skinning/raster pipeline because the render sandbox has no display/GPU for
+Godot. Nothing here is a mockup, a still of a static scene, or a third-party asset.
 
 ## Videos (`videos/`)
 
@@ -14,8 +17,9 @@ Nothing here is a mockup, a still of a static scene, or a third-party asset.
 | `05_cameras.mp4` | 21 s, 1280×720, 24 fps | The camera/ring upgrade: all six views selected with `1`–`6`, mouse-wheel zoom in and out, and the selection ring + arrow staying visible from every angle. |
 | `06_friends.mp4` | 18 s, 1280×720, 12 fps | A real online match: an exported Linux client in room `FRIEND6` playing against a second human host over the authoritative WebSocket server. HUD shows ping / LIVE; both rings visible. |
 | `07_online_v2.mp4` | 8 s, 960×540, 12 fps | v2 online: a live authoritative room with the rollback-prediction HUD (`ONLINE · tick · ping · host · RB corrections/replayed ticks`). 96 real viewport frames from the running C# client. |
+| `08_soccer_player.mp4` | 10 s, 960×544, 20 fps | The Sprite Forge soccer player (PR #104): the sculpted mesh driven by its real GLB clips — dribble, short pass, shot, keeper dive, goal celebration. Rendered with a Python CPU skinning/raster pipeline (see note below), not captured from the running Godot build. |
 
-All seven are H.264 MP4 with `yuv420p` and `+faststart`, playable in browsers, VLC,
+All eight are H.264 MP4 with `yuv420p` and `+faststart`, playable in browsers, VLC,
 Windows Media Player, QuickTime and most phones.
 
 ## Screenshots (`screenshots/`)
@@ -32,6 +36,9 @@ is the room lobby, `29` is a live 1v1 online match with two selection rings,
 (reconnect / host migration / rollback status line and RECONNECT button), and
 `32` is the live online match with the rollback HUD
 (`ONLINE · tick 1109 · ping 320ms · host #0 · RB 380/240t e=0.00m`).
+`18_soccer_player.png` is a broadcast frame of the Sprite Forge soccer
+player (PR #104) mid-shot, rendered from the shipped GLB with a Python
+CPU skinning/raster pipeline — see the note under `08_soccer_player.mp4`.
 
 `gallery.html` is a self-contained index: open it in a browser after extracting
 the ZIP to play the clips and browse the screenshots. Thumbnails are inlined as
