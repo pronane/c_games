@@ -1,136 +1,132 @@
 # Arena FC — Sprite Forge soccer player (mesh + skeleton + animations)
 
-Built with the latest Sprite Forge on `main`.
+*Current status, 2026-11-18:* **the realistic footballer ships on desktop and in the
+browser.** The 18‑bone sculpted "mannequin" was the first answer to the brief and is
+kept in git history (`eab13d8`, Sprite Forge **v11.17** rebuild of the v11.13 original —
+v11.14–v11.17 only touched the scan‑capture head path, so the sculpt rebuild was
+byte‑identical). The step‑change that actually landed is a new build of the game mesh:
+a **MakeHuman‑derived, anatomically real footballer on the full 52‑joint skeleton with
+all 71 soccer clips**. Player previews rendered from the shipped data:
 
-* 2026-11-18: rebuilt with Sprite Forge **v11.17** (`49be53a`), which brings the
-  v11.14–v11.17 head/face/hair fixes (face joins the head, no tiled hair texture,
-  collar stays below the jaw, white balance from a neutral garment, face colour
-  matched to skin). 71 clips / 82 aliases now ship (was 67 / 75).
-* Original: v11.13 (PR #100 `891facd`).
-The procedural primitive players are replaced — on desktop and in the browser
-preview — by a sculpted footballer with a real skeleton and a clip for every
-soccer move.
+| Frame | File |
+| --- | --- |
+| Player, full body, run clip | `media/screenshots/render_player_run.png` |
+| Close‑up, run clip | `media/screenshots/render_closeup_run.png` |
+| Close‑up, header clip (frame 0) | `media/screenshots/render_closeup_header.png` |
+| Broadcast/gameplay view | `media/screenshots/render_gameplay_run.png` |
 
-## What was built
+CPU‑rasterised from `Data/soccer_rig.json` by `Tools/render_gameplay.py` (not a capture of
+the running build; the sky‑coloured triangles at the pitch edges are that tool's known
+coverage artifact, not a model defect).
+
+## What ships now (Option 2 — the realistic player)
 
 | Artifact | Path | What it is |
 | --- | --- | --- |
-| Desktop player | `Data/models/soccer_player.glb` (3.1 MB) | Sculpted skinned mesh (16,000 tris) on Arena's 18-bone skeleton, 6 flat kit materials, **67 animation clips** |
-| Browser player | `Data/soccer_rig.json` (1.2 MB) | Same mesh in the `rig_default.json` schema (10,488 verts), so the GDScript edition uses it with no glTF module |
-| Manifest | `Data/soccer_player_manifest.json` | Clip list + loop flags, 75 action aliases, material order, build stats |
-| Motion library | `Tools/soccer_motions.py` | 67 named clips: shipped Sprite Forge motions + 13 soccer-specific poses (shield, slide tackle, volley, header, chest control, trap, throw-in, shoulder charge, keeper ready/punch, toe lift, dribble, idle-ready) |
-| Builder | `Tools/build_soccer_player.py` | Reproducible pipeline (below) |
-| Tests | `Tools/test_soccer_forge.py` | 36 checks (stdlib-only GLB/JSON parsing; motion checks need `sprite_forge` on `PYTHONPATH`) |
+| Realistic GLB | `Data/models/soccer_player.glb` (12.8 MB) | MakeHuman‑derived footballer: real anatomy, baked skin/eye/hair atlases, smooth normals, **52‑joint skeleton incl. fingers, ball‑of‑foot, neck**. 108,375 tris across 3 identities sharing one skin, **71 animation clips × 53 channels** |
+| Browser rig | `Data/soccer_rig.json` (12.1 MB) | The same player in the GDScript rig schema (31,101 verts / 36,934 tris base "v0" + `variant_sets` v2 36,805 tris / v6 34,636 tris), all 71 clips baked |
+| Manifest | `Data/soccer_player_manifest.json` | Clip list + loop flags + `ball_contact` events + 82 aliases; `look: "realistic"`, `skeleton: "makehuman-52"`, `variants: [v0, v2, v6]` |
+| Builder | `Tools/build_soccer_realistic.py` | Reproducible (see pipeline below); regenerates all three artifacts in ~20 s |
+| Tests | `Tools/test_soccer_forge.py` | 101 checks (stdlib): GLB round‑trip (52 joints, 71 clips, MASK only on hair/brows/lashes/beard, weight sums = 1, tri budget 100k–115k) + browser JSON schema gates + manifest gates |
+
+**Identities (3 looks, like the GAA squad):**
+
+| Id | Look | Eyes | Hair / face |
+| --- | --- | --- | --- |
+| v0 | clean‑shaven base | brown | short02, brown brows |
+| v2 | bearded veteran | blue‑green | short01, beard shell + facial hair |
+| v6 | afro | brownlight | afro01, darker brows |
+
+Desktop picks an identity per character from the stable **display name** (same roster →
+same faces across runs; `SoccerClipRig.ApplyVariant` with the same `h*31+c` hash style the
+browser uses). The browser edition assigns v0/v2/v6 per slot (`(side*5+i) % 3`). All three
+identities are hidden/shown at runtime, so players on one pitch visibly differ.
 
 ## Pipeline
 
-1. **Sculpt** — `sforge.footballer.design()` on the MakeHuman game skeleton
-   (the same design `tools/gaelic_forge.py` uses): 122 SDF shapes, marching
-   cubes at 6 mm, decimated to 16,000 tris, inverse-distance skin weights.
-2. **Skeleton** — the 52 MakeHuman joint weights are collapsed onto Arena's
-   18 bones (`Hips … RFoot`, identical to `Data/rig_default.json`) by nearest
-   bind position. The mesh is grounded (min y = 0) and faces +Z.
-3. **Animations** — every clip is baked on the Sprite Forge mannequin
-   (`rigrec.from_mannequin`), then retargeted mannequin → Arena skeleton with
-   `sforge.retarget` (in-place root motion; the engine owns translation).
-4. **Materials** — flat colours per body layer (skin / jersey / shorts / socks
-   / boots / hair) instead of a baked kit texture, so kits stay per-club:
-   the C# loader tints them from `CharacterSpec` exactly like the procedural
-   rig, and the browser recolors via its existing material slots.
+1. **Extract** the v0/v2/v6 identities from `Gaelic_Football_3d/assets/models/gaelic_player.glb`
+   (52 joints, JOINTS_0/WEIGHTS_0, 4 influences per vertex).
+2. **Kit swap** — the source's GAA `kit` material is replaced with flat white slots
+   (`jersey`/`shorts`/`socks`/`boots`) that the engines multiply by club colours; skin,
+   eyes, brows, lashes, hair and beard are kept untouched (multiply‑tinting baked atlases
+   would wreck them). The GAA kit texture itself is **not** carried over.
+3. **Retarget** — the 71 mannequin soccer clips (`Tools/soccer_motions.py`) are
+   retargeted onto the MH skeleton twice: rest‑matched for the desktop GLB, and against an
+   identity rest for the browser JSON (the GDScript runtime sets pose rotations directly).
+4. **Export** — GLB via `sforge.glbpack`, browser JSON in the `rig_default.json` schema
+   (`bones[{n, p, h}]` parents‑first, `pos/nrm/uv/bi/w/idx/mats`, baked clip keyframes
+   with fps 30 and ball‑contact events), manifest JSON.
 
-## Runtime
+## Runtime changes
 
-- **Desktop (C#)** — `Scripts/Godot/SoccerClipRig.cs` loads the GLB with
-  `GltfDocument`, sets loop modes from the manifest, and plays clips from
-  `PlayerState`: one-shots (`kick`, `tackle`, `slide`, `dive`, `catch`,
-  `foul`, `celebrate`) play once while their `ActionTimer` runs, otherwise
-  locomotion by speed (`idle` / `walk` / `jog` / `run` / `sprint`),
-  `dribble` / `shield` when close-controlling, `keeper_ready` for keepers.
-  `RigFactory` attaches it (editor/self-test stay procedural);
-  `RigAnimator.Pose` routes to it.
-- **Locomotion (FIFA-style)** — cadence is matched to ground speed per clip:
-  each clip's foot travel per 1 s cycle was measured from the GLB
-  (walk 0.74 m, jog/run 1.01 m, sprint 1.22 m, dribble 0.60 m) and
-  `SpeedScale = speed / natural rate` (clamped, smoothed) keeps foot speed
-  ~= ground speed, so players no longer run on the spot or slide backwards.
-  Bands have hysteresis (no threshold flicker), the dribble clip only plays
-  while moving, one-shots never replay, and the body leans forward with
-  speed/acceleration and rolls into turns. Each player has a stable style
-  (stride ±7%, lean variation) seeded from their spec.
-- **Browser (GDScript)** — `BrowserBoot` loads `Data/soccer_rig.json` first
-  (same 18-bone schema). The WASM template has no glTF module, so the GLB
-  itself cannot load in the preview — the JSON is the browser path, and it
-  now carries the same 67 clips baked as keyframes (2.0 MB). `BrowserBoot`
-  plays them with the same cadence matching as desktop (per-clip natural
-  rates, hysteresis bands, one-shots once, lean/roll from acceleration),
-  falling back to the procedural gait if clips are absent.
+- **Desktop (C#)** — `SoccerClipRig.cs`: bone names are MakeHuman (`thigh_l`, `calf_l`,
+  `upperarm_l`…). The old lookups (`shin_L`, `upperarm_L`) could never match, so
+  foot‑planting IK and ball look‑at had silently never run. Two unpicked identity meshes
+  per player are hidden at spawn; kit tint is driven by glTF **material name**
+  (`skin_v*`/`eyes_*` stay natural, everything else tints per club) with a
+  `resource_name`→sub‑resource‑path fallback.
+- **Browser (GDScript)** — `ProceduralRig3D.gd` validates either skeleton family
+  (Arena‑18 or MakeHuman‑52), builds the v2/v6 identity meshes sharing the one skin, and
+  reports the GLB match by MH names. `BrowserBoot.gd` resolves Arena‑style names onto MH
+  names (`bname()`/`MH_MAP` — including the `UpperArmR`→`upperarm_r` path that could never
+  resolve, and the root‑translation clip lookup), recolours every identity mesh, hides the
+  two unused ones, and keeps the clip system (cadence matching, hysteresis, one‑shots,
+  lean/roll) unchanged.
+- The realistic rig ignores the 18‑bone‑era editor fields (`SkinHex`, `HairStyle`…).
+  **Editor preview stays the 18‑bone procedural rig** (`rig_default.json`) — it is the
+  rig the editor's bone list and skeleton overlay were built around.
+
+## Licence / asset provenance
+
+- The realistic body/anatomy/textures derive from **MakeHuman assets (CC0)** via the
+  Gaelic squad build (`sprite_forge/tools/gaelic_squad.py`); MakeHuman's CC0 licence
+  places no restrictions on shipping the derived meshes.
+- Source file `Gaelic_Football_3d/assets/models/gaelic_player.glb` is this repository's
+  own sanitised build. It contains **no GAA branding** (kit textures were swapped for
+  flat per‑club slots in this build) and **no Mixamo data**: the 71 clips come from
+  Sprite Forge's mannequin mocap‑free pose library in this repo (`Tools/soccer_motions.py`),
+  and the `.fbx` caveat documented for the Gaelic project (`Gaelic_Football_3d/README.md`)
+  is unaffected.
+- The Sprite Forge pipeline itself, the sculpt, the retarget and the exports are original
+  to this repository. No FIFA/PES/eFootball assets, likenesses, kits or branding are used.
+- If you redistribute, keep an attribution note for MakeHuman (courtesy; CC0 does not
+  require it).
 
 ## Verification
 
 | Check | Result |
 | --- | --- |
-| `Tools/build_soccer_player.py` | 122 shapes → 16,000 tris, 67 clips retargeted, GLB 3.1 MB, JSON 2.0 MB (mesh + baked clips) |
-| `Tools/test_soccer_forge.py` (full, with Sprite Forge venv) | **52 passed, 0 failed** |
-| `Tools/test_soccer_forge.py` (system python, stdlib only) | **36 passed, 0 failed** (motion section skips) |
-| `Tools/test_pads.py` regression | **129 passed, 0 failed** |
-| `gdparse` (BrowserBoot) + tree-sitter C# (3 changed files) | clean |
-| WASM preview rebuilt + served | 35 staged files incl. `soccer_rig.json`; `/`, `godot.mjs`, `godot.wasm`, manifest all HTTP 200 |
-| CI (`arena-fc-tests.yml`) | new `Sprite Forge soccer player checks` step; `dotnet-core` builds the C# loader |
+| GLB round‑trip via `sforge.gltfread` | 52 joints parents‑first; 71 clips × 53 channels; pelvis translation present; MASK + `doubleSided` only on hair/brows/lashes/beard/facial; weights sum to 1.0 |
+| Pose sanity (from GLB) | idle hips 0.935 m; keeper‑dive head ≈ 0.26 m; header apex ≈ 1.91 m |
+| `test_soccer_forge.py` | **101 passed, 0 failed** (identical under system python — earlier motion mismatch fixed by the manifest/GLB gate rewrite) |
+| `test_pads.py` | **129 passed, 0 failed** |
+| `gdparse` (BrowserBoot, ProceduralRig3D) | parses clean; `gdlint` shows **zero new** violations vs baseline (164 → 76, all identical categories) |
+| CPU render of shipped data | 4 preview frames (see top of file) show correct anatomy, stance, gait and broadcast view |
+| CI (`.github/workflows/arena-fc-tests.yml`) | gd‑tests + `dotnet` build + `test_soccer_forge.py` + `test_pads.py` re‑run; forge section (numpy) runs only where numpy exists by design |
 
-## Option 2 (2026-11-18) — the realistic player
+## History
 
-Pulling the latest `main` (`49be53a`) made the "sculpted mannequin" route a
-known quantity: rebuilding it with the newest Sprite Forge (**v11.17**) yields a
-byte-identical GLB — v11.14–v11.17 only touched the capture/scan head path, not
-the `sforge.footballer` sculpt. So the visible step-change is a new build:
-
-| Artifact | Path | What it is |
-| --- | --- | --- |
-| Realistic GLB | `Data/models/soccer_player.glb` (12.8 MB) | **MakeHuman-derived footballer** from `Gaelic_Football_3d/assets/models/gaelic_player.glb` (same source GAA/AFL/Hurling use): real anatomy mesh, baked skin/eye/hair/beard atlases, smooth normals, **52-joint MH skeleton** incl. fingers, ball-of-foot, neck |
-| Browser rig | `Data/soccer_rig.json` (12.1 MB) | Same player in the `rig_default.json` schema (v0 base, `variant_sets` for v2/v6) + all 71 clips baked for the GDScript runtime |
-| Manifest | `Data/soccer_player_manifest.json` | Clip list + events + aliases, `look: "realistic"`, `skeleton: "makehuman-52"`, `variants: [v0, v2, v6]` |
-| Builder | `Tools/build_soccer_realistic.py` | Reproducible: extracts the three identities from the source, swaps the GAA `kit` material for flat per-club jersey/shorts/socks/boots slots (white PNGs the engine multiplies), retargets the 71 mannequin soccer clips onto the MH skeleton twice (rest-matched for desktop, identity-rest for the browser) |
-
-**Identities:** v0 (clean-shaven), v2 (beard + blue-green eyes), v6 (afro,
-brownlight eyes). Desktop picks per character from the stable `CharacterSpec.Id`;
-the three sets share one skeleton, one skin and one animation bank — only the
-visible mesh toggles. The browser edition ships all three as well (three meshes
-per rig, one visible) — this is what costs the 12 MB JSON; gzip on the static
-host mitigates most of it.
-
-**Runtime changes:** the C# loader (`SoccerClipRig.cs`) now resolves bones by
-MakeHuman names (`thigh_l`, `calf_l`, … — the old `shin_L` lookup never matched,
-so foot-planting IK and look-at were silently dead), hides the two unpicked
-identity meshes per player, and tints by material **name** so all three
-identities follow club colours. Skin, eyes and facial atlases are left natural
-(multiply-tinting them would corrupt the baked shading). GDScript
-(`ProceduralRig3D.gd`, `BrowserBoot.gd`) validates either skeleton family
-(Arena-18 or MakeHuman-52), builds the extra identity meshes sharing the one
-skin, poses bones by MH names when present, and recolours every identity mesh.
-The foot IK / reach arm bug where the browser looked up `UpperArmR` (never a
-real bone name) is fixed as well.
-
-**Verification** (all local, CI re-runs the same):
-`Tools/build_soccer_realistic.py` 108,375 tris total; GLB round-trips through a
-strict glTF reader (`gltfread`): 52 joints, 71 clips × 53 channels, pelvis
-translation present, weights sum to 1, pose ranges sane (idle hips 0.93 m, keeper
-dive head at 0.26 m, header apex 1.91 m). `test_soccer_forge.py` **101 passed**
-(stdlib python: **99**, motion section needs the venv), `test_pads.py` **129
-passed**, GDScript parses via `gdparse` (Godot CI job compiles it for real).
+- **2026‑11‑18 (this branch, `f138585`+)** — realistic player lands (Option 2).
+  Option 1 (the v11.17 sculpted‑mannequin rebuild, `eab13d8`) proved byte‑identical and
+  established the test/lint baseline; it remains in history but no longer ships.
+- **2026‑11‑17** — original Sprite Forge v11.13 footballer (PR #100, `891facd`), 18 bones,
+  16,000 tris, 67→71 clips.
+- v2 online (27 Oct 2026): reconnect, host migration, rollback prediction.
 
 ## Limits / next steps
 
-- The browser edition now plays the same baked clips as desktop; the
-  procedural gait remains as a fallback when clips are absent.
-- The realistic rig ignores `SkinHex`, `HairStyle` etc. — faces come from the
-  three shipped identities (v0/v2/v6); extending to more (e.g. v1/v4/v6) is
-  "extract more variants", a one-line change in the builder.
-- In-game visual check remains user-side: no Godot/.NET in the sandbox, so
-  renders/screenshots must come from CI artifacts or the host machine.
-- `soccer_rig.json` is **12.1 MB** — heavy; the browser could ship only v0
-  (drops ~8 MB) if the transfer cost matters on slow connections.
-- Kit detail is flat colours (no fabric weave), matching Arena's per-club kit
-  system; the realistic body/face still carries the original MH textures.
-- All players share one 1.77 m mesh; the C# loader scales the rig node by
-  `CharacterSpec.Height`, so editor height edits still work.
-- Editor preview/`rig_default.json` stays the 18-bone procedural rig.
+- **Browser payload**: `soccer_rig.json` is **12.1 MB** (three identities × baked clips).
+  Mitigations in place: static hosts gzip it well (~70% smaller over the wire), and only one
+  identity per player is visible. If transfer cost matters, ship `v0` only (drops ~8 MB,
+  one‑line builder change) at the cost of uniform faces. Accepted knowingly by selecting
+  the browser+realistic combination; flag it if you want the v0‑only cut instead.
+- **Visual/animation check on the real engine remains user‑side**: no Godot/.NET in the
+  sandbox. The CI Godot job compiles the GDScript; the previews above are CPU renders of
+  the shipped data, not engine captures.
+- The realistic rig has no per‑player face editor (three fixed identities); more looks =
+  extract more variants in the builder (source ships nine).
+- All players share one 1.77 m mesh; `SoccerClipRig` scales by `CharacterSpec.Height`, so
+  editor height edits still work.
+- Editor preview/`rig_default.json` stays the 18‑bone procedural rig.
+- `Data/soccer_player.glb` embeds no textures on kit slots beyond the flat whites —
+  intentional (per‑club tint), matching the flat‑kit approach everywhere else in Arena FC.

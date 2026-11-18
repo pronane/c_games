@@ -132,7 +132,7 @@ Restart your terminal after installation.
 Make sure you're using Godot 4.7.2 Mono. Other versions may not load the project.
 
 ### Game runs but no player visible
-Check that `Data\models\soccer_player.glb` exists (3.1 MB).
+Check that `Data\models\soccer_player.glb` exists (12.8 MB).
 If missing, pull latest: `git pull origin main`
 
 ### Controller not working
