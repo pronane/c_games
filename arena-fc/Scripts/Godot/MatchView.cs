@@ -220,6 +220,8 @@ public partial class MatchView : Node3D
         {
             // Keep draining authoritative packets even while the local UI is paused.
             Online?.Client.Poll();
+            // Sync with dt=0 freezes player animations (prevents running on the spot).
+            Sync(0f);
             Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
             return;
         }

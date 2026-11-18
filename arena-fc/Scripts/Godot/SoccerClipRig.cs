@@ -239,6 +239,13 @@ public sealed partial class SoccerClipRig : Node3D
     public void Update(PlayerState p, float dt)
     {
         if (Player == null) return;
+        // Paused: freeze animation playback so players don't run on the spot.
+        if (dt <= 0f)
+        {
+            Player.SpeedScale = 0f;
+            return;
+        }
+        Player.SpeedScale = _speedScale;
         float speed = Mx.Flat(p.Vel).Length();
         bool hasBall = p.Dribbling || p.Shielding;
 
