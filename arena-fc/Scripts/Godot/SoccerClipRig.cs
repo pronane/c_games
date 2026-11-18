@@ -15,7 +15,7 @@ using Godot;
 
 namespace ArenaFC.GodotGame;
 
-public sealed class SoccerClipRig : Node3D
+public sealed partial class SoccerClipRig : Node3D
 {
     public const string GlbPath = "res://Data/models/soccer_player.glb";
     public const string ManifestPath = "res://Data/soccer_player_manifest.json";
