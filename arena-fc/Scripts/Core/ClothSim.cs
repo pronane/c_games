@@ -2,6 +2,7 @@
 // Verlet integration with distance constraints. Runs on CPU, <0.1ms per player.
 using System;
 using System.Collections.Generic;
+using Godot;
 
 namespace ArenaFC.Core;
 
