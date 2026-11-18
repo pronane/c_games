@@ -192,14 +192,14 @@ def main():
     boot = open(os.path.join(ROOT, "Web", "BrowserBoot.gd")).read()
     match_cs = open(os.path.join(ROOT, "Scripts", "Core", "Match.cs")).read()
     check("C# rig drives the GLB animation player",
-          "AnimationPlayer" in soccer_cs and "AnimationLibrary" in soccer_cs)
+          "AnimationPlayer" in soccer_cs and "GltfDocument" in soccer_cs)
     check("C# loader plays clips from PlayerState",
           "SelectClip" in soccer_cs)
     # FIFA-style locomotion: cadence matched to ground speed per clip
     # (foot speed ~= ground speed), blend-space clip selection, phase sync,
     # foot-planting IK, look-at/reach and archetype biases (Phase 1).
     check("locomotion cadence matches ground speed",
-          "NaturalRate" in soccer_cs and "_speed / Math.Max(natural" in soccer_cs)
+          "NaturalRate" in soccer_cs and "speed / (nat" in soccer_cs)
     check("blend-space clip selection", "SelectClip" in soccer_cs and "SelectDirectionalClip" in soccer_cs)
     check("phase sync on clip switch", "_phase" in soccer_cs and "startPhase" in soccer_cs)
     check("foot-planting IK", "SolveTwoBone" in soccer_cs and "ShortestArc" in soccer_cs)
