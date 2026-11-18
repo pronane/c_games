@@ -296,7 +296,7 @@ public sealed partial class SoccerClipRig : Node3D
                 : _speedScale + (target - _speedScale) * Math.Min(1f, dt * 8f);
             Player.SpeedScale = _speedScale;
         }
-        float clipLen = Player.GetAnimation(clip).Length;
+        float clipLen = (float)Player.GetAnimation(clip).Length;
         _phase = (_phase + dt * Player.SpeedScale / clipLen) % 1f;
 
         UpdateLean(p, dt, speed);
