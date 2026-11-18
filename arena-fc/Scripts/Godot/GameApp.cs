@@ -163,7 +163,7 @@ public partial class GameApp : Node3D
         if (_menuRig != null)
         {
             _menuRig.Rotation = new Vector3(0, MathF.Sin(_t * .35f) * .5f, 0);
-            var d = new PlayerState { AnimPhase = _t * 2.4f, Vel = new System.Numerics.Vector3(1.4f, 0, 0) };
+            var d = new PlayerState { AnimPhase = _t * 0.5f, Vel = System.Numerics.Vector3.Zero };
             RigAnimator.Pose(_menuRig, d, (float)delta, _t, System.Numerics.Vector3.Zero);
         }
     }
@@ -202,15 +202,19 @@ public partial class GameApp : Node3D
         Clear();
         PadMenuNavigator.Active = false;
         var view = new MatchView();
+        bool isTraining = Mode == GameMode.Training;
         var opts = new MatchOptions
         {
             TeamSize = Options.TeamSize, HalfMinutes = Options.HalfMinutes, TimeSpeed = Options.TimeSpeed,
-            Difficulty = Options.Difficulty, Offside = Options.Offside, Fouls = Options.Fouls,
+            Difficulty = Options.Difficulty,
+            Offside = isTraining ? false : Options.Offside,
+            Fouls = isTraining ? false : Options.Fouls,
             HomeClub = Options.HomeClub, AwayClub = Options.AwayClub, Seed = Options.Seed,
             HomeFormation = Options.HomeFormation, AwayFormation = Options.AwayFormation,
             CustomHome = CustomHome?.Select(x => x.Clone()).ToList(),
             Preset = Options.Preset,
             Quality = Options.Quality,
+            Mode = (int)Mode,
         };
         view.Init(opts, CustomHome, ShowMenu);
         AddChild(view);

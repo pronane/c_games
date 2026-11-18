@@ -43,6 +43,8 @@ public sealed class MatchOptions
     public MatchPreset Preset = MatchPreset.Competitive;
     /// <summary>Phase 3.7: quality preset.  Auto-detects from device.</summary>
     public QualityPreset Quality = QualityPreset.Auto;
+    /// <summary>Game mode: 0=Kickoff, 1=Tournament, 2=Training, 3=Shootout.</summary>
+    public int Mode;
 }
 
 public struct PlayerCommand
@@ -189,9 +191,20 @@ public sealed partial class MatchEngine
         }
         State.AttackSign = 1;
         ResetPositions(true);
-        State.Phase = Phase.Kickoff;
-        State.PhaseTimer = 1.2f;
-        Add(EventKind.Info, "Welcome to Arena FC — kick off!");
+        if (Options.Mode == 3) // Shootout: start with a penalty
+        {
+            State.Phase = Phase.Penalty;
+            State.PhaseTimer = 1.5f;
+            State.RestartSide = 0;
+            State.RestartPos = new Vector3(Mx.HalfLength - 11f, 0, 0);
+            Add(EventKind.Info, "Penalty shootout — take your first penalty!");
+        }
+        else
+        {
+            State.Phase = Phase.Kickoff;
+            State.PhaseTimer = 1.2f;
+            Add(EventKind.Info, "Welcome to Arena FC — kick off!");
+        }
     }
 
     public void Add(EventKind kind, string text)
