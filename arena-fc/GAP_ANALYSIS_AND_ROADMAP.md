@@ -435,7 +435,7 @@ The clip's `ball_contact` frame comes from `game_packs/soccer.json` events (alre
 - **3.6** — Game modes: `GameMode` enum (Kickoff/Tournament/Training/Shootout) on `GameApp`; menu buttons for Tournament, Training (no fouls/offside), Penalty Shootout.
 - **3.7** — Quality presets: `QualityPreset` enum (Low/Medium/High/Auto) on `MatchOptions`; `DetectQuality()` auto-detects from OS; post FX/fog/shadows scaled by preset.
 - **3.8** — `MatchAnalysis.cs`: last 10 matches history, style chart (possession/shots/passes/fouls normalised), real-time advice from match state.
-- **3.9** — Deferred (optional ML step; the data pipeline from `ReplayRecorder` is the foundation).
+- **3.9** — ML blend weights: `BlendLearner.cs` learns clip usage per blend-space cell from replay frames; `BlendWeights` normalises to 0..1 for runtime use. Foundation for data-driven blend tuning.
 
 **Exit criteria:** desktop High looks broadcast-grade (ACES + bloom + vignette); browser Medium still 60 fps (post FX disabled on Low/Med); all tiers pass `test_pads.py` 129/0 + `test_soccer_forge.py` 96/0 + `gdparse` clean.
 
