@@ -54,6 +54,36 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.14: no more tiled heads - the hair shell's texture map
+
+* **The cause.** The hair shell's texture map was a straight top-down view of the head.
+  - Below the widest part of the head, the back and sides fold under the top in that view.
+  - So 6,000-14,000 texels of each sample head's map belonged to two places at once, and each place was painted
+    with the other's colour. That made the angular, tiled patches on the back and sides of every head.
+  - The texture was being blended correctly; it was being stored in a map that overlapped itself.
+* **The fix: `capture_layers.shell_uv` flattens the shell like a peeled cap.**
+  - It starts from the head's own angles: the angle down from the crown is the distance from the centre of the
+    map, and the direction round the head is the angle round the map, with the front at the top.
+  - Where that folds (over the ears, below the back of the skull), the area round the fold is laid out again with
+    mean-value weights until nothing folds. A cap that still folds is laid with its rim on a circle, which is
+    always one-to-one.
+  - A shell in two pieces (a parting) gets a band of the map for each piece. Single-vertex gaps in the hair votes
+    are closed first.
+  - **`capture_layers.uv_overlap(F, fuv)`** counts texels claimed by two triangles in any atlas.
+  - All four sample heads go from 6,069-14,042 shared texels to 0. Mike's back of head is smooth now.
+* **`tools/test_hair_uv.py`** (needs the MakeHuman assets, no videos) runs 6 checks on 3 head shapes × 6
+  hairstyles (cap, short, down to the nape, split by a parting, patchy votes, shaved):
+  - no texel claimed twice;
+  - no triangle folded;
+  - the map stays in its quarter;
+  - front at the top;
+  - no part of the shell starved of texels;
+  - and that the old top-down map fails the first check.
+* **Not fixed by this:**
+  - Tmon's head is still patchy in colour. That is light: his video mixes lamp and window light. It is not tiling.
+  - The front edge of the hairline still has a few hard steps where the hair shell meets the skin.
+  - Existing captures pick up the new map when their layers are rebuilt (`forge.py capture` again).
+
 ## New in v11.13: heads - no ghost face in profile, no window-blue scalp
 
 * **The head follows the camera.** In a turnaround people turn their head towards the phone. The face tracker
