@@ -10,6 +10,15 @@ public partial class Stadium : Node3D
 {
     public const float LineY = 0.012f;
 
+    /// <summary>Phase 3.7: auto-detect quality from device capabilities.</summary>
+    public static QualityPreset DetectQuality()
+    {
+        string os = OS.GetName();
+        if (os == "Android" || os == "iOS")
+            return QualityPreset.Medium;
+        return QualityPreset.High;
+    }
+
     public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto)
     {
         Name = "Stadium";
@@ -284,15 +293,6 @@ public partial class BroadcastCamera : Camera3D
 
     private static Vector3 MxToG(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);
     private static System.Numerics.Vector3 Gx(Vector3 v) => new(v.X, v.Y, v.Z);
-
-    /// <summary>Phase 3.7: auto-detect quality from device capabilities.</summary>
-    public static QualityPreset DetectQuality()
-    {
-        string os = OS.GetName();
-        if (os == "Android" || os == "iOS")
-            return QualityPreset.Medium;
-        return QualityPreset.High;
-    }
 }
 
 /// <summary>Procedural skeletal animation: writes quaternions straight into Skeleton3D bone poses.</summary>
