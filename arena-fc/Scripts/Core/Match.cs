@@ -1243,6 +1243,11 @@ public sealed partial class MatchEngine
         v.Y += Mx.Gravity * dt;
         // Magnus effect from spin (side curve + dip).
         v += Vector3.Cross(b.Spin, v) * (.055f * dt);
+        // Ball drag: air resistance proportional to velocity squared.
+        // Prevents shots from floating; high-speed balls decelerate faster.
+        float speed = v.Length();
+        float dragCoeff = 0.0035f; // tuned for realistic shot trajectories
+        v -= v * (dragCoeff * speed * dt);
         v *= 1f - (v.Y > 0f || b.Pos.Y > Mx.BallRadius + .05f ? .045f : 0f) * dt;
         b.Pos += v * dt;
 
@@ -1402,7 +1407,9 @@ public sealed partial class MatchEngine
             float staminaFactor = Mx.Clamp(p.Stamina * 1.4f, 0f, 1f);
             float skillFactor = p.Spec.Passing * .5f + p.Spec.Pace * .3f + .2f;
             float presetFactor = Options.Preset == MatchPreset.Authentic ? .92f : 1f;
-            float quality = Mx.Clamp((skillFactor * .5f + staminaFactor * .3f + (1f - pressure) * .2f) * presetFactor, .15f, 1f);
+            // Fatigue: tired players (stamina < 0.3) trap significantly worse.
+            float fatiguePenalty = p.Stamina < 0.3f ? (0.3f - p.Stamina) * 1.5f : 0f;
+            float quality = Mx.Clamp((skillFactor * .5f + staminaFactor * .3f + (1f - pressure) * .2f) * presetFactor - fatiguePenalty, .10f, 1f);
             p.FirstTouchQuality = quality;
             if (needsTouch)
             {
