@@ -55,6 +55,8 @@ public struct PlayerCommand
     public bool Shield;
     /// <summary>Hold for close-control dribbling: quicker touches, tighter ball, more evade.</summary>
     public bool Dribble;
+    /// <summary>M10: Skill move trigger (stick gesture detected).</summary>
+    public SkillMove Skill;
     public float Charge;
     public static PlayerCommand None => default;
 }
@@ -101,6 +103,13 @@ public sealed class PlayerState
     public int JockeyState;
     // Phase 2.7 off-ball: run type (0=none, 1=overlap, 2=underlap, 3=decoy, 4=third-man).
     public int RunType;
+    // M9 shielding: visible body lean/rotation when protecting ball.
+    public float ShieldLeanX, ShieldLeanZ, ShieldRotY;
+    // M10 skill moves: current skill move and timer.
+    public SkillMove CurrentSkill = SkillMove.None;
+    public float SkillTimer;
+    // A5 tactics: AI modifiers from in-match tactics.
+    public float TacticsPressMult = 1f, TacticsRunMult = 1f, TacticsPassMult = 1f;
 }
 
 public sealed class BallState
@@ -546,6 +555,26 @@ public sealed partial class MatchEngine
         p.Dribbling = owner && closeControl && p.Stamina > .08f;
         if (owner)
         {
+            // M10: Skill moves — stick gesture triggers animation + evade.
+            if (cmd.Skill != SkillMove.None && p.SkillTimer <= 0f)
+            {
+                var nearestOpp = NearestOpponent(p, out float oppDist);
+                float chance = SkillMoves.SuccessChance(cmd.Skill, p.Spec.Pace, oppDist);
+                if (Rng.Next() < chance)
+                {
+                    p.CurrentSkill = cmd.Skill;
+                    p.SkillTimer = SkillMoves.Duration(cmd.Skill);
+                    SetAction(p, SkillMoves.ClipName(cmd.Skill), p.SkillTimer, 0.5f);
+                    // Evade: burst away from opponent
+                    if (nearestOpp != null)
+                    {
+                        Vector3 away = Mx.Flat(p.Pos - nearestOpp.Pos);
+                        p.Vel += Mx.Norm(away) * 2.5f;
+                    }
+                    Add(EventKind.Info, $"{p.Spec.DisplayName} pulls off a {cmd.Skill}!");
+                }
+                return;
+            }
             if (cmd.Shoot) { Shoot(p, MathF.Max(.25f, cmd.Charge)); return; }
             if (cmd.Pass) { int t = FindBestPassTarget(p, false); if (t >= 0) PassTo(p, S.Players[t], 13f, false); return; }
             if (cmd.Through) { int t = FindBestPassTarget(p, true); if (t >= 0) PassTo(p, S.Players[t], 17f, true); return; }
@@ -608,7 +637,9 @@ public sealed partial class MatchEngine
             else if (humanDefending && S.ControlLock <= 0f)
             {
                 var carrier = S.Players[ball.Owner];
-                p.Target = carrier.Pos + Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team)) * 1.1f;
+                // A5: Tactics-based pressing — mentality and pressing intensity affect AI.
+                float pressDist = 1.1f * p.TacticsPressMult;
+                p.Target = carrier.Pos + Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team)) * pressDist;
                 p.Pressing = true;
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
@@ -1016,7 +1047,22 @@ public sealed partial class MatchEngine
         float contestD = MathF.Max(1f, d - 1.0f);
         float between = Mx.Clamp(Vector3.Dot(Mx.Flat(p.Pos - carrier.Pos), f) / MathF.Max(.4f, contestD), -1f, 1f);
         float strength = (p.Spec.Bulk - 1f) * .35f + p.Spec.Defending * .22f;
-        float shield = carrier.Shielding ? .22f + (carrier.Spec.Bulk - 1f) * .12f : 0f;
+        // M9: Full shielding integration — body positioning + strength + stamina.
+        float shield = 0f;
+        if (carrier.Shielding)
+        {
+            float oppDist = d;
+            int strengthAttr = (int)(carrier.Spec.Bulk * 50f + carrier.Spec.Pace * 30f);
+            shield = Shielding.Effectiveness(oppDist, strengthAttr, carrier.Stamina);
+            // Visible body lean when shielding (M9)
+            var (leanX, leanZ, rotY) = Shielding.GetPose(
+                (p.Pos.X - carrier.Pos.X) / Math.Max(0.1f, d),
+                (p.Pos.Z - carrier.Pos.Z) / Math.Max(0.1f, d),
+                oppDist, strengthAttr);
+            carrier.ShieldLeanX = leanX;
+            carrier.ShieldLeanZ = leanZ;
+            carrier.ShieldRotY = rotY;
+        }
         float dribble = carrier.Dribbling ? .16f : 0f;
         // Jockeying (staying goal-side, not diving in) improves the chance.
         float jockeyBonus = p.JockeyState == 2 ? .08f : p.JockeyState == 1 ? .04f : 0f;
@@ -1247,7 +1293,15 @@ public sealed partial class MatchEngine
         // Prevents shots from floating; high-speed balls decelerate faster.
         float speed = v.Length();
         float dragCoeff = 0.0035f; // tuned for realistic shot trajectories
+        // G6: Weather effects — rain increases drag, wind adds lateral force.
+        if (Weather.Raining) dragCoeff *= 1.5f;
         v -= v * (dragCoeff * speed * dt);
+        // Wind: lateral force on airborne ball
+        if (b.Pos.Y > Mx.BallRadius + 0.5f)
+        {
+            v.X += Weather.WindX * dt * 0.5f;
+            v.Z += Weather.WindZ * dt * 0.5f;
+        }
         v *= 1f - (v.Y > 0f || b.Pos.Y > Mx.BallRadius + .05f ? .045f : 0f) * dt;
         b.Pos += v * dt;
 
