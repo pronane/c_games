@@ -182,6 +182,36 @@ def face_join(col, X, face, side, log=print, reach=0.035, band=0.015, smooth=0.0
     return col, info
 
 
+FACE_SKIN = os.environ.get("SF_FACE_SKIN", "1") != "0"
+
+
+def face_to_skin(col, fw, ref, log=print, strength=0.8, max_ab=15.0, min_step=3.0):
+    """-> (colours, info). The face is painted from the frames that saw it front-on, often under a different light
+    or white balance from the ones that saw the neck and hands (Tmon: his face from the window's blue frames, his
+    neck and hands from the lamps' warm ones - a grey face on a warm body, worse after white balancing to his grey
+    hoodie). The face's colour (a, b; not its lightness - a face is often lit differently, and its shading is
+    detail) is moved `strength` of the way to the median of the person's other skin (`ref`: neck, arms, hands),
+    weighted by how much each texel is face (fw), at most `max_ab`. A step under `min_step` is left (v11.17)"""
+    from .capture_clean import _lab, _rgb
+    f = np.nonzero(fw > 0.02)[0]
+    core = fw > 0.7
+    if len(f) < 300 or core.sum() < 300 or ref.sum() < 300:
+        return col, {}
+    L = _lab(col.astype(np.float32))
+    step = np.median(L[ref], 0)[1:] - np.median(L[core], 0)[1:]
+    size = float(np.linalg.norm(step))
+    if size < min_step:
+        return col, dict(step_ab=size, applied=False)
+    step = step * min(1.0, max_ab / size) * strength
+    out = L[f].copy()
+    out[:, 1:] += fw[f, None] * step[None, :]
+    col = col.copy()
+    col[f] = _rgb(out)
+    log("texture: the face's colour matched to the person's other skin (a/b step %.0f, moved %.0f)" % (
+        size, float(np.linalg.norm(step))))
+    return col, dict(step_ab=size, moved_ab=float(np.linalg.norm(step)), applied=True)
+
+
 RINGS = os.environ.get("SF_RINGS", "1") != "0"
 HEAD_MIN_FACING = float(os.environ.get("SF_HEAD_FACING", "0.4"))
 # v11.13: people turn their head to follow the camera round them (Declan by 25 degrees). The face tracker gives the
@@ -668,6 +698,12 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
             mix, stats["face_join"] = face_join(mix, Xr, jface, jside, log=log)
             if light is not None and light.get("applied"):
                 alb, _ = face_join(alb, Xr, jface, jside, log=lambda *a: None)
+        # v11.17: the face's colour cast matched to the person's own skin elsewhere (face_to_skin)
+        skin_ref = seen_t & (lay_c == 0) & (lab_c == 2) & ~hd_t
+        if FACE_SKIN and skin_ref.sum() > 300 and (fw > 0.5).sum() > 300:
+            mix, stats["face_skin"] = face_to_skin(mix, fw * (lay_c == 0), skin_ref, log=log)
+            if light is not None and light.get("applied"):
+                alb, _ = face_to_skin(alb, fw * (lay_c == 0), skin_ref, log=lambda *a: None)
 
     def fill(colours):
         # unseen texels and the gutters are filled together, from known texels only (filling the holes first let
@@ -771,3 +807,45 @@ def render(P, F, fuv, tex, yaw=0.0, size=(360, 480), pitch=0.0, bg=(205, 210, 21
     T = tex.shape[0]
     out[m] = _bilinear(tex, uv[:, 0] * T - 0.5, (1 - uv[:, 1]) * T - 0.5).astype(np.uint8)
     return out, m
+
+
+# ------------------------------------------------------------------ white balance from a neutral garment (v11.17)
+NEUTRAL_PARTS = ("upper", "lower", "shoes")
+
+
+def _part_bones(bi, part):
+    if part == "upper":
+        return [i for n, i in bi.items() if n.startswith(("spine", "clavicle", "upperarm", "lowerarm", "shoulder"))]
+    if part == "lower":
+        return [i for n, i in bi.items() if n.startswith(("root", "pelvis", "upperleg", "lowerleg", "thigh", "shin"))]
+    if part == "shoes":
+        return [i for n, i in bi.items() if n.startswith(("foot", "toe"))]
+    raise ValueError("neutral part must be one of %s" % ", ".join(NEUTRAL_PARTS))
+
+
+def neutral_gain(tex, F, fuv, layer, J, bi, part, max_gain=1.6):
+    """-> (RGB gains, info). The capture's white balance from a garment the user says is neutral (white, grey or
+    black): the gains that make its median colour grey, its lightness kept. A video's colour is the room's light
+    as much as the clothes' (Tmon: lamps and a window; the phone's white balance swinging between them) and no
+    automatic method can tell a warm room from a warm jumper - the person can"""
+    res = tex.shape[0]
+    tid, _ = texel_map(F, fuv, res)
+    ins = tid >= 0
+    t = tid[ins]
+    lay = layer[F[t, 0]]; bone = J[F[t, 0], 0]
+    bones = _part_bones(bi, part)
+    worn = (lay == 0) if part == "shoes" else np.isin(lay, (1, 2))
+    sel = worn & np.isin(bone, bones)
+    c = tex[ins][sel].astype(np.float32)
+    c = c[(c.max(1) < 250) & (c.min(1) > 5)]                         # not blown out, not black
+    if len(c) < 200:
+        return np.ones(3, np.float32), dict(part=part, texels=int(len(c)), applied=False)
+    med = np.median(c, 0)
+    g = np.clip(med.mean() / np.maximum(med, 1.0), 1.0 / max_gain, max_gain).astype(np.float32)
+    return g, dict(part=part, texels=int(len(c)), before=[float(v) for v in med], gains=[float(v) for v in g],
+                   applied=True)
+
+
+def white_balance(tex, gains):
+    """the whole atlas times the RGB gains (empty texels too: they are background)"""
+    return np.clip(tex.astype(np.float32) * gains[None, None, :], 0, 255).astype(np.uint8)
