@@ -1016,10 +1016,10 @@ public sealed partial class MatchEngine
         float jockeyBonus = p.JockeyState == 2 ? .08f : p.JockeyState == 1 ? .04f : 0f;
         // Preset: Authentic has more realistic (lower) tackle accuracy.
         float presetTackle = Options.Preset == MatchPreset.Authentic ? .88f : 1f;
-        float chance = (.38f + p.Spec.Defending * .30f + strength + between * .22f - shield - dribble
-                       - carrier.Spec.Pace * .12f - (contestD - 1f) * .12f
+        float chance = (.42f + p.Spec.Defending * .32f + strength + between * .22f - shield - dribble
+                       - carrier.Spec.Pace * .12f - (contestD - 1f) * .10f
                        + (slide ? .14f : 0f) + (powered ? .10f : 0f) + jockeyBonus) * presetTackle;
-        chance = Mx.Clamp(chance, .06f, .82f);
+        chance = Mx.Clamp(chance, .06f, .85f);
         if (Rng.Next() < chance)
         {
             // A successful tackle cancels any wind-up the carrier had started.
