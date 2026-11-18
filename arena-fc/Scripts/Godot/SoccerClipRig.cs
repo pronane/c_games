@@ -115,11 +115,21 @@ public sealed partial class SoccerClipRig : Node3D
     public bool Load(CharacterSpec spec)
     {
         LoadManifest();
+        GD.Print($"[SoccerClipRig] Loading GLB from {GlbPath}, exists={Godot.FileAccess.FileExists(GlbPath)}");
         var doc = new GltfDocument();
         var state = new GltfState();
-        if (doc.AppendFromFile(GlbPath, state) != Error.Ok) return false;
+        var err = doc.AppendFromFile(GlbPath, state);
+        if (err != Error.Ok)
+        {
+            GD.PrintErr($"[SoccerClipRig] AppendFromFile failed: {err}");
+            return false;
+        }
         var scene = doc.GenerateScene(state) as Node3D;
-        if (scene == null) return false;
+        if (scene == null)
+        {
+            GD.PrintErr("[SoccerClipRig] GenerateScene returned null");
+            return false;
+        }
         AddChild(scene);
         _sceneRoot = scene;
         int h = 17;
@@ -129,7 +139,12 @@ public sealed partial class SoccerClipRig : Node3D
         Player = FindFirst<AnimationPlayer>(scene);
         Skel = FindFirst<Skeleton3D>(scene);
         Mesh = FindFirst<MeshInstance3D>(scene);
-        if (Player == null || Skel == null || Mesh == null) return false;
+        if (Player == null || Skel == null || Mesh == null)
+        {
+            GD.PrintErr($"[SoccerClipRig] Missing nodes: Player={Player != null}, Skel={Skel != null}, Mesh={Mesh != null}");
+            return false;
+        }
+        GD.Print($"[SoccerClipRig] GLB loaded OK: {Player.GetAnimationList().Count} animations");
         foreach (var name in Player.GetAnimationList())
         {
             var anim = Player.GetAnimation(name);
