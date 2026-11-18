@@ -682,8 +682,9 @@ public sealed partial class MatchEngine
             Vector3 cutPos = goalCentre - ballToGoal * cutDist;
             float tx = cutPos.X;
             float tz = Mx.Clamp(ball.Pos.Z * .62f, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
-            // Rush: if the ball is loose and close, charge it (1v1).
-            bool rush = ball.Owner < 0 && distToGoal < 8f && Mx.FlatDist(p.Pos, ball.Pos) < 6f;
+            // Rush: if ball is loose OR opponent has it close (1v1), charge.
+            bool oppHasBall = ball.Owner >= 0 && State.Players[ball.Owner].Team != p.Team;
+            bool rush = distToGoal < 14f && Mx.FlatDist(p.Pos, ball.Pos) < 9f && (ball.Owner < 0 || oppHasBall);
             if (rush)
             {
                 p.Target = ball.Pos;
