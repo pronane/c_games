@@ -230,7 +230,7 @@ public static class RigBuilder
 
         private void Tri(int a, int b, int c, RigMat mat) { _idx[(int)mat].Add(a); _idx[(int)mat].Add(b); _idx[(int)mat].Add(c); }
 
-        public void Cyl(string bone, float from, float to, float r0, float r1, RigMat mat, int seg = 10)
+        public void Cyl(string bone, float from, float to, float r0, float r1, RigMat mat, int seg = 16)
         {
             int b = B(bone);
             var head = _bones[b].Head; var tail = _bones[b].Tail;
@@ -241,7 +241,7 @@ public static class RigBuilder
             Vector3 v = Vector3.Cross(ax, u);
             Vector3 p0 = head + (tail - head) * from, p1 = head + (tail - head) * to;
             int start = _p.Count;
-            int rings = 4;
+            int rings = 8;
             for (int j = 0; j <= rings; j++)
             {
                 float s = j / (float)rings;
@@ -307,7 +307,7 @@ public static class RigBuilder
             }
         }
 
-        public void Sphere(string bone, Vector3 center, float radius, RigMat mat, int lat = 10, int lon = 14,
+        public void Sphere(string bone, Vector3 center, float radius, RigMat mat, int lat = 16, int lon = 24,
                            bool upperOnly = false, float upperFraction = .55f)
         {
             int b = B(bone);
