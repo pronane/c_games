@@ -74,17 +74,15 @@ public partial class MatchView : Node3D
         {
             Name = name,
             Text = text,
-            FontSize = 44,
-            PixelSize = .010f,
-            OutlineSize = 10,
+            FontSize = 32,
+            PixelSize = .008f,
+            OutlineSize = 8,
             Modulate = color,
             DoubleSided = true,
         };
-        // String property names avoid depending on generated C# enum spellings
-        // for billboard / draw flags, while keeping the labels readable and on top.
+        // Billboard so labels face the camera. No fixed_size/no_depth_test —
+        // those made labels render huge and on top of everything.
         l.Set("billboard", 1);
-        l.Set("no_depth_test", true);
-        l.Set("fixed_size", true);
         l.Set("outline_modulate", new Color(0f, 0f, 0f, .92f));
         return l;
     }

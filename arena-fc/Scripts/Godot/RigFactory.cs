@@ -98,6 +98,8 @@ public partial class CharacterRig : Node3D
 
         BuildBoneOverlay();
         ApplyPoseOverrides();
+        // Re-attach GLB after rebuild (Rebuild clears all children).
+        AttachSoccer(Spec);
     }
 
     public static Vector3 G(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);
@@ -153,10 +155,11 @@ public partial class CharacterRig : Node3D
     }
 
     /// <summary>Attach the Sprite Forge soccer player (GLB + clips) if present.
-    /// The procedural skeleton/mesh stay as a fallback (and for the name label).</summary>
+    /// The procedural skeleton/mesh stay as a fallback (and for the name label).
+    /// GLB loads in EditorMode too so the Character Editor shows realistic players.</summary>
     public void AttachSoccer(CharacterSpec spec)
     {
-        if (EditorMode || !SoccerClipRig.Available) return;
+        if (!SoccerClipRig.Available) return;
         Soccer = new SoccerClipRig { Name = "SoccerPlayer" };
         AddChild(Soccer);
         if (Soccer.Load(spec)) Mesh.Visible = false;
@@ -225,8 +228,7 @@ public static class RigFactory
     public static CharacterRig Create(CharacterSpec spec, bool editorMode = false)
     {
         var rig = new CharacterRig { Name = "Rig_" + spec.DisplayName, EditorMode = editorMode };
-        rig.Rebuild(spec);
-        rig.AttachSoccer(spec);
+        rig.Rebuild(spec); // Rebuild calls AttachSoccer internally
         return rig;
     }
 }
