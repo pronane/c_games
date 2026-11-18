@@ -19,7 +19,22 @@ brown with blue patches (Tmon). Checks:
   9 the strands' light and dark (lightness) are kept
  10 SF_HAIR_EVEN=0 leaves the hair as it was baked
  11 the bare scalp: a blue patch on skin is dropped and filled; a dark fringe beside a skin-coloured ear (two video
-    labels) keeps both colours"""
+    labels) keeps both colours
+Face edge (capture_texture.face_weight, v11.15): the face is painted almost from one frame, the rest of the head
+from many; switched at a hard line the face looked set into the head from the side (Mike, Tmon). Checks:
+ 12 the middle of the face is all face, the back and the crown none
+ 13 round the head and up to the crown it changes smoothly - no step anywhere
+ 14 SF_FACE_FEATHER=0 gives back the old hard edge
+ 15 face_join: a pale face set into a warm head (Tmon) - the colour step at the edge more than halves
+ 16 the middle of the face and the back of the head keep their own colour
+ 17 fine detail on the face (eyes, stubble) is kept exactly; a face already matching the head is left alone
+Head length from the side (capture_face.fit_head_depth, v11.15; needs MakeHuman's base mesh): the face fit sees the
+head mostly from the front and left its length at MakeHuman's average - too long for most people (the cheek from the
+ear to the nose looked stretched). Checks:
+ 18 a silhouette row: the run of pixels through the nose is measured, not the arm beside it
+ 19 side-on frames that say the head is 10% too long shorten it about 10% (as far as the slider goes)
+ 20 frames that say it is shorter than the video (the video includes the hair) leave it alone
+ 21 side-on frames that disagree leave it alone; too few side-on frames leave it alone"""
 from __future__ import annotations
 import math
 import os
@@ -87,6 +102,109 @@ def hair_checks():
         "patch off by %.1f, fringe moved %.1f" % (e_patch, e_fr))
 
 
+def face_edge_checks(CT):
+    # a head: points on a sphere of 10 cm about (0, 1.65, 0), rest-pose normals outward
+    th = np.radians(np.arange(0, 360, 1.0)); el = np.radians(np.arange(-60, 90, 1.0))
+    T_, E_ = np.meshgrid(th, el)
+    N = np.c_[(np.cos(E_) * np.sin(T_)).ravel(), np.sin(E_).ravel(), (np.cos(E_) * np.cos(T_)).ravel()]
+    X = N * 0.1 + [0, 1.65, 0]
+    head = np.ones(len(X), bool)
+    fw = CT.face_weight(N, X, head).reshape(T_.shape)
+    i0 = np.argmin(np.abs(np.degrees(el)))                                  # eye level
+    front, back = fw[i0, 0], fw[i0, 180]
+    crown = fw[-1].max()
+    rec("12 the face's middle is face, the back and crown are not", front > 0.99 and back == 0 and crown == 0,
+        "front %.2f back %.2f crown %.2f" % (front, back, crown))
+    step_round = np.abs(np.diff(fw, axis=1)).max(); step_up = np.abs(np.diff(fw, axis=0)).max()
+    rec("13 it changes smoothly round the head and up to the crown", max(step_round, step_up) < 0.1,
+        "largest step per degree %.3f round, %.3f up (the old edge: 1)" % (step_round, step_up))
+    old = CT.FACE_FEATHER
+    try:
+        CT.FACE_FEATHER = False
+        hard = CT.face_weight(N, X, head)
+    finally:
+        CT.FACE_FEATHER = old
+    join_checks(CT, N, X, T_, i0)
+    depth_checks()
+    rec("14 SF_FACE_FEATHER=0: the old hard edge", set(np.unique(hard)) <= {0.0, 1.0} and hard.reshape(T_.shape)[i0, 0] == 1,
+        "")
+
+
+def join_checks(CT, N, X, T_, i0):
+    from sforge.capture_clean import _lab
+    face = N[:, 2] > 0.55; side = (N[:, 2] < 0.45) & (N[:, 2] > -0.6)
+    warm = np.array([200.0, 130, 100]); pale = np.array([175.0, 160, 165])
+    col = np.where(face[:, None], pale, warm)
+    detail = 18.0 * np.sign(np.sin(X[:, 0] * 900) * np.sin(X[:, 1] * 900))   # a fine checker on the face
+    col[face] += detail[face, None]
+    col = np.clip(col, 0, 255)
+
+    def edge_step(c):
+        L = _lab(c.astype(np.float32))
+        fe = face & (N[:, 2] < 0.62); se = side & (N[:, 2] > 0.38)
+        return float(np.linalg.norm(np.median(L[fe], 0) - np.median(L[se], 0)))
+    out, info = CT.face_join(col, X, face, side, log=lambda *a: None)
+    before, after = edge_step(col), edge_step(out)
+    rec("15 face_join: the colour step at the face's edge mostly goes", after < 0.5 * before,
+        "step %.1f -> %.1f (Lab)" % (before, after))
+    mid = face & (N[:, 2] > 0.95); back = N[:, 2] < -0.3
+    dm = float(np.abs(out[mid] - col[mid]).max()); db = float(np.abs(out[back] - col[back]).max())
+    rec("16 the middle of the face and the back of the head keep their colour", dm == 0 and db == 0,
+        "largest change %.1f (face middle), %.1f (back)" % (dm, db))
+    # detail: the checker's contrast in the changed band is the same
+    band = face & (N[:, 2] < 0.7)
+    Lb, La = _lab(col[band].astype(np.float32))[:, 0], _lab(out[band].astype(np.float32))[:, 0]
+    hi_ = detail[band] > 0
+    keep = abs((La[hi_].mean() - La[~hi_].mean()) - (Lb[hi_].mean() - Lb[~hi_].mean()))
+    same = np.where(face[:, None], warm, warm)
+    o2, _ = CT.face_join(same, X, face, side, log=lambda *a: None)
+    rec("17 detail kept; a face already matching its head is left alone", keep < 1.5 and np.abs(o2 - same).max() < 1.5,
+        "detail contrast changed by %.2f L; matching head changed by %.2f" % (keep, np.abs(o2 - same).max()))
+
+
+def depth_checks():
+    import types
+    from sforge import capture_face as CFA
+    m = np.zeros((20, 200), bool); m[:, 10:40] = True; m[:, 60:150] = True        # an arm, then the head
+    rec("18 the silhouette row through the nose is measured", CFA._row_run(m, range(5, 10), 100) == 90, "")
+    try:
+        from sforge import capture_body as CB
+        bm = CB.BodyModel()
+    except Exception as e:                                                     # noqa: BLE001
+        print("head length checks skipped (no MakeHuman assets): %s" % e)
+        return
+    f = types.SimpleNamespace(bm=bm, mac=dict(gender=1.0), sl={"head_depth": 0.0}, height=1.8)
+    hb = bm.bi["head"]; head = (bm.J[:, 0] == hb) & (bm.W[:, 0] > 0.6)
+
+    def length(sl):
+        V = bm.shape(f.mac, sl, f.height).V[head]
+        nose = V[np.argmax(V[:, 2])]
+        return float(nose[2] - V[np.abs(V[:, 1] - nose[1]) < 0.03][:, 2].min())
+    L0 = length(f.sl)
+    real = CFA.profile_head_ratio
+    try:
+        CFA.profile_head_ratio = lambda fitter, frames: (1.05, [1.04, 1.05, 1.05, 1.06, 1.05])
+        CFA.fit_head_depth(f, [], log=lambda *a: None)
+        L1 = length(f.sl)
+        ok19 = 0.93 < L1 / L0 < 0.97
+        d19 = "length x%.3f (want about 1/1.05 = 0.952), head_depth %.2f" % (L1 / L0, f.sl["head_depth"])
+        f.sl = {"head_depth": 0.0}
+        CFA.profile_head_ratio = lambda fitter, frames: (0.92, [0.9, 0.92, 0.92, 0.93, 0.94])
+        CFA.fit_head_depth(f, [], log=lambda *a: None)
+        ok20 = f.sl["head_depth"] == 0.0
+        CFA.profile_head_ratio = lambda fitter, frames: (1.1, [0.85, 0.95, 1.1, 1.25, 1.35])
+        CFA.fit_head_depth(f, [], log=lambda *a: None)
+        ok21 = f.sl["head_depth"] == 0.0
+        CFA.profile_head_ratio = lambda fitter, frames: (None, [1.1, 1.1])
+        CFA.fit_head_depth(f, [], log=lambda *a: None)
+        ok21 = ok21 and f.sl["head_depth"] == 0.0
+    finally:
+        CFA.profile_head_ratio = real
+    rec("19 a head 5% too long side-on is shortened about 5%", ok19, d19)
+    rec("20 a head shorter than the video's (hair) is left alone", ok20, "")
+    rec("21 disagreeing or too few side-on frames: left alone", ok21, "")
+
+
 def main():
     from sforge import capture_texture as CT
     # a person who turns their head 0.35 x the body's angle, a little more to one side (as Declan does)
@@ -142,6 +260,7 @@ def main():
         d = "frames given a pose: %s" % sorted(out)
     rec("6 the head turns about the neck in an untracked frame", ok, d)
     hair_checks()
+    face_edge_checks(CT)
     bad = [n for n, ok_, _ in R if not ok_]
     print("\n%d / %d passed" % (len(R) - len(bad), len(R)))
     return 1 if bad else 0

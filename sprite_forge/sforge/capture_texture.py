@@ -42,6 +42,31 @@ def _sharpness(img):
 # head texels are weighted by (frame's head score / best) ** FACE_POWER: high = the face from (nearly) one frame
 FACE_POWER = float(os.environ.get("SFS_FACE_POWER", "10"))
 
+FACE_FEATHER = os.environ.get("SF_FACE_FEATHER", "1") != "0"
+FACE_RAMP = (0.15, 0.5)            # the face ramps in as the head's normal turns forward (rest-pose z) ...
+CROWN_GAP, CROWN_RAMP = 0.05, 0.03  # ... and out towards the crown: full 8 cm below the top, none 5 cm below
+
+
+def _smooth(x, a, b):
+    t = np.clip((x - a) / (b - a), 0.0, 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def face_weight(Nr, Xr, head_t):
+    """per texel how much it is face (0..1): the front of the head (rest-pose normal forward), not the crown. A ramp
+    (v11.15); SF_FACE_FEATHER=0 gives the old hard edge (normal z over 0.35, 5 cm below the top)"""
+    fw = np.zeros(len(Nr), np.float32)
+    if not head_t.any():
+        return fw
+    top = Xr[head_t, 1].max()
+    if not FACE_FEATHER:
+        fw[head_t & (Nr[:, 2] > 0.35) & (Xr[:, 1] < top - CROWN_GAP)] = 1.0
+        return fw
+    w = _smooth(Nr[:, 2], *FACE_RAMP) * _smooth(top - Xr[:, 1], CROWN_GAP, CROWN_GAP + CROWN_RAMP)
+    fw[head_t] = w[head_t]
+    return fw
+
+
 def head_sides(col, X, side, face, log=print, ratio=1.25, force=None):
     """-> (colours, info). How cleanly each side of the head (x > 0 / x < 0) joins the face: the colour step
     between face texels and the side texels next to them (within 1.5 cm). The worse side, when worse by `ratio`,
@@ -100,6 +125,60 @@ def face_balance(col, X, face, log=print, strength=0.5, radius=0.02):
     col[fi] = _rgb(L2)
     info = dict(mean_abs_lr_step=float(np.abs(sm).mean()))
     log("texture: face light evened left / right (mean step %.1f L)" % info["mean_abs_lr_step"])
+    return col, info
+
+
+FACE_JOIN = os.environ.get("SF_FACE_JOIN", "1") != "0"
+
+
+def face_join(col, X, face, side, log=print, reach=0.035, band=0.015, smooth=0.02, max_dl=25.0, max_dab=18.0):
+    """-> (colours, info). The face comes from one frame, the sides of the head from others with their own light
+    and white balance: even feathered, the face kept its own colour and looked set into the head (Mike, Tmon from
+    the side). Along the edge, the colour step (Lab, smoothed over `smooth` m) between the face and the side texels
+    within `band` m of it is measured; the face and the sides each take half of it at the edge, fading to nothing
+    `reach` m away - so the middle of the face and the back of the head keep their own colour, and fine detail
+    (eyes, stubble) is untouched (v11.15)"""
+    from scipy.spatial import cKDTree
+    from .capture_clean import _lab, _rgb
+    fi = np.nonzero(face)[0]; si = np.nonzero(side)[0]
+    if len(fi) < 300 or len(si) < 300:
+        return col, {}
+    L = _lab(col.astype(np.float32))
+    tf, ts = cKDTree(X[fi]), cKDTree(X[si])
+    # edge points: face texels with side texels within `band`, and the step there (side - face), averaged
+    d_fs, j_fs = ts.query(X[fi], k=8, distance_upper_bound=band)
+    ok = np.isfinite(d_fs)
+    ef = np.nonzero(ok.any(1))[0]
+    if len(ef) < 30:
+        return col, {}
+    side_mean = np.array([L[si[j_fs[e][ok[e]]]].mean(0) for e in ef])
+    step = side_mean - L[fi[ef]]
+    te = cKDTree(X[fi[ef]])
+    nb = te.query_ball_point(X[fi[ef]], r=smooth)
+    step = np.array([np.median(step[n], 0) for n in nb])
+    step[:, 0] = np.clip(step[:, 0], -max_dl, max_dl)
+    step[:, 1:] = np.clip(step[:, 1:], -max_dab, max_dab)
+    # spread to both sides: half at the edge, fading over `reach`
+    out = L.copy()
+    for idx, sgn in ((fi, 0.5), (si, -0.5)):
+        dd, jj = te.query(X[idx], k=6, distance_upper_bound=reach)
+        w = np.where(np.isfinite(dd), 1.0 / (dd + 0.004), 0.0)
+        ws = w.sum(1)
+        has = ws > 0
+        s_ = np.zeros((len(idx), 3))
+        jj_ = np.where(np.isfinite(dd), jj, 0)
+        s_[has] = (w[has, :, None] * step[jj_[has]]).sum(1) / ws[has, None]
+        fade = np.clip(1.0 - np.min(np.where(np.isfinite(dd), dd, reach), 1) / reach, 0, 1)
+        fade = fade * fade * (3 - 2 * fade)
+        out[idx] = L[idx] + sgn * fade[:, None] * s_
+        moved = np.zeros(len(L), bool); moved[idx[(fade > 0) & has]] = True
+        changed = moved if idx is fi else (changed | moved)
+    col = col.copy()
+    ch = np.nonzero(changed)[0]                                       # only what moved: no round trip elsewhere
+    col[ch] = _rgb(out[ch])
+    info = dict(edge_step_L=float(np.median(np.abs(step[:, 0]))), edge_step_ab=float(np.median(np.linalg.norm(step[:, 1:], axis=1))))
+    log("texture: face joined to the head round its edge (colour step there %.0f L, %.0f a/b; met halfway)" % (
+        info["edge_step_L"], info["edge_step_ab"]))
     return col, info
 
 
@@ -417,16 +496,22 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     # the face comes from as few frames as possible: per frame a head score (how much of the head it sees, how
     # squarely and how close); head texels are weighted by (score / best)^10, so one good frontal frame paints the
     # face instead of a patchwork of slightly misaligned ones (double eyes)
-    face_t = head_t & (Nr[:, 2] > 0.35) & (Xr[:, 1] < Xr[head_t, 1].max() - 0.05)   # front of the head, not the crown
-    if face_t.any() and turned:
+    # v11.15: how much each head texel is "face" (0..1): a ramp, not a line. The face is painted almost from one
+    # frame and the sides of the head from many - switched at a hard edge, the face looked set into the head
+    # from the side (Mike, Tmon). Over the ramp the face's own weighting, its frames and its gain fade into the
+    # head's
+    fw = face_weight(Nr, Xr, head_t)
+    face_t = fw > 0.5                                                     # front of the head, not the crown
+    fh = np.nonzero(fw > 0)[0]
+    if len(fh) and turned:
         # the face itself comes from the frames whose head pose was tracked: a frame given a turned head (a guess)
         # only paints the sides and back of the head (it greyed Declan's face when it painted the cheeks too)
-        tk = np.isin(np.array(used), list(turned))
-        Wt[np.ix_(tk, np.nonzero(face_t)[0])] = 0.0
+        tk = np.nonzero(np.isin(np.array(used), list(turned)))[0]
+        Wt[np.ix_(tk, fh)] *= (1.0 - fw[fh])[None, :]
     if face_t.any():
         hs = (Wt[:, face_t]).sum(1)
         hs = hs / (hs.max() + 1e-9)
-        Wt[:, face_t] *= (hs[:, None] ** FACE_POWER)
+        Wt[:, fh] *= hs[:, None] ** (FACE_POWER * fw[fh][None, :])
     # exposure: one RGB gain per frame against the blended result, two rounds. Samples stay uint8 and the blend runs
     # in texel chunks: (frames x texels) float copies of a 2048^2 atlas would need several GB
     n = C.shape[1]; CH = 150000
@@ -461,9 +546,9 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
     out = []; sd_out = []; ne_out = []
     for c in chunks:
         Cg = C[:, c].astype(np.float32) * gains[:, None, :]; Wc = Wt[:, c]
-        fc = face_t[c]
+        fwc = fw[c]; fc = fwc > 0
         if fc.any():
-            Cg[:, fc] *= fgain[:, None, :]
+            Cg[:, fc] *= fgain[:, None, :] ** fwc[fc][None, :, None]
         mean = (Wc[..., None] * Cg).sum(0) / (Wc.sum(0)[:, None] + 1e-9)
         lum = Cg @ np.array([0.299, 0.587, 0.114], np.float32)
         order = np.argsort(lum, axis=0)
@@ -567,6 +652,12 @@ def bake(fitter, frames=None, res=1024, power=4.0, min_facing=0.15, log=print, m
             stats["head_sides"] = hinfo
             if light is not None and light.get("applied") and hinfo.get("mirrored"):
                 alb, _ = head_sides(alb, Xr, side_t, face_t, log=lambda *a: None, force=hinfo["mirrored"])
+        if FACE_JOIN and side_t.sum() > 300 and face_t.sum() > 300:
+            # v11.15: the face's colour met halfway by the head's round its edge (face_join)
+            jface = (fw > 0.6) & (lay_c == 0); jside = hd_t & (lay_c == 0) & (fw < 0.3)
+            mix, stats["face_join"] = face_join(mix, Xr, jface, jside, log=log)
+            if light is not None and light.get("applied"):
+                alb, _ = face_join(alb, Xr, jface, jside, log=lambda *a: None)
 
     def fill(colours):
         # unseen texels and the gutters are filled together, from known texels only (filling the holes first let

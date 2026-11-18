@@ -377,3 +377,107 @@ def paint_photo(fitter, tex, mesh, photo, log=print, focal_k=1.2):
         int(sel.sum())))
     return out, dict(photo=os.path.basename(photo), face_px=float(px), landmark_err_pct=float(err), texels=int(sel.sum()),
                      gain=gain.round(3).tolist())
+
+
+# ------------------------------------------------------------------ head length from the profile (v11.15)
+HEAD_DEPTH_FIT = os.environ.get("SF_HEAD_DEPTH", "1") != "0"
+PROFILE_YAW = (70.0, 110.0)        # frames this far round are side-on (nearer the front, the head is turned to the camera)
+HEAD_DEPTH_MIN_FRAMES = 4
+HEAD_DEPTH_MAX_CHANGE = 0.15       # the head's length is changed by at most this fraction
+
+
+def _row_run(mask, rows, x0):
+    """median over rows of the width of the run of mask pixels containing (or nearest) column x0"""
+    out = []
+    for yy in rows:
+        x = np.nonzero(mask[yy])[0]
+        if not len(x):
+            continue
+        runs = np.split(x, np.nonzero(np.diff(x) > 1)[0] + 1)
+        best = min(runs, key=lambda rr: 0 if rr[0] <= x0 <= rr[-1] else min(abs(rr[0] - x0), abs(rr[-1] - x0)))
+        out.append(best[-1] - best[0] + 1)
+    return float(np.median(out)) if out else None
+
+
+def profile_head_ratio(fitter, frames):
+    """-> (median of the mesh's head length / the video's, per-frame ratios). In each side-on frame the width of the
+    person's silhouette along the row through the nose tip - the head from the nose to the back of the hair - against
+    the same row of the fitted body drawn through that frame's camera. Front-on frames cannot see the head's length:
+    the face fit (landmarks, mostly from the front) leaves it at MakeHuman's average, which is long for most people
+    (the cheek between the ear and the nose looked stretched)"""
+    import cv2
+    from PIL import Image
+    from .render_sculpt import rasterise
+    bm = fitter.bm
+    sh, P, _ = fitter.posed()
+    hb = bm.bi["head"]
+    head = (bm.J[:, 0] == hb) & (bm.W[:, 0] > 0.6)
+    nose = np.nonzero(head)[0][np.argmax(sh.V[head, 2])]
+    ratios = []
+    for r in frames:
+        i = r["i"]
+        if i not in fitter.cams.par:
+            continue
+        yaw = abs(((fitter.cams.par[i][0] + 180) % 360) - 180)
+        if not (PROFILE_YAW[0] < yaw < PROFILE_YAW[1]):
+            continue
+        mp = os.path.join(fitter.dir, "masks", "%04d.png" % i)
+        if not os.path.isfile(mp):
+            continue
+        m = np.asarray(Image.open(mp)) > 127
+        H, W = m.shape
+        uv = fitter.cams.project(r, P)
+        y, x0 = int(round(uv[nose, 1])), int(round(uv[nose, 0]))
+        if not (4 <= y < H - 4) or not (0 <= x0 < W):
+            continue
+        tid, _, _ = rasterise(uv[:, 0], uv[:, 1], np.zeros(len(uv)), bm.F, W, H, K=8)
+        ren = tid.reshape(H, W) >= 0
+        rows = range(y - 3, y + 4)
+        a, b = _row_run(m, rows, x0), _row_run(ren, rows, x0)
+        if a and b and a > 10:
+            ratios.append(b / a)
+    if len(ratios) < HEAD_DEPTH_MIN_FRAMES:
+        return None, ratios
+    return float(np.median(ratios)), ratios
+
+
+def fit_head_depth(fitter, frames, log=print):
+    """the head's front-to-back length from the side-on frames (v11.15): head_depth set so the head's length
+    (nose tip to the back of the skull) changes by 1 / profile_head_ratio, by at most HEAD_DEPTH_MAX_CHANGE, and only
+    ever shorter: the video's silhouette includes the hair, so a mesh head shorter than it is not wrong. Needs HEAD_DEPTH_MIN_FRAMES side-on frames; their ratios must agree (the middle half within 15%). -> info"""
+    if not HEAD_DEPTH_FIT:
+        return None
+    ratio, rs = profile_head_ratio(fitter, frames)
+    if ratio is None:
+        log("head: %d side-on frames - head length kept as fitted" % len(rs))
+        return dict(frames=len(rs))
+    q1, q3 = np.percentile(rs, [25, 75])
+    if (q3 - q1) / ratio > 0.15:
+        log("head: the side-on frames disagree on the head's length (x%.2f, spread %.0f%%) - kept as fitted" % (
+            ratio, 100 * (q3 - q1) / ratio))
+        return dict(frames=len(rs), ratio=ratio, spread=float((q3 - q1) / ratio))
+    if ratio <= 1.0:
+        # the video's row runs to the back of the hair: a head shorter than that may be right (hair, a ponytail)
+        log("head: side-on the head is x%.2f the video's length (hair included there) - kept as fitted" % ratio)
+        return dict(frames=len(rs), ratio=ratio)
+    bm = fitter.bm
+    hb = bm.bi["head"]
+    head = (bm.J[:, 0] == hb) & (bm.W[:, 0] > 0.6)
+
+    def length(v):
+        sl = dict(fitter.sl); sl["head_depth"] = v
+        V = bm.shape(fitter.mac, sl, fitter.height).V[head]
+        nose = V[np.argmax(V[:, 2])]
+        band = V[np.abs(V[:, 1] - nose[1]) < 0.03]
+        return float(nose[2] - band[:, 2].min())
+    v0 = float(fitter.sl.get("head_depth", 0.0))
+    L0 = length(v0)
+    want = L0 / float(min(ratio, 1 + HEAD_DEPTH_MAX_CHANGE))
+    vs = np.linspace(-1.0, 1.0, 9); Ls = np.array([length(v) for v in vs])
+    o = np.argsort(Ls)
+    v1 = float(np.clip(np.interp(want, Ls[o], vs[o]), -1.0, 1.0))
+    fitter.sl["head_depth"] = v1
+    L1 = length(v1)
+    log("head: side-on in %d frames the head is x%.2f the video's length - head depth %.2f -> %.2f "
+        "(nose to back %.1f -> %.1f cm)" % (len(rs), ratio, v0, v1, 100 * L0, 100 * L1))
+    return dict(frames=len(rs), ratio=ratio, head_depth=(v0, v1), length_cm=(100 * L0, 100 * L1))
