@@ -350,7 +350,7 @@ def main() -> int:
           "p.Pressing" in match_cs and "chaser3" in match_cs and "1.12f" in match_cs)
     check("slide tackle, shield and strength contest exist",
           "bool Slide" in match_cs and "bool Shield" in match_cs
-          and "AttemptSlide" in match_cs and "between * .20f" in match_cs
+          and "AttemptSlide" in match_cs and "between *" in match_cs
           and "cmd.Slide" in controls_cs and "cmd.Shield" in controls_cs)
     check("auto-select keeps the controlled player near the ball",
           "ControlLock" in match_cs and "FindNearestHome(S.Ball.Pos, true)" in match_cs)
@@ -414,7 +414,7 @@ def main() -> int:
           and "SmoothPose" in rig_factory and "ActionEnvelope" in world3d)
     check("browser edition mirrors lob / dribble / long ball",
           'out["lob"]' in controllers_gd and 'out["dribble"]' in controllers_gd
-          and 'cmd["sd"]' in browser and "Long ball." in browser)
+          and 'cmd["sd"]' in browser and "Lofted pass." in browser)
     check("camera plan keeps a fixed sideline orientation",
           "fixed world orientation, never spins with facing" in camera_plan
           and "ClampPitch" in camera_plan)

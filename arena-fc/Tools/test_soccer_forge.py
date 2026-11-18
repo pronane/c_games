@@ -245,6 +245,22 @@ def main():
     check("browser archetype biases", "ARCHETYPE_BIAS" in boot and "archetype" in boot)
     check("browser foot-planting IK", "apply_foot_ik" in boot and "solve_two_bone" in boot)
     check("browser look-at and reach", "apply_look_reach" in boot)
+    # Phase 2: gameplay depth — first touch, dribble, passing, shooting,
+    # defending, keeper AI, off-ball AI, set pieces, presets.
+    check("C# first-touch quality", "FirstTouchQuality" in match_cs and "pressure" in match_cs)
+    check("C# dribble momentum/burst", "DribbleMomentum" in match_cs and "DribbleBurstCd" in match_cs)
+    check("C# pass types", "PassType" in match_cs and "Driven" in match_cs and "Threaded" in match_cs)
+    check("C# shot types", "ShotType" in match_cs and "Placement" in match_cs and "Volley" in match_cs)
+    check("C# jockey/contain", "JockeyState" in match_cs and "jockey" in match_cs.lower())
+    check("C# keeper angle-cutting", "angle" in match_cs.lower() and "rush" in match_cs.lower())
+    check("C# off-ball runs", "RunType" in match_cs and "overlap" in match_cs.lower())
+    check("C# set-piece routines", "isCorner" in match_cs and "isThrowIn" in match_cs)
+    check("C# match presets", "MatchPreset" in match_cs and "Authentic" in match_cs)
+    check("browser first-touch quality", "first_touch" in boot and "quality" in boot)
+    check("browser pass types", '"threaded"' in boot and '"lofted"' in boot and '"chip"' in boot)
+    check("browser shot types", '"placement"' in boot and '"volley"' in boot and '"power"' in boot)
+    check("browser jockey", '"jockey"' in boot)
+    check("browser keeper punch", '"punch"' in boot)
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))
