@@ -160,6 +160,17 @@ def main():
           "GltfDocument" in soccer_cs and "soccer_player_manifest.json" in soccer_cs)
     check("C# loader plays clips from PlayerState",
           "SelectClip" in soccer_cs and "PlayerState" in soccer_cs)
+    # FIFA-style locomotion: cadence matched to ground speed per clip
+    # (foot speed ~= ground speed), hysteresis bands, dribble gating,
+    # one-shots play once, and lean/roll from acceleration.
+    check("locomotion cadence matches ground speed",
+          "NaturalRate" in soccer_cs and "speed / (nat" in soccer_cs)
+    check("locomotion bands have hysteresis", "SelectLocomotion" in soccer_cs)
+    check("dribble clip gated by speed",
+          "p.Dribbling && speed > 0.8f" in soccer_cs)
+    check("one-shots play once (no replay freeze)",
+          "oneShot && _oneShotDone" in soccer_cs)
+    check("body lean/roll from acceleration", "UpdateLean" in soccer_cs)
     check("RigFactory attaches the soccer player", "AttachSoccer" in factory)
     check("RigAnimator routes to clips", "rig.Soccer.Update" in world)
     check("browser loads the sculpted rig", "soccer_rig.json" in boot)
