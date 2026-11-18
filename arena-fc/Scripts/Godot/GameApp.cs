@@ -19,6 +19,14 @@ public partial class GameApp : Node3D
     public List<CharacterSpec>? CustomHome;
     public GameMode Mode = GameMode.Kickoff;
 
+    // P3: AI Control — delegate hard moments to AI (accessibility).
+    public AIControl AIControl = new();
+    public bool AIControlEnabled
+    {
+        get => AIControl.IsActive;
+        set => AIControl.Mode = value ? AIControlMode.Situational : AIControlMode.Off;
+    }
+
     private Node3D _menuWorld = null!;
     private Camera3D _menuCam = null!;
     private MeshInstance3D _menuBall = null!;

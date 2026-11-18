@@ -10,6 +10,20 @@ public partial class Stadium : Node3D
 {
     public const float LineY = 0.012f;
 
+    // P1: Grass deformation — pitch wear from player positions.
+    private GrassDeformation _grassDeformation;
+
+    /// <summary>Update grass wear from player positions (call per frame).</summary>
+    public void UpdateGrassWear(System.Numerics.Vector3[] playerPositions)
+    {
+        if (_grassDeformation == null) return;
+        foreach (var pos in playerPositions)
+        {
+            _grassDeformation.ApplyWear(new Vector3(pos.X, 0, pos.Z), 0.005f);
+        }
+        _grassDeformation.UpdateTexture();
+    }
+
     /// <summary>Phase 3.7: auto-detect quality from device capabilities.</summary>
     public static QualityPreset DetectQuality()
     {
