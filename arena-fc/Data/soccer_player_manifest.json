@@ -1,6 +1,6 @@
 {
  "generator": "ArenaFC soccer rig (Tools/build_soccer_player.py)",
- "sprite_forge": "v11.13 (main 891facd)",
+ "sprite_forge": "v11.17 (main 49be53a)",
  "skeleton": "arena-18",
  "bones": [
   "Hips",
@@ -1247,6 +1247,6 @@
    0.3775
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 8.0
+  "seconds": 8.3
  }
 }

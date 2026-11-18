@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the Sprite Forge soccer player for Arena FC (mesh + skeleton + animations).
 
-Pipeline (Sprite Forge v11.13, latest on main):
+Pipeline (Sprite Forge v11.17, latest on main):
   1. Sculpt a footballer with sforge.footballer on the MakeHuman game skeleton
      (the same design tools/gaelic_forge.py uses), mesh it with
      sforge.gamemesh (marching cubes -> decimate -> skin weights).
@@ -213,7 +213,7 @@ def main() -> int:
         mats = sorted(s for s in range(9) if idx[s])
         r4 = lambda arr: [round(float(x), 4) for x in np.asarray(arr).ravel()]
         data = {
-            "generator": "ArenaFC soccer rig (Tools/build_soccer_player.py, Sprite Forge v11.13)",
+            "generator": "ArenaFC soccer rig (Tools/build_soccer_player.py, Sprite Forge v11.17)",
             "bones": rig_json["bones"],
             "pos": r4(m.V), "nrm": r4(m.N), "uv": r4(m.UV),
             "bi": [int(x) for x in Ju.ravel()], "w": r4(Wu),
@@ -273,7 +273,7 @@ def main() -> int:
 
     manifest = {
         "generator": "ArenaFC soccer rig (Tools/build_soccer_player.py)",
-        "sprite_forge": "v11.13 (main 891facd)",
+        "sprite_forge": "v11.17 (main 49be53a)",
         "skeleton": "arena-18",
         "bones": tgt.bones,
         "materials": LAYER_ORDER,

@@ -1,6 +1,12 @@
 # Arena FC — Sprite Forge soccer player (mesh + skeleton + animations)
 
-Built with the latest Sprite Forge on `main` (v11.13, PR #100 `891facd`).
+Built with the latest Sprite Forge on `main`.
+
+* 2026-11-18: rebuilt with Sprite Forge **v11.17** (`49be53a`), which brings the
+  v11.14–v11.17 head/face/hair fixes (face joins the head, no tiled hair texture,
+  collar stays below the jaw, white balance from a neutral garment, face colour
+  matched to skin). 71 clips / 82 aliases now ship (was 67 / 75).
+* Original: v11.13 (PR #100 `891facd`).
 The procedural primitive players are replaced — on desktop and in the browser
 preview — by a sculpted footballer with a real skeleton and a clip for every
 soccer move.
