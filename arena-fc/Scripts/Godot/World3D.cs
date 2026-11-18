@@ -42,7 +42,6 @@ public partial class Stadium : Node3D
             GlowEnabled = highFx,
             GlowIntensity = .22f,
             GlowBloom = .08f,
-            GlowBlendMode = Godot.Environment.GlowBlendModeEnum.SoftLight,
             FogEnabled = medFx,
             FogLightColor = new Color(.36f, .45f, .55f),
             FogDensity = .0012f,
@@ -285,6 +284,15 @@ public partial class BroadcastCamera : Camera3D
 
     private static Vector3 MxToG(System.Numerics.Vector3 v) => new(v.X, v.Y, v.Z);
     private static System.Numerics.Vector3 Gx(Vector3 v) => new(v.X, v.Y, v.Z);
+
+    /// <summary>Phase 3.7: auto-detect quality from device capabilities.</summary>
+    public static QualityPreset DetectQuality()
+    {
+        string os = OS.GetName();
+        if (os == "Android" || os == "iOS")
+            return QualityPreset.Medium;
+        return QualityPreset.High;
+    }
 }
 
 /// <summary>Procedural skeletal animation: writes quaternions straight into Skeleton3D bone poses.</summary>
@@ -433,15 +441,5 @@ public static class RigAnimator
         if (clip == "kick") dummy.ActionTimer = .4f - (time % .4f);
         Pose(rig, dummy, 1f / 60f, time, System.Numerics.Vector3.Zero);
         rig.Skeleton.Position = Vector3.Zero;
-    }
-
-    /// <summary>Phase 3.7: auto-detect quality from device capabilities.</summary>
-    public static QualityPreset DetectQuality()
-    {
-        string os = OS.GetName();
-        if (os == "Android" || os == "iOS")
-            return QualityPreset.Medium;
-        // Desktop: check GPU via rendering device (fallback to High).
-        return QualityPreset.High;
     }
 }

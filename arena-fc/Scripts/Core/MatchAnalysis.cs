@@ -28,6 +28,8 @@ public sealed class MatchAnalysis
 
     public void Record(MatchState state, string homeClub, string awayClub)
     {
+        float total = state.PossessionTime[0] + state.PossessionTime[1];
+        float possPct = total < .1f ? 50f : state.PossessionTime[0] / total * 100f;
         var summary = new MatchSummary
         {
             HomeScore = state.Score[0],
@@ -38,7 +40,7 @@ public sealed class MatchAnalysis
             AwayPasses = state.Passes[1],
             HomeFouls = state.Fouls[0],
             AwayFouls = state.Fouls[1],
-            HomePossessionPct = state.PossessionPct(0),
+            HomePossessionPct = possPct,
             DurationMinutes = state.Clock / 60f,
             HomeClub = homeClub,
             AwayClub = awayClub,
@@ -51,17 +53,18 @@ public sealed class MatchAnalysis
     public (float possession, float shots, float passes, float fouls) StyleChart(int side)
     {
         if (_history.Count == 0) return (0.5f, 0.5f, 0.5f, 0.5f);
-        float poss = _history.Average(m => side == 0 ? m.HomePossessionPct : 100f - m.HomePossessionPct) / 100f;
-        float shots = _history.Average(m => side == 0 ? m.HomeShots : m.AwayShots);
-        float passes = _history.Average(m => side == 0 ? m.HomePasses : m.AwayPasses);
-        float fouls = _history.Average(m => side == 0 ? m.HomeFouls : m.AwayFouls);
+        float poss = (float)(_history.Average(m => side == 0 ? m.HomePossessionPct : 100f - m.HomePossessionPct) / 100.0);
+        float shots = (float)_history.Average(m => side == 0 ? m.HomeShots : m.AwayShots);
+        float passes = (float)_history.Average(m => side == 0 ? m.HomePasses : m.AwayPasses);
+        float fouls = (float)_history.Average(m => side == 0 ? m.HomeFouls : m.AwayFouls);
         return (poss, Math.Min(shots / 15f, 1f), Math.Min(passes / 200f, 1f), Math.Min(fouls / 8f, 1f));
     }
 
     /// <summary>Real-time advice based on current match state.</summary>
     public string Advice(MatchState state, int side)
     {
-        float poss = state.PossessionPct(side);
+        float total = state.PossessionTime[0] + state.PossessionTime[1];
+        float poss = total < .1f ? 50f : state.PossessionTime[side] / total * 100f;
         int shots = state.Shots[side];
         int fouls = state.Fouls[side];
         if (poss < 35f) return "Keep the ball — try shorter passes and hold possession.";
