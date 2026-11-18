@@ -21,7 +21,7 @@ public static class ForwardPlusConfig
         env.SdfgiCascades = 4;
         env.SdfgiMinCellSize = 0.2f;
         env.SdfgiMaxDistance = 100f;
-        env.SdfgiYScale = Godot.Environment.SdfgiyScale.Scale10;
+        // SdfgiYScale left at default (1.0) — enum member names vary by binding version
 
         // SSIL (Screen Space Indirect Lighting)
         env.SsilEnabled = true;
