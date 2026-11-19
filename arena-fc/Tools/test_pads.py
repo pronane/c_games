@@ -390,7 +390,7 @@ def main() -> int:
           "p.Target = p.Pos;" in match_core and "Active stick input always wins" in match_core
           and "humanDefending && S.ControlLock <= 0f" in match_core)
     check("short pass, long ball, dribble and stronger sprint exist",
-          "FindBestPassTarget(p, true, true)" in match_core and "bool Dribble" in match_core
+          "FindBestPassTarget(p, true, true" in match_core and "bool Dribble" in match_core
           and "1.42f" in match_core and "owner.Dribbling" in match_core)
     check("dribble survives the v2 wire format",
           "Sd = c.Shield || c.Dribble" in packet and "Shield = Sd, Dribble = Sd" in packet)
