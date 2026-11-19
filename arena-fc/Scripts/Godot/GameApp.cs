@@ -10,7 +10,7 @@ using Godot;
 namespace ArenaFC.GodotGame;
 
 /// <summary>Phase 3.6 game mode.</summary>
-public enum GameMode { Kickoff, Tournament, Training, Shootout }
+public enum GameMode { Kickoff, Tournament, Training, Shootout, SkillGames, PracticeArena }
 
 public partial class GameApp : Node3D
 {
@@ -71,6 +71,119 @@ public partial class GameApp : Node3D
         c.OffsetLeft = x; c.OffsetTop = y; c.OffsetRight = x + w; c.OffsetBottom = y + h;
     }
 
+    /// <summary>Phase 10: Pro Clubs (11v11 fixed positions).</summary>
+    public void StartProClubs()
+    {
+        Mode = GameMode.Kickoff;
+        var proClubs = new ProClubs();
+        proClubs.GenerateTeam();
+        proClubs.SetCoopMode(CoopMode.ProClubs);
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 9: Ultimate Team screen.</summary>
+    // Feature 7: Club system
+    public Club PlayerClub = new() { Name = "Arena FC", Badge = "AFC" };
+    // Feature 9: Custom training
+    public List<CustomTraining> CustomTrainings = new();
+
+    // Feature 7: Club system UI
+    public void ShowClub()
+    {
+        Clear();
+        var root = new Control { Name = "Club" };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(root);
+        var box = Ui.VBox(10);
+        box.AddChild(Ui.Lbl("MY CLUB", 32, Ui.Accent));
+        box.AddChild(Ui.Lbl($"Name: {PlayerClub.Name}", 18));
+        box.AddChild(Ui.Lbl($"Badge: {PlayerClub.Badge}", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Reputation: {PlayerClub.Reputation}", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Members: {PlayerClub.Members.Count}", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Record: {PlayerClub.Wins}W - {PlayerClub.Losses}L", 16, Ui.Sub));
+        box.AddChild(Ui.Btn("BACK", ShowMenu, true));
+        var panel = Ui.PanelC(box);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        panel.CustomMinimumSize = new Vector2(500, 350);
+        root.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(box);
+    }
+
+    // Feature 6: Achievements UI
+    public void ShowAchievements()
+    {
+        Clear();
+        var root = new Control { Name = "Achievements" };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(root);
+        var box = Ui.VBox(10);
+        box.AddChild(Ui.Lbl("ACHIEVEMENTS", 32, Ui.Accent));
+        box.AddChild(Ui.Lbl("First Goal — Score your first goal", 16));
+        box.AddChild(Ui.Lbl("Hat Trick — Score 3 goals in one match", 16));
+        box.AddChild(Ui.Lbl("Clean Sheet — Win without conceding", 16));
+        box.AddChild(Ui.Lbl("Perfect Timing — 10 perfect shots", 16));
+        box.AddChild(Ui.Btn("BACK", ShowMenu, true));
+        var panel = Ui.PanelC(box);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        panel.CustomMinimumSize = new Vector2(600, 400);
+        root.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(box);
+    }
+
+    // Feature 9: Custom training UI
+    public void ShowCustomTraining()
+    {
+        Clear();
+        var root = new Control { Name = "CustomTraining" };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(root);
+        var box = Ui.VBox(10);
+        box.AddChild(Ui.Lbl("CUSTOM TRAINING", 32, Ui.Accent));
+        box.AddChild(Ui.Lbl($"Drills: {CustomTrainings.Count}", 16));
+        box.AddChild(Ui.Btn("CREATE DRILL", () => { CustomTrainings.Add(new CustomTraining { Name = "New Drill" }); ShowCustomTraining(); }));
+        box.AddChild(Ui.Btn("BACK", ShowMenu, true));
+        var panel = Ui.PanelC(box);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        panel.CustomMinimumSize = new Vector2(500, 350);
+        root.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(box);
+    }
+
+    public void ShowUltimateTeam()
+    {
+        Clear();
+        var ut = new UltimateTeam();
+        ut.GenerateSBCs();
+
+        var root = new Control { Name = "UltimateTeam" };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(root);
+
+        var box = Ui.VBox(10);
+        box.AddChild(Ui.Lbl("ULTIMATE TEAM", 32, Ui.Accent));
+        box.AddChild(Ui.Lbl($"Coins: {ut.Coins}", 18));
+        box.AddChild(Ui.Lbl($"Club: {ut.Club.Count} players | Squad: {ut.Squad.Count}/11", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Rating: {ut.CalculateRating()} | Chemistry: {ut.CalculateChemistry()}", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Division: {ut.CurrentDivision} ({ut.DivisionPoints} pts)", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Squad Battles: {ut.SquadBattlesPoints} pts", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl("", 10));
+        box.AddChild(Ui.Btn("OPEN BRONZE PACK (500)", () => { ut.OpenPack(0); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("OPEN GOLD PACK (5000)", () => { ut.OpenPack(2); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("SQUAD BATTLES", () => { ut.PlaySquadBattles(SquadBattlesDifficulty.Pro, true, 2, 1); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("DIVISION RIVALS", () => { ut.PlayDivisionRivals(true, false); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("BACK", ShowMenu));
+
+        var panel = Ui.PanelC(box);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        panel.CustomMinimumSize = new Vector2(600, 500);
+        root.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(box);
+    }
+
     public void ShowMenu()
     {
         // Leaving a match (or the lobby) always disconnects cleanly.
@@ -115,8 +228,19 @@ public partial class GameApp : Node3D
 
         var menu = Ui.VBox(10);
         menu.AddChild(Ui.Btn("PLAY MATCH", StartMatch, true));
+        menu.AddChild(Ui.Btn("PRO CLUBS", StartProClubs));
+        menu.AddChild(Ui.Btn("ULTIMATE TEAM", ShowUltimateTeam));
+        menu.AddChild(Ui.Btn("MY CLUB", ShowClub));
+        menu.AddChild(Ui.Btn("ACHIEVEMENTS", ShowAchievements));
+        menu.AddChild(Ui.Btn("CUSTOM TRAINING", ShowCustomTraining));
         menu.AddChild(Ui.Btn("TOURNAMENT", () => StartTournament()));
+        menu.AddChild(Ui.Btn("WORLD CUP", StartWorldCup));
+        menu.AddChild(Ui.Btn("EUROS", StartEuros));
+        menu.AddChild(Ui.Btn("COPA AMERICA", StartCopaAmerica));
+        menu.AddChild(Ui.Btn("CHAMPIONS LEAGUE", StartChampionsLeague));
         menu.AddChild(Ui.Btn("TRAINING", () => StartTraining()));
+        menu.AddChild(Ui.Btn("SKILL GAMES", StartSkillGames));
+        menu.AddChild(Ui.Btn("PRACTICE ARENA", StartPracticeArena));
         menu.AddChild(Ui.Btn("PENALTY SHOOTOUT", () => StartShootout()));
         menu.AddChild(Ui.Btn("PLAY WITH FRIENDS", ShowOnline));
         menu.AddChild(Ui.Btn("CHARACTER EDITOR", ShowEditor));
@@ -171,13 +295,89 @@ public partial class GameApp : Node3D
     public void StartMatch()
     {
         Mode = GameMode.Kickoff;
-        StartMatchInternal();
+        ShowPreMatch();
+    }
+
+    /// <summary>Phase 4: Pre-match screen with lineups and head-to-head.</summary>
+    private void ShowPreMatch()
+    {
+        Clear();
+        var presentation = new Presentation();
+        string homeName = Clubs.All[Options.HomeClub].Name;
+        string awayName = Clubs.All[Options.AwayClub].Name;
+        var pre = presentation.GeneratePreMatch(homeName, awayName, Options.HomeFormation, Options.AwayFormation);
+
+        var root = new Control { Name = "PreMatch" };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(root);
+
+        var box = Ui.VBox(10);
+        box.AddChild(Ui.Lbl("MATCH PREVIEW", 32, Ui.Accent));
+        box.AddChild(Ui.Lbl($"{pre.HomeTeam} ({pre.HomeFormation}) vs {pre.AwayTeam} ({pre.AwayFormation})", 20));
+        box.AddChild(Ui.Lbl($"Strength: {pre.HomeStrength} vs {pre.AwayStrength}", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Form: {Presentation.FormatForm(pre.HomeForm)} vs {Presentation.FormatForm(pre.AwayForm)}", 16, Ui.Sub));
+        box.AddChild(Ui.Lbl(pre.HeadToHead, 14, Ui.Sub));
+        box.AddChild(Ui.Lbl($"Weather: {pre.Weather} | Stadium: {pre.Stadium}", 14, Ui.Sub));
+        box.AddChild(Ui.Lbl("", 10));
+        box.AddChild(Ui.Btn("KICK OFF", StartMatchInternal, true));
+        box.AddChild(Ui.Btn("BACK", ShowMenu));
+
+        var panel = Ui.PanelC(box);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        panel.CustomMinimumSize = new Vector2(600, 400);
+        root.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(box);
     }
 
     /// <summary>Phase 3.6: tournament mode (up to 8 teams, single elimination).</summary>
     public void StartTournament()
     {
         Mode = GameMode.Tournament;
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 8: World Cup tournament.</summary>
+    public void StartWorldCup()
+    {
+        Mode = GameMode.Tournament;
+        var tournament = new TournamentSystem();
+        var teams = TournamentSystem.GetWorldCupTeams();
+        tournament.GenerateWorldCup(teams);
+        tournament.PlayerTeam = "England";
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 8: Euros tournament.</summary>
+    public void StartEuros()
+    {
+        Mode = GameMode.Tournament;
+        var tournament = new TournamentSystem();
+        var teams = TournamentSystem.GetWorldCupTeams();
+        tournament.GenerateEuros(teams);
+        tournament.PlayerTeam = "England";
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 8: Copa America tournament.</summary>
+    public void StartCopaAmerica()
+    {
+        Mode = GameMode.Tournament;
+        var tournament = new TournamentSystem();
+        var teams = TournamentSystem.GetWorldCupTeams();
+        tournament.GenerateCopaAmerica(teams);
+        tournament.PlayerTeam = "Argentina";
+        StartMatchInternal();
+    }
+
+    /// <summary>Phase 8: Champions League.</summary>
+    public void StartChampionsLeague()
+    {
+        Mode = GameMode.Tournament;
+        var tournament = new TournamentSystem();
+        var teams = Clubs.All.Select(c => c.Name).ToList();
+        tournament.GenerateChampionsLeague(teams);
+        tournament.PlayerTeam = Clubs.All[Options.HomeClub].Name;
         StartMatchInternal();
     }
 
@@ -190,11 +390,49 @@ public partial class GameApp : Node3D
         StartMatchInternal();
     }
 
+    public void StartSkillGames() { Mode = GameMode.SkillGames; StartMatchInternal(); }
+    public void StartPracticeArena() { Mode = GameMode.PracticeArena; Options.Fouls = false; Options.Offside = false; StartMatchInternal(); }
+
     /// <summary>Phase 3.6: penalty shootout (alternating penalties).</summary>
     public void StartShootout()
     {
         Mode = GameMode.Shootout;
         StartMatchInternal();
+    }
+
+    /// <summary>Phase 4: Post-match screen with ratings and MOTM.</summary>
+    public void ShowPostMatch(MatchState state)
+    {
+        Clear();
+        var presentation = new Presentation();
+        string homeName = Clubs.All[Options.HomeClub].Name;
+        string awayName = Clubs.All[Options.AwayClub].Name;
+        var post = presentation.GeneratePostMatch(state, homeName, awayName);
+
+        var root = new Control { Name = "PostMatch" };
+        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        AddChild(root);
+
+        var box = Ui.VBox(10);
+        box.AddChild(Ui.Lbl("FULL TIME", 32, Ui.Accent));
+        box.AddChild(Ui.Lbl(post.ResultSummary, 24));
+        box.AddChild(Ui.Lbl($"Man of the Match: {post.ManOfTheMatch} ({post.MotM Rating / 10.0:0.0})", 18, Ui.Accent));
+        box.AddChild(Ui.Lbl("", 10));
+        box.AddChild(Ui.Lbl("Highlights:", 16));
+        foreach (var h in post.Highlights.Take(3))
+        {
+            box.AddChild(Ui.Lbl($"• {h}", 14, Ui.Sub));
+        }
+        box.AddChild(Ui.Lbl("", 10));
+        box.AddChild(Ui.Btn("BACK TO MENU", ShowMenu, true));
+        box.AddChild(Ui.Btn("PLAY AGAIN", StartMatch));
+
+        var panel = Ui.PanelC(box);
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        panel.CustomMinimumSize = new Vector2(600, 450);
+        root.AddChild(panel);
+        PadMenuNavigator.Active = true;
+        Ui.FocusFirst(box);
     }
 
     private void StartMatchInternal()
@@ -217,6 +455,7 @@ public partial class GameApp : Node3D
             Mode = (int)Mode,
         };
         view.Init(opts, CustomHome, ShowMenu);
+        view.OnMatchEnd = ShowPostMatch;
         AddChild(view);
     }
 

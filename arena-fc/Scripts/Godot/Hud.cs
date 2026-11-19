@@ -120,7 +120,12 @@ public partial class Hud : CanvasLayer
 
     private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!,
                   _hint = null!, _cam = null!, _possession = null!, _focus = null!, _actions = null!;
+    // Phase 4: Broadcast graphics
+    private Label _scoreBug = null!, _lowerThird = null!, _statsOverlay = null!;
+    private float _lowerThirdTimer;
     private ProgressBar _power = null!, _stamina = null!;
+    // Feature 1: Shot meter feedback
+    private Label _shotFeedback = null!;
     private PanelContainer _pauseMenu = null!;
     private Control _pauseButtons = null!;
     private Minimap _minimap = null!;
@@ -149,6 +154,26 @@ public partial class Hud : CanvasLayer
         var statsPanel = Ui.PanelC(_stats);
         Place(statsPanel, 1f, 0f, -340, 14, 324, 44);
         root.AddChild(statsPanel);
+
+        // Phase 4: Broadcast score bug (top left, compact)
+        _scoreBug = Ui.Lbl("HAR 0-0 NOR", 16, Ui.Text);
+        var bugPanel = Ui.PanelC(_scoreBug);
+        Place(bugPanel, 0f, 0f, 16, 100, 160, 32);
+        root.AddChild(bugPanel);
+
+        // Phase 4: Lower third (bottom centre, for player names/events)
+        _lowerThird = Ui.Lbl("", 18, Ui.Text);
+        var lowerPanel = Ui.PanelC(_lowerThird);
+        Place(lowerPanel, 0.5f, 1f, -250, -180, 500, 40);
+        root.AddChild(lowerPanel);
+        _lowerThird.Visible = false;
+
+        // Phase 4: Stats overlay (right side, toggled)
+        _statsOverlay = Ui.Lbl("", 14, Ui.Sub);
+        var overlayPanel = Ui.PanelC(_statsOverlay);
+        Place(overlayPanel, 1f, 0.5f, -220, -100, 204, 200);
+        root.AddChild(overlayPanel);
+        _statsOverlay.Visible = false;
 
         // Big top-centre focus panel: camera, ball carrier, controlled player and
         // the buttons that matter right now.  The old left-edge labels sat under
@@ -180,6 +205,10 @@ public partial class Hud : CanvasLayer
         _power = Bar(new Color(1f, .72f, .18f));
         Place(_power, .5f, 1f, -130, -112, 260, 14);
         root.AddChild(_power);
+        // Feature 1: Shot meter feedback label
+        _shotFeedback = Ui.Lbl("", 16, Ui.Accent);
+        Place(_shotFeedback, .5f, 1f, -50, -135, 100, 20);
+        root.AddChild(_shotFeedback);
         _stamina = Bar(new Color(.18f, .9f, .55f));
         Place(_stamina, .5f, 1f, -130, -94, 260, 10);
         root.AddChild(_stamina);
@@ -295,6 +324,43 @@ public partial class Hud : CanvasLayer
         _toastTimer = seconds;
     }
 
+    /// <summary>Phase 4: Show lower third graphic (player name, event).</summary>
+    public void ShowLowerThird(string text, float seconds = 3f)
+    {
+        _lowerThird.Text = text;
+        _lowerThird.Visible = true;
+        _lowerThirdTimer = seconds;
+    }
+
+    /// <summary>Phase 4: Show stats overlay.</summary>
+    public void ShowStatsOverlay(string text)
+    {
+        _statsOverlay.Text = text;
+        _statsOverlay.Visible = true;
+    }
+
+    /// <summary>Phase 4: Hide stats overlay.</summary>
+    public void HideStatsOverlay()
+    {
+        _statsOverlay.Visible = false;
+    }
+
+    /// <summary>Phase 4: Update score bug.</summary>
+    public void UpdateScoreBug(string home, int homeScore, int awayScore, string away)
+    {
+        _scoreBug.Text = $"{home} {homeScore}-{awayScore} {away}";
+    }
+
+    /// <summary>Add a commentary line to the feed (Phase 1).</summary>
+    public void AddCommentary(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return;
+        var lines = _feed.Text.Split('\n').ToList();
+        lines.Add(line);
+        while (lines.Count > 3) lines.RemoveAt(0);
+        _feed.Text = string.Join("\n", lines);
+    }
+
     public void Update(MatchEngine e, float dt, float charge, string cameraName)
     {
         _engine = e;
@@ -306,6 +372,13 @@ public partial class Hud : CanvasLayer
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
         _cam.Text = cameraName;
+        // Phase 4: Update score bug and lower third timer
+        UpdateScoreBug(home, s.Score[0], s.Score[1], away);
+        if (_lowerThirdTimer > 0)
+        {
+            _lowerThirdTimer -= dt;
+            if (_lowerThirdTimer <= 0) _lowerThird.Visible = false;
+        }
         int owner = s.Ball.Owner;
         int ctrl = s.Controlled;
         bool validCtrl = ctrl >= 0 && ctrl < s.Players.Length;
@@ -336,6 +409,17 @@ public partial class Hud : CanvasLayer
         else
             _actions.Text = "RT SPRINT · B TACKLE · RB+B SLIDE · LB SWITCH · R3 CAMERA";
         _power.Value = charge * 100f;
+        // Feature 1: Shot meter feedback
+        if (charge > 0.1f)
+        {
+            var meter = new ShotMeter { Charge = charge };
+            _shotFeedback.Text = meter.GetFeedback();
+            _shotFeedback.Modulate = meter.IsPerfect ? new Color(0.2f, 1f, 0.2f) : new Color(1f, 0.8f, 0.2f);
+        }
+        else
+        {
+            _shotFeedback.Text = "";
+        }
         if (validCtrl) _stamina.Value = s.Players[ctrl].Stamina * 100f;
         if (Input.TouchEnabled) Input.TouchMove = _stick.Value;
         _minimap.Engine = e;
