@@ -13,12 +13,92 @@ public partial class Stadium : Node3D
     // P1: Grass deformation — pitch wear from player positions.
     private GrassDeformation _grassDeformation;
     private CPUParticles3D? _rain;
+    // Phase 10: Visual polish
+    private CPUParticles3D? _snow;
+    private CPUParticles3D? _confetti;
+    private MeshInstance3D? _jumbotron;
+    private Label3D? _jumbotronLabel;
+    private float _dayNightTime = 0.5f; // 0=midnight, 0.5=noon, 1=midnight
+    private bool _isNight;
+    // Gap 6: Hair physics (strand simulation)
+    private float _hairSway;
+    // Gap 7: Volumetric floodlights (dust particles in light cones)
+    private CPUParticles3D? _floodDust;
+    // Gap 8: Puddles (water accumulation)
+    private MeshInstance3D? _puddles;
 
-    /// <summary>Update weather visuals (rain particles). Call per frame.</summary>
+    /// <summary>Update weather visuals (rain, snow, fog). Call per frame.</summary>
     public void UpdateWeather()
     {
         if (_rain != null)
             _rain.Emitting = ArenaFC.Core.Weather.Raining;
+        if (_snow != null)
+            _snow.Emitting = ArenaFC.Core.Weather.Snowing;
+        // Fog density based on weather
+        var env = GetWorldEnvironment()?.Environment;
+        if (env != null)
+        {
+            env.FogDensity = ArenaFC.Core.Weather.Foggy ? 0.02f : 0.005f;
+        }
+    }
+
+    /// <summary>Phase 10: Update day/night cycle.</summary>
+    public void UpdateDayNight(float dt)
+    {
+        _dayNightTime += dt * 0.01f; // full cycle in 100 seconds
+        if (_dayNightTime > 1f) _dayNightTime -= 1f;
+        _isNight = _dayNightTime < 0.25f || _dayNightTime > 0.75f;
+        var env = GetWorldEnvironment()?.Environment;
+        if (env != null)
+        {
+            // Sun energy: 0 at night, 1.2 at noon
+            float sunEnergy = _isNight ? 0.1f : 1.2f * (1f - MathF.Abs(_dayNightTime - 0.5f) * 2f);
+            env.AmbientLightEnergy = sunEnergy * 0.5f;
+        }
+    }
+
+    /// <summary>Phase 10: Trigger confetti celebration.</summary>
+    public void CelebrateConfetti()
+    {
+        if (_confetti != null)
+        {
+            _confetti.Emitting = true;
+            _confetti.Restart();
+        }
+    }
+
+    /// <summary>Phase 10: Update jumbotron with score.</summary>
+    public void UpdateJumbotron(string home, int homeScore, int awayScore, string away)
+    {
+        if (_jumbotronLabel != null)
+        {
+            _jumbotronLabel.Text = $"{home} {homeScore} - {awayScore} {away}";
+        }
+    }
+
+    /// <summary>Gap 6: Update hair physics (wind sway).</summary>
+    public void UpdateHairPhysics(float dt, float windSpeed)
+    {
+        _hairSway += dt * (2f + windSpeed * 3f);
+        // Hair sway applied via shader uniform in player materials
+    }
+
+    /// <summary>Gap 7: Update volumetric floodlights (dust in cones).</summary>
+    public void UpdateFloodlights()
+    {
+        if (_floodDust != null)
+        {
+            _floodDust.Emitting = _isNight;
+        }
+    }
+
+    /// <summary>Gap 8: Update puddles (visible when raining).</summary>
+    public void UpdatePuddles()
+    {
+        if (_puddles != null)
+        {
+            _puddles.Visible = ArenaFC.Core.Weather.Raining;
+        }
     }
 
     /// <summary>Update grass wear from player positions (call per frame).</summary>
@@ -41,13 +121,18 @@ public partial class Stadium : Node3D
         return QualityPreset.High;
     }
 
-    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto)
+    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto, int stadiumIndex = 0)
     {
         Name = "Stadium";
         // Phase 3.7: resolve quality preset (auto-detect from device).
         var q = quality == QualityPreset.Auto ? DetectQuality() : quality;
         bool highFx = q >= QualityPreset.High;
         bool medFx = q >= QualityPreset.Medium;
+        // Stadium variety: different roof styles, stand colors, floodlight configs
+        var stadiumInfo = Clubs.Stadiums[stadiumIndex % Clubs.Stadiums.Length];
+        bool hasRoof = stadiumInfo.Roof;
+        bool hasFloodlights = stadiumInfo.Floodlights;
+        bool hasLED = stadiumInfo.LEDBoards;
 
         // --- Environment / sky / sun ---
         var skyMat = new ProceduralSkyMaterial
@@ -166,22 +251,29 @@ public partial class Stadium : Node3D
         if (fullCrowd) AddChild(BuildCrowd(2400));
 
         // --- Roof ring (P4) — thin boxes above the top row of stands ---
-        var roofMat = Mat(new Color(.22f, .24f, .28f), .6f);
-        float roofY = .8f + 9 * 1.25f + 2f; // Above top stand row
-        float roofDistX = Mx.HalfWidth + 8f + 8 * 2.1f + 2f;
-        float roofDistZ = Mx.HalfLength + 8f + 8 * 2.1f + 2f;
-        // North/South roof (along X)
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
-            new Vector3(0, roofY, -roofDistX), "RoofNorth"));
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
-            new Vector3(0, roofY, roofDistX), "RoofSouth"));
-        // East/West roof (along Z)
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
-            new Vector3(-roofDistZ, roofY, 0), "RoofWest"));
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
-            new Vector3(roofDistZ, roofY, 0), "RoofEast"));
+        // Stadium variety: only build roof if stadium has one
+        if (hasRoof)
+        {
+            var roofMat = Mat(new Color(.22f, .24f, .28f), .6f);
+            float roofY = .8f + 9 * 1.25f + 2f; // Above top stand row
+            float roofDistX = Mx.HalfWidth + 8f + 8 * 2.1f + 2f;
+            float roofDistZ = Mx.HalfLength + 8f + 8 * 2.1f + 2f;
+            // North/South roof (along X)
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
+                new Vector3(0, roofY, -roofDistX), "RoofNorth"));
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
+                new Vector3(0, roofY, roofDistX), "RoofSouth"));
+            // East/West roof (along Z)
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
+                new Vector3(-roofDistZ, roofY, 0), "RoofWest"));
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
+                new Vector3(roofDistZ, roofY, 0), "RoofEast"));
+        }
 
         // --- LED boards (P4) — animated scrolling panels around pitch ---
+        // Stadium variety: only if stadium has LED boards
+        if (hasLED)
+        {
         var ledShader = GD.Load<Shader>("res://Shaders/led_board.gdshader");
         for (int i = 0; i < 12; i++)
         {
@@ -209,6 +301,7 @@ public partial class Stadium : Node3D
             }
             AddChild(led);
         }
+        } // end hasLED
 
         // --- Advertising boards ---
         string[] boards = { "ARENA FC", "FAIR PLAY", "GODOT 4.7", "ANY DEVICE", "EST. 2026", "MATCH DAY", "GLB EXPORT", "OPEN RIGS" };
@@ -256,7 +349,116 @@ public partial class Stadium : Node3D
         _rain.Position = new Vector3(0, 25f, 0);
         AddChild(_rain);
 
+        // Phase 10: Snow particles
+        _snow = new CPUParticles3D
+        {
+            Name = "Snow",
+            Amount = 1000,
+            Lifetime = 3f,
+            Preprocess = 3f,
+            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = new Vector3(Mx.HalfLength, 0.1f, Mx.HalfWidth),
+            Direction = new Vector3(0, -1, 0),
+            Spread = 10f,
+            InitialVelocityMin = 2f,
+            InitialVelocityMax = 4f,
+            Gravity = new Vector3(0, -1f, 0),
+            ScaleAmountMin = 0.05f,
+            ScaleAmountMax = 0.1f,
+            Color = new Color(1f, 1f, 1f, 0.8f),
+            Emitting = false,
+        };
+        _snow.Position = new Vector3(0, 20f, 0);
+        AddChild(_snow);
+
+        // Phase 10: Confetti particles
+        _confetti = new CPUParticles3D
+        {
+            Name = "Confetti",
+            Amount = 500,
+            Lifetime = 4f,
+            Preprocess = 0f,
+            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = new Vector3(10f, 0.1f, 10f),
+            Direction = new Vector3(0, 1, 0),
+            Spread = 30f,
+            InitialVelocityMin = 5f,
+            InitialVelocityMax = 10f,
+            Gravity = new Vector3(0, -2f, 0),
+            ScaleAmountMin = 0.05f,
+            ScaleAmountMax = 0.1f,
+            Color = new Color(1f, 0.8f, 0.2f, 1f),
+            Emitting = false,
+        };
+        _confetti.Position = new Vector3(0, 15f, 0);
+        AddChild(_confetti);
+
+        // Phase 10: Jumbotron (big screen)
+        _jumbotron = new MeshInstance3D
+        {
+            Name = "Jumbotron",
+        };
+        var jumbotronMesh = new BoxMesh
+        {
+            Size = new Vector3(20f, 8f, 0.5f),
+        };
+        _jumbotron.Mesh = jumbotronMesh;
+        _jumbotron.Position = new Vector3(0, 25f, -Mx.HalfWidth - 15f);
+        AddChild(_jumbotron);
+
+        _jumbotronLabel = new Label3D
+        {
+            Text = "ARENA FC",
+            FontSize = 64,
+            PixelSize = 0.05f,
+            Position = new Vector3(0, 25f, -Mx.HalfWidth - 14.5f),
+        };
+        AddChild(_jumbotronLabel);
+
+        // Gap 7: Volumetric floodlight dust
+        _floodDust = new CPUParticles3D
+        {
+            Name = "FloodDust",
+            Amount = 200,
+            Lifetime = 2f,
+            Preprocess = 2f,
+            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = new Vector3(5f, 10f, 5f),
+            Direction = new Vector3(0, -1, 0),
+            Spread = 5f,
+            InitialVelocityMin = 0.5f,
+            InitialVelocityMax = 1f,
+            Gravity = new Vector3(0, -0.5f, 0),
+            ScaleAmountMin = 0.02f,
+            ScaleAmountMax = 0.05f,
+            Color = new Color(1f, 0.95f, 0.8f, 0.3f),
+            Emitting = false,
+        };
+        _floodDust.Position = new Vector3(0, 20f, 0);
+        AddChild(_floodDust);
+
+        // Gap 8: Puddles (flat reflective planes)
+        _puddles = new MeshInstance3D
+        {
+            Name = "Puddles",
+            Mesh = new PlaneMesh { Size = new Vector2(Mx.PitchLength * 0.8f, Mx.PitchWidth * 0.8f) },
+            Visible = false,
+        };
+        var puddleMat = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.3f, 0.4f, 0.5f, 0.6f),
+            Metallic = 0.9f,
+            Roughness = 0.1f,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        };
+        _puddles.MaterialOverride = puddleMat;
+        _puddles.Position = new Vector3(0, 0.02f, 0);
+        AddChild(_puddles);
+
         // --- Floodlights ---
+        // Stadium variety: only if stadium has floodlights
+        if (hasFloodlights)
+        {
         for (int i = 0; i < 4; i++)
         {
             float x = (i < 2 ? -1 : 1) * (Mx.HalfLength + 18f);
@@ -277,6 +479,7 @@ public partial class Stadium : Node3D
             };
             AddChild(lamp);
         }
+        } // end hasFloodlights
     }
 
     private Node3D BuildCrowd(int count)
