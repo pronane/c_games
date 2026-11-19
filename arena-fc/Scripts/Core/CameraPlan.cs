@@ -23,11 +23,12 @@ public struct CameraPlan
 
 public static class BroadcastPlan
 {
-    public const int ModeCount = 5;
+    public const int ModeCount = 7;
 
     public static string ModeName(int mode) => mode switch
     {
-        0 => "Broadcast", 1 => "Ball follow", 2 => "Shoulder", 3 => "Sideline", _ => "Tactical"
+        0 => "Broadcast", 1 => "Ball follow", 2 => "Shoulder", 3 => "Sideline",
+        4 => "Tactical", 5 => "Goal-line", _ => "Spider"
     };
 
     private static Vector3 ClampPitch(Vector3 v, float marginX, float marginZ)
@@ -104,6 +105,22 @@ public static class BroadcastPlan
                 look = new Vector3(focus.X * .35f, 0f, focus.Z * .2f);
                 up = new Vector3(0f, 0f, -1f);
                 fov = 58f;
+                break;
+            case 5: // Goal-line: behind the goal, low angle
+                float goalX = ball.X > 0 ? Mx.HalfLength + 8f : -Mx.HalfLength - 8f;
+                target = new Vector3(goalX, 4f, ball.Z * 0.3f);
+                look = new Vector3(ball.X, 1f, ball.Z);
+                fov = 50f;
+                break;
+            case 6: // Spider: high above centre, rotating slowly
+                float angle = (ball.X + ball.Z) * 0.01f; // slow rotation based on ball pos
+                target = new Vector3(
+                    MathF.Cos(angle) * 40f,
+                    55f,
+                    MathF.Sin(angle) * 40f
+                );
+                look = new Vector3(ball.X, 0f, ball.Z);
+                fov = 45f;
                 break;
             default: // high broadcast: fixed world orientation, never spins with facing
                 target = ClampPitch(new Vector3(focus.X - 8f, 32f, focus.Z + 48f), 14f, 22f);
