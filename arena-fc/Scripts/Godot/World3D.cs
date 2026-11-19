@@ -104,6 +104,44 @@ public partial class Stadium : Node3D
         };
         AddChild(pitch);
 
+        // --- Grass blades (P2) — GPU-instanced for close-up detail ---
+        // 5000 blades across the pitch. Shader animates wind sway.
+        // Blades are small crossed planes (2 quads) for cheap rendering.
+        var bladeMesh = new PlaneMesh
+        {
+            Size = new Vector2(0.06f, 0.12f),
+            SubdivideWidth = 1,
+            SubdivideDepth = 2,
+        };
+        var grassMM = new MultiMesh
+        {
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            UseColors = true,
+            Mesh = bladeMesh,
+            InstanceCount = 5000,
+        };
+        var grassRng = new Rng(4242);
+        for (int i = 0; i < 5000; i++)
+        {
+            float gx = grassRng.Range(-Mx.HalfLength, Mx.HalfLength);
+            float gz = grassRng.Range(-Mx.HalfWidth, Mx.HalfWidth);
+            float rot = grassRng.Range(0f, MathF.PI * 2f);
+            float scale = grassRng.Range(0.7f, 1.4f);
+            var basis = Basis.FromEuler(new Vector3(0, rot, 0)).Scaled(new Vector3(scale, scale, scale));
+            grassMM.SetInstanceTransform(i, new Transform3D(basis, new Vector3(gx, LineY + 0.06f, gz)));
+            // Color variation: darker in worn areas (center), lighter elsewhere.
+            float wear = 1f - MathF.Min(1f, new Vector2(gx, gz).Length() / 25f);
+            float shade = grassRng.Range(0.75f, 1.1f) * (1f - wear * 0.25f);
+            grassMM.SetInstanceColor(i, new Color(shade, shade, shade));
+        }
+        var grassInstances = new MultiMeshInstance3D
+        {
+            Name = "GrassBlades",
+            Multimesh = grassMM,
+            MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://Shaders/grass_blade.gdshader") },
+        };
+        AddChild(grassInstances);
+
         // --- Goals ---
         foreach (int sign in new[] { -1, 1 })
         {
@@ -234,7 +272,29 @@ public partial class Stadium : Node3D
             mm.SetInstanceColor(i, palette[rng.RangeInt(0, palette.Length - 1)] * rng.Range(.72f, 1.15f));
         }
         var crowd = new MultiMeshInstance3D { Name = "Crowd", Multimesh = mm, MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://Shaders/crowd.gdshader") } };
+        _crowdMaterial = (ShaderMaterial)crowd.MaterialOverride;
         return crowd;
+    }
+
+    private ShaderMaterial? _crowdMaterial;
+    private float _celebrateTimer;
+
+    /// <summary>Trigger crowd celebration (jump + arms) for a few seconds.</summary>
+    public void CelebrateCrowd(float seconds = 4f)
+    {
+        _celebrateTimer = seconds;
+        if (_crowdMaterial != null)
+            _crowdMaterial.SetShaderParameter("celebrate", 1.0f);
+    }
+
+    public void UpdateCrowd(float dt)
+    {
+        if (_celebrateTimer > 0f)
+        {
+            _celebrateTimer -= dt;
+            if (_celebrateTimer <= 0f && _crowdMaterial != null)
+                _crowdMaterial.SetShaderParameter("celebrate", 0.0f);
+        }
     }
 
     public static StandardMaterial3D Mat(Color color, float roughness = .8f, float metallic = 0f, Color? emission = null)
