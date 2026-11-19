@@ -234,7 +234,29 @@ public partial class Stadium : Node3D
             mm.SetInstanceColor(i, palette[rng.RangeInt(0, palette.Length - 1)] * rng.Range(.72f, 1.15f));
         }
         var crowd = new MultiMeshInstance3D { Name = "Crowd", Multimesh = mm, MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://Shaders/crowd.gdshader") } };
+        _crowdMaterial = (ShaderMaterial)crowd.MaterialOverride;
         return crowd;
+    }
+
+    private ShaderMaterial? _crowdMaterial;
+    private float _celebrateTimer;
+
+    /// <summary>Trigger crowd celebration (jump + arms) for a few seconds.</summary>
+    public void CelebrateCrowd(float seconds = 4f)
+    {
+        _celebrateTimer = seconds;
+        if (_crowdMaterial != null)
+            _crowdMaterial.SetShaderParameter("celebrate", 1.0f);
+    }
+
+    public void UpdateCrowd(float dt)
+    {
+        if (_celebrateTimer > 0f)
+        {
+            _celebrateTimer -= dt;
+            if (_celebrateTimer <= 0f && _crowdMaterial != null)
+                _crowdMaterial.SetShaderParameter("celebrate", 0.0f);
+        }
     }
 
     public static StandardMaterial3D Mat(Color color, float roughness = .8f, float metallic = 0f, Color? emission = null)
