@@ -235,6 +235,7 @@ public partial class MatchView : Node3D
         }
         PlayEventSounds();
         Sync(dt);
+        GetNodeOrNull<World3D>("../Stadium")?.UpdateCrowd(dt);
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
     }
 
@@ -258,6 +259,15 @@ public partial class MatchView : Node3D
         if (audio != null)
             for (int i = start; i < events.Count; i++)
                 audio.Call("play_for_event", events[i].Kind.ToString());
+        // Crowd celebration on goal.
+        for (int i = start; i < events.Count; i++)
+        {
+            if (events[i].Kind == EventKind.Goal)
+            {
+                var stadium = GetNodeOrNull<World3D>("../Stadium");
+                stadium?.CelebrateCrowd(5f);
+            }
+        }
         _lastSoundEvent = newest;
     }
 

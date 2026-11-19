@@ -14,8 +14,8 @@ extends Node
 
 @export var master_volume: float = 0.7
 @export var enabled: bool = true
-const MIX_RATE := 22050          # low rate keeps the web build cheap; these are short, dull sounds
-const MAX_VOICES := 12
+const MIX_RATE := 44100          # full quality for desktop; web build still cheap (short sounds)
+const MAX_VOICES := 16
 
 var _gen: AudioStreamGenerator
 var _playback: AudioStreamGeneratorPlayback
