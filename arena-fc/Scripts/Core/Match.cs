@@ -1522,6 +1522,12 @@ public sealed partial class MatchEngine
         v.Y += Mx.Gravity * dt;
         // Magnus effect from spin (side curve + dip).
         v += Vector3.Cross(b.Spin, v) * (.055f * dt);
+        // Gap 5: Knuckleball wobble for power shots.
+        if (b.Spin.LengthSquared() < 0.1f && v.Length() > 20f)
+        {
+            v.X += Rng.Signed() * 0.5f * dt;
+            v.Z += Rng.Signed() * 0.5f * dt;
+        }
         // Ball drag: air resistance proportional to velocity squared.
         // Prevents shots from floating; high-speed balls decelerate faster.
         float speed = v.Length();

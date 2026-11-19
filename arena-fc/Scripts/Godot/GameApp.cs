@@ -10,7 +10,7 @@ using Godot;
 namespace ArenaFC.GodotGame;
 
 /// <summary>Phase 3.6 game mode.</summary>
-public enum GameMode { Kickoff, Tournament, Training, Shootout }
+public enum GameMode { Kickoff, Tournament, Training, Shootout, SkillGames, PracticeArena }
 
 public partial class GameApp : Node3D
 {
@@ -166,6 +166,8 @@ public partial class GameApp : Node3D
         menu.AddChild(Ui.Btn("COPA AMERICA", StartCopaAmerica));
         menu.AddChild(Ui.Btn("CHAMPIONS LEAGUE", StartChampionsLeague));
         menu.AddChild(Ui.Btn("TRAINING", () => StartTraining()));
+        menu.AddChild(Ui.Btn("SKILL GAMES", StartSkillGames));
+        menu.AddChild(Ui.Btn("PRACTICE ARENA", StartPracticeArena));
         menu.AddChild(Ui.Btn("PENALTY SHOOTOUT", () => StartShootout()));
         menu.AddChild(Ui.Btn("PLAY WITH FRIENDS", ShowOnline));
         menu.AddChild(Ui.Btn("CHARACTER EDITOR", ShowEditor));
@@ -314,6 +316,9 @@ public partial class GameApp : Node3D
         Options.Offside = false;
         StartMatchInternal();
     }
+
+    public void StartSkillGames() { Mode = GameMode.SkillGames; StartMatchInternal(); }
+    public void StartPracticeArena() { Mode = GameMode.PracticeArena; Options.Fouls = false; Options.Offside = false; StartMatchInternal(); }
 
     /// <summary>Phase 3.6: penalty shootout (alternating penalties).</summary>
     public void StartShootout()

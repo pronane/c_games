@@ -90,13 +90,18 @@ public partial class Stadium : Node3D
         return QualityPreset.High;
     }
 
-    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto)
+    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto, int stadiumIndex = 0)
     {
         Name = "Stadium";
         // Phase 3.7: resolve quality preset (auto-detect from device).
         var q = quality == QualityPreset.Auto ? DetectQuality() : quality;
         bool highFx = q >= QualityPreset.High;
         bool medFx = q >= QualityPreset.Medium;
+        // Gap 1: Stadium variety
+        var stadiumInfo = Clubs.Stadiums[stadiumIndex % Clubs.Stadiums.Length];
+        bool hasRoof = stadiumInfo.Roof;
+        bool hasFloodlights = stadiumInfo.Floodlights;
+        bool hasLED = stadiumInfo.LEDBoards;
 
         // --- Environment / sky / sun ---
         var skyMat = new ProceduralSkyMaterial
