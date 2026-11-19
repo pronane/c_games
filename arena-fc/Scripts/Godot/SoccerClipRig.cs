@@ -1,12 +1,13 @@
-// Arena FC - Sprite Forge soccer player (sculpted mesh + 18-bone skeleton + 71 clips).
+// Arena FC - Sprite Forge realistic soccer player (MakeHuman-derived mesh,
+// 52-joint MH skeleton, smooth normals, baked skin/eye/hair atlases, 71 clips).
 //
-// Tools/build_soccer_player.py builds Data/models/soccer_player.glb from the
-// latest Sprite Forge pipeline (sforge.footballer + sforge.gamemesh, retargeted
-// soccer clips) plus Data/soccer_player_manifest.json (clip list, loop flags,
-// action aliases, material order).  This loader plays those clips from the
-// match engine's PlayerState, tinting the flat kit materials per CharacterSpec
-// exactly like the procedural rig.  When the GLB is absent the game falls back
-// to the procedural CharacterRig untouched.
+// Tools/build_soccer_realistic.py builds Data/models/soccer_player.glb from the
+// MakeHuman squad in Gaelic_Football_3d (identities v0/v2/v6 selected per player
+// from the spec's stable Id) plus Data/soccer_player_manifest.json (clip list,
+// loop flags, action aliases, material order).  The GAA `kit` material is split
+// into flat jersey/shorts/socks/boots slots so kits stay per-club like the old
+// sculpt.  This loader plays those clips from the match engine's PlayerState.
+// When the GLB is absent the game falls back to the procedural CharacterRig.
 //
 // Phase 1 (AME core):
 //   1.1 blend space: speed x turnRate x ballState -> clip + phase + weight
@@ -32,12 +33,13 @@ public sealed partial class SoccerClipRig : Node3D
     public AnimationPlayer? Player;
     public Skeleton3D? Skel;
     public MeshInstance3D? Mesh;
+    private readonly List<MeshInstance3D> _meshes = new();
+    private static readonly string[] VariantPrefixes = { "v0_", "v2_", "v6_" };
 
     private readonly Dictionary<string, string> _aliases = new();
     private readonly HashSet<string> _loops = new();
     private readonly Dictionary<string, float> _clipDuration = new();
     private readonly Dictionary<string, float> _contactFrac = new();
-    private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
     private bool _oneShotDone = true;
@@ -128,7 +130,9 @@ public sealed partial class SoccerClipRig : Node3D
         _styleLean = 0.8f + (Math.Abs(h / 7) % 100) / 100f * 0.4f;
         Player = FindFirst<AnimationPlayer>(scene);
         Skel = FindFirst<Skeleton3D>(scene);
-        Mesh = FindFirst<MeshInstance3D>(scene);
+        _meshes.Clear();
+        FindAll(scene, _meshes);
+        Mesh = _meshes.Count > 0 ? _meshes[0] : null;
         if (Player == null || Skel == null || Mesh == null) return false;
         foreach (var name in Player.GetAnimationList())
         {
@@ -137,6 +141,7 @@ public sealed partial class SoccerClipRig : Node3D
                 anim.LoopMode = _loops.Contains(name.ToString())
                     ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
         }
+        ApplyVariant(scene, spec);
         Tint(spec);
         SetArchetype(spec.Archetype);
         float s = _height > 0.01f ? spec.Height / _height : 1f;
@@ -148,7 +153,6 @@ public sealed partial class SoccerClipRig : Node3D
     private void LoadManifest()
     {
         foreach (var kv in FallbackAliases) _aliases[kv.Key] = kv.Value;
-        _materialOrder.AddRange(new[] { "skin", "jersey", "shorts", "socks", "boots", "hair" });
         try
         {
             string text = Godot.FileAccess.GetFileAsString(ManifestPath);
@@ -169,45 +173,76 @@ public sealed partial class SoccerClipRig : Node3D
                         && ev.TryGetProperty("ball_contact_frac", out var bc) && bc.ValueKind != JsonValueKind.Null)
                         _contactFrac[clipName] = bc.GetSingle();
                 }
-            if (root.TryGetProperty("materials", out var mats))
-            {
-                _materialOrder.Clear();
-                foreach (var m in mats.EnumerateArray()) _materialOrder.Add(m.GetString() ?? "");
-            }
             if (root.TryGetProperty("stats", out var stats) && stats.TryGetProperty("height_m", out var h))
                 _height = h.GetSingle();
         }
         catch (Exception) { /* fallback aliases above still cover the core actions */ }
     }
 
-    /// <summary>Retint the GLB kit materials from the character spec (per club).</summary>
+    /// <summary>Show one realistic identity (v0/v2/v6) per player, derived from the
+    /// character's display name so the same squad looks the same across runs. All
+    /// three ship inside the GLB; the hidden ones cost nothing.</summary>
+    private void ApplyVariant(Node3D scene, CharacterSpec spec)
+    {
+        int h = 7;
+        foreach (char c in spec.Name ?? "") h = h * 31 + c;
+        string prefix = VariantPrefixes[Math.Abs(h) % VariantPrefixes.Length];
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            bool isVariant = n.StartsWith("v0_") || n.StartsWith("v2_") || n.StartsWith("v6_");
+            if (isVariant) mi.Visible = n.StartsWith(prefix);
+        }
+    }
+
+    /// <summary>Hex for a glTF material name, or null to leave the atlas untouched
+    /// (real skin/eyes stay natural; per-club tint only hits kit + hair family).</summary>
+    private static string? TintHexFor(string layer, CharacterSpec spec)
+    {
+        if (layer == "jersey") return spec.KitPrimary;
+        if (layer == "shorts") return spec.ShortsColor;
+        if (layer == "socks") return spec.SocksColor;
+        if (layer == "boots") return spec.BootsColor;
+        if (layer == "hair") return spec.HairColor;
+        if (layer.StartsWith("hair_", StringComparison.OrdinalIgnoreCase)) return spec.HairColor;
+        if (layer.StartsWith("eyebrows_", StringComparison.OrdinalIgnoreCase)) return spec.HairColor;
+        if (layer.StartsWith("eyelashes_", StringComparison.OrdinalIgnoreCase)) return spec.HairColor;
+        if (layer == "beard_shell" || layer == "facial_hair") return spec.HairColor;
+        return null;   // skin_*, eyes_* : keep the realistic atlases
+    }
+
+    /// <summary>Retint the GLB kit materials from the character spec (per club).
+    /// Driven by material NAME (not surface index), so all three identities tint alike.</summary>
     public void Tint(CharacterSpec spec)
     {
-        if (Mesh?.Mesh == null) return;
-        for (int i = 0; i < Mesh.Mesh.GetSurfaceCount(); i++)
+        var targets = _meshes.Count > 0 ? _meshes : new List<MeshInstance3D> { Mesh! };
+        foreach (var mi in targets)
         {
-            string layer = i < _materialOrder.Count ? _materialOrder[i] : "";
-            string hex = layer switch
+            if (mi?.Mesh == null) continue;
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
             {
-                "skin" => spec.SkinHex,
-                "jersey" => spec.KitPrimary,
-                "shorts" => spec.ShortsColor,
-                "socks" => spec.SocksColor,
-                "boots" => spec.BootsColor,
-                "hair" => spec.HairColor,
-                _ => "#888888",
-            };
-            var src = Mesh.GetSurfaceOverrideMaterial(i) ?? Mesh.Mesh.SurfaceGetMaterial(i);
-            if (src is not StandardMaterial3D std) continue;
-            var mat = (StandardMaterial3D)std.Duplicate();
-            mat.AlbedoColor = CharacterRig.C(hex);
-            mat.Roughness = layer is "boots" or "hair" ? .34f : .68f;
-            mat.MetallicSpecular = .38f;
-            mat.RimEnabled = layer is "skin" or "jersey" or "shorts" or "socks";
-            mat.Rim = .22f;
-            mat.RimTint = .30f;
-            mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-            Mesh.SetSurfaceOverrideMaterial(i, mat);
+                var src = mi.GetSurfaceOverrideMaterial(i) ?? mi.Mesh.SurfaceGetMaterial(i);
+                if (src is not StandardMaterial3D std) continue;
+                // glTF material name ("skin_v0", "jersey", ...). Godot sets it as
+                // resource_name; fall back to the sub-resource path suffix just in case.
+                string layer = std.ResourceName ?? "";
+                if (layer.Length == 0)
+                {
+                    string path = std.ResourcePath ?? "";
+                    int at = path.LastIndexOf("::", StringComparison.Ordinal);
+                    if (at >= 0) layer = path.Substring(at + 2);
+                }
+                string? hex = TintHexFor(layer, spec);
+                if (hex == null) continue;
+                var mat = (StandardMaterial3D)std.Duplicate();
+                mat.AlbedoColor = CharacterRig.C(hex);
+                mat.Roughness = layer is "boots" ? .34f : .52f;
+                mat.MetallicSpecular = .38f;
+                mat.RimEnabled = layer is "jersey" or "shorts" or "socks";
+                mat.Rim = .22f;
+                mat.RimTint = .30f;
+                mi.SetSurfaceOverrideMaterial(i, mat);
+            }
         }
     }
 
@@ -415,9 +450,9 @@ public sealed partial class SoccerClipRig : Node3D
         {
             var b = new BoneData
             {
-                Thigh = Skel.FindBone("thigh_" + side),
-                Shin = Skel.FindBone("shin_" + side),
-                Foot = Skel.FindBone("foot_" + side),
+                Thigh = Skel.FindBone("thigh_" + side.ToLowerInvariant()),
+                Shin = Skel.FindBone("calf_" + side.ToLowerInvariant()),
+                Foot = Skel.FindBone("foot_" + side.ToLowerInvariant()),
             };
             if (b.Thigh < 0 || b.Shin < 0 || b.Foot < 0) continue;
             b.ThighRest = Skel.GetBoneRest(b.Thigh).Origin;
@@ -428,10 +463,10 @@ public sealed partial class SoccerClipRig : Node3D
         var spine = Skel.FindBone("spine_02");
         var neck = Skel.FindBone("neck_01");
         var head = Skel.FindBone("head");
-        var uaL = Skel.FindBone("upperarm_L");
-        var laL = Skel.FindBone("lowerarm_L");
-        var uaR = Skel.FindBone("upperarm_R");
-        var laR = Skel.FindBone("lowerarm_R");
+        var uaL = Skel.FindBone("upperarm_l");
+        var laL = Skel.FindBone("lowerarm_l");
+        var uaR = Skel.FindBone("upperarm_r");
+        var laR = Skel.FindBone("lowerarm_r");
         if (spine >= 0 && neck >= 0 && head >= 0)
         {
             var b = _bones.TryGetValue("L", out var bl) ? bl : new BoneData();
@@ -550,6 +585,13 @@ public sealed partial class SoccerClipRig : Node3D
                 Skel.SetBonePoseRotation(b.LowerArmR,
                     new Quaternion(Vector3.Right, -_reach * .4f));
         }
+    }
+
+    private static void FindAll(Node root, List<MeshInstance3D> acc)
+    {
+        if (root is MeshInstance3D m) acc.Add(m);
+        foreach (var c in root.GetChildren())
+            FindAll(c, acc);
     }
 
     private static T? FindFirst<T>(Node root) where T : Node

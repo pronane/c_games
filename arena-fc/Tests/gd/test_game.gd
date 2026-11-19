@@ -17,11 +17,11 @@ func _run() -> void:
 	await process_frame
 	var b = scene
 	ok(b.audio != null and b.recorder != null and b.replayer != null and b.aim != null, "modules created")
-	ok(b.rig_data.has("bones") and b.rig_data["bones"].size() == 18, "rig data loaded via RigBuilder")
+	ok(b.rig_data.has("bones") and b.rig_data["bones"].size() == 52, "rig data loaded via RigBuilder")
 	b.start_match()
 	ok(b.phase == "kickoff" and b.rigs.size() == 10, "match started, 10 rigs")
 	var sk: Skeleton3D = b.rigs[0].get_meta("sk")
-	ok(sk.get_bone_count() == 18, "rig built by module has 18 bones")
+	ok(sk.get_bone_count() == 52, "rig built by module has 52 bones")
 	step(b, 70)
 	ok(b.phase == "play", "kickoff -> play")
 	step(b, 600)

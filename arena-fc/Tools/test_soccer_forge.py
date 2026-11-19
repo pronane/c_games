@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Portable checks for the Sprite Forge soccer player (no Godot/.NET needed).
+"""Portable checks for the Sprite Forge realistic soccer player (no Godot/.NET needed).
 
   python3 Tools/test_soccer_forge.py
 
 Covers: the soccer motion library (needs sprite_forge on PYTHONPATH), the
-generated GLB (18 Arena joints, 67 clips, 6 kit materials), the browser rig
-JSON (rig_default.json schema), the manifest (action aliases, loop flags) and
-the C#/GDScript wiring.  Sections that need numpy/sforge SKIP cleanly when
-they are unavailable; the file checks always run.
+generated GLB (MakeHuman 52-joint skeleton, 71 clips, three identities
+v0/v2/v6 on one skin, baked skin/eye/hair atlases and flat per-club kit
+slots), the browser rig JSON (ProceduralRig3D schema + variant_sets), the
+manifest (action aliases, loop flags) and the C#/GDScript wiring.  Sections
+that need numpy/sforge SKIP cleanly when they are unavailable; the file
+checks always run.
 """
 from __future__ import annotations
 
@@ -22,6 +24,17 @@ sys.path.insert(0, SF)
 sys.path.insert(0, os.path.join(ROOT, "Tools"))
 
 PASS = FAIL = 0
+
+# MakeHuman 52-joint order, parents first (skins[0].joints of the template).
+MH_JOINTS = ["pelvis", "spine_01", "thigh_l", "thigh_r", "spine_02", "calf_l", "calf_r", "spine_03",
+             "foot_l", "foot_r", "clavicle_l", "clavicle_r", "neck_01", "ball_l", "ball_r",
+             "upperarm_l", "upperarm_r", "head", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r",
+             "index_01_l", "middle_01_l", "pinky_01_l", "ring_01_l", "thumb_01_l",
+             "index_01_r", "middle_01_r", "pinky_01_r", "ring_01_r", "thumb_01_r",
+             "index_02_l", "middle_02_l", "pinky_02_l", "ring_02_l", "thumb_02_l",
+             "index_02_r", "middle_02_r", "pinky_02_r", "ring_02_r", "thumb_02_r",
+             "index_03_l", "middle_03_l", "pinky_03_l", "ring_03_l", "thumb_03_l",
+             "index_03_r", "middle_03_r", "pinky_03_r", "ring_03_r", "thumb_03_r"]
 
 
 def check(name, ok, detail=""):
@@ -79,20 +92,30 @@ def main():
         j, buf = read_glb(glb)
         names = [n.get("name", "?") for n in j["nodes"]]
         joints = [names[i] for i in j["skins"][0]["joints"]]
-        arena = json.load(open(os.path.join(ROOT, "Data", "rig_default.json")))
-        arena_bones = [b["n"] for b in arena["bones"]]
-        check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
+        check("GLB skeleton is the 52 MakeHuman joints (parents first)", joints == MH_JOINTS, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
         check("GLB carries 71 soccer clips", len(anims) == 71, str(len(anims)))
-        check("every clip animates every bone",
-              all(len(a["channels"]) >= 18 for a in j["animations"]),
-              str(min(len(a["channels"]) for a in j["animations"])))
-        check("GLB has 6 flat kit materials",
-              [m.get("name") for m in j.get("materials", [])] == ["skin", "jersey", "shorts", "socks", "boots", "hair"],
-              str([m.get("name") for m in j.get("materials", [])]))
-        check("GLB mesh has 6 primitives (one per layer)",
-              len(j["meshes"][0]["primitives"]) == 6)
-        prims = j["meshes"][0]["primitives"]
+        check("every clip animates every joint (+pelvis translation)",
+              all(len(a["channels"]) == 53 for a in j["animations"]),
+              str(sorted(set(len(a["channels"]) for a in j["animations"]))))
+        mesh_nodes = [n for n in j["nodes"] if "mesh" in n]
+        prefixes = sorted({n["name"].split("_", 1)[0] for n in mesh_nodes})
+        check("GLB carries the three identities (v0/v2/v6)", prefixes == ["v0", "v2", "v6"], str(prefixes))
+        for v in ("v0", "v2", "v6"):
+            have = {n["name"][len(v) + 1:] for n in mesh_nodes if n["name"].startswith(v + "_")}
+            check("%s has body, kit and face parts" % v,
+                  {"body", "jersey", "shorts", "socks", "boots", "eyes"} <= have, str(sorted(have)))
+        mat_names = [m.get("name") for m in j.get("materials", [])]
+        check("GLB has the flat kit slots + natural atlases",
+              {"jersey", "shorts", "socks", "boots", "skin_v0", "skin_v2", "skin_v6"} <= set(mat_names),
+              str(mat_names))
+        shell_prefixes = ("hair_", "eyelashes_", "eyebrows_", "beard_", "facial_")
+        check("hair/lash/brow shells keep alpha MASK + doubleSided",
+              all(m.get("alphaMode") == "MASK" and m.get("doubleSided")
+                  for m in j["materials"] if m.get("name", "").startswith(shell_prefixes)),
+              str([m.get("name") for m in j["materials"]
+                   if m.get("name", "").startswith(shell_prefixes) and m.get("alphaMode") != "MASK"]))
+        prims = [j["meshes"][n["mesh"]]["primitives"][0] for n in mesh_nodes]
         prim = prims[0]
         pos_accs = [j["accessors"][p["attributes"]["POSITION"]] for p in prims]
         gmin = [min(a["min"][k] for a in pos_accs) for k in range(3)]
@@ -104,14 +127,8 @@ def main():
         # the tri budget, and regional kit layers.
         check("GLB mesh is full-body (x spans both sides)",
               gmin[0] < -0.2 and gmax[0] > 0.2, "%s..%s" % (gmin[0], gmax[0]))
-        glb_tris = sum(a["count"] for a in pos_accs) // 3
-        check("GLB carries the full tri budget", 14000 <= glb_tris <= 18000, str(glb_tris))
-        jersey_acc = pos_accs[1]
-        check("jersey layer sits on the torso",
-              jersey_acc["min"][1] > 0.5 and jersey_acc["max"][1] < 1.65,
-              "%s..%s" % (jersey_acc["min"][1], jersey_acc["max"][1]))
-        boots_acc = pos_accs[4]
-        check("boots layer sits at the feet", boots_acc["max"][1] < 0.3, str(boots_acc["max"][1]))
+        glb_tris = sum(j["accessors"][p["indices"]]["count"] for p in prims) // 3
+        check("GLB carries the full realistic tri budget (~108k)", 100000 <= glb_tris <= 115000, str(glb_tris))
         wraw, wn, _ = acc_bytes(j, buf, prim["attributes"]["WEIGHTS_0"])
         import array
         w = array.array("f")
@@ -124,10 +141,12 @@ def main():
     check("soccer_rig.json exists", os.path.isfile(rig_path))
     if os.path.isfile(rig_path):
         d = json.load(open(rig_path))
-        arena = json.load(open(os.path.join(ROOT, "Data", "rig_default.json")))
         check("rig JSON has the ProceduralRig3D schema",
               all(k in d for k in ("bones", "pos", "nrm", "uv", "bi", "w", "mats", "idx")))
-        check("rig JSON skeleton matches rig_default.json", d["bones"] == arena["bones"])
+        check("rig JSON skeleton is the 52 MakeHuman joints",
+              [b["n"] for b in d["bones"]] == MH_JOINTS)
+        check("rig JSON parents come first",
+              all(int(b["p"]) < i for i, b in enumerate(d["bones"])))
         verts = len(d["pos"]) // 3
         check("rig JSON vertex counts agree",
               len(d["nrm"]) == verts * 3 and len(d["uv"]) == verts * 2
@@ -135,9 +154,19 @@ def main():
         check("rig JSON bone indices in range", max(d["bi"]) < len(d["bones"]) and min(d["bi"]) >= 0)
         ws = [sum(d["w"][i * 4:(i + 1) * 4]) for i in range(min(verts, 200))]
         check("rig JSON weights sum to 1", all(abs(s - 1) < 1e-3 for s in ws))
-        check("rig JSON material slots are Arena slots", set(d["mats"]) <= {0, 1, 2, 3, 6, 8}, str(d["mats"]))
+        check("rig JSON material slots are Arena slots + eyes",
+              set(d["mats"]) <= {0, 1, 2, 3, 6, 8, 9}, str(d["mats"]))
         tris = sum(len(t) for t in d["idx"]) // 3
-        check("rig JSON triangle budget", 8000 < tris <= 20000, str(tris))
+        check("rig JSON base identity tri budget (~36k)", 30000 <= tris <= 45000, str(tris))
+        # The realistic rig ships two further identities that share the skeleton.
+        check("rig JSON carries the v2/v6 variant sets",
+              set(d.get("variant_sets", {})) == {"v2", "v6"}, str(sorted(d.get("variant_sets", {}))))
+        for v, vs in d.get("variant_sets", {}).items():
+            vtris = sum(len(t) for t in vs["idx"]) // 3
+            check("%s variant set is self-consistent" % v,
+                  len(vs["pos"]) == len(vs["nrm"]) == (len(vs["uv"]) * 3 // 2)
+                  and max(vs["bi"]) < 52 and min(vs["bi"]) >= 0 and 30000 <= vtris <= 45000,
+                  "tris=%d bi_max=%d" % (vtris, max(vs["bi"])))
         # Baked clips: the Web template has no glTF module, so the browser
         # plays these keyframes instead of the GLB.
         check("rig JSON bakes the clip keyframes", "clips" in d)
@@ -151,12 +180,12 @@ def main():
             check("baked one-shots do not loop",
                   not clips["soccer_kick_place"]["loop"] and not clips["soccer_celebrate"]["loop"])
             check("baked clip quaternions are normalized",
-                  all(abs(sum(x * x for x in clips["soccer_run"]["bones"]["Hips"]["r"][:4]) - 1) < 0.01
+                  all(abs(sum(x * x for x in clips["soccer_run"]["bones"]["pelvis"]["r"][:4]) - 1) < 0.01
                       for _ in [0]))
             check("baked clips carry fps/frames",
                   clips["soccer_run"]["fps"] == 30.0 and clips["soccer_run"]["frames"] == 31)
-            check("baked clips carry Hips translation",
-                  "t" in clips["soccer_run"]["bones"]["Hips"])
+            check("baked clips carry pelvis translation",
+                  "t" in clips["soccer_run"]["bones"]["pelvis"])
             # Phase 0.1: every baked clip carries its event frames.
             check("baked clips carry event frames",
                   all("events" in c and "ball_contact_frac" in c["events"] for c in clips.values()))
@@ -177,8 +206,15 @@ def main():
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
-        check("manifest material order matches GLB",
-              man["materials"] == ["skin", "jersey", "shorts", "socks", "boots", "hair"])
+        man_mats = set(man.get("materials", []))
+        check("manifest materials cover the GLB material order",
+              {"jersey", "shorts", "socks", "boots", "skin_v0", "skin_v2", "skin_v6"} <= man_mats,
+              str(sorted(man_mats)))
+        check("manifest declares the realistic look + identities",
+              man.get("look") == "realistic" and man.get("variants") == ["v0", "v2", "v6"]
+              and man.get("skeleton") == "makehuman-52",
+              str((man.get("look"), man.get("variants"), man.get("skeleton"))))
+        check("manifest ships 52 MakeHuman bones", man.get("bones") == MH_JOINTS)
         check("manifest clips carry event frames",
               all("events" in c and "ball_contact_frac" in c["events"] for c in man["clips"]))
         check("manifest aliases include Phase 0 actions",
@@ -273,6 +309,8 @@ def main():
     # Phase 3.9: ML blend weights.
     check("C# blend learner", "BlendLearner" in open(os.path.join(ROOT, "Scripts", "Core", "BlendLearner.cs")).read())
     check("builder exists", os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_player.py")))
+    check("realistic builder exists",
+          os.path.isfile(os.path.join(ROOT, "Tools", "build_soccer_realistic.py")))
 
     print("\nRESULT: %d passed, %d failed" % (PASS, FAIL))
     return 0 if FAIL == 0 else 1

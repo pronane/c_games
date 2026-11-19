@@ -1,7 +1,7 @@
 # Arena FC — gameplay videos & screenshots
 
 Everything in this folder was produced from the **running game** on 27 October 2026,
-except `08_soccer_player.mp4` / `18_soccer_player.png` (18 November 2026), which
+except `08_soccer_player.mp4` / `18_soccer_player.png` and `render_*.png` (18 November 2026), which
 were rendered from the shipped Sprite Forge GLB with a Python CPU
 skinning/raster pipeline because the render sandbox has no display/GPU for
 Godot. Nothing here is a mockup, a still of a static scene, or a third-party asset.
@@ -11,6 +11,10 @@ Godot. Nothing here is a mockup, a still of a static scene, or a third-party ass
 | File | Length | What it shows |
 | --- | --- | --- |
 | `01_match.mp4` | 20 s, 1280×720, 24 fps | 5-a-side match in the exported C# Linux build. Real keyboard input: sprint, pass, through ball, charged shot, camera cycle, tackle, pause/resume, second-half attack. |
+| `render_player_run.png` | 720×720 | Realistic MakeHuman footballer (v0) in `soccer_run` mid‑stride — full body. CPU render of the shipped `soccer_rig.json` |
+| `render_closeup_run.png` | 720×720 | Same, close‑up: face, hair, skin and anatomy. CPU render |
+| `render_closeup_header.png` | 720×720 | `soccer_header` frame 0 (anticipation stance). CPU render |
+| `render_gameplay_run.png` | 960×544 | Broadcast view at the centre circle. CPU render — the sky triangles at the pitch edge are the renderer's coverage artifact |
 | `02_editor.mp4` | 15 s, 1280×720, 24 fps | Character/skeleton editor: player selection, live height & bulk changes to the 18-bone skinned mesh, Kit/Face/Skeleton/Attributes tabs, bone posing. |
 | `03_menu.mp4` | 16 s, 1280×720, 24 fps | Animated 3D main menu → scrollable match settings → controls → character editor → 11v11 kick-off. |
 | `04_browser.mp4` | 20 s, 1280×720, 12 fps | The exported WebAssembly/GDScript Browser Edition actually running in Chromium with SwiftShader WebGL, from load to a 5-a-side match, cycling cameras and zooming with touch controls. |

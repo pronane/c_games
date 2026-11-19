@@ -28,3 +28,4 @@ sprite_forge/models/
 sprite_forge/captures/
 # Local guitar-lab benchmark audio that cannot be redistributed
 guitar-lab/benchmarks/regression/data/private/
+sfvenv/

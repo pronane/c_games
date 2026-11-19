@@ -19,7 +19,13 @@ const DEFAULT_RIG := "res://Data/rig_default.json"
 const OVERRIDE_RIG := "user://rig_override.json"
 
 ## Bone names Arena FC's animation code poses by name (BrowserBoot.animate_rig and the C# rig).
+## Either the Arena 18-bone skeleton or the MakeHuman-52 one shipped by the realistic rig.
 const REQUIRED_BONES := ["Hips", "Spine", "Chest", "Head"]
+const REQUIRED_ALT := ["pelvis", "spine_01", "spine_03", "head"]
+const REQUIRED_SETS := [
+	["Hips", "Spine", "Chest", "Head"],
+	["pelvis", "spine_01", "spine_03", "head"],
+]
 
 @export var kit_primary: Color = Color("#d7263d")
 @export var kit_secondary: Color = Color("#f8fafc")
@@ -86,9 +92,18 @@ static func validate(d: Dictionary) -> String:
 		if (b["h"] as Array).size() != 3:
 			return "bone %d head must be [x,y,z]" % i
 		names[str(b["n"])] = true
-	for r in REQUIRED_BONES:
-		if not names.has(r):
-			return "missing required bone '%s'" % r
+	var any_set := false
+	for required_set in REQUIRED_SETS:
+		var all_here := true
+		for r in required_set:
+			if not names.has(r):
+				all_here = false
+				break
+		if all_here:
+			any_set = true
+			break
+	if not any_set:
+		return "missing required bones (need one of the accepted skeletons: %s)" % [REQUIRED_SETS]
 	var verts: int = (d["pos"] as Array).size() / 3
 	if verts == 0 or (d["pos"] as Array).size() % 3 != 0:
 		return "pos must be a flat list of x,y,z"
@@ -120,6 +135,7 @@ static func material_for(idx: int, cols: Array) -> StandardMaterial3D:
 		5: m.albedo_color = Color("#ffd166")
 		6: m.albedo_color = Color("#241811")        # hair
 		7: m.albedo_color = Color("#2b2d42")
+		9: m.albedo_color = Color("#5b3a1e")        # eyes (realistic rig; atlas is flat in the browser)
 		_: m.albedo_color = Color("#14151a")        # boots
 	m.roughness = 0.72
 	return m
@@ -153,6 +169,36 @@ static func build(d: Dictionary, cols: Array) -> Node3D:
 	for i in range(bones.size()):
 		skin.add_bind(i, Transform3D(Basis.IDENTITY, _v3(bones[i]["h"])).inverse())
 
+	var mesh_inst := _mesh_instance(d, cols)
+	mesh_inst.skin = skin
+	sk.add_child(mesh_inst)
+	mesh_inst.skeleton = NodePath("..")
+	root.set_meta("sk", sk)
+	root.set_meta("mi", mesh_inst)
+	root.set_meta("cols", cols)
+	# Realistic rig: extra identity meshes (v2, v6) share the same skeleton/skin.
+	# Hidden by default; the caller picks one per player.
+	var variant_meshes := {}
+	if d.has("variant_sets"):
+		for vname in d["variant_sets"]:
+			var vs: Dictionary = d["variant_sets"][vname]
+			var full := {
+				"pos": vs.get("pos", []), "nrm": vs.get("nrm", []), "uv": vs.get("uv", []),
+				"bi": vs.get("bi", []), "w": vs.get("w", []),
+				"idx": vs.get("idx", []), "mats": d["mats"],
+			}
+			var vmi := _mesh_instance(full, cols)
+			vmi.skin = skin
+			vmi.name = "variant_" + str(vname)
+			vmi.visible = false
+			sk.add_child(vmi)
+			vmi.skeleton = NodePath("..")
+			variant_meshes[vname] = vmi
+	root.set_meta("variant_meshes", variant_meshes)
+	return root
+
+## Build a MeshInstance3D from one rig-data-like dictionary ({pos,nrm,uv,bi,w,idx,mats}).
+static func _mesh_instance(d: Dictionary, cols: Array) -> MeshInstance3D:
 	var uv := PackedVector2Array()
 	var uv_flat: Array = d["uv"]
 	uv.resize(uv_flat.size() / 2)
@@ -175,13 +221,7 @@ static func build(d: Dictionary, cols: Array) -> Node3D:
 		am.surface_set_material(am.get_surface_count() - 1, material_for(int(mi), cols))
 	var mesh_inst := MeshInstance3D.new()
 	mesh_inst.mesh = am
-	mesh_inst.skin = skin
-	sk.add_child(mesh_inst)
-	mesh_inst.skeleton = NodePath("..")
-	root.set_meta("sk", sk)
-	root.set_meta("mi", mesh_inst)
-	root.set_meta("cols", cols)
-	return root
+	return mesh_inst
 
 # ---------------------------------------------------------------- Sprite Forge GLB
 ## Import a Sprite Forge (or any skinned) GLB at runtime. Returns null and warns on failure.
@@ -209,6 +249,10 @@ const SPRITE_FORGE_BONES := {
 	"upperarm_r": "RUpperArm", "forearm_r": "RForearm", "hand_r": "RHand",
 	"thigh_l": "LThigh", "shin_l": "LShin", "foot_l": "LFoot",
 	"thigh_r": "RThigh", "shin_r": "RShin", "foot_r": "RFoot",
+	# MakeHuman 52-joint glTF export names (the shipped realistic rig)
+	"pelvis": "Hips", "spine_01": "Spine", "spine_03": "Chest", "neck_01": "Neck",
+	"lowerarm_l": "LForearm", "lowerarm_r": "RForearm",
+	"calf_l": "LShin", "calf_r": "RShin",
 }
 
 ## {arena bone name -> bone name in `sk`}. Exact Arena names win, then the Sprite Forge names above.
@@ -236,9 +280,22 @@ static func report_glb(scene: Node) -> Dictionary:
 	for i in range(sk.get_bone_count()):
 		out["bones"].append(sk.get_bone_name(i))
 	out["map"] = bone_map(sk)
-	for r in REQUIRED_BONES:
-		if not out["map"].has(r):
-			out["missing"].append(r)
+	var any_set := false
+	for required_set in REQUIRED_SETS:
+		var all_here := true
+		for r in required_set:
+			if not out["map"].has(r):
+				all_here = false
+				break
+		if all_here:
+			any_set = true
+			break
+	if not any_set:
+		for required_set in REQUIRED_SETS:
+			for r in required_set:
+				if not out["map"].has(r):
+					if not out["missing"].has(r):
+						out["missing"].append(r)
 	for ap in scene.find_children("*", "AnimationPlayer", true, false):
 		out["animations"].append_array((ap as AnimationPlayer).get_animation_list())
 	out["ok"] = out["missing"].is_empty()

@@ -327,6 +327,7 @@ MAT_COLORS = np.array([
     [0.10, 0.10, 0.10],  # 6 dark
     [0.50, 0.50, 0.50],  # 7 grey
     [0.20, 0.20, 0.20],  # 8 dark grey
+    [0.62, 0.75, 0.85],  # 9 eyes (bright iris)
 ], dtype=np.float32)
 
 

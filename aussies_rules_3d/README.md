@@ -91,7 +91,7 @@ All models are authored programmatically with **Blender** (`bpy`, Blender as a
 Python module) in [`tools/blender/`](tools/blender/README.md):
 
 1. `gen_player.py` — builds the humanoid body, the 19-bone armature, proximity
-   trimmed Sprite Forge squad from Gaelic_Football_3d (3 appearance variants,
+   Sprite Forge squad from Gaelic_Football_3d (all nine appearance variants,
    flat AFL club tints at runtime) → `public/assets/gaelic_player.glb`
 2. `gen_ball.py` — the Sherrin-style oval ball with laces → `public/assets/ball.glb`
 3. `gen_stadium.py` — the Melbourne arena bowl, roof, towers, screens and

@@ -1,43 +1,98 @@
 {
- "generator": "ArenaFC soccer rig (Tools/build_soccer_player.py)",
- "sprite_forge": "v11.13 (main 891facd)",
- "skeleton": "arena-18",
+ "generator": "ArenaFC realistic soccer rig (Tools/build_soccer_realistic.py)",
+ "sprite_forge": "v11.17 (main 49be53a)",
+ "skeleton": "makehuman-52",
  "bones": [
-  "Hips",
-  "Spine",
-  "Chest",
-  "Neck",
-  "Head",
-  "Face",
-  "LUpperArm",
-  "LForearm",
-  "LHand",
-  "RUpperArm",
-  "RForearm",
-  "RHand",
-  "LThigh",
-  "LShin",
-  "LFoot",
-  "RThigh",
-  "RShin",
-  "RFoot"
+  "pelvis",
+  "spine_01",
+  "thigh_l",
+  "thigh_r",
+  "spine_02",
+  "calf_l",
+  "calf_r",
+  "spine_03",
+  "foot_l",
+  "foot_r",
+  "clavicle_l",
+  "clavicle_r",
+  "neck_01",
+  "ball_l",
+  "ball_r",
+  "upperarm_l",
+  "upperarm_r",
+  "head",
+  "lowerarm_l",
+  "lowerarm_r",
+  "hand_l",
+  "hand_r",
+  "index_01_l",
+  "middle_01_l",
+  "pinky_01_l",
+  "ring_01_l",
+  "thumb_01_l",
+  "index_01_r",
+  "middle_01_r",
+  "pinky_01_r",
+  "ring_01_r",
+  "thumb_01_r",
+  "index_02_l",
+  "middle_02_l",
+  "pinky_02_l",
+  "ring_02_l",
+  "thumb_02_l",
+  "index_02_r",
+  "middle_02_r",
+  "pinky_02_r",
+  "ring_02_r",
+  "thumb_02_r",
+  "index_03_l",
+  "middle_03_l",
+  "pinky_03_l",
+  "ring_03_l",
+  "thumb_03_l",
+  "index_03_r",
+  "middle_03_r",
+  "pinky_03_r",
+  "ring_03_r",
+  "thumb_03_r"
  ],
  "materials": [
-  "skin",
+  "skin_v0",
   "jersey",
   "shorts",
   "socks",
   "boots",
-  "hair"
+  "eyes_brown",
+  "eyelashes_eyelashes02",
+  "eyebrows_eyebrow003",
+  "hair_short02",
+  "skin_v2",
+  "eyes_bluegreen",
+  "hair_short01",
+  "beard_shell",
+  "facial_hair",
+  "skin_v6",
+  "eyes_brownlight",
+  "eyebrows_eyebrow009",
+  "hair_afro01"
  ],
- "layer_slots": {
-  "skin": 0,
-  "jersey": 1,
-  "shorts": 2,
-  "socks": 3,
-  "boots": 8,
-  "hair": 6
- },
+ "skin_materials": [
+  "skin_v0",
+  "skin_v2",
+  "skin_v6"
+ ],
+ "look": "realistic",
+ "source": "Gaelic_Football_3d/assets/models/gaelic_player.glb",
+ "variants": [
+  "v0",
+  "v2",
+  "v6"
+ ],
+ "variant_prefixes": [
+  "v0_",
+  "v2_",
+  "v6_"
+ ],
  "clips": [
   {
    "name": "soccer_idle",
@@ -1233,20 +1288,14 @@
   "fist_shoot": "soccer_fist_shoot"
  },
  "stats": {
-  "tris": 16000,
-  "verts": 8002,
-  "height_m": 1.7682,
-  "bounds_min": [
-   -0.5699,
-   0.0,
-   -0.1185
-  ],
-  "bounds_max": [
-   0.5722,
-   1.7682,
-   0.3775
-  ],
+  "tris_total_all_variants": 108375,
+  "height_m": 1.7568,
+  "variants": {
+   "v0": 36934,
+   "v2": 36805,
+   "v6": 34636
+  },
   "mean_dir_err_deg": 0.0,
-  "seconds": 8.0
+  "seconds": 19.3
  }
 }
