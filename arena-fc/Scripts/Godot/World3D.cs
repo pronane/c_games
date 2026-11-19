@@ -12,6 +12,14 @@ public partial class Stadium : Node3D
 
     // P1: Grass deformation — pitch wear from player positions.
     private GrassDeformation _grassDeformation;
+    private CPUParticles3D? _rain;
+
+    /// <summary>Update weather visuals (rain particles). Call per frame.</summary>
+    public void UpdateWeather()
+    {
+        if (_rain != null)
+            _rain.Emitting = ArenaFC.Core.Weather.Raining;
+    }
 
     /// <summary>Update grass wear from player positions (call per frame).</summary>
     public void UpdateGrassWear(System.Numerics.Vector3[] playerPositions)
@@ -157,6 +165,51 @@ public partial class Stadium : Node3D
         }
         if (fullCrowd) AddChild(BuildCrowd(2400));
 
+        // --- Roof ring (P4) — thin boxes above the top row of stands ---
+        var roofMat = Mat(new Color(.22f, .24f, .28f), .6f);
+        float roofY = .8f + 9 * 1.25f + 2f; // Above top stand row
+        float roofDistX = Mx.HalfWidth + 8f + 8 * 2.1f + 2f;
+        float roofDistZ = Mx.HalfLength + 8f + 8 * 2.1f + 2f;
+        // North/South roof (along X)
+        AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
+            new Vector3(0, roofY, -roofDistX), "RoofNorth"));
+        AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
+            new Vector3(0, roofY, roofDistX), "RoofSouth"));
+        // East/West roof (along Z)
+        AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
+            new Vector3(-roofDistZ, roofY, 0), "RoofWest"));
+        AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
+            new Vector3(roofDistZ, roofY, 0), "RoofEast"));
+
+        // --- LED boards (P4) — animated scrolling panels around pitch ---
+        var ledShader = GD.Load<Shader>("res://Shaders/led_board.gdshader");
+        for (int i = 0; i < 12; i++)
+        {
+            bool alongX = i < 6;
+            float t = (i % 6) / 5f;
+            var ledMat = new ShaderMaterial { Shader = ledShader };
+            // Alternate colors for variety
+            ledMat.SetShaderParameter("color_a", i % 2 == 0
+                ? new Color(.1f, .6f, 1f) : new Color(1f, .3f, .1f));
+            var led = new MeshInstance3D
+            {
+                Name = $"LED_{i}",
+                Mesh = new PlaneMesh { Size = alongX
+                    ? new Vector2(12f, 1f) : new Vector2(1f, 12f) },
+                MaterialOverride = ledMat,
+            };
+            if (alongX)
+            {
+                led.Position = new Vector3(Mx.Lerp(-Mx.HalfLength + 6f, Mx.HalfLength - 6f, t), .5f, -Mx.HalfWidth - .8f);
+            }
+            else
+            {
+                led.Position = new Vector3(-Mx.HalfLength - .8f, .5f, Mx.Lerp(-Mx.HalfWidth + 6f, Mx.HalfWidth - 6f, t));
+                led.RotationDegrees = new Vector3(0, 90, 0);
+            }
+            AddChild(led);
+        }
+
         // --- Advertising boards ---
         string[] boards = { "ARENA FC", "FAIR PLAY", "GODOT 4.7", "ANY DEVICE", "EST. 2026", "MATCH DAY", "GLB EXPORT", "OPEN RIGS" };
         for (int i = 0; i < 8; i++)
@@ -180,6 +233,28 @@ public partial class Stadium : Node3D
             }
             AddChild(label);
         }
+
+        // --- Rain particles (P5) — visible when Weather.Raining ---
+        _rain = new CPUParticles3D
+        {
+            Name = "Rain",
+            Amount = 2000,
+            Lifetime = 1.2f,
+            Preprocess = 1.2f,
+            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = new Vector3(Mx.HalfLength, 0.1f, Mx.HalfWidth),
+            Direction = new Vector3(0, -1, 0),
+            Spread = 5f,
+            InitialVelocityMin = 18f,
+            InitialVelocityMax = 22f,
+            Gravity = new Vector3(0, -9.8f, 0),
+            ScaleAmountMin = 0.02f,
+            ScaleAmountMax = 0.04f,
+            Color = new Color(.7f, .8f, .9f, .6f),
+            Emitting = false, // Toggled by UpdateWeather()
+        };
+        _rain.Position = new Vector3(0, 25f, 0);
+        AddChild(_rain);
 
         // --- Floodlights ---
         for (int i = 0; i < 4; i++)

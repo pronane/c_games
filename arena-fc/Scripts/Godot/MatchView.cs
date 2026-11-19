@@ -235,7 +235,9 @@ public partial class MatchView : Node3D
         }
         PlayEventSounds();
         Sync(dt);
-        GetNodeOrNull<World3D>("../Stadium")?.UpdateCrowd(dt);
+        var stadium = GetNodeOrNull<World3D>("../Stadium");
+        stadium?.UpdateCrowd(dt);
+        stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
     }
 
