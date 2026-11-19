@@ -103,6 +103,55 @@ func render(sfx: String) -> PackedFloat32Array:
 		"ambience":
 			# Continuous crowd murmur: filtered noise with slow swell.
 			out = _noise(4.0, 0.12, 800.0, 7, true)
+		"chant":
+			# Crowd chant: rhythmic "ole ole" pattern (4 beats).
+			var parts: Array = []
+			for i in range(4):
+				parts.append(_tone(220.0 + i * 20.0, 0.25, 0.4, 5.0))
+				parts.append(_silence(0.1))
+			out = _mix([_concat(parts), _noise(1.5, 0.15, 1200.0, 8, true)])
+		"pa":
+			# Stadium PA: filtered voice-like tone with reverb feel.
+			out = _mix([
+				_tone(180.0, 0.8, 0.3, 2.0),
+				_tone(360.0, 0.6, 0.15, 2.0),
+				_noise(0.8, 0.08, 600.0, 9, true),
+			])
+		"music":
+			# Menu music: simple chord progression (C-Am-F-G).
+			var chords = [261.6, 220.0, 174.6, 196.0]  # C, A, F, G
+			var parts2: Array = []
+			for freq in chords:
+				parts2.append(_tone(freq, 0.5, 0.25, 1.0))
+				parts2.append(_tone(freq * 1.5, 0.5, 0.15, 1.0))
+			out = _concat(parts2)
+		"boot_grass":
+			out = _mix([_noise(0.05, 0.4, 800.0, 10), _tone(90.0, 0.06, 0.3, 30.0)])
+		"boot_turf":
+			out = _mix([_noise(0.04, 0.3, 1500.0, 11), _tone(110.0, 0.05, 0.25, 40.0)])
+		"boot_mud":
+			out = _mix([_noise(0.08, 0.5, 500.0, 12), _tone(70.0, 0.08, 0.4, 20.0)])
+		"voice_excited":
+			# Excited commentary voice: rising formant.
+			out = _mix([
+				_tone(300.0, 0.3, 0.3, 0.0),
+				_tone(600.0, 0.2, 0.2, 0.0),
+				_tone(900.0, 0.15, 0.1, 0.0),
+			])
+		"voice_calm":
+			# Calm commentary voice: steady formant.
+			out = _mix([
+				_tone(200.0, 0.4, 0.25, 0.0),
+				_tone(400.0, 0.3, 0.15, 0.0),
+			])
+		"voice_goal":
+			# Goal commentary: high-energy burst.
+			out = _mix([
+				_tone(400.0, 0.2, 0.4, 0.0),
+				_tone(800.0, 0.3, 0.3, 0.0),
+				_tone(1200.0, 0.2, 0.2, 0.0),
+				_noise(0.5, 0.2, 2000.0, 13, true),
+			])
 		_:
 			out = _silence(0.01)
 	_cache[sfx] = out
@@ -200,6 +249,23 @@ func set_crowd_ambience(on: bool) -> void:
 func play_crowd_reaction(intensity: float) -> void:
 	# intensity 0..1: louder cheer for goals, softer for near-misses.
 	_play("cheer", 0.3 + intensity * 0.7, 200)
+
+# Phase 1: Commentary & Audio — chant, PA, music, boot sounds, voice.
+func play_chant() -> void: _play("chant", 0.5, 2000)
+func play_pa() -> void: _play("pa", 0.4, 3000)
+func play_music() -> void: _play("music", 0.3, 0)
+func play_boot(surface: String = "grass") -> void:
+	match surface:
+		"grass": _play("boot_grass", 0.6, 50)
+		"turf": _play("boot_turf", 0.5, 50)
+		"mud": _play("boot_mud", 0.7, 50)
+		_: _play("boot_grass", 0.6, 50)
+func play_voice_cue(kind: String = "excited") -> void:
+	match kind:
+		"excited": _play("voice_excited", 0.5, 500)
+		"calm": _play("voice_calm", 0.4, 500)
+		"goal": _play("voice_goal", 0.7, 800)
+		_: _play("voice_calm", 0.4, 500)
 
 ## Map a match event name (the C# EventKind names, or the browser edition's own) to a sound.
 func play_for_event(kind: String) -> void:

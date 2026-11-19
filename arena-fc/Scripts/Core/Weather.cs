@@ -21,6 +21,8 @@ public static class Weather
     public static WeatherType Current = WeatherType.Clear;
     public static float WindX, WindZ;
     public static bool Raining => Current == WeatherType.Rain || Current == WeatherType.Storm;
+    public static bool Snowing => Current == WeatherType.Snow;
+    public static bool Foggy => Current == WeatherType.Fog;
 
     /// <summary>Set weather for a match.</summary>
     public static void Set(WeatherType type, float windSpeed = 0f, float windDirection = 0f)
