@@ -25,6 +25,7 @@ public partial class MatchView : Node3D
 
     private MatchOptions _opts = new();
     private Action? _onExit;
+    public Action<MatchState>? OnMatchEnd;
     private float _time;
     private bool _built;
     /// <summary>One-shot button edges survive physics frames that produce no fixed
@@ -239,9 +240,25 @@ public partial class MatchView : Node3D
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
+        // Phase 4: Trigger post-match screen on FullTime
+        if (Engine.State.Phase == Phase.FullTime && OnMatchEnd != null)
+        {
+            OnMatchEnd(Engine.State);
+            OnMatchEnd = null; // only once
+        }
     }
 
     private MatchEvent? _lastSoundEvent;
+    private readonly CommentaryAudio _commentary = new();
+    private CommentaryContext _commentaryCtx = new();
+    public ReplaySystem Replay = new();
+    // Feature 5: Photo mode
+    public PhotoMode Photo = new();
+<<<<<<< Updated upstream
+=======
+    // Feature 5: Photo mode
+    public PhotoMode Photo = new();
+>>>>>>> Stashed changes
 
     /// <summary>Plays the procedural sound for each match event raised since the last tick.
     /// The "Audio" autoload is Scripts/Core/Audio/ProceduralAudio.gd; without it this does nothing.</summary>
@@ -261,13 +278,54 @@ public partial class MatchView : Node3D
         if (audio != null)
             for (int i = start; i < events.Count; i++)
                 audio.Call("play_for_event", events[i].Kind.ToString());
-        // Crowd celebration on goal.
+        // Crowd celebration on goal + commentary + replay.
         for (int i = start; i < events.Count; i++)
         {
-            if (events[i].Kind == EventKind.Goal)
+            var evt = events[i];
+            Replay.RecordEvent(evt, Engine.CurrentTick);
+            if (evt.Kind == EventKind.Goal)
             {
                 var stadium = GetNodeOrNull<World3D>("../Stadium");
                 stadium?.CelebrateCrowd(5f);
+                // Update commentary context with score.
+                _commentaryCtx.HomeScore = Engine.State.ScoreHome;
+                _commentaryCtx.AwayScore = Engine.State.ScoreAway;
+                _commentaryCtx.Minute = (int)(Engine.State.Clock / 60f);
+                _commentaryCtx.LastScorer = evt.PlayerName ?? "";
+                _commentaryCtx.LastScorerTeam = evt.TeamName ?? "";
+                string line = _commentary.Generate(CommentaryEvent.Goal, _commentaryCtx);
+                Hud?.AddCommentary(line);
+                audio?.Call("play_voice_cue", "goal");
+                audio?.Call("play_chant");
+            }
+            else if (evt.Kind == EventKind.Shot)
+            {
+                _commentaryCtx.LastScorer = evt.PlayerName ?? "";
+                string line = _commentary.Generate(CommentaryEvent.Shot, _commentaryCtx);
+                Hud?.AddCommentary(line);
+                audio?.Call("play_voice_cue", "excited");
+            }
+            else if (evt.Kind == EventKind.Save)
+            {
+                string line = _commentary.Generate(CommentaryEvent.Save, _commentaryCtx);
+                Hud?.AddCommentary(line);
+                audio?.Call("play_voice_cue", "excited");
+            }
+            else if (evt.Kind == EventKind.Foul)
+            {
+                string line = _commentary.Generate(CommentaryEvent.Foul, _commentaryCtx);
+                Hud?.AddCommentary(line);
+                audio?.Call("play_voice_cue", "calm");
+            }
+            else if (evt.Kind == EventKind.Corner)
+            {
+                string line = _commentary.Generate(CommentaryEvent.Corner, _commentaryCtx);
+                Hud?.AddCommentary(line);
+            }
+            else if (evt.Kind == EventKind.Offside)
+            {
+                string line = _commentary.Generate(CommentaryEvent.Offside, _commentaryCtx);
+                Hud?.AddCommentary(line);
             }
         }
         _lastSoundEvent = newest;
