@@ -13,12 +13,61 @@ public partial class Stadium : Node3D
     // P1: Grass deformation — pitch wear from player positions.
     private GrassDeformation _grassDeformation;
     private CPUParticles3D? _rain;
+    // Phase 10: Visual polish
+    private CPUParticles3D? _snow;
+    private CPUParticles3D? _confetti;
+    private MeshInstance3D? _jumbotron;
+    private Label3D? _jumbotronLabel;
+    private float _dayNightTime = 0.5f; // 0=midnight, 0.5=noon, 1=midnight
+    private bool _isNight;
 
-    /// <summary>Update weather visuals (rain particles). Call per frame.</summary>
+    /// <summary>Update weather visuals (rain, snow, fog). Call per frame.</summary>
     public void UpdateWeather()
     {
         if (_rain != null)
             _rain.Emitting = ArenaFC.Core.Weather.Raining;
+        if (_snow != null)
+            _snow.Emitting = ArenaFC.Core.Weather.Snowing;
+        // Fog density based on weather
+        var env = GetWorldEnvironment()?.Environment;
+        if (env != null)
+        {
+            env.FogDensity = ArenaFC.Core.Weather.Foggy ? 0.02f : 0.005f;
+        }
+    }
+
+    /// <summary>Phase 10: Update day/night cycle.</summary>
+    public void UpdateDayNight(float dt)
+    {
+        _dayNightTime += dt * 0.01f; // full cycle in 100 seconds
+        if (_dayNightTime > 1f) _dayNightTime -= 1f;
+        _isNight = _dayNightTime < 0.25f || _dayNightTime > 0.75f;
+        var env = GetWorldEnvironment()?.Environment;
+        if (env != null)
+        {
+            // Sun energy: 0 at night, 1.2 at noon
+            float sunEnergy = _isNight ? 0.1f : 1.2f * (1f - MathF.Abs(_dayNightTime - 0.5f) * 2f);
+            env.AmbientLightEnergy = sunEnergy * 0.5f;
+        }
+    }
+
+    /// <summary>Phase 10: Trigger confetti celebration.</summary>
+    public void CelebrateConfetti()
+    {
+        if (_confetti != null)
+        {
+            _confetti.Emitting = true;
+            _confetti.Restart();
+        }
+    }
+
+    /// <summary>Phase 10: Update jumbotron with score.</summary>
+    public void UpdateJumbotron(string home, int homeScore, int awayScore, string away)
+    {
+        if (_jumbotronLabel != null)
+        {
+            _jumbotronLabel.Text = $"{home} {homeScore} - {awayScore} {away}";
+        }
     }
 
     /// <summary>Update grass wear from player positions (call per frame).</summary>
@@ -41,13 +90,18 @@ public partial class Stadium : Node3D
         return QualityPreset.High;
     }
 
-    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto)
+    public void Build(bool fullCrowd = true, QualityPreset quality = QualityPreset.Auto, int stadiumIndex = 0)
     {
         Name = "Stadium";
         // Phase 3.7: resolve quality preset (auto-detect from device).
         var q = quality == QualityPreset.Auto ? DetectQuality() : quality;
         bool highFx = q >= QualityPreset.High;
         bool medFx = q >= QualityPreset.Medium;
+        // Gap 1: Stadium variety
+        var stadiumInfo = Clubs.Stadiums[stadiumIndex % Clubs.Stadiums.Length];
+        bool hasRoof = stadiumInfo.Roof;
+        bool hasFloodlights = stadiumInfo.Floodlights;
+        bool hasLED = stadiumInfo.LEDBoards;
 
         // --- Environment / sky / sun ---
         var skyMat = new ProceduralSkyMaterial
@@ -255,6 +309,72 @@ public partial class Stadium : Node3D
         };
         _rain.Position = new Vector3(0, 25f, 0);
         AddChild(_rain);
+
+        // Phase 10: Snow particles
+        _snow = new CPUParticles3D
+        {
+            Name = "Snow",
+            Amount = 1000,
+            Lifetime = 3f,
+            Preprocess = 3f,
+            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = new Vector3(Mx.HalfLength, 0.1f, Mx.HalfWidth),
+            Direction = new Vector3(0, -1, 0),
+            Spread = 10f,
+            InitialVelocityMin = 2f,
+            InitialVelocityMax = 4f,
+            Gravity = new Vector3(0, -1f, 0),
+            ScaleAmountMin = 0.05f,
+            ScaleAmountMax = 0.1f,
+            Color = new Color(1f, 1f, 1f, 0.8f),
+            Emitting = false,
+        };
+        _snow.Position = new Vector3(0, 20f, 0);
+        AddChild(_snow);
+
+        // Phase 10: Confetti particles
+        _confetti = new CPUParticles3D
+        {
+            Name = "Confetti",
+            Amount = 500,
+            Lifetime = 4f,
+            Preprocess = 0f,
+            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionBoxExtents = new Vector3(10f, 0.1f, 10f),
+            Direction = new Vector3(0, 1, 0),
+            Spread = 30f,
+            InitialVelocityMin = 5f,
+            InitialVelocityMax = 10f,
+            Gravity = new Vector3(0, -2f, 0),
+            ScaleAmountMin = 0.05f,
+            ScaleAmountMax = 0.1f,
+            Color = new Color(1f, 0.8f, 0.2f, 1f),
+            Emitting = false,
+        };
+        _confetti.Position = new Vector3(0, 15f, 0);
+        AddChild(_confetti);
+
+        // Phase 10: Jumbotron (big screen)
+        _jumbotron = new MeshInstance3D
+        {
+            Name = "Jumbotron",
+        };
+        var jumbotronMesh = new BoxMesh
+        {
+            Size = new Vector3(20f, 8f, 0.5f),
+        };
+        _jumbotron.Mesh = jumbotronMesh;
+        _jumbotron.Position = new Vector3(0, 25f, -Mx.HalfWidth - 15f);
+        AddChild(_jumbotron);
+
+        _jumbotronLabel = new Label3D
+        {
+            Text = "ARENA FC",
+            FontSize = 64,
+            PixelSize = 0.05f,
+            Position = new Vector3(0, 25f, -Mx.HalfWidth - 14.5f),
+        };
+        AddChild(_jumbotronLabel);
 
         // --- Floodlights ---
         for (int i = 0; i < 4; i++)

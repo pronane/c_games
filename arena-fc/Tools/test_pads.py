@@ -328,8 +328,9 @@ def main() -> int:
           "new Vector3(0f, 0f, -1f)" in camera_plan
           and "f.LengthSquared() < 1e-6f" in world3d
           and "Mathf.Exp(-dt * 1.4f)" in world3d)
-    check("five stable cameras incl. ball follow, shoulder and sideline",
-          "ModeCount = 5" in camera_plan and "Shoulder" in camera_plan and "Sideline" in camera_plan
+    check("seven stable cameras incl. ball follow, shoulder, sideline, goal-line, spider",
+          "ModeCount = 7" in camera_plan and "Shoulder" in camera_plan and "Sideline" in camera_plan
+          and "Goal-line" in camera_plan and "Spider" in camera_plan
           and "case 2:" in camera_plan and "case 3:" in camera_plan and "case 4:" in camera_plan
           and "BroadcastPlan.Compute" in world3d)
     check("HUD hint advertises the pad camera button", "pad R3 camera" in hud_cs)
