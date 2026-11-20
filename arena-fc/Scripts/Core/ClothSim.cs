@@ -2,7 +2,7 @@
 // Verlet integration with distance constraints. Runs on CPU, <0.1ms per player.
 using System;
 using System.Collections.Generic;
-using Godot;
+using System.Numerics;
 
 namespace ArenaFC.Core;
 
@@ -62,7 +62,7 @@ public class ClothSim
             if (p.Pinned) continue;
             var vel = (p.Position - p.Previous) * Damping;
             p.Previous = p.Position;
-            p.Position += vel + (Vector3.Up * Gravity + Wind) * dt * dt;
+            p.Position += vel + (Vector3.UnitY * Gravity + Wind) * dt * dt;
         }
 
         // Satisfy constraints
