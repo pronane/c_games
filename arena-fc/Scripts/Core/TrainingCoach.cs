@@ -44,6 +44,8 @@ public sealed class TrainingCoach
     public string LastFeedback { get; private set; } = "";
     public TrainingLesson Current => Lessons[Math.Clamp(Index, 0, Lessons.Count - 1)];
     public bool AllDone => Index >= Lessons.Count - 1;
+    /// <summary>Lesson to open on (Practice Arena starts at free practice).</summary>
+    public int StartIndex;
 
     private int _passes, _shots, _goals, _controlled = -1, _owner = -1;
     private MatchEvent? _lastEvent;
@@ -147,7 +149,7 @@ public sealed class TrainingCoach
     /// <summary>Call once per frame after the engine stepped with <paramref name="cmd"/>.</summary>
     public void Update(MatchEngine e, PlayerCommand cmd, float dt)
     {
-        if (!_started) { _started = true; GoTo(e, 0); return; }
+        if (!_started) { _started = true; GoTo(e, StartIndex); return; }
         var S = e.State;
         CelebrateTimer = MathF.Max(0f, CelebrateTimer - dt);
 

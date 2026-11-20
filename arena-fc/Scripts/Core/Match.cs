@@ -99,6 +99,8 @@ public sealed class PlayerState
     /// <summary>Restart taker (free kick / throw-in / corner / goal kick) must play
     /// the ball immediately — no dribbling away with it.</summary>
     public bool MustPlayBall;
+    /// <summary>Seconds this player has stood over a set piece (human auto-take).</summary>
+    public float RestartHold;
     public string Action = "idle";
     /// <summary>Phase 0 event sync: total duration of the current one-shot and the
     /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
@@ -695,7 +697,7 @@ public sealed partial class MatchEngine
             p.TackleLock = MathF.Max(0, p.TackleLock - dt);
             // Was never counted down: one skill move per player per match.
             p.SkillTimer = MathF.Max(0, p.SkillTimer - dt);
-            if (p.MustPlayBall && S.Ball.Owner != p.Index) p.MustPlayBall = false;
+            if (p.MustPlayBall && S.Ball.Owner != p.Index) ReleaseSetPiece(p);
             p.Dribbling = false;
             p.Sprinting = false;
             if (p.SentOff)
@@ -708,6 +710,10 @@ public sealed partial class MatchEngine
             if (!IsActive(p)) { HoldStill(p); continue; }
             PlayerCommand pc = For(p.Index);
             bool human = humans.Contains(p.Index);
+            // A human who doesn't take a set piece within 8 s has it taken for him;
+            // otherwise an idle player stalls the match (opponents must wait 9.15 m off).
+            if (p.MustPlayBall && S.Ball.Owner == p.Index) p.RestartHold += dt; else p.RestartHold = 0f;
+            if (human && p.MustPlayBall && p.RestartHold > 8f) human = false;
             // A pad / key press lasts one fixed tick.  It must NOT wait for the
             // 0.08-0.18 s AI decision timer: that used to silently discard most
             // pass / shoot / tackle presses and made the controller look dead.
@@ -765,7 +771,8 @@ public sealed partial class MatchEngine
                 // A carried ball that crosses a line is released so BallPhysics can rule
                 // on it this tick: dribbling into the net used to be no goal, and
                 // dribbling over the touchline was never out of play.
-                if (MathF.Abs(S.Ball.Pos.X) > Mx.HalfLength + .02f || MathF.Abs(S.Ball.Pos.Z) > Mx.HalfWidth + .2f)
+                if (!owner.MustPlayBall // a throw-in taker stands behind the line by law
+                    && (MathF.Abs(S.Ball.Pos.X) > Mx.HalfLength + .02f || MathF.Abs(S.Ball.Pos.Z) > Mx.HalfWidth + .2f))
                 {
                     S.Ball.Owner = -1;
                     S.Ball.Vel = owner.Vel;
@@ -1037,6 +1044,23 @@ public sealed partial class MatchEngine
             p.Action = "run";
             if (!human)
             {
+                // Set piece: play it.  A direct free kick in range is a shot; anything
+                // else is a pass (long balls allowed), taken within about a second.
+                if (p.MustPlayBall)
+                {
+                    float dg = Mx.FlatDist(p.Pos, goal);
+                    bool throwIn = IsThrowInHold(p);
+                    if (!throwIn && dg < 28f && MathF.Abs(p.Pos.Z) < 18f && XgFrom(p.Pos, p.Team, false) > .03f && Rng.Next() < .5f)
+                    { Shoot(p, Rng.Range(.62f, .9f)); return; }
+                    if (Rng.Next() < .14f)
+                    {
+                        int t = FindBestPassTarget(p, false, longPass: !throwIn && Rng.Next() < .35f);
+                        if (t < 0) t = FindBestPassTarget(p, false);
+                        if (t >= 0 && (!throwIn || Mx.FlatDist(p.Pos, S.Players[t].Pos) < 25f))
+                        { PassTo(p, S.Players[t], throwIn ? 11f : 14f, false); return; }
+                    }
+                    return;
+                }
                 // Shoot when the chance is good: xG of this position, a lower bar under
                 // pressure, and the odd speculative long shot.  The old rule (2% per
                 // decision inside 26 m) produced ~2 shots a match.
@@ -1156,6 +1180,27 @@ public sealed partial class MatchEngine
             else
             {
                 p.Target = slotPos;
+                // Goal-side marking: a defender or midfielder with an attacker in his
+                // zone sits between that man and his own goal, never in front of him.
+                if (oppOwns && (p.Role == Role.Defender || p.Role == Role.Midfielder))
+                {
+                    var ownGoal = OwnGoalPos(p.Team);
+                    PlayerState? mark = null; float best = 11f;
+                    foreach (var q in S.Players)
+                    {
+                        if (q.Team == p.Team || q.SentOff || q.IsKeeper || q.Index == ball.Owner) continue;
+                        // Near the ball the chasers deal with it; markers pick up runners
+                        // away from it (tight marking at the ball crowded it).
+                        if (Mx.FlatDist(q.Pos, ball.Pos) < 6f) continue;
+                        float dz = Mx.FlatDist(q.Pos, slotPos);
+                        if (dz < best) { best = dz; mark = q; }
+                    }
+                    if (mark != null)
+                    {
+                        Vector3 goalSide = mark.Pos + Mx.FlatDir(mark.Pos, ownGoal) * 1.6f;
+                        p.Target = Mx.Lerp(slotPos, goalSide, .65f);
+                    }
+                }
                 p.Action = "run";
             }
             if (ball.Owner >= 0)
@@ -1168,7 +1213,7 @@ public sealed partial class MatchEngine
                 bool presser = p.Index == ClosestToBall(p.Team, 0);
                 float looseTouch = Mx.FlatDist(carrier.Pos, ball.Pos) > .45f || carrier.FirstTouchQuality < .5f ? .22f : 0f;
                 float aggression = presser
-                    ? .07f + Options.Difficulty * .025f + (p.Spec.Defending - .5f) * .06f + looseTouch
+                    ? .10f + Options.Difficulty * .03f + (p.Spec.Defending - .5f) * .06f + looseTouch
                     : .01f;
                 if (p.Team != carrier.Team && d < 2.0f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
@@ -1183,11 +1228,64 @@ public sealed partial class MatchEngine
         var slots = Clubs.Slots(Options.TeamSize == 5 ? "1-2-1 (5s)" : Options.TeamSize == 7 ? "2-3-1 (7s)"
             : (p.Team == 0 ? Options.HomeFormation : Options.AwayFormation), Options.TeamSize);
         var slot = slots[Math.Min(p.Slot, slots.Length - 1)];
-        float shift = Mx.Clamp(ballPos.X / (Mx.HalfLength * 2f), -.5f, .5f) * .30f;
-        float zShift = Mx.Clamp(ballPos.Z / Mx.HalfWidth, -1f, 1f) * .10f;
-        // Tactics width: stretch or squeeze the block (1.0 = default shape).
+        // Team shape.  The slots are kick-off shapes (everyone in their own half);
+        // the old +-0.15 shift kept forwards within ~7 m of halfway all match, so a
+        // carrier was always dribbling on his own.  Now the block moves as a unit:
+        //  * in possession it steps up with the ball - back line to halfway when
+        //    attacking, forwards into the box, held level with the opposition's
+        //    second-last defender so they stay onside;
+        //  * out of possession it is compact, shifted across to the ball, and the
+        //    defensive line never steps in front of the ball (goal-side).
+        float scale = Mx.HalfLength * .94f;
+        float bx = Mx.Clamp(ballPos.X * attack / scale, -1f, 1f);        // ball, own frame
+        float progress = (bx + 1f) * .5f;                                 // 0 own goal .. 1 their goal
+        bool inPossession = State.Ball.Owner >= 0 && State.Players[State.Ball.Owner].Team == p.Team;
         float width = Mx.Clamp(p.TacticsWidthMult, .6f, 1.4f);
-        return Clubs.SlotToWorld(slot.x + shift, (slot.z + zShift) * width, attack);
+        float bz = Mx.Clamp(ballPos.Z / Mx.HalfWidth, -1f, 1f);
+        float x, z;
+        if (inPossession)
+        {
+            float push = .20f + .62f * progress;
+            x = slot.x + push;
+            // Wide players and full-backs stretch to the touchline in possession
+            // (the ball used to never go wider than ~25 m from the centre line).
+            float zs = MathF.Abs(slot.z) > .45f ? slot.z * 1.48f : slot.z * 1.08f;
+            z = Mx.Clamp((zs + bz * .12f) * width, -.97f, .97f);
+            if (p.Role == Role.Forward || p.Role == Role.Midfielder)
+            {
+                float onside = OffsideLineFrame(p.Team) - .015f;
+                x = MathF.Min(x, MathF.Max(onside, bx));
+            }
+        }
+        else
+        {
+            // Compact block centred a little goal-side of the ball.
+            float centre = bx * .55f - .12f;
+            x = centre + (slot.x + .34f) * .62f;
+            z = (slot.z * .80f + bz * .30f) * width;
+            if (p.Role == Role.Defender) x = MathF.Min(x, bx - .03f);
+            x = MathF.Max(x, -.80f);
+        }
+        x = Mx.Clamp(x, -.86f, .80f);
+        return Clubs.SlotToWorld(x, z, attack);
+    }
+
+    /// <summary>The opposition's second-last player (offside line), in
+    /// <paramref name="team"/>'s attacking frame (-1 own goal .. 1 their goal).</summary>
+    private float OffsideLineFrame(int team)
+    {
+        int attack = SideSign(team);
+        float scale = Mx.HalfLength * .94f;
+        float deepest = float.MinValue, second = float.MinValue;
+        foreach (var q in State.Players)
+        {
+            if (q.Team == team || q.SentOff) continue;
+            float qx = q.Pos.X * attack / scale;
+            if (qx > deepest) { second = deepest; deepest = qx; }
+            else if (qx > second) second = qx;
+        }
+        // Never behind halfway (you can't be offside in your own half).
+        return MathF.Max(second == float.MinValue ? 0f : second, 0f);
     }
 
     private PlayerState? NearestOpponent(PlayerState p, out float dist)
@@ -1280,7 +1378,7 @@ public sealed partial class MatchEngine
         if (b.Owner != from.Index && b.Owner >= 0) return;
         if (b.HasPending) return;
         from.PossessionLock = .35f;
-        from.MustPlayBall = false;
+        ReleaseSetPiece(from);
         // Phase 0.1: wind-up, then release at ball_contact (0.5 * 0.34s).
         SetAction(from, "kick", .34f, .50f);
         Vector3 aim = to.Pos + Mx.Flat(to.Vel) * (through ? .55f : .22f);
@@ -1350,7 +1448,7 @@ public sealed partial class MatchEngine
         if (volley && Mx.FlatDist(p.Pos, b.Pos) > 1.6f) return;
         if (b.HasPending) return;
         p.PossessionLock = .55f;
-        p.MustPlayBall = false;
+        ReleaseSetPiece(p);
         if (Options.Mode == 3) { State.ShootoutShotTaken = true; State.ShootoutTimer = 0f; }
         // Phase 0.2: volley plays the volley clip; release at ball_contact.
         // Phase 2.4: Dynamic Volley — first-time aerial (eFootball v6.0).
@@ -1510,12 +1608,31 @@ public sealed partial class MatchEngine
         {
             // A successful tackle cancels any wind-up the carrier had started.
             b.HasPending = false; b.PendingKind = 0; b.PendingFrom = -1;
-            b.Owner = p.Index;
-            p.PossessionLock = .12f;
             carrier.PossessionLock = .45f;
-            b.Vel = Vector3.Zero;
             p.JockeyState = 0;
-            Add(EventKind.Tackle, $"{p.Spec.DisplayName} wins the ball!");
+            // Not every won tackle is a clean pick-up: slides and pokes knock it
+            // loose (where most real throw-ins and corners come from).
+            float pokeChance = slide ? .55f : .30f;
+            if (Rng.Next() < pokeChance)
+            {
+                Vector3 through = Mx.FlatDir(p.Pos, carrier.Pos);
+                float ang = Rng.Range(-1.0f, 1.0f);
+                Vector3 dir = new(through.X * MathF.Cos(ang) - through.Z * MathF.Sin(ang), 0,
+                                  through.X * MathF.Sin(ang) + through.Z * MathF.Cos(ang));
+                b.Owner = -1;
+                b.Vel = dir * Rng.Range(4f, slide ? 10f : 7f);
+                b.LastTouch = p.Index; b.LastTouchSide = p.Team;
+                b.NoPickup = .12f; b.FreeTime = 0f;
+                p.PossessionLock = .25f;
+                Add(EventKind.Tackle, $"{p.Spec.DisplayName} pokes it away!");
+            }
+            else
+            {
+                b.Owner = p.Index;
+                p.PossessionLock = .12f;
+                b.Vel = Vector3.Zero;
+                Add(EventKind.Tackle, $"{p.Spec.DisplayName} wins the ball!");
+            }
         }
         else if (Options.Fouls && contestD < (slide ? 2.6f : 1.7f)
                  && Rng.Next() < (slide ? .26f : .10f))
@@ -1623,7 +1740,7 @@ public sealed partial class MatchEngine
         p.Vel = Vector3.Zero;
         p.Action = "sentoff";
         p.ActionTimer = 0f;
-        p.MustPlayBall = false;
+        ReleaseSetPiece(p);
         p.Pressing = false; p.Shielding = false; p.Dribbling = false; p.Sprinting = false;
         Add(EventKind.Card, $"{reason} - {p.Spec.DisplayName} ({ClubShort(p.Team)}) is off. " +
                             $"{active - 1} players left.");
@@ -1648,7 +1765,7 @@ public sealed partial class MatchEngine
         Vector3 target = new(
             p.Pos.X + attack * 15f, // up the pitch, away from own goal
             0,
-            p.Pos.Z > 0 ? -20f : 20f // toward opposite wing
+            (p.Pos.Z >= 0 ? 1f : -1f) * (Mx.HalfWidth + 4f) // out towards the near touchline
         );
         Vector3 dir = Mx.FlatDir(b.Pos, target);
         float power = 14f + p.Spec.Defending * 6f;
@@ -1667,8 +1784,30 @@ public sealed partial class MatchEngine
         Add(EventKind.Info, $"{p.Spec.DisplayName} heads it clear!");
     }
 
+    /// <summary>The set-piece taker has played the ball.  Under the laws he may not
+    /// touch it again until another player has (the audit found ~10% double
+    /// touches), so he is locked out of possession briefly.</summary>
+    private static void ReleaseSetPiece(PlayerState p)
+    {
+        if (p.MustPlayBall) p.PossessionLock = MathF.Max(p.PossessionLock, 2f);
+        p.MustPlayBall = false;
+    }
+
+    /// <summary>Is the ball being held for a throw-in (on a touchline)?</summary>
+    private bool IsThrowInHold(PlayerState taker)
+        => taker.MustPlayBall && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - .6f
+           && MathF.Abs(State.Ball.Pos.X) < Mx.HalfLength - 1.5f;
+
+    /// <summary>Required distance for opponents at the current restart: 2 m at a
+    /// throw-in, 9.15 m (10 yards) at free kicks, corners and goal kicks.</summary>
+    private float RestartDistance(PlayerState taker) => IsThrowInHold(taker) ? 2f : 9.15f;
+
     private void AwardFreeKick(int side, Vector3 pos, bool penalty)
     {
+        // Play stops: nobody carries on mid-tackle or mid-celebration through the
+        // stoppage.  Only the fouled player (in "foul") keeps his reaction.
+        foreach (var q in State.Players)
+            if (q.Action != "foul") { q.Action = "idle"; q.ActionTimer = 0f; q.Pressing = false; q.JockeyState = 0; }
         State.Ball.Owner = -1;
         State.Ball.HasPending = false; State.Ball.PendingKind = 0; State.Ball.PendingFrom = -1;
         State.Ball.Vel = Vector3.Zero;
@@ -1680,8 +1819,10 @@ public sealed partial class MatchEngine
 
     private void Restart(int side, Vector3 pos, bool penalty)
     {
+        // A throw-in is taken from the touchline itself, not a metre inside it.
+        float zLimit = State.Phase == Phase.ThrowIn ? Mx.HalfWidth - .1f : Mx.HalfWidth - 1f;
         State.Ball.Pos = Mx.Clamp(pos.X, -Mx.HalfLength + 1f, Mx.HalfLength - 1f) * Vector3.UnitX
-                        + new Vector3(0, Mx.BallRadius, Mx.Clamp(pos.Z, -Mx.HalfWidth + 1f, Mx.HalfWidth - 1f));
+                        + new Vector3(0, Mx.BallRadius, Mx.Clamp(pos.Z, -zLimit, zLimit));
         State.Ball.Vel = Vector3.Zero;
         State.Ball.Spin = Vector3.Zero;
         State.Ball.NoPickup = 0;
@@ -1713,12 +1854,20 @@ public sealed partial class MatchEngine
         }
         var taker = State.Players[best];
         State.Ball.Owner = best;
-        taker.Pos = State.Ball.Pos - new Vector3(SideSign(side) * .8f, 0, 0);
+        bool throwIn = State.Phase == Phase.ThrowIn;
+        taker.Pos = throwIn
+            ? new Vector3(State.Ball.Pos.X, 0, MathF.Sign(State.Ball.Pos.Z) * (Mx.HalfWidth + .35f)) // feet behind the line
+            : State.Ball.Pos - new Vector3(SideSign(side) * .8f, 0, 0);
+        taker.Vel = Vector3.Zero;
+        taker.Target = taker.Pos;
         taker.PossessionLock = 0;
         // Free kick / throw-in / corner / goal kick: taker must play the ball.
+        // Penalties too: the taker shoots from the spot (and an idle human's kick is
+        // taken for him after 8 s instead of the shootout waiting forever).
         taker.MustPlayBall = State.Phase == Phase.FreeKick || State.Phase == Phase.ThrowIn
-                             || State.Phase == Phase.Corner || State.Phase == Phase.GoalKick;
-        taker.Facing = Mx.FlatDir(taker.Pos, GoalPos(side));
+                             || State.Phase == Phase.Corner || State.Phase == Phase.GoalKick
+                             || penalty;
+        taker.Facing = throwIn ? new Vector3(0, 0, -MathF.Sign(State.Ball.Pos.Z)) : Mx.FlatDir(taker.Pos, GoalPos(side));
         // Phase 2.8: set-piece routines.
         bool isCorner = MathF.Abs(State.Ball.Pos.X) > Mx.HalfLength - 3f && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - 3f;
         bool isThrowIn = State.Phase == Phase.ThrowIn;
@@ -1753,10 +1902,40 @@ public sealed partial class MatchEngine
                     q.Target = State.Ball.Pos + new Vector3(SideSign(side) * 4f, 0, Mx.Clamp(-State.Ball.Pos.Z * .3f, -8f, 8f));
             }
         }
-        // Push opponents away from the set piece.
+        // Opponents back the required distance: 9.15 m at free kicks, corners and
+        // goal kicks (was 4 m), 2 m at a throw-in.  MovePlayer keeps them there
+        // until the ball is played.
+        float keepOff = throwIn ? 2f : 9.15f;
         foreach (var q in State.Players)
-            if (q.Team != side && Mx.FlatDist(q.Pos, State.Ball.Pos) < 4f)
-                q.Pos += Mx.FlatDir(State.Ball.Pos, q.Pos) * (4f - Mx.FlatDist(q.Pos, State.Ball.Pos));
+        {
+            if (q.Team == side || q.SentOff || (penalty && q.IsKeeper)) continue;
+            float qd = Mx.FlatDist(q.Pos, State.Ball.Pos);
+            if (qd < keepOff)
+            {
+                Vector3 away = qd > .05f ? Mx.FlatDir(State.Ball.Pos, q.Pos) : Mx.FlatDir(State.Ball.Pos, OwnGoalPos(q.Team));
+                q.Pos = State.Ball.Pos + away * (keepOff + .2f);
+                q.Target = q.Pos;
+            }
+        }
+        // Penalty in a match: everyone except the taker and the keeper outside the
+        // area and the arc.
+        if (penalty && Options.Mode != ModeShootout)
+        {
+            float gx = MathF.Sign(State.Ball.Pos.X) * Mx.HalfLength;
+            foreach (var q in State.Players)
+            {
+                if (q.Index == best || q.SentOff || (q.IsKeeper && q.Team != side)) continue;
+                bool inArea = MathF.Abs(q.Pos.X - gx) < 16.5f + .5f && MathF.Abs(q.Pos.Z) < 20.16f + .5f;
+                bool inArc = Mx.FlatDist(q.Pos, State.Ball.Pos) < 9.15f;
+                if (inArea || inArc)
+                {
+                    q.Pos = new Vector3(gx - MathF.Sign(gx) * 18.5f, 0, Mx.Clamp(q.Pos.Z, -20f, 20f));
+                    q.Target = q.Pos;
+                }
+            }
+            var gkDef = State.Players[(1 - side) * Options.TeamSize];
+            if (!gkDef.SentOff) { gkDef.Pos = new Vector3(gx - MathF.Sign(gx) * .3f, 0, 0); gkDef.Target = gkDef.Pos; }
+        }
         State.Phase = Phase.Play;
         if (penalty)
         {
@@ -1813,7 +1992,23 @@ public sealed partial class MatchEngine
             sprint = !human && (Mx.FlatDist(p.Pos, p.Target) > 5f || p.Pressing) && p.Stamina > .25f;
         }
         // Restart taker must play the ball, not run off with it.
-        if (p.MustPlayBall) wish = Vector3.Zero;
+        if (p.MustPlayBall) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }
+        if (State.Ball.Owner >= 0 && State.Ball.Owner != p.Index)
+        {
+            var holder = State.Players[State.Ball.Owner];
+            if (holder.MustPlayBall && holder.Team != p.Team)
+            {
+                // Hold the restart distance until the ball is in play.
+                float need = RestartDistance(holder);
+                Vector3 next = p.Pos + wish;
+                float nd = Mx.FlatDist(next, State.Ball.Pos);
+                if (nd < need)
+                {
+                    Vector3 rim = State.Ball.Pos + Mx.FlatDir(State.Ball.Pos, next.LengthSquared() > 0 ? next : p.Pos) * need;
+                    wish = Mx.Flat(rim - p.Pos);
+                }
+            }
+        }
         p.Sprinting = sprint;
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
         // Phase 2.9 preset: Authentic is slightly slower, Competitive faster.
@@ -2022,16 +2217,33 @@ public sealed partial class MatchEngine
                 bool diving = p.Action == "dive";
                 if (spd > 18f || (diving && spd > 14f))
                 {
-                    // Parry: deflect away from goal, ball stays loose.
+                    // Parry: either back out into play or tipped round the post /
+                    // over the bar for a corner.  The keeper is the last touch (it
+                    // used to stay with the shooter, so a parry out was a goal kick).
                     float sign = SideSign(p.Team);
-                    b.Vel = new Vector3(-sign * spd * .35f, 3.0f,
-                        (b.Pos.Z - p.Pos.Z) * 4.0f + Rng.Signed() * 3f);
+                    b.LastTouch = p.Index; b.LastTouchSide = p.Team;
+                    if (Rng.Next() < .45f)
+                    {
+                        float side = b.Pos.Z >= p.Pos.Z ? 1f : -1f;
+                        bool overBar = b.Pos.Y > 1.6f && Rng.Next() < .5f;
+                        // Own goal is at -sign: a tip keeps travelling towards the goal
+                        // line, but high (over the bar) or wide (round the post).
+                        b.Vel = overBar
+                            ? new Vector3(-sign * spd * .30f, 7.0f, Rng.Signed() * 1.5f)
+                            : new Vector3(-sign * spd * .18f, 1.2f, side * spd * .45f);
+                    }
+                    else
+                        // Back out into play, away from goal.  This used to be -sign,
+                        // i.e. towards his own net ("parries it away!" ... GOAL).
+                        b.Vel = new Vector3(sign * spd * .35f, 3.0f,
+                            (b.Pos.Z - p.Pos.Z) * 4.0f + Rng.Signed() * 3f);
                     b.NoPickup = .15f;
                     SetAction(p, "parry", .60f, .50f);
                     Add(EventKind.Save, $"{p.Spec.DisplayName} parries it away!");
                     return;
                 }
                 b.Owner = p.Index;
+                b.LastTouch = p.Index; b.LastTouchSide = p.Team;
                 p.PossessionLock = .15f;
                 SetAction(p, "catch", .40f, .50f);
                 Add(EventKind.Save, $"{p.Spec.DisplayName} makes the save!");

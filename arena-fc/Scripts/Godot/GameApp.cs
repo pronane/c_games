@@ -392,7 +392,9 @@ public partial class GameApp : Node3D
             CustomHome = CustomHome?.Select(x => x.Clone()).ToList(),
             Preset = Options.Preset,
             Quality = Options.Quality,
-            Mode = (int)Mode,
+            // Practice Arena runs on the training ground (free practice); it used to
+            // be a normal match with fouls switched off.
+            Mode = Mode == GameMode.PracticeArena ? (int)GameMode.Training : (int)Mode,
         };
         view.Init(opts, CustomHome, ShowMenu);
         view.OnMatchEnd = HandleMatchEnd;

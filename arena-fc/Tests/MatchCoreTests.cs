@@ -36,7 +36,8 @@ for (int i = 0; i < 3600; i++)
     else if (o >= 0) { hold++; longestHold = Math.Max(longestHold, hold); }
     if (pos.State.Commentary != prevComment)
     {
-        if (pos.State.Commentary.Contains("wins the ball!")) tackles++;
+        // A won tackle is either a clean pick-up or a poke loose.
+        if (pos.State.Commentary.Contains("wins the ball!") || pos.State.Commentary.Contains("pokes it away!")) tackles++;
         if (pos.State.Commentary.StartsWith("Foul!")) fouls++;
         prevComment = pos.State.Commentary;
     }
@@ -64,7 +65,21 @@ Check("a carrier can dribble for several seconds", longestHold > 180,
 Check("opposition closes down the carrier", nearTicks > 400, $"nearTicks={nearTicks}");
 // Real football is ~25-60 won tackles a match (4-10 per 15 game minutes).  The
 // old floor of 10 encoded the every-defender-lunges scrum (~120 a match).
-Check("opposition wins the ball back", tackles >= 3, $"tackles={tackles}");
+// One minute of one seed is too noisy for a rate (a seed can see 1 or 8), so
+// average four seeds.
+int tackleTotal = tackles;
+for (int ts = 2027; ts <= 2029; ts++)
+{
+    var tm = new MatchEngine(new MatchOptions { Seed = ts, TimeSpeed = 15f });
+    string pc = "";
+    for (int i = 0; i < 3600; i++)
+    {
+        tm.Step(1f / 60f, PlayerCommand.None);
+        if (tm.State.Commentary != pc && (tm.State.Commentary.Contains("wins the ball!") || tm.State.Commentary.Contains("pokes it away!"))) tackleTotal++;
+        pc = tm.State.Commentary;
+    }
+}
+Check("opposition wins the ball back", tackleTotal / 4f >= 3f, $"avg tackles={tackleTotal / 4f:0.0} (seed 2026: {tackles})");
 Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={fouls}");
 Check("players keep personal space around the ball", avgNearBall < 2.60f,
       $"avgWithin4m={avgNearBall:F3}");
@@ -667,6 +682,77 @@ Section("Goals, keeper and AI shooting");
         shots += m.State.Shots[0] + m.State.Shots[1];
     }
     Check("AI takes more than 2 shots a match on average", shots / 6f > 2f, $"avg={shots / 6f:0.0}");
+}
+
+
+Section("Laws of the game at restarts (full matches)");
+{
+    int restarts = 0, tooClose = 0, ranWithBall = 0, throwOffLine = 0, penaltyCrowd = 0;
+    for (int seed = 31; seed <= 33; seed++)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed });
+        var S = m.State; Phase prev = S.Phase; int taker = -1; Vector3 start = default;
+        while (S.Phase != Phase.FullTime)
+        {
+            S.Controlled = -1;
+            m.Step(MatchEngine.Dt, PlayerCommand.None);
+            bool wasSet = prev is Phase.FreeKick or Phase.ThrowIn or Phase.Corner or Phase.GoalKick or Phase.Penalty;
+            if (wasSet && S.Phase == Phase.Play && S.Ball.Owner >= 0)
+            {
+                restarts++;
+                taker = S.Ball.Owner; start = S.Players[taker].Pos;
+                int side = S.Players[taker].Team;
+                float need = prev == Phase.ThrowIn ? 2f : 9.15f;
+                foreach (var q in S.Players)
+                    if (q.Team != side && !q.SentOff && !(prev == Phase.Penalty && q.IsKeeper)
+                        && Mx.FlatDist(q.Pos, S.Ball.Pos) < need - .05f) { tooClose++; break; }
+                if (prev == Phase.ThrowIn && MathF.Abs(S.Ball.Pos.Z) < Mx.HalfWidth - .6f) throwOffLine++;
+                if (prev == Phase.Penalty)
+                {
+                    float gx = MathF.Sign(S.Ball.Pos.X) * Mx.HalfLength;
+                    foreach (var q in S.Players)
+                        if (q.Index != taker && !(q.IsKeeper && q.Team != side) && MathF.Abs(q.Pos.X - gx) < 16.5f && MathF.Abs(q.Pos.Z) < 20.16f) { penaltyCrowd++; break; }
+                }
+            }
+            if (taker >= 0)
+            {
+                if (S.Ball.Owner == taker && S.Players[taker].MustPlayBall && Mx.FlatDist(S.Players[taker].Pos, start) > 1.0f) { ranWithBall++; taker = -1; }
+                else if (S.Ball.Owner != taker) taker = -1;
+            }
+            prev = S.Phase;
+        }
+    }
+    Check("restarts happen in full matches", restarts > 10, $"restarts={restarts}");
+    Check("opponents stand the required distance at restarts (9.15 m / 2 m)", tooClose == 0, $"breaches={tooClose}/{restarts}");
+    Check("set-piece takers play the ball, they don't run off with it", ranWithBall == 0, $"ran={ranWithBall}");
+    Check("throw-ins are taken from the touchline", throwOffLine == 0, $"off line={throwOffLine}");
+    Check("only the taker and keeper are in the area at a penalty", penaltyCrowd == 0, $"crowded={penaltyCrowd}");
+}
+{
+    // A keeper's parry never sends the ball towards his own goal.
+    var k = new MatchEngine(new MatchOptions { Seed = 41 });
+    var K = k.State; var gk = K.Players[0];
+    float line = k.OwnGoalPos(0).X; int sign = k.SideSign(0);
+    gk.Pos = new Vector3(line + sign * 2f, 0, 0); gk.Target = gk.Pos;
+    K.Phase = Phase.Play; K.Controlled = -1;
+    int towardsGoal = 0, parries = 0;
+    for (int trial = 0; trial < 40; trial++)
+    {
+        K.Ball.Owner = -1; K.Ball.HasPending = false;
+        K.Ball.Pos = new Vector3(line + sign * 3.2f, 1.0f, 0);
+        K.Ball.Vel = new Vector3(-sign * 25f, 0, 0); K.Ball.FreeTime = .5f;
+        gk.Pos = new Vector3(line + sign * 2f, 0, 0); gk.Action = "dive"; gk.ActionTimer = .5f;
+        string before = K.Commentary;
+        k.Step(MatchEngine.Dt, PlayerCommand.None);
+        if (K.Commentary.Contains("parries"))
+        {
+            parries++;
+            bool backIntoPlay = K.Ball.Vel.X * sign > 0;
+            bool wide = MathF.Abs(K.Ball.Vel.Z) > MathF.Abs(K.Ball.Vel.X) * .8f || K.Ball.Vel.Y > 5f;
+            if (!backIntoPlay && !wide) towardsGoal++;
+        }
+    }
+    Check("keeper parries go back into play or wide/over, never into his own net", parries > 0 && towardsGoal == 0, $"parries={parries} towardsGoal={towardsGoal}");
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
