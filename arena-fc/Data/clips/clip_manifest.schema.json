@@ -3,31 +3,120 @@
   "$id": "https://arena-fc.invalid/schemas/clip-manifest-v1.json",
   "title": "Arena FC Clip Manifest",
   "type": "object",
-  "required": ["version", "skeleton", "clips"],
+  "required": [
+    "version",
+    "skeleton",
+    "clips"
+  ],
   "properties": {
-    "version": { "const": 1 },
-    "skeleton": { "const": "arena_18" },
-    "poseSource": { "type": "string" },
+    "version": {
+      "const": 1
+    },
+    "skeleton": {
+      "const": "arena_18"
+    },
+    "poseSource": {
+      "type": "string"
+    },
     "clips": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "poseDataKey", "category", "duration", "contactFraction", "ballState", "boneCount", "loop"],
+        "required": [
+          "id",
+          "poseDataKey",
+          "category",
+          "duration",
+          "contactFraction",
+          "ballState",
+          "boneCount",
+          "loop"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "poseDataKey": { "type": "string", "minLength": 1 },
-          "category": { "enum": ["Locomotion", "Approach", "FirstTouch", "Shield", "Cut", "Kick", "Pass", "Tackle", "KeeperDive", "Celebrate", "Idle", "Recovery"] },
-          "duration": { "type": "number", "exclusiveMinimum": 0 },
-          "contactFraction": { "type": "number", "minimum": -1, "maximum": 1 },
-          "footPlantFrames": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 } },
-          "rootVelocityX": { "type": "number" },
-          "rootVelocityZ": { "type": "number" },
-          "preferredSpeed": { "type": "number", "minimum": 0 },
-          "preferredTurnRate": { "type": "number" },
-          "ballState": { "enum": ["None", "Possessed", "Approaching", "Contested", "Aerial"] },
-          "tags": { "type": "array", "items": { "type": "string" } },
-          "boneCount": { "const": 18 },
-          "loop": { "type": "boolean" }
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "poseDataKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "enum": [
+              "Locomotion",
+              "Approach",
+              "FirstTouch",
+              "Shield",
+              "Cut",
+              "Kick",
+              "Pass",
+              "Tackle",
+              "KeeperDive",
+              "Celebrate",
+              "Idle",
+              "Recovery"
+            ]
+          },
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "contactFraction": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "footPlantFrames": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "rootVelocityX": {
+            "type": "number"
+          },
+          "rootVelocityZ": {
+            "type": "number"
+          },
+          "preferredSpeed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "preferredTurnRate": {
+            "type": "number"
+          },
+          "ballState": {
+            "enum": [
+              "None",
+              "Possessed",
+              "Approaching",
+              "Contested",
+              "Aerial"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "boneCount": {
+            "const": 18
+          },
+          "loop": {
+            "type": "boolean"
+          },
+          "footPlantSides": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "Left",
+                "Right"
+              ]
+            }
+          }
         },
         "additionalProperties": false
       }

@@ -30,6 +30,18 @@ static func load_manifest(path: String = DEFAULT_PATH) -> Dictionary:
 		if float(raw.get("duration", 0.0)) <= 0.0 or int(raw.get("boneCount", 0)) != 18:
 			push_error("AME clip has invalid duration or skeleton size: %s" % id)
 			return {}
+		var plants: Variant = raw.get("footPlantFrames", [])
+		var sides: Variant = raw.get("footPlantSides", [])
+		if typeof(plants) != TYPE_ARRAY or typeof(sides) != TYPE_ARRAY:
+			push_error("AME clip foot plants/sides must be arrays: %s" % id)
+			return {}
+		if raw.has("footPlantSides") and sides.size() != plants.size():
+			push_error("AME clip footPlantSides count differs from footPlantFrames: %s" % id)
+			return {}
+		for side in sides:
+			if str(side) not in ["Left", "Right"]:
+				push_error("AME clip has invalid foot plant side: %s" % id)
+				return {}
 		by_id[id] = raw
 	return {"version": VERSION, "skeleton": str(parsed.get("skeleton", "")), "by_id": by_id}
 
@@ -54,6 +66,32 @@ static func align_phase(old_id: String, new_id: String, phase: float, manifest: 
 			best = d
 			source_index = i
 	var source_plant := float(a[source_index])
-	var target_plant := float(b[source_index % b.size()])
-	var offset := wrapf(phase - source_plant + 0.5, 0.0, 1.0) - 0.5
+	var source_side := _plant_side(from, source_index)
+	var target_index := -1
+	best = INF
+	for i in range(b.size()):
+		if _plant_side(to, i) != source_side:
+			continue
+		var d := absf(wrapf(source_plant - float(b[i]) + 0.5, 0.0, 1.0) - 0.5)
+		if d < best:
+			best = d
+			target_index = i
+	if target_index < 0:
+		return wrapf(phase, 0.0, 1.0)
+	var target_plant := float(b[target_index])
+	var offset := _circular_diff(phase, source_plant)
 	return wrapf(target_plant + offset, 0.0, 1.0)
+
+static func _circular_diff(a: float, b: float) -> float:
+	var d := fmod(a - b, 1.0)
+	if d > 0.5:
+		d -= 1.0
+	if d < -0.5:
+		d += 1.0
+	return d
+
+static func _plant_side(meta: Dictionary, index: int) -> String:
+	var sides: Array = meta.get("footPlantSides", [])
+	if index < sides.size():
+		return str(sides[index])
+	return "Left" if index % 2 == 0 else "Right"

@@ -7,6 +7,9 @@ namespace ArenaFC.Core.Animation;
 
 public enum BallState { None, Possessed, Approaching, Contested, Aerial }
 
+/// <summary>Side used to preserve same-foot contact when mapping plant events across clips.</summary>
+public enum FootSide { Left, Right }
+
 public enum ClipCategory
 {
     Locomotion, Approach, FirstTouch, Shield, Cut, Kick, Pass, Tackle,
@@ -22,8 +25,13 @@ public sealed class ClipMeta
     public float Duration { get; set; }
     /// <summary>Normalized 0..1 contact time, or -1 when the clip has no contact event.</summary>
     public float ContactFraction { get; set; } = -1f;
-    /// <summary>Normalized plant phases. Convention: first is left, second is right.</summary>
+    /// <summary>Normalized plant phases in clip-cycle coordinates.</summary>
     public float[] FootPlantFrames { get; set; } = Array.Empty<float>();
+    /// <summary>Side for each plant event. Missing legacy metadata alternates Left, Right.</summary>
+    public FootSide[] FootPlantSides { get; set; } = Array.Empty<FootSide>();
+
+    public FootSide FootPlantSideAt(int index) => FootPlantSides.Length == FootPlantFrames.Length
+        ? FootPlantSides[index] : (index % 2 == 0 ? FootSide.Left : FootSide.Right);
     public Vector3 RootVelocityAvg { get; set; }
     public float PreferredSpeed { get; set; }
     public float PreferredTurnRate { get; set; }
