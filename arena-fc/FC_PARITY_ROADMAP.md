@@ -52,7 +52,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 - ⬜ 3.2 Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
 - ⬜ 3.3 Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela).
 - ⬜ 3.4 Shot power: hold-to-charge bar + timed-finish second press; height from power and body shape; low driven vs dipping vs chipped finishes.
-- ⬜ 3.5 Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
+- 🔧 3.5 (PR #3: wide players use the touchline, pokes/clearances/parries go out — throw-ins 0 → ~2, corners 0 → 0.1/match; still well under real rates) Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
 
 ## 4. First touch, aerial control and heading
 - ⬜ 4.1 Controlling a high ball: chest, thigh/knee, instep cushion — chosen by ball height and speed; quality from skill + pressure; heavy touches pop the ball away.
@@ -71,19 +71,22 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ⬜ 5.7 Remap screen covers every action, not just six.
 
 ## 6. Team shape & AI
-- ⬜ 6.1 **Next.** Formation discipline (soak: the carrier is 36–72 m from goal 86% of the time; teams reach the final third only ~4×/match — this now caps shots): units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.
-- ⬜ 6.2 Marking: goal-side positioning, zonal by default, track runners, only the nearest one/two press; no crowding round the ball.
+- ✅ 6.1 (PR #3) Formation discipline — the block now steps up in possession and drops compact out of it (final-third entries 4 → 14/match): units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.
+- ✅ 6.2 (PR #3) Marking — goal-side, away from the ball; chasers handle the ball: goal-side positioning, zonal by default, track runners, only the nearest one/two press; no crowding round the ball.
 - 🔧 6.3 (xG-based shooting done, PR #2: shots 1.4 → 4.8/match) AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
 - 🔧 6.4 (one-challenger tackling done, PR #2: tackles 91 → 33/match) Carrier who can't be dispossessed (kept the ball ~80 s under repeated tackles) — check tackle odds vs shielding/close-control stacking.
 - 🔧 6.5 (1v1 off-the-line + smother done, PR #2) Goalkeeper: comes off the line to narrow the angle and smother 1v1s, claims crosses, sweeper behaviour on through balls; distribution.
 - ⬜ 6.6 Defensive player-switch stability (ring hops between team-mates).
-- ⬜ 6.7 Offside line held by the back four; offsides at realistic rates.
+- 🔧 6.7 (PR #3: attackers hold the onside line) Offside line held by the back four; offsides at realistic rates.
 
 ## 7. Set pieces
-- ⬜ 7.1 Free kicks: taker must play the ball (pass/shoot/cross) — no picking it up and dribbling; wall at 9.15 m (10 yards) for direct kicks near goal; every opponent at least 9.15 m away.
-- ⬜ 7.2 Corners and throw-ins: aimable delivery, near/far post runs, short options; throw-in is a throw (hands), not a pass.
+- ✅ 7.1 (PR #3) Free kicks: taker must play the ball (pass/shoot/cross) — no picking it up and dribbling; wall at 9.15 m (10 yards) for direct kicks near goal; every opponent at least 9.15 m away.
+- 🔧 7.2 (PR #3: throw-ins from the touchline, taker behind the line, 2 m rule, keeper tips for corners) Corners and throw-ins: aimable delivery, near/far post runs, short options; throw-in is a throw (hands), not a pass.
 - ⬜ 7.3 Penalty kicks in matches use the shootout aiming model.
 - ⬜ 7.4 Goal kicks: short or long choice.
+
+## 7b. Rules audit (PR #3)
+- ✅ Full-match restart audit in `Tests/MatchCoreTests` (opponents 9.15 m / 2 m, taker can't carry the ball, throw-ins on the line, penalty area clear, parry direction). Found and fixed: opponents only 4 m back; ~10% double touches; throw-ins 1 m inside the pitch; a throw-in taker loop; **keeper parries aimed at his own net**; tackles/fouls animations carrying through stoppages; an idle human could stall a set piece forever (now auto-taken after 8 s).
 
 ## 8. Animation & body mechanics (after 3–7)
 - ⬜ 8.1 Arms: no raised/T-pose arms off the ball; arms only go up for celebrations, appeals, headers and keeper actions.
