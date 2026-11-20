@@ -111,6 +111,9 @@ const StadiumScript = preload("res://Scripts/Godot/StadiumKit.gd")
 const MatchRules = preload("res://Web/MatchRules.gd")
 const Controllers = preload("res://Web/Controllers.gd")
 const HudScript = preload("res://Web/HudOverlay.gd")
+const ClipManifest = preload("res://Web/ClipManifest.gd")
+var clip_manifest: Dictionary = {}
+var clip_meta_by_id: Dictionary = {}
 var audio: Node                      # ProceduralAudio (the "Audio" autoload if present)
 var recorder: Node                   # ReplayRecorder: rolling highlight buffer + optional file
 var replayer: Node                   # ReplayPlayer
@@ -143,6 +146,8 @@ func _ready() -> void:
 	rig_data = RigBuilder.load_rig_data("res://Data/soccer_rig.json")
 	if rig_data.has("clips"):
 		clips_data = rig_data["clips"]
+	clip_manifest = ClipManifest.load_manifest()
+	clip_meta_by_id = clip_manifest.get("by_id", {})
 	setup_modules()
 	var bones: Array = rig_data["bones"]
 	for i in range(bones.size()):
@@ -357,7 +362,7 @@ func reset_positions() -> void:
 				"archetype": ["controlled", "explosive", "lengthy", "controlled", "explosive"][i % 5],
 				"yaw": 0.0,
 				"jockey": 0, "first_touch": 1.0,
-				"clip": "", "clip_t": 0.0, "clip_scale": 1.0, "clip_prev": "",
+				"clip": "", "clip_t": 0.0, "clip_scale": 1.0, "clip_prev": "", "clip_action": "",
 				"clip_lean": 0.0, "clip_roll": 0.0, "clip_prev_vel": Vector3.ZERO,
 				"clip_prev_facing": Vector3(0, 0, 1), "turn_cd": 0.0,
 				"adur": 0.0, "acontact": -1.0, "arel": false,
@@ -1417,24 +1422,41 @@ func animate_clip(r: Node3D, p: Dictionary, delta: float, look_yaw: float) -> vo
 	# One-shots: play once, then locomotion.
 	if action != "idle" and CLIP_ALIASES.has(action):
 		var alias := str(CLIP_ALIASES[action])
-		if cur != alias:
+		var new_action := str(p.get("clip_action", "")) != action
+		if new_action:
+			p["clip_action"] = action
+		if cur != alias or new_action:
 			p["clip"] = alias
 			p["clip_t"] = 0.0
 			p["clip_scale"] = 1.0
 			cur = alias
 		# Phase 0.1: speed-match so contact aligns with the sim (mirrors SoccerClipRig.cs).
 		var cd0: Dictionary = clips_data[cur]
+		var meta0: Dictionary = clip_meta_by_id.get(cur, {})
 		var ev0: Dictionary = cd0.get("events", {})
-		var bc := float(ev0.get("ball_contact_frac", -1.0))
+		var bc := float(meta0.get("contactFraction", ev0.get("ball_contact_frac", -1.0)))
 		if bc >= 0.0 and float(p["adur"]) > 0.01:
-			var clip_dur := float(cd0["frames"]) / float(cd0["fps"])
-			p["clip_scale"] = clampf(clip_dur / float(p["adur"]), 0.6, 1.8)
+			var clip_dur := float(meta0.get("duration", float(cd0["frames"]) / float(cd0["fps"])))
+			var contact_at := float(p.get("acontact", -1.0))
+			p["clip_scale"] = clip_dur * bc / contact_at if contact_at > 0.001 else clip_dur / float(p["adur"])
 	# Locomotion with hysteresis.
 	if action == "idle":
+		p["clip_action"] = ""
 		var want := clip_select_locomotion(p, speed)
 		if cur != want:
+			var phase := 0.0
+			var old_meta: Dictionary = clip_meta_by_id.get(cur, {})
+			var new_meta: Dictionary = clip_meta_by_id.get(want, {})
+			var can_align := not old_meta.is_empty() and not new_meta.is_empty()
+			can_align = can_align and bool(old_meta.get("loop", false)) and bool(new_meta.get("loop", false))
+			can_align = can_align and str(old_meta.get("category", "")) in ["Locomotion", "Idle"]
+			can_align = can_align and str(new_meta.get("category", "")) in ["Locomotion", "Idle"]
+			if can_align:
+				var old_phase := ClipManifest.phase_from_seconds(cur, float(p["clip_t"]), clip_manifest)
+				phase = ClipManifest.align_phase(cur, want, old_phase, clip_manifest)
+			var new_duration := float(new_meta.get("duration", 0.0))
 			p["clip"] = want
-			p["clip_t"] = 0.0
+			p["clip_t"] = phase * new_duration if new_duration > 0.0 else 0.0
 			p["clip_scale"] = 1.0
 			cur = want
 		p["clip_prev"] = cur

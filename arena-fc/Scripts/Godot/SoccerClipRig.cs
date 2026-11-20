@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using ArenaFC.Core;
+using ArenaFC.Core.Animation;
 using Godot;
 
 namespace ArenaFC.GodotGame;
@@ -41,6 +42,10 @@ public sealed partial class SoccerClipRig : Node3D
     private float _height = 1.77f;
     private string _current = "";
     private bool _oneShotDone = true;
+    private MotionState? _motionState;
+
+    /// <summary>Presentation-only motion input; never written back to PlayerState.</summary>
+    public void ApplyMotion(MotionState? motion) => _motionState = motion;
 
     // FIFA-style locomotion state.
     private Node3D? _sceneRoot;
@@ -277,8 +282,17 @@ public sealed partial class SoccerClipRig : Node3D
 
         // One-shots (actions) take priority over locomotion.
         string clip = SelectClip(p, speed, out bool oneShot);
+        bool motionDriven = _motionState != null && _motionState.RenderClipId.Length > 0;
+        if (motionDriven)
+        {
+            clip = _motionState!.RenderClipId;
+            oneShot = _motionState.LastIntent is PlayerIntent.Pass or PlayerIntent.ThroughBall
+                or PlayerIntent.Shoot or PlayerIntent.Trap or PlayerIntent.Tackle
+                or PlayerIntent.Dive or PlayerIntent.Celebrate or PlayerIntent.Cut;
+        }
+        if (!Player.HasAnimation(clip)) { motionDriven = false; clip = SelectClip(p, speed, out oneShot); }
         if (!Player.HasAnimation(clip)) clip = "soccer_idle";
-        if (oneShot && _oneShotDone)
+        if (!motionDriven && oneShot && _oneShotDone)
         {
             clip = SelectLocomotion(p, speed);
             oneShot = false;
@@ -286,7 +300,7 @@ public sealed partial class SoccerClipRig : Node3D
         if (clip != _current)
         {
             // Locomotion clips inherit cycle phase; one-shots must begin at frame zero.
-            float startPhase = oneShot ? 0f : _phase;
+            float startPhase = motionDriven ? _motionState!.RenderPhase : oneShot ? 0f : _phase;
             Player.Play(clip, oneShot ? .08f : .12f);
             Player.Seek(startPhase * Player.GetAnimation(clip).Length, true);
             _current = clip;
@@ -326,7 +340,15 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = _speedScale;
         }
         float clipLen = (float)Player.GetAnimation(clip).Length;
-        _phase = (_phase + dt * Player.SpeedScale / clipLen) % 1f;
+        if (motionDriven)
+        {
+            // The shared engine owns normalized phase and contact timing. Seeking here
+            // is presentation-only and cannot affect authoritative simulation state.
+            Player.Seek(_motionState!.RenderPhase * clipLen, true);
+            Player.SpeedScale = _motionState.PlaybackScale;
+            _phase = _motionState.RenderPhase;
+        }
+        else _phase = (_phase + dt * Player.SpeedScale / clipLen) % 1f;
 
         UpdateLean(p, dt, speed);
         UpdateLookAt(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
