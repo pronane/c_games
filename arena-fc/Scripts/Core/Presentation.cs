@@ -47,7 +47,7 @@ public class PostMatchData
     public string HomeTeam = "";
     public string AwayTeam = "";
     public string ManOfTheMatch = "";
-    public int MotM Rating;
+    public int MotMRating;
     public List<PlayerRating> HomeRatings = new();
     public List<PlayerRating> AwayRatings = new();
     public List<string> Highlights = new();
@@ -174,7 +174,7 @@ public class Presentation
         if (motm != null)
         {
             data.ManOfTheMatch = motm.Name;
-            data.MotM Rating = motm.Rating;
+            data.MotMRating = motm.Rating;
             motm.IsMotM = true;
         }
 
