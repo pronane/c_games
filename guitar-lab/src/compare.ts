@@ -95,7 +95,8 @@ export function scoreCards(comparison: Comparison) {
     overall: report.summary.overall == null ? "–" : `${report.summary.overall}%`,
     detail: line(report.summary),
   }));
-  if (comparison.combined) {
+  // With the player's tab, the tab score is the score; averaging the app's own transcriptions adds nothing.
+  if (comparison.combined && !comparison.reports.some((r) => r.source === "tab")) {
     cards.push({
       key: "combined",
       label: "Combined",

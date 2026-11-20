@@ -47,20 +47,21 @@ export default function TakeReport({
       {tempo && <p className="helper">{tempo}</p>}
       {report.duration_policy === "review_only" && <p className="helper" role="note">{report.duration_notice}</p>}
       {onPractise && report.worst_bars.length > 0 && (
-        <button
-          className="secondary"
-          onClick={() => {
-            const bars = report.worst_bars.map((b) => b.bar).filter((b) => b > 0);
-            if (bars.length) onPractise(Math.min(...bars), Math.max(...bars));
-          }}
-        >
-          Loop the weakest bars, slower
-        </button>
+        <div className="presets">
+          <button
+            onClick={() => {
+              const bars = report.worst_bars.map((b) => b.bar).filter((b) => b > 0);
+              if (bars.length) onPractise(Math.min(...bars), Math.max(...bars));
+            }}
+          >
+            Loop the weakest bars, slower
+          </button>
+        </div>
       )}
       {worst.length ? (
         <ul className="diff-worst">
-          {worst.map((line) => (
-            <li key={line}>{line}</li>
+          {worst.map((line, i) => (
+            <li key={i}>{line}</li>
           ))}
         </ul>
       ) : (
@@ -102,8 +103,8 @@ export default function TakeReport({
               </button>
             )}
             <ul>
-              {bar.messages.map((line) => (
-                <li key={line}>{line}</li>
+              {bar.messages.map((line, i) => (
+                <li key={i}>{line}</li>
               ))}
             </ul>
           </li>

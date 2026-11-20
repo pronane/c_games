@@ -2163,3 +2163,13 @@ footer span:first-child {
   margin: 0 8px;
   font-size: 12px;
 }
+.take-card label.speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.take-card label.speed select {
+  width: auto;
+  padding: 4px 6px;
+}
