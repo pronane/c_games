@@ -30,6 +30,13 @@ public sealed class InputHub
     public float Charge => _charge;
     public bool PausePressed { get; private set; }
     public bool CameraPressed { get; private set; }
+    /// <summary>Training: go to the next / previous lesson (N / B keys, or hold LB+RB).</summary>
+    public bool TrainingNextPressed { get; private set; }
+    public bool TrainingPrevPressed { get; private set; }
+    private float _rsPrevMag, _bumperHold;
+    private bool _fakeShotLatch;
+    private readonly bool[] _pNum = new bool[8];
+    private bool _pNext, _pPrev;
 
     private readonly int _playerIndex;
     private readonly bool _twoPlayer;
@@ -276,6 +283,8 @@ public sealed class InputHub
         bool padSprint = false, padPass = false, padThrough = false, padTackle = false,
              padSwitch = false, padShoot = false, padPause = false, padCamera = false,
              padShield = false, padLob = false, padDribble = false;
+        System.Numerics.Vector2 rightStick = System.Numerics.Vector2.Zero;
+        bool padLB = false, padRB = false;
         foreach (int dev in devices)
         {
             bool[] buttons = ReadButtons(dev);
@@ -298,6 +307,14 @@ public sealed class InputHub
             // LT / L3 is close control + shielding.  The old Back-button shield
             // clashed with the menu Back button and left no long-pass button.
             padShield |= h["dribble"];
+            // Right stick drives skill moves.  Only on pads with a known (SDL) layout:
+            // on raw pads axes 2/3 are often the triggers.
+            if (known)
+            {
+                rightStick += new System.Numerics.Vector2(Input.GetJoyAxis(dev, JoyAxis.RightX), Input.GetJoyAxis(dev, JoyAxis.RightY));
+                padLB |= Input.IsJoyButtonPressed(dev, JoyButton.LeftShoulder);
+                padRB |= Input.IsJoyButtonPressed(dev, JoyButton.RightShoulder);
+            }
         }
         if (padMove.LengthSquared() > 1f) padMove = padMove.Normalized();
         move += padMove;
@@ -336,10 +353,42 @@ public sealed class InputHub
         bool cameraFire = Input.IsPhysicalKeyPressed(Key.C) || _cameraHold > .12f;
         CameraPressed = Edge(cameraFire, ref _pCamera);
 
+        // Fake shot: start charging a shot, then tap pass before letting go.
+        if (_charge > 0f && cmd.Pass)
+        {
+            cmd.Pass = false;
+            cmd.Skill = SkillMove.FakeShot;
+            _charge = 0f;
+            _fakeShotLatch = true;               // the release must not shoot
+        }
+        if (!shoot) _fakeShotLatch = false;
+
         // Hold to charge a shot; release to shoot. Also works on touch & gamepad.
-        if (shoot) _charge = MathF.Min(1f, _charge + dt / .95f);
-        else if (_charge > 0f) { cmd.Shoot = true; cmd.Charge = MathF.Max(.22f, _charge); _charge = 0f; }
+        if (shoot && !_fakeShotLatch) _charge = MathF.Min(1f, _charge + dt / .95f);
+        else if (!shoot && _charge > 0f) { cmd.Shoot = true; cmd.Charge = MathF.Max(.22f, _charge); _charge = 0f; }
         _pShoot = shoot;
+
+        // Skill moves: right-stick flick (LT/L3 held for the advanced set), or keys 1-7.
+        float rsMag = rightStick.Length();
+        var flick = SkillMoves.DetectFlick(rightStick.X, rightStick.Y, _rsPrevMag);
+        _rsPrevMag = rsMag;
+        if (flick != SkillMoves.Flick.None && cmd.Skill == SkillMove.None)
+            cmd.Skill = SkillMoves.FromFlick(flick, padDribble);
+        Key[] numKeys = { Key.Key1, Key.Key2, Key.Key3, Key.Key4, Key.Key5, Key.Key6, Key.Key7 };
+        for (int i = 0; i < numKeys.Length; i++)
+            if (Edge(Input.IsPhysicalKeyPressed(numKeys[i]), ref _pNum[i]) && cmd.Skill == SkillMove.None)
+                cmd.Skill = SkillMoves.FromNumberKey(i + 1);
+
+        // Training lesson navigation: N / B (or PageDown / PageUp), or hold LB+RB for 0.8 s.
+        TrainingNextPressed = Edge(Input.IsPhysicalKeyPressed(Key.N) || Input.IsPhysicalKeyPressed(Key.Pagedown), ref _pNext);
+        TrainingPrevPressed = Edge(Input.IsPhysicalKeyPressed(Key.B) || Input.IsPhysicalKeyPressed(Key.Pageup), ref _pPrev);
+        if (padLB && padRB)
+        {
+            float before = _bumperHold;
+            _bumperHold += dt;
+            if (before < .8f && _bumperHold >= .8f) TrainingNextPressed = true;
+        }
+        else _bumperHold = 0f;
         return cmd;
     }
 
@@ -348,5 +397,8 @@ public sealed class InputHub
         _charge = 0;
         _cameraHold = 0f;
         _pShoot = _pPass = _pThrough = _pTackle = _pSlide = _pSwitch = _pPause = _pCamera = _pLob = false;
+        _fakeShotLatch = false;
+        _rsPrevMag = 0f;
+        _bumperHold = 0f;
     }
 }

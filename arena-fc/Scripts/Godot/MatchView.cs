@@ -46,6 +46,9 @@ public partial class MatchView : Node3D
     /// <summary>One-shot button edges survive physics frames that produce no fixed
     /// engine tick, instead of being silently dropped by the accumulator.</summary>
     private PlayerCommand _pending;
+    /// <summary>Training coach and the coach / shootout overlay (Modes 2 and 3).</summary>
+    private TrainingCoach? _coach;
+    private ModeOverlay? _modeOverlay;
 
     public void Init(MatchOptions opts, List<CharacterSpec>? customHome, Action onExit)
     {
@@ -126,6 +129,8 @@ public partial class MatchView : Node3D
         _pending.Slide |= cmd.Slide;
         _pending.Switch |= cmd.Switch;
         _pending.Lob |= cmd.Lob;
+        _pending.CallForBall |= cmd.CallForBall;
+        if (cmd.Skill != SkillMove.None) _pending.Skill = cmd.Skill;
         if (cmd.Charge > _pending.Charge) _pending.Charge = cmd.Charge;
     }
 
@@ -229,7 +234,15 @@ public partial class MatchView : Node3D
         Hud.OnCamera = () => Cam.Cycle();
         bool touch = DisplayServer.IsTouchscreenAvailable() || OS.HasFeature("mobile") || OS.HasFeature("web");
         Hud.SetTouch(touch);
-        Hud.ShowToast("KICK OFF!", 1.8f);
+        if (_opts.Mode == MatchEngine.ModeTraining || _opts.Mode == MatchEngine.ModeShootout)
+        {
+            if (_opts.Mode == MatchEngine.ModeTraining) _coach = new TrainingCoach();
+            _modeOverlay = new ModeOverlay();
+            _modeOverlay.Setup(_opts.Mode);
+            AddChild(_modeOverlay);
+            Hud.ShowToast(_opts.Mode == MatchEngine.ModeTraining ? "TRAINING GROUND" : "PENALTY SHOOTOUT", 1.8f);
+        }
+        else Hud.ShowToast("KICK OFF!", 1.8f);
         Sync(0f);
     }
 
@@ -288,8 +301,16 @@ public partial class MatchView : Node3D
             // produces no tick, buffer the one-shot edges until one does.
             MergePending(cmd);
             int before = Engine.CurrentTick;
+            var stepped = _pending;
             Engine.Step(dt, _pending);
-            if (Engine.CurrentTick != before) _pending = PlayerCommand.None;
+            bool ticked = Engine.CurrentTick != before;
+            if (ticked) _pending = PlayerCommand.None;
+            if (_coach != null)
+            {
+                if (Input.TrainingNextPressed) _coach.Next(Engine);
+                else if (Input.TrainingPrevPressed) _coach.Previous(Engine);
+                else _coach.Update(Engine, ticked ? stepped : cmd, dt);
+            }
         }
         PlayEventSounds();
         Sync(dt);
@@ -312,6 +333,7 @@ public partial class MatchView : Node3D
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
+        _modeOverlay?.UpdateOverlay(Engine, _coach);
         // Phase 4: Trigger post-match screen on FullTime
         if (Engine.State.Phase == Phase.FullTime && OnMatchEnd != null)
         {

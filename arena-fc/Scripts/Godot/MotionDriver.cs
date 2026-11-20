@@ -118,6 +118,8 @@ public sealed class MotionDriver
                 "dive" or "keeper_dive" => PlayerIntent.Dive,
                 "celebrate" => PlayerIntent.Celebrate,
                 "cut" or "turn" => PlayerIntent.Cut,
+                // No dedicated skill clips yet (Sprite Forge TODO): read as a sharp cut.
+                _ when p.Action.StartsWith("skill_") => PlayerIntent.Cut,
                 _ => p.Shielding ? PlayerIntent.Shield : PlayerIntent.Move,
             };
         }

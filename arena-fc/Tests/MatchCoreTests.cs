@@ -503,6 +503,7 @@ var fixtureJson = JsonSerializer.Serialize(new
     version = MotionDatabase.CurrentVersion,
     featureSchemaVersion = MotionFeatureLayout.SchemaVersion,
     dimensions = MotionFeatureLayout.Dimensions,
+    space = "facing_root_xz",
     layout = MotionFeatureLayout.Names,
     trajectoryTimes = MotionFeatureLayout.TrajectoryTimes,
     normalization = new { method = "zscore", mean = zeroFeatures, stdDev = Enumerable.Repeat(1f, MotionFeatureLayout.Dimensions).ToArray() },
@@ -534,6 +535,100 @@ var ballB = DribbleSystem.Update(dribbleB, 4, new Vector3(0, Mx.BallRadius, 0), 
 Check("timed dribble helper is deterministic for equal seeded streams",
       ballA == ballB && dribbleA.TouchTimer == dribbleB.TouchTimer
       && dribbleA.Separation <= DribbleSystem.MaxSeparationShield + .001f);
+
+
+Section("Penalty shootout is a shootout, not a match (Mode 3)");
+Check("shootout: 3-0 after three each is decided", MatchEngine.ShootoutDecided(3, 3, 3, 0));
+Check("shootout: 3-1 after 3/2 kicks — away can still reach 3", !MatchEngine.ShootoutDecided(3, 2, 3, 1));
+Check("shootout: 4-2 after 4/4 — away can reach at most 3", MatchEngine.ShootoutDecided(4, 4, 4, 2));
+Check("shootout: level after five each goes to sudden death", !MatchEngine.ShootoutDecided(5, 5, 4, 4));
+Check("shootout: sudden death waits for the pair", !MatchEngine.ShootoutDecided(6, 5, 5, 4));
+Check("shootout: sudden death decided after the pair", MatchEngine.ShootoutDecided(6, 6, 5, 4));
+var so = new MatchEngine(new MatchOptions { Seed = 11, Mode = MatchEngine.ModeShootout });
+int soTicks = 0, strayMoves = 0, playTicks = 0;
+var soStart = so.State.Players.Select(p => p.Pos).ToArray();
+while (so.State.Phase != Phase.FullTime && soTicks < 60 * 60 * 6)
+{
+    var S = so.State; var cmdS = PlayerCommand.None;
+    // The human shoots as soon as their taker has the ball.
+    if (S.ShootoutTakerSide == 0 && S.Phase == Phase.Play && S.Ball.Owner == S.Controlled && !S.ShootoutShotTaken && soTicks % 20 == 0)
+    { cmdS.Shoot = true; cmdS.Charge = .7f; cmdS.Move = new Vector2(.3f, soTicks % 40 == 0 ? .5f : -.5f); }
+    var inactiveBefore = S.Players.Where(p => S.Phase == Phase.Play && !so.IsActive(p)).Select(p => (p.Index, p.Pos)).ToList();
+    int kicksBefore = S.ShootoutKicksHome + S.ShootoutKicksAway;
+    so.Step(MatchEngine.Dt, cmdS); soTicks++;
+    if (S.Phase == Phase.Play) playTicks++;
+    // Players sitting out must not move (the next kick's set-up teleports them, so skip those ticks).
+    if (S.ShootoutKicksHome + S.ShootoutKicksAway == kicksBefore)
+        foreach (var (idx, before) in inactiveBefore)
+            if (Vector3.Distance(S.Players[idx].Pos, before) > .001f) strayMoves++;
+}
+Check("shootout reaches a result", so.State.Phase == Phase.FullTime, $"ticks={soTicks}");
+Check("shootout took at least 3 kicks each", so.State.ShootoutKicksHome >= 3 && so.State.ShootoutKicksAway >= 3,
+      $"{so.State.ShootoutKicksHome}/{so.State.ShootoutKicksAway}");
+Check("shootout: kicks are recorded for the tally", so.State.ShootoutHome.Count == so.State.ShootoutKicksHome);
+Check("shootout: score equals kicks scored", so.State.Score[0] == so.State.ShootoutHome.Count(x => x)
+      && so.State.Score[1] == so.State.ShootoutAway.Count(x => x),
+      $"score {so.State.Score[0]}-{so.State.Score[1]}");
+Check("shootout: nobody else plays during a kick", strayMoves == 0, $"strayMoves={strayMoves}");
+Check("shootout: no match clock", so.State.Clock == 0f && so.State.Half == 1);
+Check("shootout: no open-play passing", so.State.Passes[0] + so.State.Passes[1] == 0,
+      $"passes={so.State.Passes[0] + so.State.Passes[1]}");
+
+Section("Training ground (Mode 2)");
+var tr = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeTraining });
+Check("training starts in play with the ball at your feet",
+      tr.State.Phase == Phase.Play && tr.State.Ball.Owner == tr.State.Controlled);
+var trAway = Enumerable.Range(1, 10).Select(i => tr.State.Players[11 + i].Pos).ToArray();
+for (int i = 0; i < 60 * 20; i++) tr.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(1, 0), Shoot = i % 90 == 0, Charge = .6f });
+Check("training: computer outfielders stay off the pitch in the attack drill",
+      Enumerable.Range(1, 10).All(i => tr.State.Players[11 + i].Pos == trAway[i - 1]));
+Check("training: no clock, never reaches half-time", tr.State.Clock == 0f && tr.State.Phase != Phase.HalfTime);
+Check("training: stamina never runs out", tr.State.Players.All(p => p.Stamina >= .999f));
+tr.SetDrill(TrainingDrill.Defend);
+Check("training: defend drill gives the ball to one attacker",
+      tr.State.Ball.Owner == tr.TrainingAttacker && tr.State.Players[tr.State.Controlled].Team == 0);
+
+Section("Training coach lessons");
+var coachEng = new MatchEngine(new MatchOptions { Seed = 9, Mode = MatchEngine.ModeTraining });
+var coach = new TrainingCoach();
+coach.Update(coachEng, PlayerCommand.None, MatchEngine.Dt);         // starts lesson 1
+Check("coach: has a lesson for every move", coach.Lessons.Count >= 19
+      && coach.Lessons.All(l => l.Pad.Length > 0 && l.Keys.Length > 0 && l.Tip.Length > 0));
+int passLesson = coach.Lessons.FindIndex(l => l.Goal == LessonGoal.ShortPass);
+coach.GoTo(coachEng, passLesson);
+for (int i = 0; i < 60 * 30 && coach.Index == passLesson; i++)
+{
+    var c = new PlayerCommand { Pass = i % 45 == 0 };
+    if (i % 45 == 0 && coachEng.State.Ball.Owner != coachEng.State.Controlled) coachEng.ResetDrill();
+    coachEng.Step(MatchEngine.Dt, c);
+    coach.Update(coachEng, c, MatchEngine.Dt);
+}
+Check("coach: three short passes complete the passing lesson and move on", coach.Index == passLesson + 1,
+      $"index={coach.Index} progress={coach.Progress}");
+int stepOver = coach.Lessons.FindIndex(l => l.Skill == SkillMove.StepOver);
+coach.GoTo(coachEng, stepOver);
+for (int i = 0; i < 60 * 3; i++)
+{
+    var c = new PlayerCommand { Skill = i == 30 ? SkillMove.StepOver : SkillMove.None };
+    coachEng.Step(MatchEngine.Dt, c); coach.Update(coachEng, c, MatchEngine.Dt);
+}
+Check("coach: a step-over completes the step-over lesson", coach.Index == stepOver + 1 || coach.Progress >= 1f);
+Check("skills: RS flicks map to the taught moves",
+      SkillMoves.FromFlick(SkillMoves.DetectFlick(.9f, 0f, 0f), false) == SkillMove.StepOver
+      && SkillMoves.FromFlick(SkillMoves.DetectFlick(0f, .9f, 0f), false) == SkillMove.HeelToHeel
+      && SkillMoves.FromFlick(SkillMoves.DetectFlick(0f, -.9f, 0f), true) == SkillMove.Rainbow
+      && SkillMoves.DetectFlick(.9f, 0f, .8f) == SkillMoves.Flick.None);
+var sk = new MatchEngine(new MatchOptions { Seed = 3, Mode = MatchEngine.ModeTraining });
+int skills = 0;
+for (int i = 0; i < 60 * 6; i++)
+{
+    var c = new PlayerCommand { Skill = i % 60 == 0 ? SkillMove.StepOver : SkillMove.None };
+    if (sk.State.Ball.Owner != sk.State.Controlled && i % 60 == 59) sk.ResetDrill();
+    int before = sk.Events.Count(ev => ev.Text.Contains("pulls off"));
+    sk.Step(MatchEngine.Dt, c);
+    if (sk.Events.Count(ev => ev.Text.Contains("pulls off")) > before) skills++;
+}
+Check("skills: a player can do more than one skill move (timer counts down)", skills >= 3, $"skills={skills}");
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

@@ -303,15 +303,15 @@ public partial class GameApp : Node3D
     {
         _context = MatchContext.Friendly;
         Mode = GameMode.Training;
-        Options.Fouls = false;
-        Options.Offside = false;
+        // Fouls/offside are switched off per match in StartMatchInternal.  Setting
+        // them on the shared Options here turned them off for every later match.
         StartMatchInternal();
     }
 
     public void StartSkillGames() {
         _context = MatchContext.Friendly; Mode = GameMode.SkillGames; StartMatchInternal(); }
     public void StartPracticeArena() {
-        _context = MatchContext.Friendly; Mode = GameMode.PracticeArena; Options.Fouls = false; Options.Offside = false; StartMatchInternal(); }
+        _context = MatchContext.Friendly; Mode = GameMode.PracticeArena; StartMatchInternal(); }
 
     /// <summary>Phase 3.6: penalty shootout (alternating penalties).</summary>
     public void StartShootout()
@@ -379,7 +379,7 @@ public partial class GameApp : Node3D
         Clear();
         PadMenuNavigator.Active = false;
         var view = new MatchView();
-        bool isTraining = Mode == GameMode.Training;
+        bool isTraining = Mode == GameMode.Training || Mode == GameMode.PracticeArena;
         var opts = new MatchOptions
         {
             TeamSize = Options.TeamSize, HalfMinutes = Options.HalfMinutes, TimeSpeed = Options.TimeSpeed,
