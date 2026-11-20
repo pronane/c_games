@@ -1,5 +1,5 @@
 // Strict reader for the shared Sprite Forge clip metadata JSON. No Godot APIs here;
-// the desktop adapter reads text via Godot.FileAccess and browser uses ClipManifest.gd.
+// the desktop adapter reads text via Godot's FileAccess and browser uses ClipManifest.gd.
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
