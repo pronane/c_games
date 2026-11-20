@@ -149,7 +149,7 @@ public sealed partial class SoccerClipRig : Node3D
         {
             var anim = Player.GetAnimation(name);
             if (anim != null)
-                anim.LoopMode = _loops.Contains(name.ToString())
+                anim.LoopMode = _loops.Contains(name)
                     ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
         }
         Tint(spec);

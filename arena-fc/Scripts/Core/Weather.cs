@@ -11,6 +11,8 @@ public enum WeatherType
     Windy,
     Rain,
     Storm,
+    Snow,
+    Fog,
 }
 
 /// <summary>

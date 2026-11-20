@@ -9,7 +9,7 @@ using System.Numerics;
 namespace ArenaFC.Core;
 
 public enum Phase { Kickoff, Play, Goal, HalfTime, FullTime, ThrowIn, Corner, GoalKick, FreeKick, Penalty, Paused }
-public enum EventKind { Info, Pass, Shot, Save, Goal, Tackle, Foul, Offside, Out, Card, Whistle }
+public enum EventKind { Info, Pass, Shot, Save, Goal, Tackle, Foul, Offside, Out, Card, Whistle, Corner }
 
 /// <summary>Phase 2.9 gameplay preset (FC 26-style Authentic/Competitive).
 /// Authentic = measured tempo, realistic tackle accuracy, weather on.

@@ -236,7 +236,7 @@ public partial class MatchView : Node3D
         }
         PlayEventSounds();
         Sync(dt);
-        var stadium = GetNodeOrNull<World3D>("../Stadium");
+        var stadium = GetNodeOrNull<Stadium>("../Stadium");
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
@@ -278,7 +278,7 @@ public partial class MatchView : Node3D
             Replay.RecordEvent(evt, Engine.CurrentTick);
             if (evt.Kind == EventKind.Goal)
             {
-                var stadium = GetNodeOrNull<World3D>("../Stadium");
+                var stadium = GetNodeOrNull<Stadium>("../Stadium");
                 stadium?.CelebrateCrowd(5f);
                 // Update commentary context with score.
                 _commentaryCtx.HomeScore = Engine.State.ScoreHome;
@@ -293,7 +293,7 @@ public partial class MatchView : Node3D
             }
             else if (evt.Kind == EventKind.Shot)
             {
-                _commentaryCtx.LastScorer = evt.PlayerName ?? "";
+                _commentaryCtx.LastScorer = evt.Text;
                 string line = _commentary.Generate(CommentaryEvent.Shot, _commentaryCtx);
                 Hud?.AddCommentary(line);
                 audio?.Call("play_voice_cue", "excited");
