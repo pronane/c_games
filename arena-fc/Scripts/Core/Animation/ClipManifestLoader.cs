@@ -42,6 +42,7 @@ public static class ClipManifestLoader
             foreach (float phase in feet)
                 if (!float.IsFinite(phase) || phase < 0f || phase > 1f)
                     throw new FormatException($"Clip '{id}' has a foot plant outside [0,1].");
+            var footSides = ReadFootSides(item, id, feet.Length);
             var tags = ReadStrings(item, "tags");
             int bones = item.TryGetProperty("boneCount", out var boneValue) ? boneValue.GetInt32() : 18;
             if (bones != 18)
@@ -54,6 +55,7 @@ public static class ClipManifestLoader
                 Duration = duration,
                 ContactFraction = contact,
                 FootPlantFrames = feet,
+                FootPlantSides = footSides,
                 RootVelocityAvg = new Vector3(OptionalSingle(item, "rootVelocityX", 0f), 0f,
                     OptionalSingle(item, "rootVelocityZ", 0f)),
                 PreferredSpeed = OptionalSingle(item, "preferredSpeed", 0f),
@@ -86,6 +88,31 @@ public static class ClipManifestLoader
             ? result : throw new FormatException($"Clip manifest field '{name}' is required and must be numeric.");
     private static float OptionalSingle(JsonElement e, string name, float fallback) =>
         e.TryGetProperty(name, out var value) && value.TryGetSingle(out float result) ? result : fallback;
+    private static FootSide[] ReadFootSides(JsonElement e, string id, int plantCount)
+    {
+        if (!e.TryGetProperty("footPlantSides", out var value))
+        {
+            var inferred = new FootSide[plantCount];
+            for (int i = 0; i < inferred.Length; i++)
+                inferred[i] = i % 2 == 0 ? FootSide.Left : FootSide.Right;
+            return inferred;
+        }
+        if (value.ValueKind != JsonValueKind.Array)
+            throw new FormatException($"Clip '{id}' footPlantSides must be an array.");
+        var sides = new List<FootSide>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String
+                || !Enum.TryParse(item.GetString(), ignoreCase: true, out FootSide side)
+                || !Enum.IsDefined(typeof(FootSide), side))
+                throw new FormatException($"Clip '{id}' has an invalid footPlantSides entry.");
+            sides.Add(side);
+        }
+        if (sides.Count != plantCount)
+            throw new FormatException($"Clip '{id}' footPlantSides count must match footPlantFrames.");
+        return sides.ToArray();
+    }
+
     private static float[] ReadFloats(JsonElement e, string name)
     {
         if (!e.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array) return Array.Empty<float>();

@@ -23,7 +23,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_block",
@@ -39,7 +43,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_celebrate",
@@ -55,7 +60,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_celebrate_jump",
@@ -71,7 +77,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_change_direction",
@@ -92,7 +99,10 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
     },
     {
       "id": "soccer_chest_control",
@@ -110,7 +120,8 @@
         "ball_contact"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_corner_kick",
@@ -128,7 +139,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_cross",
@@ -146,7 +158,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_dispossess",
@@ -162,7 +175,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_dribble",
@@ -185,7 +199,11 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_drop_kick",
@@ -203,7 +221,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_fall",
@@ -219,7 +238,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_fist_pass",
@@ -237,7 +257,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_fist_shoot",
@@ -255,7 +276,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_foul",
@@ -271,7 +293,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_free_kick",
@@ -289,7 +312,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_get_up",
@@ -305,7 +329,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_goal_kick",
@@ -323,7 +348,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_hand_pass",
@@ -341,7 +367,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_header",
@@ -359,7 +386,8 @@
         "ball_contact"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_hit_react",
@@ -375,7 +403,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_idle",
@@ -391,7 +420,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": []
     },
     {
       "id": "soccer_idle_ready",
@@ -407,7 +437,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": []
     },
     {
       "id": "soccer_jockey",
@@ -429,7 +460,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_jog",
@@ -451,7 +486,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_juke_feint",
@@ -467,7 +506,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_catch",
@@ -483,7 +523,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_dive_high",
@@ -499,7 +540,8 @@
       "ballState": "Aerial",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_dive_left",
@@ -515,7 +557,8 @@
       "ballState": "Aerial",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_dive_right",
@@ -531,7 +574,8 @@
       "ballState": "Aerial",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_ground_catch",
@@ -547,7 +591,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_idle",
@@ -563,7 +608,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_kick",
@@ -581,7 +627,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_punch",
@@ -597,7 +644,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_ready",
@@ -613,7 +661,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_save",
@@ -629,7 +678,8 @@
       "ballState": "Aerial",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_keeper_throw",
@@ -645,7 +695,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_kick_out",
@@ -663,7 +714,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_kick_place",
@@ -681,7 +733,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_kick_run",
@@ -699,7 +752,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_knocked_down",
@@ -715,7 +769,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_long_pass",
@@ -733,7 +788,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_penalty_kick",
@@ -751,7 +807,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_pickup",
@@ -769,7 +826,8 @@
         "ball_contact"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_pushed",
@@ -785,7 +843,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_run",
@@ -807,7 +866,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_run_ball",
@@ -830,7 +893,11 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_shield",
@@ -848,7 +915,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": []
     },
     {
       "id": "soccer_shoot",
@@ -866,7 +934,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_short_pass",
@@ -884,7 +953,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_shoulder_charge",
@@ -900,7 +970,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_sidestep",
@@ -921,7 +992,10 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
     },
     {
       "id": "soccer_slide_tackle",
@@ -937,7 +1011,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_solo",
@@ -959,7 +1034,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_spin",
@@ -980,7 +1059,10 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
     },
     {
       "id": "soccer_sprint",
@@ -1002,7 +1084,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_stop",
@@ -1023,7 +1109,10 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
     },
     {
       "id": "soccer_strafe_l",
@@ -1045,7 +1134,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_strafe_r",
@@ -1067,7 +1160,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     },
     {
       "id": "soccer_stumble",
@@ -1083,7 +1180,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_tackle",
@@ -1099,7 +1197,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_taunt",
@@ -1115,7 +1214,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_through_ball",
@@ -1133,7 +1233,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_throw_in",
@@ -1151,7 +1252,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_toe_lift",
@@ -1167,7 +1269,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_trap",
@@ -1185,7 +1288,8 @@
         "ball_contact"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_trip",
@@ -1201,7 +1305,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_turn",
@@ -1222,7 +1327,10 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
     },
     {
       "id": "soccer_victory",
@@ -1238,7 +1346,8 @@
       "ballState": "None",
       "tags": [],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_volley",
@@ -1256,7 +1365,8 @@
         "ball_possessed"
       ],
       "boneCount": 18,
-      "loop": false
+      "loop": false,
+      "footPlantSides": []
     },
     {
       "id": "soccer_walk",
@@ -1278,7 +1388,11 @@
         "alternating_feet"
       ],
       "boneCount": 18,
-      "loop": true
+      "loop": true,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
     }
   ]
 }

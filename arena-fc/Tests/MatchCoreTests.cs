@@ -402,7 +402,8 @@ var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
       manifestEngine.ClipCount == 71 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
-      && runMeta.BoneCount == 18 && runMeta.Loop,
+      && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
+      && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
 var walkMeta = new ClipMeta { Id = "walk", Category = ClipCategory.Locomotion, Duration = .8f,
     PreferredSpeed = 2f, BallState = ArenaFC.Core.Animation.BallState.None, Loop = true, BoneCount = 18,
@@ -416,7 +417,34 @@ var phaseSelector = new MotionEngine();
 phaseSelector.LoadClips(new[] { walkMeta, runMetaToy, kickMeta });
 Check("locomotion switch aligns the same foot event across different clip phases",
       MathF.Abs(MotionEngine.AlignToNearestFootEvent(walkMeta, runMetaToy, .09f) - .19f) < .001f);
-Check("one-shot actions restart at phase zero",
+var sideSource = new ClipMeta { Id = "side_source", Category = ClipCategory.Locomotion,
+    Duration = 1f, Loop = true, FootPlantFrames = new[] { .10f, .60f },
+    FootPlantSides = new[] { FootSide.Left, FootSide.Right } };
+var unevenTarget = new ClipMeta { Id = "uneven_target", Category = ClipCategory.Locomotion,
+    Duration = 1f, Loop = true, FootPlantFrames = new[] { .08f, .30f, .55f },
+    FootPlantSides = new[] { FootSide.Left, FootSide.Left, FootSide.Right } };
+Check("uneven plant counts map the nearest right plant to the same side",
+      MathF.Abs(MotionEngine.AlignToNearestFootEvent(sideSource, unevenTarget, .58f) - .53f) < .001f);
+Check("transition policy applies side-aware alignment to locomotion switches",
+      MathF.Abs(MotionEngine.ComputeStartPhase(sideSource, unevenTarget, .58f, PlayerIntent.Move) - .53f) < .001f);
+Check("uneven plant counts map the nearest left plant to the same side",
+      MathF.Abs(MotionEngine.AlignToNearestFootEvent(sideSource, unevenTarget, .12f) - .10f) < .001f);
+var noRightPlant = new ClipMeta { Id = "left_only", Category = ClipCategory.Locomotion,
+    Duration = 1f, Loop = true, FootPlantFrames = new[] { .08f },
+    FootPlantSides = new[] { FootSide.Left } };
+Check("missing same-side target event falls back to inherited phase",
+      MathF.Abs(MotionEngine.AlignToNearestFootEvent(sideSource, noRightPlant, .58f) - .58f) < .001f);
+var seamSource = new ClipMeta { Id = "seam_source", Category = ClipCategory.Locomotion,
+    Duration = 1f, Loop = true, FootPlantFrames = new[] { .95f },
+    FootPlantSides = new[] { FootSide.Left } };
+var seamTarget = new ClipMeta { Id = "seam_target", Category = ClipCategory.Locomotion,
+    Duration = 1f, Loop = true, FootPlantFrames = new[] { .05f },
+    FootPlantSides = new[] { FootSide.Left } };
+Check("plant alignment preserves signed offset across cycle wrap",
+      MathF.Abs(MotionEngine.AlignToNearestFootEvent(seamSource, seamTarget, .98f) - .08f) < .001f);
+kickMeta.FootPlantFrames = new[] { .25f, .75f };
+kickMeta.FootPlantSides = new[] { FootSide.Left, FootSide.Right };
+Check("one-shot actions restart at phase zero despite foot-plant metadata",
       MotionEngine.ComputeStartPhase(runMetaToy, kickMeta, .67f, PlayerIntent.Shoot) == 0f);
 var motionA = new MotionState { CurrentClipId = "walk", Phase = .09f };
 phaseSelector.Update(motionA, 4.8f, 0f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f);

@@ -79,8 +79,6 @@ public sealed class MotionEngine
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
             if (!_clips.TryGetValue(motion.CurrentClipId, out var from)) from = selected;
             float start = ComputeStartPhase(from, selected, motion.Phase, intent);
-            if (selected.Loop && IsLocomotion(selected.Category) && IsLocomotion(from.Category))
-                start = AlignToNearestFootEvent(from, selected, motion.Phase);
             motion.NextClipId = selected.Id;
             motion.NextPhase = selected.Loop ? Wrap01(start) : Clamp01(start);
             motion.CrossfadeDuration = DefaultCrossfadeSeconds;
@@ -153,11 +151,14 @@ public sealed class MotionEngine
             or PlayerIntent.Shoot or PlayerIntent.Trap or PlayerIntent.Tackle or PlayerIntent.Dive
             or PlayerIntent.Celebrate)
             return 0f;
+        if (from.Loop && IsLocomotion(from.Category) && IsLocomotion(to.Category))
+            return AlignToNearestFootEvent(from, to, currentPhase);
         return Clamp01(currentPhase);
     }
 
-    /// <summary>Map the nearest source foot event to the same ordered event in the target clip.
-    /// FootPlantFrames use a shared convention: element 0 = left, element 1 = right.</summary>
+    /// <summary>Map the nearest source plant to the nearest target plant for that same
+    /// side, preserving the circular offset from the source event. Legacy metadata
+    /// infers alternating Left/Right sides from event order.</summary>
     public static float AlignToNearestFootEvent(ClipMeta from, ClipMeta to, float phase)
     {
         if (from.FootPlantFrames.Length == 0 || to.FootPlantFrames.Length == 0)
@@ -169,9 +170,19 @@ public sealed class MotionEngine
             float d = CircularDistance(phase, from.FootPlantFrames[i]);
             if (d < bestDistance) { bestDistance = d; nearest = i; }
         }
+
         float sourcePlant = from.FootPlantFrames[nearest];
-        float targetPlant = to.FootPlantFrames[nearest % to.FootPlantFrames.Length];
-        return Wrap01(targetPlant + CircularDifference(phase, sourcePlant));
+        FootSide side = from.FootPlantSideAt(nearest);
+        int targetIndex = -1;
+        bestDistance = float.MaxValue;
+        for (int i = 0; i < to.FootPlantFrames.Length; i++)
+        {
+            if (to.FootPlantSideAt(i) != side) continue;
+            float d = CircularDistance(sourcePlant, to.FootPlantFrames[i]);
+            if (d < bestDistance) { bestDistance = d; targetIndex = i; }
+        }
+        if (targetIndex < 0) return Wrap01(phase);
+        return Wrap01(to.FootPlantFrames[targetIndex] + CircularDifference(phase, sourcePlant));
     }
 
     public static float AdvancePhase(ClipMeta clip, float phase, float dt, float playbackScale)
@@ -239,9 +250,12 @@ public sealed class MotionEngine
     {
         state.FootPlantedLeft = state.FootPlantedRight = false;
         if (clip == null || clip.FootPlantFrames.Length == 0) return;
-        state.FootPlantedLeft = NearPlant(phase, clip.FootPlantFrames[0]);
-        if (clip.FootPlantFrames.Length > 1)
-            state.FootPlantedRight = NearPlant(phase, clip.FootPlantFrames[1]);
+        for (int i = 0; i < clip.FootPlantFrames.Length; i++)
+        {
+            if (!NearPlant(phase, clip.FootPlantFrames[i])) continue;
+            if (clip.FootPlantSideAt(i) == FootSide.Left) state.FootPlantedLeft = true;
+            else state.FootPlantedRight = true;
+        }
     }
 
     private static bool NearPlant(float phase, float plant) => CircularDistance(phase, plant) <= .035f;
