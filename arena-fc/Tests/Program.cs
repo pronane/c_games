@@ -716,8 +716,13 @@ var highPress = new MatchEngine(new MatchOptions
     Seed = 3, TeamSize = 5,
     HomeTactics = new Tactics { PressingIntensity = 1f, Mentality = Mentality.VeryAttacking, Width = 1f },
 });
-lowBlock.Step(1f / 60f, PlayerCommand.None);
-highPress.Step(1f / 60f, PlayerCommand.None);
+// Tactics are applied while the ball is in play (kickoff has its own phase).
+foreach (var t in new[] { lowBlock, highPress })
+{
+    t.State.Phase = Phase.Play;
+    t.State.PhaseTimer = 0f;
+    t.Step(1f / 60f, PlayerCommand.None);
+}
 Check("pressing intensity reaches the AI",
       lowBlock.State.Players[1].TacticsPressMult < .9f &&
       highPress.State.Players[1].TacticsPressMult > 1.1f,

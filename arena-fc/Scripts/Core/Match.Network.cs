@@ -281,6 +281,13 @@ public sealed partial class MatchEngine
         s.ShotsOnTarget = (int[])src.ShotsOnTarget.Clone(); s.Passes = (int[])src.Passes.Clone();
         s.Fouls = (int[])src.Fouls.Clone(); s.Corners = (int[])src.Corners.Clone();
         s.PossessionTime = (float[])src.PossessionTime.Clone();
+        // RestoreFrom() goes through here, so anything missing silently diverged
+        // the mirror/predictor from the authoritative server.
+        s.YellowCards = (int[])src.YellowCards.Clone();
+        s.RedCards = (int[])src.RedCards.Clone();
+        s.ShootoutKicksHome = src.ShootoutKicksHome; s.ShootoutKicksAway = src.ShootoutKicksAway;
+        s.ShootoutTakerSide = src.ShootoutTakerSide; s.ShootoutShotTaken = src.ShootoutShotTaken;
+        s.ShootoutTimer = src.ShootoutTimer;
         s.Ball = CloneBall(src.Ball);
         s.Controlled = src.Controlled; s.ControlledAway = src.ControlledAway;
         s.KickoffSide = src.KickoffSide; s.RestartSide = src.RestartSide;
