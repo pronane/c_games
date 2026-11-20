@@ -62,7 +62,9 @@ Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}")
 Check("a carrier can dribble for several seconds", longestHold > 180,
       $"longest={longestHold} ticks");
 Check("opposition closes down the carrier", nearTicks > 400, $"nearTicks={nearTicks}");
-Check("opposition wins the ball back", tackles >= 10, $"tackles={tackles}");
+// Real football is ~25-60 won tackles a match (4-10 per 15 game minutes).  The
+// old floor of 10 encoded the every-defender-lunges scrum (~120 a match).
+Check("opposition wins the ball back", tackles >= 3, $"tackles={tackles}");
 Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={fouls}");
 Check("players keep personal space around the ball", avgNearBall < 2.60f,
       $"avgWithin4m={avgNearBall:F3}");
@@ -629,6 +631,43 @@ for (int i = 0; i < 60 * 6; i++)
     if (sk.Events.Count(ev => ev.Text.Contains("pulls off")) > before) skills++;
 }
 Check("skills: a player can do more than one skill move (timer counts down)", skills >= 3, $"skills={skills}");
+
+
+Section("Goals, keeper and AI shooting");
+{
+    // Dribble the ball into an empty net: must be a goal.
+    var g = new MatchEngine(new MatchOptions { Seed = 21, Mode = MatchEngine.ModeTraining });
+    var S = g.State; var me = S.Players[S.Controlled];
+    var keeper = S.Players[11]; keeper.Pos = new Vector3(0, 0, 30f); keeper.Target = keeper.Pos;
+    me.Pos = new Vector3(g.GoalPos(0).X - 3f, 0, 0); S.Ball.Owner = me.Index;
+    S.Ball.Pos = me.Pos + new Vector3(.5f, Mx.BallRadius, 0); me.Facing = Vector3.UnitX;
+    int before = S.Score[0];
+    for (int i = 0; i < 120 && S.Score[0] == before; i++)
+    { keeper.Pos = new Vector3(0, 0, 30f); g.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(1, 0) }); }
+    Check("dribbling the ball into the net is a goal", S.Score[0] == before + 1);
+
+    // 1v1: the keeper leaves his line when a carrier is through on goal.
+    var k = new MatchEngine(new MatchOptions { Seed = 22 });
+    var K = k.State; foreach (var p in K.Players) { p.Pos = new Vector3(0, 0, p.Index * 2f - 20f); p.Target = p.Pos; }
+    var striker = K.Players[21]; var gk = K.Players[0];
+    float line = k.OwnGoalPos(0).X;
+    gk.Pos = new Vector3(line, 0, 0); striker.Pos = new Vector3(line + k.SideSign(0) * 15f, 0, 0);
+    K.Ball.Owner = striker.Index; K.Ball.Pos = striker.Pos + new Vector3(-k.SideSign(0) * .5f, Mx.BallRadius, 0);
+    K.Phase = Phase.Play; K.Controlled = -1;
+    float maxOut = 0f;
+    for (int i = 0; i < 60; i++) { k.Step(MatchEngine.Dt, PlayerCommand.None); maxOut = MathF.Max(maxOut, MathF.Abs(gk.Pos.X - line)); }
+    Check("keeper comes off his line in a 1v1", maxOut > 3f, $"maxOut={maxOut:0.0}");
+
+    // AI shoots at a sensible rate (was ~2 per 90 minutes).
+    int shots = 0;
+    for (int seed = 1; seed <= 6; seed++)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed, HalfMinutes = 45 });
+        while (m.State.Phase != Phase.FullTime) { m.State.Controlled = -1; m.Step(MatchEngine.Dt, PlayerCommand.None); }
+        shots += m.State.Shots[0] + m.State.Shots[1];
+    }
+    Check("AI takes more than 2 shots a match on average", shots / 6f > 2f, $"avg={shots / 6f:0.0}");
+}
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
