@@ -22,7 +22,6 @@ from sforge.motions import (
     HOLD,
     K,
     LIB,
-    LIE_FRONT,
     M,
     P,
     READY,
@@ -49,8 +48,10 @@ def _shield(t: float):
 
 def _dribble(t: float):
     # Quick feet, low centre of gravity, ball kept close.  Root travel is left
-    # to the match engine; this is an in-place close-control loop.
-    return loco(18, 52, 26, 58, 12)(t)
+    # to the match engine; this is an in-place close-control loop. Keep the
+    # arms compact here too; the generic carry loop lifts them as if protecting
+    # a ball at chest height, which is not the close-control dribble pose.
+    return _soccer_loco(18, 52, 26, 58, 12, air=0.0)(t)
 
 
 def _keeper_ready(t: float):
@@ -90,6 +91,18 @@ def archetype_loco(archetype: str):
     p = ARCHETYPE_PRESETS[archetype]
     return loco(p["stride"], p["knee"], p["arm"], p["elbow"], p["lean"],
                 p["air"], p["carry"], p["guard"], p["bounce"])
+
+
+def _soccer_loco(stride, knee, arm, elbow, lean, air, arm_out=-55):
+    """Football gait with the upper arms held down/out of the hands-up pose."""
+    base = loco(stride, knee, arm, elbow, lean, air=air)
+    def sample(t):
+        pose = base(t)
+        for side in ("L", "R"):
+            f, _out, twist = pose["arm_" + side]
+            pose["arm_" + side] = (f, arm_out, twist)
+        return pose
+    return sample
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +168,36 @@ CUSTOM = {
                              func=_backpedal),
     "soccer_jockey": dict(category="Defence", desc="defensive jockey", loop=True,
                           func=_jockey),
+    # Compact football running: the generic Sprite Forge run/sprint presets
+    # swing the upper arms 42-62 degrees and flex the elbows 80-92 degrees.
+    # Retargeted to this rig those values lift the hands out beside the head.
+    # Keep the arms pumping close to the torso, with a relaxed elbow bend.
+    "soccer_jog": dict(category="Locomotion", desc="compact soccer jog", loop=True,
+                        func=_soccer_loco(25, 62, 18, 44, 8, air=0.01)),
+    "soccer_run": dict(category="Locomotion", desc="compact soccer run", loop=True,
+                        func=_soccer_loco(35, 78, 22, 48, 11, air=0.025)),
+    "soccer_sprint": dict(category="Locomotion", desc="compact soccer sprint", loop=True,
+                           func=_soccer_loco(46, 98, 26, 52, 15, air=0.06)),
+    # Feet-first slide: recline the torso, keep the head lifted, extend the lead
+    # leg toward the challenge and tuck the trailing leg. Match movement supplies
+    # the actual ground travel, so these poses deliberately contain no root run-up.
+    "soccer_slide_tackle": dict(category="Defence", desc="feet-first sliding tackle", loop=False, keys=K(
+        (0.0, P(READY, arm_L=(16, -46, 0), arm_R=(16, -46, 0), elbow_L=40, elbow_R=40)),
+        (0.16, P(CROUCH, hips=(12, -4, 0), spine=(4, 0, 0), chest=(2, 0, 0), neck=(5, 0, 0),
+                 leg_L=(36, 8, 0), knee_L=82, leg_R=(18, -8, 0), knee_R=88,
+                 arm_L=(18, -50, 0), arm_R=(18, -50, 0), elbow_L=48, elbow_R=48)),
+        (0.38, P(CROUCH, hips=(-10, -6, 65), spine=(8, 0, 0), chest=(2, 0, 0), neck=(10, 0, 0),
+                 leg_L=(72, 10, 0), knee_L=16, ankle_L=-6,
+                 leg_R=(34, -8, 0), knee_R=72,
+                 arm_L=(8, -50, 0), arm_R=(8, -50, 0), elbow_L=42, elbow_R=42)),
+        (0.68, P(CROUCH, hips=(-8, -6, 60), spine=(6, 0, 0), chest=(2, 0, 0), neck=(8, 0, 0),
+                 leg_L=(68, 10, 0), knee_L=18, ankle_L=-4,
+                 leg_R=(32, -8, 0), knee_R=68,
+                 arm_L=(8, -50, 0), arm_R=(8, -50, 0), elbow_L=42, elbow_R=42)),
+        (0.86, P(CROUCH, hips=(-12, 0, 0), spine=(6, 0, 0), chest=(2, 0, 0), neck=(4, 0, 0),
+                 leg_L=(34, 6, 0), knee_L=68, leg_R=(24, -6, 0), knee_R=76,
+                 arm_L=(14, -46, 0), arm_R=(14, -46, 0), elbow_L=46, elbow_R=46)),
+        (1.0, P(READY)))),
     "soccer_volley": dict(category="Ball", desc="first-time volley", loop=False, keys=K(
         (0.0, P(READY, ball=("world", 0, 0.55, 0.45))),
         (0.25, P(READY, hips=(-8, 0, 0), leg_R=(-52, 6, 0), knee_R=95,
@@ -189,15 +232,6 @@ CUSTOM = {
         (0.6, P(READY, hips=(8, 0, 0), leg_R=(18, 8, 0), knee_R=32, ankle_R=12,
                 ball=("foot_R",))),
         (1.0, P(READY)))),
-    "soccer_slide_tackle": dict(category="Defence", desc="committed sliding tackle", loop=False, keys=K(
-        (0.0, P(READY)),
-        (0.2, P(CROUCH, hips=(34, 0, 0), spine=(18, 0, 0), neck=(-28, 0, 0))),
-        (0.45, P(LIE_FRONT, hips=(72, 0, 0), leg_L=(18, 12, 0), leg_R=(-8, 8, 0),
-                 knee_L=22, knee_R=55, arm_L=(120, 30, 0), arm_R=(110, 34, 0),
-                 lift=0.04, pos=(0.28, 0))),
-        (0.7, P(LIE_FRONT, hips=(66, 0, 0), leg_L=(12, 12, 0), leg_R=(4, 8, 0),
-                knee_L=30, knee_R=48, pos=(0.52, 0))),
-        (1.0, P(LIE_FRONT, pos=(0.52, 0))))),
     "soccer_shoulder_charge": dict(category="Defence", desc="lean into a carrier to dispossess", loop=False, keys=K(
         (0.0, P(READY)),
         (0.3, P(READY, hips=(20, -10, 0), chest=(14, -8, 0), leg_L=(34, 8, 0),
@@ -242,9 +276,9 @@ CLIP_SPECS = [
     ("soccer_idle", "idle", True, "Locomotion", "standing idle"),
     ("soccer_idle_ready", None, True, "Soccer", "athletic ready stance"),
     ("soccer_walk", "walk", True, "Locomotion", "walk"),
-    ("soccer_jog", "run", True, "Locomotion", "jog"),
-    ("soccer_run", "run", True, "Locomotion", "run"),
-    ("soccer_sprint", "sprint", True, "Locomotion", "full sprint"),
+    ("soccer_jog", None, True, "Locomotion", "compact soccer jog"),
+    ("soccer_run", None, True, "Locomotion", "compact soccer run"),
+    ("soccer_sprint", None, True, "Locomotion", "compact soccer sprint"),
     ("soccer_run_ball", "carry", True, "Ball", "carry the ball at pace"),
     ("soccer_dribble", None, True, "Ball", "close-control dribble"),
     ("soccer_shield", None, True, "Ball", "shield the ball"),

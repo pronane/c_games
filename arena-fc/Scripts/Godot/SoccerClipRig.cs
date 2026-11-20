@@ -299,10 +299,17 @@ public sealed partial class SoccerClipRig : Node3D
         if (oneShot)
         {
             float scale = 1f;
-            if (_contactFrac.TryGetValue(clip, out float frac) && frac > 0f
-                && _clipDuration.TryGetValue(clip, out float clipDur)
-                && clipDur > 0f)
-                scale = ActionTiming.ContactAlignedPlaybackScale(clipDur, frac, p.ActionContactAt);
+            // Align ball actions to their contact frame. Other one-shots, such as
+            // slide tackles, should still finish inside the engine action window.
+            if (_clipDuration.TryGetValue(clip, out float clipDur)
+                && clipDur > 0f && p.ActionDuration > 0.01f)
+            {
+                if (_contactFrac.TryGetValue(clip, out float frac) && frac > 0f
+                    && p.ActionContactAt > 0f)
+                    scale = ActionTiming.ContactAlignedPlaybackScale(clipDur, frac, p.ActionContactAt);
+                else
+                    scale = Math.Clamp(clipDur / p.ActionDuration, 0.6f, 1.8f);
+            }
             Player.SpeedScale = scale;
         }
         else

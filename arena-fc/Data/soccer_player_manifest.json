@@ -91,7 +91,7 @@
    "name": "soccer_jog",
    "loop": true,
    "category": "Locomotion",
-   "source": "run",
+   "source": "soccer_motions.CUSTOM",
    "frames": 31,
    "fps": 30.0,
    "events": {
@@ -109,7 +109,7 @@
    "name": "soccer_run",
    "loop": true,
    "category": "Locomotion",
-   "source": "run",
+   "source": "soccer_motions.CUSTOM",
    "frames": 31,
    "fps": 30.0,
    "events": {
@@ -127,7 +127,7 @@
    "name": "soccer_sprint",
    "loop": true,
    "category": "Locomotion",
-   "source": "sprint",
+   "source": "soccer_motions.CUSTOM",
    "frames": 31,
    "fps": 30.0,
    "events": {
@@ -1247,6 +1247,6 @@
    0.3775
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 8.0
+  "seconds": 6.4
  }
 }
