@@ -674,5 +674,98 @@ Check("out-of-range constraint is rejected", cloth.ParticleCount == 3);
 cloth.Step(0f, bones);
 Check("zero dt is a no-op", Mx.IsFinite(cloth.GetPosition(2)));
 
+
+Section("Disciplinary rules (cards actually matter)");
+var cardEng = new MatchEngine(new MatchOptions { Seed = 11, TeamSize = 5 });
+cardEng.State.Phase = Phase.Play;
+cardEng.State.PhaseTimer = 0f;
+var villain = cardEng.State.Players[2];
+var sendOff = typeof(MatchEngine).GetMethod("SendOff", BindingFlags.Instance | BindingFlags.NonPublic)!;
+Check("a dismissed player is flagged and counted",
+      (bool)sendOff.Invoke(cardEng, new object[] { villain, "Second yellow card" })! &&
+      villain.SentOff && cardEng.State.RedCards[villain.Team] == 1);
+Check("a dismissed player leaves the field of play",
+      MathF.Abs(villain.Pos.Z) > Mx.HalfWidth && villain.Action == "sentoff", $"z={villain.Pos.Z:F2}");
+Check("a dismissed player is never offered as a pass target or a switch target",
+      Enumerable.Range(0, 400).All(_ => cardEng.FindNearestForTeam(villain.Team, Vector3.Zero, false) != villain.Index));
+for (int i = 0; i < 600; i++) cardEng.Step(1f / 60f, PlayerCommand.None);
+Check("the match keeps playing with ten men",
+      cardEng.State.Clock > 0f && Mx.IsFinite(cardEng.State.Ball.Pos) &&
+      cardEng.State.Players.All(p => Mx.IsFinite(p.Pos)));
+Check("the dismissed player did not walk back on",
+      MathF.Abs(villain.Pos.Z) > Mx.HalfWidth, $"z={villain.Pos.Z:F2}");
+Check("the dismissed player did not take possession",
+      cardEng.State.Ball.Owner != villain.Index);
+// A side can never be reduced below two players: small-sided restarts need a taker.
+var wipe = new MatchEngine(new MatchOptions { Seed = 12, TeamSize = 5 });
+wipe.State.Phase = Phase.Play;
+foreach (var idx in new[] { 0, 1, 2, 3 })
+    sendOff.Invoke(wipe, new object[] { wipe.State.Players[idx], "Straight red card" });
+Check("a side is never reduced below two players",
+      wipe.State.Players.Take(5).Count(p => !p.SentOff) == 2,
+      $"active={wipe.State.Players.Take(5).Count(p => !p.SentOff)}");
+
+Section("In-match tactics change the AI");
+var lowBlock = new MatchEngine(new MatchOptions
+{
+    Seed = 3, TeamSize = 5,
+    HomeTactics = new Tactics { PressingIntensity = 0f, Mentality = Mentality.VeryDefensive, Width = 0f },
+});
+var highPress = new MatchEngine(new MatchOptions
+{
+    Seed = 3, TeamSize = 5,
+    HomeTactics = new Tactics { PressingIntensity = 1f, Mentality = Mentality.VeryAttacking, Width = 1f },
+});
+lowBlock.Step(1f / 60f, PlayerCommand.None);
+highPress.Step(1f / 60f, PlayerCommand.None);
+Check("pressing intensity reaches the AI",
+      lowBlock.State.Players[1].TacticsPressMult < .9f &&
+      highPress.State.Players[1].TacticsPressMult > 1.1f,
+      $"low={lowBlock.State.Players[1].TacticsPressMult:F2} high={highPress.State.Players[1].TacticsPressMult:F2}");
+Check("width reaches the AI shape", lowBlock.State.Players[1].TacticsWidthMult < .9f &&
+      highPress.State.Players[1].TacticsWidthMult > 1.1f);
+Check("balanced tactics are neutral (tuned numbers unchanged)",
+      MathF.Abs(new MatchEngine(new MatchOptions()).HomeTactics.GetModifiers().pressMultiplier / .9f - 1f) < 1e-5f);
+var shapeMethod = typeof(MatchEngine).GetMethod("FormationPosition", BindingFlags.Instance | BindingFlags.NonPublic)!;
+Vector3 ShapeOf(MatchEngine e, int index) =>
+    (Vector3)shapeMethod.Invoke(e, new object[] { e.State.Players[index], 1, Vector3.Zero })!;
+var wideShape = MathF.Abs(ShapeOf(highPress, 3).Z);     // slot 3 is a wide midfielder in 1-2-1
+var narrowShape = MathF.Abs(ShapeOf(lowBlock, 3).Z);
+Check("a wide/attacking shape is wider than a narrow block", wideShape > narrowShape,
+      $"wide={wideShape:F2} narrow={narrowShape:F2}");
+for (int i = 0; i < 600; i++) { highPress.Step(1f / 60f, PlayerCommand.None); lowBlock.Step(1f / 60f, PlayerCommand.None); }
+Check("extreme tactics keep the simulation stable",
+      Mx.IsFinite(highPress.State.Ball.Pos) && highPress.State.Players.All(p => Mx.IsFinite(p.Pos)) &&
+      lowBlock.State.Players.All(p => Mx.IsFinite(p.Pos)));
+
+Section("Checkpoint / resume keeps every gameplay flag");
+var flagEng = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 5 });
+flagEng.State.Phase = Phase.Play;
+var flagged = flagEng.State.Players[3];
+flagged.Dribbling = true; flagged.Sprinting = true; flagged.MustPlayBall = true;
+flagged.JockeyState = 2; flagged.RunType = 1; flagged.SkillTimer = .3f;
+flagged.FirstTouchQuality = .42f; flagged.TacticsPressMult = 1.25f;
+flagged.Cards = 1; flagged.SentOff = false;
+flagEng.State.YellowCards[0] = 1;
+var fork = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 5 });
+fork.Restore(flagEng.Capture());
+var f3 = fork.State.Players[3];
+Check("capture/restore keeps dribble, sprint, restart and skill flags",
+      f3.Dribbling && f3.Sprinting && f3.MustPlayBall && f3.JockeyState == 2 &&
+      f3.RunType == 1 && MathF.Abs(f3.SkillTimer - .3f) < 1e-6f,
+      $"drb={f3.Dribbling} spr={f3.Sprinting} mpb={f3.MustPlayBall} jk={f3.JockeyState} rt={f3.RunType}");
+Check("capture/restore keeps confidence, tactics and cards",
+      MathF.Abs(f3.FirstTouchQuality - .42f) < 1e-6f && MathF.Abs(f3.TacticsPressMult - 1.25f) < 1e-6f &&
+      f3.Cards == 1 && fork.State.YellowCards[0] == 1);
+var wireFull = StateCodec.BuildFull(flagEng, 1);
+var viaWire = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 5 });
+StateCodec.ApplyFull(viaWire, wireFull);
+var w3 = viaWire.State.Players[3];
+Check("full-state wire transfer keeps dribble (not shield) and sprint",
+      w3.Dribbling && w3.Sprinting && !w3.Shielding, $"drb={w3.Dribbling} spr={w3.Sprinting} sh={w3.Shielding}");
+Check("full-state wire transfer keeps cards and tactics",
+      w3.Cards == 1 && MathF.Abs(w3.TacticsPressMult - 1.25f) < 1e-6f &&
+      viaWire.State.YellowCards[0] == 1 && viaWire.State.RedCards[0] == 0);
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

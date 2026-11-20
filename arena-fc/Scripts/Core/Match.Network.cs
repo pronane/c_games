@@ -62,6 +62,7 @@ public sealed partial class MatchEngine
         for (int i = start; i < start + Options.TeamSize && i < State.Players.Length; i++)
         {
             var p = State.Players[i];
+            if (p.SentOff) continue;
             if (excludeKeeper && p.IsKeeper) continue;
             float d = Mx.FlatDist2(p.Pos, pos);
             if (d < bd) { bd = d; best = i; }
@@ -158,7 +159,12 @@ public sealed partial class MatchEngine
             p.DecisionTimer = d.Dt; p.PossessionLock = d.Pl; p.TackleLock = d.Tl;
             p.Action = d.A; p.IsKeeper = d.Ik; p.Cards = d.C;
             p.Pressing = d.Pr; p.Shielding = d.Sh;
-            p.Dribbling = d.Sh; p.Sprinting = false;
+            // This used to read `p.Dribbling = d.Sh; p.Sprinting = false;` - a copy
+            // -paste error that turned shielding into dribbling and killed sprint.
+            p.Dribbling = d.Drb; p.Sprinting = d.Spr;
+            p.MustPlayBall = d.Mpb; p.SentOff = d.So;
+            p.JockeyState = d.Jk; p.RunType = d.Rt; p.SkillTimer = d.Sk;
+            p.FirstTouchQuality = d.Fq; p.TacticsPressMult = d.Tp;
             p.Team = d.Team; p.Slot = d.Slot; p.Role = (Role)d.Role;
         }
         var b = f.Ball;
@@ -181,6 +187,10 @@ public sealed partial class MatchEngine
         if (f.Fouls.Length >= 2) s.Fouls = (int[])f.Fouls.Clone();
         if (f.Corners.Length >= 2) s.Corners = (int[])f.Corners.Clone();
         if (f.Poss.Length >= 2) s.PossessionTime = (float[])f.Poss.Clone();
+        s.YellowCards = f.Yellows is { Length: >= 2 } ? (int[])f.Yellows.Clone() : new int[2];
+        s.RedCards = f.Reds is { Length: >= 2 } ? (int[])f.Reds.Clone() : new int[2];
+        s.ShootoutKicksHome = f.SkH; s.ShootoutKicksAway = f.SkA;
+        s.ShootoutTakerSide = f.SkT; s.ShootoutShotTaken = f.SkS; s.ShootoutTimer = f.SkTimer;
         s.Phase = (Phase)f.Phase;
         s.PhaseTimer = f.Pt; s.Clock = f.Clock; s.Half = f.Half;
         s.Controlled = f.Ctrl; s.ControlledAway = f.CtrlA;
@@ -199,17 +209,31 @@ public sealed partial class MatchEngine
         Kind = e.Kind, Text = e.Text, Clock = e.Clock, Side = e.Side,
     };
 
+    /// <summary>Every mutable gameplay word of a player.  A partial copy used to
+    /// lose dribbling, skill timers, jockey/run state and tactics multipliers, so a
+    /// rollback or a resume handoff silently diverged from the authoritative tick.</summary>
     private static PlayerState ClonePlayer(PlayerState p) => new()
     {
         Spec = p.Spec, Index = p.Index, Team = p.Team, Slot = p.Slot, Role = p.Role,
         Pos = p.Pos, Vel = p.Vel, Facing = p.Facing, Home = p.Home, Target = p.Target,
         Stamina = p.Stamina, AnimPhase = p.AnimPhase, ActionTimer = p.ActionTimer,
         ActionDuration = p.ActionDuration, ActionContactAt = p.ActionContactAt,
-        ActionReleased = p.ActionReleased,
+        ActionReleased = p.ActionReleased, MustPlayBall = p.MustPlayBall,
         DecisionTimer = p.DecisionTimer, PossessionLock = p.PossessionLock,
         TackleLock = p.TackleLock, Action = p.Action, IsKeeper = p.IsKeeper,
-        Cards = p.Cards, Pressing = p.Pressing, Shielding = p.Shielding,
-        Dribbling = p.Dribbling, Sprinting = p.Sprinting,
+        Pressing = p.Pressing, Shielding = p.Shielding,
+        Dribbling = p.Dribbling, Sprinting = p.Sprinting, Cards = p.Cards, SentOff = p.SentOff,
+        FirstTouchQuality = p.FirstTouchQuality,
+        DribbleTouchTimer = p.DribbleTouchTimer, DribbleBurstCd = p.DribbleBurstCd,
+        DribbleMomentum = p.DribbleMomentum, JockeyState = p.JockeyState, RunType = p.RunType,
+        ShieldLeanX = p.ShieldLeanX, ShieldLeanZ = p.ShieldLeanZ, ShieldRotY = p.ShieldRotY,
+        CurrentSkill = p.CurrentSkill, SkillTimer = p.SkillTimer,
+        TacticsPressMult = p.TacticsPressMult, TacticsRunMult = p.TacticsRunMult,
+        TacticsPassMult = p.TacticsPassMult, TacticsWidthMult = p.TacticsWidthMult,
+        PreferredFoot = p.PreferredFoot, ShotTimingQuality = p.ShotTimingQuality,
+        CalledForBall = p.CalledForBall, CallForBallTimer = p.CallForBallTimer,
+        Personality = p.Personality, Morale = p.Morale,
+        IsInjured = p.IsInjured, InjurySeverity = p.InjurySeverity,
     };
 
     private static BallState CloneBall(BallState b) => new()
@@ -233,6 +257,10 @@ public sealed partial class MatchEngine
             ShotsOnTarget = (int[])s.ShotsOnTarget.Clone(), Passes = (int[])s.Passes.Clone(),
             Fouls = (int[])s.Fouls.Clone(), Corners = (int[])s.Corners.Clone(),
             PossessionTime = (float[])s.PossessionTime.Clone(),
+            YellowCards = (int[])s.YellowCards.Clone(), RedCards = (int[])s.RedCards.Clone(),
+            ShootoutKicksHome = s.ShootoutKicksHome, ShootoutKicksAway = s.ShootoutKicksAway,
+            ShootoutTakerSide = s.ShootoutTakerSide, ShootoutShotTaken = s.ShootoutShotTaken,
+            ShootoutTimer = s.ShootoutTimer,
             Ball = CloneBall(s.Ball),
             Controlled = s.Controlled, ControlledAway = s.ControlledAway,
             KickoffSide = s.KickoffSide, RestartSide = s.RestartSide,
