@@ -78,7 +78,7 @@ public class PlayerProgress
     public int ContractYears = 3;
     public string Position = "CM";
     public List<int> FormHistory = new(); // last 5 match ratings
-    public int AverageRating => FormHistory.Count > 0 ? FormHistory.Average() : 75;
+    public int AverageRating => FormHistory.Count > 0 ? (int)FormHistory.Average() : 75;
 
     public void Train(string attribute, int amount = 1)
     {

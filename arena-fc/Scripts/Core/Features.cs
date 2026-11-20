@@ -35,7 +35,7 @@ public class HeatMap
     public List<(float x, float z, int count)> Zones = new();
     public void AddPosition(float x, float z)
     {
-        var zone = Zones.FirstOrDefault(z => Math.Abs(z.x - x) < 5 && Math.Abs(z.z - z) < 5);
+        var zone = Zones.FirstOrDefault(zn => Math.Abs(zn.x - x) < 5 && Math.Abs(zn.z - z) < 5);
         if (zone.count == 0) Zones.Add((x, z, 1));
         else Zones[Zones.IndexOf(zone)] = (zone.x, zone.z, zone.count + 1);
     }

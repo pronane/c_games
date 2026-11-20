@@ -29,7 +29,7 @@ public partial class Stadium : Node3D
         if (_snow != null)
             _snow.Emitting = ArenaFC.Core.Weather.Snowing;
         // Fog density based on weather
-        var env = GetWorldEnvironment()?.Environment;
+        var env = GetWorld3D()?.Environment;
         if (env != null)
         {
             env.FogDensity = ArenaFC.Core.Weather.Foggy ? 0.02f : 0.005f;
@@ -42,7 +42,7 @@ public partial class Stadium : Node3D
         _dayNightTime += dt * 0.01f; // full cycle in 100 seconds
         if (_dayNightTime > 1f) _dayNightTime -= 1f;
         _isNight = _dayNightTime < 0.25f || _dayNightTime > 0.75f;
-        var env = GetWorldEnvironment()?.Environment;
+        var env = GetWorld3D()?.Environment;
         if (env != null)
         {
             // Sun energy: 0 at night, 1.2 at noon

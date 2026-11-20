@@ -187,7 +187,7 @@ public class Presentation
             data.ResultSummary = $"Draw {data.HomeScore}-{data.AwayScore}. Points shared.";
 
         // Highlights (from events)
-        data.Highlights = state.Events
+        data.Highlights = (events ?? new List<MatchEvent>())
             .Where(e => e.Kind == EventKind.Goal || e.Kind == EventKind.Shot)
             .Select(e => e.Text)
             .Take(5)
