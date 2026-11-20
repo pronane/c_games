@@ -12,10 +12,10 @@ public partial class Stadium : Node3D
 
     // P1: Grass deformation — pitch wear from player positions.
     private GrassDeformation _grassDeformation;
-    private CPUParticles3D? _rain;
+    private CpuParticles3D? _rain;
     // Phase 10: Visual polish
-    private CPUParticles3D? _snow;
-    private CPUParticles3D? _confetti;
+    private CpuParticles3D? _snow;
+    private CpuParticles3D? _confetti;
     private MeshInstance3D? _jumbotron;
     private Label3D? _jumbotronLabel;
     private float _dayNightTime = 0.5f; // 0=midnight, 0.5=noon, 1=midnight
@@ -289,13 +289,13 @@ public partial class Stadium : Node3D
         }
 
         // --- Rain particles (P5) — visible when Weather.Raining ---
-        _rain = new CPUParticles3D
+        _rain = new CpuParticles3D
         {
             Name = "Rain",
             Amount = 2000,
             Lifetime = 1.2f,
             Preprocess = 1.2f,
-            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionShape = CpuParticles3D.EmissionShapeEnum.Box,
             EmissionBoxExtents = new Vector3(Mx.HalfLength, 0.1f, Mx.HalfWidth),
             Direction = new Vector3(0, -1, 0),
             Spread = 5f,
@@ -311,13 +311,13 @@ public partial class Stadium : Node3D
         AddChild(_rain);
 
         // Phase 10: Snow particles
-        _snow = new CPUParticles3D
+        _snow = new CpuParticles3D
         {
             Name = "Snow",
             Amount = 1000,
             Lifetime = 3f,
             Preprocess = 3f,
-            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionShape = CpuParticles3D.EmissionShapeEnum.Box,
             EmissionBoxExtents = new Vector3(Mx.HalfLength, 0.1f, Mx.HalfWidth),
             Direction = new Vector3(0, -1, 0),
             Spread = 10f,
@@ -333,13 +333,13 @@ public partial class Stadium : Node3D
         AddChild(_snow);
 
         // Phase 10: Confetti particles
-        _confetti = new CPUParticles3D
+        _confetti = new CpuParticles3D
         {
             Name = "Confetti",
             Amount = 500,
             Lifetime = 4f,
             Preprocess = 0f,
-            EmissionShape = CPUParticles3D.EmissionShapeEnum.Box,
+            EmissionShape = CpuParticles3D.EmissionShapeEnum.Box,
             EmissionBoxExtents = new Vector3(10f, 0.1f, 10f),
             Direction = new Vector3(0, 1, 0),
             Spread = 30f,
