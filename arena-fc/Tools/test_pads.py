@@ -307,8 +307,11 @@ def main() -> int:
           and "func load_mappings" in controllers_gd and 'extends "res://' not in controllers_gd)
     check("web preset exports the DB",
           'include_filter="Data/input/*.txt"' in (ROOT / "Web" / "export_presets_web.cfg").read_text())
+    # The desktop presets also ship the clip manifests (Data/clips/*.json), so check
+    # every preset's filter includes the pad DB rather than matching the exact string.
+    desktop_filters = re.findall(r'^include_filter="([^"]*)"', (ROOT / "export_presets.cfg").read_text(), re.M)
     check("desktop presets export the DB",
-          'include_filter="Data/input/*.txt"' in (ROOT / "export_presets.cfg").read_text())
+          bool(desktop_filters) and all("Data/input/*.txt" in f.split(",") for f in desktop_filters))
 
     section("Desktop gameplay / camera regressions")
     match_cs = (ROOT / "Scripts" / "Core" / "Match.cs").read_text(encoding="utf-8")

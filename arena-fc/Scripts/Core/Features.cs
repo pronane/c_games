@@ -44,12 +44,13 @@ public class HeatMap
 /// <summary>Feature 4: Expected Goals (xG).</summary>
 public class ExpectedGoals
 {
-    public float CalculateXG(float distance, float angle, bool isOneOnOne)
+    /// <summary>Logistic xG from distance (m) and visible goal-mouth angle (radians).
+    /// Calibration: 6-yard box ~0.55, penalty spot ~0.25, edge of box ~0.10, 25 m ~0.05.</summary>
+    public float CalculateXG(float distance, float goalAngle, bool isOneOnOne)
     {
-        float xg = 0.1f;
-        xg -= distance * 0.005f;
-        xg -= angle * 0.02f;
-        if (isOneOnOne) xg += 0.3f;
+        float z = -1.1f + 1.6f * goalAngle - 0.09f * distance;
+        if (isOneOnOne) z += 0.8f;
+        float xg = 1f / (1f + MathF.Exp(-z));
         return Math.Clamp(xg, 0.01f, 0.95f);
     }
 }

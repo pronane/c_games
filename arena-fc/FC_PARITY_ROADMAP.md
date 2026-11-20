@@ -1,0 +1,107 @@
+# Arena FC — FC 25 parity roadmap (working tracker)
+
+This is the **single working list**. It replaces the order (not the content) of
+`GAP_ANALYSIS_AND_ROADMAP.md`, `ROADMAP_GRAPHICS_GAMEPLAY.md` and `GAP_ROADMAP_10_PHASES.md`.
+Each item ships as its own PR; tick it here in the same PR.
+
+Order rule: **simulation correctness → ball and player physics → controls → AI shape →
+animation/visuals → modes**. Animation work comes after the football is right, because
+no animation can make a scramble for a dead ball look like FC 25.
+
+Measured with the headless soak harness (`Tools/soak`, 30 seeded matches per size).
+Real-football targets used as gates are in §0.
+
+Legend: ✅ done · 🔧 in progress · ⬜ to do
+
+---
+
+## 0. Football-realism gate (CI)
+| Metric (11-a-side, per match) | Before | Target band |
+|---|---|---|
+| Pass reaches a team-mate | 53% | 75–90% |
+| Shots (both teams) | 1.9 | 15–30 |
+| Shots on target counted | 0 | 30–45% of shots |
+| Throw-ins | 0 | 25–50 |
+| Corners | 0 | 6–14 |
+| Goal kicks | 0.6 | 10–20 |
+| Offsides | 0 | 1–6 |
+| Tackles won | ~120 | 25–60 |
+
+- ⬜ 0.1 Add the soak harness to `Tests/` and fail CI when a metric leaves its band (bands widen until the AI items below land).
+
+## 1. Simulation correctness (PR #1)
+- ✅ 1.1 Ground-ball friction ~5× too high (full-power pass rolled 12 m). Now: 15 m/s rolls ~30 m.
+- ✅ 1.2 Pass weight computed from distance (ground passes arrive at the receiver with pace; lofted/chipped carry ~80% in the air).
+- ✅ 1.3 Pass/shot wind-up could be tackled ~1 in 4 times before the ball left the foot.
+- ✅ 1.4 Shots on target never counted (keeper saves derived from it were wrong).
+- ✅ 1.5 xG formula clamped almost every shot to 0.01 → logistic model on distance + visible goal angle.
+- ✅ 1.6 AI substitution replaced a player with himself; now uses the real bench, never on a human side.
+- ✅ 1.7 Defensive header clearance aimed at the defender's own goal.
+- ✅ 1.8 Skill-move cooldown never counted down (one skill per player per match).
+- ✅ 1.9 Stale motion-database test fixture crashed `MatchCoreTests`.
+
+## 2. Modes (PR #1)
+- ✅ 2.1 Penalty shootout restarted into open play after kick 1 → proper shootout (only taker + keeper move, no clock, best-of-5 + sudden death, early finish, kick tally on screen).
+- ✅ 2.2 Training was a normal match with fouls off → Training ground with drills (Attack / Defend) and a coach that teaches every move with pad + keyboard prompts and auto-detects completion.
+- ✅ 2.3 Starting Training / Practice Arena switched fouls + offside off for every later match.
+- ⬜ 2.4 Skill Games and Practice Arena menu entries are still plain matches.
+- ⬜ 2.5 You control your keeper (dive left/right/stay) on the computer's penalties.
+
+## 3. Ball physics & goal detection
+- ⬜ 3.1 Running the ball into the net while dribbling is not a goal (goal check only runs on a free ball).
+- ⬜ 3.2 Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
+- ⬜ 3.3 Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela).
+- ⬜ 3.4 Shot power: hold-to-charge bar + timed-finish second press; height from power and body shape; low driven vs dipping vs chipped finishes.
+- ⬜ 3.5 Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
+
+## 4. First touch, aerial control and heading
+- ⬜ 4.1 Controlling a high ball: chest, thigh/knee, instep cushion — chosen by ball height and speed; quality from skill + pressure; heavy touches pop the ball away.
+- ⬜ 4.2 Player-directed first touch: stick direction at the moment of the touch takes the ball that way; LT = soft touch-and-stop, RT = knock-on.
+- ⬜ 4.3 Headers: attacking (aim with stick, `X` = header on goal, `A` = header pass), defensive clearances, jump timing, aerial duels decided by heading + jumping + strength.
+- ⬜ 4.4 Volleys / half-volleys and bicycle kicks from high balls in the box.
+
+## 5. Controls — every move clear and reachable
+Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` close control/shield · `A` pass · `Y` through · `X` shoot (hold) · `VIEW` long ball · `B` tackle · `RT+B` slide · `LB` switch (with ball: call a run) · `RS` flick skills (LT+RS advanced) · `X`→`A` fake shot.
+- ✅ 5.1 Skill moves wired to input (were unreachable): RS flicks + keys 1–7.
+- ✅ 5.2 Call a team-mate's run (LB / Tab with the ball).
+- ⬜ 5.3 Defending set: `B` stand tackle / poke (foot in, no slide) · `RT+B` slide · `LT` jockey (contain, face-up, stay goal-side) · `A` (held) contain by team-mate · `B` (held) push/pull · shoulder charge = move into carrier while jockeying.
+- ⬜ 5.4 Attacking extras: `RB` knock-on (speed burst touch) · `LB`+`Y` lofted through · `RB+X` finesse/curl shot · `LB+X` chip shot · `LT+X` low driven shot · `RB` (with pass) driven pass.
+- ⬜ 5.5 Switch play: `RS` flick off the ball = switch to the player in that direction (right-stick switching).
+- ⬜ 5.6 In-game control cards: pause-menu page with the full layout, plus first-time contextual prompts (“Press B to tackle”) in matches.
+- ⬜ 5.7 Remap screen covers every action, not just six.
+
+## 6. Team shape & AI
+- ⬜ 6.1 Formation discipline: units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.
+- ⬜ 6.2 Marking: goal-side positioning, zonal by default, track runners, only the nearest one/two press; no crowding round the ball.
+- ⬜ 6.3 AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
+- ⬜ 6.4 Carrier who can't be dispossessed (kept the ball ~80 s under repeated tackles) — check tackle odds vs shielding/close-control stacking.
+- ⬜ 6.5 Goalkeeper: comes off the line to narrow the angle and smother 1v1s, claims crosses, sweeper behaviour on through balls; distribution.
+- ⬜ 6.6 Defensive player-switch stability (ring hops between team-mates).
+- ⬜ 6.7 Offside line held by the back four; offsides at realistic rates.
+
+## 7. Set pieces
+- ⬜ 7.1 Free kicks: taker must play the ball (pass/shoot/cross) — no picking it up and dribbling; wall at 9.15 m (10 yards) for direct kicks near goal; every opponent at least 9.15 m away.
+- ⬜ 7.2 Corners and throw-ins: aimable delivery, near/far post runs, short options; throw-in is a throw (hands), not a pass.
+- ⬜ 7.3 Penalty kicks in matches use the shootout aiming model.
+- ⬜ 7.4 Goal kicks: short or long choice.
+
+## 8. Animation & body mechanics (after 3–7)
+- ⬜ 8.1 Arms: no raised/T-pose arms off the ball; arms only go up for celebrations, appeals, headers and keeper actions.
+- ⬜ 8.2 No “jump with arms up” at the wrong time (trigger only from real events).
+- ⬜ 8.3 Slide tackles go feet first along the ground in the direction of travel.
+- ⬜ 8.4 Skill-move, chest/knee control, header and keeper clips via Sprite Forge (capture → solve → clean → export → feedback).
+- ⬜ 8.5 Motion engine (already in `Scripts/Core/Animation/`): extend the clip database; foot planting; ball-contact sync for every new action.
+
+## 9. Presentation & UI
+- ⬜ 9.1 Main menu panel overlaps the subtitle.
+- ⬜ 9.2 Match preview off-centre on a blank grey screen; shows “Arena Stadium” instead of the home ground.
+- ⬜ 9.3 Weather: “Rain” shown but not rendered.
+- ⬜ 9.4 HUD footprint at 720p (hint bar, commentary, minimap cover ~20% of the pitch); stats overlay wrapping.
+- ⬜ 9.5 Esc / Menu pause screen and clock (verify on real hardware).
+- ⬜ 9.6 Training/shootout scoreboard shows a match clock.
+
+## 10. Later (modes & platform) — unchanged from the existing docs
+Career skeleton, ranked online, replay editor, browser-edition parity (the GDScript web build has its own ball physics and needs 1.1/1.2 ported).
+
+## Engineering housekeeping
+- ⬜ H.1 Build outputs (`obj/`, `bin/`, `.godot/`) are committed; add to `.gitignore` and remove from the index.

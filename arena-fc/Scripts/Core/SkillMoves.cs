@@ -83,6 +83,61 @@ public static class SkillMoves
         return Math.Clamp(baseChance + skillBonus - pressurePenalty, 0.1f, 0.95f);
     }
 
+    /// <summary>Player-facing name ("Step-over", not "StepOver").</summary>
+    public static string DisplayName(SkillMove move) => move switch
+    {
+        SkillMove.StepOver => "step-over",
+        SkillMove.Roulette => "roulette",
+        SkillMove.Elastico => "elastico",
+        SkillMove.Rainbow => "rainbow flick",
+        SkillMove.FakeShot => "fake shot",
+        SkillMove.HeelToHeel => "drag-back",
+        SkillMove.BallRoll => "ball roll",
+        _ => "skill",
+    };
+
+    /// <summary>Right-stick flick direction, screen-relative.</summary>
+    public enum Flick { None, Side, Up, Down }
+
+    /// <summary>Classify a right-stick flick: the stick must go from near centre
+    /// (&lt; 0.35) to near full (&gt; 0.75) between two reads.  Y is screen-down
+    /// positive (Godot's joypad convention), so "up" is a negative Y.</summary>
+    public static Flick DetectFlick(float x, float y, float prevMagnitude)
+    {
+        float mag = MathF.Sqrt(x * x + y * y);
+        if (mag < 0.75f || prevMagnitude >= 0.35f) return Flick.None;
+        if (MathF.Abs(x) >= MathF.Abs(y)) return Flick.Side;
+        return y < 0f ? Flick.Up : Flick.Down;
+    }
+
+    /// <summary>The controller scheme taught in Training:
+    /// RS flick side = step-over, down = drag-back, up = ball roll;
+    /// with LT held: side = elastico, down = roulette, up = rainbow flick.
+    /// The fake shot is "hold X (shoot) then tap A (pass)", handled by the input layer.</summary>
+    public static SkillMove FromFlick(Flick flick, bool modifier) => (flick, modifier) switch
+    {
+        (Flick.Side, false) => SkillMove.StepOver,
+        (Flick.Down, false) => SkillMove.HeelToHeel,
+        (Flick.Up, false) => SkillMove.BallRoll,
+        (Flick.Side, true) => SkillMove.Elastico,
+        (Flick.Down, true) => SkillMove.Roulette,
+        (Flick.Up, true) => SkillMove.Rainbow,
+        _ => SkillMove.None,
+    };
+
+    /// <summary>Keyboard skill keys 1-7.</summary>
+    public static SkillMove FromNumberKey(int n) => n switch
+    {
+        1 => SkillMove.StepOver,
+        2 => SkillMove.HeelToHeel,
+        3 => SkillMove.BallRoll,
+        4 => SkillMove.Elastico,
+        5 => SkillMove.Roulette,
+        6 => SkillMove.Rainbow,
+        7 => SkillMove.FakeShot,
+        _ => SkillMove.None,
+    };
+
     /// <summary>Get the animation clip name for a skill move.</summary>
     public static string ClipName(SkillMove move) => move switch
     {
