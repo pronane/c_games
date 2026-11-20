@@ -963,11 +963,11 @@ public sealed partial class MatchEngine
         }
 
         // Keep challenges coordinated: one defender engages a loose ball; against
-        // a carrier, one engages and a second contains the nearest passing lane.
-        // Everyone else holds their formation instead of joining the same scrum.
+        // a carrier, one engages and two stagger across the passing lanes to contain.
+        // The cover defenders jockey instead of all diving into the same scrum.
         bool oppOwns = ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team;
-        int chaser1 = ClosestToBall(p.Team, 0);
-        int chaser2 = oppOwns ? ClosestToBall(p.Team, 1) : -1;
+        int chaser1 = ClosestToBall(p.Team, 0), chaser2 = ClosestToBall(p.Team, 1);
+        int chaser3 = oppOwns ? ClosestToBall(p.Team, 2) : -1;
         p.Pressing = false;
         if (ourBall)
         {
@@ -1016,15 +1016,15 @@ public sealed partial class MatchEngine
         }
         else
         {
-            bool isChaser = p.Index == chaser1 || p.Index == chaser2;
+            bool isChaser = p.Index == chaser1 || p.Index == chaser2 || p.Index == chaser3;
             if (isChaser)
             {
                 if (oppOwns)
                 {
                     var carrier = S.Players[ball.Owner];
                     Vector3 goalDir = Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team));
-                    // The second defender stays goal-side and jockeys the lane
-                    // instead of diving in alongside the first challenger.
+                    // The second and third defenders stay goal-side and jockey
+                    // separate lanes instead of diving in alongside the challenger.
                     // Only the first presser (chaser1) commits to the tackle.
                     if (p.Index != chaser1)
                     {
@@ -1063,7 +1063,7 @@ public sealed partial class MatchEngine
             {
                 var carrier = S.Players[ball.Owner];
                 float d = Mx.FlatDist(p.Pos, carrier.Pos);
-                float aggression = .48f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
+                float aggression = .38f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
                 if (p.Team != carrier.Team && d < 2.2f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
             }
