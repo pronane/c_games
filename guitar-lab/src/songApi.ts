@@ -157,11 +157,13 @@ export function compareTake(body: { take?: Blob; takeNotes?: unknown[]; targets?
 export function compareSongTake(
   id: string,
   take: Blob,
-  body: { parts: string[]; role: string; tuning: string; capo: number; start: number; end: number; speed: number; transcriber?: string },
+  body: { parts: string[]; role: string; tuning: string; capo: number; start: number; end: number; speed: number; transcriber?: string; tabPart?: string },
 ) {
   const form = new FormData();
   form.set("take", take, "take.wav");
   if (body.transcriber) form.set("transcriber", body.transcriber);
+  // Score against this part of the player's own tab (lined up with the song) first.
+  if (body.tabPart) form.set("tab_part", body.tabPart);
   form.set("parts", body.parts.join(","));
   form.set("role", body.role);
   form.set("tuning", body.tuning);

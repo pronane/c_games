@@ -699,12 +699,15 @@ def _score_recorded_take(path, targets, backend=None):
 async def compare_song_take(key: str, take: UploadFile = File(...), parts: str = Form('all'),
                             role: str = Form('any'), tuning: str = Form('standard'), capo: int = Form(0),
                             start: float = Form(0), end: float = Form(0), speed: float = Form(1),
-                            transcriber: str = Form(''),
+                            transcriber: str = Form(''), tab_part: str = Form(''),
                             x_fretwork_client: str | None = Header(None)):
     """Transcribe this take (clean guitar) and score it against the stem and the written notation.
 
-    When both targets exist the response has each score plus their average. The last few
-    takes are kept on the session so a player can look back without us storing audio.
+    When both targets exist the response has each score plus their average. ``tab_part`` names a
+    part of the player's own tab (lined up with this song through /tab-parts): it is then scored
+    first and its score is the take's score, because a tab is a far more reliable reference than
+    a transcription of a band recording. The last few takes are kept on the session so a player
+    can look back without us storing audio.
     """
     client(x_fretwork_client)
     song = get_song(key)
@@ -747,6 +750,16 @@ async def compare_song_take(key: str, take: UploadFile = File(...), parts: str =
         {'source': 'stem', 'label': 'Guitar stem', 'notes': stem_w, 'bars': bars_w, 'bpm': bpm_w, 'beats_per_bar': bpb},
         {'source': 'notation', 'label': 'Written notation', 'notes': note_w, 'bars': bars_w, 'bpm': bpm_w, 'beats_per_bar': bpb},
     ]
+    if tab_part:
+        tab = next((p for p in (song.tab_parts or {}).get('parts', []) if p['name'] == tab_part), None)
+        if tab is None:
+            raise HTTPException(404, 'That tab part is not loaded for this song. Load the tab again.')
+        tab_plain = [{'time': n['time'], 'duration': n.get('duration', 0.25), 'midi': n['midi']} for n in tab['notes']]
+        tab_w, _, _, _ = take_diff.place_in_take_time(tab_plain, tempo.get('bars'), start, end, speed, bpm, per_bar)
+        if not tab_w:
+            raise HTTPException(422, f'The tab part "{tab_part}" has no notes in this stretch of the song.')
+        targets.insert(0, {'source': 'tab', 'label': f'Your tab: {tab_part}', 'notes': tab_w, 'bars': bars_w,
+                           'bpm': bpm_w, 'beats_per_bar': bpb})
     path = song.folder / f'take-{uuid4().hex}.wav'
     try:
         await save_upload(take, path)
@@ -765,7 +778,9 @@ async def compare_song_take(key: str, take: UploadFile = File(...), parts: str =
     finally:
         path.unlink(missing_ok=True)
     overall = None
-    if result.get('combined') and result['combined'].get('overall') is not None:
+    if tab_part and result['reports']:
+        overall = result['reports'][0]['summary']['overall']
+    elif result.get('combined') and result['combined'].get('overall') is not None:
         overall = result['combined']['overall']
     elif result['reports']:
         overall = result['reports'][0]['summary']['overall']

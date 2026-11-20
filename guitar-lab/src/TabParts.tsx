@@ -37,7 +37,16 @@ const percent = (x: number) => `${Math.round(x * 100)}%`;
  * is lined up with the recording, each tab track becomes a named part with the stretches where
  * it plays, and every note the app heard is credited to the tab part it matches.
  */
-export default function TabParts({ songId, songTitle }: { songId: string; songTitle: string }) {
+export default function TabParts({
+  songId,
+  songTitle,
+  onParts,
+}: {
+  songId: string;
+  songTitle: string;
+  /** The tab parts now lined up with the song, with where each plays (empty when cleared). */
+  onParts?: (parts: { name: string; sections: { start: number; end: number }[] }[]) => void;
+}) {
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [result, setResult] = useState<Result | null>(null),
@@ -60,6 +69,9 @@ export default function TabParts({ songId, songTitle }: { songId: string; songTi
     setResult(null);
     mix.current = null;
   }, [songId]);
+  useEffect(() => {
+    onParts?.(result ? result.parts.map((p) => ({ name: p.name, sections: p.sections.map(({ start, end }) => ({ start, end })) })) : []);
+  }, [result]);
 
   async function load(file: File) {
     setError("");

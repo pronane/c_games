@@ -109,6 +109,7 @@ export function scoreCards(comparison: Comparison) {
 /** The written chart when we have one, otherwise whichever target was scored. */
 export function shownReport(comparison: Comparison) {
   return (
+    comparison.reports.find((r) => r.source === "tab") ??
     comparison.reports.find((r) => r.source === "notation") ??
     comparison.reports.find((r) => r.source === "file") ??
     comparison.reports[0]

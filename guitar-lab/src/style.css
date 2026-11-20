@@ -2128,3 +2128,38 @@ footer span:first-child {
 .listening-reviewer textarea { display: block; width: 100%; min-height: 5rem; box-sizing: border-box; }
 .listening-reviewer fieldset { margin: 1rem 0; padding: 1rem; border: 1px solid #64748b88; border-radius: 8px; }
 .listening-reviewer button { margin: .3rem; }
+
+/* Your amp and pedals for recording */
+.your-sound {
+  padding: 10px 12px;
+  border: 1px solid #dfe5d6;
+  border-radius: 8px;
+  background: #fafcf7;
+}
+.your-sound .processing-label {
+  flex-basis: 100%;
+  font-weight: 600;
+  font-size: 13px;
+  color: #2f3a29;
+}
+.your-sound .speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.your-sound select {
+  width: auto;
+  padding: 3px 6px;
+}
+.your-sound input[type="range"] {
+  width: 110px;
+}
+.your-sound .helper {
+  flex-basis: 100%;
+  margin: 0;
+}
+.diff-bars li > .link-button {
+  margin: 0 8px;
+  font-size: 12px;
+}
