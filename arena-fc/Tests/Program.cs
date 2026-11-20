@@ -772,5 +772,71 @@ Check("full-state wire transfer keeps cards and tactics",
       w3.Cards == 1 && MathF.Abs(w3.TacticsPressMult - 1.25f) < 1e-6f &&
       viaWire.State.YellowCards[0] == 1 && viaWire.State.RedCards[0] == 0);
 
+
+Section("Tournament engine (groups, bracket, champion)");
+var wc = new TournamentSystem(4242);
+wc.GenerateWorldCup(TournamentSystem.GetWorldCupTeams());
+wc.PlayerTeam = "England";
+Check("world cup seeds 16 teams into 4 groups of 4",
+      wc.Groups.Count == 4 && wc.Teams.Count == 16 && wc.Groups.All(g => g.Teams.Count == 4),
+      $"groups={wc.Groups.Count} teams={wc.Teams.Count}");
+Check("group stage is 24 fixtures (6 per group)",
+      wc.Fixtures.Count(f => f.Stage == TournamentStage.GroupStage) == 24,
+      $"group fixtures={wc.Fixtures.Count(f => f.Stage == TournamentStage.GroupStage)}");
+Check("the player has three group fixtures", wc.PlayerFixtures.Count == 3, $"{wc.PlayerFixtures.Count}");
+Check("an untouched table has no points", wc.GroupTable.All(t => t.Played == 0 && t.Points == 0));
+var firstTie = wc.NextPlayerFixture;
+Check("next player fixture is served", firstTie != null && wc.InvolvesPlayer(firstTie!));
+wc.RecordPlayerResult(3, 0);
+Check("recording a result updates the table and the other groups",
+      wc.GroupTable.Sum(t => t.Played) >= 8 && wc.PlayedCount >= 4,
+      $"played cells={wc.GroupTable.Sum(t => t.Played)} fixtures={wc.PlayedCount}");
+int tourGuard = 0;
+while (!wc.IsComplete && tourGuard++ < 24)
+{
+    if (wc.NextPlayerFixture == null) wc.SimulateRemainingRound();
+    else wc.RecordPlayerResult(2, 0);           // the player wins every tie
+}
+Check("a full run produces a champion", wc.IsComplete && wc.Champion.Length > 0,
+      $"champion='{wc.Champion}' stage={wc.CurrentStage} played={wc.PlayedCount}/{wc.TotalCount}");
+Check("winning every match wins the trophy", wc.Champion == "England", $"champion={wc.Champion}");
+Check("every fixture was settled", wc.Fixtures.All(f => f.Played));
+Check("the bracket ran group -> quarter -> semi -> final",
+      wc.Fixtures.Any(f => f.Stage == TournamentStage.QuarterFinal) &&
+      wc.Fixtures.Any(f => f.Stage == TournamentStage.SemiFinal) &&
+      wc.Fixtures.Count(f => f.Stage == TournamentStage.Final) == 1);
+Check("a knockout tie is never left drawn",
+      wc.Fixtures.Where(f => f.Stage != TournamentStage.GroupStage).All(f => f.Winner.Length > 0));
+Check("the runner-up is recorded", wc.RunnerUp.Length > 0 && wc.RunnerUp != wc.Champion);
+
+var cl = new TournamentSystem(99);
+cl.GenerateChampionsLeague(Clubs.All.Select(c => c.Name).ToList());
+cl.PlayerTeam = Clubs.All[0].Name;
+cl.SimulateAll();
+Check("champions league resolves to a club champion",
+      cl.IsComplete && Clubs.All.Any(c => c.Name == cl.Champion), $"champion='{cl.Champion}'");
+
+var league = new TournamentSystem(7);
+league.GenerateLeague(Clubs.All.Take(8).Select(c => c.Name).ToList());
+league.PlayerTeam = Clubs.All[0].Name;
+Check("a double round robin is 56 fixtures", league.Fixtures.Count == 56, $"{league.Fixtures.Count}");
+league.SimulateAll();
+Check("the league crowns its table leader",
+      league.IsComplete && league.Champion == league.GetTable()[0].Team, $"{league.Champion}");
+Check("league points are consistent with fixtures played",
+      league.GetTable().Sum(t => t.Points) % 3 <= 1 &&
+      league.GetTable().All(t => t.Won + t.Drawn + t.Lost == t.Played));
+
+var wcA = new TournamentSystem(2026); wcA.GenerateWorldCup(TournamentSystem.GetWorldCupTeams()); wcA.SimulateAll();
+var wcB = new TournamentSystem(2026); wcB.GenerateWorldCup(TournamentSystem.GetWorldCupTeams()); wcB.SimulateAll();
+Check("the same seed produces the same tournament", wcA.Champion == wcB.Champion && wcA.PlayedCount == wcB.PlayedCount);
+var euros = new TournamentSystem(11); euros.GenerateEuros(TournamentSystem.GetWorldCupTeams());
+Check("the euros only invite UEFA teams", euros.Teams.All(t => TournamentSystem.GetWorldCupTeams()
+      .First(x => x.Name == t).Confederation == "UEFA"), string.Join(",", euros.Teams));
+var copa = new TournamentSystem(12); copa.GenerateCopaAmerica(TournamentSystem.GetWorldCupTeams());
+Check("the copa only invites CONMEBOL teams and still has a bracket",
+      copa.Teams.Count >= 4 && copa.Teams.All(t => TournamentSystem.GetWorldCupTeams()
+      .First(x => x.Name == t).Confederation == "CONMEBOL"), string.Join(",", copa.Teams));
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
