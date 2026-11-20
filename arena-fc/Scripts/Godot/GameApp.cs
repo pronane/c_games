@@ -55,7 +55,7 @@ public partial class GameApp : Node3D
         Instance = this;
         // Lives on the Window, outside Clear(), so it survives every menu/match swap.
         if (GetTree().Root.GetNodeOrNull<PadMenuNavigator>("PadMenuNavigator") == null)
-            GetTree().Root.AddChild(new PadMenuNavigator());
+            GetTree().Root.CallDeferred("add_child", new PadMenuNavigator());
         ShowMenu();
     }
 
