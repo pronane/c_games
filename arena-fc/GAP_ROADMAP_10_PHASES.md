@@ -1,4 +1,10 @@
-# Arena FC — 10-Phase Gap Roadmap (vs FIFA 25 / eFootball)
+# Arena FC — Archived 10-Phase Gap Roadmap
+
+> **Superseded:** This historical checklist is not a reliable implementation
+> status report; its checked boxes overstated completed functionality. Use the
+> evidence-based [Graphics, Gameplay and Product Roadmap](./ROADMAP_GRAPHICS_GAMEPLAY.md)
+> as the active roadmap. A feature is complete only after it has an in-game
+> implementation, verification, and an observable acceptance result.
 
 Every gap item from the analysis is assigned to one of 10 phases, in priority order.
 

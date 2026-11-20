@@ -116,8 +116,48 @@ public static class SelfTest
         var hud = new Hud();
         root.AddChild(hud);
         Check("HUD constructed", hud.GetChildCount() > 0);
+        var lowerThirdPanel = hud.FindChild("LowerThirdPanel", true, false) as PanelContainer;
+        var statsOverlayPanel = hud.FindChild("StatsOverlayPanel", true, false) as PanelContainer;
+        var fpsCounterPanel = hud.FindChild("FpsCounterPanel", true, false) as PanelContainer;
+        var fpsCounterText = hud.FindChild("FpsCounterText", true, false) as Label;
+        var commentaryPanel = hud.FindChild("CommentaryPanel", true, false) as Control;
+        var minimapPanel = hud.FindChild("MinimapPanel", true, false) as Control;
+        var actionHintsPanel = hud.FindChild("ActionHintsPanel", true, false) as Control;
+        Check("inactive broadcast panels are hidden",
+              lowerThirdPanel != null && !lowerThirdPanel.Visible
+              && statsOverlayPanel != null && !statsOverlayPanel.Visible);
+        Check("bottom HUD panels do not overlap the action hints",
+              commentaryPanel != null && minimapPanel != null && actionHintsPanel != null
+              && commentaryPanel.OffsetBottom <= actionHintsPanel.OffsetTop
+              && minimapPanel.OffsetBottom <= actionHintsPanel.OffsetTop);
+        Check("FPS counter is hidden by default",
+              fpsCounterPanel != null && !fpsCounterPanel.Visible);
+        hud.ToggleFpsCounter();
+        Check("FPS counter can be toggled on",
+              fpsCounterPanel != null && fpsCounterPanel.Visible);
+        Check("FPS counter displays a numeric reading",
+              fpsCounterText != null
+              && fpsCounterText.Text.StartsWith("FPS ", StringComparison.Ordinal)
+              && int.TryParse(fpsCounterText.Text.Substring(4), out _));
+        hud.ToggleFpsCounter();
+        Check("FPS counter can be toggled off",
+              fpsCounterPanel != null && !fpsCounterPanel.Visible);
+        hud.ShowLowerThird("GOAL", 1f);
+        Check("lower third becomes visible with content",
+              lowerThirdPanel != null && lowerThirdPanel.Visible);
+        hud.ShowStatsOverlay("MATCH STATS");
+        Check("stats overlay becomes visible with content",
+              statsOverlayPanel != null && statsOverlayPanel.Visible);
+        hud.HideStatsOverlay();
+        Check("stats overlay hides with its panel",
+              statsOverlayPanel != null && !statsOverlayPanel.Visible);
         hud.SetTouch(true);
         Check("touch controls can be enabled", hud.Input.TouchEnabled);
+        Check("minimap hides while touch controls are active",
+              minimapPanel != null && !minimapPanel.Visible);
+        hud.SetTouch(false);
+        Check("minimap returns when touch controls are off",
+              minimapPanel != null && minimapPanel.Visible);
         var ed = new CharacterEditor();
         ed.Init(roster);
         root.AddChild(ed);
@@ -140,6 +180,13 @@ public static class SelfTest
         Check("no NaN ball/player positions", Mx.IsFinite(view.Engine.State.Ball.Pos) && view.Engine.State.Players.All(p => Mx.IsFinite(p.Pos)));
         Check("3D rig transforms followed simulation",
               view.Rigs.Any(r => MathF.Abs(r.Position.X) > .5f || MathF.Abs(r.Position.Z) > .5f));
+        int owner = view.Engine.State.Ball.Owner;
+        int controlled = view.Engine.State.Controlled;
+        Check("pressure marker is not duplicated on an opponent ball carrier",
+              !view.PressureRing.Visible
+              || (owner >= 0 && owner < view.Engine.State.Players.Length
+                  && controlled >= 0 && controlled < view.Engine.State.Players.Length
+                  && view.Engine.State.Players[owner].Team == view.Engine.State.Players[controlled].Team));
         Check("HUD scoreboard updated", view.Hud != null);
         view.QueueFree();
         rig.QueueFree();

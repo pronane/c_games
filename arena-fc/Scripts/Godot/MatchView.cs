@@ -505,16 +505,22 @@ public partial class MatchView : Node3D
                 ControlName.Position = new Vector3(c.Pos.X, 2.2f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
             }
 
-            // Nearest opponent to the ball: a blue ring + OPP tag makes the
-            // pressing player readable without marking all eleven opponents.
-            int pressure = -1; float bd = float.MaxValue;
-            foreach (var q in Engine.State.Players)
+            // Mark the nearest pressing opponent only while the controlled
+            // side has possession; otherwise the ball-carrier marker already
+            // identifies the opponent nearest to the ball.
+            bool teamHasBall = hasOwner && Engine.State.Players[owner].Team == c.Team;
+            int pressure = -1;
+            float bd = float.MaxValue;
+            if (teamHasBall)
             {
-                if (q.Team == c.Team || q.IsKeeper) continue;
-                float d = Mx.FlatDist(q.Pos, b.Pos);
-                if (d < bd) { bd = d; pressure = q.Index; }
+                foreach (var q in Engine.State.Players)
+                {
+                    if (q.Team == c.Team || q.IsKeeper) continue;
+                    float d = Mx.FlatDist(q.Pos, b.Pos);
+                    if (d < bd) { bd = d; pressure = q.Index; }
+                }
             }
-            bool showPressure = pressure >= 0 && pressure < Rigs.Length && bd < 12f;
+            bool showPressure = teamHasBall && pressure >= 0 && pressure < Rigs.Length && bd < 12f;
             PressureRing.Visible = showPressure;
             PressureName.Visible = showPressure;
             if (showPressure)

@@ -122,10 +122,10 @@ public static class BroadcastPlan
                 look = new Vector3(ball.X, 0f, ball.Z);
                 fov = 45f;
                 break;
-            default: // high broadcast: fixed world orientation, never spins with facing
-                target = ClampPitch(new Vector3(focus.X - 8f, 32f, focus.Z + 48f), 14f, 22f);
+            default: // broadcast: fixed world orientation, never spins with facing
+                target = ClampPitch(new Vector3(focus.X - 7f, 28f, focus.Z + 42f), 14f, 22f);
                 look = ClampPitch(new Vector3(focus.X, 1.2f, focus.Z), 2f, 2f);
-                fov = 48f + widen;
+                fov = 46f + widen;
                 break;
         }
         // Looking straight down its own up axis is degenerate; the tactical mode

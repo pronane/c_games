@@ -7,6 +7,7 @@
 //   godot --path . -- --rigshot                     close-up of one rig (debug)
 //   godot --path . -- --screenshot                   save one rendered frame to user://screenshot.png
 //   godot --path . -- --record DIR --frames N        dump N viewport frames as PNG (video capture)
+//   godot --path . -- --arena-profile-frames N       profile a live 5v5 render after warm-up
 //   godot --headless --path . -- --dump-rig         regenerate Data/rig_default.json for the web build
 using System;
 using System.Collections.Generic;
@@ -29,6 +30,12 @@ public partial class Boot : Node3D
     private int _recordMax;
     private int _recordCount;
     private bool _recording;
+
+    private bool _profiling;
+    private int _profileWarmupFrames;
+    private int _profileFrameTarget;
+    private readonly List<double> _profileFrameMs = new();
+    private double _profilePhysicsMs, _profileDrawCalls, _profilePrimitives;
 
     public override void _Ready()
     {
@@ -60,7 +67,15 @@ public partial class Boot : Node3D
             return;
         }
 
-        if (Has("--match"))
+        _profiling = Has("--arena-profile-frames");
+        if (_profiling)
+        {
+            _profileFrameTarget = int.TryParse(Value("--arena-profile-frames"), out int n)
+                ? Math.Clamp(n, 60, 3600) : 300;
+            _profileWarmupFrames = 60;
+        }
+
+        if (Has("--match") || _profiling)
         {
             var view = new MatchView();
             view.Init(new MatchOptions { TeamSize = 5, Seed = 2026, TimeSpeed = 15f }, null, () => GetTree().Quit());
@@ -84,11 +99,18 @@ public partial class Boot : Node3D
             _recording = true;
             GD.Print($"ARENA_FC_RECORD_START dir={_recordDir} frames={_recordMax}");
         }
+        if (_profiling)
+            GD.Print($"ARENA_FC_PROFILE_START renderer={RenderingServer.GetCurrentRenderingMethod()} " +
+                     $"driver={RenderingServer.GetCurrentRenderingDriverName()} " +
+                     $"adapter={RenderingServer.GetVideoAdapterName()} " +
+                     $"warmup={_profileWarmupFrames} frames={_profileFrameTarget}");
         GD.Print("ARENA_FC_BOOT_OK");
     }
 
     public override void _Process(double delta)
     {
+        if (_profiling && ProfileFrame(delta)) return;
+
         if (_recording && GetViewport()?.GetTexture() is Texture2D recTex)
         {
             string file = Path.Combine(_recordDir!, $"f{_recordCount:D5}.png");
@@ -117,6 +139,33 @@ public partial class Boot : Node3D
         GD.Print($"ARENA_FC_SCREENSHOT {ProjectSettings.GlobalizePath(path)} err={err} size={img.GetWidth()}x{img.GetHeight()}");
         img.Dispose();
         GetTree().Quit(0);
+    }
+
+    private bool ProfileFrame(double delta)
+    {
+        if (_profileWarmupFrames > 0)
+        {
+            _profileWarmupFrames--;
+            return false;
+        }
+
+        _profileFrameMs.Add(delta * 1000.0);
+        _profilePhysicsMs += Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000.0;
+        _profileDrawCalls += Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
+        _profilePrimitives += Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
+        if (_profileFrameMs.Count < _profileFrameTarget) return false;
+
+        _profiling = false;
+        var sorted = _profileFrameMs.OrderBy(x => x).ToArray();
+        double Percentile(double p) => sorted[Math.Clamp((int)Math.Ceiling(p * sorted.Length) - 1, 0, sorted.Length - 1)];
+        double avgFrameMs = _profileFrameMs.Average();
+        GD.Print($"ARENA_FC_PROFILE frames={sorted.Length} avg_fps={1000.0 / avgFrameMs:F1} " +
+                 $"avg_frame_ms={avgFrameMs:F2} p95_frame_ms={Percentile(.95):F2} p99_frame_ms={Percentile(.99):F2} " +
+                 $"avg_physics_ms={_profilePhysicsMs / sorted.Length:F2} " +
+                 $"avg_draw_calls={_profileDrawCalls / sorted.Length:F1} " +
+                 $"avg_primitives={_profilePrimitives / sorted.Length:F0}");
+        GetTree().Quit(0);
+        return true;
     }
 
     private void RunSelfTest() => SelfTest.Run(this);

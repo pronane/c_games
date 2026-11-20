@@ -8,19 +8,19 @@
     "net9.0": []
   },
   "packageFolders": {
-    "/home/user/.nuget/packages/": {}
+    "C:\\Users\\prona\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/user/arena-fc/Tests/CoreTests.csproj",
-      "projectName": "CoreTests",
-      "projectPath": "/home/user/arena-fc/Tests/CoreTests.csproj",
-      "packagesPath": "/home/user/.nuget/packages/",
-      "outputPath": "/home/user/arena-fc/Tests/obj/",
+      "projectUniqueName": "D:\\c_games\\arena-fc\\Tests\\MatchCoreTests.csproj",
+      "projectName": "MatchCoreTests",
+      "projectPath": "D:\\c_games\\arena-fc\\Tests\\MatchCoreTests.csproj",
+      "packagesPath": "C:\\Users\\prona\\.nuget\\packages\\",
+      "outputPath": "D:\\c_games\\arena-fc\\Tests\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/home/user/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\prona\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
@@ -65,7 +65,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/home/user/.cache/arena-fc/dotnet/sdk/9.0.320/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "D:\\Program Files\\dotnet\\sdk\\9.0.321/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

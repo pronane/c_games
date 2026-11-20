@@ -235,8 +235,8 @@ def main():
           "NaturalRate" in soccer_cs and "speed / (nat" in soccer_cs)
     check("blend-space clip selection", "SelectClip" in soccer_cs and "SelectDirectionalClip" in soccer_cs)
     check("phase sync on clip switch", "_phase" in soccer_cs and "startPhase" in soccer_cs)
-    check("one-shots fit the match action window",
-          "clipDur / p.ActionDuration" in soccer_cs and "every one-shot" in soccer_cs)
+    check("non-contact one-shots fit the match action window",
+          "clipDur / p.ActionDuration" in soccer_cs and "Other one-shots" in soccer_cs)
     check("foot-planting IK", "SolveTwoBone" in soccer_cs and "ShortestArc" in soccer_cs)
     check("look-at and reach", "UpdateLookAt" in soccer_cs and "UpdateReach" in soccer_cs)
     check("archetype biases", "SetArchetype" in soccer_cs and "Archetype.Explosive" in soccer_cs)

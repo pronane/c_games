@@ -36,6 +36,7 @@ public sealed partial class SoccerClipRig : Node3D
     private readonly Dictionary<string, string> _aliases = new();
     private readonly HashSet<string> _loops = new();
     private readonly Dictionary<string, float> _clipDuration = new();
+    private readonly Dictionary<string, float> _contactFrac = new();
     private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
@@ -179,6 +180,9 @@ public sealed partial class SoccerClipRig : Node3D
                     if (c.TryGetProperty("loop", out var loop) && loop.GetBoolean()) _loops.Add(clipName);
                     if (c.TryGetProperty("fps", out var fps) && c.TryGetProperty("frames", out var frames))
                         _clipDuration[clipName] = frames.GetSingle() / Math.Max(1f, fps.GetSingle());
+                    if (c.TryGetProperty("events", out var ev)
+                        && ev.TryGetProperty("ball_contact_frac", out var bc) && bc.ValueKind != JsonValueKind.Null)
+                        _contactFrac[clipName] = bc.GetSingle();
                 }
             if (root.TryGetProperty("materials", out var mats))
             {
@@ -281,8 +285,8 @@ public sealed partial class SoccerClipRig : Node3D
         }
         if (clip != _current)
         {
-            // 1.6 phase sync: start the new clip at the matching cycle phase.
-            float startPhase = _phase;
+            // Locomotion clips inherit cycle phase; one-shots must begin at frame zero.
+            float startPhase = oneShot ? 0f : _phase;
             Player.Play(clip, oneShot ? .08f : .12f);
             Player.Seek(startPhase * Player.GetAnimation(clip).Length, true);
             _current = clip;
@@ -295,12 +299,17 @@ public sealed partial class SoccerClipRig : Node3D
         if (oneShot)
         {
             float scale = 1f;
-            // Match every one-shot's full authored motion to its engine action
-            // window, not only ball-contact clips. Otherwise the 25-frame slide
-            // outlasts the 0.60s slide action and is cut off before it recovers.
+            // Align ball actions to their contact frame. Other one-shots, such as
+            // slide tackles, should still finish inside the engine action window.
             if (_clipDuration.TryGetValue(clip, out float clipDur)
-                && clipDur > 0.01f && p.ActionDuration > 0.01f)
-                scale = Math.Clamp(clipDur / p.ActionDuration, 0.6f, 1.8f);
+                && clipDur > 0f && p.ActionDuration > 0.01f)
+            {
+                if (_contactFrac.TryGetValue(clip, out float frac) && frac > 0f
+                    && p.ActionContactAt > 0f)
+                    scale = ActionTiming.ContactAlignedPlaybackScale(clipDur, frac, p.ActionContactAt);
+                else
+                    scale = Math.Clamp(clipDur / p.ActionDuration, 0.6f, 1.8f);
+            }
             Player.SpeedScale = scale;
         }
         else

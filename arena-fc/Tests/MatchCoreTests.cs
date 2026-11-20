@@ -65,6 +65,24 @@ Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={
 Check("players keep personal space around the ball", avgNearBall < 2.60f,
       $"avgWithin4m={avgNearBall:F3}");
 
+Section("Action pose timing");
+float passStartPose = ActionTiming.ContactEnvelope(0f, .34f, .17f);
+float passContactPose = ActionTiming.ContactEnvelope(.17f, .34f, .17f);
+float passEndPose = ActionTiming.ContactEnvelope(.34f, .34f, .17f);
+float earlyContactPose = ActionTiming.ContactEnvelope(.2f, .5f, .2f);
+float midpointPose = ActionTiming.ContactEnvelope(.25f, .5f, .2f);
+float passPlaybackScale = ActionTiming.ContactAlignedPlaybackScale(25f / 30f, .5f, .17f);
+float passEventTime = .5f * (25f / 30f) / passPlaybackScale;
+Check("action pose starts and ends neutral and peaks at contact",
+      passStartPose < .001f && passContactPose > .999f && passEndPose < .001f,
+      $"start={passStartPose:F3} contact={passContactPose:F3} end={passEndPose:F3}");
+Check("action pose peak follows a non-midpoint contact time",
+      earlyContactPose > .999f && earlyContactPose > midpointPose,
+      $"contact={earlyContactPose:F3} midpoint={midpointPose:F3}");
+Check("one-shot clip contact lands on the scheduled simulation time",
+      MathF.Abs(passEventTime - .17f) < .001f && passPlaybackScale > 1.8f,
+      $"event={passEventTime:F3}s speed={passPlaybackScale:F2}x");
+
 Section("Gait joint sign convention");
 // A leg bone points down; +X rotation sends it BEHIND the player (-Z).  Forward
 // thigh swing must be negative, knee flexion positive.  See Scripts/Core/Gait.cs.
@@ -285,6 +303,9 @@ var camA = BroadcastPlan.Compute(0, ballPos, playerPos, new Vector3(1f, 0f, 0f))
 var camB = BroadcastPlan.Compute(0, ballPos, playerPos, new Vector3(-1f, 0f, 0f));
 Check("broadcast camera never rotates with instantaneous player facing",
       camA.Target == camB.Target && camA.Look == camB.Look && camA.Up == camB.Up);
+Check("broadcast camera keeps the play closer in frame",
+      Vector3.Distance(camA.Target, camA.Look) < 52f,
+      $"distance={Vector3.Distance(camA.Target, camA.Look):F1}");
 var tactical = BroadcastPlan.Compute(4, ballPos, playerPos, new Vector3(1f, 0f, 0f));
 Check("tactical view keeps a stable -Z screen-up vector", tactical.Up == new Vector3(0f, 0f, -1f));
 bool bounded = true;

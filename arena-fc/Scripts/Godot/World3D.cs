@@ -551,8 +551,9 @@ public static class RigAnimator
         rig.PoseReady = true;
         GaitPose g = raw;
 
-        float ActionEnvelope(float total) =>
-            MathF.Sin(Math.Clamp(1f - p.ActionTimer / total, 0f, 1f) * MathF.PI);
+        float ActionEnvelope() =>
+            ActionTiming.ContactEnvelope(p.ActionDuration - p.ActionTimer,
+                                         p.ActionDuration, p.ActionContactAt);
 
         Set(rig, "Hips", g.Lean * .25f, g.HipYawL * .5f, g.Roll + g.TurnLean);
         Set(rig, "Spine", g.Lean * .35f, -g.Twist * .6f + g.ShoulderYaw * .3f, -g.Roll * .5f);
@@ -596,9 +597,9 @@ public static class RigAnimator
         }
         // Action clips are added to the smoothed gait and eased in/out, instead
         // of overwriting every joint with a constant pose for N frames.
-        if (p.Action == "kick" && p.ActionTimer > 0f)
+        if ((p.Action == "kick" || p.Action == "volley") && p.ActionTimer > 0f)
         {
-            float env = ActionEnvelope(.4f);
+            float env = ActionEnvelope();
             float kick = env * 1.25f;
             Set(rig, "RThigh", g.HipR - kick, 0, 0);
             Set(rig, "RShin", g.KneeR + MathF.Max(0f, .4f - kick) * .8f, 0, 0);
@@ -606,14 +607,14 @@ public static class RigAnimator
         }
         else if (p.Action == "tackle" && p.ActionTimer > 0f)
         {
-            float env = ActionEnvelope(.45f);
+            float env = ActionEnvelope();
             Set(rig, "Chest", g.Lean * .45f, 0, g.Roll + env * .85f);
             Set(rig, "LThigh", g.HipL - env * 1.1f, 0, 0);
             Set(rig, "RThigh", g.HipR + env * .5f, 0, 0);
         }
         else if (p.Action == "slide" && p.ActionTimer > 0f)
         {
-            float env = ActionEnvelope(.60f);
+            float env = ActionEnvelope();
             Set(rig, "Hips", g.Lean * .25f - env * .35f, 0, g.Roll + env * .35f);
             Set(rig, "Chest", g.Lean * .45f - env * .55f, 0, g.Roll + env * .25f);
             Set(rig, "LThigh", g.HipL - env * 1.25f, 0, 0);
@@ -626,7 +627,7 @@ public static class RigAnimator
         }
         else if (p.Action == "foul" && p.ActionTimer > 0f)
         {
-            float env = ActionEnvelope(1.1f);
+            float env = ActionEnvelope();
             float fall = MathF.Sin(MathF.Min(1f, env * 1.6f) * MathF.PI * .5f);
             Set(rig, "Hips", g.Lean * .25f, 0, g.Roll + fall * .55f);
             Set(rig, "Chest", g.Lean * .45f + fall * .65f, 0, g.Roll + fall * .35f);
@@ -647,7 +648,7 @@ public static class RigAnimator
         }
         else if (p.Action == "dive" && p.ActionTimer > 0f)
         {
-            float env = ActionEnvelope(.65f);
+            float env = ActionEnvelope();
             Set(rig, "Chest", g.Lean * .45f, 0, g.Roll + env * 1.2f);
             Set(rig, "LThigh", g.HipL - env * .7f, 0, 0);
             Set(rig, "RThigh", g.HipR + env * .4f, 0, 0);
