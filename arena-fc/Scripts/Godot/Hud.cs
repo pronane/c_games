@@ -124,6 +124,7 @@ public partial class Hud : CanvasLayer
     private Label _scoreBug = null!, _lowerThird = null!, _statsOverlay = null!;
     private float _lowerThirdTimer;
     private ProgressBar _power = null!, _stamina = null!;
+    private Label? _chargeFeedback;
     private PanelContainer _pauseMenu = null!;
     private Control _pauseButtons = null!;
     private Minimap _minimap = null!;
@@ -203,6 +204,10 @@ public partial class Hud : CanvasLayer
         _power = Bar(new Color(1f, .72f, .18f));
         Place(_power, .5f, 1f, -130, -112, 260, 14);
         root.AddChild(_power);
+        _chargeFeedback = Ui.Lbl("", 12, Ui.Accent);
+        _chargeFeedback.HorizontalAlignment = HorizontalAlignment.Center;
+        Place(_chargeFeedback, .5f, 1f, -130, -130, 260, 16);
+        root.AddChild(_chargeFeedback);
         _stamina = Bar(new Color(.18f, .9f, .55f));
         Place(_stamina, .5f, 1f, -130, -94, 260, 10);
         root.AddChild(_stamina);
@@ -283,12 +288,15 @@ public partial class Hud : CanvasLayer
         var v = Ui.VBox(10);
         v.AddChild(Ui.Lbl("PAUSED", 30, Ui.Accent));
         v.AddChild(Ui.Btn("Resume", () => { SetPaused(false); OnResume?.Invoke(); }, true));
+        v.AddChild(Ui.Btn("Substitutions", ShowSubstitutions));
+        v.AddChild(Ui.Btn("Match analysis", ShowAnalysis));
+        v.AddChild(Ui.Btn("Photo mode", TogglePhotoMode));
         v.AddChild(Ui.Btn("Change camera (C)", () => OnCamera?.Invoke()));
         v.AddChild(Ui.Btn("Toggle touch controls", () => { SetTouch(!Input.TouchEnabled); OnTouchToggle?.Invoke(); }));
         v.AddChild(Ui.Btn("Quit to main menu", () => { SetPaused(false); OnQuit?.Invoke(); }));
         v.AddChild(Ui.Lbl("Arena FC build " + ProjectSettings.GetSetting("application/config/version", "1.0"), 12, Ui.Sub));
         _pauseMenu = Ui.PanelC(v, Ui.Panel);
-        Place(_pauseMenu, .5f, .5f, -180, -170, 360, 340);
+        Place(_pauseMenu, .5f, .5f, -190, -215, 380, 430);
         _pauseMenu.Visible = false;
         root.AddChild(_pauseMenu);
         // Focus is seeded in SetPaused(true) when the panel actually becomes visible.
@@ -359,10 +367,11 @@ public partial class Hud : CanvasLayer
     {
         _engine = e;
         var s = e.State;
-        string home = Clubs.All[e.Options.HomeClub].Short, away = Clubs.All[e.Options.AwayClub].Short;
+        string home = e.ShortFor(0), away = e.ShortFor(1);
         _score.Text = $"{home}   {s.Score[0]}  -  {s.Score[1]}   {away}";
-        _clock.Text = $"{e.ClockString()}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
-        _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}"
+        string stoppage = e.InStoppageTime ? $"  +{e.AddedMinutesShown}'" : "";
+        _clock.Text = $"{e.ClockString()}{stoppage}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
+        _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}   |   xG {s.Xg[0]:0.00}-{s.Xg[1]:0.00}"
                     + (s.YellowCards[0] + s.YellowCards[1] + s.RedCards[0] + s.RedCards[1] > 0
                         ? $"   |   Yellow {s.YellowCards[0]}-{s.YellowCards[1]}  Red {s.RedCards[0]}-{s.RedCards[1]}"
                         : "");
@@ -406,6 +415,12 @@ public partial class Hud : CanvasLayer
         else
             _actions.Text = "RT SPRINT · B TACKLE · RB+B SLIDE · LB SWITCH · R3 CAMERA";
         _power.Value = charge * 100f;
+        // ShotMeter (Features 1): the perfect window, spoken in words, not a colour.
+        if (charge > 0.02f && _chargeFeedback != null)
+        {
+            var app = GameApp.Instance;
+            _chargeFeedback.Text = app != null ? app.ShotFeedback(charge) : "";
+        }
         if (validCtrl) _stamina.Value = s.Players[ctrl].Stamina * 100f;
         if (Input.TouchEnabled) Input.TouchMove = _stick.Value;
         _minimap.Engine = e;

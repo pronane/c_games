@@ -187,6 +187,8 @@ public sealed partial class MatchEngine
         if (f.Fouls.Length >= 2) s.Fouls = (int[])f.Fouls.Clone();
         if (f.Corners.Length >= 2) s.Corners = (int[])f.Corners.Clone();
         if (f.Poss.Length >= 2) s.PossessionTime = (float[])f.Poss.Clone();
+        s.AddedTime = f.Added;
+        s.Xg = f.Xg is { Length: >= 2 } ? (float[])f.Xg.Clone() : new float[2];
         s.YellowCards = f.Yellows is { Length: >= 2 } ? (int[])f.Yellows.Clone() : new int[2];
         s.RedCards = f.Reds is { Length: >= 2 } ? (int[])f.Reds.Clone() : new int[2];
         s.ShootoutKicksHome = f.SkH; s.ShootoutKicksAway = f.SkA;
@@ -258,6 +260,7 @@ public sealed partial class MatchEngine
             Fouls = (int[])s.Fouls.Clone(), Corners = (int[])s.Corners.Clone(),
             PossessionTime = (float[])s.PossessionTime.Clone(),
             YellowCards = (int[])s.YellowCards.Clone(), RedCards = (int[])s.RedCards.Clone(),
+            AddedTime = s.AddedTime, Xg = (float[])s.Xg.Clone(),
             ShootoutKicksHome = s.ShootoutKicksHome, ShootoutKicksAway = s.ShootoutKicksAway,
             ShootoutTakerSide = s.ShootoutTakerSide, ShootoutShotTaken = s.ShootoutShotTaken,
             ShootoutTimer = s.ShootoutTimer,
@@ -285,6 +288,8 @@ public sealed partial class MatchEngine
         // the mirror/predictor from the authoritative server.
         s.YellowCards = (int[])src.YellowCards.Clone();
         s.RedCards = (int[])src.RedCards.Clone();
+        s.AddedTime = src.AddedTime;
+        s.Xg = (float[])src.Xg.Clone();
         s.ShootoutKicksHome = src.ShootoutKicksHome; s.ShootoutKicksAway = src.ShootoutKicksAway;
         s.ShootoutTakerSide = src.ShootoutTakerSide; s.ShootoutShotTaken = src.ShootoutShotTaken;
         s.ShootoutTimer = src.ShootoutTimer;

@@ -209,6 +209,8 @@ public sealed class FullStateDto
     [JsonPropertyName("fouls")] public int[] Fouls { get; set; } = new int[2];
     [JsonPropertyName("corners")] public int[] Corners { get; set; } = new int[2];
     [JsonPropertyName("poss")] public float[] Poss { get; set; } = new float[2];
+    [JsonPropertyName("xg")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float[]? Xg { get; set; }
+    [JsonPropertyName("added")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Added { get; set; }
     [JsonPropertyName("yellows")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int[]? Yellows { get; set; }
     [JsonPropertyName("reds")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int[]? Reds { get; set; }
     // Penalty shootout progress: without it a reconnect during a shootout restarted

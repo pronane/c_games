@@ -119,6 +119,33 @@ public class TournamentSystem
         _rng = new Rng(seed);
     }
 
+    /// <summary>Deterministic stream word, so a saved competition resumes with
+    /// exactly the AI results it would have produced.</summary>
+    public uint RngState
+    {
+        get => _rng.State;
+        set => _rng.State = value;
+    }
+
+    /// <summary>Rebuild the parts a save file cannot carry (team strengths,
+    /// null-safe collections) after loading.</summary>
+    public void Rehydrate()
+    {
+        Fixtures ??= new List<TournamentFixture>();
+        GroupTable ??= new List<GroupTableEntry>();
+        Groups ??= new List<TournamentGroup>();
+        Teams ??= new List<string>();
+        _strength.Clear();
+        foreach (var c in Clubs.All) _strength[c.Name] = c.Strength;
+        foreach (var t in GetWorldCupTeams()) _strength[t.Name] = t.Strength;
+        foreach (var g in Groups)
+        {
+            g.Teams ??= new List<string>();
+            foreach (var t in g.Teams) _strength.TryAdd(t, .72f);
+        }
+        foreach (var t in GroupTable) _strength.TryAdd(t.Team, .72f);
+    }
+
     // ---------------------------------------------------------------- queries
 
     public bool IsComplete => Champion.Length > 0;

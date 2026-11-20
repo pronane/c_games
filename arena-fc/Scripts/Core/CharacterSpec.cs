@@ -53,6 +53,9 @@ public sealed class CharacterSpec
     public float Passing { get; set; } = 0.72f;
     public float Defending { get; set; } = 0.55f;
     public float Goalkeeping { get; set; } = 0.10f;
+    /// <summary>Unlocked traits (Features.cs Badge enum): these change how the
+    /// simulation treats the player instead of being cosmetic.</summary>
+    public List<Badge> Badges { get; set; } = new();
     public float StaminaMax { get; set; } = 0.85f;
 
     /// <summary>Per-bone rest-pose offset in degrees (name => XYZ euler). Editable in the Skeleton tab.</summary>

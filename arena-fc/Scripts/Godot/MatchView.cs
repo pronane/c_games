@@ -10,6 +10,20 @@ namespace ArenaFC.GodotGame;
 
 public partial class MatchView : Node3D
 {
+    // CrowdDensity (P2) drives the noise of the ground: attendance follows the
+    // competition, and goals push the excitement up so the stadium reacts.
+    private readonly CrowdDensitySystem _crowd = new();
+    private int _lastGoals = -1;
+    // AmbientBehaviour / FacialExpression: off-ball players gesture and react,
+    // and both now show on the nameplates instead of being simulated nowhere.
+    private AmbientBehaviour[] _ambient = Array.Empty<AmbientBehaviour>();
+    private FacialExpression[] _face = Array.Empty<FacialExpression>();
+    // BlendLearner: which movement clip each player is actually using.
+    private readonly BlendLearner _blend = new();
+    private int _blendFrame;
+    private AmbientAction[] _ambientTag = Array.Empty<AmbientAction>();
+    private Emotion[] _faceTag = Array.Empty<Emotion>();
+    private bool _photoKeyHeld;
     public MatchEngine Engine = null!;
     public InputHub Input = new();
     public Hud Hud = null!;
@@ -123,13 +137,27 @@ public partial class MatchView : Node3D
         // The home club's own ground: World3D used to be built with the default
         // index, so every fixture in the game was played at "Lions Den".
         var stadium = new Stadium();
-        stadium.Build(true, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
+        _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
+        // Empty grounds still get the stadium, just not the crowd.
+        stadium.Build(_crowd.GetCrowdCount() > 0, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
         AddChild(stadium);
 
         // Online: the mirror/predictor engine is authoritative for rendering, but
         // it is still a plain MatchEngine so every HUD/camera/rig path is reused.
         Engine = Online != null ? Online.Engine : new MatchEngine(_opts);
+        // Substitutions are not in the wire protocol yet: refuse them online
+        // instead of desyncing the room.
+        Engine.OnlineLocked = Online != null;
         Rigs = new CharacterRig[Engine.State.Players.Length];
+        _ambient = new AmbientBehaviour[Rigs.Length];
+        _face = new FacialExpression[Rigs.Length];
+        _ambientTag = new AmbientAction[Rigs.Length];
+        _faceTag = new Emotion[Rigs.Length];
+        for (int i = 0; i < Rigs.Length; i++)
+        {
+            _ambient[i] = new AmbientBehaviour();
+            _face[i] = new FacialExpression();
+        }
         for (int i = 0; i < Rigs.Length; i++)
         {
             Rigs[i] = RigFactory.Create(Engine.State.Players[i].Spec);
@@ -217,11 +245,18 @@ public partial class MatchView : Node3D
         }
         if (Input.PausePressed)
         {
+            // Esc leaves photo mode before it opens the pause menu.
+            if (Hud.PhotoModeActive) { Hud.TogglePhotoMode(); Input.Reset(); return; }
             Hud.SetPaused(!Hud.Paused);
             _pending = PlayerCommand.None;
             Input.Reset();
         }
         if (Input.CameraPressed) Cam.Cycle();
+        if (Godot.Input.IsPhysicalKeyPressed(Key.P))
+        {
+            if (!_photoKeyHeld) { _photoKeyHeld = true; Hud.TogglePhotoMode(); }
+        }
+        else _photoKeyHeld = false;
         if (Hud.Paused)
         {
             // Keep draining authoritative packets even while the local UI is paused.
@@ -243,6 +278,21 @@ public partial class MatchView : Node3D
         }
         PlayEventSounds();
         Sync(dt);
+        // Crowd reacts to goals and settles back down between them.
+        int goals = Engine.State.Score[0] + Engine.State.Score[1];
+        if (_lastGoals >= 0 && goals > _lastGoals)
+        {
+            _crowd.OnGoal();
+            for (int i = 0; i < _face.Length && i < Engine.State.Players.Length; i++)
+            {
+                bool home = Engine.State.Players[i].Team == 0;
+                _face[i].ReactToEvent(home ? "goal_scored" : "goal_conceded");
+                _ambient[i].OnGoal(home);
+            }
+        }
+        _lastGoals = goals;
+        _crowd.Update(dt);
+        RecordBlendClips();
         var stadium = GetNodeOrNull<Stadium>("../Stadium");
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
@@ -250,6 +300,9 @@ public partial class MatchView : Node3D
         // Phase 4: Trigger post-match screen on FullTime
         if (Engine.State.Phase == Phase.FullTime && OnMatchEnd != null)
         {
+            GameApp.Instance?.RememberHeat(Engine.Heat);
+            GameApp.Instance?.RememberBlend(_blend);
+            GameApp.Instance?.RememberEvents(Engine.Events);
             OnMatchEnd(Engine.State);
             OnMatchEnd = null; // only once
         }
@@ -262,6 +315,50 @@ public partial class MatchView : Node3D
 
     /// <summary>Plays the procedural sound for each match event raised since the last tick.
     /// The "Audio" autoload is Scripts/Core/Audio/ProceduralAudio.gd; without it this does nothing.</summary>
+    /// <summary>Sample which movement clip each player is using (BlendLearner).</summary>
+    private void RecordBlendClips()
+    {
+        if (++_blendFrame % 6 != 0 || Engine == null) return;
+        int owner = Engine.State.Ball.Owner;
+        foreach (var p in Engine.State.Players)
+        {
+            float speed = Mx.Flat(p.Vel).Length();
+            int band = speed < .5f ? 0 : speed < 1.8f ? 1 : speed < 3.2f ? 2 : speed < 5f ? 3 : 4;
+            string clip = band switch { 0 => "idle", 1 => "walk", 2 => "jog", 3 => "run", _ => "sprint" };
+            int ball = p.Index == owner ? (p.Dribbling ? 2 : 1) : 0;
+            _blend.Record(new BlendCell { SpeedBand = band, TurnBand = 0, BallState = ball }, clip);
+        }
+        _blend.Normalise();
+    }
+
+    /// <summary>Off-ball gesture / emotion tag for a nameplate.</summary>
+    private string MoodTag(int index)
+    {
+        if (index < 0 || index >= _ambientTag.Length) return "";
+        string ambient = _ambientTag[index] switch
+        {
+            AmbientAction.Point => " · POINTING",
+            AmbientAction.Gesture => " · CALLING",
+            AmbientAction.Direct => " · DIRECTING",
+            AmbientAction.LookAround => " · SCANNING",
+            AmbientAction.Stretch => " · STRETCHING",
+            AmbientAction.WalkBack => " · WALKING BACK",
+            _ => "",
+        };
+        string mood = _faceTag[index] switch
+        {
+            Emotion.Happy => " · HAPPY",
+            Emotion.Sad => " · DOWN",
+            Emotion.Angry => " · ANGRY",
+            Emotion.Tired => " · TIRED",
+            Emotion.Focused => " · FOCUSED",
+            Emotion.Surprised => " · SURPRISED",
+            Emotion.Injured => " · HURT",
+            _ => "",
+        };
+        return ambient + mood;
+    }
+
     private void PlayEventSounds()
     {
         var events = Engine.Events;
@@ -345,6 +442,19 @@ public partial class MatchView : Node3D
             float yaw = MathF.Atan2(p.Facing.X, p.Facing.Z);
             rig.Rotation = new Vector3(0, yaw, 0);
             RigAnimator.Pose(rig, p, dt, _time, b.Pos);
+            var ambient = _ambient[i].Update(dt, _time, i == owner, i != owner, p.Stamina);
+            var (faceYaw, facePitch, faceRoll) = _face[i].Update(dt);
+            if (rig.BoneIndex.TryGetValue("Head", out int headBone) && rig.Skeleton != null
+                && (MathF.Abs(facePitch) > .001f || MathF.Abs(faceRoll) > .001f))
+            {
+                // Small readable head reaction without fighting the gait pose.
+                var q = rig.Skeleton.GetBonePoseRotation(headBone);
+                rig.Skeleton.SetBonePoseRotation(headBone,
+                    q * new Quaternion(new Vector3(1f, 0f, 0f), facePitch * .6f)
+                      * new Quaternion(new Vector3(0f, 0f, 1f), faceRoll * .6f));
+            }
+            _ambientTag[i] = ambient;
+            _faceTag[i] = _face[i].Current;
             // Shirt names used to clutter every player.  Keep only the two names
             // that matter: the controlled player and whoever owns the ball.
             rig.NameLabel.Visible = i == ctrl || i == owner;
@@ -367,9 +477,9 @@ public partial class MatchView : Node3D
             OwnerRing.Position = new Vector3(o.Pos.X, .055f, o.Pos.Z);
             OwnerRing.RotationDegrees = new Vector3(0, _time * 35f, 0);
             OwnerArrow.Position = new Vector3(o.Pos.X, 2.35f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
-            SetText(OwnerName, owner == ctrl
+            SetText(OwnerName, (owner == ctrl
                 ? $"YOU · BALL · {o.Spec.DisplayName}"
-                : $"BALL · {o.Spec.DisplayName}");
+                : $"BALL · {o.Spec.DisplayName}") + MoodTag(owner));
             OwnerName.Modulate = owner == ctrl ? new Color(.2f, 1f, .55f) : new Color(1f, .72f, .18f);
             OwnerName.Position = new Vector3(o.Pos.X, 2.2f + MathF.Sin(_time * 5f) * .08f, o.Pos.Z);
         }
@@ -391,7 +501,7 @@ public partial class MatchView : Node3D
             ControlName.Visible = !hasOwner || owner != ctrl;
             if (ControlName.Visible)
             {
-                SetText(ControlName, $"YOU · {c.Spec.DisplayName}");
+                SetText(ControlName, $"YOU · {c.Spec.DisplayName}" + MoodTag(ctrl));
                 ControlName.Position = new Vector3(c.Pos.X, 2.2f + MathF.Sin(_time * 5f) * .08f, c.Pos.Z);
             }
 

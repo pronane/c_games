@@ -838,5 +838,172 @@ Check("the copa only invites CONMEBOL teams and still has a bracket",
       copa.Teams.Count >= 4 && copa.Teams.All(t => TournamentSystem.GetWorldCupTeams()
       .First(x => x.Name == t).Confederation == "CONMEBOL"), string.Join(",", copa.Teams));
 
+
+Section("Substitutions, stoppage time and persistence");
+var subEng = new MatchEngine(new MatchOptions { Seed = 21, TeamSize = 5 });
+subEng.State.Phase = Phase.Play;
+Check("a bench is generated on demand", subEng.BenchOf(0).Count == 7, $"{subEng.BenchOf(0).Count}");
+Check("the bench contains a reserve goalkeeper", subEng.BenchOf(0)[0].Role == Role.Goalkeeper);
+var starter = subEng.State.Players[2].Spec;
+var firstSub = subEng.BenchOf(0)[1];
+Check("a substitution swaps the players", subEng.Substitute(0, 2, 1) && subEng.State.Players[2].Spec == firstSub &&
+      subEng.State.Players[2].Stamina == 1f, "swap failed");
+Check("the outgoing player drops to the bench", subEng.BenchOf(0)[1] == starter);
+Check("the substitution counter advances", subEng.SubsUsed[0] == 1 && subEng.SubsLeft(0) == MatchEngine.MaxSubstitutions - 1);
+for (int i = 0; i < 8; i++) subEng.Substitute(0, 3, 2);
+Check("only five substitutions are allowed", subEng.SubsUsed[0] == MatchEngine.MaxSubstitutions,
+      $"used={subEng.SubsUsed[0]}");
+var sentOffEng = new MatchEngine(new MatchOptions { Seed = 22, TeamSize = 5 });
+typeof(MatchEngine).GetMethod("SendOff", BindingFlags.Instance | BindingFlags.NonPublic)!
+    .Invoke(sentOffEng, new object[] { sentOffEng.State.Players[1], "Red" });
+sentOffEng.EnsureBench(0);
+Check("a dismissed player cannot be substituted", !sentOffEng.Substitute(0, 1, 0));
+subEng.OnlineLocked = true;
+Check("online matches refuse local substitutions", !subEng.Substitute(1, 0, 0));
+
+var stEng = new MatchEngine(new MatchOptions { Seed = 23, HalfMinutes = 1f, TimeSpeed = 60f, Mode = 0 });
+stEng.State.Phase = Phase.Play;
+stEng.State.Half = 1;
+stEng.State.Clock = 59f;
+Check("no stoppage time before anything happens", stEng.State.AddedTime == 0f);
+stEng.AddStoppage(30f);
+Check("stoppage time accumulates", MathF.Abs(stEng.State.AddedTime - 30f) < 1e-4f && stEng.AddedMinutesShown == 1,
+      $"added={stEng.State.AddedTime} shown={stEng.AddedMinutesShown}");
+for (int i = 0; i < 120 && stEng.State.Phase == Phase.Play; i++) stEng.Step(1f / 60f, PlayerCommand.None);
+Check("the first half runs into the added minute before ending",
+      stEng.State.Phase != Phase.Play && stEng.State.Clock > 60f,
+      $"phase={stEng.State.Phase} clock={stEng.State.Clock:F1}");
+Check("the added time is reported as played", MathF.Abs(stEng.State.Clock - 90f) < .01f ||
+      stEng.State.Clock >= 60f);
+
+// Persistence
+var save = new SaveGame();
+var saveOpts = new MatchOptions { TeamSize = 7, Difficulty = 2, HomeClub = 3, AwayClub = 5, TimeSpeed = 21f };
+var saveTactics = new Tactics { Mentality = Mentality.VeryAttacking, PressingIntensity = .8f, Width = .3f };
+save.Settings.CopyFrom(saveOpts, saveTactics);
+save.Tournament = new TournamentSystem(5);
+save.Tournament.GenerateWorldCup(TournamentSystem.GetWorldCupTeams());
+save.Tournament.PlayerTeam = "England";
+save.Tournament.RecordPlayerResult(2, 0);
+var mmrBefore = save.Ranked.Mmr;
+save.Ranked.Record(true, false, 3, 1, 1100);
+save.PushResult("HAR 3-1 NOR");
+string saveJson = save.ToJson();
+var loaded = SaveGame.FromJson(saveJson);
+Check("settings survive a save/load", loaded.Settings.TeamSize == 7 && loaded.Settings.Difficulty == 2 &&
+      loaded.Settings.HomeClub == 3 && MathF.Abs(loaded.Settings.TimeSpeed - 21f) < 1e-4f);
+var loadedOpts = new MatchOptions();
+var loadedTactics = new Tactics();
+loaded.Settings.ApplyTo(loadedOpts, loadedTactics);
+Check("settings apply back onto match options", loadedOpts.TeamSize == 7 && loadedTactics.Mentality == Mentality.VeryAttacking);
+Check("tactics survive a save/load", MathF.Abs(loadedTactics.PressingIntensity - .8f) < 1e-4f);
+Check("the tournament survives a save/load", loaded.Tournament != null && loaded.Tournament!.PlayerTeam == "England" &&
+      loaded.Tournament.PlayedCount == save.Tournament.PlayedCount && loaded.Tournament.Groups.Count == 4,
+      $"played={loaded.Tournament?.PlayedCount}");
+Check("a resumed tournament keeps simulating", loaded.Tournament!.NextPlayerFixture != null);
+loaded.Tournament.RecordPlayerResult(1, 0);
+Check("ranked MMR survives a save/load", loaded.Ranked.Mmr == save.Ranked.Mmr && loaded.Ranked.Mmr > mmrBefore,
+      $"{loaded.Ranked.Mmr} vs {save.Ranked.Mmr}");
+Check("the ranked ladder promotes on rating", new RankedLadder { Mmr = 1500 }.Division == 1 &&
+      new RankedLadder { Mmr = 1000 }.Division == 6);
+Check("recent results survive a save/load", loaded.RecentResults.Count == 1 && loaded.RecentResults[0] == "HAR 3-1 NOR");
+Check("a corrupt save degrades to a fresh game",
+      SaveGame.FromJson("{ not json").Version == SaveGame.CurrentVersion &&
+      SaveGame.FromJson("null").Settings.TeamSize == 11);
+var clampSave = SaveGame.FromJson("{\"Settings\":{\"TeamSize\":4,\"HomeClub\":99,\"AwayClub\":99}}");
+clampSave.Normalize();
+var clampOpts = new MatchOptions();
+clampSave.Settings.ApplyTo(clampOpts, new Tactics());
+Check("a hand-edited save is clamped to legal values",
+      clampOpts.TeamSize == 11 && clampOpts.HomeClub < Clubs.All.Length && clampOpts.HomeClub != clampOpts.AwayClub,
+      $"teamSize={clampOpts.TeamSize} home={clampOpts.HomeClub} away={clampOpts.AwayClub}");
+
+Section("Career, report, referee and badges");
+
+// --- career: fixtures, table and season flow ------------------------------
+var careerTeams = Clubs.All.Take(10).Select(c => c.Name).ToList();
+var career = new CareerMode();
+career.StartNew(careerTeams[0], careerTeams, 4242);
+Check("a new career builds a squad", career.State.Squad.Count >= 11, $"squad={career.State.Squad.Count}");
+Check("a 10-team league is 18 match weeks", career.MatchWeeks == 18, $"weeks={career.MatchWeeks}");
+Check("a double round-robin is 90 fixtures", career.State.Fixtures.Count == 90, $"fixtures={career.State.Fixtures.Count}");
+Check("every club has a table row", career.State.Table.Count == 10, $"rows={career.State.Table.Count}");
+Check("every club plays every week once",
+      career.State.Fixtures.Where(f => f.Week == 1).Select(f => f.HomeTeam).Distinct().Count() == 5 &&
+      career.State.Fixtures.Where(f => f.Week == 1).Select(f => f.AwayTeam).Distinct().Count() == 5);
+Check("no pairing is repeated inside a round",
+      career.State.Fixtures
+          .GroupBy(f => string.CompareOrdinal(f.HomeTeam, f.AwayTeam) < 0
+              ? f.HomeTeam + "|" + f.AwayTeam : f.AwayTeam + "|" + f.HomeTeam)
+          .All(g => g.GroupBy(f => f.Week).All(w => w.Count() == 1)));
+Check("every pairing happens twice (home and away)", career.State.Fixtures
+      .GroupBy(f => string.CompareOrdinal(f.HomeTeam, f.AwayTeam) < 0
+          ? f.HomeTeam + "|" + f.AwayTeam : f.AwayTeam + "|" + f.HomeTeam)
+      .All(g => g.Count() == 2));
+var firstFixture = career.NextFixture;
+Check("the career knows its next fixture", firstFixture != null, "no next fixture");
+career.PlayNextResult(3, 1);
+Check("playing a week advances the clock", career.State.Week == 2, $"week={career.State.Week}");
+Check("the table follows the result",
+      career.State.Table.Sum(t => t.Played) == 10 && career.TableSorted.Count == 10,
+      $"played={career.State.Table.Sum(t => t.Played)}");
+Check("the whole round was settled", career.State.Table.All(t => t.Played == 1),
+      $"played={career.State.Table.Sum(t => t.Played)}");
+int goalsFor = career.State.Table.Sum(t => t.GF), goalsAgainst = career.State.Table.Sum(t => t.GA);
+Check("the table's goals balance", goalsFor == goalsAgainst, $"{goalsFor} vs {goalsAgainst}");
+Check("the division ladder position is sane", career.Position is >= 1 and <= 10, $"pos={career.Position}");
+for (int i = 0; i < 17; i++) career.SimulateWeek();
+Check("the season rolls over after 18 weeks",
+      career.State.Season == 2 && career.State.Week == 1 && career.MatchWeeks == 18,
+      $"season={career.State.Season} week={career.State.Week}");
+Check("a rolled season has fresh fixtures", career.State.Fixtures.Count == 90 &&
+      career.State.Fixtures.All(f => !f.Played), $"played={career.State.Fixtures.Count(f => f.Played)}");
+career.SimulateWeek();
+Check("a simulated week settles the round", career.State.Table.All(t => t.Played == 1));
+
+// --- match report ---------------------------------------------------------
+var reportOpts = new MatchOptions { TeamSize = 5, Seed = 99, Mode = 0 };
+var reportEngine = new MatchEngine(reportOpts);
+var reportState = reportEngine.State;
+for (int i = 0; i < 240; i++) reportEngine.Step(1f / 60f, PlayerCommand.None);
+var ratings = MatchReport.Ratings(reportState, 0);
+Check("every outfielder gets a rating", ratings.Count == 5, $"ratings={ratings.Count}");
+Check("ratings stay in the legal band", ratings.All(r => r.rating is >= 3f and <= 10f),
+      string.Join(",", ratings.Select(r => r.rating)));
+Check("a man of the match exists", MatchReport.BestPlayer(reportState, 0).name.Length > 0);
+Check("xG has been sampled", reportState.Xg[0] >= 0f && reportState.Xg[1] >= 0f);
+Check("the heat map has zones", reportEngine.Heat.Zones.Count > 0, $"zones={reportEngine.Heat.Zones.Count}");
+var heatGrid = MatchReport.HeatGrid(reportEngine.Heat);
+Check("the heat grid is 9x5", heatGrid.GetLength(0) == 9 && heatGrid.GetLength(1) == 5);
+Check("the verdict line is written", MatchReport.Verdict(reportState).Length > 0);
+
+// --- referee, badges, link-ups -------------------------------------------
+var referee = new RefereeSystem();
+var decisions = new List<RefereeDecision>();
+for (int i = 0; i < 200; i++) decisions.Add(referee.DecideFoul(i % 2 == 0, i % 7 == 0, i % 5 == 0, false, (i % 10) / 10f));
+Check("the referee reaches more than one verdict", decisions.Distinct().Count() > 2,
+      string.Join(",", decisions.Distinct()));
+Check("the referee counts its fouls", referee.FoulCount == 200, $"fouls={referee.FoulCount}");
+var badgeRoster = Clubs.CreateRoster(0, 11);
+Check("generated players carry badges", badgeRoster.Any(p => p.Badges.Count > 0),
+      $"none of {badgeRoster.Count}");
+Check("goalkeepers never get shooting badges",
+      badgeRoster.Where(p => p.Role == Role.Goalkeeper).All(p => !p.Badges.Contains(Badge.Deadeye)));
+
+// --- persistence of the new state ---------------------------------------
+var featureSave = new SaveGame();
+featureSave.Career = new CareerDto { Started = true, State = career.State, UltimateTeam = career.UltimateTeam };
+featureSave.Achievements.Add("unlocked:First win");
+featureSave.ReplayClips.Add("GOAL (120-210)");
+var featureLoaded = SaveGame.FromJson(featureSave.ToJson());
+Check("a career survives a save/load", featureLoaded.Career is { Started: true } &&
+      featureLoaded.Career!.State.TeamName == career.State.TeamName &&
+      featureLoaded.Career.State.Fixtures.Count == 90,
+      $"fixtures={featureLoaded.Career?.State.Fixtures.Count}");
+Check("a reloaded career can keep playing",
+      new CareerMode { State = featureLoaded.Career!.State }.NextFixture != null);
+Check("achievements and clips survive a save/load",
+      featureLoaded.Achievements.Contains("unlocked:First win") && featureLoaded.ReplayClips.Count == 1);
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

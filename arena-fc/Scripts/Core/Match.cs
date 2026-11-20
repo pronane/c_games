@@ -33,6 +33,11 @@ public sealed class MatchOptions
     public int AwayClub = 1;
     public string HomeFormation = "4-4-2";
     public string AwayFormation = "4-3-3";
+    /// <summary>Optional short labels ("ENG", "BRA"). Clubs fall back to Clubs.All.</summary>
+    public string HomeLabel = "";
+    public string AwayLabel = "";
+    /// <summary>Substitutes available per side (0 disables the bench).</summary>
+    public int Bench = 7;
     /// <summary>In-match tactics per side (A5).  Balanced defaults keep the
     /// tuned simulation numbers unchanged.</summary>
     public Tactics HomeTactics = new();
@@ -171,7 +176,13 @@ public sealed class MatchState
     public int[] Score = new int[2];
     public int[] Shots = new int[2], ShotsOnTarget = new int[2], Passes = new int[2], Fouls = new int[2], Corners = new int[2];
     public int[] YellowCards = new int[2], RedCards = new int[2];
+    /// <summary>Stoppage time for the current half, in game seconds. Accrued from
+    /// goals, cards, treatments and substitutions - the clock used to stop dead on
+    /// 45:00 / 90:00, sometimes mid-attack.</summary>
+    public float AddedTime;
     public float[] PossessionTime = new float[2];
+    /// <summary>Accumulated expected goals per side - shown full-time and in the HUD.</summary>
+    public float[] Xg = new float[2];
     public PlayerState[] Players = Array.Empty<PlayerState>();
     public BallState Ball = new();
     public int Controlled = -1, ControlledAway = -1, KickoffSide = 0, RestartSide = 0, AttackSign = 1;
@@ -229,6 +240,22 @@ public sealed partial class MatchEngine
             }
         }
         State.AttackSign = 1;
+        // LinkUpPlays: a named combination per adjacent pair, so a carrier has a
+        // runner waiting on a pattern instead of every team-mate freelancing.
+        for (int side = 0; side < 2; side++)
+        {
+            for (int i = 1; i + 1 < Options.TeamSize; i++)
+            {
+                _linkUps.AddPlay(new LinkUpPlay
+                {
+                    Name = $"link-{side}-{i}",
+                    PasserIndex = side * Options.TeamSize + i,
+                    RunnerIndex = side * Options.TeamSize + i + 1,
+                    Type = i % 2 == 0 ? "overlap" : "third_man",
+                    TriggerDistance = 22f,
+                });
+            }
+        }
         ResetPositions(true);
         if (Options.Mode == 3) // Shootout: start with a penalty
         {
@@ -465,6 +492,7 @@ public sealed partial class MatchEngine
         if (S.Phase == Phase.FullTime || S.Phase == Phase.Paused) return;
 
         S.Clock += dt * Options.TimeSpeed;
+        if (_tick % 30 == 0) Heat.AddPosition(S.Ball.Pos.X, S.Ball.Pos.Z);
         // Phase 7: AI substitutions (tired players after 60')
         int minute = (int)(S.Clock / 60f);
         if (minute >= 60 && _tick % 600 == 0) // check every 10 seconds
@@ -481,16 +509,22 @@ public sealed partial class MatchEngine
             }
         }
         float halfSeconds = Options.HalfMinutes * 60f;
-        if (S.Phase == Phase.Play && S.Half == 1 && S.Clock >= halfSeconds)
+        // Stoppage time: the half runs until the added minutes are used up.
+        float halfEnd = halfSeconds + (Options.Mode == 3 ? 0f : S.AddedTime);
+        if (S.Phase == Phase.Play && S.Half == 1 && S.Clock >= halfEnd)
         {
-            S.Clock = halfSeconds;
+            S.Clock = halfEnd;
             S.Phase = Phase.HalfTime;
             S.PhaseTimer = 3.0f;
-            Add(EventKind.Whistle, "Half time!");
+            Add(EventKind.Whistle, S.AddedTime > 0f
+                ? $"Half time! (+{MathF.Round(S.AddedTime / 60f * 10f) / 10f:0.#} min added)"
+                : "Half time!");
+            S.AddedTime = 0f;
             return;
         }
-        if (S.Phase == Phase.Play && S.Half == 2 && S.Clock >= halfSeconds * 2f)
+        if (S.Phase == Phase.Play && S.Half == 2 && S.Clock >= halfSeconds * 2f + (Options.Mode == 3 ? 0f : S.AddedTime))
         {
+            S.Clock = halfSeconds * 2f + S.AddedTime;
             S.Phase = Phase.FullTime;
             Add(EventKind.Whistle, $"Full time! {ScoreText()}");
             foreach (var p in S.Players) p.Action = S.Score[p.Team] > S.Score[1 - p.Team] ? "celebrate" : "idle";
@@ -515,6 +549,7 @@ public sealed partial class MatchEngine
                     break;
                 case Phase.HalfTime:
                     S.Half = 2;
+                    S.AddedTime = 0f;
                     S.KickoffSide = 1;
                     ResetPositions(true);
                     S.Phase = Phase.Kickoff;
@@ -719,7 +754,7 @@ public sealed partial class MatchEngine
         }
     }
 
-    private string ScoreText() => $"{Clubs.All[Options.HomeClub].Short} {State.Score[0]} - {State.Score[1]} {Clubs.All[Options.AwayClub].Short}";
+    private string ScoreText() => $"{ShortFor(0)} {State.Score[0]} - {State.Score[1]} {ShortFor(1)}";
 
     private void KickoffPass(int from)
     {
@@ -942,6 +977,17 @@ public sealed partial class MatchEngine
             Vector3 carrier = ball.Pos;
             Vector3 support = slotPos + Mx.FlatDir(p.Home, carrier) * 1.6f;
             support.X += attack * 3.5f;
+            // Fluid Formations: a link-up pattern can override the role run type.
+            _posScratch.Clear();
+            foreach (var q in S.Players) _posScratch.Add((q.Pos.X, q.Pos.Z));
+            var linkUp = _linkUps.CheckTrigger(ball.Owner, ball.Pos.X, ball.Pos.Z, _posScratch);
+            if (linkUp != null && linkUp.RunnerIndex == p.Index)
+            {
+                p.RunType = RunTypeFor(linkUp.Type);
+                p.Target = support + new Vector3(attack * 3f, 0, Mx.Clamp(-carrier.Z * .35f, -10f, 10f));
+                p.Action = "run";
+                return;
+            }
             // Assign run types by role and position.
             if (p.Role == Role.Forward)
             {
@@ -1198,6 +1244,7 @@ public sealed partial class MatchEngine
         SetAction(p, isVolley ? "volley" : "kick", .40f, .50f);
         int attack = SideSign(p.Team);
         Vector3 target = new(GoalPos(p.Team).X, Rng.Range(.4f, 2.0f), Rng.Range(-Mx.GoalHalfWidth * .78f, Mx.GoalHalfWidth * .78f));
+        State.Xg[p.Team] += ShotXg(p, target);
         // Phase 2.4: shot type by charge and context.
         // Phase 3: finesse shots (charge 0.5-0.65 = curved placement).
         ShotType shotType = isVolley ? ShotType.Volley
@@ -1368,15 +1415,29 @@ public sealed partial class MatchEngine
             // booking, a second yellow is a red, and a professional foul that
             // denies a clear run on goal can be a straight red.
             bool denial = IsDenyingGoal(carrier, p);
-            bool straightRed = denial && Rng.Next() < .30f;
-            bool booked = !straightRed && Rng.Next() < (slide ? .34f : .16f);
+            // RefereeSystem (G9) had advantage, penalties, cards and injury all
+            // implemented and nothing calling it.  Decisions now go through it,
+            // so the referee is a single authority instead of four RNG rolls.
+            var decision = _referee.DecideFoul(inBox, denial, slide, false, slide ? .82f : .45f);
+            bool straightRed = decision == RefereeDecision.RedCard;
+            bool booked = !straightRed && decision == RefereeDecision.YellowCard;
+            bool injury = decision == RefereeDecision.Injury;
+            if (injury)
+            {
+                // A dangerous tackle that hurts: booking plus treatment time.
+                booked = true;
+                AddStoppage(25f);
+                Add(EventKind.Foul, $"{p.Spec.DisplayName} is hurt in the challenge.");
+            }
             if (straightRed)
             {
+                AddStoppage(45f);
                 Add(EventKind.Foul, $"Foul! {p.Spec.DisplayName} denies a clear chance.");
                 SendOff(p, "Straight red card");
             }
             else if (booked)
             {
+                AddStoppage(20f);
                 p.Cards++;
                 State.YellowCards[p.Team]++;
                 if (p.Cards >= 2) SendOff(p, "Second yellow card");
@@ -1680,8 +1741,10 @@ public sealed partial class MatchEngine
         p.Vel = Mx.MoveTowards(p.Vel, targetVel, accel);
         p.Pos += p.Vel * dt;
         p.Pos.Y = 0;
-        if (p.Shielding) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .12f);
-        else if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f);
+        // Engine badge: a bigger tank, so the same sprints cost less.
+        float drain = p.Spec.Badges.Contains(Badge.Engine) ? .7f : 1f;
+        if (p.Shielding) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .12f * drain);
+        else if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f * drain);
         else p.Stamina = MathF.Min(1f, p.Stamina + dt * .022f);
         float planar = Mx.Flat(p.Vel).Length();
         if (planar > .15f) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.Flat(p.Vel), MathF.Min(1f, dt * 7f)));
@@ -1869,6 +1932,7 @@ public sealed partial class MatchEngine
 
     private void Goal(int side)
     {
+        AddStoppage(30f);
         State.Score[side]++;
         State.GoalScorer = State.Ball.LastTouch;
         var scorer = State.GoalScorer >= 0 ? State.Players[State.GoalScorer].Spec.DisplayName : "Own goal";
@@ -1970,6 +2034,122 @@ public sealed partial class MatchEngine
     }
 
     // ---- Read-only helpers for the front end ----
+    // ---- Substitutions -------------------------------------------------------
+    public const int MaxSubstitutions = 5;
+    /// <summary>Bench for each side. Built lazily from the club squads so that
+    /// headless tests and the server pay nothing unless a sub is actually made.</summary>
+    public readonly List<CharacterSpec>[] Bench = { new(), new() };
+    public readonly int[] SubsUsed = new int[2];
+    /// <summary>Set by the online client: substitutions are local-only until the
+    /// protocol carries them, so they are refused rather than desyncing clients.</summary>
+    public bool OnlineLocked;
+
+    public int SubsLeft(int side) => MaxSubstitutions - SubsUsed[side];
+    public bool HasBench => Bench[0].Count > 0 || Bench[1].Count > 0;
+    public List<CharacterSpec> BenchOf(int side) { EnsureBench(side); return Bench[side]; }
+
+    public void EnsureBench(int side, int count = 7)
+    {
+        if (Bench[side].Count > 0) return;
+        int club = side == 0 ? Options.HomeClub : Options.AwayClub;
+        Bench[side].AddRange(Clubs.CreateBench(club, Math.Max(1, count), Options.Seed + side * 31));
+    }
+
+    /// <summary>Replace an on-pitch player with a substitute.  The outgoing player
+    /// swaps onto the bench, keeps his cards with him, and the incoming player
+    /// starts fresh (full stamina, no bookings).</summary>
+    public bool Substitute(int side, int slot, int benchIndex)
+    {
+        if (OnlineLocked) return false;
+        if (side is < 0 or > 1) return false;
+        if (SubsUsed[side] >= MaxSubstitutions) return false;
+        slot = Math.Clamp(slot, 0, Options.TeamSize - 1);
+        int index = side * Options.TeamSize + slot;
+        if (index < 0 || index >= State.Players.Length) return false;
+        var p = State.Players[index];
+        if (p.SentOff) return false;
+        EnsureBench(side, Math.Max(1, Options.Bench));
+        if (benchIndex < 0 || benchIndex >= Bench[side].Count) return false;
+
+        var incoming = Bench[side][benchIndex];
+        var outgoing = p.Spec;
+        Bench[side][benchIndex] = outgoing;
+
+        p.Spec = incoming;
+        p.Stamina = 1f;
+        p.Cards = 0;
+        p.ActionTimer = 0f;
+        p.PossessionLock = 0f;
+        p.Action = "idle";
+        p.IsInjured = false;
+        p.FirstTouchQuality = 1f;
+        SubsUsed[side]++;
+        AddStoppage(15f);
+        if (State.Ball.Owner == index) State.Ball.Owner = -1;
+        Add(EventKind.Info, $"Substitution ({ClubShort(side)}): {incoming.DisplayName} on for {outgoing.DisplayName}");
+        return true;
+    }
+
+    /// <summary>Short label for a side: an explicit tournament label, else the club code.</summary>
+    public string ShortFor(int side)
+    {
+        string label = side == 0 ? Options.HomeLabel : Options.AwayLabel;
+        if (!string.IsNullOrWhiteSpace(label)) return label;
+        int club = side == 0 ? Options.HomeClub : Options.AwayClub;
+        return Clubs.All[Math.Clamp(club, 0, Clubs.All.Length - 1)].Short;
+    }
+
+    /// <summary>Territory map of the match, sampled 2x/second from the ball.</summary>
+    public HeatMap Heat { get; } = new();
+    private readonly ExpectedGoals _xgModel = new();
+
+    /// <summary>xG for one shot, from distance, angle and defensive pressure.</summary>
+    private readonly RefereeSystem _referee = new();
+    // LinkUpPlays (FluidFormations): named combinations between a carrier and a
+    // runner.  Built from the naming order so indices are stable for both sides.
+    private readonly LinkUpPlays _linkUps = new();
+    private readonly List<(float x, float z)> _posScratch = new();
+
+    private static int RunTypeFor(string type) => type switch
+    {
+        "overlap" => 1, "underlap" => 2, "decoy" => 3, _ => 4,
+    };
+
+    private float ShotXg(PlayerState p, Vector3 target)
+    {
+        var goal = GoalPos(p.Team);
+        float distance = Mx.FlatDist(State.Ball.Pos, goal);
+        float dx = MathF.Max(.5f, MathF.Abs(goal.X - State.Ball.Pos.X));
+        float angle = MathF.Abs(MathF.Atan2(target.Z - State.Ball.Pos.Z, dx)) * 57.2958f;
+        var nearest = NearestOpponent(p, out float oppDist);
+        bool oneOnOne = nearest == null || oppDist > 8f;
+        return _xgModel.CalculateXG(distance, angle, oneOnOne);
+    }
+
+    /// <summary>Accrue stoppage time for the current half (game seconds).</summary>
+    public void AddStoppage(float gameSeconds)
+    {
+        if (Options.Mode == 3) return;
+        State.AddedTime = MathF.Min(State.AddedTime + MathF.Max(0f, gameSeconds), 420f);
+    }
+
+    /// <summary>Minutes of added time signalled for the current half (rounded up,
+    /// as the fourth official would show it).</summary>
+    public int AddedMinutesShown => (int)MathF.Ceiling(State.AddedTime / 60f);
+
+    /// <summary>True once the clock is inside the added time of the half.</summary>
+    public bool InStoppageTime
+    {
+        get
+        {
+            if (Options.Mode == 3 || State.Phase != Phase.Play) return false;
+            float halfSeconds = Options.HalfMinutes * 60f;
+            return State.Half == 1
+                ? State.Clock >= halfSeconds
+                : State.Clock >= halfSeconds * 2f;
+        }
+    }
+
     public string ClockString()
     {
         float minutes = State.Clock / 60f;

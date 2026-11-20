@@ -32,6 +32,8 @@ public static class StateCodec
             Fouls = (int[])s.Fouls.Clone(),
             Corners = (int[])s.Corners.Clone(),
             Poss = (float[])s.PossessionTime.Clone(),
+            Added = s.AddedTime,
+            Xg = (float[])s.Xg.Clone(),
             Yellows = (int[])s.YellowCards.Clone(),
             Reds = (int[])s.RedCards.Clone(),
             SkH = s.ShootoutKicksHome, SkA = s.ShootoutKicksAway,

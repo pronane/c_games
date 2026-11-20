@@ -147,6 +147,44 @@ public static class Clubs
     }
 
     /// <summary>World-space starting/home position. attackSign: home +1, away -1 (flips at half time).</summary>
+    /// <summary>Substitutes for a club: extra outfielders (plus a reserve keeper)
+    /// generated from the same club identity as the starting eleven.</summary>
+    public static List<CharacterSpec> CreateBench(int clubIndex, int count = 7, int seed = 7)
+    {
+        var list = CreateRoster(clubIndex, Math.Max(1, count), seed + 5000);
+        for (int i = 0; i < list.Count; i++)
+        {
+            list[i].Number = 12 + i;
+            var role = i == 0 ? Role.Goalkeeper
+                     : i % 3 == 0 ? Role.Defender
+                     : i % 3 == 1 ? Role.Midfielder : Role.Forward;
+            list[i].Role = role;
+            list[i].Goalkeeping = role == Role.Goalkeeper ? MathF.Max(list[i].Goalkeeping, .62f) : .12f;
+        }
+        AssignBadges(list, seed + 77);
+        return list;
+    }
+
+    /// <summary>Deterministic trait assignment (Features.cs Badge).  The engine
+    /// reads these - see the Engine badge's stamina drain in Match.cs.</summary>
+    public static void AssignBadges(List<CharacterSpec> list, int seed = 11)
+    {
+        var rng = new Random(seed);
+        foreach (var p in list)
+        {
+            var pool = p.Role switch
+            {
+                Role.Goalkeeper => new[] { Badge.Wall, Badge.Engine },
+                Role.Defender => new[] { Badge.Wall, Badge.Engine, Badge.TargetMan },
+                Role.Midfielder => new[] { Badge.Playmaker, Badge.Handles, Badge.Engine },
+                _ => new[] { Badge.Deadeye, Badge.Trickster, Badge.TargetMan },
+            };
+            p.Badges.Clear();
+            p.Badges.Add(pool[rng.Next(pool.Length)]);
+            if (rng.NextDouble() < .35) p.Badges.Add(pool[rng.Next(pool.Length)]);
+        }
+    }
+
     public static Vector3 SlotToWorld(float x, float z, int attackSign)
         => new(attackSign * x * Mx.HalfLength * .94f, 0f, z * Mx.HalfWidth * .88f);
 
@@ -201,6 +239,7 @@ public static class Clubs
             p.Sanitize();
             list.Add(p);
         }
+        AssignBadges(list, seed + clubIndex);
         return list;
     }
 }
