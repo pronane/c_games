@@ -84,6 +84,9 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ✅ 7.1 (PR #3) Free kicks: taker must play the ball (pass/shoot/cross) — no picking it up and dribbling; wall at 9.15 m (10 yards) for direct kicks near goal; every opponent at least 9.15 m away.
 - 🔧 7.2 (PR #3: throw-ins from the touchline, taker behind the line, 2 m rule, keeper tips for corners) Corners and throw-ins: aimable delivery, near/far post runs, short options; throw-in is a throw (hands), not a pass.
 - ⬜ 7.3 Penalty kicks in matches use the shootout aiming model.
+- ✅ 7.5 (PR #5) **Rules are enforced, not physically prevented** (FIFA/PES behaviour): a human may encroach — caution and sent back (second = red); a human taker may run off with a set piece — free kick to the opposition (foul throw → throw-in to them); a double touch — indirect free kick. AI players keep the distance by choice.
+- ✅ 7.6 (PR #5) **Violent conduct**: punch (hold LB+RB, then B / key G) and headbutt (LB+RB, then Y / key T), human-only. Seen by the referee (likelier near the ball) → straight red + direct free kick / penalty; unseen → **VAR** review at the next stoppage or within 6 s → red, and a goal the offending side scored in the meantime is disallowed.
+- ✅ 7.7 (PR #5) Skill moves and call-for-ball now work online (they were never sent over the wire).
 - ⬜ 7.4 Goal kicks: short or long choice.
 
 ## 7b. Rules audit (PR #3)

@@ -76,6 +76,8 @@ public struct PlayerCommand
     public SkillMove Skill;
     /// <summary>Phase 3: Call for ball (trigger teammate run).</summary>
     public bool CallForBall;
+    /// <summary>Violent conduct (human only): straight red if seen, VAR if not.</summary>
+    public bool Punch, Headbutt;
     public float Charge;
     public static PlayerCommand None => default;
 }
@@ -202,6 +204,14 @@ public sealed class MatchState
     public int ShootoutTaker = -1;
     /// <summary>Kick-by-kick shootout results (true = scored) for the HUD tally.</summary>
     public readonly List<bool> ShootoutHome = new(), ShootoutAway = new();
+    /// <summary>Set-piece taker being watched for a double touch.</summary>
+    public int SetPieceTaker = -1;
+    public bool SetPieceLeftFoot;
+    public float SetPieceTimer;
+    /// <summary>Unseen violent conduct waiting for VAR.</summary>
+    public int VarOffender = -1, VarVictimTeam = -1;
+    public Vector3 VarSpot;
+    public float VarTimer;
 }
 
 public sealed partial class MatchEngine
@@ -554,6 +564,7 @@ public sealed partial class MatchEngine
         if (S.Phase != Phase.Play)
         {
             S.PhaseTimer -= dt;
+            UpdateVar(dt);                      // VAR reviews at the stoppage
             if (S.PhaseTimer > 0) { AnimateOnly(dt); return; }
             // Training: a goal or the ball going out just resets the drill.
             if (IsTraining) { SetupDrill(Drill); return; }
@@ -723,6 +734,7 @@ public sealed partial class MatchEngine
                 p.DecisionTimer = Rng.Range(.08f, .18f);
                 Decide(p, pc, human);
             }
+            if (!human) RespectRestartDistance(p);
         }
 
         // ---- Movement ----
@@ -792,6 +804,8 @@ public sealed partial class MatchEngine
         if (S.Ball.Owner < 0) BallPhysics(dt);
         // While a first-touch capture is pending, nobody else may steal the ball.
         if (!S.Ball.HasPending) TryPossession(dt);
+        EnforceRestartLaws(dt);
+        UpdateVar(dt);
         ClampAll();
     }
 
@@ -820,6 +834,7 @@ public sealed partial class MatchEngine
     /// dribble do not flicker with the AI decision clock.</summary>
     private void HumanActions(PlayerState p, PlayerCommand cmd)
     {
+        if (cmd.Punch || cmd.Headbutt) { ViolentConduct(p, cmd.Headbutt); return; }
         var S = State;
         var ball = S.Ball;
         bool owner = ball.Owner == p.Index;
@@ -1787,9 +1802,17 @@ public sealed partial class MatchEngine
     /// <summary>The set-piece taker has played the ball.  Under the laws he may not
     /// touch it again until another player has (the audit found ~10% double
     /// touches), so he is locked out of possession briefly.</summary>
-    private static void ReleaseSetPiece(PlayerState p)
+    private void ReleaseSetPiece(PlayerState p)
     {
-        if (p.MustPlayBall) p.PossessionLock = MathF.Max(p.PossessionLock, 2f);
+        if (p.MustPlayBall)
+        {
+            // Follow-through only; touching it again before anyone else is an
+            // offence the referee punishes (EnforceRestartLaws), not prevented.
+            p.PossessionLock = MathF.Max(p.PossessionLock, .35f);
+            State.SetPieceTaker = p.Index;
+            State.SetPieceLeftFoot = false;
+            State.SetPieceTimer = 0f;
+        }
         p.MustPlayBall = false;
     }
 
@@ -1797,10 +1820,6 @@ public sealed partial class MatchEngine
     private bool IsThrowInHold(PlayerState taker)
         => taker.MustPlayBall && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - .6f
            && MathF.Abs(State.Ball.Pos.X) < Mx.HalfLength - 1.5f;
-
-    /// <summary>Required distance for opponents at the current restart: 2 m at a
-    /// throw-in, 9.15 m (10 yards) at free kicks, corners and goal kicks.</summary>
-    private float RestartDistance(PlayerState taker) => IsThrowInHold(taker) ? 2f : 9.15f;
 
     private void AwardFreeKick(int side, Vector3 pos, bool penalty)
     {
@@ -1992,23 +2011,10 @@ public sealed partial class MatchEngine
             sprint = !human && (Mx.FlatDist(p.Pos, p.Target) > 5f || p.Pressing) && p.Stamina > .25f;
         }
         // Restart taker must play the ball, not run off with it.
-        if (p.MustPlayBall) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }
-        if (State.Ball.Owner >= 0 && State.Ball.Owner != p.Index)
-        {
-            var holder = State.Players[State.Ball.Owner];
-            if (holder.MustPlayBall && holder.Team != p.Team)
-            {
-                // Hold the restart distance until the ball is in play.
-                float need = RestartDistance(holder);
-                Vector3 next = p.Pos + wish;
-                float nd = Mx.FlatDist(next, State.Ball.Pos);
-                if (nd < need)
-                {
-                    Vector3 rim = State.Ball.Pos + Mx.FlatDir(State.Ball.Pos, next.LengthSquared() > 0 ? next : p.Pos) * need;
-                    wish = Mx.Flat(rim - p.Pos);
-                }
-            }
-        }
+        // An AI taker stands over the ball until he plays it.  A human is free to
+        // move: carrying it away is a free kick against him (EnforceRestartLaws),
+        // and opponents are free to encroach and be cautioned for it.
+        if (p.MustPlayBall && !human) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }
         p.Sprinting = sprint;
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
         // Phase 2.9 preset: Authentic is slightly slower, Competitive faster.

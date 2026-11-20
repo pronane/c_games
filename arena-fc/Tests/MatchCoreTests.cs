@@ -767,5 +767,78 @@ Section("Laws of the game at restarts (full matches)");
     Check("keeper parries go back into play or wide/over, never into his own net", parries > 0 && towardsGoal == 0, $"parries={parries} towardsGoal={towardsGoal}");
 }
 
+
+Section("The referee enforces the Laws (nothing is physically prevented)");
+{
+    MatchEngine SetPiece(int seed, int side, Vector3 spot, out PlayerState taker)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed });
+        var S = m.State;
+        S.Phase = Phase.FreeKick; S.RestartSide = side; S.RestartPos = spot; S.PhaseTimer = .01f;
+        m.Step(MatchEngine.Dt, PlayerCommand.None);
+        taker = S.Players[S.Ball.Owner];
+        return m;
+    }
+    // A human defender walks into the 10 yards: cautioned and sent back.
+    var e1 = SetPiece(51, 1, new Vector3(5f, 0, 0), out var t1);
+    var S1 = e1.State;
+    int yBefore = S1.YellowCards[0];
+    var enc = S1.Players.Where(p => p.Team == 0 && !p.IsKeeper).OrderBy(p => Mx.FlatDist(p.Pos, S1.Ball.Pos)).First();
+    S1.Controlled = enc.Index; S1.ControlLock = 99f;
+    for (int i = 0; i < 240 && S1.YellowCards[0] == yBefore && S1.Ball.Owner == t1.Index && t1.MustPlayBall; i++)
+    {
+        var d = Mx.FlatDir(enc.Pos, S1.Ball.Pos);
+        t1.DecisionTimer = 1f;                                 // keep the AI taker waiting
+        e1.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(d.X, d.Z) });
+    }
+    Check("a human can walk into the 10 yards (not physically stopped) and is cautioned",
+          S1.YellowCards[0] == yBefore + 1, $"yellows {yBefore}->{S1.YellowCards[0]}");
+    Check("the encroacher is sent back the full distance", Mx.FlatDist(enc.Pos, S1.Ball.Pos) >= 9.15f || enc.SentOff,
+          $"dist {Mx.FlatDist(enc.Pos, S1.Ball.Pos):0.0}");
+
+    // A human taker runs off with a free kick: free kick to the opposition.
+    var e2 = SetPiece(52, 0, new Vector3(-5f, 0, 0), out var t2);
+    var S2 = e2.State; S2.Controlled = t2.Index; S2.ControlLock = 99f;
+    var spot2 = S2.RestartPos;
+    for (int i = 0; i < 180 && S2.Phase == Phase.Play; i++)
+        e2.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(1, 0) });
+    Check("a human taker can carry the ball (not frozen)...", Mx.FlatDist(t2.Pos, spot2) > 1f, $"moved {Mx.FlatDist(t2.Pos, spot2):0.0} m");
+    Check("...and it is a free kick to the opposition", S2.Phase == Phase.FreeKick && S2.RestartSide == 1,
+          $"phase {S2.Phase} side {S2.RestartSide}");
+
+    // Double touch: the taker plays it, then has it again before anyone else.
+    var e3 = SetPiece(53, 0, new Vector3(-5f, 0, 0), out var t3);
+    var S3 = e3.State; S3.Controlled = t3.Index; S3.ControlLock = 99f;
+    for (int i = 0; i < 60 && S3.SetPieceTaker < 0; i++) e3.Step(MatchEngine.Dt, new PlayerCommand { Pass = i == 1 });
+    for (int i = 0; i < 40 && !S3.SetPieceLeftFoot; i++) e3.Step(MatchEngine.Dt, PlayerCommand.None);
+    S3.Ball.Owner = t3.Index; S3.Ball.Pos = t3.Pos + new Vector3(.5f, Mx.BallRadius, 0); t3.PossessionLock = 0;
+    e3.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("a double touch by the taker is an indirect free kick to the opposition",
+          S3.Phase == Phase.FreeKick && S3.RestartSide == 1, $"phase {S3.Phase} side {S3.RestartSide}");
+
+    // Violent conduct: straight red, from the referee or (if he missed it) VAR.
+    int sentOff = 0, viaVar = 0, trials = 12;
+    for (int k = 0; k < trials; k++)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = 60 + k });
+        var S = m.State; S.Phase = Phase.Play;
+        var me = S.Players[3]; var them = S.Players[S.Players.Length - 2];
+        me.Pos = new Vector3(0, 0, k * 2f - 10f); them.Pos = me.Pos + new Vector3(.8f, 0, 0);
+        S.Ball.Owner = -1; S.Ball.Pos = me.Pos + new Vector3(0, Mx.BallRadius, 30f - k * 5f);
+        S.Controlled = me.Index; S.ControlLock = 99f;
+        m.Step(MatchEngine.Dt, new PlayerCommand { Punch = k % 2 == 0, Headbutt = k % 2 == 1 });
+        bool immediate = me.SentOff;
+        for (int i = 0; i < 60 * 8 && !me.SentOff; i++) { S.Controlled = me.Index; m.Step(MatchEngine.Dt, PlayerCommand.None); }
+        if (me.SentOff) sentOff++;
+        if (me.SentOff && !immediate) viaVar++;
+    }
+    Check("punches and headbutts are always a red card (referee or VAR)", sentOff == trials, $"{sentOff}/{trials}, via VAR {viaVar}");
+    Check("the referee misses some off the ball, and VAR catches them", viaVar > 0, $"via VAR {viaVar}");
+
+    // Online: skill moves, call-for-ball and the new actions survive the wire.
+    var wire = ArenaFC.Core.Net.CommandDto.From(new PlayerCommand { Skill = SkillMove.Roulette, CallForBall = true, Punch = true }).To();
+    Check("skill / call-for-ball / punch go over the network", wire.Skill == SkillMove.Roulette && wire.CallForBall && wire.Punch);
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
