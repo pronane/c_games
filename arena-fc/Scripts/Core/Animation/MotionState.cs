@@ -19,6 +19,8 @@ public sealed class MotionState
     public float CrossfadeRemaining;
     public float CrossfadeDuration = .12f;
     public float PlaybackScale = 1f;
+    /// <summary>Optional baked feature-row payload for a future MM selector; -1 means rule selector.</summary>
+    public int MotionMatchRowIndex = -1;
     public float Speed;
     public float TurnRate;
     public BallState Ball;

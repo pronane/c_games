@@ -11,6 +11,7 @@
 // Run: dotnet run --project Tests/MatchCoreTests.csproj -c Release
 using System.Numerics;
 using System.Reflection;
+using System.Text.Json;
 using ArenaFC.Core;
 using ArenaFC.Core.Animation;
 
@@ -466,6 +467,63 @@ Check("same fixed inputs produce the same clip and normalized phase",
       deterministicA.CurrentClipId == deterministicB.CurrentClipId
       && deterministicA.NextClipId == deterministicB.NextClipId
       && MathF.Abs(deterministicA.RenderPhase - deterministicB.RenderPhase) < 1e-6f);
+
+Section("Motion Matching feature database (Core only; runtime selector unchanged)");
+var motionDb = MotionDatabase.Parse(File.ReadAllText("Data/clips/motion_features.json"));
+Check("baked motion feature table loads with the versioned 23D layout",
+      motionDb.Count == 403 && motionDb.Dimensions == 23);
+var poseFeatures = new float[8]; poseFeatures[0] = .12f; poseFeatures[4] = .3f;
+var builtQueryA = MotionQuery.BuildFeatures(poseFeatures, 1f, 0f, .1f, 2f, .5f, .8f);
+var builtQueryB = MotionQuery.BuildFeatures(poseFeatures, 1f, 0f, .1f, 2f, .5f, .8f);
+Check("MotionQuery builds a repeatable facing-root trajectory from current and desired motion",
+      builtQueryA.AsSpan().SequenceEqual(builtQueryB)
+      && builtQueryA[0] == .12f && builtQueryA[8] == 1f
+      && MathF.Abs(builtQueryA[17] - MathF.Sin(.16f)) < 1e-6f
+      && MathF.Abs(builtQueryA[18] - MathF.Cos(.16f)) < 1e-6f);
+var probeRow = motionDb.GetRow(100);
+var probeQuery = new MotionQuery(probeRow.Features.Span.ToArray(), probeRow.Category, probeRow.Ball,
+    PlayerIntent.Move, currentClipId: probeRow.ClipId, currentPhase: probeRow.Phase);
+var probeOk1 = motionDb.TrySearch(probeQuery, out var probeMatch1);
+var probeOk2 = motionDb.TrySearch(probeQuery, out var probeMatch2);
+Check("exact search is repeatable and prefers the identical current payload",
+      probeOk1 && probeOk2 && probeMatch1.Row.ClipId == probeMatch2.Row.ClipId
+      && probeMatch1.Row.FrameIndex == probeMatch2.Row.FrameIndex
+      && probeMatch1.Row.ClipId == probeRow.ClipId && probeMatch1.Row.FrameIndex == probeRow.FrameIndex);
+var zeroFeatures = new float[MotionFeatureLayout.Dimensions];
+var walkFeatures = new float[MotionFeatureLayout.Dimensions];
+var runFeatures = new float[MotionFeatureLayout.Dimensions]; runFeatures[0] = .2f;
+var fixtureRows = new[]
+{
+    new { clipId = "walk", frameIndex = 0, phase = .1f, category = "Locomotion", ballState = "None", styleTag = "", features = walkFeatures },
+    new { clipId = "run", frameIndex = 0, phase = .1f, category = "Locomotion", ballState = "None", styleTag = "", features = runFeatures },
+    new { clipId = "possessed", frameIndex = 0, phase = .1f, category = "Locomotion", ballState = "Possessed", styleTag = "", features = zeroFeatures },
+};
+var fixtureJson = JsonSerializer.Serialize(new
+{
+    version = MotionDatabase.CurrentVersion,
+    featureSchemaVersion = MotionFeatureLayout.SchemaVersion,
+    dimensions = MotionFeatureLayout.Dimensions,
+    layout = MotionFeatureLayout.Names,
+    trajectoryTimes = MotionFeatureLayout.TrajectoryTimes,
+    normalization = new { method = "zscore", mean = zeroFeatures, stdDev = Enumerable.Repeat(1f, MotionFeatureLayout.Dimensions).ToArray() },
+    weights = MotionFeatureLayout.GroupWeights,
+    rows = fixtureRows,
+});
+var fixtureDb = MotionDatabase.Parse(fixtureJson);
+var preferWalkQueryFeatures = new float[MotionFeatureLayout.Dimensions]; preferWalkQueryFeatures[0] = .2f;
+var continuityQuery = new MotionQuery(preferWalkQueryFeatures, ClipCategory.Locomotion,
+    ArenaFC.Core.Animation.BallState.None, currentClipId: "walk", currentPhase: .1f,
+    switchPenalty: .5f, temporalPenalty: 0f);
+Check("switch penalty can retain the current clip over a slightly closer candidate",
+      fixtureDb.TrySearch(continuityQuery, out var continuityMatch) && continuityMatch.Row.ClipId == "walk");
+var possessedQuery = new MotionQuery(zeroFeatures, ClipCategory.Locomotion,
+    ArenaFC.Core.Animation.BallState.Possessed);
+Check("ball-state tags hard-filter impossible motion candidates",
+      fixtureDb.TrySearch(possessedQuery, out var possessedMatch) && possessedMatch.Row.ClipId == "possessed");
+var shotQuery = new MotionQuery(zeroFeatures, ClipCategory.Locomotion,
+    ArenaFC.Core.Animation.BallState.None, PlayerIntent.Shoot);
+Check("event-driven one-shots never enter motion database search",
+      !fixtureDb.TrySearch(shotQuery, out _));
 var dribbleA = new DribbleState { TouchTimer = 0f };
 var dribbleB = new DribbleState { TouchTimer = 0f };
 var rngA = new Rng(1337); var rngB = new Rng(1337);

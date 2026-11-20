@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arena-fc.invalid/schemas/motion-features-v1.json",
+  "title": "Arena FC Motion Feature Database",
+  "type": "object",
+  "required": ["version", "featureSchemaVersion", "dimensions", "layout", "trajectoryTimes", "space", "normalization", "weights", "rows"],
+  "properties": {
+    "version": { "const": 1 },
+    "featureSchemaVersion": { "const": 1 },
+    "dimensions": { "const": 23 },
+    "layout": {
+      "const": [
+        "foot_l_pos_x", "foot_l_pos_z", "foot_r_pos_x", "foot_r_pos_z",
+        "foot_l_vel_x", "foot_l_vel_z", "foot_r_vel_x", "foot_r_vel_z",
+        "root_vel_x", "root_vel_z", "yaw_rate",
+        "traj_pos_0_x", "traj_pos_0_z", "traj_pos_1_x", "traj_pos_1_z",
+        "traj_pos_2_x", "traj_pos_2_z",
+        "traj_dir_0_x", "traj_dir_0_z", "traj_dir_1_x", "traj_dir_1_z",
+        "traj_dir_2_x", "traj_dir_2_z"
+      ]
+    },
+    "trajectoryTimes": { "const": [0.2, 0.4, 0.6] },
+    "space": { "const": "facing_root_xz" },
+    "normalization": {
+      "type": "object",
+      "required": ["method", "mean", "stdDev"],
+      "properties": {
+        "method": { "const": "zscore" },
+        "mean": { "$ref": "#/$defs/vector" },
+        "stdDev": { "$ref": "#/$defs/positiveVector" }
+      },
+      "additionalProperties": false
+    },
+    "weights": { "$ref": "#/$defs/weights" },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["clipId", "frameIndex", "phase", "category", "ballState", "styleTag", "features"],
+        "properties": {
+          "clipId": { "type": "string", "minLength": 1 },
+          "frameIndex": { "type": "integer", "minimum": 0 },
+          "phase": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+          "category": { "const": "Locomotion" },
+          "ballState": { "enum": ["None", "Possessed", "Approaching", "Contested", "Aerial"] },
+          "styleTag": { "type": "string" },
+          "features": { "$ref": "#/$defs/vector" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "vector": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "items": { "type": "number" }
+    },
+    "positiveVector": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "items": { "type": "number", "exclusiveMinimum": 0 }
+    },
+    "weights": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "items": { "type": "number", "minimum": 0 }
+    }
+  },
+  "additionalProperties": false
+}
