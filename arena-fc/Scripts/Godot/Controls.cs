@@ -36,7 +36,7 @@ public sealed class InputHub
     private float _rsPrevMag, _bumperHold;
     private bool _fakeShotLatch;
     private readonly bool[] _pNum = new bool[8];
-    private bool _pNext, _pPrev;
+    private bool _pNext, _pPrev, _pPunch, _pHeadbutt;
 
     private readonly int _playerIndex;
     private readonly bool _twoPlayer;
@@ -378,6 +378,16 @@ public sealed class InputHub
         for (int i = 0; i < numKeys.Length; i++)
             if (Edge(Input.IsPhysicalKeyPressed(numKeys[i]), ref _pNum[i]) && cmd.Skill == SkillMove.None)
                 cmd.Skill = SkillMoves.FromNumberKey(i + 1);
+
+        // Violent conduct (straight red, or VAR if the referee misses it):
+        // hold LB+RB then B = punch, Y = headbutt; keys G / T.
+        if (padLB && padRB && (cmd.Tackle || cmd.Through))
+        {
+            cmd.Punch = cmd.Tackle; cmd.Headbutt = cmd.Through;
+            cmd.Tackle = cmd.Slide = cmd.Through = false;
+        }
+        if (Edge(Input.IsPhysicalKeyPressed(Key.G), ref _pPunch)) cmd.Punch = true;
+        if (Edge(Input.IsPhysicalKeyPressed(Key.T), ref _pHeadbutt)) cmd.Headbutt = true;
 
         // Training lesson navigation: N / B (or PageDown / PageUp), or hold LB+RB for 0.8 s.
         TrainingNextPressed = Edge(Input.IsPhysicalKeyPressed(Key.N) || Input.IsPhysicalKeyPressed(Key.Pagedown), ref _pNext);

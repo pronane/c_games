@@ -130,6 +130,8 @@ public partial class MatchView : Node3D
         _pending.Switch |= cmd.Switch;
         _pending.Lob |= cmd.Lob;
         _pending.CallForBall |= cmd.CallForBall;
+        _pending.Punch |= cmd.Punch;
+        _pending.Headbutt |= cmd.Headbutt;
         if (cmd.Skill != SkillMove.None) _pending.Skill = cmd.Skill;
         if (cmd.Charge > _pending.Charge) _pending.Charge = cmd.Charge;
     }

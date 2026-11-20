@@ -115,6 +115,7 @@ public sealed partial class SoccerClipRig : Node3D
         ["idle"] = "soccer_idle", ["run"] = "soccer_run", ["kick"] = "soccer_kick_place",
         ["tackle"] = "soccer_tackle", ["slide"] = "soccer_slide_tackle", ["dive"] = "soccer_keeper_dive_left",
         ["catch"] = "soccer_keeper_catch", ["foul"] = "soccer_trip", ["celebrate"] = "soccer_celebrate",
+        ["punch"] = "soccer_fist_shoot", ["headbutt"] = "soccer_header", ["knocked_down"] = "soccer_knocked_down",
     };
 
     public bool Load(CharacterSpec spec)
