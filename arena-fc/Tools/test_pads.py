@@ -359,7 +359,9 @@ def main() -> int:
           'SetAction(carrier, "foul"' in match_cs and "FOUL · FREE KICK" in hud_cs
           and 'p.Action == "slide"' in world3d)
     check("player spacing avoids scrums",
-          "1.05f - dd) * .60f" in match_cs and "State.Ball.Owner >= 0 && p.Index != State.Ball.Owner" in match_cs)
+          "1.2f - dd) * .65f" in match_cs
+          and "1.8f - bd) * .42f" in match_cs
+          and "State.Ball.Owner >= 0 && p.Index != State.Ball.Owner" in match_cs)
     rig_cs = (ROOT / "Scripts" / "Core" / "RigDefinition.cs").read_text(encoding="utf-8")
     gait_cs = (ROOT / "Scripts" / "Core" / "Gait.cs").read_text(encoding="utf-8")
     check("rig has visible hip/knee/ankle joints and shaped boots",
@@ -416,8 +418,8 @@ def main() -> int:
     check("browser edition mirrors lob / dribble / long ball",
           'out["lob"]' in controllers_gd and 'out["dribble"]' in controllers_gd
           and 'cmd["sd"]' in browser and "Lofted pass." in browser)
-    check("camera plan keeps a fixed sideline orientation",
-          "fixed world orientation, never spins with facing" in camera_plan
+    check("default camera stays fixed and facing-independent",
+          "stable and facing-independent" in camera_plan
           and "ClampPitch" in camera_plan)
 
     section("06.11.2026 second pass — latched taps, dead-zone camera, tracking")

@@ -29,7 +29,7 @@ public partial class MatchView : Node3D
     public Hud Hud = null!;
     public BroadcastCamera Cam = null!;
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
-    public MeshInstance3D Ball = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
+    public MeshInstance3D Ball = null!, BallShadow = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
                           ControlArrow = null!, OwnerArrow = null!, PressureRing = null!;
     /// <summary>Billboarded, always-visible nameplates for the controlled player,
     /// the ball carrier, a loose ball and the nearest opponent.</summary>
@@ -167,6 +167,17 @@ public partial class MatchView : Node3D
 
         Ball = BallFactory.Create();
         AddChild(Ball);
+        var shadowMat = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(.015f, .025f, .018f, .36f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
+        BallShadow = Marker("BallGroundShadow",
+            new CylinderMesh { TopRadius = 1f, BottomRadius = 1f, Height = .02f, RadialSegments = 32 }, shadowMat);
+        BallShadow.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        AddChild(BallShadow);
 
         var green = MarkerMaterial(new Color(.2f, 1f, .55f));
         var amber = MarkerMaterial(new Color(1f, .72f, .18f));
@@ -176,7 +187,7 @@ public partial class MatchView : Node3D
             new TorusMesh { InnerRadius = .72f, OuterRadius = .95f, RingSegments = 32, Rings = 8 }, green);
         AddChild(Cursor);
         BallRing = Marker("BallRing",
-            new TorusMesh { InnerRadius = .36f, OuterRadius = .52f, RingSegments = 24, Rings = 6 }, yellow);
+            new TorusMesh { InnerRadius = .28f, OuterRadius = .38f, RingSegments = 24, Rings = 6 }, yellow);
         AddChild(BallRing);
         OwnerRing = Marker("BallOwnerRing",
             new TorusMesh { InnerRadius = .90f, OuterRadius = 1.08f, RingSegments = 32, Rings = 8 }, amber);
@@ -455,11 +466,17 @@ public partial class MatchView : Node3D
             }
             _ambientTag[i] = ambient;
             _faceTag[i] = _face[i].Current;
-            // Shirt names used to clutter every player.  Keep only the two names
-            // that matter: the controlled player and whoever owns the ball.
-            rig.NameLabel.Visible = i == ctrl || i == owner;
+            // The world-space role trackers below carry the useful names; hide
+            // the rig's own duplicate label to avoid stacked text over key players.
+            rig.NameLabel.Visible = false;
         }
         Ball.Position = G(b.Pos);
+        float shadowHeight = Math.Clamp(b.Pos.Y, 0f, 8f);
+        float shadowRadius = .62f + shadowHeight * .045f;
+        BallShadow.Position = new Vector3(b.Pos.X, .022f, b.Pos.Z);
+        BallShadow.Scale = new Vector3(shadowRadius, shadowRadius, shadowRadius);
+        if (BallShadow.MaterialOverride is StandardMaterial3D shadowMaterial)
+            shadowMaterial.AlbedoColor = new Color(.015f, .025f, .018f, Math.Clamp(.38f - shadowHeight * .035f, .08f, .38f));
         var v = Mx.Flat(b.Vel);
         Ball.RotationDegrees += new Vector3(v.Z, 0, -v.X) * (dt * 190f);
 
@@ -468,9 +485,9 @@ public partial class MatchView : Node3D
         // the recording; billboarded nameplates make possession obvious.
         BallRing.Visible = true;
         BallRing.Position = new Vector3(b.Pos.X, .05f, b.Pos.Z);
-        BallRing.RotationDegrees = new Vector3(0, _time * -55f, 0);
+        BallRing.RotationDegrees = Vector3.Zero;
         OwnerRing.Visible = hasOwner && owner != ctrl;
-        OwnerArrow.Visible = hasOwner;
+        OwnerArrow.Visible = hasOwner && owner != ctrl;
         if (hasOwner)
         {
             var o = Engine.State.Players[owner];
@@ -520,9 +537,9 @@ public partial class MatchView : Node3D
                     if (d < bd) { bd = d; pressure = q.Index; }
                 }
             }
-            bool showPressure = teamHasBall && pressure >= 0 && pressure < Rigs.Length && bd < 12f;
+            bool showPressure = teamHasBall && pressure >= 0 && pressure < Rigs.Length && bd < 7f;
             PressureRing.Visible = showPressure;
-            PressureName.Visible = showPressure;
+            PressureName.Visible = false; // the ring alone is enough for secondary pressure
             if (showPressure)
             {
                 var q = Engine.State.Players[pressure];

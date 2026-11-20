@@ -127,6 +127,7 @@ public partial class Hud : CanvasLayer
     private ProgressBar _power = null!, _stamina = null!;
     private Label? _chargeFeedback;
     private PanelContainer _pauseMenu = null!;
+    private PanelContainer _statsPanel = null!, _hintPanel = null!;
     private PanelContainer _fpsCounterPanel = null!;
     private Label _fpsCounterLabel = null!;
     private Control _pauseButtons = null!;
@@ -155,9 +156,11 @@ public partial class Hud : CanvasLayer
 
         // Stats (top right)
         _stats = Ui.Lbl("Possession 50% | Shots 0-0", 15, Ui.Sub);
-        var statsPanel = Ui.PanelC(_stats);
-        Place(statsPanel, 1f, 0f, -340, 14, 324, 44);
-        root.AddChild(statsPanel);
+        _statsPanel = Ui.PanelC(_stats);
+        _statsPanel.Name = "MatchStatsPanel";
+        Place(_statsPanel, 1f, 0f, -340, 14, 324, 44);
+        _statsPanel.Visible = false;
+        root.AddChild(_statsPanel);
 
         _fpsCounterLabel = Ui.Lbl("FPS --", 13, Ui.Accent);
         _fpsCounterLabel.Name = "FpsCounterText";
@@ -191,10 +194,12 @@ public partial class Hud : CanvasLayer
         _possession = Ui.Lbl("BALL · LOOSE", 18, new Color(1f, .92f, .45f));
         _focus = Ui.Lbl("YOU · —", 14, Ui.Sub);
         _actions = Ui.Lbl("A PASS · X SHOOT · LT DRIBBLE · RT SPRINT", 13, Ui.Text);
-        focusBox.AddChild(_cam); focusBox.AddChild(_possession);
-        focusBox.AddChild(_focus); focusBox.AddChild(_actions);
+        // Keep persistent play context to two compact lines. Camera/debug details
+        // and duplicate action copy live in the dismissible controls overlay.
+        focusBox.AddChild(_possession);
+        focusBox.AddChild(_focus);
         var focusPanel = Ui.PanelC(focusBox, Ui.Panel);
-        Place(focusPanel, .5f, 0f, -230, 12, 460, 118);
+        Place(focusPanel, .5f, 0f, -190, 12, 380, 66);
         root.AddChild(focusPanel);
 
         // Commentary feed (bottom left)
@@ -226,13 +231,13 @@ public partial class Hud : CanvasLayer
         // Compact two-line legend.  "pad R3 camera" stays advertised, but the
         // actions the player complained about are now impossible to miss.
         _hint = Ui.Lbl("E / A SHORT PASS  ·  R / SELECT LONG BALL  ·  SPACE / X SHOOT (hold)  ·  X / LT CLOSE CONTROL  ·  SHIFT / RT SPRINT\n" +
-                       "F / B TACKLE  ·  SHIFT+F / RB+B SLIDE  ·  Q / Y THROUGH  ·  TAB / LB SWITCH  ·  C / pad R3 camera  ·  ESC / START pause",
+                       "F / B TACKLE  ·  SHIFT+F / RB+B SLIDE  ·  Q / Y THROUGH  ·  TAB / LB SWITCH  ·  C / R3 camera (4 = tactical)  ·  ESC pause  ·  H hide / F2 stats",
                        13, Ui.Sub);
         _hint.HorizontalAlignment = HorizontalAlignment.Center;
-        var hintPanel = Ui.PanelC(_hint);
-        hintPanel.Name = "ActionHintsPanel";
-        Place(hintPanel, .5f, 1f, -430, -78, 860, 58);
-        root.AddChild(hintPanel);
+        _hintPanel = Ui.PanelC(_hint);
+        _hintPanel.Name = "ActionHintsPanel";
+        Place(_hintPanel, .5f, 1f, -430, -78, 860, 58);
+        root.AddChild(_hintPanel);
 
         _toast = Ui.Lbl("", 46, Ui.Accent);
         _toast.HorizontalAlignment = HorizontalAlignment.Center;
@@ -258,11 +263,24 @@ public partial class Hud : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is not InputEventKey key || !key.Pressed || key.Echo || key.Keycode != Key.F3)
+        if (@event is not InputEventKey key || !key.Pressed || key.Echo)
             return;
 
-        ToggleFpsCounter();
+        if (key.Keycode == Key.F3) ToggleFpsCounter();
+        else if (key.Keycode == Key.F1 || key.Keycode == Key.H) ToggleControls();
+        else if (key.Keycode == Key.F2) ToggleMatchStats();
+        else return;
         GetViewport().SetInputAsHandled();
+    }
+
+    public void ToggleControls()
+    {
+        if (_hintPanel != null) _hintPanel.Visible = !_hintPanel.Visible;
+    }
+
+    public void ToggleMatchStats()
+    {
+        if (_statsPanel != null) _statsPanel.Visible = !_statsPanel.Visible;
     }
 
     public void ToggleFpsCounter()
@@ -333,12 +351,14 @@ public partial class Hud : CanvasLayer
         v.AddChild(Ui.Btn("Match analysis", ShowAnalysis));
         v.AddChild(Ui.Btn("Photo mode", TogglePhotoMode));
         v.AddChild(Ui.Btn("Change camera (C)", () => OnCamera?.Invoke()));
+        v.AddChild(Ui.Btn("Toggle controls (H)", ToggleControls));
+        v.AddChild(Ui.Btn("Match stats (F2)", ToggleMatchStats));
         v.AddChild(Ui.Btn("Toggle FPS counter (F3)", ToggleFpsCounter));
         v.AddChild(Ui.Btn("Toggle touch controls", () => { SetTouch(!Input.TouchEnabled); OnTouchToggle?.Invoke(); }));
         v.AddChild(Ui.Btn("Quit to main menu", () => { SetPaused(false); OnQuit?.Invoke(); }));
         v.AddChild(Ui.Lbl("Arena FC build " + ProjectSettings.GetSetting("application/config/version", "1.0"), 12, Ui.Sub));
         _pauseMenu = Ui.PanelC(v, Ui.Panel);
-        Place(_pauseMenu, .5f, .5f, -190, -250, 380, 500);
+        Place(_pauseMenu, .5f, .5f, -190, -290, 380, 580);
         _pauseMenu.Visible = false;
         root.AddChild(_pauseMenu);
         // Focus is seeded in SetPaused(true) when the panel actually becomes visible.

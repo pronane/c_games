@@ -306,6 +306,12 @@ Check("broadcast camera never rotates with instantaneous player facing",
 Check("broadcast camera keeps the play closer in frame",
       Vector3.Distance(camA.Target, camA.Look) < 52f,
       $"distance={Vector3.Distance(camA.Target, camA.Look):F1}");
+var tightBroadcast = BroadcastPlan.Compute(0, Vector3.Zero, new Vector3(5f, 0f, 0f), Vector3.UnitX);
+var spreadBroadcast = BroadcastPlan.Compute(0, Vector3.Zero, new Vector3(35f, 0f, 0f), Vector3.UnitX);
+Check("default camera stays tight in normal play and widens for separated play",
+      tightBroadcast.Fov == 45f && spreadBroadcast.Fov > tightBroadcast.Fov
+      && spreadBroadcast.Fov <= 59f,
+      $"tight={tightBroadcast.Fov:F1} wide={spreadBroadcast.Fov:F1}");
 var tactical = BroadcastPlan.Compute(4, ballPos, playerPos, new Vector3(1f, 0f, 0f));
 Check("tactical view keeps a stable -Z screen-up vector", tactical.Up == new Vector3(0f, 0f, -1f));
 bool bounded = true;

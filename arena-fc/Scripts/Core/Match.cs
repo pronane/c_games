@@ -962,10 +962,9 @@ public sealed partial class MatchEngine
             return;
         }
 
-        // Three players press when the opposition has the ball (two for a loose ball).
-        // The old code sent only two, aimed them at the ball's projected position and
-        // gave them no pace advantage, so a carrier could stroll out of trouble while
-        // the other nine stood in formation: "the opposition never tries to win it back".
+        // Keep challenges coordinated: one defender engages a loose ball; against
+        // a carrier, one engages and two stagger across the passing lanes to contain.
+        // The cover defenders jockey instead of all diving into the same scrum.
         bool oppOwns = ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team;
         int chaser1 = ClosestToBall(p.Team, 0), chaser2 = ClosestToBall(p.Team, 1);
         int chaser3 = oppOwns ? ClosestToBall(p.Team, 2) : -1;
@@ -1024,8 +1023,8 @@ public sealed partial class MatchEngine
                 {
                     var carrier = S.Players[ball.Owner];
                     Vector3 goalDir = Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team));
-                    // Phase 2.5: jockey/contain — second/third pressers stay
-                    // goal-side and jockey (shuffle) instead of diving in.
+                    // The second and third defenders stay goal-side and jockey
+                    // separate lanes instead of diving in alongside the challenger.
                     // Only the first presser (chaser1) commits to the tackle.
                     if (p.Index != chaser1)
                     {
@@ -1764,15 +1763,14 @@ public sealed partial class MatchEngine
             }
         }
         if (p.ActionTimer <= 0) p.Action = planar > 1.2f ? "run" : "idle";
-        // Personal space.  The old .62 m / .38 push was far too weak: with three
-        // pressers and a carrier all aiming at the same point, players visibly
-        // stacked into one scrum.  Keep a 1 m bubble and push harder.
+        // Personal space prevents target convergence from turning into a stack.
+        // The coordinated press assignment above leaves more players on shape.
         foreach (var q in State.Players)
         {
             if (q.Index == p.Index) continue;
             Vector3 diff = Mx.Flat(p.Pos - q.Pos);
             float dd = diff.Length();
-            if (dd > .001f && dd < 1.05f) p.Pos += Mx.Norm(diff) * (1.05f - dd) * .60f;
+            if (dd > .001f && dd < 1.2f) p.Pos += Mx.Norm(diff) * (1.2f - dd) * .65f;
         }
         // Only the carrier and the nearest presser should be right on top of the ball.
         // IMPORTANT: only while the ball is OWNED.  Around a loose ball everybody
@@ -1781,7 +1779,7 @@ public sealed partial class MatchEngine
         {
             Vector3 away = Mx.Flat(p.Pos - State.Ball.Pos);
             float bd = away.Length();
-            if (bd > .001f && bd < 1.45f) p.Pos += Mx.Norm(away) * (1.45f - bd) * .35f;
+            if (bd > .001f && bd < 1.8f) p.Pos += Mx.Norm(away) * (1.8f - bd) * .42f;
         }
         p.Pos.X = Mx.Clamp(p.Pos.X, -Mx.HalfLength - 2.5f, Mx.HalfLength + 2.5f);
         p.Pos.Z = Mx.Clamp(p.Pos.Z, -Mx.HalfWidth - 2.5f, Mx.HalfWidth + 2.5f);
