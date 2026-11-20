@@ -12,6 +12,7 @@
 using System.Numerics;
 using System.Reflection;
 using ArenaFC.Core;
+using ArenaFC.Core.Animation;
 
 int passed = 0, failed = 0;
 void Check(string name, bool ok, string? detail = null)
@@ -394,6 +395,59 @@ var lookPose = Gait.Compute(5f, 1f, 0f, false, false, .4f);
 var easedLook = Gait.Lerp(Gait.Compute(0f, 0f, 0f), lookPose, .5f);
 Check("head tracking survives pose easing", MathF.Abs(easedLook.HeadYaw) > .1f,
       $"headYaw={easedLook.HeadYaw:F3}");
+
+Section("Arena Motion Engine: shared manifest and phase synchronization");
+var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_manifest.json"));
+var manifestEngine = new MotionEngine();
+manifestEngine.LoadClips(manifestClips);
+Check("shared Sprite Forge clip manifest loads all 18-bone clips",
+      manifestEngine.ClipCount == 71 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      && runMeta.BoneCount == 18 && runMeta.Loop,
+      $"clips={manifestEngine.ClipCount}");
+var walkMeta = new ClipMeta { Id = "walk", Category = ClipCategory.Locomotion, Duration = .8f,
+    PreferredSpeed = 2f, BallState = ArenaFC.Core.Animation.BallState.None, Loop = true, BoneCount = 18,
+    FootPlantFrames = new[] { .1f, .6f } };
+var runMetaToy = new ClipMeta { Id = "run", Category = ClipCategory.Locomotion, Duration = .6f,
+    PreferredSpeed = 5f, BallState = ArenaFC.Core.Animation.BallState.None, Loop = true, BoneCount = 18,
+    FootPlantFrames = new[] { .2f, .7f } };
+var kickMeta = new ClipMeta { Id = "kick", Category = ClipCategory.Kick, Duration = .6f,
+    ContactFraction = .5f, PreferredSpeed = .5f, BallState = ArenaFC.Core.Animation.BallState.Possessed, Loop = false, BoneCount = 18 };
+var phaseSelector = new MotionEngine();
+phaseSelector.LoadClips(new[] { walkMeta, runMetaToy, kickMeta });
+Check("locomotion switch aligns the same foot event across different clip phases",
+      MathF.Abs(MotionEngine.AlignToNearestFootEvent(walkMeta, runMetaToy, .09f) - .19f) < .001f);
+Check("one-shot actions restart at phase zero",
+      MotionEngine.ComputeStartPhase(runMetaToy, kickMeta, .67f, PlayerIntent.Shoot) == 0f);
+var motionA = new MotionState { CurrentClipId = "walk", Phase = .09f };
+phaseSelector.Update(motionA, 4.8f, 0f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f);
+Check("speed-context selector queues a running clip without losing source phase",
+      motionA.NextClipId == "run" && motionA.CrossfadeRemaining > 0f && motionA.BlendWeight > 0f);
+var shotState = new MotionState();
+phaseSelector.Update(shotState, .5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Shoot, .08f, .10f);
+phaseSelector.Update(shotState, .5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Shoot, .05f, .02f);
+Check("contact marker crossing is observable and does not mutate match state",
+      shotState.ContactCrossed && shotState.TimeSinceContact == 0f);
+var deterministicA = new MotionState { CurrentClipId = "walk", Phase = .31f };
+var deterministicB = new MotionState { CurrentClipId = "walk", Phase = .31f };
+for (int i = 0; i < 120; i++)
+{
+    phaseSelector.Update(deterministicA, 3.4f, .2f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f);
+    phaseSelector.Update(deterministicB, 3.4f, .2f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f);
+}
+Check("same fixed inputs produce the same clip and normalized phase",
+      deterministicA.CurrentClipId == deterministicB.CurrentClipId
+      && deterministicA.NextClipId == deterministicB.NextClipId
+      && MathF.Abs(deterministicA.RenderPhase - deterministicB.RenderPhase) < 1e-6f);
+var dribbleA = new DribbleState { TouchTimer = 0f };
+var dribbleB = new DribbleState { TouchTimer = 0f };
+var rngA = new Rng(1337); var rngB = new Rng(1337);
+var ballA = DribbleSystem.Update(dribbleA, 4, new Vector3(0, Mx.BallRadius, 0), Vector3.Zero,
+    Vector3.UnitX, .72f, .8f, .65f, true, 1f / 60f, rngA);
+var ballB = DribbleSystem.Update(dribbleB, 4, new Vector3(0, Mx.BallRadius, 0), Vector3.Zero,
+    Vector3.UnitX, .72f, .8f, .65f, true, 1f / 60f, rngB);
+Check("timed dribble helper is deterministic for equal seeded streams",
+      ballA == ballB && dribbleA.TouchTimer == dribbleB.TouchTimer
+      && dribbleA.Separation <= DribbleSystem.MaxSeparationShield + .001f);
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

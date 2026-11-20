@@ -20,6 +20,7 @@ public partial class MatchView : Node3D
     private FacialExpression[] _face = Array.Empty<FacialExpression>();
     // BlendLearner: which movement clip each player is actually using.
     private readonly BlendLearner _blend = new();
+    private readonly MotionDriver _motion = new();
     private int _blendFrame;
     private AmbientAction[] _ambientTag = Array.Empty<AmbientAction>();
     private Emotion[] _faceTag = Array.Empty<Emotion>();
@@ -149,6 +150,9 @@ public partial class MatchView : Node3D
         // instead of desyncing the room.
         Engine.OnlineLocked = Online != null;
         Rigs = new CharacterRig[Engine.State.Players.Length];
+        _motion.EnsureCapacity(Rigs.Length);
+        if (Godot.FileAccess.FileExists("res://Data/clips/clip_manifest.json"))
+            _motion.LoadManifest(Godot.FileAccess.GetFileAsString("res://Data/clips/clip_manifest.json"));
         _ambient = new AmbientBehaviour[Rigs.Length];
         _face = new FacialExpression[Rigs.Length];
         _ambientTag = new AmbientAction[Rigs.Length];
@@ -452,6 +456,11 @@ public partial class MatchView : Node3D
             rig.Position = new Vector3(p.Pos.X, 0, p.Pos.Z);
             float yaw = MathF.Atan2(p.Facing.X, p.Facing.Z);
             rig.Rotation = new Vector3(0, yaw, 0);
+            // MotionDriver owns only render-phase state; simulation PlayerState and BallState
+            // remain read-only inputs. Keep the mature procedural selector if metadata is absent.
+            var motion = _motion.UpdatePlayer(i, p, b, owner == i, Engine.CurrentTick);
+            if (rig.Soccer != null && motion != null)
+                rig.Soccer.ApplyMotion(motion);
             RigAnimator.Pose(rig, p, dt, _time, b.Pos);
             var ambient = _ambient[i].Update(dt, _time, i == owner, i != owner, p.Stamina);
             var (faceYaw, facePitch, faceRoll) = _face[i].Update(dt);

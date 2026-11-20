@@ -1,0 +1,45 @@
+// Runtime animation state is presentation data. It is intentionally separate
+// from MatchState so visuals can never alter authoritative match outcomes.
+namespace ArenaFC.Core.Animation;
+
+public enum PlayerIntent
+{
+    None, Move, Sprint, SprintStop, Pass, ThroughBall, Shoot, Trap, Shield,
+    Cut, Tackle, Dive, Celebrate
+}
+
+public sealed class MotionState
+{
+    public string CurrentClipId = "";
+    /// <summary>Normalized source phase (0..1). Loops wrap; one-shots clamp.</summary>
+    public float Phase;
+    public float BlendWeight = 1f;
+    public string NextClipId = "";
+    public float NextPhase;
+    public float CrossfadeRemaining;
+    public float CrossfadeDuration = .12f;
+    public float PlaybackScale = 1f;
+    public float Speed;
+    public float TurnRate;
+    public BallState Ball;
+    public PlayerIntent LastIntent;
+    public float TimeSinceContact;
+    public bool ContactCrossed;
+    public bool FootPlantedLeft;
+    public bool FootPlantedRight;
+
+    public string RenderClipId => NextClipId.Length > 0 ? NextClipId : CurrentClipId;
+    public float RenderPhase => NextClipId.Length > 0 ? NextPhase : Phase;
+}
+
+/// <summary>Migration-ready timed-touch data; not yet wired into MatchEngine.</summary>
+public sealed class DribbleState
+{
+    public int OwnerId = -1;
+    public float LocalOffsetX, LocalOffsetZ;
+    public float TouchTimer;
+    public float Separation;
+    public bool Shielding;
+    public float ShieldStrength;
+    public float LastTouchSpeed;
+}
