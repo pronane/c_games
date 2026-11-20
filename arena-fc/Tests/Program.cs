@@ -725,7 +725,7 @@ Check("pressing intensity reaches the AI",
 Check("width reaches the AI shape", lowBlock.State.Players[1].TacticsWidthMult < .9f &&
       highPress.State.Players[1].TacticsWidthMult > 1.1f);
 Check("balanced tactics are neutral (tuned numbers unchanged)",
-      MathF.Abs(new MatchEngine(new MatchOptions()).HomeTactics.GetModifiers().pressMultiplier / .9f - 1f) < 1e-5f);
+      MathF.Abs(new MatchOptions().HomeTactics.GetModifiers().pressMultiplier / .9f - 1f) < 1e-5f);
 var shapeMethod = typeof(MatchEngine).GetMethod("FormationPosition", BindingFlags.Instance | BindingFlags.NonPublic)!;
 Vector3 ShapeOf(MatchEngine e, int index) =>
     (Vector3)shapeMethod.Invoke(e, new object[] { e.State.Players[index], 1, Vector3.Zero })!;
