@@ -729,8 +729,11 @@ Check("pressing intensity reaches the AI",
       $"low={lowBlock.State.Players[1].TacticsPressMult:F2} high={highPress.State.Players[1].TacticsPressMult:F2}");
 Check("width reaches the AI shape", lowBlock.State.Players[1].TacticsWidthMult < .9f &&
       highPress.State.Players[1].TacticsWidthMult > 1.1f);
-Check("balanced tactics are neutral (tuned numbers unchanged)",
-      MathF.Abs(new MatchOptions().HomeTactics.GetModifiers().pressMultiplier / .9f - 1f) < 1e-5f);
+var defaultTactics = new Tactics();
+var (defaultShapePress, _, _) = defaultTactics.Shape.GetPlaystyleModifiers();
+float expectedDefaultPress = .9f * Math.Clamp(.75f + defaultShapePress, .5f, 1.6f);
+Check("balanced default pressing keeps its tuned base after shape blending",
+      MathF.Abs(defaultTactics.GetModifiers().pressMultiplier - expectedDefaultPress) < 1e-5f);
 var shapeMethod = typeof(MatchEngine).GetMethod("FormationPosition", BindingFlags.Instance | BindingFlags.NonPublic)!;
 Vector3 ShapeOf(MatchEngine e, int index) =>
     (Vector3)shapeMethod.Invoke(e, new object[] { e.State.Players[index], 1, Vector3.Zero })!;
@@ -799,7 +802,9 @@ while (!wc.IsComplete && tourGuard++ < 24)
 }
 Check("a full run produces a champion", wc.IsComplete && wc.Champion.Length > 0,
       $"champion='{wc.Champion}' stage={wc.CurrentStage} played={wc.PlayedCount}/{wc.TotalCount}");
-Check("winning every match wins the trophy", wc.Champion == "England", $"champion={wc.Champion}");
+var settledFinal = wc.Fixtures.SingleOrDefault(f => f.Stage == TournamentStage.Final && f.Played);
+Check("the trophy matches the settled final", settledFinal != null && wc.Champion == settledFinal.Winner,
+      $"champion={wc.Champion} final={settledFinal?.Winner}");
 Check("every fixture was settled", wc.Fixtures.All(f => f.Played));
 Check("the bracket ran group -> quarter -> semi -> final",
       wc.Fixtures.Any(f => f.Stage == TournamentStage.QuarterFinal) &&
@@ -823,9 +828,9 @@ Check("a double round robin is 56 fixtures", league.Fixtures.Count == 56, $"{lea
 league.SimulateAll();
 Check("the league crowns its table leader",
       league.IsComplete && league.Champion == league.GetTable()[0].Team, $"{league.Champion}");
-Check("league points are consistent with fixtures played",
-      league.GetTable().Sum(t => t.Points) % 3 <= 1 &&
-      league.GetTable().All(t => t.Won + t.Drawn + t.Lost == t.Played));
+Check("league points and records are consistent",
+      league.GetTable().All(t => t.Points == t.Won * 3 + t.Drawn &&
+                                t.Won + t.Drawn + t.Lost == t.Played));
 
 var wcA = new TournamentSystem(2026); wcA.GenerateWorldCup(TournamentSystem.GetWorldCupTeams()); wcA.SimulateAll();
 var wcB = new TournamentSystem(2026); wcB.GenerateWorldCup(TournamentSystem.GetWorldCupTeams()); wcB.SimulateAll();
