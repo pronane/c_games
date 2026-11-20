@@ -889,24 +889,24 @@ var mmrBefore = save.Ranked.Mmr;
 save.Ranked.Record(true, false, 3, 1, 1100);
 save.PushResult("HAR 3-1 NOR");
 string saveJson = save.ToJson();
-var loaded = SaveGame.FromJson(saveJson);
-Check("settings survive a save/load", loaded.Settings.TeamSize == 7 && loaded.Settings.Difficulty == 2 &&
-      loaded.Settings.HomeClub == 3 && MathF.Abs(loaded.Settings.TimeSpeed - 21f) < 1e-4f);
+var roundTrip = SaveGame.FromJson(saveJson);
+Check("settings survive a save/load", roundTrip.Settings.TeamSize == 7 && roundTrip.Settings.Difficulty == 2 &&
+      roundTrip.Settings.HomeClub == 3 && MathF.Abs(roundTrip.Settings.TimeSpeed - 21f) < 1e-4f);
 var loadedOpts = new MatchOptions();
 var loadedTactics = new Tactics();
-loaded.Settings.ApplyTo(loadedOpts, loadedTactics);
+roundTrip.Settings.ApplyTo(loadedOpts, loadedTactics);
 Check("settings apply back onto match options", loadedOpts.TeamSize == 7 && loadedTactics.Mentality == Mentality.VeryAttacking);
 Check("tactics survive a save/load", MathF.Abs(loadedTactics.PressingIntensity - .8f) < 1e-4f);
-Check("the tournament survives a save/load", loaded.Tournament != null && loaded.Tournament!.PlayerTeam == "England" &&
-      loaded.Tournament.PlayedCount == save.Tournament.PlayedCount && loaded.Tournament.Groups.Count == 4,
-      $"played={loaded.Tournament?.PlayedCount}");
-Check("a resumed tournament keeps simulating", loaded.Tournament!.NextPlayerFixture != null);
-loaded.Tournament.RecordPlayerResult(1, 0);
-Check("ranked MMR survives a save/load", loaded.Ranked.Mmr == save.Ranked.Mmr && loaded.Ranked.Mmr > mmrBefore,
-      $"{loaded.Ranked.Mmr} vs {save.Ranked.Mmr}");
+Check("the tournament survives a save/load", roundTrip.Tournament != null && roundTrip.Tournament!.PlayerTeam == "England" &&
+      roundTrip.Tournament.PlayedCount == save.Tournament.PlayedCount && roundTrip.Tournament.Groups.Count == 4,
+      $"played={roundTrip.Tournament?.PlayedCount}");
+Check("a resumed tournament keeps simulating", roundTrip.Tournament!.NextPlayerFixture != null);
+roundTrip.Tournament.RecordPlayerResult(1, 0);
+Check("ranked MMR survives a save/load", roundTrip.Ranked.Mmr == save.Ranked.Mmr && roundTrip.Ranked.Mmr > mmrBefore,
+      $"{roundTrip.Ranked.Mmr} vs {save.Ranked.Mmr}");
 Check("the ranked ladder promotes on rating", new RankedLadder { Mmr = 1500 }.Division == 1 &&
       new RankedLadder { Mmr = 1000 }.Division == 6);
-Check("recent results survive a save/load", loaded.RecentResults.Count == 1 && loaded.RecentResults[0] == "HAR 3-1 NOR");
+Check("recent results survive a save/load", roundTrip.RecentResults.Count == 1 && roundTrip.RecentResults[0] == "HAR 3-1 NOR");
 Check("a corrupt save degrades to a fresh game",
       SaveGame.FromJson("{ not json").Version == SaveGame.CurrentVersion &&
       SaveGame.FromJson("null").Settings.TeamSize == 11);
