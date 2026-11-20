@@ -81,6 +81,10 @@ jobs:
             grep -E '^  FAIL' "$f" | while IFS= read -r line; do
               echo "::error file=$f::$line"
             done || true
+            # Publish the tally so the result is visible without downloading logs.
+            grep -E '^RESULT:' "$f" | while IFS= read -r line; do
+              echo "::warning file=$f::$line"
+            done || true
           done
       # Compiler diagnostics become file/line annotations, so a red build is
       # actionable from the Checks tab without hunting through raw job logs.
@@ -139,6 +143,9 @@ jobs:
           [ -f selftest.log ] || exit 0
           grep -E '^  FAIL' selftest.log | sort -u | while IFS= read -r line; do
             echo "::error file=arena-fc/Scripts/Godot/SelfTest.cs::$line"
+          done || true
+          grep -E '^RESULT:' selftest.log | while IFS= read -r line; do
+            echo "::warning file=arena-fc/selftest.log::$line"
           done || true
       - name: Upload selftest log
         if: always()
