@@ -110,6 +110,13 @@ jobs:
       - name: Sprite Forge soccer player checks
         working-directory: arena-fc
         run: python3 Tools/test_soccer_forge.py
+      # Advisory, never failing: core systems nobody calls are invisible features.
+      - name: Dead core report
+        if: always()
+        working-directory: arena-fc
+        run: |
+          python3 Tools/dead_core_report.py
+          python3 Tools/dead_core_report.py --ci
 
   # The actual game, not just the pure C# core: build the Godot assemblies and run
   # the in-engine selftest (skinned rig, GLB round trip, shaders, stadium, HUD,
