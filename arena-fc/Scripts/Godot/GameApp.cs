@@ -175,7 +175,11 @@ public partial class GameApp : Node3D
         menu.AddChild(Ui.Btn("CONTROLS", ShowControls));
         menu.AddChild(Ui.Btn("CONTROLLER SETUP", ShowPadSetup));
         menu.AddChild(Ui.Btn("QUIT", () => GetTree().Quit()));
-        var panel = Ui.PanelC(menu, Ui.Panel);
+        menu.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        var scroll = new ScrollContainer();
+        scroll.HorizontalScrollMode = ScrollContainer.ScrollModeEnum.Disabled;
+        scroll.AddChild(menu);
+        var panel = Ui.PanelC(scroll, Ui.Panel);
         Place(panel, 0, .5f, 60, -220, 330, 360);
         root.AddChild(panel);
         // Seed GUI focus: arrow keys / Enter / the pad d-pad all act on the focused Control.

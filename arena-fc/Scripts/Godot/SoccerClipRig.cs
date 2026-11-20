@@ -381,7 +381,7 @@ public sealed partial class SoccerClipRig : Node3D
         if (cur == "soccer_jog" && speed >= 1.4f && speed < 3.3f) return "soccer_jog";
         if (cur == "soccer_run" && speed >= 2.6f && speed < 4.8f) return "soccer_run";
         if (cur == "soccer_sprint" && speed >= 4f) return "soccer_sprint";
-        if (speed < 0.5f) return p.IsKeeper ? "soccer_keeper_ready" : "soccer_idle";
+        if (speed < 0.5f) return p.IsKeeper ? "soccer_keeper_ready" : "soccer_idle_ready";
         if (speed < 1.7f) return "soccer_walk";
         if (speed < 2.9f) return "soccer_jog";
         if (speed < 4.3f) return "soccer_run";
