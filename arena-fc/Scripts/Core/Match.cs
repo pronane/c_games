@@ -166,6 +166,11 @@ public sealed class MatchState
     public Vector3 RestartPos;
     public string Commentary = "Kick off!";
     public int GoalScorer = -1;
+    // Penalty shootout state (Mode == 3).
+    public int ShootoutKicksHome, ShootoutKicksAway;
+    public int ShootoutTakerSide;
+    public bool ShootoutShotTaken;
+    public float ShootoutTimer;
 }
 
 public sealed partial class MatchEngine
@@ -216,6 +221,7 @@ public sealed partial class MatchEngine
             State.Phase = Phase.Penalty;
             State.PhaseTimer = 1.5f;
             State.RestartSide = 0;
+            State.ShootoutTakerSide = 0;
             State.RestartPos = new Vector3(Mx.HalfLength - 11f, 0, 0);
             Add(EventKind.Info, "Penalty shootout — take your first penalty!");
         }
@@ -481,6 +487,7 @@ public sealed partial class MatchEngine
                     if (S.Ball.Owner >= 0) KickoffPass(S.Ball.Owner);
                     break;
                 case Phase.Goal:
+                    if (Options.Mode == 3) { ShootoutNext(true); break; }
                     ResetPositions(true);
                     S.Phase = Phase.Kickoff;
                     S.PhaseTimer = 1.1f;
@@ -494,10 +501,22 @@ public sealed partial class MatchEngine
                     Add(EventKind.Info, "Second half under way — ends have been switched.");
                     break;
                 case Phase.ThrowIn: case Phase.Corner: case Phase.GoalKick: case Phase.FreeKick: case Phase.Penalty:
+                    if (Options.Mode == 3 && S.ShootoutShotTaken && S.Phase != Phase.Penalty) { ShootoutNext(false); break; }
                     Restart(S.RestartSide, S.RestartPos, S.Phase == Phase.Penalty);
                     break;
             }
             return;
+        }
+
+        // Shootout: a saved or dead penalty counts as a miss.
+        if (Options.Mode == 3 && S.ShootoutShotTaken && S.Phase == Phase.Play)
+        {
+            S.ShootoutTimer += dt;
+            var b = S.Ball;
+            bool keeperSave = b.Owner >= 0 && S.Players[b.Owner].IsKeeper
+                              && S.Players[b.Owner].Team != S.ShootoutTakerSide;
+            bool deadBall = b.Owner < 0 && b.Vel.LengthSquared() < 0.05f && S.ShootoutTimer > 1.5f;
+            if (keeperSave || deadBall) ShootoutNext(false);
         }
 
         // ---- Human control ----
@@ -1121,6 +1140,7 @@ public sealed partial class MatchEngine
         if (volley && Mx.FlatDist(p.Pos, b.Pos) > 1.6f) return;
         if (b.HasPending) return;
         p.PossessionLock = .55f;
+        if (Options.Mode == 3) { State.ShootoutShotTaken = true; State.ShootoutTimer = 0f; }
         // Phase 0.2: volley plays the volley clip; release at ball_contact.
         // Phase 2.4: Dynamic Volley — first-time aerial (eFootball v6.0).
         bool isVolley = volley || (b.Pos.Y > .5f && b.Owner == p.Index);
@@ -1355,14 +1375,23 @@ public sealed partial class MatchEngine
         State.Ball.Spin = Vector3.Zero;
         State.Ball.NoPickup = 0;
         int best = -1; float bd = float.MaxValue;
-        for (int i = 0; i < Options.TeamSize; i++)
+        if (penalty && Options.Mode == 3)
         {
-            var p = State.Players[side * Options.TeamSize + i];
-            if (p.IsKeeper && !penalty) continue;
-            float d = Mx.FlatDist2(p.Pos, State.Ball.Pos);
-            if (d < bd) { bd = d; best = p.Index; }
+            // Shootout: rotate takers through the outfield players.
+            int kicks = side == 0 ? State.ShootoutKicksHome : State.ShootoutKicksAway;
+            best = side * Options.TeamSize + 1 + (kicks % Math.Max(1, Options.TeamSize - 1));
         }
-        if (best < 0) best = side * Options.TeamSize;
+        else
+        {
+            for (int i = 0; i < Options.TeamSize; i++)
+            {
+                var p = State.Players[side * Options.TeamSize + i];
+                if (p.IsKeeper && !penalty) continue;
+                float d = Mx.FlatDist2(p.Pos, State.Ball.Pos);
+                if (d < bd) { bd = d; best = p.Index; }
+            }
+            if (best < 0) best = side * Options.TeamSize;
+        }
         var taker = State.Players[best];
         State.Ball.Owner = best;
         taker.Pos = State.Ball.Pos - new Vector3(SideSign(side) * .8f, 0, 0);
@@ -1407,8 +1436,43 @@ public sealed partial class MatchEngine
             if (q.Team != side && Mx.FlatDist(q.Pos, State.Ball.Pos) < 4f)
                 q.Pos += Mx.FlatDir(State.Ball.Pos, q.Pos) * (4f - Mx.FlatDist(q.Pos, State.Ball.Pos));
         State.Phase = Phase.Play;
-        if (penalty) { Shoot(taker, .9f); }
+        if (penalty)
+        {
+            // Shootout: the human side takes their own penalties; AI shoots at once.
+            if (!(Options.Mode == 3 && side == 0)) Shoot(taker, .9f);
+            else Add(EventKind.Info, "Your penalty — aim and shoot!");
+        }
         Add(EventKind.Info, penalty ? "Penalty!" : "Back under way.");
+    }
+
+    /// <summary>Penalty shootout: record the kick, check the result, set up the next.</summary>
+    private void ShootoutNext(bool scored)
+    {
+        var S = State;
+        int side = S.ShootoutTakerSide;
+        if (side == 0) S.ShootoutKicksHome++; else S.ShootoutKicksAway++;
+        Add(EventKind.Info, scored
+            ? $"Penalty scored! {S.Score[0]}-{S.Score[1]}"
+            : $"Penalty missed! {S.Score[0]}-{S.Score[1]}");
+        int kh = S.ShootoutKicksHome, ka = S.ShootoutKicksAway;
+        int sh = S.Score[0], sa = S.Score[1];
+        bool decided = false;
+        if (kh >= 5 && ka >= 5 && kh == ka && sh != sa) decided = true;
+        else if (kh == ka && kh > 0 && kh < 5 && Math.Abs(sh - sa) > 5 - kh) decided = true;
+        if (decided)
+        {
+            S.Phase = Phase.FullTime;
+            S.PhaseTimer = 2f;
+            Add(EventKind.Info, sh > sa ? "Shootout won! Champions!" : "Shootout lost.");
+            return;
+        }
+        S.ShootoutTakerSide = 1 - side;
+        S.ShootoutShotTaken = false;
+        S.ShootoutTimer = 0f;
+        S.RestartSide = S.ShootoutTakerSide;
+        S.RestartPos = new Vector3(SideSign(S.ShootoutTakerSide) * (Mx.HalfLength - 11f), 0, 0);
+        S.Phase = Phase.Penalty;
+        S.PhaseTimer = 1.5f;
     }
 
     private void MovePlayer(PlayerState p, float dt, PlayerCommand cmd, bool human)
