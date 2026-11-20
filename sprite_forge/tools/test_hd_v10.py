@@ -3,6 +3,9 @@
 1. every attack's strongest pose (furthest hand / foot reach) sits on frame 1 or 2 - the only frames on which the
    shared online sim registers hits (HD_Fighter/multiplayer/public/sim.mjs hitbox())
 2. frame counts match HD_Fighter/assets_hd/meta.json
+   (checks 1-2 are for the fighters Sprite Forge makes - those with a spec in HD_Fighter/sprite_specs. Fighters
+   imported from other art, PADEL MIKE, DARAGH and DANGEROUS DEC from egyptian_fighter, have frame counts of their
+   own: for them, each sheet's width must hold the frames meta.json says)
 3. a full `forge.py build` of one sculpted fighter writes 16 strips that pass tools/hd_install.py's checks
    (192x256 cells, transparent, nothing clipped, feet on the 244 baseline)"""
 from __future__ import annotations
@@ -35,7 +38,21 @@ def reach(st, s):
 def main():
     fails = []
     meta = json.load(open(META))["characters"]
-    for c in meta:
+    specs = os.path.join(ROOT, "..", "HD_Fighter", "sprite_specs")
+    made = [c for c in meta if os.path.isfile(os.path.join(specs, c + ".txt"))]
+    imported = [c for c in meta if c not in made]
+    from PIL import Image
+    for c in imported:
+        for s, (rel, n, _) in meta[c].items():
+            p = os.path.join(os.path.dirname(META), rel)
+            if not os.path.isfile(p):
+                fails.append("%s/%s: no sheet %s" % (c, s, rel)); continue
+            w, h = Image.open(p).size
+            if w != n * 192 or h != 256:
+                fails.append("%s/%s: sheet %dx%d, meta.json says %d frames of 192x256" % (c, s, w, h, n))
+    if imported:
+        print("imported fighters (sheets checked against meta.json): %s" % ", ".join(imported))
+    for c in made:
         for s, (_, n, _) in meta[c].items():
             if H.STATES[s][0] != n:
                 fails.append("%s/%s: %d frames, meta.json says %d" % (c, s, H.STATES[s][0], n))
