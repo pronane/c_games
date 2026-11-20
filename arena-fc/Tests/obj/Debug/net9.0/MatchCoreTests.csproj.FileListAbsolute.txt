@@ -1,0 +1,15 @@
+D:\c_games\arena-fc\Tests\bin\Debug\net9.0\MatchCoreTests.exe
+D:\c_games\arena-fc\Tests\bin\Debug\net9.0\MatchCoreTests.deps.json
+D:\c_games\arena-fc\Tests\bin\Debug\net9.0\MatchCoreTests.runtimeconfig.json
+D:\c_games\arena-fc\Tests\bin\Debug\net9.0\MatchCoreTests.dll
+D:\c_games\arena-fc\Tests\bin\Debug\net9.0\MatchCoreTests.pdb
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.GeneratedMSBuildEditorConfig.editorconfig
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.AssemblyInfoInputs.cache
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.AssemblyInfo.cs
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.csproj.CoreCompileInputs.cache
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.sourcelink.json
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.dll
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\refint\MatchCoreTests.dll
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.pdb
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\MatchCoreTests.genruntimeconfig.cache
+D:\c_games\arena-fc\Tests\obj\Debug\net9.0\ref\MatchCoreTests.dll

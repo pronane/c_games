@@ -121,17 +121,22 @@ public partial class Hud : CanvasLayer
     private Label _score = null!, _clock = null!, _stats = null!, _feed = null!, _toast = null!,
                   _hint = null!, _cam = null!, _possession = null!, _focus = null!, _actions = null!;
     // Phase 4: Broadcast graphics
-    private Label _scoreBug = null!, _lowerThird = null!, _statsOverlay = null!;
+    private Label _lowerThird = null!, _statsOverlay = null!;
+    private PanelContainer _lowerThirdPanel = null!, _statsOverlayPanel = null!;
     private float _lowerThirdTimer;
     private ProgressBar _power = null!, _stamina = null!;
     private Label? _chargeFeedback;
     private PanelContainer _pauseMenu = null!;
+    private PanelContainer _fpsCounterPanel = null!;
+    private Label _fpsCounterLabel = null!;
     private Control _pauseButtons = null!;
     private Minimap _minimap = null!;
+    private PanelContainer _minimapPanel = null!;
     private Control _touchLayer = null!;
     private VirtualStick _stick = null!;
     private MatchEngine? _engine;
     private float _toastTimer;
+    private float _fpsRefreshTimer;
 
     public override void _Ready()
     {
@@ -154,25 +159,29 @@ public partial class Hud : CanvasLayer
         Place(statsPanel, 1f, 0f, -340, 14, 324, 44);
         root.AddChild(statsPanel);
 
-        // Phase 4: Broadcast score bug (top left, compact)
-        _scoreBug = Ui.Lbl("HAR 0-0 NOR", 16, Ui.Text);
-        var bugPanel = Ui.PanelC(_scoreBug);
-        Place(bugPanel, 0f, 0f, 16, 100, 160, 32);
-        root.AddChild(bugPanel);
+        _fpsCounterLabel = Ui.Lbl("FPS --", 13, Ui.Accent);
+        _fpsCounterLabel.Name = "FpsCounterText";
+        _fpsCounterPanel = Ui.PanelC(_fpsCounterLabel);
+        _fpsCounterPanel.Name = "FpsCounterPanel";
+        Place(_fpsCounterPanel, 1f, 0f, -138, 64, 122, 28);
+        _fpsCounterPanel.Visible = false;
+        root.AddChild(_fpsCounterPanel);
 
         // Phase 4: Lower third (bottom centre, for player names/events)
         _lowerThird = Ui.Lbl("", 18, Ui.Text);
-        var lowerPanel = Ui.PanelC(_lowerThird);
-        Place(lowerPanel, 0.5f, 1f, -250, -180, 500, 40);
-        root.AddChild(lowerPanel);
-        _lowerThird.Visible = false;
+        _lowerThirdPanel = Ui.PanelC(_lowerThird);
+        _lowerThirdPanel.Name = "LowerThirdPanel";
+        Place(_lowerThirdPanel, 0.5f, 1f, -250, -180, 500, 40);
+        root.AddChild(_lowerThirdPanel);
+        _lowerThirdPanel.Visible = false;
 
         // Phase 4: Stats overlay (right side, toggled)
         _statsOverlay = Ui.Lbl("", 14, Ui.Sub);
-        var overlayPanel = Ui.PanelC(_statsOverlay);
-        Place(overlayPanel, 1f, 0.5f, -220, -100, 204, 200);
-        root.AddChild(overlayPanel);
-        _statsOverlay.Visible = false;
+        _statsOverlayPanel = Ui.PanelC(_statsOverlay);
+        _statsOverlayPanel.Name = "StatsOverlayPanel";
+        Place(_statsOverlayPanel, 1f, 0.5f, -220, -100, 204, 200);
+        root.AddChild(_statsOverlayPanel);
+        _statsOverlayPanel.Visible = false;
 
         // Big top-centre focus panel: camera, ball carrier, controlled player and
         // the buttons that matter right now.  The old left-edge labels sat under
@@ -191,14 +200,16 @@ public partial class Hud : CanvasLayer
         // Commentary feed (bottom left)
         _feed = Ui.Lbl("", 14, Ui.Sub);
         var feedPanel = Ui.PanelC(_feed);
-        Place(feedPanel, 0f, 1f, 16, -152, 430, 96);
+        feedPanel.Name = "CommentaryPanel";
+        Place(feedPanel, 0f, 1f, 16, -182, 430, 96);
         root.AddChild(feedPanel);
 
         // Minimap (bottom right) - larger and higher contrast than the tiny 210px map.
         _minimap = new Minimap { CustomMinimumSize = new Vector2(250, 164) };
-        var mapPanel = Ui.PanelC(_minimap);
-        Place(mapPanel, 1f, 1f, -292, -214, 276, 196);
-        root.AddChild(mapPanel);
+        _minimapPanel = Ui.PanelC(_minimap);
+        _minimapPanel.Name = "MinimapPanel";
+        Place(_minimapPanel, 1f, 1f, -292, -280, 276, 196);
+        root.AddChild(_minimapPanel);
 
         // Bars sit above the action legend instead of obscuring it.
         _power = Bar(new Color(1f, .72f, .18f));
@@ -219,6 +230,7 @@ public partial class Hud : CanvasLayer
                        13, Ui.Sub);
         _hint.HorizontalAlignment = HorizontalAlignment.Center;
         var hintPanel = Ui.PanelC(_hint);
+        hintPanel.Name = "ActionHintsPanel";
         Place(hintPanel, .5f, 1f, -430, -78, 860, 58);
         root.AddChild(hintPanel);
 
@@ -231,6 +243,35 @@ public partial class Hud : CanvasLayer
         BuildTouchControls(root);
         BuildPauseMenu(root);
         Layer = 10;
+    }
+
+    public override void _Process(double delta)
+    {
+        if (!_fpsCounterPanel.Visible) return;
+
+        _fpsRefreshTimer -= (float)delta;
+        if (_fpsRefreshTimer > 0f) return;
+
+        _fpsRefreshTimer = .25f;
+        _fpsCounterLabel.Text = $"FPS {Godot.Engine.GetFramesPerSecond()}";
+    }
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is not InputEventKey key || !key.Pressed || key.Echo || key.Keycode != Key.F3)
+            return;
+
+        ToggleFpsCounter();
+        GetViewport().SetInputAsHandled();
+    }
+
+    public void ToggleFpsCounter()
+    {
+        _fpsCounterPanel.Visible = !_fpsCounterPanel.Visible;
+        if (!_fpsCounterPanel.Visible) return;
+
+        _fpsRefreshTimer = 0f;
+        _fpsCounterLabel.Text = $"FPS {Godot.Engine.GetFramesPerSecond()}";
     }
 
     private ProgressBar Bar(Color c)
@@ -292,11 +333,12 @@ public partial class Hud : CanvasLayer
         v.AddChild(Ui.Btn("Match analysis", ShowAnalysis));
         v.AddChild(Ui.Btn("Photo mode", TogglePhotoMode));
         v.AddChild(Ui.Btn("Change camera (C)", () => OnCamera?.Invoke()));
+        v.AddChild(Ui.Btn("Toggle FPS counter (F3)", ToggleFpsCounter));
         v.AddChild(Ui.Btn("Toggle touch controls", () => { SetTouch(!Input.TouchEnabled); OnTouchToggle?.Invoke(); }));
         v.AddChild(Ui.Btn("Quit to main menu", () => { SetPaused(false); OnQuit?.Invoke(); }));
         v.AddChild(Ui.Lbl("Arena FC build " + ProjectSettings.GetSetting("application/config/version", "1.0"), 12, Ui.Sub));
         _pauseMenu = Ui.PanelC(v, Ui.Panel);
-        Place(_pauseMenu, .5f, .5f, -190, -215, 380, 430);
+        Place(_pauseMenu, .5f, .5f, -190, -250, 380, 500);
         _pauseMenu.Visible = false;
         root.AddChild(_pauseMenu);
         // Focus is seeded in SetPaused(true) when the panel actually becomes visible.
@@ -307,6 +349,7 @@ public partial class Hud : CanvasLayer
     {
         Input.TouchEnabled = on;
         if (_touchLayer != null) _touchLayer.Visible = on;
+        if (_minimapPanel != null) _minimapPanel.Visible = !on;
     }
 
     public void SetPaused(bool on)
@@ -331,6 +374,7 @@ public partial class Hud : CanvasLayer
     {
         _lowerThird.Text = text;
         _lowerThird.Visible = true;
+        _lowerThirdPanel.Visible = true;
         _lowerThirdTimer = seconds;
     }
 
@@ -339,18 +383,14 @@ public partial class Hud : CanvasLayer
     {
         _statsOverlay.Text = text;
         _statsOverlay.Visible = true;
+        _statsOverlayPanel.Visible = true;
     }
 
     /// <summary>Phase 4: Hide stats overlay.</summary>
     public void HideStatsOverlay()
     {
         _statsOverlay.Visible = false;
-    }
-
-    /// <summary>Phase 4: Update score bug.</summary>
-    public void UpdateScoreBug(string home, int homeScore, int awayScore, string away)
-    {
-        _scoreBug.Text = $"{home} {homeScore}-{awayScore} {away}";
+        _statsOverlayPanel.Visible = false;
     }
 
     /// <summary>Add a commentary line to the feed (Phase 1).</summary>
@@ -378,12 +418,15 @@ public partial class Hud : CanvasLayer
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
         _cam.Text = cameraName;
-        // Phase 4: Update score bug and lower third timer
-        UpdateScoreBug(home, s.Score[0], s.Score[1], away);
+        // Phase 4: lower third timer
         if (_lowerThirdTimer > 0)
         {
             _lowerThirdTimer -= dt;
-            if (_lowerThirdTimer <= 0) _lowerThird.Visible = false;
+            if (_lowerThirdTimer <= 0)
+            {
+                _lowerThird.Visible = false;
+                _lowerThirdPanel.Visible = false;
+            }
         }
         int owner = s.Ball.Owner;
         int ctrl = s.Controlled;

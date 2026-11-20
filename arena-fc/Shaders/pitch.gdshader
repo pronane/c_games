@@ -1,8 +1,8 @@
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
-uniform vec3 grass_a : source_color = vec3(0.085, 0.32, 0.135);
-uniform vec3 grass_b : source_color = vec3(0.095, 0.345, 0.145);
+uniform vec3 grass_a : source_color = vec3(0.075, 0.255, 0.105);
+uniform vec3 grass_b : source_color = vec3(0.085, 0.28, 0.115);
 uniform float line_width = 0.11;
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.25;
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;

@@ -285,8 +285,8 @@ public sealed partial class SoccerClipRig : Node3D
         }
         if (clip != _current)
         {
-            // 1.6 phase sync: start the new clip at the matching cycle phase.
-            float startPhase = _phase;
+            // Locomotion clips inherit cycle phase; one-shots must begin at frame zero.
+            float startPhase = oneShot ? 0f : _phase;
             Player.Play(clip, oneShot ? .08f : .12f);
             Player.Seek(startPhase * Player.GetAnimation(clip).Length, true);
             _current = clip;
@@ -299,10 +299,10 @@ public sealed partial class SoccerClipRig : Node3D
         if (oneShot)
         {
             float scale = 1f;
-            if (_contactFrac.TryGetValue(clip, out float frac) && frac >= 0f
+            if (_contactFrac.TryGetValue(clip, out float frac) && frac > 0f
                 && _clipDuration.TryGetValue(clip, out float clipDur)
-                && p.ActionDuration > 0.01f)
-                scale = Math.Clamp(clipDur / p.ActionDuration, 0.6f, 1.8f);
+                && clipDur > 0f)
+                scale = ActionTiming.ContactAlignedPlaybackScale(clipDur, frac, p.ActionContactAt);
             Player.SpeedScale = scale;
         }
         else
