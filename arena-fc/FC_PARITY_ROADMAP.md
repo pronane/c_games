@@ -27,6 +27,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 | Offsides | 0 | 1–6 |
 | Tackles won | ~120 | 25–60 |
 
+- ✅ 0.2 `--autoplay` QA flag (PR #3): plays a whole match / shootout / training session unattended in the real Godot app (headless, `--fixed-fps 60`), logs every 5 game-minutes and a full-time summary, then quits. A 90-minute match takes ~25 s. Verified: full match, shootout (decided early, 5 v 4 kicks), Training, Practice Arena — no script errors.
 - ⬜ 0.1 Add the soak harness to `Tests/` and fail CI when a metric leaves its band (bands widen until the AI items below land).
 
 ## 1. Simulation correctness (PR #1)
@@ -44,7 +45,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 - ✅ 2.1 Penalty shootout restarted into open play after kick 1 → proper shootout (only taker + keeper move, no clock, best-of-5 + sudden death, early finish, kick tally on screen).
 - ✅ 2.2 Training was a normal match with fouls off → Training ground with drills (Attack / Defend) and a coach that teaches every move with pad + keyboard prompts and auto-detects completion.
 - ✅ 2.3 Starting Training / Practice Arena switched fouls + offside off for every later match.
-- ⬜ 2.4 Skill Games and Practice Arena menu entries are still plain matches.
+- 🔧 2.4 Practice Arena now opens the training ground on free practice (PR #3). Skill Games is still a plain match.
 - ⬜ 2.5 You control your keeper (dive left/right/stay) on the computer's penalties.
 
 ## 3. Ball physics & goal detection
@@ -89,6 +90,9 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ✅ Full-match restart audit in `Tests/MatchCoreTests` (opponents 9.15 m / 2 m, taker can't carry the ball, throw-ins on the line, penalty area clear, parry direction). Found and fixed: opponents only 4 m back; ~10% double touches; throw-ins 1 m inside the pitch; a throw-in taker loop; **keeper parries aimed at his own net**; tackles/fouls animations carrying through stoppages; an idle human could stall a set piece forever (now auto-taken after 8 s).
 
 ## 8. Animation & body mechanics (after 3–7)
+- 🔍 **Root cause found (PR #3, `Tools/clip_sheet.gd` contact sheets):** every one of the 71 Sprite Forge clips has the arms ~45–60° too far out/up. Side-on, idle/run look like "boxer" arms at chest height; front-on, idle stands with arms out in an A/T shape, and pass/shoot throw both arms above the head. The clips themselves are authored correctly in `Tools/soccer_motions.py` (Sprite Forge's arm (0,0,0) = hanging down); the bias comes from `Tools/build_soccer_player.py` skinning the sculpted mesh to Arena's 18-bone skeleton bound in a different arm pose. Fix = rebuild the GLB through Sprite Forge with matching rest poses (next PR), then re-shoot the sheets.
+- 🔍 `soccer_foul` is a both-arms-up surrender pose for the whole clip and is what the fouled player plays at every free kick → use `soccer_trip`/`soccer_stumble` instead.
+- 🔍 `soccer_slide_tackle` is a crouch with one leg out, not a feet-first slide along the ground → re-author in `soccer_motions.py` (hips down to the turf, lead leg extended, travel along the ground).
 - ⬜ 8.1 Arms: no raised/T-pose arms off the ball; arms only go up for celebrations, appeals, headers and keeper actions.
 - ⬜ 8.2 No “jump with arms up” at the wrong time (trigger only from real events).
 - ⬜ 8.3 Slide tackles go feet first along the ground in the direction of travel.

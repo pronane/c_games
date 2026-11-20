@@ -1862,8 +1862,11 @@ public sealed partial class MatchEngine
         taker.Target = taker.Pos;
         taker.PossessionLock = 0;
         // Free kick / throw-in / corner / goal kick: taker must play the ball.
+        // Penalties too: the taker shoots from the spot (and an idle human's kick is
+        // taken for him after 8 s instead of the shootout waiting forever).
         taker.MustPlayBall = State.Phase == Phase.FreeKick || State.Phase == Phase.ThrowIn
-                             || State.Phase == Phase.Corner || State.Phase == Phase.GoalKick;
+                             || State.Phase == Phase.Corner || State.Phase == Phase.GoalKick
+                             || penalty;
         taker.Facing = throwIn ? new Vector3(0, 0, -MathF.Sign(State.Ball.Pos.Z)) : Mx.FlatDir(taker.Pos, GoalPos(side));
         // Phase 2.8: set-piece routines.
         bool isCorner = MathF.Abs(State.Ball.Pos.X) > Mx.HalfLength - 3f && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - 3f;

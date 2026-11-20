@@ -75,13 +75,13 @@ public partial class Boot : Node3D
             _profileWarmupFrames = 60;
         }
 
-        if (Has("--training") || Has("--shootout"))
+        if (Has("--training") || Has("--shootout") || Has("--practice"))
         {
             // Direct boot into a mode (dev / QA): same engine paths as the menu.
             var view = new MatchView();
             view.Init(new MatchOptions { TeamSize = 11, Seed = 2026, TimeSpeed = 15f,
-                Mode = Has("--training") ? MatchEngine.ModeTraining : MatchEngine.ModeShootout,
-                Fouls = !Has("--training"), Offside = !Has("--training") }, null, () => GetTree().Quit());
+                Mode = Has("--shootout") ? MatchEngine.ModeShootout : MatchEngine.ModeTraining,
+                Fouls = Has("--shootout"), Offside = Has("--shootout") }, null, () => GetTree().Quit());
             AddChild(view);
         }
         else if (Has("--match") || _profiling)

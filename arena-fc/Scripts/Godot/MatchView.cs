@@ -236,7 +236,13 @@ public partial class MatchView : Node3D
         Hud.SetTouch(touch);
         if (_opts.Mode == MatchEngine.ModeTraining || _opts.Mode == MatchEngine.ModeShootout)
         {
-            if (_opts.Mode == MatchEngine.ModeTraining) _coach = new TrainingCoach();
+            if (_opts.Mode == MatchEngine.ModeTraining)
+            {
+                _coach = new TrainingCoach();
+                bool practiceArena = GameApp.Instance?.Mode == GameMode.PracticeArena
+                                     || System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--practice") >= 0;
+                if (practiceArena) _coach.StartIndex = _coach.Lessons.Count - 1; // straight to free practice
+            }
             _modeOverlay = new ModeOverlay();
             _modeOverlay.Setup(_opts.Mode);
             AddChild(_modeOverlay);
@@ -334,6 +340,7 @@ public partial class MatchView : Node3D
         stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
         _modeOverlay?.UpdateOverlay(Engine, _coach);
+        AutoplayReport();
         // Phase 4: Trigger post-match screen on FullTime
         if (Engine.State.Phase == Phase.FullTime && OnMatchEnd != null)
         {
@@ -342,6 +349,40 @@ public partial class MatchView : Node3D
             GameApp.Instance?.RememberEvents(Engine.Events);
             OnMatchEnd(Engine.State);
             OnMatchEnd = null; // only once
+        }
+    }
+
+    // ---- QA: --autoplay plays a whole match/shootout/drill unattended, logging
+    // progress every 5 game-minutes and a summary at the end, then quits.
+    private readonly bool _autoplay = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--autoplay") >= 0;
+    private int _autoplayBucket = -1;
+    private bool _autoplayDone;
+    private double _autoplayStart = -1;
+    private void AutoplayReport()
+    {
+        if (!_autoplay || _autoplayDone || Engine == null) return;
+        var S = Engine.State;
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (_autoplayStart < 0) _autoplayStart = now;
+        int bucket = S.Clock > 0 ? (int)(S.Clock / 300f) : (int)((now - _autoplayStart) / 30.0);
+        if (bucket != _autoplayBucket)
+        {
+            _autoplayBucket = bucket;
+            GD.Print($"[AUTOPLAY] {S.Clock / 60f:0}' half {S.Half} {S.Phase} score {S.Score[0]}-{S.Score[1]} "
+                   + $"shots {S.Shots[0]}-{S.Shots[1]} fps {Godot.Engine.GetFramesPerSecond():0} real {now - _autoplayStart:0}s");
+        }
+        bool trainingDone = _opts.Mode == MatchEngine.ModeTraining && now - _autoplayStart > 90;
+        if (S.Phase == Phase.FullTime || trainingDone)
+        {
+            _autoplayDone = true;
+            int K(EventKind k) { int n = 0; foreach (var e in Engine.Events) if (e.Kind == k) n++; return n; }
+            int T(string t) { int n = 0; foreach (var e in Engine.Events) if (e.Text.StartsWith(t)) n++; return n; }
+            GD.Print($"[AUTOPLAY] END mode {_opts.Mode} score {S.Score[0]}-{S.Score[1]} shots {S.Shots[0]}-{S.Shots[1]} "
+                   + $"on target {S.ShotsOnTarget[0]}-{S.ShotsOnTarget[1]} passes {S.Passes[0]}-{S.Passes[1]} "
+                   + $"fouls {S.Fouls[0]}-{S.Fouls[1]} corners {S.Corners[0]}-{S.Corners[1]} "
+                   + $"(last {Engine.Events.Count} events: throw-ins {T("Throw-in")} goal kicks {T("Goal kick")} saves {K(EventKind.Save)}) "
+                   + $"shootout {S.ShootoutKicksHome}/{S.ShootoutKicksAway} real {now - _autoplayStart:0}s");
+            GetTree().CreateTimer(3.0).Timeout += () => GetTree().Quit();
         }
     }
 
