@@ -364,8 +364,8 @@ public sealed partial class MatchEngine
             Vector3 to = p.Pos - from.Pos;
             float dist = to.Length();
             if (dist < 0.5f) continue;
-            Vector2 dir2 = new(to.X, to.Z).Normalized();
-            float alignment = Vector2.Dot(aimDir.Normalized(), dir2);
+            Vector2 dir2 = Vector2.Normalize(new Vector2(to.X, to.Z));
+            float alignment = Vector2.Dot(Vector2.Normalize(aimDir), dir2);
             float score = alignment * 10f - dist * 0.1f;
             if (score > bestScore)
             {

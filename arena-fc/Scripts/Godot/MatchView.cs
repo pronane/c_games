@@ -281,11 +281,11 @@ public partial class MatchView : Node3D
                 var stadium = GetNodeOrNull<Stadium>("../Stadium");
                 stadium?.CelebrateCrowd(5f);
                 // Update commentary context with score.
-                _commentaryCtx.HomeScore = Engine.State.ScoreHome;
-                _commentaryCtx.AwayScore = Engine.State.ScoreAway;
+                _commentaryCtx.HomeScore = Engine.State.Score[0];
+                _commentaryCtx.AwayScore = Engine.State.Score[1];
                 _commentaryCtx.Minute = (int)(Engine.State.Clock / 60f);
-                _commentaryCtx.LastScorer = evt.PlayerName ?? "";
-                _commentaryCtx.LastScorerTeam = evt.TeamName ?? "";
+                _commentaryCtx.LastScorer = evt.Text;
+                _commentaryCtx.LastScorerTeam = evt.Side == 0 ? "Home" : "Away";
                 string line = _commentary.Generate(CommentaryEvent.Goal, _commentaryCtx);
                 Hud?.AddCommentary(line);
                 audio?.Call("play_voice_cue", "goal");

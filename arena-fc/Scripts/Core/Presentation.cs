@@ -154,7 +154,7 @@ public class Presentation
     }
 
     /// <summary>Generate post-match data with ratings and MOTM.</summary>
-    public PostMatchData GeneratePostMatch(MatchState state, string homeTeam, string awayTeam)
+    public PostMatchData GeneratePostMatch(MatchState state, string homeTeam, string awayTeam, List<MatchEvent>? events = null)
     {
         var data = new PostMatchData
         {
