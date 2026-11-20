@@ -343,7 +343,7 @@ public partial class GameApp : Node3D
         var box = Ui.VBox(10);
         box.AddChild(Ui.Lbl("FULL TIME", 32, Ui.Accent));
         box.AddChild(Ui.Lbl(post.ResultSummary, 24));
-        box.AddChild(Ui.Lbl($"Man of the Match: {post.ManOfTheMatch} ({post.MotM Rating / 10.0:0.0})", 18, Ui.Accent));
+        box.AddChild(Ui.Lbl($"Man of the Match: {post.ManOfTheMatch} ({post.MotMRating / 10.0:0.0})", 18, Ui.Accent));
         box.AddChild(Ui.Lbl("", 10));
         box.AddChild(Ui.Lbl("Highlights:", 16));
         foreach (var h in post.Highlights.Take(3))
