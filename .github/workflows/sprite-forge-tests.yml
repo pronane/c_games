@@ -29,6 +29,8 @@ jobs:
       - run: python tools/test_look.py
       # v11.18: the Studio's Capture and Motion tabs (the window checks run under a virtual display)
       - run: xvfb-run -a python tools/test_studio_tabs.py
+      # v11.19: the Games tab - a page per kind of game, every pack in game_packs/
+      - run: xvfb-run -a python tools/test_game_tabs.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

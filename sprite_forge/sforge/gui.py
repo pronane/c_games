@@ -165,6 +165,11 @@ class Studio:
         self.nb.add(self.motiontab, text=" Motion  ", image=tk_icon("library"), compound=tk.LEFT)
         from .gui_motion import MotionTab
         self.motionlib = MotionTab(self, self.motiontab)
+        # v11.19: a page per kind of game (soccer, boxing, platformer, kart...) - its moves, clips, character and build
+        self.gamestab = ttk.Frame(self.nb)
+        self.nb.add(self.gamestab, text=" Games  ", image=tk_icon("build"), compound=tk.LEFT)
+        from .gui_games import GamesTab
+        self.games = GamesTab(self, self.gamestab)
         self.nb.add(buildtab, text=" Build (advanced)  ", image=tk_icon("build"), compound=tk.LEFT)
         self.nb.add(self.libtab_frame, text=" Library  ", image=tk_icon("library"), compound=tk.LEFT)
         self.gaelictab = ttk.Frame(self.nb)
