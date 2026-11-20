@@ -362,7 +362,10 @@ public partial class Hud : CanvasLayer
         string home = Clubs.All[e.Options.HomeClub].Short, away = Clubs.All[e.Options.AwayClub].Short;
         _score.Text = $"{home}   {s.Score[0]}  -  {s.Score[1]}   {away}";
         _clock.Text = $"{e.ClockString()}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
-        _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}";
+        _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}"
+                    + (s.YellowCards[0] + s.YellowCards[1] + s.RedCards[0] + s.RedCards[1] > 0
+                        ? $"   |   Yellow {s.YellowCards[0]}-{s.YellowCards[1]}  Red {s.RedCards[0]}-{s.RedCards[1]}"
+                        : "");
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
         _cam.Text = cameraName;

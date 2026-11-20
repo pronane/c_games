@@ -346,6 +346,22 @@ public partial class GameApp : Node3D
         var box = Ui.VBox(10);
         box.AddChild(Ui.Lbl("FULL TIME", 32, Ui.Accent));
         box.AddChild(Ui.Lbl(post.ResultSummary, 24));
+        // Real full-time statistics. The state tracked all of this already; the
+        // screen used to show three lines of prose.
+        float possTotal = MathF.Max(1f, state.PossessionTime[0] + state.PossessionTime[1]);
+        int possHome = (int)MathF.Round(state.PossessionTime[0] / possTotal * 100f);
+        var stats = new[]
+        {
+            $"Possession      {possHome}%  -  {100 - possHome}%",
+            $"Shots           {state.Shots[0]}  -  {state.Shots[1]}   (on target {state.ShotsOnTarget[0]}-{state.ShotsOnTarget[1]})",
+            $"Passes          {state.Passes[0]}  -  {state.Passes[1]}",
+            $"Fouls           {state.Fouls[0]}  -  {state.Fouls[1]}",
+            $"Yellow / red    {state.YellowCards[0]}/{state.RedCards[0]}  -  {state.YellowCards[1]}/{state.RedCards[1]}",
+            $"Corners         {state.Corners[0]}  -  {state.Corners[1]}",
+        };
+        box.AddChild(Ui.Lbl("", 8));
+        foreach (var line in stats) box.AddChild(Ui.Lbl(line, 15, Ui.Sub));
+        box.AddChild(Ui.Lbl("", 8));
         box.AddChild(Ui.Lbl($"Man of the Match: {post.ManOfTheMatch} ({post.MotMRating / 10.0:0.0})", 18, Ui.Accent));
         box.AddChild(Ui.Lbl("", 10));
         box.AddChild(Ui.Lbl("Highlights:", 16));
