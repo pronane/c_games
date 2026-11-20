@@ -48,7 +48,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 - ⬜ 2.5 You control your keeper (dive left/right/stay) on the computer's penalties.
 
 ## 3. Ball physics & goal detection
-- ⬜ 3.1 Running the ball into the net while dribbling is not a goal (goal check only runs on a free ball).
+- ✅ 3.1 Running the ball into the net while dribbling is not a goal (goal check only runs on a free ball).
 - ⬜ 3.2 Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
 - ⬜ 3.3 Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela).
 - ⬜ 3.4 Shot power: hold-to-charge bar + timed-finish second press; height from power and body shape; low driven vs dipping vs chipped finishes.
@@ -71,11 +71,11 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ⬜ 5.7 Remap screen covers every action, not just six.
 
 ## 6. Team shape & AI
-- ⬜ 6.1 Formation discipline: units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.
+- ⬜ 6.1 **Next.** Formation discipline (soak: the carrier is 36–72 m from goal 86% of the time; teams reach the final third only ~4×/match — this now caps shots): units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.
 - ⬜ 6.2 Marking: goal-side positioning, zonal by default, track runners, only the nearest one/two press; no crowding round the ball.
-- ⬜ 6.3 AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
-- ⬜ 6.4 Carrier who can't be dispossessed (kept the ball ~80 s under repeated tackles) — check tackle odds vs shielding/close-control stacking.
-- ⬜ 6.5 Goalkeeper: comes off the line to narrow the angle and smother 1v1s, claims crosses, sweeper behaviour on through balls; distribution.
+- 🔧 6.3 (xG-based shooting done, PR #2: shots 1.4 → 4.8/match) AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
+- 🔧 6.4 (one-challenger tackling done, PR #2: tackles 91 → 33/match) Carrier who can't be dispossessed (kept the ball ~80 s under repeated tackles) — check tackle odds vs shielding/close-control stacking.
+- 🔧 6.5 (1v1 off-the-line + smother done, PR #2) Goalkeeper: comes off the line to narrow the angle and smother 1v1s, claims crosses, sweeper behaviour on through balls; distribution.
 - ⬜ 6.6 Defensive player-switch stability (ring hops between team-mates).
 - ⬜ 6.7 Offside line held by the back four; offsides at realistic rates.
 

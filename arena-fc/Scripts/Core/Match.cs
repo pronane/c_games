@@ -762,6 +762,17 @@ public sealed partial class MatchEngine
                     ? new Vector3(-f.Z, 0, f.X) * MathF.Sin(owner.AnimPhase) * .14f
                     : Vector3.Zero;
                 S.Ball.Pos = owner.Pos + f * lead + side + new Vector3(0, Mx.BallRadius + bob, 0);
+                // A carried ball that crosses a line is released so BallPhysics can rule
+                // on it this tick: dribbling into the net used to be no goal, and
+                // dribbling over the touchline was never out of play.
+                if (MathF.Abs(S.Ball.Pos.X) > Mx.HalfLength + .02f || MathF.Abs(S.Ball.Pos.Z) > Mx.HalfWidth + .2f)
+                {
+                    S.Ball.Owner = -1;
+                    S.Ball.Vel = owner.Vel;
+                    S.Ball.FreeTime = 0f;
+                    S.Ball.LastTouch = owner.Index;
+                    S.Ball.LastTouchSide = owner.Team;
+                }
                 // Knock-on: sprinting pushes the ball slightly ahead of the runner.
                 S.Ball.Vel = owner.Sprinting && planar > 4.5f ? owner.Vel * 1.12f : owner.Vel;
                 S.Ball.Spin = Vector3.Zero;
@@ -956,6 +967,45 @@ public sealed partial class MatchEngine
             float tz = Mx.Clamp(ball.Pos.Z * .62f, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
             // Rush: if the ball is loose and close, charge it (1v1).
             bool rush = ball.Owner < 0 && distToGoal < 8f && Mx.FlatDist(p.Pos, ball.Pos) < 6f;
+            // 1v1: an opponent carrying the ball in on goal with no defender left
+            // between him and the goal.  The keeper comes off his line to narrow the
+            // angle and, once close, goes down at the attacker's feet.
+            bool oneOnOne = false;
+            if (ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team && distToGoal < 20f
+                && MathF.Abs(ball.Pos.Z) < 18f)
+            {
+                oneOnOne = true;
+                foreach (var q in S.Players)
+                {
+                    if (q.Team != p.Team || q.IsKeeper || q.SentOff) continue;
+                    float qd = Mx.FlatDist(q.Pos, goalCentre);
+                    if (qd < distToGoal - 1f && Mx.FlatDist(q.Pos, ball.Pos) < distToGoal) { oneOnOne = false; break; }
+                }
+            }
+            if (oneOnOne)
+            {
+                var carrier1 = S.Players[ball.Owner];
+                float outDist = Mx.Clamp((distToGoal - 2.5f) * .72f, 1.5f, 11f);
+                p.Target = goalCentre - ballToGoal * outDist;
+                p.Pressing = true;
+                if (p.ActionTimer <= 0f) p.Action = "run";
+                if (Mx.FlatDist(p.Pos, carrier1.Pos) < 1.9f && p.TackleLock <= 0f && p.ActionTimer <= 0f)
+                {
+                    p.TackleLock = 1.1f;
+                    SetAction(p, "dive", .65f, .45f);
+                    float smother = Mx.Clamp(.42f + p.Spec.Defending * .25f - carrier1.Spec.Pace * .10f, .25f, .7f);
+                    if (Rng.Next() < smother)
+                    {
+                        ball.HasPending = false; ball.PendingKind = 0; ball.PendingFrom = -1;
+                        ball.Owner = p.Index;
+                        ball.Vel = Vector3.Zero;
+                        p.PossessionLock = .2f;
+                        carrier1.PossessionLock = .5f;
+                        Add(EventKind.Save, $"{p.Spec.DisplayName} smothers it at {carrier1.Spec.DisplayName}'s feet!");
+                    }
+                }
+                return;
+            }
             if (rush)
             {
                 p.Target = ball.Pos;
@@ -987,10 +1037,21 @@ public sealed partial class MatchEngine
             p.Action = "run";
             if (!human)
             {
+                // Shoot when the chance is good: xG of this position, a lower bar under
+                // pressure, and the odd speculative long shot.  The old rule (2% per
+                // decision inside 26 m) produced ~2 shots a match.
                 float distGoal = Mx.FlatDist(p.Pos, goal);
-                float shotChance = Mx.Clamp((25f - distGoal) / 25f, 0f, 1f) * .06f * (Options.Difficulty * .35f + 1f);
-                if (distGoal < 26f && MathF.Abs(p.Pos.Z) < 22f && Rng.Next() < shotChance)
-                { Shoot(p, Rng.Range(.55f, 1f)); return; }
+                bool pressed = press != null && pd < 2.6f;
+                float xgHere = XgFrom(p.Pos, p.Team, press == null || pd > 8f);
+                float bar = (pressed ? .055f : .085f) / (1f + Options.Difficulty * .08f);
+                bool chance = distGoal < 32f && xgHere > bar && Rng.Next() < .5f;
+                bool speculative = distGoal < 30f && xgHere > .03f && Rng.Next() < .015f;
+                if (chance || speculative)
+                {
+                    float power = distGoal < 12f ? Rng.Range(.42f, .72f) : Rng.Range(.58f, .92f);
+                    Shoot(p, power);
+                    return;
+                }
                 if ((press != null && pd < 2.1f && Rng.Next() < .20f) || Rng.Next() < .012f)
                 {
                     int t = FindBestPassTarget(p, Rng.Next() < .25f);
@@ -1101,8 +1162,15 @@ public sealed partial class MatchEngine
             {
                 var carrier = S.Players[ball.Owner];
                 float d = Mx.FlatDist(p.Pos, carrier.Pos);
-                float aggression = .38f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
-                if (p.Team != carrier.Team && d < 2.2f && p.TackleLock <= 0 && Rng.Next() < aggression)
+                // One challenger at a time: only the designated presser commits, and
+                // mostly when the carrier's touch is loose.  Every defender within
+                // 2.2 m used to lunge ~3 times a second (~120 tackles a match).
+                bool presser = p.Index == ClosestToBall(p.Team, 0);
+                float looseTouch = Mx.FlatDist(carrier.Pos, ball.Pos) > .45f || carrier.FirstTouchQuality < .5f ? .22f : 0f;
+                float aggression = presser
+                    ? .07f + Options.Difficulty * .025f + (p.Spec.Defending - .5f) * .06f + looseTouch
+                    : .01f;
+                if (p.Team != carrier.Team && d < 2.0f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
             }
         }
@@ -2204,6 +2272,16 @@ public sealed partial class MatchEngine
         float goalAngle = MathF.Abs(a1 - a2);
         var nearest = NearestOpponent(p, out float oppDist);
         bool oneOnOne = nearest == null || oppDist > 8f;
+        return _xgModel.CalculateXG(distance, goalAngle, oneOnOne);
+    }
+
+    /// <summary>xG of a shot from <paramref name="from"/> by <paramref name="team"/>.</summary>
+    public float XgFrom(Vector3 from, int team, bool oneOnOne)
+    {
+        var goal = GoalPos(team);
+        float distance = Mx.FlatDist(from, goal);
+        float dx = MathF.Max(.1f, MathF.Abs(goal.X - from.X));
+        float goalAngle = MathF.Abs(MathF.Atan2(Mx.GoalHalfWidth - from.Z, dx) - MathF.Atan2(-Mx.GoalHalfWidth - from.Z, dx));
         return _xgModel.CalculateXG(distance, goalAngle, oneOnOne);
     }
 
