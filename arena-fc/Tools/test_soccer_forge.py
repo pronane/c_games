@@ -69,6 +69,39 @@ def main():
               all(a in SM.ACTION_ALIASES for a in core_actions),
               str([a for a in core_actions if a not in SM.ACTION_ALIASES]))
         check("loop clips are looping", SM.LOOP_CLIPS <= set(SM.ALL_CLIPS))
+        # Sample the authored clips, not just their registration: this catches
+        # a regression to the generic arms-up run cycle or prone slide pose.
+        def sampled(name, count=33):
+            motion = SM.LIB[name]
+            return [motion.sample(i / (count - 1))[0] for i in range(count)]
+
+        run_poses = [pose for name in ("soccer_jog", "soccer_run", "soccer_sprint")
+                     for pose in sampled(name)]
+        arm_swing = max(abs(pose.get(side, (0,))[0])
+                        for pose in run_poses for side in ("arm_L", "arm_R"))
+        elbow_bend = max(abs(pose.get(side, 0))
+                         for pose in run_poses for side in ("elbow_L", "elbow_R"))
+        arm_out = max(pose.get(side, (0, 0, 0))[1]
+                      for pose in run_poses for side in ("arm_L", "arm_R"))
+        check("running arms stay compact", arm_swing <= 34, "max swing %.1f deg" % arm_swing)
+        check("running arms stay lowered", arm_out <= -50, "max out angle %.1f deg" % arm_out)
+        check("running elbows stay relaxed", elbow_bend <= 66, "max bend %.1f deg" % elbow_bend)
+
+        slide = SM.LIB["soccer_slide_tackle"].sample(0.5)[0]
+        hips = slide.get("hips", (0, 0, 0))
+        neck = slide.get("neck", (0, 0, 0))
+        lead = slide.get("leg_L", (0, 0, 0))
+        trail = slide.get("leg_R", (0, 0, 0))
+        check("slide keeps the head lifted", neck[0] >= 0, "neck pitch %.1f" % neck[0])
+        check("slide leads with the extended foot", lead[0] > trail[0]
+              and slide.get("knee_L", 0) < slide.get("knee_R", 0),
+              "hips=%s lead=%s trail=%s" % (hips, lead, trail))
+        check("slide rolls onto the side instead of diving head-first", hips[2] >= 45
+              and neck[0] >= 0, "hips=%s neck=%s" % (hips, neck))
+        check("slide arms do not reach ahead of the head",
+              max(abs(slide.get("arm_L", (0,))[0]), abs(slide.get("arm_R", (0,))[0])) < 60,
+              "arms=%s/%s" % (slide.get("arm_L"), slide.get("arm_R")))
+        check("slide stays out of a prone face-down pose", slide.get("flat", 1.0) > 0.9)
     except ImportError as e:
         print("  SKIP  sprite_forge not importable (%s)" % e)
 
@@ -202,6 +235,8 @@ def main():
           "NaturalRate" in soccer_cs and "speed / (nat" in soccer_cs)
     check("blend-space clip selection", "SelectClip" in soccer_cs and "SelectDirectionalClip" in soccer_cs)
     check("phase sync on clip switch", "_phase" in soccer_cs and "startPhase" in soccer_cs)
+    check("one-shots fit the match action window",
+          "clipDur / p.ActionDuration" in soccer_cs and "every one-shot" in soccer_cs)
     check("foot-planting IK", "SolveTwoBone" in soccer_cs and "ShortestArc" in soccer_cs)
     check("look-at and reach", "UpdateLookAt" in soccer_cs and "UpdateReach" in soccer_cs)
     check("archetype biases", "SetArchetype" in soccer_cs and "Archetype.Explosive" in soccer_cs)
