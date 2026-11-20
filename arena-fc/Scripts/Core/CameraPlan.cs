@@ -48,7 +48,7 @@ public static class BroadcastPlan
         return ClampPitch(focus, 4f, 4f);
     }
 
-    public static float FocusDeadzone(int mode) => mode == 4 ? 14f : 5.5f;
+    public static float FocusDeadzone(int mode) => mode == 4 ? 14f : 3.5f;
 
     /// <summary>Advance the held camera focus.  Small ball/player movement does not
     /// move the camera at all; a breakaway eases toward the desired focus but keeps
@@ -76,6 +76,9 @@ public static class BroadcastPlan
         focus = ClampPitch(focus, 4f, 4f);
         float separation = Vector2.Distance(new Vector2(ball.X, ball.Z),
                                            new Vector2(player.X, player.Z));
+        // Keep the default broadcast shot close through normal play. Only widen
+        // after the ball and controlled player begin to separate substantially.
+        float adaptiveWiden = Mx.Clamp((separation - 12f) * .32f, 0f, 14f);
         float widen = Mx.Clamp(separation * .18f, 0f, 9f);
         Vector3 h = heading.LengthSquared() > 1e-6f ? Vector3.Normalize(heading) : new Vector3(1f, 0f, 0f);
         Vector3 side = new(-h.Z, 0f, h.X);
@@ -122,10 +125,10 @@ public static class BroadcastPlan
                 look = new Vector3(ball.X, 0f, ball.Z);
                 fov = 45f;
                 break;
-            default: // broadcast: fixed world orientation, never spins with facing
-                target = ClampPitch(new Vector3(focus.X - 7f, 28f, focus.Z + 42f), 14f, 22f);
+            default: // default broadcast: closer active-play framing, stable and facing-independent
+                target = ClampPitch(new Vector3(focus.X - 4f, 22f, focus.Z + 32f), 14f, 22f);
                 look = ClampPitch(new Vector3(focus.X, 1.2f, focus.Z), 2f, 2f);
-                fov = 46f + widen;
+                fov = 45f + adaptiveWiden;
                 break;
         }
         // Looking straight down its own up axis is degenerate; the tactical mode

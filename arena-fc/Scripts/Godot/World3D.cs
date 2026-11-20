@@ -125,6 +125,11 @@ public partial class Stadium : Node3D
             TonemapExposure = 1.12f,
             TonemapWhite = 1.0f,
             GlowEnabled = highFx,
+            // Subtle ambient occlusion restores foot-to-pitch contact on the
+            // high-quality desktop path without taxing mobile presets.
+            SsaoEnabled = highFx,
+            SsaoRadius = 1.1f,
+            SsaoIntensity = 1.1f,
             GlowIntensity = .22f,
             GlowBloom = .08f,
             FogEnabled = medFx,
@@ -134,7 +139,7 @@ public partial class Stadium : Node3D
             AdjustmentEnabled = highFx,
             AdjustmentBrightness = 1.02f,
             AdjustmentContrast = 1.05f,
-            AdjustmentSaturation = 1.08f,
+            AdjustmentSaturation = 1.0f,
         };
         var world = new WorldEnvironment { Name = "WorldEnvironment", Environment = env };
         AddChild(world);
@@ -146,7 +151,9 @@ public partial class Stadium : Node3D
             LightEnergy = 1.45f,
             RotationDegrees = new Vector3(-52f, -38f, 0),
             ShadowEnabled = true,
-            DirectionalShadowMaxDistance = 220f,
+            ShadowBias = .045f,
+            ShadowNormalBias = 1f,
+            DirectionalShadowMaxDistance = 160f,
         };
         AddChild(sun);
 
@@ -199,8 +206,13 @@ public partial class Stadium : Node3D
         }
 
         // --- Stands + crowd ---
-        var concrete = Mat(new Color(.16f, .18f, .22f));
-        var seat = Mat(new Color(.11f, .14f, .20f));
+        var concrete = Mat(new Color(.15f, .17f, .20f));
+        var seats = new Material[]
+        {
+            Mat(new Color(.09f, .12f, .17f)),
+            Mat(new Color(.10f, .14f, .16f)),
+            Mat(new Color(.13f, .11f, .16f)),
+        };
         int rows = 9;
         for (int side = 0; side < 4; side++)
         {
@@ -214,7 +226,8 @@ public partial class Stadium : Node3D
                                      : new Vector3(s * dist, height * .5f - .35f, 0);
                 Vector3 size = alongX ? new Vector3(Mx.PitchLength + 42f + r * 3f, height, 2.1f)
                                       : new Vector3(2.1f, height, Mx.PitchWidth + 42f + r * 3f);
-                AddChild(Mesh(new BoxMesh { Size = size }, r % 2 == 0 ? concrete : seat, pos, $"Stand{side}_{r}"));
+                Material rowMaterial = r % 2 == 0 ? concrete : seats[(r + side) % seats.Length];
+                AddChild(Mesh(new BoxMesh { Size = size }, rowMaterial, pos, $"Stand{side}_{r}"));
             }
         }
         if (fullCrowd) AddChild(BuildCrowd(2400));
