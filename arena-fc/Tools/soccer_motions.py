@@ -178,25 +178,28 @@ CUSTOM = {
                         func=_soccer_loco(35, 78, 22, 48, 11, air=0.025)),
     "soccer_sprint": dict(category="Locomotion", desc="compact soccer sprint", loop=True,
                            func=_soccer_loco(46, 98, 26, 52, 15, air=0.06)),
-    # Feet-first slide: recline the torso, keep the head lifted, extend the lead
-    # leg toward the challenge and tuck the trailing leg. Match movement supplies
-    # the actual ground travel, so these poses deliberately contain no root run-up.
+    # Feet-first slide.  The old keys only reclined the pelvis ~10 deg, so the
+    # feet stayed the lowest point and the ground constraint left the player in
+    # a crouch with one leg out.  Now the pelvis reclines ~50 deg, the lead leg
+    # goes straight out along the turf, the trailing leg folds under and the
+    # support hand goes down behind - the ground constraint lays the body on
+    # the grass.  Match movement supplies the travel (no root run-up here).
     "soccer_slide_tackle": dict(category="Defence", desc="feet-first sliding tackle", loop=False, keys=K(
         (0.0, P(READY, arm_L=(16, -46, 0), arm_R=(16, -46, 0), elbow_L=40, elbow_R=40)),
-        (0.16, P(CROUCH, hips=(12, -4, 0), spine=(4, 0, 0), chest=(2, 0, 0), neck=(5, 0, 0),
-                 leg_L=(36, 8, 0), knee_L=82, leg_R=(18, -8, 0), knee_R=88,
-                 arm_L=(18, -50, 0), arm_R=(18, -50, 0), elbow_L=48, elbow_R=48)),
-        (0.38, P(CROUCH, hips=(-10, -6, 65), spine=(8, 0, 0), chest=(2, 0, 0), neck=(10, 0, 0),
-                 leg_L=(72, 10, 0), knee_L=16, ankle_L=-6,
-                 leg_R=(34, -8, 0), knee_R=72,
-                 arm_L=(8, -50, 0), arm_R=(8, -50, 0), elbow_L=42, elbow_R=42)),
-        (0.68, P(CROUCH, hips=(-8, -6, 60), spine=(6, 0, 0), chest=(2, 0, 0), neck=(8, 0, 0),
-                 leg_L=(68, 10, 0), knee_L=18, ankle_L=-4,
-                 leg_R=(32, -8, 0), knee_R=68,
-                 arm_L=(8, -50, 0), arm_R=(8, -50, 0), elbow_L=42, elbow_R=42)),
-        (0.86, P(CROUCH, hips=(-12, 0, 0), spine=(6, 0, 0), chest=(2, 0, 0), neck=(4, 0, 0),
-                 leg_L=(34, 6, 0), knee_L=68, leg_R=(24, -6, 0), knee_R=76,
-                 arm_L=(14, -46, 0), arm_R=(14, -46, 0), elbow_L=46, elbow_R=46)),
+        (0.14, P(READY, hips=(10, -4, 0), spine=(4, 0, 0), neck=(-6, 0, 0),
+                 leg_L=(42, 8, 0), knee_L=64, leg_R=(8, -6, 0), knee_R=76,
+                 arm_L=(20, 30, 0), arm_R=(-10, 30, 0), elbow_L=40, elbow_R=30)),
+        (0.32, P(STAND, hips=(-58, -4, 52), spine=(14, 0, 0), chest=(8, 0, 0), neck=(34, 0, 0),
+                 leg_L=(30, 6, 0), knee_L=6, ankle_L=-12,
+                 leg_R=(-22, -6, 0), knee_R=112, ankle_R=20,
+                 arm_L=(24, 34, 0), elbow_L=30, arm_R=(-38, 30, 0), elbow_R=14)),
+        (0.68, P(STAND, hips=(-54, -4, 50), spine=(14, 0, 0), chest=(8, 0, 0), neck=(32, 0, 0),
+                 leg_L=(28, 6, 0), knee_L=8, ankle_L=-10,
+                 leg_R=(-20, -6, 0), knee_R=108, ankle_R=20,
+                 arm_L=(22, 32, 0), elbow_L=30, arm_R=(-36, 30, 0), elbow_R=16)),
+        (0.86, P(CROUCH, hips=(-10, 0, 0), spine=(8, 0, 0), chest=(2, 0, 0), neck=(4, 0, 0),
+                 leg_L=(40, 6, 0), knee_L=70, leg_R=(20, -6, 0), knee_R=96,
+                 arm_L=(14, 20, 0), arm_R=(-16, 24, 0), elbow_L=46, elbow_R=30)),
         (1.0, P(READY)))),
     "soccer_volley": dict(category="Ball", desc="first-time volley", loop=False, keys=K(
         (0.0, P(READY, ball=("world", 0, 0.55, 0.45))),
@@ -380,7 +383,9 @@ ACTION_ALIASES = {
     "shoulder_charge": "soccer_shoulder_charge",
     "dispossess": "soccer_dispossess",
     "block": "soccer_block",
-    "foul": "soccer_foul",
+    # The fouled player goes down (soccer_foul is an arms-up appeal and was
+    # what showed at every free kick).
+    "foul": "soccer_trip",
     "stumble": "soccer_stumble",
     "trip": "soccer_trip",
     "fall": "soccer_fall",

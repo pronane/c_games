@@ -119,6 +119,14 @@ public sealed class MotionEngine
         float bodyTypeFactor = 1f, string? styleTag = null)
     {
         ClipCategory category = SelectCategory(intent, ball);
+        // Standing still is idle, not the slowest "locomotion" clip: with blocks,
+        // appeals and victories filed under Locomotion at speed 0, stationary
+        // players stood with their arms in the air at every stoppage.
+        if (category == ClipCategory.Locomotion && ball != BallState.Possessed && speed < .35f)
+        {
+            ClipMeta? idle = SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, styleTag);
+            if (idle != null) return idle;
+        }
         ClipMeta? best = SelectBest(category, ball, speed, turnRate, bodyTypeFactor, styleTag);
         if (best != null) return best;
         if (category != ClipCategory.Locomotion)

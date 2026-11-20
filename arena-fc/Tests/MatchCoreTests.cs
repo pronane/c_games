@@ -423,6 +423,18 @@ Check("shared Sprite Forge clip manifest loads all 18-bone clips",
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
+// Only gait cycles may be Locomotion: blocks, appeals, victories and keeper
+// stances filed there at speed 0 made standing players hold arms-up poses.
+string[] gait = { "soccer_backpedal", "soccer_dribble", "soccer_jockey", "soccer_jog", "soccer_run",
+    "soccer_run_ball", "soccer_sidestep", "soccer_sprint", "soccer_strafe_l", "soccer_strafe_r", "soccer_walk" };
+var locoIds = manifestClips.Where(c => c.Category == ClipCategory.Locomotion).Select(c => c.Id).OrderBy(x => x).ToArray();
+Check("clip manifest: Locomotion holds only gait cycles", locoIds.SequenceEqual(gait),
+      string.Join(",", locoIds.Except(gait)));
+var standing = manifestEngine.SelectClip(PlayerIntent.Move, ArenaFC.Core.Animation.BallState.None, 0f, 0f);
+Check("a standing player plays an idle clip, not an action clip",
+      standing != null && standing.Category == ClipCategory.Idle, standing?.Id ?? "null");
+var jogging = manifestEngine.SelectClip(PlayerIntent.Move, ArenaFC.Core.Animation.BallState.None, 3.2f, 0f);
+Check("a moving player still plays a gait clip", jogging != null && gait.Contains(jogging.Id), jogging?.Id ?? "null");
 var walkMeta = new ClipMeta { Id = "walk", Category = ClipCategory.Locomotion, Duration = .8f,
     PreferredSpeed = 2f, BallState = ArenaFC.Core.Animation.BallState.None, Loop = true, BoneCount = 18,
     FootPlantFrames = new[] { .1f, .6f } };

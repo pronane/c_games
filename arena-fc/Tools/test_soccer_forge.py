@@ -168,6 +168,11 @@ def main():
         check("rig JSON bone indices in range", max(d["bi"]) < len(d["bones"]) and min(d["bi"]) >= 0)
         ws = [sum(d["w"][i * 4:(i + 1) * 4]) for i in range(min(verts, 200))]
         check("rig JSON weights sum to 1", all(abs(s - 1) < 1e-3 for s in ws))
+        # Bind-pose arms hang at the sides: the sculpt's A-pose arms used to be
+        # skinned to a hanging-arm skeleton, adding ~35-55 deg to every clip.
+        xs = [abs(d["pos"][i * 3]) for i in range(verts)]
+        check("mesh is in Arena's bind pose (arms down, half-width <= 0.32 m)", max(xs) <= 0.32,
+              "half-width %.3f m" % max(xs))
         check("rig JSON material slots are Arena slots", set(d["mats"]) <= {0, 1, 2, 3, 6, 8}, str(d["mats"]))
         tris = sum(len(t) for t in d["idx"]) // 3
         check("rig JSON triangle budget", 8000 < tris <= 20000, str(tris))
