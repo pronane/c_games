@@ -71,6 +71,16 @@ public static class Clubs
         new() { Name="Meridian Stadium", Capacity=40000, Roof=true, Floodlights=true, LEDBoards=true },
         new() { Name="Coastal Arena", Capacity=32000, Roof=false, Floodlights=true, LEDBoards=false },
         new() { Name="Summit Stadium", Capacity=55000, Roof=true, Floodlights=true, LEDBoards=true },
+        new() { Name="Harbor Ground", Capacity=30000, Roof=false, Floodlights=true, LEDBoards=false },
+        new() { Name="Pinnacle Dome", Capacity=48000, Roof=true, Floodlights=true, LEDBoards=true },
+        new() { Name="Emberton Park", Capacity=26000, Roof=false, Floodlights=true, LEDBoards=false },
+        new() { Name="Frostbite Arena", Capacity=38000, Roof=true, Floodlights=true, LEDBoards=true },
+        new() { Name="Golden Gate Stadium", Capacity=62000, Roof=true, Floodlights=true, LEDBoards=true },
+        new() { Name="Silverton Ground", Capacity=24000, Roof=false, Floodlights=true, LEDBoards=false },
+        new() { Name="Crimson Stadium", Capacity=44000, Roof=true, Floodlights=true, LEDBoards=true },
+        new() { Name="Azure Arena", Capacity=58000, Roof=true, Floodlights=true, LEDBoards=true },
+        new() { Name="Verdant Park", Capacity=34000, Roof=false, Floodlights=true, LEDBoards=false },
+        new() { Name="Obsidian Dome", Capacity=50000, Roof=true, Floodlights=true, LEDBoards=true },
     };
 
     public static readonly LeagueInfo[] Leagues =

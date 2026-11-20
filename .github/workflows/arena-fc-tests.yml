@@ -107,6 +107,48 @@ jobs:
         working-directory: arena-fc
         run: python3 Tools/test_soccer_forge.py
 
+  # The actual game, not just the pure C# core: build the Godot assemblies and run
+  # the in-engine selftest (skinned rig, GLB round trip, shaders, stadium, HUD,
+  # character editor and a full 3D 5v5 match pipeline) headlessly.
+  godot-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '9.0.x' }
+      - name: Download Godot 4.7.2 (.NET build)
+        run: |
+          curl -fsSL -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip
+          unzip -q godot.zip -d godot
+          chmod +x godot/*/Godot_v4.7.2-stable_mono_linux.x86_64
+          echo "GODOT=$PWD/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Build the Godot C# assemblies
+        working-directory: arena-fc
+        run: |
+          set -o pipefail
+          dotnet build ArenaFC.sln -c Debug -v:q 2>&1 | tee build-debug.log
+      - name: In-engine selftest (real nodes, real match)
+        working-directory: arena-fc
+        run: |
+          set -o pipefail
+          timeout 420 "$GODOT" --headless --path . -- --selftest 2>&1 | tee selftest.log
+      - name: Surface selftest failures as annotations
+        if: always()
+        working-directory: arena-fc
+        run: |
+          [ -f selftest.log ] || exit 0
+          grep -E '^  FAIL' selftest.log | sort -u | while IFS= read -r line; do
+            echo "::error file=arena-fc/Scripts/Godot/SelfTest.cs::$line"
+          done || true
+      - name: Upload selftest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-selftest-log
+          path: |
+            arena-fc/selftest.log
+            arena-fc/build-debug.log
+
   node-hub:
     runs-on: ubuntu-latest
     steps:

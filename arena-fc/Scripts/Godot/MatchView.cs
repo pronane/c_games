@@ -93,6 +93,11 @@ public partial class MatchView : Node3D
         if (label.Text != text) label.Text = text;
     }
 
+    /// <summary>The home club's ground. Clubs.All and Clubs.Stadiums are
+    /// index-aligned, which the pure-C# core suite asserts.</summary>
+    public static int StadiumIndexFor(int club) =>
+        Clubs.Stadiums.Length == 0 ? 0 : ((club % Clubs.Stadiums.Length) + Clubs.Stadiums.Length) % Clubs.Stadiums.Length;
+
     private void MergePending(PlayerCommand cmd)
     {
         _pending.Move = cmd.Move;
@@ -115,8 +120,10 @@ public partial class MatchView : Node3D
         _built = true;
         Name = "MatchView";
 
+        // The home club's own ground: World3D used to be built with the default
+        // index, so every fixture in the game was played at "Lions Den".
         var stadium = new Stadium();
-        stadium.Build(true);
+        stadium.Build(true, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
         AddChild(stadium);
 
         // Online: the mirror/predictor engine is authoritative for rendering, but

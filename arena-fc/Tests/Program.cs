@@ -56,7 +56,24 @@ var roster = Clubs.CreateRoster(0, 11);
 var json = CharacterIo.SerializeRoster(roster, "TEST FC");
 var roster2 = CharacterIo.DeserializeRoster(json, out var teamName);
 Check("roster round trip", roster2.Count == 11 && teamName == "TEST FC" && roster2[0].IsKeeper);
-Check("8 fictional clubs", Clubs.All.Length == 8);
+Check("league table matches the club list", Clubs.All.Length == Clubs.Leagues.Sum(l => l.Teams),
+      $"clubs={Clubs.All.Length} leagues={Clubs.Leagues.Sum(l => l.Teams)}");
+Check("every league has exactly its advertised club count",
+      Enumerable.Range(0, Clubs.Leagues.Length).All(i => Clubs.All.Count(c => c.LeagueId == i) == Clubs.Leagues[i].Teams));
+Check("club short codes are unique 3-letter tags", Clubs.All.Select(c => c.Short).Distinct().Count() == Clubs.All.Length
+      && Clubs.All.All(c => c.Short.Length == 3));
+Check("club names are unique", Clubs.All.Select(c => c.Name).Distinct().Count() == Clubs.All.Length);
+Check("every club has a defined stadium", Clubs.All.All(c => Clubs.Stadiums.Any(s => s.Name == c.Stadium)),
+      string.Join(", ", Clubs.All.Where(c => !Clubs.Stadiums.Any(s => s.Name == c.Stadium)).Select(c => c.Stadium)));
+Check("club list and stadium table are index-aligned (stadium variety depends on it)",
+      Clubs.All.Length == Clubs.Stadiums.Length &&
+      Enumerable.Range(0, Clubs.All.Length).All(i => Clubs.All[i].Stadium == Clubs.Stadiums[i].Name),
+      string.Join(", ", Enumerable.Range(0, Math.Min(Clubs.All.Length, Clubs.Stadiums.Length))
+          .Where(i => Clubs.All[i].Stadium != Clubs.Stadiums[i].Name).Select(i => $"{Clubs.All[i].Name}->{Clubs.Stadiums[i].Name}")));
+Check("stadiums have plausible capacities", Clubs.Stadiums.All(s => s.Capacity >= 8000 && s.Capacity <= 90000));
+Check("every club has home/away/third kits and a style",
+      Clubs.All.All(c => c.AwayPrimary.Length > 0 && c.ThirdPrimary.Length > 0 && c.Style.Length > 0));
+Check("club strengths stay in a playable band", Clubs.All.All(c => c.Strength >= .6f && c.Strength <= .95f));
 Check("formations sized correctly", Clubs.Slots("4-4-2", 11).Length == 11 && Clubs.Slots("1-2-1 (5s)", 5).Length == 5 && Clubs.Slots("2-3-1 (7s)", 7).Length == 7);
 
 Section("Deterministic RNG");
