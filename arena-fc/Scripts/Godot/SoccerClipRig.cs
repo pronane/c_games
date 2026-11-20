@@ -144,7 +144,7 @@ public sealed partial class SoccerClipRig : Node3D
             GD.PrintErr($"[SoccerClipRig] Missing nodes: Player={Player != null}, Skel={Skel != null}, Mesh={Mesh != null}");
             return false;
         }
-        GD.Print($"[SoccerClipRig] GLB loaded OK: {Player.GetAnimationList().Count} animations");
+        GD.Print("[SoccerClipRig] GLB loaded OK");
         foreach (var name in Player.GetAnimationList())
         {
             var anim = Player.GetAnimation(name);
