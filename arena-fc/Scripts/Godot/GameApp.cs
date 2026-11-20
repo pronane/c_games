@@ -177,7 +177,6 @@ public partial class GameApp : Node3D
         menu.AddChild(Ui.Btn("QUIT", () => GetTree().Quit()));
         menu.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         var scroll = new ScrollContainer();
-        scroll.HorizontalScrollMode = ScrollContainer.ScrollModeEnum.Disabled;
         scroll.AddChild(menu);
         var panel = Ui.PanelC(scroll, Ui.Panel);
         Place(panel, 0, .5f, 60, -220, 330, 360);
