@@ -30,11 +30,11 @@ public partial class GameApp
     /// <summary>Most-used movement clips from the last match (BlendLearner).</summary>
     internal string BlendSummary()
     {
-        if (_blend == null || _blend.CellWeights.Count == 0) return "";
+        if (_blend == null || _blend.Weights.CellWeights.Count == 0) return "";
         var totals = new Dictionary<string, float>();
-        foreach (var cell in _blend.CellWeights.Values)
-            foreach (var (clip, weight) in cell)
-                totals[clip] = totals.TryGetValue(clip, out float w) ? w + weight : weight;
+        foreach (var cell in _blend.Weights.CellWeights.Values)
+            foreach (var pair in cell)
+                totals[pair.Key] = totals.TryGetValue(pair.Key, out float w) ? w + pair.Value : pair.Value;
         var top = totals.OrderByDescending(t => t.Value).Take(3)
             .Select(t => $"{t.Key} {t.Value:0.0}");
         return "Movement profile: " + string.Join(" · ", top);

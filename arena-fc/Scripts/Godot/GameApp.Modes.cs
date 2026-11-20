@@ -84,7 +84,7 @@ public partial class GameApp
         _menuWorld = new Node3D { Name = "ModeWorld" };
         AddChild(_menuWorld);
         var stadium = new Stadium();
-        stadium.Build(true, Options.Quality, StadiumIndexFor(Options.HomeClub));
+        stadium.Build(true, Options.Quality, MatchView.StadiumIndexFor(Options.HomeClub));
         _menuWorld.AddChild(stadium);
         _menuBall = BallFactory.Create();
         _menuBall.Position = new Vector3(1.8f, .11f, -.3f);
@@ -121,7 +121,7 @@ public partial class GameApp
 
     public void StartTournamentFlow(TournamentType type)
     {
-        var t = new TournamentSystem(Environment.TickCount & 0x7fffffff);
+        var t = new TournamentSystem(System.Environment.TickCount & 0x7fffffff);
         switch (type)
         {
             case TournamentType.WorldCup:

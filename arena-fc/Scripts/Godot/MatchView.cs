@@ -326,9 +326,9 @@ public partial class MatchView : Node3D
             int band = speed < .5f ? 0 : speed < 1.8f ? 1 : speed < 3.2f ? 2 : speed < 5f ? 3 : 4;
             string clip = band switch { 0 => "idle", 1 => "walk", 2 => "jog", 3 => "run", _ => "sprint" };
             int ball = p.Index == owner ? (p.Dribbling ? 2 : 1) : 0;
-            _blend.Record(new BlendCell { SpeedBand = band, TurnBand = 0, BallState = ball }, clip);
+            _blend.Weights.Record(new BlendCell { SpeedBand = band, TurnBand = 0, BallState = ball }, clip);
         }
-        _blend.Normalise();
+        _blend.Weights.Normalise();
     }
 
     /// <summary>Off-ball gesture / emotion tag for a nameplate.</summary>
