@@ -114,7 +114,7 @@ public sealed partial class SoccerClipRig : Node3D
     {
         ["idle"] = "soccer_idle", ["run"] = "soccer_run", ["kick"] = "soccer_kick_place",
         ["tackle"] = "soccer_tackle", ["slide"] = "soccer_slide_tackle", ["dive"] = "soccer_keeper_dive_left",
-        ["catch"] = "soccer_keeper_catch", ["foul"] = "soccer_foul", ["celebrate"] = "soccer_celebrate",
+        ["catch"] = "soccer_keeper_catch", ["foul"] = "soccer_trip", ["celebrate"] = "soccer_celebrate",
     };
 
     public bool Load(CharacterSpec spec)
@@ -283,6 +283,12 @@ public sealed partial class SoccerClipRig : Node3D
         // One-shots (actions) take priority over locomotion.
         string clip = SelectClip(p, speed, out bool oneShot);
         bool motionDriven = _motionState != null && _motionState.RenderClipId.Length > 0;
+        // An engine one-shot with its own clip (foul -> trip, catch, parry, header,
+        // throw-in ...) wins over plain locomotion: the motion engine has no intent
+        // for these and used to keep the player running through them.
+        if (motionDriven && p.ActionTimer > 0f && _aliases.ContainsKey(p.Action)
+            && _motionState!.LastIntent is PlayerIntent.Move or PlayerIntent.Sprint)
+            motionDriven = false;
         if (motionDriven)
         {
             clip = _motionState!.RenderClipId;

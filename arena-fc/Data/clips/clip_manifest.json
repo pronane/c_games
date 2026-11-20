@@ -32,7 +32,7 @@
     {
       "id": "soccer_block",
       "poseDataKey": "soccer_block",
-      "category": "Locomotion",
+      "category": "Tackle",
       "duration": 0.833333,
       "contactFraction": 0.5,
       "footPlantFrames": [],
@@ -83,7 +83,7 @@
     {
       "id": "soccer_change_direction",
       "poseDataKey": "soccer_change_direction",
-      "category": "Locomotion",
+      "category": "Cut",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [
@@ -164,7 +164,7 @@
     {
       "id": "soccer_dispossess",
       "poseDataKey": "soccer_dispossess",
-      "category": "Locomotion",
+      "category": "Tackle",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -227,7 +227,7 @@
     {
       "id": "soccer_fall",
       "poseDataKey": "soccer_fall",
-      "category": "Locomotion",
+      "category": "Recovery",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -282,7 +282,7 @@
     {
       "id": "soccer_foul",
       "poseDataKey": "soccer_foul",
-      "category": "Locomotion",
+      "category": "Recovery",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -392,7 +392,7 @@
     {
       "id": "soccer_hit_react",
       "poseDataKey": "soccer_hit_react",
-      "category": "Locomotion",
+      "category": "Recovery",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -495,7 +495,7 @@
     {
       "id": "soccer_juke_feint",
       "poseDataKey": "soccer_juke_feint",
-      "category": "Locomotion",
+      "category": "Cut",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -512,7 +512,7 @@
     {
       "id": "soccer_keeper_catch",
       "poseDataKey": "soccer_keeper_catch",
-      "category": "Locomotion",
+      "category": "Keeper",
       "duration": 0.833333,
       "contactFraction": 0.5,
       "footPlantFrames": [],
@@ -580,7 +580,7 @@
     {
       "id": "soccer_keeper_ground_catch",
       "poseDataKey": "soccer_keeper_ground_catch",
-      "category": "Locomotion",
+      "category": "Keeper",
       "duration": 0.833333,
       "contactFraction": 0.5,
       "footPlantFrames": [],
@@ -597,7 +597,7 @@
     {
       "id": "soccer_keeper_idle",
       "poseDataKey": "soccer_keeper_idle",
-      "category": "Locomotion",
+      "category": "Keeper",
       "duration": 1.033333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -633,7 +633,7 @@
     {
       "id": "soccer_keeper_punch",
       "poseDataKey": "soccer_keeper_punch",
-      "category": "Locomotion",
+      "category": "Keeper",
       "duration": 0.833333,
       "contactFraction": 0.5,
       "footPlantFrames": [],
@@ -650,7 +650,7 @@
     {
       "id": "soccer_keeper_ready",
       "poseDataKey": "soccer_keeper_ready",
-      "category": "Locomotion",
+      "category": "Keeper",
       "duration": 1.033333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -684,7 +684,7 @@
     {
       "id": "soccer_keeper_throw",
       "poseDataKey": "soccer_keeper_throw",
-      "category": "Locomotion",
+      "category": "Keeper",
       "duration": 0.833333,
       "contactFraction": 0.5,
       "footPlantFrames": [],
@@ -1017,7 +1017,7 @@
     {
       "id": "soccer_solo",
       "poseDataKey": "soccer_solo",
-      "category": "Locomotion",
+      "category": "Kick",
       "duration": 1.033333,
       "contactFraction": -1.0,
       "footPlantFrames": [
@@ -1043,7 +1043,7 @@
     {
       "id": "soccer_spin",
       "poseDataKey": "soccer_spin",
-      "category": "Locomotion",
+      "category": "Cut",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [
@@ -1093,7 +1093,7 @@
     {
       "id": "soccer_stop",
       "poseDataKey": "soccer_stop",
-      "category": "Locomotion",
+      "category": "Recovery",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [
@@ -1203,7 +1203,7 @@
     {
       "id": "soccer_taunt",
       "poseDataKey": "soccer_taunt",
-      "category": "Locomotion",
+      "category": "Celebrate",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],
@@ -1335,7 +1335,7 @@
     {
       "id": "soccer_victory",
       "poseDataKey": "soccer_victory",
-      "category": "Locomotion",
+      "category": "Celebrate",
       "duration": 0.833333,
       "contactFraction": -1.0,
       "footPlantFrames": [],

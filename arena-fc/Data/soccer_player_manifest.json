@@ -1180,7 +1180,7 @@
   "shoulder_charge": "soccer_shoulder_charge",
   "dispossess": "soccer_dispossess",
   "block": "soccer_block",
-  "foul": "soccer_foul",
+  "foul": "soccer_trip",
   "stumble": "soccer_stumble",
   "trip": "soccer_trip",
   "fall": "soccer_fall",
@@ -1235,18 +1235,18 @@
  "stats": {
   "tris": 16000,
   "verts": 8002,
-  "height_m": 1.7682,
+  "height_m": 1.7724,
   "bounds_min": [
-   -0.5699,
-   0.0,
-   -0.1185
+   -0.2701,
+   -0.0031,
+   -0.1194
   ],
   "bounds_max": [
-   0.5722,
-   1.7682,
-   0.3775
+   0.2706,
+   1.7724,
+   0.2116
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 6.4
+  "seconds": 6.3
  }
 }

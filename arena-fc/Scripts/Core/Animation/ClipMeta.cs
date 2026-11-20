@@ -13,7 +13,9 @@ public enum FootSide { Left, Right }
 public enum ClipCategory
 {
     Locomotion, Approach, FirstTouch, Shield, Cut, Kick, Pass, Tackle,
-    KeeperDive, Celebrate, Idle, Recovery
+    KeeperDive, Celebrate, Idle, Recovery,
+    /// <summary>Goalkeeper-only stances and handling (never chosen for outfield movement).</summary>
+    Keeper
 }
 
 /// <summary>Metadata only; actual poses stay in the Sprite Forge GLB / baked JSON.</summary>
