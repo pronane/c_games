@@ -50,16 +50,16 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 
 ## 3. Ball physics & goal detection
 - ✅ 3.1 Running the ball into the net while dribbling is not a goal (goal check only runs on a free ball).
-- ⬜ 3.2 Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
+- 🔧 3.2 (PR #6: landing-point prediction; AI crosses from wide) Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
 - ⬜ 3.3 Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela).
 - ⬜ 3.4 Shot power: hold-to-charge bar + timed-finish second press; height from power and body shape; low driven vs dipping vs chipped finishes.
 - 🔧 3.5 (PR #3: wide players use the touchline, pokes/clearances/parries go out — throw-ins 0 → ~2, corners 0 → 0.1/match; still well under real rates) Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
 
 ## 4. First touch, aerial control and heading
-- ⬜ 4.1 Controlling a high ball: chest, thigh/knee, instep cushion — chosen by ball height and speed; quality from skill + pressure; heavy touches pop the ball away.
-- ⬜ 4.2 Player-directed first touch: stick direction at the moment of the touch takes the ball that way; LT = soft touch-and-stop, RT = knock-on.
-- ⬜ 4.3 Headers: attacking (aim with stick, `X` = header on goal, `A` = header pass), defensive clearances, jump timing, aerial duels decided by heading + jumping + strength.
-- ⬜ 4.4 Volleys / half-volleys and bicycle kicks from high balls in the box.
+- ✅ 4.1 (PR #6: foot <0.45 m, thigh/knee <0.95 m, chest <1.55 m, head above; quality from skill + pressure) Controlling a high ball: chest, thigh/knee, instep cushion — chosen by ball height and speed; quality from skill + pressure; heavy touches pop the ball away.
+- ✅ 4.2 (PR #6: stick at reception knocks it that way, sprint knocks it further) Player-directed first touch: stick direction at the moment of the touch takes the ball that way; LT = soft touch-and-stop, RT = knock-on.
+- 🔧 4.3 (PR #6: jumping headers up to height+0.55 m, aerial duels on height/strength/skill, X = header at goal / A = header pass, AI attacks crosses; players run to the landing point) Headers: attacking (aim with stick, `X` = header on goal, `A` = header pass), defensive clearances, jump timing, aerial duels decided by heading + jumping + strength.
+- 🔧 4.4 (PR #6: first-time volleys at goal / volley passes; bicycle kicks to do) Volleys / half-volleys and bicycle kicks from high balls in the box.
 
 ## 5. Controls — every move clear and reachable
 Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` close control/shield · `A` pass · `Y` through · `X` shoot (hold) · `VIEW` long ball · `B` tackle · `RT+B` slide · `LB` switch (with ball: call a run) · `RS` flick skills (LT+RS advanced) · `X`→`A` fake shot.

@@ -115,6 +115,8 @@ public sealed partial class SoccerClipRig : Node3D
         ["idle"] = "soccer_idle", ["run"] = "soccer_run", ["kick"] = "soccer_kick_place",
         ["tackle"] = "soccer_tackle", ["slide"] = "soccer_slide_tackle", ["dive"] = "soccer_keeper_dive_left",
         ["catch"] = "soccer_keeper_catch", ["foul"] = "soccer_trip", ["celebrate"] = "soccer_celebrate",
+        ["thigh_control"] = "soccer_toe_lift", ["chest_control"] = "soccer_chest_control", ["volley"] = "soccer_volley",
+        ["header"] = "soccer_header",
         ["punch"] = "soccer_fist_shoot", ["headbutt"] = "soccer_header", ["knocked_down"] = "soccer_knocked_down",
     };
 

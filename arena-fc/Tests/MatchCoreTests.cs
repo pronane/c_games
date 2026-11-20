@@ -840,5 +840,53 @@ Section("The referee enforces the Laws (nothing is physically prevented)");
     Check("skill / call-for-ball / punch go over the network", wire.Skill == SkillMove.Roulette && wire.CallForBall && wire.Punch);
 }
 
+
+Section("The ball in the air");
+{
+    Check("touch by height: foot / thigh / chest / head",
+          MatchEngine.TouchFor(.3f, 0) == "trap" && MatchEngine.TouchFor(.7f, 0) == "thigh_control"
+          && MatchEngine.TouchFor(1.2f, 0) == "chest_control" && MatchEngine.TouchFor(1.9f, 0) == "header");
+    // Landing point of a lofted ball.
+    var lb = new ArenaFC.Core.BallState { Pos = new Vector3(0, .11f, 0), Vel = new Vector3(15f, 7f, 0) };
+    var land = MatchEngine.LandingPoint(lb, 1.3f);
+    float tLand = (7f + MathF.Sqrt(49f + 2 * 9.81f * (.11f - 1.3f))) / 9.81f;
+    Check("landing point of a lofted ball is predicted", MathF.Abs(land.X - 15f * tLand * .93f) < .5f, $"x={land.X:0.0}");
+
+    // A ball dropping at 2 m next to a player is now playable (headed).
+    var m = new MatchEngine(new MatchOptions { Seed = 71 });
+    var S = m.State; S.Phase = Phase.Play;
+    var me = S.Players[5]; S.Controlled = -1;
+    foreach (var q in S.Players) if (q.Index != me.Index) { q.Pos = new Vector3(q.Pos.X, 0, q.Pos.Z + 25f); q.Target = q.Pos; }
+    me.Pos = new Vector3(0, 0, 0);
+    S.Ball.Owner = -1; S.Ball.Pos = new Vector3(.3f, 2.0f, 0); S.Ball.Vel = new Vector3(-1f, -2f, 0); S.Ball.FreeTime = .5f;
+    int lt = S.Ball.LastTouch;
+    for (int i = 0; i < 12; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("a 2 m high ball can be headed (was unplayable above 1.55 m)", S.Ball.LastTouch == me.Index || S.Ball.Owner == me.Index
+          || (S.Ball.HasPending && S.Ball.PendingFrom == me.Index), $"last {S.Ball.LastTouch}");
+
+    // A human volleys at goal: it is a shot.
+    var v = new MatchEngine(new MatchOptions { Seed = 72 });
+    var V = v.State; V.Phase = Phase.Play;
+    var st = V.Players[9]; V.Controlled = st.Index; V.ControlLock = 99f;
+    var goal = v.GoalPos(0);
+    st.Pos = goal - new Vector3(v.SideSign(0) * 12f, 0, 0);
+    V.Ball.Owner = -1; V.Ball.Pos = st.Pos + new Vector3(v.SideSign(0) * .6f, .9f, 0); V.Ball.Vel = new Vector3(0, -1f, 2f); V.Ball.FreeTime = .5f;
+    int shots0 = V.Shots[0];
+    v.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .7f });
+    Check("a first-time volley at goal is a shot", V.Shots[0] == shots0 + 1 && V.Ball.Vel.X * v.SideSign(0) > 10f,
+          $"shots {shots0}->{V.Shots[0]} vx={V.Ball.Vel.X:0.0}");
+
+    // Directed first touch: stick held at reception knocks it that way.
+    var d = new MatchEngine(new MatchOptions { Seed = 73 });
+    var D = d.State; D.Phase = Phase.Play;
+    var rc = D.Players[6]; D.Controlled = rc.Index; D.ControlLock = 99f;
+    foreach (var q in D.Players) if (q.Index != rc.Index) { q.Pos = new Vector3(q.Pos.X, 0, q.Pos.Z + 25f); q.Target = q.Pos; }
+    rc.Pos = Vector3.Zero; rc.Vel = Vector3.Zero;
+    D.Ball.Owner = -1; D.Ball.Pos = new Vector3(.7f, .6f, 0); D.Ball.Vel = new Vector3(-6f, 0, 0); D.Ball.FreeTime = .5f;
+    float maxZ = 0f;
+    for (int i = 0; i < 60; i++) { d.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1) }); maxZ = MathF.Max(maxZ, D.Ball.Pos.Z); }
+    Check("a steered first touch goes where the stick points", maxZ > 1.2f, $"ball z reached {maxZ:0.0}");
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

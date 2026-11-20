@@ -221,6 +221,7 @@ public sealed partial class MatchEngine
         Stamina = p.Stamina, AnimPhase = p.AnimPhase, ActionTimer = p.ActionTimer,
         ActionDuration = p.ActionDuration, ActionContactAt = p.ActionContactAt,
         ActionReleased = p.ActionReleased, MustPlayBall = p.MustPlayBall, RestartHold = p.RestartHold,
+        TouchDir = p.TouchDir, TouchKnock = p.TouchKnock,
         DecisionTimer = p.DecisionTimer, PossessionLock = p.PossessionLock,
         TackleLock = p.TackleLock, Action = p.Action, IsKeeper = p.IsKeeper,
         Pressing = p.Pressing, Shielding = p.Shielding,

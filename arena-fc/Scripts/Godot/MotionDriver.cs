@@ -113,7 +113,7 @@ public sealed class MotionDriver
                 "kick" or "volley" or "shoot" => PlayerIntent.Shoot,
                 "pass" or "short_pass" => PlayerIntent.Pass,
                 "through_ball" or "cross" or "throw_in" => PlayerIntent.ThroughBall,
-                "trap" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
+                "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
                 "tackle" or "slide" or "shoulder_charge" => PlayerIntent.Tackle,
                 "dive" or "keeper_dive" => PlayerIntent.Dive,
                 "celebrate" => PlayerIntent.Celebrate,
