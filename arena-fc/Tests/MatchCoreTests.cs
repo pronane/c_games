@@ -317,8 +317,8 @@ MethodInfo? bestPass = typeof(MatchEngine).GetMethod("FindBestPassTarget",
 Check("pass-target helper is available to the regression suite", bestPass != null);
 if (bestPass != null)
 {
-    int shortIdx = (int)bestPass.Invoke(passPlan, new object[] { passer, false, false })!;
-    int longIdx = (int)bestPass.Invoke(passPlan, new object[] { passer, true, true })!;
+    int shortIdx = (int)bestPass.Invoke(passPlan, new object[] { passer, false, false, default(Vector2) })!;
+    int longIdx = (int)bestPass.Invoke(passPlan, new object[] { passer, true, true, default(Vector2) })!;
     float shortD = shortIdx >= 0 ? Mx.FlatDist(passer.Pos, passPlan.State.Players[shortIdx].Pos) : 999f;
     float longD = longIdx >= 0 ? Mx.FlatDist(passer.Pos, passPlan.State.Players[longIdx].Pos) : 0f;
     Check("short pass prefers a nearer safe receiver than the long ball",
