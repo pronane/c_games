@@ -54,6 +54,47 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.19: a Games tab with a page per kind of game
+
+The Studio's **Games** tab (`sforge/gui_games.py`) lists every kind of game Sprite Forge builds characters for:
+basketball, beat 'em up, boxing, fighting, Gaelic football, kart racer, platformer, shooter, soccer, tennis / padel,
+top-down RPG and wrestling. Any pack JSON you add to `game_packs/` gets a page too.
+
+Each game's page shows:
+
+* **What the game needs:** its description, camera (side-on, three-quarter or top-down 8-way), frame size, the props
+  the game draws (ball, racket, gun...) and its notes.
+* **Its moves:** one row per move with the clip it plays, and whether that is its own clip, one **borrowed** from
+  another move (header plays jump) or **procedural**. Also the frames and fps, whether it loops, its game events
+  (ball contact, hit window, release, footsteps) and, after a build, its sprite QA.
+  - Pick a move and it plays on the mannequin, side-on or front-on. Its events are marked on the timeline and named
+    as the figure passes them.
+  - Below the table: where the clip came from, its licence, and what the last build actually drew it from.
+* **The character:** the mannequin (female-male, muscle and weight sliders), a library rig, or your own captured
+  GLB / FBX. Only the settings that fit the game are offered:
+  - fighter types (quick striker, heavy brawler, small agile, big boss) for boxing, fighting, wrestling and
+    beat 'em up;
+  - player types (playmaker, keeper) and a **team kit** for soccer, Gaelic and basketball.
+* **Build this game's character:** runs `forge.py build --game PACK ...` in the background with the log streamed.
+  Then it shows the sheet preview, and colours each move by its QA (clipping, feet drift, pops, loop seams).
+* **Shot list:** what to film to replace the borrowed and procedural moves with your own.
+
+A **Motions** folder (your own library, e.g. CMU or recorded moves) can be set, and every game's moves are then
+resolved against it.
+
+Tests: `xvfb-run -a python tools/test_game_tabs.py [--motion-library DIR]` (11 checks, in CI). It covers every pack in
+`game_packs/`, not only the shipped twelve:
+
+* every move of every game has a clip that plays;
+* its events fall on its timeline;
+* each game offers the right settings;
+* the build line really builds a mannequin soccer player in a kit and a library-rig boxer;
+* the page reads back the QA and sources;
+* every page fills and every move draws in the window, and Build and Shot list run from the tab.
+
+Known: two shipped moves fail their sprite QA today. The soccer tackle touches the cell edge, and the procedural
+boxing KO fails. The tab shows both in red.
+
 ## New in v11.18: Capture and Motion tabs in the Studio
 
 `python forge.py gui` (or `run_studio`) now has two more tabs, so the video-to-character pipeline and the motion
