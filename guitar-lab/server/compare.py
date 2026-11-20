@@ -45,7 +45,7 @@ SKIP_COST = 0.72
 TAKE_HISTORY = 5
 
 KINDS = ('uncertain', 'correct', 'wrong_pitch', 'wrong_string', 'early', 'late', 'missing', 'extra', 'wrong_duration')
-SOURCES = ('stem', 'notation', 'file')
+SOURCES = ('stem', 'notation', 'file', 'tab')
 NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 _STEP = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
@@ -426,7 +426,7 @@ def compare_to_target(take_notes, target, heard=None, *, duration_review=False) 
     is not reported as missing: the player most likely played it and the detector dropped it."""
     source = target.get('source') or 'file'
     if source not in SOURCES:
-        raise ValueError('Target source must be stem, notation, or file.')
+        raise ValueError('Target source must be stem, notation, file or tab.')
     take = normalize_notes(take_notes)
     ref = normalize_notes(target.get('notes') or [])
     span = 0.0

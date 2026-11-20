@@ -53,6 +53,8 @@ import LatencyCheck from "./LatencyCheck";
 import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
 import TakeReport from "./TakeReport";
+import YourSound from "./YourSound";
+import { reamp, usePlayerSound } from "./liveTone";
 import { rememberTake, shownReport, type Comparison } from "./compare";
 import { captureError } from "./audioInputs";
 import { MEDIA_ACCEPT, needsBrowserDecode, toWav } from "./audioFiles";
@@ -126,7 +128,11 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [refine, setRefine] = useState(false),
     [refineAvailable, setRefineAvailable] = useState(false),
     [scorePlaying, setScorePlaying] = useState<"" | "part" | "written" | "both">(""),
-    [sound, setSound] = useGuitarSound();
+    [sound, setSound] = useGuitarSound(),
+    [mySound, setMySound] = usePlayerSound(),
+    [tryingSound, setTryingSound] = useState(false),
+    [tabParts, setTabParts] = useState<{ name: string; sections: { start: number; end: number }[] }[]>([]),
+    [markAgainst, setMarkAgainst] = useState("");
   const ctx = useRef<AudioContext | null>(null),
     current = useRef<AudioBufferSourceNode | null>(null),
     clock = useRef({ context: 0, song: 0, speed: 1, loop: null as null | { start: number; end: number } }),
@@ -457,6 +463,8 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
       const c = context();
       await c.resume();
       await recorder().ensure();
+      setTryingSound(false);
+      recorder().monitor(mySound.monitor ? mySound : null, mySound.level);
       setPreparing(speed !== 1);
       await new Promise((r) => setTimeout(r, 0));
       const band = toBuffer(render("without", range.start, range.end, c.sampleRate, { guide, click: clickOn }), c.sampleRate);
@@ -486,6 +494,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
       const totalFrames = Math.ceil((songStart - recordFrom + length + 0.6) * c.sampleRate);
       setRecording(true);
       const raw = await recorder().capture(totalFrames, length + countIn + 10);
+      recorder().monitor(null);
       setRecording(false);
       stop();
       // Trim to the song start, then remove the delay: the measured one if this device has
@@ -514,6 +523,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
           (speed !== 1 ? ` Recorded at ${Math.round(speed * 100)}% speed.` : ""),
       });
     } catch (e) {
+      rec.current?.monitor(null);
       setRecording(false);
       setPreparing(false);
       stop();
@@ -522,10 +532,23 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
   }
 
   /** The band without the replaced music, with the player's take dropped in its place. */
-  function bandWithTake(t: Take) {
+  /** Tab parts that play somewhere in the take's stretch of the song: the ones it can be marked against. */
+  const tabNames = take
+    ? tabParts.filter((p) => p.sections.some((sec) => sec.start < take.end && sec.end > take.start)).map((p) => p.name)
+    : [];
+  useEffect(() => {
+    setMarkAgainst((prev) => (tabNames.includes(prev) ? prev : tabNames[0] ?? ""));
+  }, [tabNames.join("|")]);
+
+  /** Your take through your amp and pedals (the take itself is kept dry). */
+  async function wetTake(t: Take) {
+    return reamp(t.buffer, mySound);
+  }
+
+  async function bandWithTake(t: Take) {
     // Render at the speed the take was played at, so both line up.
     const band = render("without", t.start, t.end, context().sampleRate, { speed: t.speed });
-    mixInto(band, [t.buffer.getChannelData(0)], 1);
+    mixInto(band, [(await wetTake(t)).getChannelData(0)], 1);
     let peak = 0;
     for (const ch of band) for (const v of ch) peak = Math.max(peak, Math.abs(v));
     if (peak > 0.99) for (const ch of band) for (let i = 0; i < ch.length; i++) ch[i] *= 0.99 / peak;
@@ -537,15 +560,66 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     stop();
     const c = context();
     await c.resume();
-    start(toBuffer(bandWithTake(take), c.sampleRate), c.currentTime + 0.05, take.start, take.speed, null);
+    start(toBuffer(await bandWithTake(take), c.sampleRate), c.currentTime + 0.05, take.start, take.speed, null);
     setPlaying(true);
     tick();
   }
 
-  function exportMix() {
+  async function exportMix() {
     if (!take) return;
     const sr = context().sampleRate;
-    setMixUrl(URL.createObjectURL(encodeWav(bandWithTake(take), sr)));
+    setMixUrl(URL.createObjectURL(encodeWav(await bandWithTake(take), sr)));
+  }
+
+  /** Just your take, through your sound. */
+  async function hearMine() {
+    if (!take) return;
+    stop();
+    const c = context();
+    await c.resume();
+    const wet = await wetTake(take);
+    start(toBuffer([wet.getChannelData(0), wet.getChannelData(0)], c.sampleRate), c.currentTime + 0.05, take.start, take.speed, null);
+    setPlaying(true);
+    tick();
+  }
+
+  /** The original recording over the same stretch, at the speed you played. */
+  async function hearOriginal() {
+    if (!take) return;
+    stop();
+    const c = context();
+    await c.resume();
+    start(toBuffer(render("mixer", take.start, take.end, c.sampleRate, { speed: take.speed }), c.sampleRate), c.currentTime + 0.05, take.start, take.speed, null);
+    setPlaying(true);
+    tick();
+  }
+
+  /** Loop the bars that went wrong, slower, ready to record them again. */
+  function practiseBars(first: number, last = first) {
+    stop();
+    setFromBar(Math.max(1, first));
+    setToBar(Math.max(first, last));
+    setLoopOn(true);
+    if (speed > 0.75) setSpeed(0.75);
+    document.getElementById("loop-on")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  /** Listen to yourself through your sound without recording, to set it up. */
+  async function trySound() {
+    try {
+      if (tryingSound) {
+        rec.current?.monitor(null);
+        setTryingSound(false);
+        return;
+      }
+      const c = context();
+      await c.resume();
+      await recorder().ensure();
+      recorder().monitor(mySound, mySound.level);
+      setTryingSound(true);
+    } catch (e) {
+      setError(captureError(e));
+    }
   }
 
   async function checkTake() {
@@ -565,6 +639,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         start: take.start,
         end: take.end,
         speed: take.speed,
+        tabPart: markAgainst && tabNames.includes(markAgainst) ? markAgainst : undefined,
       });
       const entry: TakeCheck = {
         id: comparison.take_id,
@@ -980,7 +1055,11 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             </button>
           </div>
           {song && result && parts.length > 0 && <TranscriptionCheck songId={song.id} parts={parts} />}
-          {song && result && song.instrument === "guitar" && <TabParts songId={song.id} songTitle={song.name} />}
+          {song && result && song.instrument === "guitar" && <TabParts
+              songId={song.id}
+              songTitle={song.name}
+              onParts={setTabParts}
+            />}
           {score && (
             <div className="score">
               <p className="helper">
@@ -1054,6 +1133,17 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             {speed !== 1 ? ` at ${Math.round(speed * 100)}% speed` : ""} while we record you. Afterwards your take
             drops into the song in its place.
           </p>
+          <YourSound
+            sound={mySound}
+            onChange={(next) => {
+              setMySound(next);
+              if (tryingSound) rec.current?.monitor(next, next.level);
+            }}
+            latencyMs={latency?.ok ? latency.ms : null}
+            trying={tryingSound}
+            onTry={trySound}
+            disabled={recording}
+          />
           <LatencyCheck
             recorder={recorder}
             latency={latency}
@@ -1117,8 +1207,27 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                 <button onClick={hearTake}>
                   <Headphones size={13} /> Hear yourself in the band
                 </button>
+                <button onClick={hearMine}>
+                  <Mic size={13} /> Just me
+                </button>
+                <button onClick={hearOriginal}>
+                  <Music2 size={13} /> The original
+                </button>
                 <button onClick={exportMix}><Download size={13} /> Make a mix to keep</button>
                 <button onClick={compareTake}>Compare with the original part</button>
+                {song?.instrument === "guitar" && tabNames.length > 0 && (
+                  <label className="speed">
+                    Mark against
+                    <select id="mark-against" value={markAgainst} onChange={(e) => setMarkAgainst(e.target.value)}>
+                      {tabNames.map((n) => (
+                        <option key={n} value={n}>
+                          Your tab: {n}
+                        </option>
+                      ))}
+                      <option value="">The app's transcription</option>
+                    </select>
+                  </label>
+                )}
                 {song?.instrument === "guitar" && (
                   <button className="primary" disabled={checking} onClick={checkTake}>
                     {checking ? "Checking the take…" : "Review my take"}
@@ -1134,7 +1243,14 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                   ))}
                 </div>
               )}
-              {checks[checkAt] && <TakeReport comparison={checks[checkAt].comparison} />}
+              {checks[checkAt] && <TakeReport comparison={checks[checkAt].comparison} onPractise={practiseBars} />}
+              {!tabNames.length && song?.instrument === "guitar" && (
+                <p className="helper">
+                  {tabParts.length
+                    ? "None of your tab's parts plays in this stretch of the song, so the take is marked against the app's own transcription."
+                    : 'Load your tab for this song under "Name the guitar parts from a tab file" to be marked against the tab instead of the app\'s own transcription, which is much less reliable on band recordings.'}
+                </p>
+              )}
               {mixUrl && (
                 <a className="download" href={mixUrl} download={`${song!.name.replace(/\.[^.]+$/, "")} - with me.wav`}>
                   <Download size={14} /> Download your version (WAV)

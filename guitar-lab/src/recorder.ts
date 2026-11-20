@@ -2,9 +2,12 @@
 // records mono PCM, plus the one-time delay check. Browser-only.
 import { inputConstraints, mergeCapture } from "./audioInputs";
 import { addClicks, detectHits, jitteredTimes, saveLatency, summariseLatency, type LatencyResult } from "./practice";
+import { buildToneChain, type ToneChain } from "./liveTone";
+import type { GuitarSound } from "./guitarTone";
 
 export class Recorder {
-  private mic: { stream: MediaStream; node: AudioWorkletNode } | null = null;
+  private mic: { stream: MediaStream; node: AudioWorkletNode; source: MediaStreamAudioSourceNode } | null = null;
+  private live: { chain: ToneChain; level: GainNode } | null = null;
   constructor(public context: AudioContext) {}
 
   async ensure() {
@@ -23,7 +26,28 @@ export class Recorder {
       silent = c.createGain();
     silent.gain.value = 0;
     source.connect(node).connect(silent).connect(c.destination);
-    this.mic = { stream, node };
+    this.mic = { stream, node, source };
+  }
+
+  /**
+   * Hear yourself through an amp and pedals while recording (headphones: through speakers the
+   * microphone would pick it up). Only what you hear changes: the recording stays dry.
+   * Pass null to go back to silent monitoring.
+   */
+  monitor(sound: GuitarSound | null, level = 0.8) {
+    if (this.live) {
+      this.live.chain.stop();
+      this.live.level.disconnect();
+      this.mic?.source.disconnect(this.live.chain.input);
+      this.live = null;
+    }
+    if (!sound || !this.mic) return;
+    const chain = buildToneChain(this.context, sound),
+      gain = this.context.createGain();
+    gain.gain.value = level;
+    this.mic.source.connect(chain.input);
+    chain.output.connect(gain).connect(this.context.destination);
+    this.live = { chain, level: gain };
   }
 
   /** Record `frames` mono samples from now, or until stop(). */
@@ -52,6 +76,7 @@ export class Recorder {
   }
 
   release() {
+    this.monitor(null);
     this.mic?.stream.getTracks().forEach((t) => t.stop());
     this.mic?.node.disconnect();
     this.mic = null;

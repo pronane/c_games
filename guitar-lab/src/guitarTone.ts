@@ -25,7 +25,7 @@ export const DRIVES: { id: Drive; label: string }[] = [
 ];
 
 // Pre-gain into the clipper, and how far the "speaker cabinet" rolls off the top end.
-const AMP: Record<Drive, { gain: number; cab: number; out: number }> = {
+export const AMP: Record<Drive, { gain: number; cab: number; out: number }> = {
   clean: { gain: 1, cab: 0, out: 1 },
   crunch: { gain: 12, cab: 5500, out: 0.5 },
   distorted: { gain: 150, cab: 4200, out: 0.35 },

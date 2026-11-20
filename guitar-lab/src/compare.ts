@@ -95,7 +95,8 @@ export function scoreCards(comparison: Comparison) {
     overall: report.summary.overall == null ? "–" : `${report.summary.overall}%`,
     detail: line(report.summary),
   }));
-  if (comparison.combined) {
+  // With the player's tab, the tab score is the score; averaging the app's own transcriptions adds nothing.
+  if (comparison.combined && !comparison.reports.some((r) => r.source === "tab")) {
     cards.push({
       key: "combined",
       label: "Combined",
@@ -109,6 +110,7 @@ export function scoreCards(comparison: Comparison) {
 /** The written chart when we have one, otherwise whichever target was scored. */
 export function shownReport(comparison: Comparison) {
   return (
+    comparison.reports.find((r) => r.source === "tab") ??
     comparison.reports.find((r) => r.source === "notation") ??
     comparison.reports.find((r) => r.source === "file") ??
     comparison.reports[0]

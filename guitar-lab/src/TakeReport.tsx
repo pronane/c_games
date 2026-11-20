@@ -9,7 +9,14 @@ import {
 } from "./compare";
 
 /** Stem, notation, and combined scores, then the notes and bars that didn't match. */
-export default function TakeReport({ comparison }: { comparison: Comparison }) {
+export default function TakeReport({
+  comparison,
+  onPractise,
+}: {
+  comparison: Comparison;
+  /** Loop these bars (slower) to practise them. */
+  onPractise?: (first: number, last?: number) => void;
+}) {
   const report = shownReport(comparison);
   if (!report) return null;
   const cards = scoreCards(comparison);
@@ -39,10 +46,22 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
       {report.alignment_warning && <p role="alert">{report.alignment_warning}</p>}
       {tempo && <p className="helper">{tempo}</p>}
       {report.duration_policy === "review_only" && <p className="helper" role="note">{report.duration_notice}</p>}
+      {onPractise && report.worst_bars.length > 0 && (
+        <div className="presets">
+          <button
+            onClick={() => {
+              const bars = report.worst_bars.map((b) => b.bar).filter((b) => b > 0);
+              if (bars.length) onPractise(Math.min(...bars), Math.max(...bars));
+            }}
+          >
+            Loop the weakest bars, slower
+          </button>
+        </div>
+      )}
       {worst.length ? (
         <ul className="diff-worst">
-          {worst.map((line) => (
-            <li key={line}>{line}</li>
+          {worst.map((line, i) => (
+            <li key={i}>{line}</li>
           ))}
         </ul>
       ) : (
@@ -78,9 +97,14 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
               <small>Bar {bar.bar}</small>
               {bar.score}
             </span>
+            {onPractise && bar.className !== "good" && bar.className !== "none" && bar.bar > 0 && (
+              <button className="link-button" onClick={() => onPractise(bar.bar)}>
+                Practise this bar
+              </button>
+            )}
             <ul>
-              {bar.messages.map((line) => (
-                <li key={line}>{line}</li>
+              {bar.messages.map((line, i) => (
+                <li key={i}>{line}</li>
               ))}
             </ul>
           </li>
@@ -90,7 +114,11 @@ export default function TakeReport({ comparison }: { comparison: Comparison }) {
         {comparison.transcription === "clean-guitar Basic Pitch"
           ? "Your take was transcribed as clean guitar and lined up to the target, so playing slower or rushing the phrase is allowed for."
           : "Lined up to the target note by note. Playing slower or rushing the phrase is allowed for."}
-        {comparison.combined ? " Stem and notation are scored on their own; combined is their average." : ""}
+        {comparison.reports.some((r) => r.source === "tab")
+          ? " Your score is against your tab; the app's own transcription is shown alongside for interest."
+          : comparison.combined
+            ? " Stem and notation are scored on their own; combined is their average."
+            : ""}
       </p>
     </div>
   );
