@@ -1063,7 +1063,7 @@ public sealed partial class MatchEngine
             {
                 var carrier = S.Players[ball.Owner];
                 float d = Mx.FlatDist(p.Pos, carrier.Pos);
-                float aggression = .38f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
+                float aggression = .48f + Options.Difficulty * .08f + (p.Spec.Defending - .5f) * .12f;
                 if (p.Team != carrier.Team && d < 2.2f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
             }
