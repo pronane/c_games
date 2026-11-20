@@ -156,6 +156,15 @@ class Studio:
         self.looktab = ttk.Frame(self.nb); self.nb.add(self.looktab, text=" Appearance  ", image=tk_icon("start"), compound=tk.LEFT)
         from .gui_appearance import AppearanceTab
         self.look = AppearanceTab(self, self.looktab)
+        # v11.18: a person's video -> 3D character, and the shared-skeleton motion library
+        self.capturetab = ttk.Frame(self.nb)
+        self.nb.add(self.capturetab, text=" Capture  ", image=tk_icon("start"), compound=tk.LEFT)
+        from .gui_capture import CaptureTab
+        self.capture = CaptureTab(self, self.capturetab)
+        self.motiontab = ttk.Frame(self.nb)
+        self.nb.add(self.motiontab, text=" Motion  ", image=tk_icon("library"), compound=tk.LEFT)
+        from .gui_motion import MotionTab
+        self.motionlib = MotionTab(self, self.motiontab)
         self.nb.add(buildtab, text=" Build (advanced)  ", image=tk_icon("build"), compound=tk.LEFT)
         self.nb.add(self.libtab_frame, text=" Library  ", image=tk_icon("library"), compound=tk.LEFT)
         self.gaelictab = ttk.Frame(self.nb)

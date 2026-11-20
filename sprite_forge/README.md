@@ -54,6 +54,41 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.18: Capture and Motion tabs in the Studio
+
+`python forge.py gui` (or `run_studio`) now has two more tabs, so the video-to-character pipeline and the motion
+library no longer need the command line.
+
+* **Capture tab** (`sforge/gui_capture.py`): a turnaround video, or one photo, of a person becomes a rigged,
+  textured 3D character.
+  - Pick the video, give a name and the person's height, and press **Capture**. It runs `forge.py capture`.
+  - Options: body (auto / male / female), a face close-up photo, the **neutral garment** picker (`--neutral`),
+    separate clothes and hair meshes, face fit, taking out the room's light, camera alignment, texture size and
+    frames per second.
+  - The log streams as it runs. Five steps light up as they go: Track, Fit, Texture, Export, Check.
+  - Every finished capture in the output folder is listed. Pick one to see its turntable, its fit and held-out
+    scores in plain words, and its files (GLB, FBX, OBJ, MakeHuman, MPFB).
+  - **Rebuild texture** reruns `--rebuild` on a capture without refitting. **Download models** fetches the pose
+    models once.
+  - The inputs are checked first: a missing video, a name with spaces, a height that isn't in centimetres.
+* **Motion tab** (`sforge/gui_motion.py`): the shared-skeleton motion library (`forge.py motion`).
+  - Every move (the shipped starter set, recorded clips, Mixamo, CMU and Quaternius imports) is listed with its
+    category, length, whether it loops, where it came from and its licence. Search and filter by category.
+  - Pick a move and it plays on the mannequin, front-on and side-on, with play / pause, a scrubber and speed.
+  - The motion checks (`tools/check_motion.py`: length, size, floor, pops, facing, feet) show beside it as pass /
+    fail lines.
+  - **Import file** (BVH / FBX / GLB / JSON, with its licence), **Record from video**, **Clean move** (foot plant,
+    weight shift, anticipation, follow-through) and **Retarget onto** (a GLB / FBX rig) run the matching
+    `forge.py motion` commands. The result appears in the list.
+* **`tools/test_studio_tabs.py`**: 12 checks.
+  - Without a window: the form's options become the right capture flags; the progress steps follow the real log
+    lines; bad inputs are refused; captures are found and read; every starter move is listed and can be drawn;
+    the views are the right way round; the checks run.
+  - With a window (`xvfb-run` on a server): the Studio opens with both tabs; picking a move draws it; Import
+    turns a BVH into a playable move; a failed capture says so plainly.
+  - Work started from either tab runs in a background thread that only queues its output. The tab reads the
+    queue on Tk's own thread, because Tk isn't thread-safe.
+
 ## New in v11.17: white balance from a neutral garment; the face's colour matched to the skin
 
 * **The problem.** A video's colour is the room's light as much as the clothes'. Tmon's video has lamps and a
