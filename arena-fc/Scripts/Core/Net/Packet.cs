@@ -111,6 +111,17 @@ public sealed class FullPlayerDto
     [JsonPropertyName("c")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int C { get; set; }
     [JsonPropertyName("pr")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Pr { get; set; }
     [JsonPropertyName("sh")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Sh { get; set; }
+    // Resume / rollback fidelity: these were missing from the full-state payload,
+    // so a reconnecting or promoted client could not reproduce the live match.
+    [JsonPropertyName("drb")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Drb { get; set; }
+    [JsonPropertyName("spr")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Spr { get; set; }
+    [JsonPropertyName("mpb")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Mpb { get; set; }
+    [JsonPropertyName("so")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool So { get; set; }
+    [JsonPropertyName("jk")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Jk { get; set; }
+    [JsonPropertyName("rt")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Rt { get; set; }
+    [JsonPropertyName("sk")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Sk { get; set; }
+    [JsonPropertyName("fq")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Fq { get; set; } = 1f;
+    [JsonPropertyName("tp")] public float Tp { get; set; } = 1f;
     [JsonPropertyName("team")] public int Team { get; set; }
     [JsonPropertyName("slot")] public int Slot { get; set; }
     [JsonPropertyName("role")] public int Role { get; set; }
@@ -123,6 +134,9 @@ public sealed class FullPlayerDto
         At = p.ActionTimer, Ad = p.ActionDuration, Ac = p.ActionContactAt,
         Dt = p.DecisionTimer, Pl = p.PossessionLock, Tl = p.TackleLock,
         A = p.Action, Ik = p.IsKeeper, C = p.Cards, Pr = p.Pressing, Sh = p.Shielding,
+        Drb = p.Dribbling, Spr = p.Sprinting, Mpb = p.MustPlayBall, So = p.SentOff,
+        Jk = p.JockeyState, Rt = p.RunType, Sk = p.SkillTimer, Fq = p.FirstTouchQuality,
+        Tp = p.TacticsPressMult,
         Team = p.Team, Slot = p.Slot, Role = (int)p.Role,
     };
 }
@@ -195,6 +209,17 @@ public sealed class FullStateDto
     [JsonPropertyName("fouls")] public int[] Fouls { get; set; } = new int[2];
     [JsonPropertyName("corners")] public int[] Corners { get; set; } = new int[2];
     [JsonPropertyName("poss")] public float[] Poss { get; set; } = new float[2];
+    [JsonPropertyName("xg")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float[]? Xg { get; set; }
+    [JsonPropertyName("added")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Added { get; set; }
+    [JsonPropertyName("yellows")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int[]? Yellows { get; set; }
+    [JsonPropertyName("reds")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int[]? Reds { get; set; }
+    // Penalty shootout progress: without it a reconnect during a shootout restarted
+    // the shootout from kick one.
+    [JsonPropertyName("skh")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int SkH { get; set; }
+    [JsonPropertyName("ska")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int SkA { get; set; }
+    [JsonPropertyName("skt")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int SkT { get; set; }
+    [JsonPropertyName("sks")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool SkS { get; set; }
+    [JsonPropertyName("sktm")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float SkTimer { get; set; }
     [JsonPropertyName("players")] public FullPlayerDto[] Players { get; set; } = Array.Empty<FullPlayerDto>();
     [JsonPropertyName("ball")] public FullBallDto Ball { get; set; } = new();
     [JsonPropertyName("ctrl")] public int Ctrl { get; set; } = -1;

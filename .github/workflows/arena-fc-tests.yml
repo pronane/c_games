@@ -30,12 +30,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '9.0.x' }
+      # Guard rail: Scripts/Core is compiled standalone by Server/ and Tests/ with no
+      # Godot assemblies, so a single "using Godot" there breaks the whole .NET job.
+      - name: Core must stay engine-free (no Godot types in Scripts/Core)
+        working-directory: arena-fc
+        run: |
+          hits=$(grep -rn --include='*.cs' -E '(^|[^A-Za-z0-9_.])using[[:space:]]+Godot|(^|[^A-Za-z0-9_.])Godot\.|(^|[^A-Za-z0-9_.])GD\.' Scripts/Core || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error file=arena-fc/Scripts/Core::Scripts/Core must not reference Godot - it is compiled by Server/ and Tests/ without Godot assemblies. Use System.Numerics and convert at the Godot boundary."
+            exit 1
+          fi
+          echo "Scripts/Core is engine-free."
       - name: Build the Godot C# assemblies with .NET 9
         working-directory: arena-fc
-        run: dotnet build ArenaFC.sln -c Release -v:q
+        run: |
+          set -o pipefail
+          dotnet build ArenaFC.sln -c Release -v:q 2>&1 | tee build-godot.log
       - name: Build the authoritative .NET server (v2 protocol)
         working-directory: arena-fc
-        run: dotnet build Server/ArenaFC.Server.csproj -c Release -v:q
+        run: |
+          set -o pipefail
+          dotnet build Server/ArenaFC.Server.csproj -c Release -v:q 2>&1 | tee build-server.log
       - name: Full C# core + protocol + rollback + online-client suite
         working-directory: arena-fc
         run: |
@@ -54,6 +70,8 @@ jobs:
           path: |
             arena-fc/coretests.log
             arena-fc/matchcoretests.log
+            arena-fc/build-godot.log
+            arena-fc/build-server.log
       - name: Surface failed .NET tests as annotations
         if: always()
         working-directory: arena-fc
@@ -63,6 +81,28 @@ jobs:
             grep -E '^  FAIL' "$f" | while IFS= read -r line; do
               echo "::error file=$f::$line"
             done || true
+            # Publish the tally so the result is visible without downloading logs.
+            grep -E '^RESULT:' "$f" | while IFS= read -r line; do
+              echo "::warning file=$f::$line"
+            done || true
+          done
+      # Compiler diagnostics become file/line annotations, so a red build is
+      # actionable from the Checks tab without hunting through raw job logs.
+      - name: Surface compiler errors as annotations
+        if: always()
+        working-directory: arena-fc
+        run: |
+          for f in build-godot.log build-server.log coretests.log matchcoretests.log; do
+            [ -f "$f" ] || continue
+            grep -E ': (error|warning) CS[0-9]+' "$f" | sort -u | while IFS= read -r line; do
+              loc=${line%%:*}
+              rest=${line#*: }
+              sev=${rest%% *}
+              msg=${rest#* }
+              if [ "$sev" = "error" ]; then
+                echo "::error file=$loc::$msg"
+              fi
+            done || true
           done
       - name: Portable pad / gameplay static checks
         working-directory: arena-fc
@@ -70,6 +110,58 @@ jobs:
       - name: Sprite Forge soccer player checks
         working-directory: arena-fc
         run: python3 Tools/test_soccer_forge.py
+      # Advisory, never failing: core systems nobody calls are invisible features.
+      - name: Dead core report
+        if: always()
+        working-directory: arena-fc
+        run: |
+          python3 Tools/dead_core_report.py
+          python3 Tools/dead_core_report.py --ci
+
+  # The actual game, not just the pure C# core: build the Godot assemblies and run
+  # the in-engine selftest (skinned rig, GLB round trip, shaders, stadium, HUD,
+  # character editor and a full 3D 5v5 match pipeline) headlessly.
+  godot-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '9.0.x' }
+      - name: Download Godot 4.7.2 (.NET build)
+        run: |
+          curl -fsSL -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip
+          unzip -q godot.zip -d godot
+          chmod +x godot/*/Godot_v4.7.2-stable_mono_linux.x86_64
+          echo "GODOT=$PWD/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Build the Godot C# assemblies
+        working-directory: arena-fc
+        run: |
+          set -o pipefail
+          dotnet build ArenaFC.sln -c Debug -v:q 2>&1 | tee build-debug.log
+      - name: In-engine selftest (real nodes, real match)
+        working-directory: arena-fc
+        run: |
+          set -o pipefail
+          timeout 420 "$GODOT" --headless --path . -- --selftest 2>&1 | tee selftest.log
+      - name: Surface selftest failures as annotations
+        if: always()
+        working-directory: arena-fc
+        run: |
+          [ -f selftest.log ] || exit 0
+          grep -E '^  FAIL' selftest.log | sort -u | while IFS= read -r line; do
+            echo "::error file=arena-fc/Scripts/Godot/SelfTest.cs::$line"
+          done || true
+          grep -E '^RESULT:' selftest.log | while IFS= read -r line; do
+            echo "::warning file=arena-fc/selftest.log::$line"
+          done || true
+      - name: Upload selftest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-selftest-log
+          path: |
+            arena-fc/selftest.log
+            arena-fc/build-debug.log
 
   node-hub:
     runs-on: ubuntu-latest

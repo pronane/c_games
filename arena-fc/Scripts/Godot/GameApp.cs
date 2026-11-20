@@ -56,6 +56,7 @@ public partial class GameApp : Node3D
         // Lives on the Window, outside Clear(), so it survives every menu/match swap.
         if (GetTree().Root.GetNodeOrNull<PadMenuNavigator>("PadMenuNavigator") == null)
             GetTree().Root.CallDeferred("add_child", new PadMenuNavigator());
+        LoadSave();
         ShowMenu();
     }
 
@@ -71,22 +72,20 @@ public partial class GameApp : Node3D
         c.OffsetLeft = x; c.OffsetTop = y; c.OffsetRight = x + w; c.OffsetBottom = y + h;
     }
 
-    /// <summary>Phase 10: Pro Clubs (11v11 fixed positions).</summary>
+    /// <summary>Phase 10: Pro Clubs (11v11 fixed positions, generated squad).</summary>
     public void StartProClubs()
     {
         Mode = GameMode.Kickoff;
-        var proClubs = new ProClubs();
-        proClubs.GenerateTeam();
-        proClubs.SetCoopMode(CoopMode.ProClubs);
-        StartMatchInternal();
+        StartProClubsMode();
     }
 
     /// <summary>Phase 9: Ultimate Team screen.</summary>
     public void ShowUltimateTeam()
     {
         Clear();
-        var ut = new UltimateTeam();
-        ut.GenerateSBCs();
+        _ultimate ??= new UltimateTeam();
+        var ut = _ultimate;
+        if (ut.SBCs.Count == 0) ut.GenerateSBCs();
 
         var root = new Control { Name = "UltimateTeam" };
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -100,10 +99,10 @@ public partial class GameApp : Node3D
         box.AddChild(Ui.Lbl($"Division: {ut.CurrentDivision} ({ut.DivisionPoints} pts)", 16, Ui.Sub));
         box.AddChild(Ui.Lbl($"Squad Battles: {ut.SquadBattlesPoints} pts", 16, Ui.Sub));
         box.AddChild(Ui.Lbl("", 10));
-        box.AddChild(Ui.Btn("OPEN BRONZE PACK (500)", () => { ut.OpenPack(0); ShowUltimateTeam(); }));
-        box.AddChild(Ui.Btn("OPEN GOLD PACK (5000)", () => { ut.OpenPack(2); ShowUltimateTeam(); }));
-        box.AddChild(Ui.Btn("SQUAD BATTLES", () => { ut.PlaySquadBattles(SquadBattlesDifficulty.Pro, true, 2, 1); ShowUltimateTeam(); }));
-        box.AddChild(Ui.Btn("DIVISION RIVALS", () => { ut.PlayDivisionRivals(true, false); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("OPEN BRONZE PACK (500)", () => { ut.OpenPack(0); SaveGameNow(); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("OPEN GOLD PACK (5000)", () => { ut.OpenPack(2); SaveGameNow(); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("SQUAD BATTLES", () => { ut.PlaySquadBattles(SquadBattlesDifficulty.Pro, true, 2, 1); SaveGameNow(); ShowUltimateTeam(); }));
+        box.AddChild(Ui.Btn("DIVISION RIVALS", () => { ut.PlayDivisionRivals(true, false); SaveGameNow(); ShowUltimateTeam(); }));
         box.AddChild(Ui.Btn("BACK", ShowMenu));
 
         var panel = Ui.PanelC(box);
@@ -158,6 +157,8 @@ public partial class GameApp : Node3D
 
         var menu = Ui.VBox(10);
         menu.AddChild(Ui.Btn("PLAY MATCH", StartMatch, true));
+        menu.AddChild(Ui.Btn("CAREER", StartCareer));
+        menu.AddChild(Ui.Btn("RANKED", ShowRanked));
         menu.AddChild(Ui.Btn("PRO CLUBS", StartProClubs));
         menu.AddChild(Ui.Btn("ULTIMATE TEAM", ShowUltimateTeam));
         menu.AddChild(Ui.Btn("TOURNAMENT", () => StartTournament()));
@@ -171,6 +172,7 @@ public partial class GameApp : Node3D
         menu.AddChild(Ui.Btn("PENALTY SHOOTOUT", () => StartShootout()));
         menu.AddChild(Ui.Btn("PLAY WITH FRIENDS", ShowOnline));
         menu.AddChild(Ui.Btn("CHARACTER EDITOR", ShowEditor));
+        menu.AddChild(Ui.Btn("EXTRAS", ShowExtras));
         menu.AddChild(Ui.Btn("MATCH SETTINGS", ShowSettings));
         menu.AddChild(Ui.Btn("CONTROLS", ShowControls));
         menu.AddChild(Ui.Btn("CONTROLLER SETUP", ShowPadSetup));
@@ -224,6 +226,7 @@ public partial class GameApp : Node3D
 
     public void StartMatch()
     {
+        _context = MatchContext.Friendly;
         Mode = GameMode.Kickoff;
         ShowPreMatch();
     }
@@ -264,68 +267,56 @@ public partial class GameApp : Node3D
     public void StartTournament()
     {
         Mode = GameMode.Tournament;
-        StartMatchInternal();
+        StartTournamentFlow(TournamentType.DomesticCup);
     }
 
-    /// <summary>Phase 8: World Cup tournament.</summary>
+    /// <summary>Phase 8: World Cup tournament (24 nations, groups then a seeded bracket).</summary>
     public void StartWorldCup()
     {
         Mode = GameMode.Tournament;
-        var tournament = new TournamentSystem();
-        var teams = TournamentSystem.GetWorldCupTeams();
-        tournament.GenerateWorldCup(teams);
-        tournament.PlayerTeam = "England";
-        StartMatchInternal();
+        StartTournamentFlow(TournamentType.WorldCup);
     }
 
     /// <summary>Phase 8: Euros tournament.</summary>
     public void StartEuros()
     {
         Mode = GameMode.Tournament;
-        var tournament = new TournamentSystem();
-        var teams = TournamentSystem.GetWorldCupTeams();
-        tournament.GenerateEuros(teams);
-        tournament.PlayerTeam = "England";
-        StartMatchInternal();
+        StartTournamentFlow(TournamentType.Euros);
     }
 
-    /// <summary>Phase 8: Copa America tournament.</summary>
+    /// <summary>Phase 8: Copa America.</summary>
     public void StartCopaAmerica()
     {
         Mode = GameMode.Tournament;
-        var tournament = new TournamentSystem();
-        var teams = TournamentSystem.GetWorldCupTeams();
-        tournament.GenerateCopaAmerica(teams);
-        tournament.PlayerTeam = "Argentina";
-        StartMatchInternal();
+        StartTournamentFlow(TournamentType.CopaAmerica);
     }
 
     /// <summary>Phase 8: Champions League.</summary>
     public void StartChampionsLeague()
     {
         Mode = GameMode.Tournament;
-        var tournament = new TournamentSystem();
-        var teams = Clubs.All.Select(c => c.Name).ToList();
-        tournament.GenerateChampionsLeague(teams);
-        tournament.PlayerTeam = Clubs.All[Options.HomeClub].Name;
-        StartMatchInternal();
+        StartTournamentFlow(TournamentType.ChampionsLeague);
     }
 
     /// <summary>Phase 3.6: training mode (no fouls, no offside, infinite stamina).</summary>
     public void StartTraining()
     {
+        _context = MatchContext.Friendly;
         Mode = GameMode.Training;
         Options.Fouls = false;
         Options.Offside = false;
         StartMatchInternal();
     }
 
-    public void StartSkillGames() { Mode = GameMode.SkillGames; StartMatchInternal(); }
-    public void StartPracticeArena() { Mode = GameMode.PracticeArena; Options.Fouls = false; Options.Offside = false; StartMatchInternal(); }
+    public void StartSkillGames() {
+        _context = MatchContext.Friendly; Mode = GameMode.SkillGames; StartMatchInternal(); }
+    public void StartPracticeArena() {
+        _context = MatchContext.Friendly; Mode = GameMode.PracticeArena; Options.Fouls = false; Options.Offside = false; StartMatchInternal(); }
 
     /// <summary>Phase 3.6: penalty shootout (alternating penalties).</summary>
     public void StartShootout()
     {
+        _context = MatchContext.Friendly;
         Mode = GameMode.Shootout;
         StartMatchInternal();
     }
@@ -346,6 +337,23 @@ public partial class GameApp : Node3D
         var box = Ui.VBox(10);
         box.AddChild(Ui.Lbl("FULL TIME", 32, Ui.Accent));
         box.AddChild(Ui.Lbl(post.ResultSummary, 24));
+        // Real full-time statistics. The state tracked all of this already; the
+        // screen used to show three lines of prose.
+        float possTotal = MathF.Max(1f, state.PossessionTime[0] + state.PossessionTime[1]);
+        int possHome = (int)MathF.Round(state.PossessionTime[0] / possTotal * 100f);
+        var stats = new[]
+        {
+            $"Possession      {possHome}%  -  {100 - possHome}%",
+            $"Shots           {state.Shots[0]}  -  {state.Shots[1]}   (on target {state.ShotsOnTarget[0]}-{state.ShotsOnTarget[1]})",
+            $"Passes          {state.Passes[0]}  -  {state.Passes[1]}",
+            $"Fouls           {state.Fouls[0]}  -  {state.Fouls[1]}",
+            $"Yellow / red    {state.YellowCards[0]}/{state.RedCards[0]}  -  {state.YellowCards[1]}/{state.RedCards[1]}",
+            $"Corners         {state.Corners[0]}  -  {state.Corners[1]}",
+            $"Expected goals  {state.Xg[0]:0.00}  -  {state.Xg[1]:0.00}",
+        };
+        box.AddChild(Ui.Lbl("", 8));
+        foreach (var line in stats) box.AddChild(Ui.Lbl(line, 15, Ui.Sub));
+        box.AddChild(Ui.Lbl("", 8));
         box.AddChild(Ui.Lbl($"Man of the Match: {post.ManOfTheMatch} ({post.MotMRating / 10.0:0.0})", 18, Ui.Accent));
         box.AddChild(Ui.Lbl("", 10));
         box.AddChild(Ui.Lbl("Highlights:", 16));
@@ -354,7 +362,8 @@ public partial class GameApp : Node3D
             box.AddChild(Ui.Lbl($"• {h}", 14, Ui.Sub));
         }
         box.AddChild(Ui.Lbl("", 10));
-        box.AddChild(Ui.Btn("BACK TO MENU", ShowMenu, true));
+        box.AddChild(Ui.Btn("MATCH ANALYSIS", () => ShowMatchAnalysis(state), true));
+        box.AddChild(Ui.Btn("BACK TO MENU", ShowMenu));
         box.AddChild(Ui.Btn("PLAY AGAIN", StartMatch));
 
         var panel = Ui.PanelC(box);
@@ -379,13 +388,14 @@ public partial class GameApp : Node3D
             Fouls = isTraining ? false : Options.Fouls,
             HomeClub = Options.HomeClub, AwayClub = Options.AwayClub, Seed = Options.Seed,
             HomeFormation = Options.HomeFormation, AwayFormation = Options.AwayFormation,
+            HomeTactics = _tactics, Bench = Options.Bench,
             CustomHome = CustomHome?.Select(x => x.Clone()).ToList(),
             Preset = Options.Preset,
             Quality = Options.Quality,
             Mode = (int)Mode,
         };
         view.Init(opts, CustomHome, ShowMenu);
-        view.OnMatchEnd = ShowPostMatch;
+        view.OnMatchEnd = HandleMatchEnd;
         AddChild(view);
     }
 
@@ -590,8 +600,21 @@ public partial class GameApp : Node3D
         v.AddChild(Ui.Combo(Clubs.Formations, 0, i => Options.HomeFormation = Clubs.Formations[i]));
         v.AddChild(Ui.Check("Offside rule", Options.Offside, on => Options.Offside = on));
         v.AddChild(Ui.Check("Fouls & free kicks", Options.Fouls, on => Options.Fouls = on));
+        v.AddChild(Ui.Lbl("BENCH", 15, Ui.Sub));
+        v.AddChild(Ui.Combo(new[] { "No bench", "5 substitutes", "7 substitutes", "9 substitutes" },
+            Options.Bench <= 0 ? 0 : Options.Bench <= 5 ? 1 : Options.Bench <= 7 ? 2 : 3,
+            i => Options.Bench = i == 0 ? 0 : i == 1 ? 5 : i == 2 ? 7 : 9));
+        v.AddChild(Ui.Lbl("PLAYSTYLE (FLUID FORMATION)", 15, Ui.Sub));
+        v.AddChild(Ui.Combo(new[] { "Balanced", "Overload", "Counter", "Possession", "Direct", "Gegenpress" },
+            (int)_shape.Playstyle, i => { _shape.Playstyle = (TeamPlaystyle)i; _tactics.Shape = _shape; }));
+        v.AddChild(Ui.Lbl("TACTICS", 15, Ui.Sub));
+        v.AddChild(Ui.Combo(new[] { "Very defensive", "Defensive", "Balanced", "Attacking", "Very attacking" },
+            (int)_tactics.Mentality, i => _tactics.Mentality = (Mentality)i));
+        v.AddChild(Ui.SliderRow("Width", .2f, .8f, .05f, _tactics.Width, d => _tactics.Width = (float)d, out _, out _, "0.00"));
+        v.AddChild(Ui.SliderRow("Pressing", 0f, 1f, .05f, _tactics.PressingIntensity, d => _tactics.PressingIntensity = (float)d, out _, out _, "0.00"));
+        v.AddChild(Ui.SliderRow("Tempo", 0f, 1f, .05f, _tactics.Tempo, d => _tactics.Tempo = (float)d, out _, out _, "0.00"));
         v.AddChild(Ui.Btn("Reset custom squad", () => { CustomHome = null; }));
-        Overlay("MATCH SETTINGS", v, () => { });
+        Overlay("MATCH SETTINGS", v, SaveGameNow);
     }
 
     private void ShowControls()

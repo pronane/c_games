@@ -33,6 +33,15 @@ public sealed class MatchOptions
     public int AwayClub = 1;
     public string HomeFormation = "4-4-2";
     public string AwayFormation = "4-3-3";
+    /// <summary>Optional short labels ("ENG", "BRA"). Clubs fall back to Clubs.All.</summary>
+    public string HomeLabel = "";
+    public string AwayLabel = "";
+    /// <summary>Substitutes available per side (0 disables the bench).</summary>
+    public int Bench = 7;
+    /// <summary>In-match tactics per side (A5).  Balanced defaults keep the
+    /// tuned simulation numbers unchanged.</summary>
+    public Tactics HomeTactics = new();
+    public Tactics AwayTactics = new();
     public List<CharacterSpec>? CustomHome;
     /// <summary>True when a remote human controls the away side (2-player online).</summary>
     public bool AwayHuman;
@@ -104,7 +113,11 @@ public sealed class PlayerState
     public bool Shielding;
     /// <summary>Close-control dribbling: ball stays at the feet and is harder to tackle.</summary>
     public bool Dribbling, Sprinting;
-    public int Cards;
+    public int Cards;                          // yellow cards shown to this player
+    /// <summary>Sent off: stays on the touchline and takes no further part.
+    /// Before this existed a booking had no consequence at all - a player could
+    /// collect ten yellows and keep playing.</summary>
+    public bool SentOff;
     public float MaxSpeed => (3.6f + Spec.Pace * 3.5f) * (IsKeeper ? .94f : 1f);
     // Phase 2.1 first-touch: quality of the current touch (0..1).  Low quality
     // = heavy touch (ball runs away), high = tight control.  Set by
@@ -121,8 +134,10 @@ public sealed class PlayerState
     // M10 skill moves: current skill move and timer.
     public SkillMove CurrentSkill = SkillMove.None;
     public float SkillTimer;
-    // A5 tactics: AI modifiers from in-match tactics.
+    // A5 tactics: AI modifiers from in-match tactics. 1 = the balanced default;
+    // MatchEngine refreshes them from Options.HomeTactics / AwayTactics every tick.
     public float TacticsPressMult = 1f, TacticsRunMult = 1f, TacticsPassMult = 1f;
+    public float TacticsWidthMult = 1f;
     // Phase 3: weak foot (0=left, 1=right, 2=both), timed finishing, call for ball.
     public int PreferredFoot = 1;
     public float ShotTimingQuality = 1f; // 0..1, 1 = perfect timing
@@ -160,7 +175,14 @@ public sealed class MatchState
     public int Half = 1;
     public int[] Score = new int[2];
     public int[] Shots = new int[2], ShotsOnTarget = new int[2], Passes = new int[2], Fouls = new int[2], Corners = new int[2];
+    public int[] YellowCards = new int[2], RedCards = new int[2];
+    /// <summary>Stoppage time for the current half, in game seconds. Accrued from
+    /// goals, cards, treatments and substitutions - the clock used to stop dead on
+    /// 45:00 / 90:00, sometimes mid-attack.</summary>
+    public float AddedTime;
     public float[] PossessionTime = new float[2];
+    /// <summary>Accumulated expected goals per side - shown full-time and in the HUD.</summary>
+    public float[] Xg = new float[2];
     public PlayerState[] Players = Array.Empty<PlayerState>();
     public BallState Ball = new();
     public int Controlled = -1, ControlledAway = -1, KickoffSide = 0, RestartSide = 0, AttackSign = 1;
@@ -218,6 +240,22 @@ public sealed partial class MatchEngine
             }
         }
         State.AttackSign = 1;
+        // LinkUpPlays: a named combination per adjacent pair, so a carrier has a
+        // runner waiting on a pattern instead of every team-mate freelancing.
+        for (int side = 0; side < 2; side++)
+        {
+            for (int i = 1; i + 1 < Options.TeamSize; i++)
+            {
+                _linkUps.AddPlay(new LinkUpPlay
+                {
+                    Name = $"link-{side}-{i}",
+                    PasserIndex = side * Options.TeamSize + i,
+                    RunnerIndex = side * Options.TeamSize + i + 1,
+                    Type = i % 2 == 0 ? "overlap" : "third_man",
+                    TriggerDistance = 22f,
+                });
+            }
+        }
         ResetPositions(true);
         if (Options.Mode == 3) // Shootout: start with a penalty
         {
@@ -328,6 +366,13 @@ public sealed partial class MatchEngine
                 p.Facing = Mx.FlatDir(p.Pos, GoalPos(s));
                 p.Action = "idle";
                 p.DecisionTimer = Rng.Range(0f, .15f);
+                if (p.SentOff)
+                {
+                    p.Pos = TouchlinePos(p);
+                    p.Target = p.Pos;
+                    p.Vel = Vector3.Zero;
+                    p.Action = "sentoff";
+                }
             }
         }
         if (kickoff)
@@ -447,6 +492,7 @@ public sealed partial class MatchEngine
         if (S.Phase == Phase.FullTime || S.Phase == Phase.Paused) return;
 
         S.Clock += dt * Options.TimeSpeed;
+        if (_tick % 30 == 0) Heat.AddPosition(S.Ball.Pos.X, S.Ball.Pos.Z);
         // Phase 7: AI substitutions (tired players after 60')
         int minute = (int)(S.Clock / 60f);
         if (minute >= 60 && _tick % 600 == 0) // check every 10 seconds
@@ -463,16 +509,22 @@ public sealed partial class MatchEngine
             }
         }
         float halfSeconds = Options.HalfMinutes * 60f;
-        if (S.Phase == Phase.Play && S.Half == 1 && S.Clock >= halfSeconds)
+        // Stoppage time: the half runs until the added minutes are used up.
+        float halfEnd = halfSeconds + (Options.Mode == 3 ? 0f : S.AddedTime);
+        if (S.Phase == Phase.Play && S.Half == 1 && S.Clock >= halfEnd)
         {
-            S.Clock = halfSeconds;
+            S.Clock = halfEnd;
             S.Phase = Phase.HalfTime;
             S.PhaseTimer = 3.0f;
-            Add(EventKind.Whistle, "Half time!");
+            Add(EventKind.Whistle, S.AddedTime > 0f
+                ? $"Half time! (+{MathF.Round(S.AddedTime / 60f * 10f) / 10f:0.#} min added)"
+                : "Half time!");
+            S.AddedTime = 0f;
             return;
         }
-        if (S.Phase == Phase.Play && S.Half == 2 && S.Clock >= halfSeconds * 2f)
+        if (S.Phase == Phase.Play && S.Half == 2 && S.Clock >= halfSeconds * 2f + (Options.Mode == 3 ? 0f : S.AddedTime))
         {
+            S.Clock = halfSeconds * 2f + S.AddedTime;
             S.Phase = Phase.FullTime;
             Add(EventKind.Whistle, $"Full time! {ScoreText()}");
             foreach (var p in S.Players) p.Action = S.Score[p.Team] > S.Score[1 - p.Team] ? "celebrate" : "idle";
@@ -497,6 +549,7 @@ public sealed partial class MatchEngine
                     break;
                 case Phase.HalfTime:
                     S.Half = 2;
+                    S.AddedTime = 0f;
                     S.KickoffSide = 1;
                     ResetPositions(true);
                     S.Phase = Phase.Kickoff;
@@ -592,9 +645,21 @@ public sealed partial class MatchEngine
             return cmd;
         }
 
+        // ---- In-match tactics (A5) ----
+        // Wire Tactics into the live engine: mentality, pressing, width and tempo
+        // scale the AI.  Everything is normalised so the BALANCED default is
+        // exactly 1.0 and the tuned regression suite keeps its numbers.
+        var hm = Options.HomeTactics.GetModifiers();
+        var am = Options.AwayTactics.GetModifiers();
+
         // ---- Human intent + AI decisions ----
         foreach (var p in S.Players)
         {
+            var mod = p.Team == 0 ? hm : am;
+            p.TacticsPressMult = mod.pressMultiplier / 0.9f;
+            p.TacticsRunMult = mod.runAggression / 0.85f;
+            p.TacticsPassMult = mod.passLength / 1.05f;
+            p.TacticsWidthMult = mod.widthMultiplier;
             p.DecisionTimer -= dt;
             p.ActionTimer = MathF.Max(0, p.ActionTimer - dt);
             p.PossessionLock = MathF.Max(0, p.PossessionLock - dt);
@@ -602,6 +667,13 @@ public sealed partial class MatchEngine
             if (p.MustPlayBall && S.Ball.Owner != p.Index) p.MustPlayBall = false;
             p.Dribbling = false;
             p.Sprinting = false;
+            if (p.SentOff)
+            {
+                // Off the pitch, frozen on the touchline: no AI, no human input.
+                p.Action = "sentoff";
+                p.Pressing = false; p.Shielding = false;
+                continue;
+            }
             PlayerCommand pc = For(p.Index);
             bool human = humans.Contains(p.Index);
             // A pad / key press lasts one fixed tick.  It must NOT wait for the
@@ -616,7 +688,11 @@ public sealed partial class MatchEngine
         }
 
         // ---- Movement ----
-        foreach (var p in S.Players) MovePlayer(p, dt, For(p.Index), humans.Contains(p.Index));
+        foreach (var p in S.Players)
+        {
+            if (p.SentOff) continue;
+            MovePlayer(p, dt, For(p.Index), humans.Contains(p.Index));
+        }
 
         // ---- Ball ----
         S.Ball.NoPickup = MathF.Max(0, S.Ball.NoPickup - dt);
@@ -678,7 +754,7 @@ public sealed partial class MatchEngine
         }
     }
 
-    private string ScoreText() => $"{Clubs.All[Options.HomeClub].Short} {State.Score[0]} - {State.Score[1]} {Clubs.All[Options.AwayClub].Short}";
+    private string ScoreText() => $"{ShortFor(0)} {State.Score[0]} - {State.Score[1]} {ShortFor(1)}";
 
     private void KickoffPass(int from)
     {
@@ -901,6 +977,17 @@ public sealed partial class MatchEngine
             Vector3 carrier = ball.Pos;
             Vector3 support = slotPos + Mx.FlatDir(p.Home, carrier) * 1.6f;
             support.X += attack * 3.5f;
+            // Fluid Formations: a link-up pattern can override the role run type.
+            _posScratch.Clear();
+            foreach (var q in S.Players) _posScratch.Add((q.Pos.X, q.Pos.Z));
+            var linkUp = _linkUps.CheckTrigger(ball.Owner, ball.Pos.X, ball.Pos.Z, _posScratch);
+            if (linkUp != null && linkUp.RunnerIndex == p.Index)
+            {
+                p.RunType = RunTypeFor(linkUp.Type);
+                p.Target = support + new Vector3(attack * 3f, 0, Mx.Clamp(-carrier.Z * .35f, -10f, 10f));
+                p.Action = "run";
+                return;
+            }
             // Assign run types by role and position.
             if (p.Role == Role.Forward)
             {
@@ -954,7 +1041,9 @@ public sealed partial class MatchEngine
                     else
                     {
                         p.JockeyState = 0;
-                        float lane = .55f;
+                        // High pressing closes the carrier down; a low block
+                        // stands off and invites the pass.
+                        float lane = .55f / Mx.Clamp(p.TacticsPressMult, .6f, 1.7f);
                         p.Target = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f;
                         p.Pressing = true;
                     }
@@ -991,7 +1080,9 @@ public sealed partial class MatchEngine
         var slot = slots[Math.Min(p.Slot, slots.Length - 1)];
         float shift = Mx.Clamp(ballPos.X / (Mx.HalfLength * 2f), -.5f, .5f) * .30f;
         float zShift = Mx.Clamp(ballPos.Z / Mx.HalfWidth, -1f, 1f) * .10f;
-        return Clubs.SlotToWorld(slot.x + shift, slot.z + zShift, attack);
+        // Tactics width: stretch or squeeze the block (1.0 = default shape).
+        float width = Mx.Clamp(p.TacticsWidthMult, .6f, 1.4f);
+        return Clubs.SlotToWorld(slot.x + shift, (slot.z + zShift) * width, attack);
     }
 
     private PlayerState? NearestOpponent(PlayerState p, out float dist)
@@ -999,7 +1090,7 @@ public sealed partial class MatchEngine
         dist = float.MaxValue; PlayerState? best = null;
         foreach (var q in State.Players)
         {
-            if (q.Team == p.Team) continue;
+            if (q.Team == p.Team || q.SentOff) continue;
             float d = Mx.FlatDist(p.Pos, q.Pos);
             if (d < dist) { dist = d; best = q; }
         }
@@ -1008,7 +1099,7 @@ public sealed partial class MatchEngine
 
     private int ClosestToBall(int team, int rank)
     {
-        var list = State.Players.Where(p => p.Team == team && !p.IsKeeper)
+        var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff)
             .OrderBy(p => Mx.FlatDist2(p.Pos, State.Ball.Pos)).ToArray();
         return rank < list.Length ? list[rank].Index : (list.Length > 0 ? list[0].Index : -1);
     }
@@ -1024,7 +1115,7 @@ public sealed partial class MatchEngine
         Vector2 aim = hasAim ? Vector2.Normalize(aimDir) : new Vector2(from.Facing.X, from.Facing.Z);
         foreach (var q in State.Players)
         {
-            if (q.Team != from.Team || q.Index == from.Index || q.IsKeeper) continue;
+            if (q.Team != from.Team || q.Index == from.Index || q.IsKeeper || q.SentOff) continue;
             float d = Mx.FlatDist(from.Pos, q.Pos);
             if (d < 2.5f || d > 42f) continue;
             if (longPass && d < 12f) continue;
@@ -1153,6 +1244,7 @@ public sealed partial class MatchEngine
         SetAction(p, isVolley ? "volley" : "kick", .40f, .50f);
         int attack = SideSign(p.Team);
         Vector3 target = new(GoalPos(p.Team).X, Rng.Range(.4f, 2.0f), Rng.Range(-Mx.GoalHalfWidth * .78f, Mx.GoalHalfWidth * .78f));
+        State.Xg[p.Team] += ShotXg(p, target);
         // Phase 2.4: shot type by charge and context.
         // Phase 3: finesse shots (charge 0.5-0.65 = curved placement).
         ShotType shotType = isVolley ? ShotType.Volley
@@ -1314,18 +1406,113 @@ public sealed partial class MatchEngine
             // every miss at 2 m had an ~18% chance of a free kick that looked like
             // nothing happened.  Give the victim a visible stumble too.
             State.Fouls[p.Team]++;
-            p.Cards += Rng.Next() < .12f ? 1 : 0;
             SetAction(carrier, "foul", 1.1f, .40f);
             carrier.Vel *= .2f;
             float ownGoalX = OwnGoalPos(p.Team).X;
             bool inBox = MathF.Abs(b.Pos.X - ownGoalX) < 16.5f && MathF.Abs(b.Pos.Z) < 20.16f;
-            Add(EventKind.Foul, p.Cards > 0 ? "Foul! Yellow card." : "Foul! Free kick.");
+            // Disciplinary rules.  Cards used to be a decorative counter that
+            // incremented with no consequence whatsoever; now a booking is a
+            // booking, a second yellow is a red, and a professional foul that
+            // denies a clear run on goal can be a straight red.
+            bool denial = IsDenyingGoal(carrier, p);
+            // RefereeSystem (G9) had advantage, penalties, cards and injury all
+            // implemented and nothing calling it.  Decisions now go through it,
+            // so the referee is a single authority instead of four RNG rolls.
+            var decision = _referee.DecideFoul(inBox, denial, slide, false, slide ? .82f : .45f);
+            bool straightRed = decision == RefereeDecision.RedCard;
+            bool booked = !straightRed && decision == RefereeDecision.YellowCard;
+            bool injury = decision == RefereeDecision.Injury;
+            if (injury)
+            {
+                // A dangerous tackle that hurts: booking plus treatment time.
+                booked = true;
+                AddStoppage(25f);
+                Add(EventKind.Foul, $"{p.Spec.DisplayName} is hurt in the challenge.");
+            }
+            if (straightRed)
+            {
+                AddStoppage(45f);
+                Add(EventKind.Foul, $"Foul! {p.Spec.DisplayName} denies a clear chance.");
+                SendOff(p, "Straight red card");
+            }
+            else if (booked)
+            {
+                AddStoppage(20f);
+                p.Cards++;
+                State.YellowCards[p.Team]++;
+                if (p.Cards >= 2) SendOff(p, "Second yellow card");
+                else
+                {
+                    Add(EventKind.Card, $"Yellow card - {p.Spec.DisplayName} ({ClubShort(p.Team)})");
+                    Add(EventKind.Foul, "Foul! Free kick.");
+                }
+            }
+            else Add(EventKind.Foul, "Foul! Free kick.");
             if (inBox && Rng.Next() < .55f) AwardFreeKick(1 - p.Team, new Vector3(-SideSign(p.Team) * (Mx.HalfLength - 11f), 0, 0), true);
             else AwardFreeKick(1 - p.Team, b.Pos, false);
         }
     }
 
     private void AttemptSlide(PlayerState p) => AttemptTackle(p, true);
+
+    public string ClubShort(int team) =>
+        Clubs.All[team == 0 ? Options.HomeClub % Clubs.All.Length : Options.AwayClub % Clubs.All.Length].Short;
+
+    /// <summary>True when the fouled player had a clear run on goal and this
+    /// defender was the last one able to stop it (a red-card offence).</summary>
+    private bool IsDenyingGoal(PlayerState carrier, PlayerState fouler)
+    {
+        Vector3 goal = GoalPos(carrier.Team);
+        if (Mx.FlatDist(carrier.Pos, goal) > 30f) return false;
+        foreach (var q in State.Players)
+        {
+            if (q.Team != fouler.Team || q.Index == fouler.Index || q.SentOff || q.IsKeeper) continue;
+            if (Mx.FlatDist(q.Pos, carrier.Pos) < 5f) return false;   // cover is there
+        }
+        return true;
+    }
+
+    /// <summary>Where a sent-off player waits for the rest of the match.</summary>
+    private static Vector3 TouchlinePos(PlayerState p) => new(
+        Mx.Clamp(p.Pos.X, -Mx.HalfLength + 6f, Mx.HalfLength - 6f), 0f,
+        p.Pos.Z >= 0 ? Mx.HalfWidth + 3.5f : -(Mx.HalfWidth + 3.5f));
+
+    /// <summary>Dismiss a player: he leaves the pitch and takes no further part.
+    /// Guards against reducing a side below two players so a small-sided match
+    /// can always be restarted.</summary>
+    private bool SendOff(PlayerState p, string reason)
+    {
+        if (p.SentOff) return false;
+        int active = 0;
+        int start = p.Team * Options.TeamSize;
+        for (int i = start; i < start + Options.TeamSize && i < State.Players.Length; i++)
+            if (!State.Players[i].SentOff) active++;
+        if (active <= 2)
+        {
+            Add(EventKind.Card, $"{p.Spec.DisplayName} keeps his place - too few players left.");
+            return false;
+        }
+        p.SentOff = true;
+        State.RedCards[p.Team]++;
+        if (State.Ball.Owner == p.Index) State.Ball.Owner = -1;
+        if (State.Ball.HasPending && State.Ball.PendingFrom == p.Index)
+        {
+            State.Ball.HasPending = false; State.Ball.PendingFrom = -1;
+            State.Ball.PendingKind = 0; State.Ball.PendingReceiver = -1;
+        }
+        p.Pos = TouchlinePos(p);
+        p.Target = p.Pos;
+        p.Vel = Vector3.Zero;
+        p.Action = "sentoff";
+        p.ActionTimer = 0f;
+        p.MustPlayBall = false;
+        p.Pressing = false; p.Shielding = false; p.Dribbling = false; p.Sprinting = false;
+        Add(EventKind.Card, $"{reason} - {p.Spec.DisplayName} ({ClubShort(p.Team)}) is off. " +
+                            $"{active - 1} players left.");
+        if (State.Controlled == p.Index) State.Controlled = FindNearestForTeam(p.Team, State.Ball.Pos, true);
+        if (State.ControlledAway == p.Index) State.ControlledAway = FindNearestForTeam(p.Team, State.Ball.Pos, true);
+        return true;
+    }
 
     /// <summary>Phase 3: Header clearance — defender heads aerial ball away.</summary>
     private void HeaderClearance(PlayerState p)
@@ -1392,11 +1579,20 @@ public sealed partial class MatchEngine
             for (int i = 0; i < Options.TeamSize; i++)
             {
                 var p = State.Players[side * Options.TeamSize + i];
+                if (p.SentOff) continue;
                 if (p.IsKeeper && !penalty) continue;
                 float d = Mx.FlatDist2(p.Pos, State.Ball.Pos);
                 if (d < bd) { bd = d; best = p.Index; }
             }
-            if (best < 0) best = side * Options.TeamSize;
+            if (best < 0)
+            {
+                best = side * Options.TeamSize;
+                for (int i = 0; i < Options.TeamSize; i++)
+                {
+                    int idx = side * Options.TeamSize + i;
+                    if (idx < State.Players.Length && !State.Players[idx].SentOff) { best = idx; break; }
+                }
+            }
         }
         var taker = State.Players[best];
         State.Ball.Owner = best;
@@ -1545,8 +1741,10 @@ public sealed partial class MatchEngine
         p.Vel = Mx.MoveTowards(p.Vel, targetVel, accel);
         p.Pos += p.Vel * dt;
         p.Pos.Y = 0;
-        if (p.Shielding) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .12f);
-        else if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f);
+        // Engine badge: a bigger tank, so the same sprints cost less.
+        float drain = p.Spec.Badges.Contains(Badge.Engine) ? .7f : 1f;
+        if (p.Shielding) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .12f * drain);
+        else if (sprint) p.Stamina = MathF.Max(.08f, p.Stamina - dt * .055f * drain);
         else p.Stamina = MathF.Min(1f, p.Stamina + dt * .022f);
         float planar = Mx.Flat(p.Vel).Length();
         if (planar > .15f) p.Facing = Mx.Norm(Mx.Lerp(p.Facing, Mx.Flat(p.Vel), MathF.Min(1f, dt * 7f)));
@@ -1734,6 +1932,7 @@ public sealed partial class MatchEngine
 
     private void Goal(int side)
     {
+        AddStoppage(30f);
         State.Score[side]++;
         State.GoalScorer = State.Ball.LastTouch;
         var scorer = State.GoalScorer >= 0 ? State.Players[State.GoalScorer].Spec.DisplayName : "Own goal";
@@ -1757,6 +1956,7 @@ public sealed partial class MatchEngine
         int best = -1; float bd = 1.05f * 1.05f;
         foreach (var p in State.Players)
         {
+            if (p.SentOff) continue;
             if (p.PossessionLock > 0f) continue;
             if (b.PassReceiver == p.Index && b.FreeTime < .05f) continue;
             float d = Mx.FlatDist2(p.Pos, b.Pos);
@@ -1834,6 +2034,122 @@ public sealed partial class MatchEngine
     }
 
     // ---- Read-only helpers for the front end ----
+    // ---- Substitutions -------------------------------------------------------
+    public const int MaxSubstitutions = 5;
+    /// <summary>Bench for each side. Built lazily from the club squads so that
+    /// headless tests and the server pay nothing unless a sub is actually made.</summary>
+    public readonly List<CharacterSpec>[] Bench = { new(), new() };
+    public readonly int[] SubsUsed = new int[2];
+    /// <summary>Set by the online client: substitutions are local-only until the
+    /// protocol carries them, so they are refused rather than desyncing clients.</summary>
+    public bool OnlineLocked;
+
+    public int SubsLeft(int side) => MaxSubstitutions - SubsUsed[side];
+    public bool HasBench => Bench[0].Count > 0 || Bench[1].Count > 0;
+    public List<CharacterSpec> BenchOf(int side) { EnsureBench(side); return Bench[side]; }
+
+    public void EnsureBench(int side, int count = 7)
+    {
+        if (Bench[side].Count > 0) return;
+        int club = side == 0 ? Options.HomeClub : Options.AwayClub;
+        Bench[side].AddRange(Clubs.CreateBench(club, Math.Max(1, count), Options.Seed + side * 31));
+    }
+
+    /// <summary>Replace an on-pitch player with a substitute.  The outgoing player
+    /// swaps onto the bench, keeps his cards with him, and the incoming player
+    /// starts fresh (full stamina, no bookings).</summary>
+    public bool Substitute(int side, int slot, int benchIndex)
+    {
+        if (OnlineLocked) return false;
+        if (side is < 0 or > 1) return false;
+        if (SubsUsed[side] >= MaxSubstitutions) return false;
+        slot = Math.Clamp(slot, 0, Options.TeamSize - 1);
+        int index = side * Options.TeamSize + slot;
+        if (index < 0 || index >= State.Players.Length) return false;
+        var p = State.Players[index];
+        if (p.SentOff) return false;
+        EnsureBench(side, Math.Max(1, Options.Bench));
+        if (benchIndex < 0 || benchIndex >= Bench[side].Count) return false;
+
+        var incoming = Bench[side][benchIndex];
+        var outgoing = p.Spec;
+        Bench[side][benchIndex] = outgoing;
+
+        p.Spec = incoming;
+        p.Stamina = 1f;
+        p.Cards = 0;
+        p.ActionTimer = 0f;
+        p.PossessionLock = 0f;
+        p.Action = "idle";
+        p.IsInjured = false;
+        p.FirstTouchQuality = 1f;
+        SubsUsed[side]++;
+        AddStoppage(15f);
+        if (State.Ball.Owner == index) State.Ball.Owner = -1;
+        Add(EventKind.Info, $"Substitution ({ClubShort(side)}): {incoming.DisplayName} on for {outgoing.DisplayName}");
+        return true;
+    }
+
+    /// <summary>Short label for a side: an explicit tournament label, else the club code.</summary>
+    public string ShortFor(int side)
+    {
+        string label = side == 0 ? Options.HomeLabel : Options.AwayLabel;
+        if (!string.IsNullOrWhiteSpace(label)) return label;
+        int club = side == 0 ? Options.HomeClub : Options.AwayClub;
+        return Clubs.All[Math.Clamp(club, 0, Clubs.All.Length - 1)].Short;
+    }
+
+    /// <summary>Territory map of the match, sampled 2x/second from the ball.</summary>
+    public HeatMap Heat { get; } = new();
+    private readonly ExpectedGoals _xgModel = new();
+
+    /// <summary>xG for one shot, from distance, angle and defensive pressure.</summary>
+    private readonly RefereeSystem _referee = new();
+    // LinkUpPlays (FluidFormations): named combinations between a carrier and a
+    // runner.  Built from the naming order so indices are stable for both sides.
+    private readonly LinkUpPlays _linkUps = new();
+    private readonly List<(float x, float z)> _posScratch = new();
+
+    private static int RunTypeFor(string type) => type switch
+    {
+        "overlap" => 1, "underlap" => 2, "decoy" => 3, _ => 4,
+    };
+
+    private float ShotXg(PlayerState p, Vector3 target)
+    {
+        var goal = GoalPos(p.Team);
+        float distance = Mx.FlatDist(State.Ball.Pos, goal);
+        float dx = MathF.Max(.5f, MathF.Abs(goal.X - State.Ball.Pos.X));
+        float angle = MathF.Abs(MathF.Atan2(target.Z - State.Ball.Pos.Z, dx)) * 57.2958f;
+        var nearest = NearestOpponent(p, out float oppDist);
+        bool oneOnOne = nearest == null || oppDist > 8f;
+        return _xgModel.CalculateXG(distance, angle, oneOnOne);
+    }
+
+    /// <summary>Accrue stoppage time for the current half (game seconds).</summary>
+    public void AddStoppage(float gameSeconds)
+    {
+        if (Options.Mode == 3) return;
+        State.AddedTime = MathF.Min(State.AddedTime + MathF.Max(0f, gameSeconds), 420f);
+    }
+
+    /// <summary>Minutes of added time signalled for the current half (rounded up,
+    /// as the fourth official would show it).</summary>
+    public int AddedMinutesShown => (int)MathF.Ceiling(State.AddedTime / 60f);
+
+    /// <summary>True once the clock is inside the added time of the half.</summary>
+    public bool InStoppageTime
+    {
+        get
+        {
+            if (Options.Mode == 3 || State.Phase != Phase.Play) return false;
+            float halfSeconds = Options.HalfMinutes * 60f;
+            return State.Half == 1
+                ? State.Clock >= halfSeconds
+                : State.Clock >= halfSeconds * 2f;
+        }
+    }
+
     public string ClockString()
     {
         float minutes = State.Clock / 60f;

@@ -201,7 +201,7 @@ public class CareerMode
     public void AdvanceWeek()
     {
         State.Week++;
-        if (State.Week > 38)
+        if (State.Week > MatchWeeks)
         {
             EndSeason();
         }
@@ -218,66 +218,218 @@ public class CareerMode
         else State.Losses++;
         State.GoalsFor += gf;
         State.GoalsAgainst += ga;
-        // Update table
-        var entry = State.Table.FirstOrDefault(t => t.Team == State.TeamName);
-        if (entry != null)
-        {
-            entry.Played++;
-            if (won) { entry.Won++; entry.Points += 3; }
-            else if (draw) { entry.Drawn++; entry.Points += 1; }
-            else entry.Lost++;
-            entry.GF += gf;
-            entry.GA += ga;
-        }
-        // Mark fixture as played
+
+        // Mark the player's fixture for this week.
         var fixture = State.Fixtures.FirstOrDefault(f =>
             f.Week == State.Week && !f.Played &&
             (f.HomeTeam == State.TeamName || f.AwayTeam == State.TeamName));
         if (fixture != null)
         {
-            if (fixture.HomeTeam == State.TeamName)
-            {
-                fixture.HomeScore = gf;
-                fixture.AwayScore = ga;
-            }
-            else
-            {
-                fixture.HomeScore = ga;
-                fixture.AwayScore = gf;
-            }
+            if (fixture.HomeTeam == State.TeamName) { fixture.HomeScore = gf; fixture.AwayScore = ga; }
+            else { fixture.HomeScore = ga; fixture.AwayScore = gf; }
+        }
+        RebuildTable();
+        // Everyone who played loses fitness, gains an appearance and moves on form.
+        foreach (var p in State.Squad) p.PlayMatch(won, 0, 0, 70 + (won ? 8 : draw ? 4 : 0));
+    }
+
+    /// <summary>Recompute the league table from the fixtures that have been played.
+    /// Incremental updates drifted (the opponent's row was never credited).</summary>
+    public void RebuildTable()
+    {
+        foreach (var e in State.Table)
+        {
+            e.Played = e.Won = e.Drawn = e.Lost = e.GF = e.GA = e.Points = 0;
+        }
+        foreach (var f in State.Fixtures)
+        {
+            if (!f.Played) continue;
+            ApplyToTable(f.HomeTeam, f.HomeScore, f.AwayTeam, f.AwayScore);
         }
     }
 
-    /// <summary>Generate season fixtures (round-robin).</summary>
+    private void ApplyToTable(string home, int hs, string away, int aScore)
+    {
+        var h = State.Table.FirstOrDefault(t => t.Team == home);
+        var a = State.Table.FirstOrDefault(t => t.Team == away);
+        if (h == null || a == null) return;
+        h.Played++; a.Played++;
+        h.GF += hs; h.GA += aScore; a.GF += aScore; a.GA += hs;
+        if (hs > aScore) { h.Won++; a.Lost++; h.Points += 3; }
+        else if (aScore > hs) { a.Won++; h.Lost++; a.Points += 3; }
+        else { h.Drawn++; a.Drawn++; h.Points++; a.Points++; }
+    }
+
+    /// <summary>Generate season fixtures: a proper double round-robin where every
+    /// team plays exactly once per match week.  The old version gave each *fixture*
+    /// its own week (10 teams => 90 "weeks"), so a career ended after two games.</summary>
     public void GenerateFixtures(List<string> teams)
     {
         State.Fixtures.Clear();
         State.Table.Clear();
         foreach (var team in teams)
-        {
             State.Table.Add(new LeagueTableEntry { Team = team });
-        }
-        // Simple round-robin: each team plays each other home and away
-        int week = 1;
-        for (int i = 0; i < teams.Count; i++)
+
+        var pool = new List<string>(teams);
+        if (pool.Count % 2 == 1) pool.Add("BYE");
+        int n = pool.Count;
+        int rounds = n - 1;
+
+        // Circle method: fix pool[0] and rotate the rest.  Each round is one
+        // match week for the whole division; the second half is the reverse leg.
+        for (int r = 0; r < rounds; r++)
         {
-            for (int j = i + 1; j < teams.Count; j++)
+            for (int i = 0; i < n / 2; i++)
             {
-                State.Fixtures.Add(new Fixture
-                {
-                    Week = week++,
-                    HomeTeam = teams[i],
-                    AwayTeam = teams[j],
-                });
-                State.Fixtures.Add(new Fixture
-                {
-                    Week = week++,
-                    HomeTeam = teams[j],
-                    AwayTeam = teams[i],
-                });
+                string a = pool[i], b = pool[n - 1 - i];
+                if (a == "BYE" || b == "BYE") continue;
+                // Alternate home advantage so no club is always at home.
+                bool aAtHome = (r + i) % 2 == 0;
+                string home = aAtHome ? a : b;
+                string away = aAtHome ? b : a;
+                State.Fixtures.Add(new Fixture { Week = r + 1, HomeTeam = home, AwayTeam = away });
+                State.Fixtures.Add(new Fixture { Week = r + 1 + rounds, HomeTeam = away, AwayTeam = home });
             }
+            // Rotate every club except the first.
+            var last = pool[n - 1];
+            pool.RemoveAt(n - 1);
+            pool.Insert(1, last);
         }
+        State.Week = 1;
+        MatchWeeks = rounds * 2;
     }
+
+    /// <summary>Number of match weeks in the current season.</summary>
+    public int MatchWeeks = 38;
+
+    // ---- Season driving API -------------------------------------------------
+
+    /// <summary>Create a brand-new career: squad, league, market and academy.</summary>
+    public void StartNew(string teamName, List<string> leagueTeams, int seed = 42)
+    {
+        var teams = new List<string>(leagueTeams);
+        if (!teams.Contains(teamName))
+        {
+            if (teams.Count == 0) teams.Add(teamName);
+            else teams[0] = teamName;
+        }
+        State = new CareerState
+        {
+            TeamName = teamName,
+            Division = 2,
+            Season = 1,
+            Week = 1,
+            TransferBudget = 2_500_000,
+            WageBudget = 450_000,
+            PromotionSpots = 2,
+            RelegationSpots = 2,
+        };
+        State.Squad.AddRange(BuildSquad(seed));
+        GenerateFixtures(teams);
+        GenerateTransferMarket(10);
+        GenerateAcademy(5);
+        RebuildTable();
+    }
+
+    private static readonly string[] _positions = { "GK", "RB", "CB", "CB", "LB", "CDM", "CM", "CM", "CAM", "RW", "LW", "ST", "ST", "CB", "CM", "ST" };
+    private static readonly string[] _first = { "Alex", "Marco", "Nico", "Jamie", "Rafael", "Yuki", "Omar", "Luca", "Elias", "Tomas", "Kai", "Ivan", "Samir", "Diego", "Felix", "Noah" };
+    private static readonly string[] _last = { "Varela", "Okafor", "Bianchi", "Kovac", "Silva", "Nakamura", "Haddad", "Rossi", "Lindqvist", "Mendes", "Adeyemi", "Petrov", "Costa", "Duarte", "Novak", "Berg" };
+
+    private static List<PlayerProgress> BuildSquad(int seed)
+    {
+        var rng = new Random(seed);
+        var squad = new List<PlayerProgress>(_positions.Length);
+        for (int i = 0; i < _positions.Length; i++)
+        {
+            int overall = rng.Next(66, 79);
+            var p = new PlayerProgress
+            {
+                Name = _first[rng.Next(_first.Length)] + " " + _last[rng.Next(_last.Length)],
+                Age = rng.Next(18, 34),
+                Overall = overall,
+                Potential = Math.Min(99, overall + rng.Next(2, 12)),
+                Position = _positions[i],
+                Pace = Math.Clamp(overall + rng.Next(-6, 7), 40, 99),
+                Shooting = Math.Clamp(overall + rng.Next(-8, 7), 40, 99),
+                Passing = Math.Clamp(overall + rng.Next(-6, 7), 40, 99),
+                Defending = Math.Clamp(overall + rng.Next(-8, 7), 40, 99),
+                Goalkeeping = _positions[i] == "GK" ? Math.Clamp(overall + 4, 45, 99) : 10,
+                Wage = rng.Next(8000, 24000),
+                ContractYears = rng.Next(1, 5),
+            };
+            squad.Add(p);
+        }
+        return squad;
+    }
+
+    /// <summary>The player's next unplayed fixture.</summary>
+    public Fixture? NextFixture => State.Fixtures.FirstOrDefault(f => !f.Played &&
+        (f.HomeTeam == State.TeamName || f.AwayTeam == State.TeamName));
+
+    public List<LeagueTableEntry> TableSorted => State.Table
+        .OrderByDescending(t => t.Points).ThenByDescending(t => t.GoalDifference)
+        .ThenByDescending(t => t.GF).ThenBy(t => t.Team, StringComparer.Ordinal).ToList();
+
+    public int Position => TableSorted.FindIndex(t => t.Team == State.TeamName) + 1;
+    public string Form => $"{State.Wins}W {State.Draws}D {State.Losses}L";
+
+    /// <summary>Play the next fixture for the player's club and settle the week.</summary>
+    public bool PlayNextResult(int goalsFor, int goalsAgainst)
+    {
+        var f = NextFixture;
+        if (f == null) return false;
+        State.Week = f.Week;
+        RecordResult(goalsFor > goalsAgainst, goalsFor == goalsAgainst, goalsFor, goalsAgainst);
+        SimulateOtherMatches(f.Week);
+        AdvanceWeek();
+        RebuildTable();
+        return true;
+    }
+
+    /// <summary>Simulate every other fixture in a week from club strength.</summary>
+    public void SimulateOtherMatches(int week)
+    {
+        foreach (var f in State.Fixtures.Where(x => x.Week == week && !x.Played).ToList())
+        {
+            float h = Strength(f.HomeTeam), a = Strength(f.AwayTeam);
+            int hs = GoalsFor(h, a), aScore = GoalsFor(a, h);
+            f.HomeScore = hs; f.AwayScore = aScore;
+        }
+        RebuildTable();
+    }
+
+    /// <summary>Goals for a side, from the strength gap.  Deterministic so a saved
+    /// career replays the same way.</summary>
+    private static int GoalsFor(float attack, float defence)
+    {
+        float lambda = Math.Clamp(1.25f + (attack - defence) * 2f, .25f, 4f);
+        var rng = new Rng((int)(attack * 100003f + defence * 7919f) | 1);
+        float roll = rng.Next();
+        return Math.Clamp((int)MathF.Round(lambda + (roll - .5f) * 2.4f), 0, 5);
+    }
+
+    /// <summary>Club strength from the fictional club table (0.6 when unknown).</summary>
+    public static float Strength(string team)
+    {
+        var club = Clubs.All.FirstOrDefault(c => c.Name == team);
+        return club?.Strength ?? .70f;
+    }
+
+    /// <summary>Skip the current week without playing (simulates the player's match).</summary>
+    public void SimulateWeek()
+    {
+        var f = NextFixture;
+        if (f == null) return;
+        State.Week = f.Week;
+        int gf = GoalsFor(Strength(State.TeamName), .70f);
+        int ga = GoalsFor(.70f, Strength(State.TeamName));
+        RecordResult(gf > ga, gf == ga, gf, ga);
+        SimulateOtherMatches(f.Week);
+        AdvanceWeek();
+        RebuildTable();
+    }
+
+
 
     /// <summary>End of season: promotion/relegation, aging, reset.</summary>
     private void EndSeason()
@@ -303,6 +455,8 @@ public class CareerMode
         State.Points = 0;
         State.Wins = State.Draws = State.Losses = 0;
         State.GoalsFor = State.GoalsAgainst = 0;
+        // A new season needs new fixtures, not last season's played-out ones.
+        GenerateFixtures(State.Table.Select(t => t.Team).ToList());
 
         // Age players, adjust potential
         foreach (var p in State.Squad)

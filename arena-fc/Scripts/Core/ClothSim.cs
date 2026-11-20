@@ -1,5 +1,11 @@
 // Arena FC — simple cloth/hair simulation for kit and hair jiggle.
 // Verlet integration with distance constraints. Runs on CPU, <0.1ms per player.
+//
+// IMPORTANT: Scripts/Core must stay engine-free.  This file used to import
+// Godot for Vector3, which broke every consumer that compiles Core without the
+// Godot assemblies (Server/ArenaFC.Server.csproj, Tests/*.csproj).  Core maths
+// is System.Numerics — the Godot layer converts at the boundary (see
+// MatchView.G / CharacterEditor).  CI enforces this with a static check.
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -51,18 +57,24 @@ public class ClothSim
 
     public void AddConstraint(int a, int b, float restLength)
     {
+        if (a < 0 || b < 0 || a >= _particles.Count || b >= _particles.Count || a == b) return;
         _constraints.Add(new ClothConstraint { A = a, B = b, RestLength = restLength });
     }
 
     public void Step(float dt, Vector3[] bonePositions)
     {
+        if (dt <= 0f) return;
+        dt = MathF.Min(dt, 1f / 20f);            // clamp hitches, keep it stable
+        Vector3 accel = Vector3.UnitY * Gravity + Wind;
+        float dt2 = dt * dt;
+
         // Update unpinned particles
         foreach (var p in _particles)
         {
-            if (p.Pinned) continue;
+            if (p.Pinned || p.Mass <= 0f) continue;
             var vel = (p.Position - p.Previous) * Damping;
             p.Previous = p.Position;
-            p.Position += vel + (Vector3.UnitY * Gravity + Wind) * dt * dt;
+            p.Position += vel + accel * dt2;
         }
 
         // Satisfy constraints
@@ -82,14 +94,15 @@ public class ClothSim
         }
 
         // Pin to bone positions
-        for (int i = 0; i < _particles.Count && i < bonePositions.Length; i++)
-        {
-            if (_particles[i].Pinned)
+        if (bonePositions != null)
+            for (int i = 0; i < _particles.Count && i < bonePositions.Length; i++)
             {
-                _particles[i].Position = bonePositions[i];
-                _particles[i].Previous = bonePositions[i];
+                if (_particles[i].Pinned)
+                {
+                    _particles[i].Position = bonePositions[i];
+                    _particles[i].Previous = bonePositions[i];
+                }
             }
-        }
     }
 
     public int ParticleCount => _particles.Count;

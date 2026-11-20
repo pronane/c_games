@@ -56,7 +56,24 @@ var roster = Clubs.CreateRoster(0, 11);
 var json = CharacterIo.SerializeRoster(roster, "TEST FC");
 var roster2 = CharacterIo.DeserializeRoster(json, out var teamName);
 Check("roster round trip", roster2.Count == 11 && teamName == "TEST FC" && roster2[0].IsKeeper);
-Check("8 fictional clubs", Clubs.All.Length == 8);
+Check("league table matches the club list", Clubs.All.Length == Clubs.Leagues.Sum(l => l.Teams),
+      $"clubs={Clubs.All.Length} leagues={Clubs.Leagues.Sum(l => l.Teams)}");
+Check("every league has exactly its advertised club count",
+      Enumerable.Range(0, Clubs.Leagues.Length).All(i => Clubs.All.Count(c => c.LeagueId == i) == Clubs.Leagues[i].Teams));
+Check("club short codes are unique 3-letter tags", Clubs.All.Select(c => c.Short).Distinct().Count() == Clubs.All.Length
+      && Clubs.All.All(c => c.Short.Length == 3));
+Check("club names are unique", Clubs.All.Select(c => c.Name).Distinct().Count() == Clubs.All.Length);
+Check("every club has a defined stadium", Clubs.All.All(c => Clubs.Stadiums.Any(s => s.Name == c.Stadium)),
+      string.Join(", ", Clubs.All.Where(c => !Clubs.Stadiums.Any(s => s.Name == c.Stadium)).Select(c => c.Stadium)));
+Check("club list and stadium table are index-aligned (stadium variety depends on it)",
+      Clubs.All.Length == Clubs.Stadiums.Length &&
+      Enumerable.Range(0, Clubs.All.Length).All(i => Clubs.All[i].Stadium == Clubs.Stadiums[i].Name),
+      string.Join(", ", Enumerable.Range(0, Math.Min(Clubs.All.Length, Clubs.Stadiums.Length))
+          .Where(i => Clubs.All[i].Stadium != Clubs.Stadiums[i].Name).Select(i => $"{Clubs.All[i].Name}->{Clubs.Stadiums[i].Name}")));
+Check("stadiums have plausible capacities", Clubs.Stadiums.All(s => s.Capacity >= 8000 && s.Capacity <= 90000));
+Check("every club has home/away/third kits and a style",
+      Clubs.All.All(c => c.AwayPrimary.Length > 0 && c.ThirdPrimary.Length > 0 && c.Style.Length > 0));
+Check("club strengths stay in a playable band", Clubs.All.All(c => c.Strength >= .6f && c.Strength <= .95f));
 Check("formations sized correctly", Clubs.Slots("4-4-2", 11).Length == 11 && Clubs.Slots("1-2-1 (5s)", 5).Length == 5 && Clubs.Slots("2-3-1 (7s)", 7).Length == 7);
 
 Section("Deterministic RNG");
@@ -631,6 +648,367 @@ Check("1P mode: every connected pad drives P1", PadLayout.DevicesFor(new[] { 0, 
 Check("2P mode: player 2 gets the second pad", PadLayout.DevicesFor(new[] { 0, 3, 7 }, true, 1).SequenceEqual(new[] { 3 }));
 Check("no pads -> no devices", PadLayout.DevicesFor(new int[0], false, 0).Length == 0
       && PadLayout.DevicesFor(new[] { 0 }, true, 1).Length == 0);
+
+
+Section("Cloth / hair simulation (engine-free core)");
+var cloth = new ClothSim();
+cloth.AddParticle(new Vector3(0f, 1.8f, 0f), true);   // pinned at the shoulder
+cloth.AddParticle(new Vector3(0f, 1.6f, 0f));
+cloth.AddParticle(new Vector3(0f, 1.4f, 0f));
+cloth.AddConstraint(0, 1, .2f);
+cloth.AddConstraint(1, 2, .2f);
+var bones = new[] { new Vector3(0f, 1.8f, 0f), Vector3.Zero, Vector3.Zero };
+Check("cloth builds particles + constraints", cloth.ParticleCount == 3);
+for (int i = 0; i < 240; i++) cloth.Step(1f / 60f, bones);
+Check("pinned particle follows its bone", MathF.Abs(cloth.GetPosition(0).Y - 1.8f) < 1e-4f);
+var p1 = cloth.GetPosition(1);
+var p2 = cloth.GetPosition(2);
+Check("cloth settles at constraint rest length",
+      MathF.Abs((p1 - cloth.GetPosition(0)).Length() - .2f) < .02f &&
+      MathF.Abs((p2 - p1).Length() - .2f) < .02f,
+      $"l01={(p1 - cloth.GetPosition(0)).Length():F4} l12={(p2 - p1).Length():F4}");
+Check("cloth hangs below the shoulder, not through the floor", p2.Y < 1.8f && p2.Y > -1f, $"y={p2.Y:F3}");
+Check("cloth stays finite", Mx.IsFinite(cloth.GetPosition(2)));
+cloth.AddConstraint(0, 99, .1f);   // out-of-range constraints are ignored, never throw
+Check("out-of-range constraint is rejected", cloth.ParticleCount == 3);
+cloth.Step(0f, bones);
+Check("zero dt is a no-op", Mx.IsFinite(cloth.GetPosition(2)));
+
+
+Section("Disciplinary rules (cards actually matter)");
+var cardEng = new MatchEngine(new MatchOptions { Seed = 11, TeamSize = 5 });
+cardEng.State.Phase = Phase.Play;
+cardEng.State.PhaseTimer = 0f;
+var villain = cardEng.State.Players[2];
+var sendOff = typeof(MatchEngine).GetMethod("SendOff", BindingFlags.Instance | BindingFlags.NonPublic)!;
+Check("a dismissed player is flagged and counted",
+      (bool)sendOff.Invoke(cardEng, new object[] { villain, "Second yellow card" })! &&
+      villain.SentOff && cardEng.State.RedCards[villain.Team] == 1);
+Check("a dismissed player leaves the field of play",
+      MathF.Abs(villain.Pos.Z) > Mx.HalfWidth && villain.Action == "sentoff", $"z={villain.Pos.Z:F2}");
+Check("a dismissed player is never offered as a pass target or a switch target",
+      Enumerable.Range(0, 400).All(_ => cardEng.FindNearestForTeam(villain.Team, Vector3.Zero, false) != villain.Index));
+for (int i = 0; i < 600; i++) cardEng.Step(1f / 60f, PlayerCommand.None);
+Check("the match keeps playing with ten men",
+      cardEng.State.Clock > 0f && Mx.IsFinite(cardEng.State.Ball.Pos) &&
+      cardEng.State.Players.All(p => Mx.IsFinite(p.Pos)));
+Check("the dismissed player did not walk back on",
+      MathF.Abs(villain.Pos.Z) > Mx.HalfWidth, $"z={villain.Pos.Z:F2}");
+Check("the dismissed player did not take possession",
+      cardEng.State.Ball.Owner != villain.Index);
+// A side can never be reduced below two players: small-sided restarts need a taker.
+var wipe = new MatchEngine(new MatchOptions { Seed = 12, TeamSize = 5 });
+wipe.State.Phase = Phase.Play;
+foreach (var idx in new[] { 0, 1, 2, 3 })
+    sendOff.Invoke(wipe, new object[] { wipe.State.Players[idx], "Straight red card" });
+Check("a side is never reduced below two players",
+      wipe.State.Players.Take(5).Count(p => !p.SentOff) == 2,
+      $"active={wipe.State.Players.Take(5).Count(p => !p.SentOff)}");
+
+Section("In-match tactics change the AI");
+var lowBlock = new MatchEngine(new MatchOptions
+{
+    Seed = 3, TeamSize = 5,
+    HomeTactics = new Tactics { PressingIntensity = 0f, Mentality = Mentality.VeryDefensive, Width = 0f },
+});
+var highPress = new MatchEngine(new MatchOptions
+{
+    Seed = 3, TeamSize = 5,
+    HomeTactics = new Tactics { PressingIntensity = 1f, Mentality = Mentality.VeryAttacking, Width = 1f },
+});
+// Tactics are applied while the ball is in play (kickoff has its own phase).
+foreach (var tacEng in new[] { lowBlock, highPress })
+{
+    tacEng.State.Phase = Phase.Play;
+    tacEng.State.PhaseTimer = 0f;
+    tacEng.Step(1f / 60f, PlayerCommand.None);
+}
+Check("pressing intensity reaches the AI",
+      lowBlock.State.Players[1].TacticsPressMult < .9f &&
+      highPress.State.Players[1].TacticsPressMult > 1.1f,
+      $"low={lowBlock.State.Players[1].TacticsPressMult:F2} high={highPress.State.Players[1].TacticsPressMult:F2}");
+Check("width reaches the AI shape", lowBlock.State.Players[1].TacticsWidthMult < .9f &&
+      highPress.State.Players[1].TacticsWidthMult > 1.1f);
+var defaultTactics = new Tactics();
+var (defaultShapePress, _, _) = defaultTactics.Shape.GetPlaystyleModifiers();
+float expectedDefaultPress = .9f * Math.Clamp(.75f + defaultShapePress, .5f, 1.6f);
+Check("balanced default pressing keeps its tuned base after shape blending",
+      MathF.Abs(defaultTactics.GetModifiers().pressMultiplier - expectedDefaultPress) < 1e-5f);
+var shapeMethod = typeof(MatchEngine).GetMethod("FormationPosition", BindingFlags.Instance | BindingFlags.NonPublic)!;
+Vector3 ShapeOf(MatchEngine e, int index) =>
+    (Vector3)shapeMethod.Invoke(e, new object[] { e.State.Players[index], 1, Vector3.Zero })!;
+var wideShape = MathF.Abs(ShapeOf(highPress, 3).Z);     // slot 3 is a wide midfielder in 1-2-1
+var narrowShape = MathF.Abs(ShapeOf(lowBlock, 3).Z);
+Check("a wide/attacking shape is wider than a narrow block", wideShape > narrowShape,
+      $"wide={wideShape:F2} narrow={narrowShape:F2}");
+for (int i = 0; i < 600; i++) { highPress.Step(1f / 60f, PlayerCommand.None); lowBlock.Step(1f / 60f, PlayerCommand.None); }
+Check("extreme tactics keep the simulation stable",
+      Mx.IsFinite(highPress.State.Ball.Pos) && highPress.State.Players.All(p => Mx.IsFinite(p.Pos)) &&
+      lowBlock.State.Players.All(p => Mx.IsFinite(p.Pos)));
+
+Section("Checkpoint / resume keeps every gameplay flag");
+var flagEng = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 5 });
+flagEng.State.Phase = Phase.Play;
+var flagged = flagEng.State.Players[3];
+flagged.Dribbling = true; flagged.Sprinting = true; flagged.MustPlayBall = true;
+flagged.JockeyState = 2; flagged.RunType = 1; flagged.SkillTimer = .3f;
+flagged.FirstTouchQuality = .42f; flagged.TacticsPressMult = 1.25f;
+flagged.Cards = 1; flagged.SentOff = false;
+flagEng.State.YellowCards[0] = 1;
+var fork = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 5 });
+fork.Restore(flagEng.Capture());
+var f3 = fork.State.Players[3];
+Check("capture/restore keeps dribble, sprint, restart and skill flags",
+      f3.Dribbling && f3.Sprinting && f3.MustPlayBall && f3.JockeyState == 2 &&
+      f3.RunType == 1 && MathF.Abs(f3.SkillTimer - .3f) < 1e-6f,
+      $"drb={f3.Dribbling} spr={f3.Sprinting} mpb={f3.MustPlayBall} jk={f3.JockeyState} rt={f3.RunType}");
+Check("capture/restore keeps confidence, tactics and cards",
+      MathF.Abs(f3.FirstTouchQuality - .42f) < 1e-6f && MathF.Abs(f3.TacticsPressMult - 1.25f) < 1e-6f &&
+      f3.Cards == 1 && fork.State.YellowCards[0] == 1);
+var wireFull = StateCodec.BuildFull(flagEng, 1);
+var viaWire = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 5 });
+StateCodec.ApplyFull(viaWire, wireFull);
+var w3 = viaWire.State.Players[3];
+Check("full-state wire transfer keeps dribble (not shield) and sprint",
+      w3.Dribbling && w3.Sprinting && !w3.Shielding, $"drb={w3.Dribbling} spr={w3.Sprinting} sh={w3.Shielding}");
+Check("full-state wire transfer keeps cards and tactics",
+      w3.Cards == 1 && MathF.Abs(w3.TacticsPressMult - 1.25f) < 1e-6f &&
+      viaWire.State.YellowCards[0] == 1 && viaWire.State.RedCards[0] == 0);
+
+
+Section("Tournament engine (groups, bracket, champion)");
+var wc = new TournamentSystem(4242);
+wc.GenerateWorldCup(TournamentSystem.GetWorldCupTeams());
+wc.PlayerTeam = "England";
+Check("world cup seeds 16 teams into 4 groups of 4",
+      wc.Groups.Count == 4 && wc.Teams.Count == 16 && wc.Groups.All(g => g.Teams.Count == 4),
+      $"groups={wc.Groups.Count} teams={wc.Teams.Count}");
+Check("group stage is 24 fixtures (6 per group)",
+      wc.Fixtures.Count(f => f.Stage == TournamentStage.GroupStage) == 24,
+      $"group fixtures={wc.Fixtures.Count(f => f.Stage == TournamentStage.GroupStage)}");
+Check("the player has three group fixtures", wc.PlayerFixtures.Count == 3, $"{wc.PlayerFixtures.Count}");
+Check("an untouched table has no points", wc.GroupTable.All(t => t.Played == 0 && t.Points == 0));
+var firstTie = wc.NextPlayerFixture;
+Check("next player fixture is served", firstTie != null && wc.InvolvesPlayer(firstTie!));
+wc.RecordPlayerResult(3, 0);
+Check("recording a result updates the table and the other groups",
+      wc.GroupTable.Sum(t => t.Played) >= 8 && wc.PlayedCount >= 4,
+      $"played cells={wc.GroupTable.Sum(t => t.Played)} fixtures={wc.PlayedCount}");
+int tourGuard = 0;
+while (!wc.IsComplete && tourGuard++ < 24)
+{
+    if (wc.NextPlayerFixture == null) wc.SimulateRemainingRound();
+    else wc.RecordPlayerResult(2, 0);           // the player wins every tie
+}
+Check("a full run produces a champion", wc.IsComplete && wc.Champion.Length > 0,
+      $"champion='{wc.Champion}' stage={wc.CurrentStage} played={wc.PlayedCount}/{wc.TotalCount}");
+var settledFinal = wc.Fixtures.SingleOrDefault(f => f.Stage == TournamentStage.Final && f.Played);
+Check("the trophy matches the settled final", settledFinal != null && wc.Champion == settledFinal.Winner,
+      $"champion={wc.Champion} final={settledFinal?.Winner}");
+Check("every fixture was settled", wc.Fixtures.All(f => f.Played));
+Check("the bracket ran group -> quarter -> semi -> final",
+      wc.Fixtures.Any(f => f.Stage == TournamentStage.QuarterFinal) &&
+      wc.Fixtures.Any(f => f.Stage == TournamentStage.SemiFinal) &&
+      wc.Fixtures.Count(f => f.Stage == TournamentStage.Final) == 1);
+Check("a knockout tie is never left drawn",
+      wc.Fixtures.Where(f => f.Stage != TournamentStage.GroupStage).All(f => f.Winner.Length > 0));
+Check("the runner-up is recorded", wc.RunnerUp.Length > 0 && wc.RunnerUp != wc.Champion);
+
+var cl = new TournamentSystem(99);
+cl.GenerateChampionsLeague(Clubs.All.Select(c => c.Name).ToList());
+cl.PlayerTeam = Clubs.All[0].Name;
+cl.SimulateAll();
+Check("champions league resolves to a club champion",
+      cl.IsComplete && Clubs.All.Any(c => c.Name == cl.Champion), $"champion='{cl.Champion}'");
+
+var league = new TournamentSystem(7);
+league.GenerateLeague(Clubs.All.Take(8).Select(c => c.Name).ToList());
+league.PlayerTeam = Clubs.All[0].Name;
+Check("a double round robin is 56 fixtures", league.Fixtures.Count == 56, $"{league.Fixtures.Count}");
+league.SimulateAll();
+Check("the league crowns its table leader",
+      league.IsComplete && league.Champion == league.GetTable()[0].Team, $"{league.Champion}");
+Check("league points and records are consistent",
+      league.GetTable().All(t => t.Points == t.Won * 3 + t.Drawn &&
+                                t.Won + t.Drawn + t.Lost == t.Played));
+
+var wcA = new TournamentSystem(2026); wcA.GenerateWorldCup(TournamentSystem.GetWorldCupTeams()); wcA.SimulateAll();
+var wcB = new TournamentSystem(2026); wcB.GenerateWorldCup(TournamentSystem.GetWorldCupTeams()); wcB.SimulateAll();
+Check("the same seed produces the same tournament", wcA.Champion == wcB.Champion && wcA.PlayedCount == wcB.PlayedCount);
+var euros = new TournamentSystem(11); euros.GenerateEuros(TournamentSystem.GetWorldCupTeams());
+Check("the euros only invite UEFA teams", euros.Teams.All(t => TournamentSystem.GetWorldCupTeams()
+      .First(x => x.Name == t).Confederation == "UEFA"), string.Join(",", euros.Teams));
+var copa = new TournamentSystem(12); copa.GenerateCopaAmerica(TournamentSystem.GetWorldCupTeams());
+Check("the copa only invites CONMEBOL teams and still has a bracket",
+      copa.Teams.Count >= 4 && copa.Teams.All(t => TournamentSystem.GetWorldCupTeams()
+      .First(x => x.Name == t).Confederation == "CONMEBOL"), string.Join(",", copa.Teams));
+
+
+Section("Substitutions, stoppage time and persistence");
+var subEng = new MatchEngine(new MatchOptions { Seed = 21, TeamSize = 5 });
+subEng.State.Phase = Phase.Play;
+Check("a bench is generated on demand", subEng.BenchOf(0).Count == 7, $"{subEng.BenchOf(0).Count}");
+Check("the bench contains a reserve goalkeeper", subEng.BenchOf(0)[0].Role == Role.Goalkeeper);
+var starter = subEng.State.Players[2].Spec;
+var firstSub = subEng.BenchOf(0)[1];
+Check("a substitution swaps the players", subEng.Substitute(0, 2, 1) && subEng.State.Players[2].Spec == firstSub &&
+      subEng.State.Players[2].Stamina == 1f, "swap failed");
+Check("the outgoing player drops to the bench", subEng.BenchOf(0)[1] == starter);
+Check("the substitution counter advances", subEng.SubsUsed[0] == 1 && subEng.SubsLeft(0) == MatchEngine.MaxSubstitutions - 1);
+for (int i = 0; i < 8; i++) subEng.Substitute(0, 3, 2);
+Check("only five substitutions are allowed", subEng.SubsUsed[0] == MatchEngine.MaxSubstitutions,
+      $"used={subEng.SubsUsed[0]}");
+var sentOffEng = new MatchEngine(new MatchOptions { Seed = 22, TeamSize = 5 });
+typeof(MatchEngine).GetMethod("SendOff", BindingFlags.Instance | BindingFlags.NonPublic)!
+    .Invoke(sentOffEng, new object[] { sentOffEng.State.Players[1], "Red" });
+sentOffEng.EnsureBench(0);
+Check("a dismissed player cannot be substituted", !sentOffEng.Substitute(0, 1, 0));
+subEng.OnlineLocked = true;
+Check("online matches refuse local substitutions", !subEng.Substitute(1, 0, 0));
+
+var stEng = new MatchEngine(new MatchOptions { Seed = 23, HalfMinutes = 1f, TimeSpeed = 60f, Mode = 0 });
+stEng.State.Phase = Phase.Play;
+stEng.State.Half = 1;
+stEng.State.Clock = 59f;
+Check("no stoppage time before anything happens", stEng.State.AddedTime == 0f);
+stEng.AddStoppage(30f);
+Check("stoppage time accumulates", MathF.Abs(stEng.State.AddedTime - 30f) < 1e-4f && stEng.AddedMinutesShown == 1,
+      $"added={stEng.State.AddedTime} shown={stEng.AddedMinutesShown}");
+for (int i = 0; i < 120 && stEng.State.Phase == Phase.Play; i++) stEng.Step(1f / 60f, PlayerCommand.None);
+Check("the first half runs into the added minute before ending",
+      stEng.State.Phase != Phase.Play && stEng.State.Clock > 60f,
+      $"phase={stEng.State.Phase} clock={stEng.State.Clock:F1}");
+Check("the added time is reported as played", MathF.Abs(stEng.State.Clock - 90f) < .01f ||
+      stEng.State.Clock >= 60f);
+
+// Persistence
+var save = new SaveGame();
+var saveOpts = new MatchOptions { TeamSize = 7, Difficulty = 2, HomeClub = 3, AwayClub = 5, TimeSpeed = 21f };
+var saveTactics = new Tactics { Mentality = Mentality.VeryAttacking, PressingIntensity = .8f, Width = .3f };
+save.Settings.CopyFrom(saveOpts, saveTactics);
+save.Tournament = new TournamentSystem(5);
+save.Tournament.GenerateWorldCup(TournamentSystem.GetWorldCupTeams());
+save.Tournament.PlayerTeam = "England";
+save.Tournament.RecordPlayerResult(2, 0);
+var mmrBefore = save.Ranked.Mmr;
+save.Ranked.Record(true, false, 3, 1, 1100);
+save.PushResult("HAR 3-1 NOR");
+string saveJson = save.ToJson();
+var roundTrip = SaveGame.FromJson(saveJson);
+Check("settings survive a save/load", roundTrip.Settings.TeamSize == 7 && roundTrip.Settings.Difficulty == 2 &&
+      roundTrip.Settings.HomeClub == 3 && MathF.Abs(roundTrip.Settings.TimeSpeed - 21f) < 1e-4f);
+var loadedOpts = new MatchOptions();
+var loadedTactics = new Tactics();
+roundTrip.Settings.ApplyTo(loadedOpts, loadedTactics);
+Check("settings apply back onto match options", loadedOpts.TeamSize == 7 && loadedTactics.Mentality == Mentality.VeryAttacking);
+Check("tactics survive a save/load", MathF.Abs(loadedTactics.PressingIntensity - .8f) < 1e-4f);
+Check("the tournament survives a save/load", roundTrip.Tournament != null && roundTrip.Tournament!.PlayerTeam == "England" &&
+      roundTrip.Tournament.PlayedCount == save.Tournament.PlayedCount && roundTrip.Tournament.Groups.Count == 4,
+      $"played={roundTrip.Tournament?.PlayedCount}");
+Check("a resumed tournament keeps simulating", roundTrip.Tournament!.NextPlayerFixture != null);
+roundTrip.Tournament.RecordPlayerResult(1, 0);
+Check("ranked MMR survives a save/load", roundTrip.Ranked.Mmr == save.Ranked.Mmr && roundTrip.Ranked.Mmr > mmrBefore,
+      $"{roundTrip.Ranked.Mmr} vs {save.Ranked.Mmr}");
+Check("the ranked ladder promotes on rating", new RankedLadder { Mmr = 1500 }.Division == 1 &&
+      new RankedLadder { Mmr = 1000 }.Division == 6);
+Check("recent results survive a save/load", roundTrip.RecentResults.Count == 1 && roundTrip.RecentResults[0] == "HAR 3-1 NOR");
+Check("a corrupt save degrades to a fresh game",
+      SaveGame.FromJson("{ not json").Version == SaveGame.CurrentVersion &&
+      SaveGame.FromJson("null").Settings.TeamSize == 11);
+var clampSave = SaveGame.FromJson("{\"Settings\":{\"TeamSize\":4,\"HomeClub\":99,\"AwayClub\":99}}");
+clampSave.Normalize();
+var clampOpts = new MatchOptions();
+clampSave.Settings.ApplyTo(clampOpts, new Tactics());
+Check("a hand-edited save is clamped to legal values",
+      clampOpts.TeamSize == 11 && clampOpts.HomeClub < Clubs.All.Length && clampOpts.HomeClub != clampOpts.AwayClub,
+      $"teamSize={clampOpts.TeamSize} home={clampOpts.HomeClub} away={clampOpts.AwayClub}");
+
+Section("Career, report, referee and badges");
+
+// --- career: fixtures, table and season flow ------------------------------
+var careerTeams = Clubs.All.Take(10).Select(c => c.Name).ToList();
+var career = new CareerMode();
+career.StartNew(careerTeams[0], careerTeams, 4242);
+Check("a new career builds a squad", career.State.Squad.Count >= 11, $"squad={career.State.Squad.Count}");
+Check("a 10-team league is 18 match weeks", career.MatchWeeks == 18, $"weeks={career.MatchWeeks}");
+Check("a double round-robin is 90 fixtures", career.State.Fixtures.Count == 90, $"fixtures={career.State.Fixtures.Count}");
+Check("every club has a table row", career.State.Table.Count == 10, $"rows={career.State.Table.Count}");
+Check("every club plays every week once",
+      career.State.Fixtures.Where(f => f.Week == 1).Select(f => f.HomeTeam).Distinct().Count() == 5 &&
+      career.State.Fixtures.Where(f => f.Week == 1).Select(f => f.AwayTeam).Distinct().Count() == 5);
+Check("no pairing is repeated inside a round",
+      career.State.Fixtures
+          .GroupBy(f => string.CompareOrdinal(f.HomeTeam, f.AwayTeam) < 0
+              ? f.HomeTeam + "|" + f.AwayTeam : f.AwayTeam + "|" + f.HomeTeam)
+          .All(g => g.GroupBy(f => f.Week).All(w => w.Count() == 1)));
+Check("every pairing happens twice (home and away)", career.State.Fixtures
+      .GroupBy(f => string.CompareOrdinal(f.HomeTeam, f.AwayTeam) < 0
+          ? f.HomeTeam + "|" + f.AwayTeam : f.AwayTeam + "|" + f.HomeTeam)
+      .All(g => g.Count() == 2));
+var firstFixture = career.NextFixture;
+Check("the career knows its next fixture", firstFixture != null, "no next fixture");
+career.PlayNextResult(3, 1);
+Check("playing a week advances the clock", career.State.Week == 2, $"week={career.State.Week}");
+Check("the table follows the result",
+      career.State.Table.Sum(t => t.Played) == 10 && career.TableSorted.Count == 10,
+      $"played={career.State.Table.Sum(t => t.Played)}");
+Check("the whole round was settled", career.State.Table.All(t => t.Played == 1),
+      $"played={career.State.Table.Sum(t => t.Played)}");
+int goalsFor = career.State.Table.Sum(t => t.GF), goalsAgainst = career.State.Table.Sum(t => t.GA);
+Check("the table's goals balance", goalsFor == goalsAgainst, $"{goalsFor} vs {goalsAgainst}");
+Check("the division ladder position is sane", career.Position is >= 1 and <= 10, $"pos={career.Position}");
+for (int i = 0; i < 17; i++) career.SimulateWeek();
+Check("the season rolls over after 18 weeks",
+      career.State.Season == 2 && career.State.Week == 1 && career.MatchWeeks == 18,
+      $"season={career.State.Season} week={career.State.Week}");
+Check("a rolled season has fresh fixtures", career.State.Fixtures.Count == 90 &&
+      career.State.Fixtures.All(f => !f.Played), $"played={career.State.Fixtures.Count(f => f.Played)}");
+career.SimulateWeek();
+Check("a simulated week settles the round", career.State.Table.All(t => t.Played == 1));
+
+// --- match report ---------------------------------------------------------
+var reportOpts = new MatchOptions { TeamSize = 5, Seed = 99, Mode = 0 };
+var reportEngine = new MatchEngine(reportOpts);
+var reportState = reportEngine.State;
+for (int i = 0; i < 240; i++) reportEngine.Step(1f / 60f, PlayerCommand.None);
+var ratings = MatchReport.Ratings(reportState, 0);
+Check("every outfielder gets a rating", ratings.Count == 5, $"ratings={ratings.Count}");
+Check("ratings stay in the legal band", ratings.All(r => r.rating is >= 3f and <= 10f),
+      string.Join(",", ratings.Select(r => r.rating)));
+Check("a man of the match exists", MatchReport.BestPlayer(reportState, 0).name.Length > 0);
+Check("xG has been sampled", reportState.Xg[0] >= 0f && reportState.Xg[1] >= 0f);
+Check("the heat map has zones", reportEngine.Heat.Zones.Count > 0, $"zones={reportEngine.Heat.Zones.Count}");
+var heatGrid = MatchReport.HeatGrid(reportEngine.Heat);
+Check("the heat grid is 9x5", heatGrid.GetLength(0) == 9 && heatGrid.GetLength(1) == 5);
+Check("the verdict line is written", MatchReport.Verdict(reportState).Length > 0);
+
+// --- referee, badges, link-ups -------------------------------------------
+var referee = new RefereeSystem();
+var decisions = new List<RefereeDecision>();
+for (int i = 0; i < 200; i++) decisions.Add(referee.DecideFoul(i % 2 == 0, i % 7 == 0, i % 5 == 0, false, (i % 10) / 10f));
+Check("the referee reaches more than one verdict", decisions.Distinct().Count() > 2,
+      string.Join(",", decisions.Distinct()));
+Check("the referee counts its fouls", referee.FoulCount == 200, $"fouls={referee.FoulCount}");
+var badgeRoster = Clubs.CreateRoster(0, 11);
+Check("generated players carry badges", badgeRoster.Any(p => p.Badges.Count > 0),
+      $"none of {badgeRoster.Count}");
+Check("goalkeepers never get shooting badges",
+      badgeRoster.Where(p => p.Role == Role.Goalkeeper).All(p => !p.Badges.Contains(Badge.Deadeye)));
+
+// --- persistence of the new state ---------------------------------------
+var featureSave = new SaveGame();
+featureSave.Career = new CareerDto { Started = true, State = career.State, UltimateTeam = career.UltimateTeam };
+featureSave.Achievements.Add("unlocked:First win");
+featureSave.ReplayClips.Add("GOAL (120-210)");
+var featureLoaded = SaveGame.FromJson(featureSave.ToJson());
+Check("a career survives a save/load", featureLoaded.Career is { Started: true } &&
+      featureLoaded.Career!.State.TeamName == career.State.TeamName &&
+      featureLoaded.Career.State.Fixtures.Count == 90,
+      $"fixtures={featureLoaded.Career?.State.Fixtures.Count}");
+Check("a reloaded career can keep playing",
+      new CareerMode { State = featureLoaded.Career!.State }.NextFixture != null);
+Check("achievements and clips survive a save/load",
+      featureLoaded.Achievements.Contains("unlocked:First win") && featureLoaded.ReplayClips.Count == 1);
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

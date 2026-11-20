@@ -1,3 +1,12 @@
+> **Status note (20 Nov 2026):** the counts below are historical and no longer
+> match the code. Measured on branch `arena/de31006f-c-games` (run 44720476401):
+> **186** pure-C# core checks, **42** match-core regressions, **39** in-engine
+> Godot checks, plus the GDScript, Node-hub, pad and sprite-forge suites — all
+> passing. The .NET server build had been failing on `main` since 06 Nov (a
+> Godot type imported into the Godot-free core), which skipped most of these
+> suites; see `REVIEW_2026-11-20.md` for the fix list, the open gaps and the
+> FIFA 25 / eFootball comparison.
+
 # Arena FC — verification report
 
 Executed on **Debian 13 x86_64**, 2026‑10‑26/27, using
