@@ -54,6 +54,8 @@ import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
 import TakeReport from "./TakeReport";
 import YourSound from "./YourSound";
+import Progress, { TrainerControls } from "./Progress";
+import { addEntry, clearProgress, DEFAULT_TRAINER, loadProgress, nextSpeed, saveProgress, songKey, trainerDone, type ProgressEntry, type Trainer } from "./progress";
 import { reamp, usePlayerSound } from "./liveTone";
 import { rememberTake, shownReport, type Comparison } from "./compare";
 import { captureError } from "./audioInputs";
@@ -84,7 +86,7 @@ type TakeCheck = { id: string; label: string; part: string; role: string; compar
 type Listen = "mixer" | "only" | "without";
 
 const GUIDE_LEVEL = 0.25;
-const SPEEDS = [1, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5];
+const SPEEDS = [1, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5];
 
 export default function SongLab({ settings, onSettings, onCompare, processing = "cpu", onPracticeTab, onPracticeProject }: Props) {
   const profile = resolveInstrument(settings);
@@ -132,7 +134,10 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [mySound, setMySound] = usePlayerSound(),
     [tryingSound, setTryingSound] = useState(false),
     [tabParts, setTabParts] = useState<{ name: string; sections: { start: number; end: number }[] }[]>([]),
-    [markAgainst, setMarkAgainst] = useState("");
+    [markAgainst, setMarkAgainst] = useState(""),
+    [trainer, setTrainerState] = useState<Trainer>(DEFAULT_TRAINER),
+    [trainerStatus, setTrainerStatus] = useState(""),
+    [history, setHistory] = useState<ProgressEntry[]>([]);
   const ctx = useRef<AudioContext | null>(null),
     current = useRef<AudioBufferSourceNode | null>(null),
     clock = useRef({ context: 0, song: 0, speed: 1, loop: null as null | { start: number; end: number } }),
@@ -532,6 +537,28 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
   }
 
   /** The band without the replaced music, with the player's take dropped in its place. */
+  const markChosen = useRef(false);
+  const progressKey = song && duration ? songKey(song.name, duration) : "";
+  useEffect(() => {
+    setHistory(progressKey ? loadProgress(progressKey) : []);
+  }, [progressKey]);
+
+  function setTrainer(next: Trainer) {
+    if (next.on && !trainer.on) {
+      // Start slow, looping the chosen bars.
+      setSpeed(next.start);
+      setLoopOn(true);
+      setTrainerStatus(`Starting at ${Math.round(next.start * 100)}%. Record bars ${fromBar}–${toBar}.`);
+    }
+    if (!next.on) setTrainerStatus("");
+    setTrainerState(next);
+  }
+
+  // With the trainer on, every take is reviewed straight away.
+  useEffect(() => {
+    if (take && trainer.on && song?.instrument === "guitar") checkTake();
+  }, [take]);
+
   /** Tab parts that play somewhere in the take's stretch of the song: the ones it can be marked against. */
   const tabNames = take
     ? tabParts.filter((p) => p.sections.some((sec) => sec.start < take.end && sec.end > take.start)).map((p) => p.name)
@@ -600,7 +627,10 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     setFromBar(Math.max(1, first));
     setToBar(Math.max(first, last));
     setLoopOn(true);
-    if (speed > 0.75) setSpeed(0.75);
+    if (trainer.on) {
+      setSpeed(trainer.start);
+      setTrainerStatus(`Bars ${Math.max(1, first)}–${Math.max(first, last)} from ${Math.round(trainer.start * 100)}%.`);
+    } else if (speed > 0.75) setSpeed(0.75);
     document.getElementById("loop-on")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -628,6 +658,9 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     if (!learned) return;
     setChecking(true);
     setError("");
+    // The chosen tab part, else the first one that plays here (a take reviewed the moment it is
+    // recorded can arrive before the choice catches up). "" = the app's own transcription.
+    const usedTab = markAgainst === "" && tabNames.length && markChosen.current ? "" : tabNames.includes(markAgainst) ? markAgainst : (tabNames[0] ?? "");
     try {
       const wav = encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate);
       const comparison = await compareSongTake(song.id, wav, {
@@ -639,7 +672,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         start: take.start,
         end: take.end,
         speed: take.speed,
-        tabPart: markAgainst && tabNames.includes(markAgainst) ? markAgainst : undefined,
+        tabPart: usedTab || undefined,
       });
       const entry: TakeCheck = {
         id: comparison.take_id,
@@ -650,6 +683,35 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
       };
       setChecks((prev) => rememberTake(prev, entry));
       setCheckAt(Math.min(checks.length, 4));
+      const score = comparison.history.at(-1)?.overall ?? null;
+      if (progressKey) {
+        const next = addEntry(history, {
+          at: Date.now(),
+          from: barAt(take.start + 1e-3),
+          to: Math.max(barAt(take.start + 1e-3), barAt(take.end - 0.05)),
+          speed: take.speed,
+          score,
+          against: usedTab ? `tab: ${usedTab}` : "transcription",
+        });
+        setHistory(next);
+        saveProgress(progressKey, next);
+      }
+      if (trainer.on) {
+        const at = Math.round(take.speed * 100);
+        if (trainerDone(trainer, take.speed, score)) {
+          setTrainerStatus(`Done: ${score}% at full speed. Turn the trainer off, or pick the next bars.`);
+        } else {
+          const next = nextSpeed(trainer, take.speed, score);
+          setSpeed(next);
+          setTrainerStatus(
+            score == null
+              ? `No score for that take (${at}%). Try again at ${Math.round(next * 100)}%.`
+              : next > take.speed
+                ? `${score}% at ${at}%: passed. Next take at ${Math.round(next * 100)}%.`
+                : `${score}% at ${at}%: aim for ${trainer.pass}%. Try again at ${at}%.`,
+          );
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1133,6 +1195,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             {speed !== 1 ? ` at ${Math.round(speed * 100)}% speed` : ""} while we record you. Afterwards your take
             drops into the song in its place.
           </p>
+          <TrainerControls trainer={trainer} onChange={setTrainer} status={trainerStatus} disabled={recording} />
           <YourSound
             sound={mySound}
             onChange={(next) => {
@@ -1218,7 +1281,14 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
                 {song?.instrument === "guitar" && tabNames.length > 0 && (
                   <label className="speed">
                     Mark against
-                    <select id="mark-against" value={markAgainst} onChange={(e) => setMarkAgainst(e.target.value)}>
+                    <select
+                      id="mark-against"
+                      value={markAgainst}
+                      onChange={(e) => {
+                        markChosen.current = true;
+                        setMarkAgainst(e.target.value);
+                      }}
+                    >
                       {tabNames.map((n) => (
                         <option key={n} value={n}>
                           Your tab: {n}
@@ -1258,6 +1328,15 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
               )}
             </div>
           )}
+          <Progress
+            history={history}
+            pass={trainer.pass}
+            onPractise={practiseBars}
+            onClear={() => {
+              if (progressKey) clearProgress(progressKey);
+              setHistory([]);
+            }}
+          />
           <details className="provenance">
             <summary>How reliable is this?</summary>
             <ul>{result.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
