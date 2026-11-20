@@ -174,8 +174,8 @@ public partial class MatchView : Node3D
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
-        BallShadow = Marker("BallGroundShadow", new CircleMesh { Radius = 1f, RadialSegments = 32 }, shadowMat);
-        BallShadow.RotationDegrees = new Vector3(-90f, 0f, 0f);
+        BallShadow = Marker("BallGroundShadow",
+            new CylinderMesh { TopRadius = 1f, BottomRadius = 1f, Height = .02f, RadialSegments = 32 }, shadowMat);
         BallShadow.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         AddChild(BallShadow);
 
