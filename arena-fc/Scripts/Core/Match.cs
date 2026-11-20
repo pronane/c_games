@@ -87,6 +87,9 @@ public sealed class PlayerState
     public Role Role;
     public Vector3 Pos, Vel, Facing, Home, Target;
     public float Stamina = 1f, AnimPhase, ActionTimer, DecisionTimer, PossessionLock, TackleLock;
+    /// <summary>Restart taker (free kick / throw-in / corner / goal kick) must play
+    /// the ball immediately — no dribbling away with it.</summary>
+    public bool MustPlayBall;
     public string Action = "idle";
     /// <summary>Phase 0 event sync: total duration of the current one-shot and the
     /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
@@ -596,6 +599,7 @@ public sealed partial class MatchEngine
             p.ActionTimer = MathF.Max(0, p.ActionTimer - dt);
             p.PossessionLock = MathF.Max(0, p.PossessionLock - dt);
             p.TackleLock = MathF.Max(0, p.TackleLock - dt);
+            if (p.MustPlayBall && S.Ball.Owner != p.Index) p.MustPlayBall = false;
             p.Dribbling = false;
             p.Sprinting = false;
             PlayerCommand pc = For(p.Index);
@@ -1080,6 +1084,7 @@ public sealed partial class MatchEngine
         if (b.Owner != from.Index && b.Owner >= 0) return;
         if (b.HasPending) return;
         from.PossessionLock = .35f;
+        from.MustPlayBall = false;
         // Phase 0.1: wind-up, then release at ball_contact (0.5 * 0.34s).
         SetAction(from, "kick", .34f, .50f);
         Vector3 aim = to.Pos + Mx.Flat(to.Vel) * (through ? .55f : .22f);
@@ -1140,6 +1145,7 @@ public sealed partial class MatchEngine
         if (volley && Mx.FlatDist(p.Pos, b.Pos) > 1.6f) return;
         if (b.HasPending) return;
         p.PossessionLock = .55f;
+        p.MustPlayBall = false;
         if (Options.Mode == 3) { State.ShootoutShotTaken = true; State.ShootoutTimer = 0f; }
         // Phase 0.2: volley plays the volley clip; release at ball_contact.
         // Phase 2.4: Dynamic Volley — first-time aerial (eFootball v6.0).
@@ -1396,6 +1402,9 @@ public sealed partial class MatchEngine
         State.Ball.Owner = best;
         taker.Pos = State.Ball.Pos - new Vector3(SideSign(side) * .8f, 0, 0);
         taker.PossessionLock = 0;
+        // Free kick / throw-in / corner / goal kick: taker must play the ball.
+        taker.MustPlayBall = State.Phase == Phase.FreeKick || State.Phase == Phase.ThrowIn
+                             || State.Phase == Phase.Corner || State.Phase == Phase.GoalKick;
         taker.Facing = Mx.FlatDir(taker.Pos, GoalPos(side));
         // Phase 2.8: set-piece routines.
         bool isCorner = MathF.Abs(State.Ball.Pos.X) > Mx.HalfLength - 3f && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - 3f;
@@ -1494,6 +1503,8 @@ public sealed partial class MatchEngine
             // go of the stick; active stick input always overrides p.Target above.
             sprint = !human && (Mx.FlatDist(p.Pos, p.Target) > 5f || p.Pressing) && p.Stamina > .25f;
         }
+        // Restart taker must play the ball, not run off with it.
+        if (p.MustPlayBall) wish = Vector3.Zero;
         p.Sprinting = sprint;
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
         // Phase 2.9 preset: Authentic is slightly slower, Competitive faster.
