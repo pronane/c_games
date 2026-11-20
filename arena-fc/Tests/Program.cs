@@ -632,5 +632,30 @@ Check("2P mode: player 2 gets the second pad", PadLayout.DevicesFor(new[] { 0, 3
 Check("no pads -> no devices", PadLayout.DevicesFor(new int[0], false, 0).Length == 0
       && PadLayout.DevicesFor(new[] { 0 }, true, 1).Length == 0);
 
+
+Section("Cloth / hair simulation (engine-free core)");
+var cloth = new ClothSim();
+cloth.AddParticle(new Vector3(0f, 1.8f, 0f), true);   // pinned at the shoulder
+cloth.AddParticle(new Vector3(0f, 1.6f, 0f));
+cloth.AddParticle(new Vector3(0f, 1.4f, 0f));
+cloth.AddConstraint(0, 1, .2f);
+cloth.AddConstraint(1, 2, .2f);
+var bones = new[] { new Vector3(0f, 1.8f, 0f), Vector3.Zero, Vector3.Zero };
+Check("cloth builds particles + constraints", cloth.ParticleCount == 3);
+for (int i = 0; i < 240; i++) cloth.Step(1f / 60f, bones);
+Check("pinned particle follows its bone", MathF.Abs(cloth.GetPosition(0).Y - 1.8f) < 1e-4f);
+var p1 = cloth.GetPosition(1);
+var p2 = cloth.GetPosition(2);
+Check("cloth settles at constraint rest length",
+      MathF.Abs((p1 - cloth.GetPosition(0)).Length() - .2f) < .02f &&
+      MathF.Abs((p2 - p1).Length() - .2f) < .02f,
+      $"l01={(p1 - cloth.GetPosition(0)).Length():F4} l12={(p2 - p1).Length():F4}");
+Check("cloth hangs below the shoulder, not through the floor", p2.Y < 1.8f && p2.Y > -1f, $"y={p2.Y:F3}");
+Check("cloth stays finite", Mx.IsFinite(cloth.GetPosition(2)));
+cloth.AddConstraint(0, 99, .1f);   // out-of-range constraints are ignored, never throw
+Check("out-of-range constraint is rejected", cloth.ParticleCount == 3);
+cloth.Step(0f, bones);
+Check("zero dt is a no-op", Mx.IsFinite(cloth.GetPosition(2)));
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
