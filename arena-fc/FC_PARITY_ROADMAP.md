@@ -70,7 +70,7 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ✅ 5.4 (PR #8: LT+X finesse/curl, LB+X chip, double-tap X low driven — finesse was a hidden 50–65% power window; **the stick now aims shots**, the post was random) Attacking extras: `RB` knock-on (speed burst touch) · `LB`+`Y` lofted through · `RB+X` finesse/curl shot · `LB+X` chip shot · `LT+X` low driven shot · `RB` (with pass) driven pass.
 - ✅ 5.5 (PR #8) Switch play: `RS` flick off the ball = switch to the player in that direction (right-stick switching).
 - ✅ 5.6 (PR #8: pause menu → "Controls – every move", generated from the coach's lessons; coach now 27 lessons) In-game control cards: pause-menu page with the full layout, plus first-time contextual prompts (“Press B to tackle”) in matches.
-- ⬜ 5.7 Remap screen covers every action, not just six.
+- ✅ 5.7 (PR #19) Remap screen covers every action, not just six: all ten (adds long ball, close control/finesse, camera, pause), with a prompt per step naming the Xbox default; Space keeps the default (for triggers that are axes). LB/RB combos follow the remapped buttons; older saves keep working.
 
 ## 6. Team shape & AI
 - ✅ 6.1 (PR #3) Formation discipline — the block now steps up in possession and drops compact out of it (final-third entries 4 → 14/match): units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.

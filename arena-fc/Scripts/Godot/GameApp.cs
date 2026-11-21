@@ -708,8 +708,12 @@ public partial class GameApp : Node3D
         _remapDevice = pads[slot];
         _remapStep = 0;
         _remapLabel = info;
-        UpdateRemapLabel($"Press the button for {PadLayout.Actions[0].ToUpperInvariant()} (pad {slot + 1})");
+        UpdateRemapLabel(RemapAsk(slot + 1));
     }
+
+    private string RemapAsk(int pad)
+        => $"Pad {pad} - step {_remapStep + 1}/{PadLayout.RemapOrder.Length}: press the button for\n" +
+           $"{PadLayout.RemapPrompt(PadLayout.RemapOrder[_remapStep])}\n(Space on the keyboard keeps the default for this one)";
 
     private void UpdateRemapLabel(string prompt)
     {
@@ -719,11 +723,25 @@ public partial class GameApp : Node3D
 
     public override void _Input(InputEvent @event)
     {
-        if (_remapStep < 0 || @event is not InputEventJoypadButton jb || !jb.Pressed) return;
-        if (jb.Device != _remapDevice) return;
-        InputHub.SetBinding(Input.GetJoyName(_remapDevice), PadLayout.Actions[_remapStep], (int)jb.ButtonIndex);
+        if (_remapStep < 0) return;
+        // 5.7: every action is remappable (it was the first six only).  Space keeps
+        // the default for a step - LT/RT are axes on many pads and can't be "pressed".
+        bool skip = @event is InputEventKey k && k.Pressed && !k.Echo && k.PhysicalKeycode == Key.Space;
+        if (!skip)
+        {
+            if (@event is not InputEventJoypadButton jb || !jb.Pressed || jb.Device != _remapDevice) return;
+            InputHub.SetBinding(Input.GetJoyName(_remapDevice), PadLayout.RemapOrder[_remapStep], (int)jb.ButtonIndex);
+        }
+        else
+        {
+            // Keep the default: core actions need a value, so store it explicitly.
+            string a = PadLayout.RemapOrder[_remapStep];
+            bool known = Input.IsJoyKnown(_remapDevice);
+            var def = PadLayout.Bindings("", known, null!);
+            if (def.ContainsKey(a)) InputHub.SetBinding(Input.GetJoyName(_remapDevice), a, def[a]);
+        }
         _remapStep++;
-        if (_remapStep >= PadLayout.Actions.Length)
+        if (_remapStep >= PadLayout.RemapOrder.Length)
         {
             _remapStep = -1;
             _remapDevice = -1;
@@ -732,7 +750,7 @@ public partial class GameApp : Node3D
         }
         else
         {
-            UpdateRemapLabel($"Press the button for {PadLayout.Actions[_remapStep].ToUpperInvariant()}");
+            UpdateRemapLabel(RemapAsk(System.Array.IndexOf(InputHub.ConnectedDevices(), _remapDevice) + 1));
         }
         GetViewport().SetInputAsHandled();
     }

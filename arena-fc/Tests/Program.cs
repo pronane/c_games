@@ -537,6 +537,23 @@ Check("interpolation of identical frames reproduces the authoritative hash",
       NetProtocol.Hash(interpEng.State) == NetProtocol.Hash(auth.State));
 om.Close();
 
+Section("5.7: every action remappable");
+{
+    Check("remap screen asks for all ten actions", PadLayout.RemapOrder.Length == 10
+          && PadLayout.Actions.All(a => PadLayout.RemapOrder.Contains(a)) && PadLayout.ExtraActions.All(a => PadLayout.RemapOrder.Contains(a)));
+    Check("every remap step has a prompt with the Xbox default", PadLayout.RemapOrder.All(a => PadLayout.RemapPrompt(a).Contains("Xbox")));
+    var saved = new Dictionary<string, Dictionary<string, int>> { ["Pad X"] = new(PadLayout.Standard) { ["lob"] = 2, ["camera"] = 5 } };
+    var bnd = PadLayout.Bindings("Pad X", true, saved);
+    var btn = new bool[16]; btn[2] = true;
+    var held = PadLayout.Held(btn, new float[8], bnd, true);
+    Check("a remapped long-ball button works", held["lob"]);
+    btn = new bool[16]; btn[4] = true;
+    Check("the old default no longer fires once remapped", !PadLayout.Held(btn, new float[8], bnd, true)["lob"]);
+    var old = new Dictionary<string, Dictionary<string, int>> { ["Pad Y"] = new(PadLayout.Standard) };
+    btn = new bool[16]; btn[4] = true;
+    Check("older saves (core six only) keep the default extras", PadLayout.Held(btn, new float[8], PadLayout.Bindings("Pad Y", true, old), true)["lob"]);
+}
+
 Section("USB / EasySMX gamepad support (PadLayout)");
 var noSaved = new Dictionary<string, Dictionary<string, int>>();
 var winDb = string.Join("\n", new[] {

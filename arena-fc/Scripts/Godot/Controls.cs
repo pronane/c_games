@@ -172,8 +172,7 @@ public sealed class InputHub
             bool known = Input.IsJoyKnown(dev);
             var b = PadLayout.Bindings(name, known, _saved);
             lines.Add($"Pad {dev + 1}: {name}   [{PadLayout.PadKind(name, known)}]");
-            lines.Add($"   pass={b["pass"]}  through={b["through"]}  shoot={b["shoot"]}  " +
-                      $"tackle={b["tackle"]}  switch={b["switch"]}  sprint={b["sprint"]}");
+            lines.Add("   " + string.Join("  ", PadLayout.RemapOrder.Select(a => b.ContainsKey(a) ? $"{a}={b[a]}" : $"{a}=default")));
         }
         lines.Add("Left stick / D-pad moves. Every connected pad drives player 1. " +
                   "Use REMAP if a button is in the wrong place; bindings are saved per pad name.");
@@ -314,9 +313,11 @@ public sealed class InputHub
             if (known)
             {
                 rightStick += new System.Numerics.Vector2(Input.GetJoyAxis(dev, JoyAxis.RightX), Input.GetJoyAxis(dev, JoyAxis.RightY));
-                padLB |= Input.IsJoyButtonPressed(dev, JoyButton.LeftShoulder);
-                padRB |= Input.IsJoyButtonPressed(dev, JoyButton.RightShoulder);
             }
+            // LB/RB combos (chip modifier, punch/headbutt, coach skip) follow the
+            // remapped switch / sprint buttons, on raw pads too (5.7).
+            padLB |= h["switch"];
+            padRB |= PadLayout.Button(buttons, binds.ContainsKey("sprint") ? binds["sprint"] : -1);
         }
         if (padMove.LengthSquared() > 1f) padMove = padMove.Normalized();
         move += padMove;
