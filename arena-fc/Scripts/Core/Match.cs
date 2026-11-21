@@ -798,7 +798,11 @@ public sealed partial class MatchEngine
             // pass / shoot / tackle presses and made the controller look dead.
             if (human) HumanActions(p, pc);
             else if (S.Ball.Owner < 0 && AiAttackHighBall(p)) continue;
-            if (p.DecisionTimer <= 0)
+            // A player mid first-touch is busy controlling the ball: re-deciding
+            // used to send the receiver running off while the ball rolled past him
+            // (about half of all failed AI passes).
+            bool trapping = S.Ball.HasPending && S.Ball.PendingKind == 2 && S.Ball.PendingFrom == p.Index;
+            if (p.DecisionTimer <= 0 && !trapping)
             {
                 p.DecisionTimer = Rng.Range(.08f, .18f);
                 Decide(p, pc, human);
@@ -1069,6 +1073,25 @@ public sealed partial class MatchEngine
 
         // --- Positional target (AI only) ---
         Vector3 slotPos = FormationPosition(p, attack, ball.Pos);
+        if (keeper && ball.Owner == p.Index && !p.MustPlayBall)
+        {
+            // Ball in hand: step out to the edge of his area and distribute.  He used
+            // to keep walking back to his line holding it and carry it over (most AI
+            // goals were these own goals).
+            Vector3 own = OwnGoalPos(p.Team);
+            float outX = own.X + MathF.Sign(-own.X) * 9f;
+            p.Target = new Vector3(outX, 0, Mx.Clamp(p.Pos.Z, -12f, 12f));
+            p.Pressing = false;
+            if (p.ActionTimer <= 0f) p.Action = "run";
+            if (p.PossessionLock <= 0f && p.ActionTimer <= 0f && Rng.Next() < .09f)
+            {
+                bool punt = Rng.Next() < .35f;
+                int t = FindBestPassTarget(p, false, longPass: punt);
+                if (t < 0) t = FindBestPassTarget(p, false);
+                if (t >= 0) PassTo(p, S.Players[t], punt ? 24f : 15f, false);
+            }
+            return;
+        }
         if (keeper)
         {
             float gx = OwnGoalPos(p.Team).X;
@@ -1154,6 +1177,18 @@ public sealed partial class MatchEngine
             }
             if (p.ActionTimer <= 0f) p.Action = "idle";
             float danger = Mx.FlatDist(ball.Pos, OwnGoalPos(p.Team));
+            // Shot stopping: read the ball's line and get across to where it will
+            // cross his own line, rather than towards where the ball is now.  Shots
+            // from 18 m+ went in 36% of the time (real: ~4-6%) because he only moved
+            // once the ball was inside 13 m, and then at the ball, not its path.
+            if (!humanKeeper && ball.Owner < 0 && !ball.HasPending && TryShotCrossing(p, out Vector3 cross, out float tCross))
+            {
+                p.Target = new Vector3(cross.X, 0, cross.Z);
+                float lateral = MathF.Abs(cross.Z - p.Pos.Z);
+                if (tCross < .55f && lateral > .6f && (p.ActionTimer <= 0 || p.Action == "keeper_penalty_set"))
+                    SetAction(p, "dive", .65f, .50f);
+                return;
+            }
             if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f && (p.ActionTimer <= 0 || p.Action == "keeper_penalty_set"))
             {
                 SetAction(p, "dive", .65f, .50f);
@@ -1231,7 +1266,9 @@ public sealed partial class MatchEngine
                 if (Rng.Next() < passRate)
                 {
                     int t = FindBestPassTarget(p, Rng.Next() < .25f);
-                    if (t >= 0) { PassTo(p, S.Players[t], 14f, false); return; }
+                    // No clean lane: keep it (dribble, shield) unless closed down hard.
+                    bool forced = press != null && pd < 1.4f;
+                    if (t >= 0 && (!LastPassTargetBlocked || (forced && Rng.Next() < .5f))) { PassTo(p, S.Players[t], 14f, false); return; }
                 }
             }
             return;
@@ -1507,7 +1544,7 @@ public sealed partial class MatchEngine
 
     private int FindBestPassTarget(PlayerState from, bool through, bool longPass = false, Vector2 aimDir = default)
     {
-        int best = -1; float bestScore = float.MinValue;
+        int best = -1; float bestScore = float.MinValue; bool bestBlocked = false;
         int attack = SideSign(from.Team);
         // FIFA/PES-style: bias target toward stick aim direction.
         // If stick is centered, use facing direction. Aim alignment is the
@@ -1526,16 +1563,13 @@ public sealed partial class MatchEngine
             Vector2 toMate = new Vector2(q.Pos.X - from.Pos.X, q.Pos.Z - from.Pos.Z);
             float aimAlign = d > 0.01f ? Vector2.Dot(Vector2.Normalize(toMate), aim) : 0f;
             float openness = NearestOpponent(q, out float od) is null ? 8f : MathF.Min(od, 8f);
-            bool laneBlocked = false;
-            foreach (var o in State.Players)
-            {
-                if (o.Team == from.Team) continue;
-                float proj = Mx.Clamp(Vector3.Dot(Mx.Flat(o.Pos - from.Pos), Mx.Flat(q.Pos - from.Pos)) / MathF.Max(.01f, d * d), 0f, 1f);
-                if (Mx.FlatDist(o.Pos, Mx.Lerp(from.Pos, q.Pos, proj)) < 1.5f && proj > .1f && proj < .9f) { laneBlocked = true; break; }
-            }
+            bool laneBlocked = LaneRisk(from, q, d) > 0f;
             // Aim alignment dominates (weight 8.0) so stick direction controls
             // the pass. AI factors (forward/openness) break ties.
-            float score = aimAlign * 8.0f + forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? 6f : 0f);
+            // An opponent who can step into the lane before the ball passes him
+            // turns the pass into an interception (61% of AI passes went past an
+            // opponent within 1.5 m of the line; real completion is ~80%).
+            float score = aimAlign * 8.0f + forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? (hasAim ? 6f : 14f) : 0f);
             // A long pass wants a distant, advanced target; a short pass prefers
             // the safe nearby option instead of always hitting the furthest man.
             if (longPass) score += MathF.Min(d, 38f) * .16f + forward * .18f;
@@ -1550,9 +1584,50 @@ public sealed partial class MatchEngine
             }
             if (Options.Offside && IsOffside(q, from)) score -= 30f;
             score += Rng.Range(-1.2f, 1.2f);
-            if (score > bestScore) { bestScore = score; best = q.Index; }
+            if (score > bestScore) { bestScore = score; best = q.Index; bestBlocked = laneBlocked; }
         }
+        LastPassTargetBlocked = bestBlocked;
         return best;
+    }
+
+    /// <summary>A ball travelling at this keeper's goal: where it crosses the plane he
+    /// stands in, and how long until it gets there.</summary>
+    private bool TryShotCrossing(PlayerState k, out Vector3 cross, out float t)
+    {
+        var b = State.Ball; cross = default; t = 0f;
+        float gx = OwnGoalPos(k.Team).X;
+        float vx = b.Vel.X;
+        if (MathF.Abs(vx) < 6f || MathF.Sign(vx) != MathF.Sign(gx - b.Pos.X)) return false;
+        float planeX = MathF.Abs(k.Pos.X - gx) < 6f ? k.Pos.X : gx - MathF.Sign(gx) * .6f;
+        t = (planeX - b.Pos.X) / vx;
+        if (t < 0f || t > 1.6f) return false;
+        float z = b.Pos.Z + b.Vel.Z * t;
+        float y = b.Pos.Y + b.Vel.Y * t - .5f * 9.81f * t * t;
+        if (MathF.Abs(z) > Mx.GoalHalfWidth + 1.0f || y > Mx.GoalHeight + .6f) return false;
+        cross = new Vector3(planeX, MathF.Max(Mx.BallRadius, y), z);
+        return true;
+    }
+
+    /// <summary>Set by FindBestPassTarget: the chosen lane can be cut out.</summary>
+    private bool LastPassTargetBlocked;
+
+    /// <summary>How far inside an opponent's interception reach the pass lane passes
+    /// (0 = clear).  Reach grows with the time the ball takes to get level with him.</summary>
+    private float LaneRisk(PlayerState from, PlayerState to, float d)
+    {
+        float worst = 0f;
+        Vector3 line = Mx.Flat(to.Pos - from.Pos);
+        foreach (var o in State.Players)
+        {
+            if (o.Team == from.Team || o.SentOff) continue;
+            float proj = Vector3.Dot(Mx.Flat(o.Pos - from.Pos), line) / MathF.Max(.01f, d * d);
+            if (proj < .05f || proj > .97f) continue;
+            float perp = Mx.FlatDist(o.Pos, Mx.Lerp(from.Pos, to.Pos, proj));
+            float tArrive = proj * d / 13f;
+            float reach = .9f + 4.5f * tArrive;
+            worst = MathF.Max(worst, reach - perp);
+        }
+        return worst;
     }
 
     private bool IsOffside(PlayerState receiver, PlayerState passer)
@@ -2587,8 +2662,10 @@ public sealed partial class MatchEngine
         foreach (var p in State.Players)
         {
             if (!p.IsKeeper) continue;
-            float d = (p.Pos - b.Pos).Length();
-            float reach = p.Action == "dive" ? 1.65f : 1.15f;
+            // Measured from his chest, not his boots: a shot at the bar straight at
+            // him (2 m up) used to be out of a standing keeper's reach.
+            float d = (p.Pos + new Vector3(0, .9f, 0) - b.Pos).Length();
+            float reach = p.Action == "dive" ? 1.70f : 1.20f;
             // A penalty dive you committed to: full stretch the way you went (a keeper
             // covers ~2.5 m sideways), nothing extra the other way.
             if (State.ShootoutShotTaken && State.ShootoutTakerSide == 1 && p.Team == 0 && !Options.AwayHuman && State.ShootoutDive != 0
@@ -2758,6 +2835,15 @@ public sealed partial class MatchEngine
                 contactFrac = touchAction == "trap" ? .60f : .55f;
                 SetAction(p, touchAction, .50f, contactFrac);
                 p.Target = b.Pos; // plant feet on the spot
+                // A ground ball is cushioned by the receiving foot: it slows into his
+                // stride instead of rolling on at pass speed while the touch plays.
+                if (touchAction == "trap")
+                {
+                    Vector3 hv = Mx.Flat(b.Vel);
+                    float keep = Mx.Lerp(.45f, .20f, quality);
+                    b.Vel = new Vector3(hv.X * keep, b.Vel.Y, hv.Z * keep);
+                    p.Target = b.Pos + Mx.Flat(b.Vel) * .3f;
+                }
                 b.HasPending = true; b.PendingKind = 2; b.PendingFrom = best;
                 b.PendingReceiver = b.PassReceiver; b.PendingTarget = b.PassTarget;
                 return;
