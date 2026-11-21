@@ -124,6 +124,7 @@ public partial class MatchView : Node3D
         _pending.Dribble = cmd.Dribble;
         _pending.Pass |= cmd.Pass;
         _pending.Shoot |= cmd.Shoot;
+        _pending.ShootPress |= cmd.ShootPress;
         _pending.Through |= cmd.Through;
         _pending.Tackle |= cmd.Tackle;
         _pending.Slide |= cmd.Slide;

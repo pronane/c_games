@@ -73,6 +73,9 @@ public struct PlayerCommand
 {
     public Vector2 Move;
     public bool Sprint, Pass, Shoot, Through, Tackle, Switch, Lob;
+    /// <summary>The shoot button went down this tick (Shoot fires on release, after
+    /// charging).  Without the ball it is the FC slide tackle.</summary>
+    public bool ShootPress;
     /// <summary>Sprint + tackle = committed slide tackle (longer reach, higher foul risk).</summary>
     public bool Slide;
     /// <summary>Hold to shield the ball / use strength to hold off a challenger.</summary>
@@ -601,7 +604,22 @@ public sealed partial class MatchEngine
             {
                 case Phase.Kickoff:
                     S.Phase = Phase.Play;
-                    if (S.Ball.Owner >= 0) KickoffPass(S.Ball.Owner);
+                    if (S.Ball.Owner >= 0)
+                    {
+                        // A human side takes its own kick-off (FC: tap pass); it used to be
+                        // played for you the instant the whistle went.  The computer still
+                        // kicks off at once; an idle human's is taken for him after 8 s.
+                        var ko = S.Players[S.Ball.Owner];
+                        bool humanSide = netCmds != null ? netCmds.ContainsKey(ko.Index)
+                                                         : ko.Team == 0 ? S.Controlled >= 0 : Options.AwayHuman;
+                        if (humanSide)
+                        {
+                            if (ko.Team == 0 && netCmds == null) { S.Controlled = ko.Index; S.ControlLock = .5f; }
+                            ko.MustPlayBall = true;
+                            S.RestartPos = S.Ball.Pos;
+                        }
+                        else KickoffPass(S.Ball.Owner);
+                    }
                     break;
                 case Phase.Goal:
                     if (Options.Mode == 3) { ShootoutNext(true); break; }
@@ -992,6 +1010,11 @@ public sealed partial class MatchEngine
         }
         else
         {
+            // FC: the shoot button (X / Square) without the ball is a slide tackle,
+            // unless the ball is loose at his feet (then it is a first-time strike).
+            bool looseNear = ball.Owner < 0 && (Mx.FlatDist(p.Pos, ball.Pos) < 2.2f || ball.PassReceiver == p.Index
+                             || (ball.LastTouchSide == p.Team && Mx.FlatDist(p.Pos, ball.Pos) < 10f));   // our ball coming to him
+            if (cmd.ShootPress && !looseNear && p.TackleLock <= 0f && !p.IsKeeper) { AttemptSlide(p); return; }
             if (cmd.Slide && p.TackleLock <= 0f) { AttemptSlide(p); return; }
             if (cmd.Tackle && p.TackleLock <= 0f) { AttemptTackle(p, false, cmd.Sprint); return; }
         }
@@ -2475,6 +2498,10 @@ public sealed partial class MatchEngine
         }
         var taker = State.Players[best];
         State.RestartId++;
+        // Your restart: the ring goes to the taker (it could stay on someone else,
+        // so the throw / free kick button "did nothing").
+        if (taker.Team == 0 && State.Controlled >= 0 && Options.Mode != ModeShootout) { State.Controlled = best; State.ControlLock = .5f; }
+        else if (taker.Team == 1 && Options.AwayHuman && State.ControlledAway >= 0) State.ControlledAway = best;
         State.Ball.Owner = best;
         bool throwIn = State.Phase == Phase.ThrowIn;
         taker.Pos = throwIn
