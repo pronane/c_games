@@ -45,7 +45,7 @@ public static class MotionFeatureLayout
         weights[10] = .7f;                            // yaw rate
         for (int i = 11; i < 17; i++) weights[i] = 1.5f; // trajectory position
         for (int i = 17; i < 23; i++) weights[i] = 1.2f; // trajectory facing
-        weights[TimeToContact] = 4f;                     // contact timing dominates action entry
+        weights[TimeToContact] = 12f;                    // contact timing dominates action entry
         return weights;
     }
 }

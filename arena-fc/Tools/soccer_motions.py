@@ -14,7 +14,9 @@ the same semantic pose channels as `sforge.rig.evaluate`.
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 
 from sforge.motions import (
     CROUCH,
@@ -366,6 +368,28 @@ CLIP_SPECS = [
     ("soccer_headbutt", "fs_headbutt", False, "Contact", "headbutt (violent conduct)"),
 ]
 
+# ---------------------------------------------------------------------------
+# Real motion capture (CMU Graphics Lab, via Tools/import_cmu_football.py):
+# Sprite Forge library moves in Data/mocap/cmu/.  Each becomes soccer_<name>.
+# ---------------------------------------------------------------------------
+MOCAP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data", "mocap", "cmu")
+_MOCAP_CATEGORY = {"Kick": "Ball", "Locomotion": "Locomotion", "Cut": "Locomotion", "Recovery": "Locomotion"}
+
+
+def _mocap_takes():
+    path = os.path.join(MOCAP_DIR, "_import.json")
+    if not os.path.isfile(path):
+        return []
+    with open(path) as f:
+        return json.load(f).get("takes", [])
+
+
+MOCAP_TAKES = _mocap_takes()
+for _t in MOCAP_TAKES:
+    CLIP_SPECS.append(("soccer_" + _t["name"], "mocap:" + _t["name"], bool(_t["loop"]),
+                       _MOCAP_CATEGORY.get(_t["category"], "Mocap"),
+                       "motion capture: CMU take %s (%s)" % (_t["take"], _t["category"].lower())))
+
 # Match-engine / control actions -> clip name.  Keys cover the C# PlayerState
 # Action strings, the pad/keyboard actions and the restart phases.
 ACTION_ALIASES = {
@@ -570,6 +594,28 @@ from sforge import fieldsport_motions as _fs  # noqa: E402
 for _name, _base, *_ in CLIP_SPECS:
     if _base in _fs.EVENTS:
         CLIP_EVENTS[_name] = dict(_fs.EVENTS[_base])
+def _mocap_events(name):
+    with open(os.path.join(MOCAP_DIR, name + ".json")) as f:
+        rec = json.load(f)
+    canon = (rec.get("import") or {}).get("canonical") or {}
+    dur = float(rec.get("duration") or canon.get("duration") or 1.0)
+    contact = -1.0
+    if canon.get("peak_s") is not None and canon.get("cut_s"):
+        contact = round((canon["peak_s"] - canon["cut_s"][0]) / dur, 3)
+    # Foot plants: each leg's most-forward swing (heel strike) in the take.
+    steps = []
+    keys = rec["keys"]
+    for leg in ("leg_L", "leg_R"):
+        vals = [(k[0], (k[1].get(leg) or [0])[0]) for k in keys]
+        for i in range(1, len(vals) - 1):
+            if vals[i][1] > vals[i - 1][1] and vals[i][1] >= vals[i + 1][1] and vals[i][1] > 15:
+                steps.append(round(float(vals[i][0]), 3))
+    return _ev(ball_contact=contact, footsteps=tuple(sorted(s for s in steps if 0.0 <= s <= 1.0)))
+
+
+for _t in MOCAP_TAKES:
+    CLIP_EVENTS["soccer_" + _t["name"]] = _mocap_events(_t["name"])
+
 # Every clip must have an event entry (default: no events).
 for _n in ALL_CLIPS:
     CLIP_EVENTS.setdefault(_n, _ev())
@@ -584,6 +630,14 @@ def register() -> None:
           keys=spec.get("keys"), func=spec.get("func"), loop=spec.get("loop", False))
     for name, base, loop, category, desc in CLIP_SPECS:
         if name in LIB:
+            continue
+        if base and base.startswith("mocap:"):
+            from sforge.motionlib import as_motion
+            src = as_motion(base.split(":", 1)[1], path=MOCAP_DIR)
+            if src is None:
+                raise KeyError("motion-capture move %s missing from %s" % (base, MOCAP_DIR))
+            M(name, category, desc, keys=src.keys, loop=loop)
+            LIB[name].duration_s = getattr(src, "duration_s", None)
             continue
         if base is None:
             raise KeyError("custom clip %s missing from CUSTOM" % name)
