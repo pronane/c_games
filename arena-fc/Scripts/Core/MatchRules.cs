@@ -23,6 +23,24 @@ public sealed partial class MatchEngine
     /// throw-in, 9.15 m (10 yards) at free kicks, corners, goal kicks and penalties.</summary>
     private float RestartDistance(PlayerState taker) => IsThrowInHold(taker) ? 2f : 9.15f;
 
+    /// <summary>Law 13/16: at a goal kick, or a free kick to the defending team inside
+    /// its own penalty area, opponents must be outside the penalty area until the
+    /// ball is in play (it no longer has to leave the area).</summary>
+    private bool OwnAreaRestart(PlayerState taker)
+    {
+        if (!taker.MustPlayBall || IsThrowInHold(taker)) return false;
+        var g = OwnGoalPos(taker.Team);
+        return InArea(State.RestartPos, g.X);
+    }
+
+    internal static bool InArea(Vector3 pos, float goalX, float margin = 0f)
+        => MathF.Abs(pos.X - goalX) < 16.5f + margin && MathF.Abs(pos.Z) < 20.16f + margin;
+
+    /// <summary>Just outside the penalty area on the pitch side, keeping the
+    /// player's channel.</summary>
+    private static Vector3 OutsideArea(Vector3 from, float goalX)
+        => new(goalX - MathF.Sign(goalX) * 17.6f, 0, Mx.Clamp(from.Z, -Mx.HalfWidth + 1f, Mx.HalfWidth - 1f));
+
     /// <summary>A spot on the restart circle, on the pitch: straight out from the ball
     /// if that is on the pitch, otherwise walking round the circle.  (Pushing a
     /// player straight out near a line put him off the pitch; the clamp then put him
@@ -68,6 +86,11 @@ public sealed partial class MatchEngine
         {
             Vector3 from = Mx.FlatDist(p.Pos, b.Pos) > .1f ? p.Pos : OwnGoalPos(p.Team);
             p.Target = OutsideCircle(b.Pos, from, need);
+        }
+        if (OwnAreaRestart(holder))
+        {
+            float gx = OwnGoalPos(holder.Team).X;
+            if (InArea(p.Target, gx, 1f)) p.Target = OutsideArea(p.Target, gx);
         }
         p.Pressing = false;
     }
@@ -122,9 +145,18 @@ public sealed partial class MatchEngine
 
         // ---- encroachment ----------------------------------------------------
         float need = RestartDistance(holder);
+        bool areaRule = OwnAreaRestart(holder);
+        float areaGx = OwnGoalPos(holder.Team).X;
         foreach (var q in S.Players)
         {
             if (q.Team == holder.Team || q.SentOff) continue;
+            // In the area but beyond 10 yards at a goal kick: the referee waves him
+            // out (no caution unless he is also inside 9.15 m).
+            if (areaRule && InArea(q.Pos, areaGx, -.3f) && Mx.FlatDist(q.Pos, b.Pos) >= need - .35f)
+            {
+                q.Pos = OutsideArea(q.Pos, areaGx); q.Target = q.Pos; q.Vel = Vector3.Zero;
+                continue;
+            }
             if (q.IsKeeper && !IsThrowInHold(holder) && MathF.Abs(b.Pos.X) > Mx.HalfLength - 12f) continue; // keeper on his line at a penalty
             float d = Mx.FlatDist(q.Pos, b.Pos);
             if (d < need - .35f)
