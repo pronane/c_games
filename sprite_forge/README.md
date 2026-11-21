@@ -54,6 +54,62 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.22: sprites that are not blocky or blotchy, HD players, a sports idle
+
+### Drawing (`sforge/render_rich.py`)
+
+A character with several textures (skin, hair, kit, eyes) used to be drawn **one flat colour per triangle**, sampled
+at the triangle's centre and lit per triangle. That was the blotchy patches, the blocky body and the missing shirt
+number. Every textured rig is now drawn per pixel:
+
+* each material's own texture, sampled smoothly from a shrunk copy, so a large texture doesn't shimmer;
+* smooth light that blends across the body, while hard creases stay sharp;
+* hair, brow and lash cards drawn as cut-outs, so their see-through parts show what's behind;
+* supersampled to about 640 px tall (4x for a 160 px cell, 2x for an HD cell).
+
+The kit recolours materials as before, and the framing is unchanged. `SF_FLAT_SPRITES=1` brings back the old drawing.
+
+### Kits on the look characters
+
+* **Hems:** the hems of the shirt, sleeves, shorts and socks zig-zagged one triangle up, one down. They are now
+  smoothed straight, without shrinking, and no vertex moves more than 1.5 cm.
+* **Plain kits:** the game kits (`sf_<kit>`) are plain. The sock hoops and shorts piping that broke up along the hems
+  are gone.
+
+### HD players
+
+* **Command line:** `forge.py build --frame 256x320`, or `forge.py roster --hd`, draws sprites at twice the game's
+  frame size.
+* **Games tab:** the same switch is the **HD sprites (2x)** tick-box.
+* **Proportions:** a pack's figure share (Gaelic 0.58) is kept at any frame size (`BuildConfig.figure_share`).
+* **QA:** the ground tolerance grows with the cell, so HD isn't flagged for the same half-pixel.
+
+### A sports idle
+
+The plain idle stands to attention. The new `idle_athletic` stance has soft knees, a slight lean, loose arms and
+weight rocking from foot to foot. It is a CC0 starter clip, and soccer, Gaelic, basketball and tennis prefer it.
+
+A pack's named motion now wins over a rig's own clip that only shares the move's name, such as a template's stiff
+"idle". A `lib:` name that is not a library clip finds the procedural motion of that name.
+
+### Feet on the ground
+
+The feet reference is now where idle, walk and run plant (the median of each move's most-planted frame), not idle
+frame 0 alone. The cell fit places it on the ground line before fitting. A crouched idle no longer lifts every other
+move off the ground, and the ground lock no longer pushes a fitted leap out of the top of the cell.
+
+### Tests
+
+`tools/test_render_quality.py` has 11 checks and runs in CI:
+
+* per-pixel textures, smooth light, see-through cards, kit recolouring and seam normals;
+* the supersampling rule;
+* straight hems that keep their size;
+* the sports idle;
+* the grounding rule and the QA tolerance;
+* every game pack at HD on the mannequin: twice the size and no clipped move;
+* the sports idle builds and passes the QA.
+
 ## New in v11.21: players who look different, every move inside its cell, hit boxes in the preview
 
 ### Teams and casts that look like real rosters

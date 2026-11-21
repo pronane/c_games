@@ -214,8 +214,8 @@ def apply(cfg, name_or_path):
     cfg.moves = moves_of(pack)
     cfg.yaw = pack["yaw"]
     cfg.frame_w, cfg.frame_h = pack["frame"]
-    if pack.get("figure") and not cfg.figure_h:
-        cfg.figure_h = int(round(cfg.frame_h * pack["figure"]))
+    if pack.get("figure"):          # a share of the frame height, so a larger --frame (HD) keeps the proportion
+        cfg.figure_share = float(pack["figure"])
     if pack["prop"] in ("none", "kart", "auto"):
         cfg.prop = pack["prop"]
     if pack["camera"] == "topdown8":

@@ -142,6 +142,31 @@ def M(name, category, desc, keys=None, func=None, loop=False):
 
 # --- locomotion
 M("idle", "Locomotion", "default standing pose", func=idle_func(STAND), loop=True)
+# v11.22: a sports player's idle - weight on the balls of the feet, knees soft, slight forward lean with the head
+# level, arms loose and a little bent, weight rocking from foot to foot. The plain idle stands to attention.
+ATHLETIC = dict(hips=(0, 10, 0), spine=(7, -3, 0), chest=(4, -5, 0), neck=(-6, -2, 0),
+                leg_L=(22, 9, 0), leg_R=(18, 10, 0), knee_L=22, knee_R=18,
+                arm_L=(12, 14, 0), arm_R=(8, 16, 0), elbow_L=30, elbow_R=26)
+
+
+def athletic_func(amp=1.0):
+    base = idle_func(ATHLETIC, amp)
+
+    def f(t):
+        p = base(t)
+        s = math.sin(2 * math.pi * t)
+        h = list(p["hips"]); h[2] = 3.0 * amp * s                        # weight from foot to foot
+        p["hips"] = tuple(h)
+        p["knee_L"] = p["knee_L"] + 4 * amp * max(0.0, s)
+        p["knee_R"] = p["knee_R"] + 4 * amp * max(0.0, -s)
+        n = list(p["neck"]); n[2] = -1.5 * amp * s                       # head stays level as the hips rock
+        p["neck"] = tuple(n)
+        return p
+    return f
+
+
+M("idle_athletic", "Locomotion", "sports ready idle: soft knees, slight lean, loose arms, weight shifting",
+  func=athletic_func(), loop=True)
 M("walk", "Locomotion", "standard walk cycle", func=loco(24, 42, 22, 15, 4), loop=True)
 M("run", "Locomotion", "jogging", func=loco(36, 80, 42, 80, 10, air=0.03), loop=True)
 M("sprint", "Locomotion", "full speed run", func=loco(48, 105, 62, 92, 18, air=0.07), loop=True)
@@ -440,6 +465,7 @@ def find_motion(name):
         m = as_motion(raw.split(":", 1)[1])
         if m is not None:
             return m
+        name = raw.split(":", 1)[1]              # v11.22: not a library clip - the procedural motion of that name
     s = slug(name)
     if s.startswith("hd_") and s not in LIB:       # v10: HD Fighter hand-posed frame library
         from .hdfighter import register
