@@ -10,7 +10,11 @@ that, with the pitch, into a probability for each string. The fingering search
 Trained on GuitarSet (CC BY 4.0, Xi et al. 2018: 6 players, hexaphonic string annotations) by
 ``training/string_timbre_train.py``. Tested on players it never saw (leave one player out): the
 right string for 77% of notes from timbre and pitch, against 63% from pitch alone (81% vs 62% on
-single-note lines). Standard tuning only: the model is not used for other tunings.
+single-note lines). Written as tab with the fingering search (benchmarks/string_eval.py, players
+held out the same way), notes on the string and fret actually played: 70% -> 89% from the true
+notes, 55% -> 92% from the app's own transcription of 24 recordings. GuitarSet's players all play
+the same tunes, so held-out players are not held-out music; expect somewhat less on other songs.
+Standard tuning only: the model is not used for other tunings.
 
 The model is stored as plain arrays (server/data/string_timbre.npz) and evaluated with NumPy;
 nothing is unpickled.

@@ -9,6 +9,10 @@ server.string_timbre) and compared with the strings and frets they actually play
   as "your take to tab" does.
 
     python -m benchmarks.string_eval <guitarset mic dir> <annotation dir> [files per player]
+
+Result (21 Nov 2026): true notes 0.704 -> 0.891 (all 360 recordings); transcribed 0.553 -> 0.915
+(24 recordings, first 30 s, share of matched notes on the played string and fret). The players
+all play the same tunes, so this is held-out players, not held-out music.
 """
 from __future__ import annotations
 
