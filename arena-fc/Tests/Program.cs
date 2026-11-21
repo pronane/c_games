@@ -16,7 +16,13 @@ void Section(string s) => Console.WriteLine($"\n== {s} ==");
 void Invoke(object o, string method, params object[] args)
 {
     var mi = o.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
-    mi.Invoke(o, args);
+    // Fill optional parameters the test leaves out with their defaults, so adding
+    // an optional parameter to an engine method doesn't crash the whole suite.
+    var ps = mi.GetParameters();
+    var full = new object?[ps.Length];
+    for (int i = 0; i < ps.Length; i++)
+        full[i] = i < args.Length ? args[i] : ps[i].HasDefaultValue ? ps[i].DefaultValue : Type.Missing;
+    mi.Invoke(o, full);
 }
 
 Section("Procedural rig / skeleton / skin weights");
