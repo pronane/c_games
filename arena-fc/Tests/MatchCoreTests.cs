@@ -1367,12 +1367,36 @@ Section("Keeper distribution and receiving");
     Check("AI pass completion 72-92% (real ~80%)", pc is >= .72 and <= .92, $"{pc:P0} of {att}");
 }
 
+Section("Keeper lets a wide shot go");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 9 }); var S = e.State;
+    S.Phase = Phase.Play;
+    var gk = S.Players.First(q => q.IsKeeper && q.Team == 0);
+    var own = e.OwnGoalPos(0); float sg = MathF.Sign(own.X);
+    gk.Pos = own + new Vector3(-sg * 1f, 0, 2.6f); gk.Target = gk.Pos;
+    foreach (var q in S.Players) if (!q.IsKeeper) q.Pos = new Vector3(-sg * 20f, 0, q.Pos.Z);
+    // struck from 14 m, crossing the line 1.1 m outside the post, passing within reach of him
+    S.Ball.Owner = -1; S.Ball.HasPending = false; S.Ball.FreeTime = 1f;
+    S.Ball.Pos = own + new Vector3(-sg * 14f, .3f, 0f);
+    Vector3 crossAt = own + new Vector3(0, .5f, Mx.GoalHalfWidth + 1.1f);
+    S.Ball.Vel = Vector3.Normalize(crossAt - S.Ball.Pos) * 22f;
+    S.Ball.LastTouchSide = 1; S.Ball.PassReceiver = -1;
+    bool touched = false;
+    for (int i = 0; i < 90 && S.Phase == Phase.Play; i++)
+    {
+        S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None);
+        if (S.Ball.LastTouch == gk.Index || S.Ball.Owner == gk.Index) touched = true;
+    }
+    Check("a shot going wide is left for a goal kick (keepers used to palm 57% of all shots)", !touched,
+          $"touched={touched} phase={S.Phase}");
+}
+
 Section("Realism gate (0.1): four full AI matches stay inside football's bands");
 {
     // Per-match averages over four seeds.  The bands are deliberately wide (they
     // tighten as the AI work lands); a change that knocks the simulation out of
     // them - e.g. the old ~2 gShots or ~120 gTackles a match - fails CI.
-    double gShots = 0, gGoals = 0, gPasses = 0, gTackles = 0, gFouls = 0, gCards = 0;
+    double gShots = 0, gGoals = 0, gPasses = 0, gTackles = 0, gFouls = 0, gCards = 0, gOut = 0, gOffside = 0, gHeaders = 0;
     // Calibration samples (same definitions as Tools/skillcorner_metrics.py).
     var cLin = new List<double>(); var cLout = new List<double>(); var cWin = new List<double>(); var cWout = new List<double>();
     var cLine = new List<double>(); var cPress = new List<double>(); var cSpd = new List<double>();
@@ -1384,7 +1408,14 @@ Section("Realism gate (0.1): four full AI matches stay inside football's bands")
         while (S.Phase != Phase.FullTime)
         {
             S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None); tick++;
-            for (; evc < e.Events.Count; evc++) if (e.Events[evc].Kind == EventKind.Tackle) gTackles++;
+            for (; evc < e.Events.Count; evc++)
+            {
+                var ev = e.Events[evc];
+                if (ev.Kind == EventKind.Tackle) gTackles++;
+                else if (ev.Kind == EventKind.Out) gOut++;
+                else if (ev.Kind == EventKind.Offside) gOffside++;
+                if (ev.Text.Contains("heads")) gHeaders++;
+            }
             if (tick % 6 == 0)
                 for (int i = 0; i < S.Players.Length; i++)
                 {
@@ -1431,6 +1462,11 @@ Section("Realism gate (0.1): four full AI matches stay inside football's bands")
     Check("gate: cards per match at most 8", gCards / n <= 8, $"{gCards / n:0.0}");
     // Real: ~11% of shots are goals.  Before the keeper fixes it was ~35% (keepers
     // carried catches back over their own line, and only moved inside 13 m).
+    // 3.5: the ball really goes out (throw-ins + corners + goal kicks).  It was ~9 a
+    // match: keepers palmed every shot, wide ones included, and nothing deflected.
+    Check("gate: ball out of play at least 10 times a match", gOut / n >= 10, $"{gOut / n:0.0}");
+    Check("gate: offsides happen (at least 0.5 a match)", gOffside / n >= .5, $"{gOffside / n:0.0}");
+    Check("gate: headers happen (at least 1.5 a match)", gHeaders / n >= 1.5, $"{gHeaders / n:0.0}");
     double conv = gShots > 0 ? gGoals / gShots : 0;
     Check("gate: shot conversion 5-25% (real ~11%)", conv is >= .05 and <= .25, $"{conv:P0}");
 

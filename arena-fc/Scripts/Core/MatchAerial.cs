@@ -171,16 +171,24 @@ public sealed partial class MatchEngine
     private bool AiCross(PlayerState p)
     {
         var goal = GoalPos(p.Team);
-        if (MathF.Abs(p.Pos.Z) < Mx.HalfWidth * .5f || MathF.Abs(goal.X - p.Pos.X) > 30f) return false;
+        if (MathF.Abs(p.Pos.Z) < Mx.HalfWidth * .4f || MathF.Abs(goal.X - p.Pos.X) > 36f) return false;
+        // A real chance from here is taken, not crossed.
+        if (XgFrom(p.Pos, p.Team, false) > .05f) return false;
+        // The most advanced team-mate heading for the box.  A cross is played into an
+        // area ahead of the run, not to feet: runners rarely got into the box before
+        // the move broke down, so crosses (~3 a match) hardly happened.
         PlayerState? best = null; float bestD = 99f;
         foreach (var q in State.Players)
         {
             if (q.Team != p.Team || q.Index == p.Index || q.IsKeeper || q.SentOff) continue;
             float gd = Mx.FlatDist(q.Pos, goal);
-            if (gd < 17f && MathF.Abs(q.Pos.Z) < 14f && gd < bestD) { bestD = gd; best = q; }
+            if (gd < 30f && MathF.Abs(q.Pos.Z) < 20f && gd < bestD) { bestD = gd; best = q; }
         }
-        if (best == null || Rng.Next() > .22f) return false;
-        PassTo(p, best, 18f, false, true);
+        if (best == null || Rng.Next() > (MathF.Abs(goal.X - p.Pos.X) < 18f ? .6f : .3f)) return false;
+        int attack = SideSign(p.Team);
+        float zone = bestD < 14f ? Mx.Clamp(best.Pos.Z, -5f, 5f) : Rng.Range(-5f, 5f);
+        Vector3 spot = new(goal.X - attack * Rng.Range(6f, 12f), 0, zone);
+        PassTo(p, best, 18f, false, true, spot);
         return true;
     }
 }
