@@ -1674,11 +1674,28 @@ public sealed partial class MatchEngine
         if (shotType == ShotType.Chip) loft = .62f;                // up and over the keeper
         if (shotType == ShotType.Low) loft = .015f;                // skidding along the turf
         b.HasPending = true; b.PendingKind = 1; b.PendingFrom = p.Index;
+        // On target is judged on the line the shot is meant to finish on (a
+        // finesse shot starts outside the post and bends back in).
+        bool onTarget = IsOnTarget(b.Pos, dir * power + new Vector3(0, power * loft, 0), GoalPos(p.Team));
+        Vector3 spin;
+        if (shotType == ShotType.Finesse)
+        {
+            // 3.3: inside-foot curl.  Start the ball outside the far post and let
+            // the Magnus force bend it back: a = k * spin * v (BallPhysics), so
+            // the bend over the flight is ~0.5 a t^2.  Spin sign makes it curve
+            // towards the middle of the goal (Cross(spin, v).Z = -spin * v.X).
+            float side = target.Z >= 0f ? 1f : -1f;
+            float spinMag = 3.2f + p.Spec.Shooting * 2.4f;
+            float t = dist / MathF.Max(8f, power);
+            float bend = MathF.Min(.5f * .055f * spinMag * power * t * t * .6f, dist * .2f);
+            Vector3 outside = new(target.X, target.Y, target.Z + side * bend);
+            dir = Mx.Norm(Mx.FlatDir(b.Pos, outside) + (dir - Mx.FlatDir(b.Pos, target)));
+            spin = new Vector3(0, side * MathF.Sign(dir.X) * spinMag, 0);
+        }
+        else spin = new Vector3(0, Rng.Signed() * (1f + p.Spec.Shooting * 2.2f), 0);
         b.PendingVel = dir * power + new Vector3(0, power * loft, 0);
-        if (IsOnTarget(b.Pos, b.PendingVel, GoalPos(p.Team))) State.ShotsOnTarget[p.Team]++;
-        // Finesse shots have more curve (spin).
-        float spinAmount = shotType == ShotType.Finesse ? 3.5f : 1f + p.Spec.Shooting * 2.2f;
-        b.PendingSpin = new Vector3(0, Rng.Signed() * spinAmount, 0);
+        if (onTarget) State.ShotsOnTarget[p.Team]++;
+        b.PendingSpin = spin;
         b.PendingPos = b.Pos + new Vector3(0, .05f, 0);
         b.PendingNoPickup = .22f;
         b.PendingReceiver = -1; b.PendingTarget = target;

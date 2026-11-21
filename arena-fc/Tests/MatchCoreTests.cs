@@ -1043,6 +1043,38 @@ Section("Controls: every move reachable and doing what it says");
         if (Strike(90 + k, ShotStyle.Auto, new Vector2(0, -1f), out _).Z < 0) left++;
     }
     Check("the stick aims the shot at a post (was random)", left >= 7 && right >= 7, $"right {right}/8 left {left}/8");
+    // 3.3: a finesse shot visibly bends: it starts outside the post and curls back
+    // in towards the middle (the curl direction used to be a coin toss).
+    {
+        int bentIn = 0, inside = 0, n = 0; float maxBow = 0f;
+        for (int k = 0; k < 12; k++)
+        {
+            var m = Striker(300 + k, out var st);
+            float aimY = k % 2 == 0 ? 1f : -1f;
+            m.State.Players[11].Pos = new Vector3(m.State.Players[11].Pos.X, 0, 25f);  // their keeper out of the way
+            m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .6f, ShotStyle = ShotStyle.Finesse, Move = new Vector2(0, aimY) });
+            for (int i = 0; i < 30 && m.State.Ball.HasPending; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+            var b = m.State.Ball; var start = b.Pos; var v0 = Vector3.Normalize(new Vector3(b.Vel.X, 0, b.Vel.Z));
+            float bow = 0f; float lineX = m.GoalPos(0).X; float crossZ = float.NaN;
+            for (int i = 0; i < 120; i++)
+            {
+                m.Step(MatchEngine.Dt, PlayerCommand.None);
+                var dd = new Vector3(b.Pos.X - start.X, 0, b.Pos.Z - start.Z);
+                float lateral = dd.Z * v0.X - dd.X * v0.Z;     // signed distance off the launch line
+                if (MathF.Abs(lateral) > MathF.Abs(bow)) bow = lateral;
+                if (float.IsNaN(crossZ) && MathF.Abs(b.Pos.X) >= MathF.Abs(lineX) - .1f) crossZ = b.Pos.Z;
+                if (m.State.Phase != Phase.Play) { if (float.IsNaN(crossZ)) crossZ = b.Pos.Z; break; }
+            }
+            n++;
+            maxBow = MathF.Max(maxBow, MathF.Abs(bow));
+            // Launched towards the aimed side, it bends back towards the centre.
+            float straightZ = start.Z + v0.Z / v0.X * (lineX - start.X);
+            if (MathF.Abs(bow) > .4f && !float.IsNaN(crossZ) && MathF.Abs(crossZ) < MathF.Abs(straightZ) - .3f) bentIn++;
+            if (!float.IsNaN(crossZ) && MathF.Abs(crossZ) < Mx.GoalHalfWidth) inside++;
+        }
+        Check("finesse shots bend visibly back towards the middle (≥0.4 m off the launch line)", bentIn >= 10, $"bent {bentIn}/{n}, max bow {maxBow:0.00} m");
+        Check("finesse shots aimed at a post curl back inside it", inside >= 8, $"inside {inside}/{n}");
+    }
     var chip = Strike(101, ShotStyle.Chip, Vector2.Zero, out var chipL);
     var low = Strike(102, ShotStyle.Low, Vector2.Zero, out var lowL);
     Strike(103, ShotStyle.Finesse, Vector2.Zero, out var finL);

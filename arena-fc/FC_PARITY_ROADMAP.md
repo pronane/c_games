@@ -52,7 +52,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 ## 3. Ball physics & goal detection
 - ✅ 3.1 Running the ball into the net while dribbling is not a goal (goal check only runs on a free ball).
 - 🔧 3.2 (PR #6: landing-point prediction; AI crosses from wide) Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
-- ⬜ 3.3 Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela).
+- 🔧 3.3 (PR #15) Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela). Finesse now starts outside the post and bends back in (was a random curl direction); about 0.5–2 m of bend over 16 m. Still to do: trivela and curled passes.
 - ⬜ 3.4 Shot power: hold-to-charge bar + timed-finish second press; height from power and body shape; low driven vs dipping vs chipped finishes.
 - 🔧 3.5 (PR #7: pass error now grows with pressure, distance and pass type, with over/under-hit weight — it was a flat ~4° from skill alone; throw-ins 1.1 → 1.8/match. PR #3: wide players use the touchline, pokes/clearances/parries go out — throw-ins 0 → ~2, corners 0 → 0.1/match; still well under real rates) Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
 
