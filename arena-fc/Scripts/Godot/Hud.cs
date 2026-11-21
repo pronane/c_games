@@ -127,7 +127,12 @@ public partial class Hud : CanvasLayer
     private ProgressBar _power = null!, _stamina = null!;
     private Label? _chargeFeedback;
     private PanelContainer _pauseMenu = null!;
-    private PanelContainer _statsPanel = null!, _hintPanel = null!;
+    private PanelContainer _statsPanel = null!, _hintPanel = null!, _feedPanel = null!;
+    // 9.4 HUD footprint: the legend tucks away after the opening seconds (H/F1
+    // brings it back for good) and the commentary fades when nothing is new.
+    private float _feedAge;
+    private bool _hintPinned;
+    private string _lastFeed = "";
     private PanelContainer _fpsCounterPanel = null!;
     private Label _fpsCounterLabel = null!;
     private Control _pauseButtons = null!;
@@ -205,16 +210,16 @@ public partial class Hud : CanvasLayer
 
         // Commentary feed (bottom left)
         _feed = Ui.Lbl("", 14, Ui.Sub);
-        var feedPanel = Ui.PanelC(_feed);
-        feedPanel.Name = "CommentaryPanel";
-        Place(feedPanel, 0f, 1f, 16, -182, 430, 96);
-        root.AddChild(feedPanel);
+        _feedPanel = Ui.PanelC(_feed);
+        _feedPanel.Name = "CommentaryPanel";
+        Place(_feedPanel, 0f, 1f, 16, -170, 400, 84);
+        root.AddChild(_feedPanel);
 
         // Minimap (bottom right) - larger and higher contrast than the tiny 210px map.
-        _minimap = new Minimap { CustomMinimumSize = new Vector2(250, 164) };
+        _minimap = new Minimap { CustomMinimumSize = new Vector2(214, 140) };
         _minimapPanel = Ui.PanelC(_minimap);
         _minimapPanel.Name = "MinimapPanel";
-        Place(_minimapPanel, 1f, 1f, -292, -280, 276, 196);
+        Place(_minimapPanel, 1f, 1f, -252, -252, 236, 166);
         root.AddChild(_minimapPanel);
 
         // Bars sit above the action legend instead of obscuring it.
@@ -231,8 +236,10 @@ public partial class Hud : CanvasLayer
 
         // Compact two-line legend.  "pad R3 camera" stays advertised, but the
         // actions the player complained about are now impossible to miss.
-        _hint = Ui.Lbl("E / A SHORT PASS  ·  R / SELECT LONG BALL  ·  SPACE / X SHOOT (hold)  ·  X / LT CLOSE CONTROL  ·  SHIFT / RT SPRINT\n" +
-                       "F / B TACKLE  ·  SHIFT+F / RB+B SLIDE  ·  Q / Y THROUGH  ·  TAB / LB SWITCH  ·  C / R3 camera (4 = tactical)  ·  ESC pause  ·  H hide / F2 stats",
+        // Two lines that actually fit in two lines at 720p; every move is on the
+        // pause menu's Controls page and in Training.
+        _hint = Ui.Lbl("A/E PASS  ·  X/SPACE SHOOT  ·  Y/Q THROUGH  ·  VIEW/R LOB  ·  RT/SHIFT SPRINT  ·  LT/X DRIBBLE\n" +
+                       "B/F TACKLE  ·  RT+B SLIDE  ·  LB/TAB SWITCH  ·  R3/C CAMERA  ·  ESC PAUSE (all controls)  ·  H HIDE",
                        13, Ui.Sub);
         _hint.HorizontalAlignment = HorizontalAlignment.Center;
         _hintPanel = Ui.PanelC(_hint);
@@ -276,6 +283,7 @@ public partial class Hud : CanvasLayer
 
     public void ToggleControls()
     {
+        _hintPinned = true;
         if (_hintPanel != null) _hintPanel.Visible = !_hintPanel.Visible;
     }
 
@@ -471,13 +479,22 @@ public partial class Hud : CanvasLayer
         string home = e.ShortFor(0), away = e.ShortFor(1);
         _score.Text = $"{home}   {s.Score[0]}  -  {s.Score[1]}   {away}";
         string stoppage = e.InStoppageTime ? $"  +{e.AddedMinutesShown}'" : "";
-        _clock.Text = $"{e.ClockString()}{stoppage}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
+        // Training and shootouts have no match clock or halves (9.6).
+        _clock.Text = e.IsShootout ? "PENALTY SHOOTOUT"
+                    : e.IsTraining ? "TRAINING GROUND   ·   no clock"
+                    : $"{e.ClockString()}{stoppage}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
         _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}   |   xG {s.Xg[0]:0.00}-{s.Xg[1]:0.00}"
                     + (s.YellowCards[0] + s.YellowCards[1] + s.RedCards[0] + s.RedCards[1] > 0
                         ? $"   |   Yellow {s.YellowCards[0]}-{s.YellowCards[1]}  Red {s.RedCards[0]}-{s.RedCards[1]}"
                         : "");
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
+        if (_feed.Text != _lastFeed) { _lastFeed = _feed.Text; _feedAge = 0f; } else _feedAge += dt;
+        _feedPanel.Modulate = new Color(1, 1, 1, Math.Clamp(1.6f - _feedAge / 5f, 0f, 1f));
+        // Hide once five match minutes have been played (~20 s at normal speed);
+        // keyed to the match clock so slow frames don't keep it up longer.
+        if (!_hintPinned && s.Phase == Phase.Play && s.Clock >= 300f && _hintPanel.Visible)
+        { _hintPanel.Visible = false; _hintPinned = true; }
         _cam.Text = cameraName;
         // Phase 4: lower third timer
         if (_lowerThirdTimer > 0)

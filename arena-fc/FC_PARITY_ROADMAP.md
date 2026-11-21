@@ -104,12 +104,12 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ⬜ 8.5 Motion engine (already in `Scripts/Core/Animation/`): extend the clip database; foot planting; ball-contact sync for every new action.
 
 ## 9. Presentation & UI
-- ⬜ 9.1 Main menu panel overlaps the subtitle.
-- ⬜ 9.2 Match preview off-centre on a blank grey screen; shows “Arena Stadium” instead of the home ground.
-- ⬜ 9.3 Weather: “Rain” shown but not rendered.
-- ⬜ 9.4 HUD footprint at 720p (hint bar, commentary, minimap cover ~20% of the pitch); stats overlay wrapping.
+- ✅ 9.1 (PR #9) Main menu panel overlaps the subtitle (subtitle no longer wraps; menu anchored below it and stretched to the bottom).
+- ✅ 9.2 (PR #9) Match preview off-centre on a blank grey screen; shows “Arena Stadium” instead of the home ground (now centred on a pitch-green backdrop, home club's ground).
+- ✅ 9.3 (PR #9) Weather: “Rain” shown but not rendered. Three bugs: the preview weather never reached the match; the HUD looked for the stadium at the wrong node path (so rain *and* goal crowd celebrations never fired); the particles had no mesh. Weather is now a MatchOptions field (resets per match, affects ball drag/wind) and `--weather rain|windy|snow|fog` for QA.
+- ✅ 9.4 (PR #9) HUD footprint at 720p: legend cut to two real lines and auto-hidden after 20 s of play (H brings it back), commentary fades after ~8 s idle, minimap ~25% smaller.
 - ✅ 9.5 (PR #8: Input.Reset cleared the held state, so the Esc that opened pause read as a new press next frame and closed it) Esc / Menu pause screen and clock (verify on real hardware).
-- ⬜ 9.6 Training/shootout scoreboard shows a match clock.
+- ✅ 9.6 (PR #9) Training/shootout scoreboard shows a match clock (now “TRAINING GROUND” / “PENALTY SHOOTOUT”).
 
 ## 10. Later (modes & platform) — unchanged from the existing docs
 Career skeleton, ranked online, replay editor, browser-edition parity (the GDScript web build has its own ball physics and needs 1.1/1.2 ported).

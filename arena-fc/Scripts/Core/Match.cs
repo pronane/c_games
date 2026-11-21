@@ -60,6 +60,11 @@ public sealed class MatchOptions
     public bool TimedFinishing = true;
     /// <summary>Phase 3: weak foot penalty enabled.</summary>
     public bool WeakFoot = true;
+    /// <summary>Match weather (9.3).  Set on the engine so ball drag/wind and the
+    /// rain/snow particles agree; every new match resets it (default Clear).</summary>
+    public WeatherType Weather = WeatherType.Clear;
+    /// <summary>Wind speed in m/s for Windy/Storm; direction comes from the seed.</summary>
+    public float WindSpeed;
 }
 
 public struct PlayerCommand
@@ -246,6 +251,7 @@ public sealed partial class MatchEngine
         Options = options ?? new MatchOptions();
         Options.TeamSize = new[] { 5, 7, 11 }.Contains(Options.TeamSize) ? Options.TeamSize : 11;
         Rng = new Rng(Options.Seed);
+        ArenaFC.Core.Weather.Set(Options.Weather, Options.WindSpeed, (Options.Seed % 628) / 100f);
         _slots = Clubs.Slots(Options.TeamSize == 5 ? "1-2-1 (5s)" : Options.TeamSize == 7 ? "2-3-1 (7s)" : Options.HomeFormation, Options.TeamSize);
         var home = Options.CustomHome ?? Clubs.CreateRoster(Options.HomeClub, Options.TeamSize, Options.Seed);
         var away = Clubs.CreateRoster(Options.AwayClub, Options.TeamSize, Options.Seed + 313);
