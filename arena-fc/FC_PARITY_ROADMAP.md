@@ -27,6 +27,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 | Offsides | 0 | 1–6 |
 | Tackles won | ~120 | 25–60 |
 
+- ✅ 0.3 (PR #7) `--ai-vs-ai`, `--size N`, `--seed N` for autoplay: full 11-a-side computer-vs-computer matches in the real app.
 - ✅ 0.2 `--autoplay` QA flag (PR #3): plays a whole match / shootout / training session unattended in the real Godot app (headless, `--fixed-fps 60`), logs every 5 game-minutes and a full-time summary, then quits. A 90-minute match takes ~25 s. Verified: full match, shootout (decided early, 5 v 4 kicks), Training, Practice Arena — no script errors.
 - ⬜ 0.1 Add the soak harness to `Tests/` and fail CI when a metric leaves its band (bands widen until the AI items below land).
 
@@ -53,7 +54,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 - 🔧 3.2 (PR #6: landing-point prediction; AI crosses from wide) Lofted ground passes / clearances / crosses: real arcs, bounce and roll on landing; chips over the keeper.
 - ⬜ 3.3 Curl: spin from the shot/pass type and stick, visible Magnus curve (finesse = inside foot curl, outside-foot trivela).
 - ⬜ 3.4 Shot power: hold-to-charge bar + timed-finish second press; height from power and body shape; low driven vs dipping vs chipped finishes.
-- 🔧 3.5 (PR #3: wide players use the touchline, pokes/clearances/parries go out — throw-ins 0 → ~2, corners 0 → 0.1/match; still well under real rates) Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
+- 🔧 3.5 (PR #7: pass error now grows with pressure, distance and pass type, with over/under-hit weight — it was a flat ~4° from skill alone; throw-ins 1.1 → 1.8/match. PR #3: wide players use the touchline, pokes/clearances/parries go out — throw-ins 0 → ~2, corners 0 → 0.1/match; still well under real rates) Ball out of play really happens (throw-ins, corners, goal kicks at real rates) — follows from 1.1 + 6.x.
 
 ## 4. First touch, aerial control and heading
 - ✅ 4.1 (PR #6: foot <0.45 m, thigh/knee <0.95 m, chest <1.55 m, head above; quality from skill + pressure) Controlling a high ball: chest, thigh/knee, instep cushion — chosen by ball height and speed; quality from skill + pressure; heavy touches pop the ball away.
@@ -65,16 +66,16 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` close control/shield · `A` pass · `Y` through · `X` shoot (hold) · `VIEW` long ball · `B` tackle · `RT+B` slide · `LB` switch (with ball: call a run) · `RS` flick skills (LT+RS advanced) · `X`→`A` fake shot.
 - ✅ 5.1 Skill moves wired to input (were unreachable): RS flicks + keys 1–7.
 - ✅ 5.2 Call a team-mate's run (LB / Tab with the ball).
-- ⬜ 5.3 Defending set: `B` stand tackle / poke (foot in, no slide) · `RT+B` slide · `LT` jockey (contain, face-up, stay goal-side) · `A` (held) contain by team-mate · `B` (held) push/pull · shoulder charge = move into carrier while jockeying.
-- ⬜ 5.4 Attacking extras: `RB` knock-on (speed burst touch) · `LB`+`Y` lofted through · `RB+X` finesse/curl shot · `LB+X` chip shot · `LT+X` low driven shot · `RB` (with pass) driven pass.
-- ⬜ 5.5 Switch play: `RS` flick off the ball = switch to the player in that direction (right-stick switching).
-- ⬜ 5.6 In-game control cards: pause-menu page with the full layout, plus first-time contextual prompts (“Press B to tackle”) in matches.
+- ✅ 5.3 (PR #8: B = poke tackle (foot in, no slide), RT+B = slide, hold LT = jockey, hold A = contain (auto goal-side), sprint alongside + B = shoulder charge — jockey/contain were AI-only) Defending set: `B` stand tackle / poke (foot in, no slide) · `RT+B` slide · `LT` jockey (contain, face-up, stay goal-side) · `A` (held) contain by team-mate · `B` (held) push/pull · shoulder charge = move into carrier while jockeying.
+- ✅ 5.4 (PR #8: LT+X finesse/curl, LB+X chip, double-tap X low driven — finesse was a hidden 50–65% power window; **the stick now aims shots**, the post was random) Attacking extras: `RB` knock-on (speed burst touch) · `LB`+`Y` lofted through · `RB+X` finesse/curl shot · `LB+X` chip shot · `LT+X` low driven shot · `RB` (with pass) driven pass.
+- ✅ 5.5 (PR #8) Switch play: `RS` flick off the ball = switch to the player in that direction (right-stick switching).
+- ✅ 5.6 (PR #8: pause menu → "Controls – every move", generated from the coach's lessons; coach now 27 lessons) In-game control cards: pause-menu page with the full layout, plus first-time contextual prompts (“Press B to tackle”) in matches.
 - ⬜ 5.7 Remap screen covers every action, not just six.
 
 ## 6. Team shape & AI
 - ✅ 6.1 (PR #3) Formation discipline — the block now steps up in possession and drops compact out of it (final-third entries 4 → 14/match): units hold lines (4-4-2 back four and midfield four), shift across with the ball, step up together; compactness between lines.
 - ✅ 6.2 (PR #3) Marking — goal-side, away from the ball; chasers handle the ball: goal-side positioning, zonal by default, track runners, only the nearest one/two press; no crowding round the ball.
-- 🔧 6.3 (xG-based shooting done, PR #2: shots 1.4 → 4.8/match) AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
+- 🔧 6.3 (xG-based shooting PR #2: 1.4 → 4.8; shot bar lowered to real-football levels PR #7: → 8.4 shots, 1.7 goals/match) AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
 - 🔧 6.4 (one-challenger tackling done, PR #2: tackles 91 → 33/match) Carrier who can't be dispossessed (kept the ball ~80 s under repeated tackles) — check tackle odds vs shielding/close-control stacking.
 - 🔧 6.5 (1v1 off-the-line + smother done, PR #2) Goalkeeper: comes off the line to narrow the angle and smother 1v1s, claims crosses, sweeper behaviour on through balls; distribution.
 - ⬜ 6.6 Defensive player-switch stability (ring hops between team-mates).
@@ -107,7 +108,7 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ⬜ 9.2 Match preview off-centre on a blank grey screen; shows “Arena Stadium” instead of the home ground.
 - ⬜ 9.3 Weather: “Rain” shown but not rendered.
 - ⬜ 9.4 HUD footprint at 720p (hint bar, commentary, minimap cover ~20% of the pitch); stats overlay wrapping.
-- ⬜ 9.5 Esc / Menu pause screen and clock (verify on real hardware).
+- ✅ 9.5 (PR #8: Input.Reset cleared the held state, so the Esc that opened pause read as a new press next frame and closed it) Esc / Menu pause screen and clock (verify on real hardware).
 - ⬜ 9.6 Training/shootout scoreboard shows a match clock.
 
 ## 10. Later (modes & platform) — unchanged from the existing docs

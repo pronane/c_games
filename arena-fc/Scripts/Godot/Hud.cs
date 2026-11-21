@@ -142,6 +142,7 @@ public partial class Hud : CanvasLayer
     public override void _Ready()
     {
         var root = new Control { Name = "HudRoot", MouseFilter = Control.MouseFilterEnum.Ignore };
+        _root = root;
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(root);
 
@@ -347,6 +348,7 @@ public partial class Hud : CanvasLayer
         var v = Ui.VBox(10);
         v.AddChild(Ui.Lbl("PAUSED", 30, Ui.Accent));
         v.AddChild(Ui.Btn("Resume", () => { SetPaused(false); OnResume?.Invoke(); }, true));
+        v.AddChild(Ui.Btn("Controls - every move", ShowControlsCard));
         v.AddChild(Ui.Btn("Substitutions", ShowSubstitutions));
         v.AddChild(Ui.Btn("Match analysis", ShowAnalysis));
         v.AddChild(Ui.Btn("Photo mode", TogglePhotoMode));
@@ -365,6 +367,44 @@ public partial class Hud : CanvasLayer
         _pauseButtons = v;
     }
 
+    private Control? _controlsCard;
+    private Control? _root;
+
+    /// <summary>Every move with its Xbox-layout (EasySMX etc.) button and keyboard key,
+    /// from the same list the Training coach teaches, so the two can never disagree.</summary>
+    private void ShowControlsCard()
+    {
+        if (_pauseMenu != null) _pauseMenu.Visible = false;   // the card replaces the pause list
+        if (_controlsCard != null) { _controlsCard.Visible = true; return; }
+        var list = new VBoxContainer();
+        list.AddThemeConstantOverride("separation", 4);
+        list.AddChild(Ui.Lbl("CONTROLS", 24, Ui.Accent));
+        string section = "";
+        foreach (var l in TrainingCoach.BuildLessons())
+        {
+            if (l.Goal == LessonGoal.FreePlay) continue;
+            if (l.Section != section) { section = l.Section; list.AddChild(Ui.Lbl(section, 13, Ui.Accent)); }
+            var row = new RichTextLabel { BbcodeEnabled = true, FitContent = true, ScrollActive = false,
+                AutowrapMode = TextServer.AutowrapMode.Off, CustomMinimumSize = new Vector2(820, 22),
+                MouseFilter = Control.MouseFilterEnum.Ignore };
+            row.AddThemeFontSizeOverride("normal_font_size", 14);
+            row.AddThemeFontSizeOverride("bold_font_size", 14);
+            row.Text = $"[b]{l.Title}[/b]   " + ModeOverlay.ToBbcode(l.Pad) + "   [color=#8fb3ad]|[/color]   " + ModeOverlay.ToBbcode(l.Keys);
+            list.AddChild(row);
+        }
+        list.AddChild(Ui.Lbl("Violent conduct (straight red, VAR if unseen): hold LB+RB then B = punch, Y = headbutt; keys G / T.", 12, Ui.Sub));
+        list.AddChild(Ui.Btn("Back", () =>
+        {
+            if (_controlsCard != null) _controlsCard.Visible = false;
+            if (_pauseMenu != null) _pauseMenu.Visible = Paused;
+        }, true));
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(880, 600) };
+        scroll.AddChild(list);
+        _controlsCard = Ui.PanelC(scroll, new Color(.03f, .05f, .06f, .97f));
+        Place(_controlsCard, .5f, .5f, -450, -320, 900, 640);
+        _root?.AddChild(_controlsCard);
+    }
+
     public void SetTouch(bool on)
     {
         Input.TouchEnabled = on;
@@ -376,6 +416,7 @@ public partial class Hud : CanvasLayer
     {
         Paused = on;
         if (_pauseMenu != null) _pauseMenu.Visible = on;
+        if (!on && _controlsCard != null) _controlsCard.Visible = false;
         // The pause menu is a menu: hand control to the pad navigator and focus
         // "Resume" so A / d-pad / arrow keys work without a mouse.
         PadMenuNavigator.Active = on;

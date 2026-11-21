@@ -131,6 +131,9 @@ public partial class MatchView : Node3D
         _pending.Lob |= cmd.Lob;
         _pending.CallForBall |= cmd.CallForBall;
         _pending.Punch |= cmd.Punch;
+        _pending.Contain = cmd.Contain;
+        if (cmd.ShotStyle != ShotStyle.Auto) _pending.ShotStyle = cmd.ShotStyle;
+        if (cmd.SwitchDir.LengthSquared() > 0f) _pending.SwitchDir = cmd.SwitchDir;
         _pending.Headbutt |= cmd.Headbutt;
         if (cmd.Skill != SkillMove.None) _pending.Skill = cmd.Skill;
         if (cmd.Charge > _pending.Charge) _pending.Charge = cmd.Charge;
@@ -278,6 +281,11 @@ public partial class MatchView : Node3D
             var worldMove = right * cmd.Move.X + up * (-cmd.Move.Y);
             cmd.Move = worldMove.LengthSquared() > 1f
                 ? System.Numerics.Vector2.Normalize(worldMove) : worldMove;
+            if (cmd.SwitchDir.LengthSquared() > 0f)
+            {
+                var ws = right * cmd.SwitchDir.X + up * (-cmd.SwitchDir.Y);
+                cmd.SwitchDir = ws.LengthSquared() > 1e-4f ? System.Numerics.Vector2.Normalize(ws) : System.Numerics.Vector2.Zero;
+            }
         }
         if (Input.PausePressed)
         {
@@ -308,6 +316,7 @@ public partial class MatchView : Node3D
             // Engine.Step() uses a fixed-tick accumulator.  When a physics frame
             // produces no tick, buffer the one-shot edges until one does.
             MergePending(cmd);
+            if (_aiVsAi) { Engine.State.Controlled = -1; _pending = PlayerCommand.None; }
             int before = Engine.CurrentTick;
             var stepped = _pending;
             Engine.Step(dt, _pending);
@@ -358,6 +367,7 @@ public partial class MatchView : Node3D
     // progress every 5 game-minutes and a summary at the end, then quits.
     private readonly bool _autoplay = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--autoplay") >= 0;
     private int _autoplayBucket = -1;
+    private readonly bool _aiVsAi = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--ai-vs-ai") >= 0;
     private bool _autoplayDone;
     private double _autoplayStart = -1;
     private void AutoplayReport()

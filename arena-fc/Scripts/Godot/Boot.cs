@@ -41,6 +41,11 @@ public partial class Boot : Node3D
     {
         var args = OS.GetCmdlineUserArgs().Concat(OS.GetCmdlineArgs()).ToArray();
         bool Has(string a) => args.Any(x => x.Equals(a, StringComparison.OrdinalIgnoreCase));
+        int ArgInt(string name, int fallback)
+        {
+            int i = Array.FindIndex(args, x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int v) ? v : fallback;
+        }
         string? Value(string a)
         {
             for (int i = 0; i < args.Length; i++)
@@ -87,7 +92,9 @@ public partial class Boot : Node3D
         else if (Has("--match") || _profiling)
         {
             var view = new MatchView();
-            view.Init(new MatchOptions { TeamSize = 5, Seed = 2026, TimeSpeed = 15f }, null, () => GetTree().Quit());
+            // --size N (5/7/11) and --seed N for QA runs; defaults unchanged.
+            int size = ArgInt("--size", 5); if (size != 7 && size != 11) size = 5;
+            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f }, null, () => GetTree().Quit());
             AddChild(view);
         }
         else if (Has("--editor"))

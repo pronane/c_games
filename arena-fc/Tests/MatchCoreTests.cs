@@ -223,13 +223,18 @@ MatchEngine Playable(int owner = 0, float mateDistance = 8f)
 
 var pass = Playable();
 pass.Step(1f / 60f, new PlayerCommand { Pass = true });
+// The kick starts (wind-up) on the first tick; the pass is counted when the
+// ball leaves the foot.
 Check("short pass fires on the first tick outside the AI decision clock",
-      pass.State.Passes[0] > 0, $"passes={pass.State.Passes[0]}");
+      pass.State.Ball.HasPending && pass.State.Ball.PendingKind == 1 && pass.State.Ball.PendingReceiver >= 0,
+      $"pending={pass.State.Ball.HasPending}");
+for (int i = 0; i < 40 && pass.State.Passes[0] == 0; i++) pass.Step(1f / 60f, PlayerCommand.None);
+Check("...and is counted when the ball leaves the foot", pass.State.Passes[0] == 1, $"passes={pass.State.Passes[0]}");
 
 var through = Playable();
 through.Step(1f / 60f, new PlayerCommand { Through = true });
-Check("through ball fires on the first tick", through.State.Passes[0] > 0,
-      $"passes={through.State.Passes[0]}");
+Check("through ball fires on the first tick", through.State.Ball.HasPending && through.State.Ball.PendingKind == 1,
+      $"pending={through.State.Ball.HasPending}");
 
 var longBall = Playable(0, 18f);
 longBall.Step(1f / 60f, new PlayerCommand { Lob = true });
@@ -886,6 +891,69 @@ Section("The ball in the air");
     float maxZ = 0f;
     for (int i = 0; i < 60; i++) { d.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1) }); maxZ = MathF.Max(maxZ, D.Ball.Pos.Z); }
     Check("a steered first touch goes where the stick points", maxZ > 1.2f, $"ball z reached {maxZ:0.0}");
+}
+
+
+Section("Controls: every move reachable and doing what it says");
+{
+    MatchEngine Striker(int seed, out PlayerState st)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed });
+        var S = m.State; S.Phase = Phase.Play;
+        st = S.Players[9]; S.Controlled = st.Index; S.ControlLock = 99f;
+        foreach (var q in S.Players) if (q.Index != st.Index && !q.IsKeeper) { q.Pos = new Vector3(q.Pos.X, 0, 30f); q.Target = q.Pos; }
+        st.Pos = m.GoalPos(0) - new Vector3(m.SideSign(0) * 16f, 0, 0);
+        st.Facing = new Vector3(m.SideSign(0), 0, 0);
+        S.Ball.Owner = st.Index; S.Ball.Pos = st.Pos + st.Facing * .5f + new Vector3(0, Mx.BallRadius, 0);
+        return m;
+    }
+    Vector3 Strike(int seed, ShotStyle style, Vector2 aim, out string label)
+    {
+        var m = Striker(seed, out var st);
+        m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .6f, ShotStyle = style, Move = aim });
+        for (int i = 0; i < 30 && m.State.Ball.HasPending; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+        label = m.State.Commentary;
+        return m.State.Ball.Vel;
+    }
+    int left = 0, right = 0;
+    for (int k = 0; k < 8; k++)
+    {
+        if (Strike(80 + k, ShotStyle.Auto, new Vector2(0, 1f), out _).Z > 0) right++;
+        if (Strike(90 + k, ShotStyle.Auto, new Vector2(0, -1f), out _).Z < 0) left++;
+    }
+    Check("the stick aims the shot at a post (was random)", left >= 7 && right >= 7, $"right {right}/8 left {left}/8");
+    var chip = Strike(101, ShotStyle.Chip, Vector2.Zero, out var chipL);
+    var low = Strike(102, ShotStyle.Low, Vector2.Zero, out var lowL);
+    Strike(103, ShotStyle.Finesse, Vector2.Zero, out var finL);
+    Check("chip shot goes up and over", chip.Y > 6f && chipL.Contains("chips it"), $"vy={chip.Y:0.0} '{chipL}'");
+    Check("low driven shot stays down", low.Y < 1.2f && lowL.Contains("drills it low"), $"vy={low.Y:0.0} '{lowL}'");
+    Check("finesse shot is a curler", finL.Contains("curls it"), finL);
+
+    // Jockey and contain without the ball.
+    var d = new MatchEngine(new MatchOptions { Seed = 110, Mode = MatchEngine.ModeTraining });
+    d.SetDrill(TrainingDrill.Defend);
+    var D = d.State; var me = D.Players[D.Controlled]; var att = D.Players[d.TrainingAttacker];
+    d.Step(MatchEngine.Dt, new PlayerCommand { Dribble = true, Move = new Vector2(0, 1) });
+    Check("holding LT off the ball jockeys (faces up the carrier)", me.JockeyState > 0
+          && Vector3.Dot(me.Facing, Mx.FlatDir(me.Pos, att.Pos)) > .9f);
+    float startGap = Mx.FlatDist(me.Pos, att.Pos);
+    for (int i = 0; i < 60; i++) d.Step(MatchEngine.Dt, new PlayerCommand { Contain = true });
+    var ownGoal = d.OwnGoalPos(0);
+    Check("holding A off the ball contains: goal-side, about 2 m off", Mx.FlatDist(me.Pos, ownGoal) < Mx.FlatDist(att.Pos, ownGoal)
+          && Mx.FlatDist(me.Pos, att.Pos) < MathF.Max(4f, startGap), $"gap {Mx.FlatDist(me.Pos, att.Pos):0.0}");
+
+    // Right-stick switch picks the team-mate in that direction.
+    var w = new MatchEngine(new MatchOptions { Seed = 111 });
+    var W = w.State; W.Phase = Phase.Play; W.Ball.Owner = W.Players[15].Index;
+    var cur = W.Players[4]; W.Controlled = cur.Index; W.ControlLock = 0f;
+    var wanted = W.Players.Where(q => q.Team == 0 && q.Index != cur.Index && !q.IsKeeper).OrderByDescending(q => q.Pos.Z - cur.Pos.Z).First();
+    w.Step(MatchEngine.Dt, new PlayerCommand { SwitchDir = new Vector2(0, 1) });
+    Check("right-stick flick switches towards that side of the pitch", W.Players[W.Controlled].Pos.Z > cur.Pos.Z,
+          $"picked {W.Controlled} (z {W.Players[W.Controlled].Pos.Z:0.0} vs {cur.Pos.Z:0.0})");
+    var wire2 = ArenaFC.Core.Net.CommandDto.From(new PlayerCommand { ShotStyle = ShotStyle.Chip, Contain = true, SwitchDir = new Vector2(.6f, .8f) }).To();
+    Check("shot style / contain / switch direction go over the network",
+          wire2.ShotStyle == ShotStyle.Chip && wire2.Contain && MathF.Abs(wire2.SwitchDir.Y - .8f) < 1e-4f);
+    Check("the coach teaches every control (27 lessons)", new TrainingCoach().Lessons.Count >= 27);
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
