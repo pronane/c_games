@@ -81,6 +81,9 @@ public sealed partial class MatchEngine
         if (b.Owner < 0 || b.Owner == p.Index) return;
         var holder = State.Players[b.Owner];
         if (!holder.MustPlayBall || holder.Team == p.Team) return;
+        // The keeper facing a penalty stays on his line (EnforceRestartLaws exempts
+        // him too); walking him round the 10-yard circle pulled him off-centre.
+        if (p.IsKeeper && !IsThrowInHold(holder) && MathF.Abs(b.Pos.X) > Mx.HalfLength - 12f) return;
         float need = RestartDistance(holder) + 1.4f;
         if (Mx.FlatDist(p.Target, b.Pos) < need)
         {
@@ -101,6 +104,7 @@ public sealed partial class MatchEngine
         var S = State;
         var b = S.Ball;
         if (S.Phase != Phase.Play) { S.SetPieceTaker = -1; return; }
+        if (IsShootout) return;   // a shootout kick is only ever a goal or a miss
 
         // ---- double touch -------------------------------------------------
         if (S.SetPieceTaker >= 0)

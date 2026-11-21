@@ -296,7 +296,7 @@ public sealed partial class MatchEngine
         s.Xg = (float[])src.Xg.Clone();
         s.ShootoutKicksHome = src.ShootoutKicksHome; s.ShootoutKicksAway = src.ShootoutKicksAway;
         s.ShootoutTakerSide = src.ShootoutTakerSide; s.ShootoutShotTaken = src.ShootoutShotTaken;
-        s.ShootoutTimer = src.ShootoutTimer;
+        s.ShootoutTimer = src.ShootoutTimer; s.ShootoutDive = src.ShootoutDive;
         s.Ball = CloneBall(src.Ball);
         s.Controlled = src.Controlled; s.ControlledAway = src.ControlledAway;
         s.KickoffSide = src.KickoffSide; s.RestartSide = src.RestartSide; s.RestartId = src.RestartId;
