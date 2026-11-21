@@ -1,0 +1,61 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sport_hurl_helmet",
+ "bones": [
+  "prop"
+ ],
+ "materials": [
+  {
+   "name": "Shell",
+   "color": [
+    0.1,
+    0.1,
+    0.12
+   ]
+  },
+  {
+   "name": "Guard",
+   "color": [
+    0.78,
+    0.8,
+    0.84
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sport_hurl_helmet_mesh",
+    "f0": 0,
+    "f1": 396
+   }
+  ],
+  "source_file": "sport_hurl_helmet.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "prop": {
+   "socket": "head",
+   "offset": [
+    0,
+    -0.13,
+    0.01
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": 1.0,
+   "fit": "head"
+  }
+ },
+ "height_m": 0.18,
+ "verts": 219,
+ "tris": 396
+}

@@ -1,0 +1,76 @@
+{
+ "format": "sforge-rig",
+ "version": 1,
+ "name": "sport_hurley",
+ "bones": [
+  "prop"
+ ],
+ "materials": [
+  {
+   "name": "Handle",
+   "color": [
+    0.8,
+    0.66,
+    0.44
+   ]
+  },
+  {
+   "name": "Grip",
+   "color": [
+    0.12,
+    0.12,
+    0.13
+   ]
+  },
+  {
+   "name": "Bas",
+   "color": [
+    0.8,
+    0.66,
+    0.44
+   ]
+  },
+  {
+   "name": "Band",
+   "color": [
+    0.62,
+    0.64,
+    0.68
+   ]
+  }
+ ],
+ "clips": [],
+ "meta": {
+  "mesh_parts": [
+   {
+    "name": "sport_hurley_mesh",
+    "f0": 0,
+    "f1": 88
+   }
+  ],
+  "source_file": "sport_hurley.glb",
+  "import_cleanup": {
+   "dedupe": {
+    "removed": [],
+    "parts": 1
+   }
+  },
+  "prop": {
+   "socket": "hand_r",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    60,
+    0,
+    0
+   ],
+   "scale": 1.0
+  }
+ },
+ "height_m": 0.86,
+ "verts": 52,
+ "tris": 88
+}

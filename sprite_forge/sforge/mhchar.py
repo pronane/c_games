@@ -231,7 +231,7 @@ def engine_images(images):
     return {k: (hard_alpha(v) if k.startswith("hair_") else v) for k, v in images.items()}
 
 
-def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_res=1024):
+def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_res=1024, kit_style="football"):
     """-> Character with body, kit garments, hair, brows, lashes, eyes (all on the template's skeleton)"""
     _LIB_BASE[0] = lib.base()
     Vb, Fb, uvb = lib.base()
@@ -245,7 +245,7 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
     Pb = G[tm.base_of]
     Jb, Wb = tm.J.astype(np.uint16), tm.W.astype(np.float32)
     covered = np.zeros(len(tm.F), bool)
-    for gname, faces, thick in garment_faces(tm, Pb, kit_regions):
+    for gname, faces, thick in garment_faces(tm, Pb, kit_regions, kit_style):
         sub = tm.F[faces]
         wid = weld_ids(Pb)
         rim = np.unique(wid[boundary_edges_welded(Pb, sub)])
@@ -255,7 +255,7 @@ def build(tm: Template, ap, lib: Library, name="player", kit_regions=None, skin_
     # ---- skin texture (MakeHuman skin + facial hair / stubble / scalp paint)
     ch.images["skin"] = _png(paint_skin(tm, ap, lib, Vm, skin_res))
     # ---- kit garments from the body surface
-    for gname, faces, thick in garment_faces(tm, Pb, kit_regions):
+    for gname, faces, thick in garment_faces(tm, Pb, kit_regions, kit_style):
         V, F, UV, J, W = _solidify(Pb, tm.F[faces], tm.UV, Jb, Wb, thick)
         ch.parts.append(Part("%s_%s" % (name, gname), "kit", V, F, kit_uv(gname, UV), J, W, normals(V, F), image="kit"))
     # ---- fitted assets
@@ -397,8 +397,9 @@ KIT = {   # name: thickness (m)
 }
 
 
-def garment_faces(tm: Template, P, regions=None):
-    """faces of the body that each garment covers (by dominant bone and position along the bone)"""
+def garment_faces(tm: Template, P, regions=None, style="football"):
+    """faces of the body that each garment covers (by dominant bone and position along the bone). v11.26: style
+    "guernsey" is sleeveless (the arms stay bare skin); see footballer.KIT_STYLES"""
     jn = {n: i for i, n in enumerate(tm.joints)}
     Fc = P[tm.F].mean(1)
     W = np.zeros((len(P), len(tm.joints))); np.add.at(W, (np.arange(len(P))[:, None].repeat(4, 1), tm.J.astype(np.int64)), tm.W)
@@ -419,6 +420,9 @@ def garment_faces(tm: Template, P, regions=None):
     arm = np.zeros(len(Fc), bool)
     for s in "lr":
         arm |= (nm == "upperarm_" + s) & (along("upperarm_" + s, "lowerarm_" + s) < 0.52)
+    if style == "guernsey":
+        arm[:] = False
+        torso &= ~(np.isin(nm, ["clavicle_l", "clavicle_r"]) & (np.abs(Fc[:, 0]) > 0.17))   # cut away at the shoulder
     out.append(("jersey", np.nonzero(torso | neck | arm)[0], KIT["jersey"]))
     leg = np.zeros(len(Fc), bool)
     for s in "lr":

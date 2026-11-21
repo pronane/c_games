@@ -66,7 +66,9 @@ def roster_checks():
         if g in RO.TEAM_GAMES:
             sides = sorted({p["side"] for p in ps})
             keepers = [p for p in ps if p["type"] == "keeper"]
-            if sides != ["Away", "Home"] or len(keepers) != 2 or any(p["kit"] != "gk" for p in keepers):
+            # v11.26: rugby and Aussie rules have no goalkeeper (their squads in roster.SQUADS say so)
+            want = 0 if g in RO.SQUADS and not any(t == "keeper" for t, _ in RO.SQUADS[g]) else 2
+            if sides != ["Away", "Home"] or len(keepers) != want or any(p["kit"] != "gk" for p in keepers):
                 bad.append("%s: sides %s, keepers %s" % (g, sides, [(p["name"], p["kit"]) for p in keepers]))
             if any(p["kit"] == "gk" for p in ps if p["type"] != "keeper"):
                 bad.append(g + ": an outfield player in the keeper's kit")

@@ -1,0 +1,505 @@
+{
+ "name": "rugby",
+ "label": "Rugby",
+ "description": "Rugby union / league: carry, spin pass and offload, kicks from hand, drop goals and place kicks, the lineout, tackles and hand-offs, scrum, ruck and the try.",
+ "camera": "side",
+ "prop": "none",
+ "props": [
+  "ball"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "figure": 0.58,
+ "yaw": 90,
+ "notes": "v11.26. The scrum and ruck are drawn as one player's body position; a game puts eight together. The rugby collar is a look-builder kit: --kit sf_<kit>#<number>@rugby.",
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "idle_athletic"
+   ]
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "sprint",
+   "library": "run",
+   "frames": 8,
+   "fps": 14,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     4
+    ]
+   },
+   "desc": "",
+   "own": [
+    "sprint"
+   ]
+  },
+  {
+   "name": "carry",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": "ball in two hands",
+   "own": [
+    "carry"
+   ]
+  },
+  {
+   "name": "pass",
+   "library": "pass",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 4,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "spin pass across the body",
+   "own": [
+    "rugby_pass"
+   ]
+  },
+  {
+   "name": "offload",
+   "library": "pass",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 3,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "hand_pass"
+   ]
+  },
+  {
+   "name": "kick",
+   "library": "kick",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "kick from hand",
+   "own": [
+    "high_kick_pass"
+   ]
+  },
+  {
+   "name": "drop_goal",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "shoot_point"
+   ]
+  },
+  {
+   "name": "place_kick",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "shoot_goal"
+   ]
+  },
+  {
+   "name": "catch",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "high ball",
+   "own": [
+    "catch_aerial"
+   ]
+  },
+  {
+   "name": "lineout",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the jumper at the top of the lineout",
+   "own": [
+    "lineout_lift"
+   ]
+  },
+  {
+   "name": "tackle",
+   "library": "tackle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "tackle"
+   ]
+  },
+  {
+   "name": "hand_off",
+   "library": "punch",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "rugby_hand_off"
+   ]
+  },
+  {
+   "name": "scrum",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Set piece",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "bound and pushing",
+   "own": [
+    "rugby_scrum"
+   ]
+  },
+  {
+   "name": "ruck",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 6,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "rugby_ruck"
+   ]
+  },
+  {
+   "name": "try",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Scoring",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "diving to ground the ball",
+   "own": [
+    "rugby_try"
+   ]
+  },
+  {
+   "name": "pick_up",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "pick_up_ground"
+   ]
+  },
+  {
+   "name": "sidestep",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Evasion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     5
+    ]
+   },
+   "desc": "",
+   "own": [
+    "sidestep"
+   ]
+  },
+  {
+   "name": "fall",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "get_up",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "get_up"
+   ]
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "celebrate",
+   "library": "wave",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "victory"
+   ]
+  }
+ ]
+}

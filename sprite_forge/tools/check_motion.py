@@ -234,25 +234,32 @@ def load_lib(path):
 
 def pack_clips(pack, library):
     """(move, clip path or "procedural:<motion>", record) for each move of a game pack: the clip the build would pick
-    (its prefer list, then its library name, from your library, then the starter), or the procedural motion the
-    build falls back to when there is no clip"""
-    from sforge import gamepack as GP, motionlib as ML
+    (its prefer list, then its own motion, then its library name, from your library, then the starter), or the
+    procedural motion the build falls back to when there is no clip. v11.26: asks the build's own resolver
+    (sforge.motionset), so a pack's "own" motion (hurl_strike, rugby_try) is what is checked and shown."""
+    from sforge import gamepack as GP, motionlib as ML, motionset as MS
+    from sforge.build import BuildConfig
     from sforge.motions import find_motion
     lib = ML.MotionLibrary(library) if library else ML.MotionLibrary()
+    cfg = BuildConfig()
+    if library:
+        cfg.motion_library = library
+    GP.apply(cfg, pack)
+    MS.apply_cfg(cfg)
     out = []
-    for m in GP.load(pack)["moves"]:
-        for n in list(m["prefer"]) + [m["library"]]:
-            if lib.has(n):
-                p = lib.path_of(n)
-                out.append((m["name"], p, json.load(open(p))))
-                break
-        else:
-            src = find_motion(m["name"])
-            if src is not None:
-                keys = [(float(t), dict(q)) for t, q in src.keys] if src.keys else \
-                    [(i / 8.0, dict(src.sample(i / 8.0)[0])) for i in range(9)]
-                out.append((m["name"], "procedural:" + src.name,
-                            dict(name=m["name"], keys=keys, loop=bool(src.loop), duration=1.0 if src.loop else 0.8)))
+    for m in cfg.moves:
+        cid = MS.clip_id(m)
+        kind, _, nm = cid.partition(":")
+        if kind == "lib" and lib.has(nm):
+            p = lib.path_of(nm)
+            out.append((m.name, p, json.load(open(p))))
+            continue
+        src = find_motion(nm) or find_motion(m.name)
+        if src is not None:
+            keys = [(float(t), dict(q)) for t, q in src.keys] if src.keys else \
+                [(i / 8.0, dict(src.sample(i / 8.0)[0])) for i in range(9)]
+            out.append((m.name, "procedural:" + src.name,
+                        dict(name=m.name, keys=keys, loop=bool(src.loop), duration=1.0 if src.loop else 0.8)))
     return out
 
 

@@ -1,0 +1,468 @@
+{
+ "name": "hurling",
+ "label": "Hurling",
+ "description": "Hurling and camogie: the player holds a hurley (cam\u00e1n) and wears a helmet in every move. Strikes from the hand and off the ground, the solo with the sliotar on the bas, the lift, the catch, hooks and blocks.",
+ "camera": "three_quarter",
+ "prop": "none",
+ "props": [
+  "sliotar",
+  "hurley"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "figure": 0.56,
+ "yaw": 65,
+ "equip": [
+  "sport_hurley@hand_r",
+  "sport_hurl_helmet@head"
+ ],
+ "notes": "v11.26. \"equip\" puts library/props/sport_hurley in the right hand and sport_hurl_helmet on the head (CC0 props made by tools/make_sport_props.py); --attach replaces them and --no-equip leaves them off. A mannequin build draws the mannequin as a library rig so the props can be attached. ball_contact is the frame the bas meets the sliotar.",
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "idle_athletic"
+   ]
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "sprint",
+   "library": "run",
+   "frames": 8,
+   "fps": 14,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     4
+    ]
+   },
+   "desc": "",
+   "own": [
+    "sprint"
+   ]
+  },
+  {
+   "name": "solo",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": "running with the sliotar balanced on the bas",
+   "own": [
+    "hurl_solo"
+   ]
+  },
+  {
+   "name": "strike",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "strike from the hand",
+   "own": [
+    "hurl_strike"
+   ]
+  },
+  {
+   "name": "ground_strike",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "ground stroke, the ball on the grass",
+   "own": [
+    "hurl_ground"
+   ]
+  },
+  {
+   "name": "puckout",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the goalkeeper's long puck-out",
+   "own": [
+    "hurl_puckout"
+   ]
+  },
+  {
+   "name": "free",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "a free: lift and strike in one move",
+   "own": [
+    "hurl_free"
+   ]
+  },
+  {
+   "name": "lift",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "lift the sliotar off the ground with the bas",
+   "own": [
+    "hurl_lift"
+   ]
+  },
+  {
+   "name": "catch",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "overhead catch, the hurley raised to protect the hand",
+   "own": [
+    "hurl_catch"
+   ]
+  },
+  {
+   "name": "hand_pass",
+   "library": "pass",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 3,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "hand_pass"
+   ]
+  },
+  {
+   "name": "hook",
+   "library": "tackle",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "hook the opponent's swing from behind",
+   "own": [
+    "hurl_hook"
+   ]
+  },
+  {
+   "name": "block",
+   "library": "block",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "block down the strike in front",
+   "own": [
+    "hurl_block"
+   ]
+  },
+  {
+   "name": "shoulder",
+   "library": "tackle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "tackle"
+   ]
+  },
+  {
+   "name": "sidestep",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Evasion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     5
+    ]
+   },
+   "desc": "",
+   "own": [
+    "sidestep"
+   ]
+  },
+  {
+   "name": "fall",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "get_up",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "get_up"
+   ]
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "celebrate_point",
+   "library": "wave",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "celebrate_point"
+   ]
+  },
+  {
+   "name": "celebrate_goal",
+   "library": "wave",
+   "frames": 10,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "celebrate_goal"
+   ]
+  }
+ ]
+}

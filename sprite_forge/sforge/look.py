@@ -103,7 +103,9 @@ class Builder:
 
     def character(self, ap, kit="home", skin_res=1024, name="player"):
         from . import mhchar, mhrender
-        ch = mhchar.build(self.tm, ap, self.lib, name=name, skin_res=skin_res)
+        from . import footballer as FB
+        ch = mhchar.build(self.tm, ap, self.lib, name=name, skin_res=skin_res,
+                          kit_style=FB.kit_style(kit) if kit.startswith("sf_") else "football")
         return mhrender.with_kit(ch, self.kit(kit))
 
     def preview(self, ch, size=420, yaw=25.0):

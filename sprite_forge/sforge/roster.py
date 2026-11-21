@@ -31,7 +31,20 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEAM_GAMES = {"soccer": 5, "gaelic": 5, "basketball": 5}
+TEAM_GAMES = {"soccer": 5, "gaelic": 5, "basketball": 5, "hurling": 5, "aussie_rules": 5, "rugby": 5}
+# v11.26: the positions a side is picked from (type, role) - the first n of them; games not listed: keeper + OUTFIELD
+SQUADS = {
+    "hurling": [("keeper", "Goalkeeper"), ("heavy_brawler", "Full back"), ("playmaker", "Midfield"),
+                ("quick_striker", "Corner forward"), ("balanced", "Centre back"), ("balanced", "Full forward"),
+                ("quick_striker", "Wing forward")],
+    "aussie_rules": [("big_boss", "Ruckman"), ("heavy_brawler", "Key defender"), ("playmaker", "Midfielder"),
+                     ("quick_striker", "Small forward"), ("balanced", "Key forward"), ("balanced", "Half back"),
+                     ("quick_striker", "Wingman")],
+    "rugby": [("heavy_brawler", "Prop"), ("big_boss", "Lock"), ("balanced", "Flanker"), ("playmaker", "Fly-half"),
+              ("quick_striker", "Winger"), ("heavy_brawler", "Hooker"), ("small_agile", "Scrum-half")],
+}
+# v11.26: the cut of each game's kit on a look (footballer.KIT_STYLES); the hurling helmet comes from the pack's equip
+KIT_STYLE = {"rugby": "rugby", "aussie_rules": "guernsey"}
 FIGHT_GAMES = ("boxing", "fighting", "wrestling", "beat_em_up")
 FIGHTER_ORDER = ["balanced", "quick_striker", "heavy_brawler", "small_agile", "big_boss"]
 FIGHTER_KITS = ["red", "blue", "black", "home", "away"]
@@ -98,13 +111,18 @@ def default_roster(game, size=0):
         n = size or TEAM_GAMES[game]
         for side, kit, g0 in (("Home", "home", 1.0), ("Away", "away", 0.0)):
             for i in range(n):
-                t = "keeper" if i == 0 else OUTFIELD[(i - 1) % len(OUTFIELD)]
+                sq = SQUADS.get(game)
+                if sq:
+                    t, role = sq[i % len(sq)]
+                else:
+                    t = "keeper" if i == 0 else OUTFIELD[(i - 1) % len(OUTFIELD)]
+                    role = "Keeper" if t == "keeper" else t.replace("_", " ").title()
                 body = dict(BODY[t]); body["gender"] = g0 if i % 2 == 0 else 1.0 - g0
                 body["height"] = round(min(1.0, body["height"] + 0.07 * ((i * 3) % 5 - 2)), 2)
                 players.append(dict(name="%s_%d" % (side.lower(), i + 1), side=side, number=i + 1,
                                     kit="gk" if t == "keeper" else kit, type=t, body=body,
                                     look=look_for(i, t, salt=0 if side == "Home" else 3),
-                                    role="Keeper" if t == "keeper" else t.replace("_", " ").title()))
+                                    role=role))
     elif game in FIGHT_GAMES:
         n = size or 5
         for i in range(n):
@@ -162,11 +180,15 @@ def validate(roster):
     return bad
 
 
-def look_argv(p, glb_path):
-    """a player with a look -> the `forge.py look` command line that makes their character GLB in their kit"""
+def look_argv(p, glb_path, game=None):
+    """a player with a look -> the `forge.py look` command line that makes their character GLB in their kit
+    (v11.26: in the game's cut - a rugby collar, a sleeveless guernsey; a player's own "kit_style" wins)"""
     kit = "sf_%s" % (p.get("kit") or "home")
     if p.get("number") is not None:
         kit += "#%d" % int(p["number"])
+    style = p.get("kit_style") or KIT_STYLE.get(game or "")
+    if style and style != "football":
+        kit += "@" + style
     sets = ",".join("%s=%s" % (k, v) for k, v in p["look"].items())
     return ["look", "--set", sets, "--kit", kit, "--glb", glb_path]
 
@@ -221,7 +243,7 @@ def build(roster, out, glb=True, library="", log=print, run=None, hd=False):
         if use_looks and p.get("look") and not p.get("rig"):
             look_glb = os.path.join(out, "_looks", p["name"] + ".glb")
             os.makedirs(os.path.dirname(look_glb), exist_ok=True)
-            la = look_argv(p, look_glb)
+            la = look_argv(p, look_glb, game)
             r = run(la) if run is not None else subprocess.run([sys.executable, os.path.join(HERE, "forge.py")] + la,
                                                                 cwd=HERE, capture_output=True, text=True)
             rc = r if isinstance(r, int) else r.returncode
