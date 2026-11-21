@@ -278,8 +278,9 @@ def main():
           '"chest_control"' in match_cs and '"trap"' in match_cs and '"header"' in match_cs)
     check("C# scales dribble lead by speed",
           "Lerp(0.15f, 0.60f" in match_cs)
+    # (#207: hot or stretching saves are parried; shots at him at a sane pace are held)
     check("C# parries hot shots",
-          '"parry"' in match_cs and "spd > 18f" in match_cs)
+          '"parry"' in match_cs and "catchChance" in match_cs)
     check("desktop selects turns by turn rate",
           '"soccer_turn"' in soccer_cs and "turnRate" in soccer_cs)
     check("desktop directional clips", '"soccer_strafe_l"' in soccer_cs and '"soccer_backpedal"' in soccer_cs)
