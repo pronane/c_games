@@ -1308,6 +1308,47 @@ Section("Controls: every move reachable and doing what it says");
     Check("a new match resets the weather (no rain leaking into the next game)", !Weather.Raining && Weather.WindX == 0f);
 }
 
+Section("Keeper distribution and receiving");
+{
+    // A keeper who catches it on his line steps out and plays it: he used to walk
+    // back onto the line holding it and carry it over (an own goal).
+    var e = new MatchEngine(new MatchOptions { Seed = 9 }); var S = e.State;
+    S.Phase = Phase.Play;
+    var gk = S.Players.First(q => q.IsKeeper && q.Team == 0);
+    var own = e.OwnGoalPos(0);
+    gk.Pos = own + new Vector3(MathF.Sign(-own.X) * .5f, 0, 1f);
+    S.Ball.Owner = gk.Index; S.Ball.HasPending = false; S.Ball.Pos = gk.Pos;
+    int[] before = { S.Score[0], S.Score[1] };
+    bool released = false;
+    for (int i = 0; i < 60 * 6 && !released; i++)
+    {
+        S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None);
+        if (S.Ball.Owner != gk.Index) released = true;
+    }
+    Check("a keeper with the ball in hand distributes it", released);
+    Check("... without carrying it over his own line", S.Score[1] == before[1] && S.Score[0] == before[0], $"score {S.Score[0]}-{S.Score[1]}");
+
+    // AI pass completion over released passes (real ~80%; ours was 65% because a
+    // receiver re-decided mid-trap and ran off while the ball rolled past).
+    int att = 0, ok = 0;
+    foreach (int seed in new[] { 31, 32 })
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed }); var M = m.State;
+        int q0 = M.Passes[0], q1 = M.Passes[1], team = -1;
+        while (M.Phase != Phase.FullTime)
+        {
+            M.Controlled = -1; m.Step(MatchEngine.Dt, PlayerCommand.None);
+            int t = M.Passes[0] > q0 ? 0 : M.Passes[1] > q1 ? 1 : -1; q0 = M.Passes[0]; q1 = M.Passes[1];
+            if (t >= 0 && M.Ball.PassReceiver >= 0 && M.Phase == Phase.Play) { team = t; continue; }
+            if (team < 0) continue;
+            if (M.Phase != Phase.Play) { att++; team = -1; continue; }
+            if (M.Ball.Owner >= 0) { att++; if (M.Players[M.Ball.Owner].Team == team) ok++; team = -1; }
+        }
+    }
+    double pc = att > 0 ? ok / (double)att : 0;
+    Check("AI pass completion 72-92% (real ~80%)", pc is >= .72 and <= .92, $"{pc:P0} of {att}");
+}
+
 Section("Realism gate (0.1): four full AI matches stay inside football's bands");
 {
     // Per-match averages over four seeds.  The bands are deliberately wide (they
@@ -1370,6 +1411,10 @@ Section("Realism gate (0.1): four full AI matches stay inside football's bands")
     Check("gate: tackles per match 20-130", gTackles / n is >= 20 and <= 130, $"{gTackles / n:0}");
     Check("gate: fouls per match 1-30", gFouls / n is >= 1 and <= 30, $"{gFouls / n:0.0}");
     Check("gate: cards per match at most 8", gCards / n <= 8, $"{gCards / n:0.0}");
+    // Real: ~11% of shots are goals.  Before the keeper fixes it was ~35% (keepers
+    // carried catches back over their own line, and only moved inside 13 m).
+    double conv = gShots > 0 ? gGoals / gShots : 0;
+    Check("gate: shot conversion 5-25% (real ~11%)", conv is >= .05 and <= .25, $"{conv:P0}");
 
     // Calibration gate: real tracking (SkillCorner open data, A-League; see
     // Data/calibration).  Real: length 34/30, width 43/34, back line 21 m from the
