@@ -657,6 +657,48 @@ Check("shootout: no open-play passing", so.State.Passes[0] + so.State.Passes[1] 
           $"moved {Mx.FlatDist(M.Ball.Pos, spot):0.0} m, phase {M.Phase}");
 }
 
+// 7.3: penalties in a match use the shootout model.
+{
+    MatchEngine Pen(int seed, int side)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed });
+        var S = m.State;
+        // A penalty for `side` at the goal it attacks.
+        S.Phase = Phase.Penalty; S.RestartSide = side; S.RestartPos = new Vector3(m.SideSign(side) * (Mx.HalfLength - 11f), 0, 0); S.PhaseTimer = .01f;
+        m.Step(MatchEngine.Dt, PlayerCommand.None);
+        return m;
+    }
+    // Ours: we take it (control on the taker), nothing is struck for us.
+    var a = Pen(301, 0); var A = a.State;
+    for (int i = 0; i < 120; i++) a.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("match penalty for you: you take it (control on the taker, no auto-shot)",
+          A.Ball.Owner == A.Controlled && A.Players[A.Controlled].MustPlayBall && A.Shots[0] == 0, $"owner {A.Ball.Owner} ctl {A.Controlled} shots {A.Shots[0]}");
+    a.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .7f, Move = new Vector2(0, .6f) });
+    for (int i = 0; i < 40; i++) a.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("match penalty for you: shoot strikes it", A.Shots[0] == 1, $"shots {A.Shots[0]}");
+
+    // Theirs: a run-up, and your dive decides it.
+    int same = 0, sameSaved = 0, other = 0, otherSaved = 0, waited = 0;
+    for (int seed = 400; seed < 460; seed++)
+    {
+        var m = Pen(seed, 1); var M = m.State; int pre = 0; bool struck = false; float z = 0f; int ev0 = m.Events.Count;
+        for (int i = 0; i < 300; i++)
+        {
+            if (M.Shots[1] == 0) pre++;
+            m.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1f) });
+            if (!struck && M.Ball.Owner < 0 && M.Ball.Vel.LengthSquared() > 100f) { struck = true; z = M.Ball.Vel.Z; }
+            if (struck && (M.Phase != Phase.Play || (M.Ball.Owner >= 0 && M.Players[M.Ball.Owner].IsKeeper))) break;
+        }
+        if (pre > 60) waited++;
+        // A keeper save (not a miss: those happen either way).
+        bool saved = m.Events.Skip(ev0).Any(ev => ev.Kind == EventKind.Save);
+        if (z > .5f) { same++; if (saved) sameSaved++; } else if (z < -.5f) { other++; if (saved) otherSaved++; }
+    }
+    Check("computer's match penalty has a run-up so you can dive", waited > 40, $"waited {waited}/60");
+    Check("match penalty: diving the right way saves more", same >= 8 && other >= 8 && (float)sameSaved / same > (float)otherSaved / other + .2f,
+          $"right {sameSaved}/{same} wrong {otherSaved}/{other}");
+}
+
 Section("Training ground (Mode 2)");
 var tr = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeTraining });
 Check("training starts in play with the ball at your feet",
