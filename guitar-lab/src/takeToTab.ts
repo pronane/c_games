@@ -1,13 +1,18 @@
 // Your take to tab: put the notes heard in a riff on a bar grid, and write plain-text tab.
 
-export type HeardNote = { time: number; duration: number; midi: number };
+export type HeardNote = { time: number; duration: number; midi: number; string_probs?: number[] };
 export type FrettedNote = HeardNote & { string?: number | null; fret?: number | null };
 
 /** Move notes so bar 1, beat 1 is at 0 s. Notes a little before it (a pickup played early) are kept at 0. */
 export function onGrid(notes: HeardNote[], firstBeat: number, slack = 0.08): HeardNote[] {
   return notes
     .filter((n) => n.time >= firstBeat - slack)
-    .map((n) => ({ time: Math.max(0, +(n.time - firstBeat).toFixed(4)), duration: Math.max(0.03, n.duration), midi: n.midi }));
+    .map((n) => ({
+      time: Math.max(0, +(n.time - firstBeat).toFixed(4)),
+      duration: Math.max(0.03, n.duration),
+      midi: n.midi,
+      ...(n.string_probs ? { string_probs: n.string_probs } : {}),
+    }));
 }
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];

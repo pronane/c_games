@@ -158,6 +158,7 @@ export default function RiffToTab({ settings }: { settings: InstrumentSettings }
       body.set("take", encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate), "take.wav");
       body.set("consent", String(consent));
       body.set("transcriber", transcriber);
+      body.set("standard_tuning", String(profile.id === "guitar" && settings.tuning === "standard" && settings.capo === 0));
       const result = await api<Heard>("/api/takes/transcribe", { method: "POST", body });
       if (!result.notes.length) throw Error("No notes were heard. Check the input level and record again.");
       setHeard(result);

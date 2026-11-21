@@ -31,3 +31,8 @@ test("every root and common quality has a shape with its root and third", () => 
       assert.ok(pcs(root + q).has(parseChord(root + q)!.root), root + q);
     }
 });
+
+test("diminished and augmented shapes", () => {
+  assert.deepEqual(pcs("Bdim"), new Set([11, 2, 5]));
+  assert.deepEqual(pcs("Caug"), new Set([0, 4, 8]));
+});

@@ -6,8 +6,10 @@ the same chord templates the app uses. The app's chords come from the same funct
 breakdown uses (song_analysis.chords_per_beat) on beat-synchronous chroma from
 
 - ``mix``: the whole recording,
-- ``harmonic``: the separated guitar + other stems (what the app uses: everything but drums and
-  vocals; bass and piano are not saved for these songs, so this is close, not identical).
+- ``harmonic``: the separated guitar + other stems (what the app used: everything but drums and
+  vocals; bass and piano are not saved for these songs, so this is close, not identical),
+- ``model``: the trained chord model (server/chord_model.py) on the whole mix, what the app uses
+  when the model is installed.
 
 Scored the usual way for chord recognition (MIREX "majmin"): root and major/minor must match;
 7ths count as their triad, power chords and sus chords as major; beats where the tab has no
@@ -24,6 +26,7 @@ Result (21 Nov 2026, 5 tabbed rock songs, 1,508 beats): majmin 0.53 / root 0.59 
 bass chroma, CENS, stickier smoothing and no key prior were tried; none beat the current
 settings (stickier smoothing and bass chroma were worse). The tab-derived reference is itself
 noisy where a part is a riff or arpeggio rather than a strummed chord.
+With the trained model (BTC): 0.60 / 0.70 on the mix.
 """
 from __future__ import annotations
 
@@ -116,15 +119,17 @@ def main(manifest):
         keep = (beats >= lo) & (beats < hi)
         ref = tab_chords(placed, beats, len(mix) / SR)
         row = {'song': s['name']}
-        for name, y in (('mix', mix), ('harmonic', harmonic)):
-            pred = app_chords(y, beats)
+        from server import chord_model
+        variants = [('mix', mix), ('harmonic', harmonic)]+([('model', mix)] if chord_model.status()[0] else [])
+        for name, y in variants:
+            pred = chord_model.chords_per_beat(y, beats, len(mix)/SR, SR) if name == 'model' else app_chords(y, beats)
             got, n = score([p for p, k in zip(pred, keep) if k], [r for r, k in zip(ref, keep) if k])
             row[name] = got
             row['beats'] = n
         rows.append(row)
         print(json.dumps(row), flush=True)
     summary = {}
-    for name in ('mix', 'harmonic'):
+    for name in ('mix', 'harmonic', 'model'):
         scored = [r for r in rows if r.get(name)]
         total = sum(r['beats'] for r in scored)
         summary[name] = {k: round(sum(r[name][k] * r['beats'] for r in scored) / total, 3) for k in ('majmin', 'root')} if total else None
