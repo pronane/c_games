@@ -1,0 +1,6 @@
+# H.1: build outputs and the Godot editor cache are regenerated on every build;
+# committing them made every PR touch dozens of binaries.
+.godot/
+**/bin/
+**/obj/
+*.log

@@ -1,5 +1,0 @@
-D:\c_games\arena-fc\Server\obj\Release\net9.0\ArenaFC.Server.GeneratedMSBuildEditorConfig.editorconfig
-D:\c_games\arena-fc\Server\obj\Release\net9.0\ArenaFC.Server.AssemblyInfoInputs.cache
-D:\c_games\arena-fc\Server\obj\Release\net9.0\ArenaFC.Server.AssemblyInfo.cs
-D:\c_games\arena-fc\Server\obj\Release\net9.0\ArenaFC.Server.csproj.CoreCompileInputs.cache
-D:\c_games\arena-fc\Server\obj\Release\net9.0\ArenaFC.Server.sourcelink.json
