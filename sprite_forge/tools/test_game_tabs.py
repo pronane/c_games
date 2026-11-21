@@ -19,9 +19,12 @@ With a window:
   8 the Studio opens with a Games tab listing every game
   9 each game's page fills: header, moves table, the right character settings; every move plays in the preview
  10 Build from the tab streams the log, then shows the sheet preview and colours the moves by their QA
- 11 Shot list from the tab prints what to film for that game"""
+ 11 Shot list from the tab prints what to film for that game
+ 12 (v11.20) the preview plays the built character's own sprites, frame by frame
+ 13 (v11.20) Build the team / cast from the tab: a roster with a select screen; Export project makes the engine project"""
 from __future__ import annotations
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -194,6 +197,38 @@ def window_checks(GG, packs):
         root.update()
         text = g.log.get("1.0", "end")
         rec("11 Shot list from the tab prints what to film", "kick" in text and len(text.splitlines()) > 5, text[:200].replace("\n", " | "))
+
+        # 12: the built character's own sprites in the preview
+        g.tree.selection_set("kick"); g.pick(); g.mode.set("character")
+        seen = set()
+        for t in (0.05, 0.35, 0.65, 0.95):
+            g.t.set(t); g.draw(); root.update()
+            if getattr(g, "_spr", None) is not None:
+                seen.add(int(t * g._strip("kick")[3]))
+        st = g._strip("kick")
+        rec("12 the preview plays the built character's own sprites", st is not None and len(seen) >= 3, "strip %s, frames %s" % (st and st[1:], seen))
+        g.mode.set("figure")
+
+        # 13: a roster from the tab, then an engine project from it
+        g.games.selection_clear(0, tk.END); g.games.selection_set(packs.index("boxing")); g.choose()
+        g.size.set(2)
+        g.roster()
+        t0 = time.time()
+        while g._proc is not None and time.time() - t0 < 600:
+            root.update(); time.sleep(0.05)
+        root.update()
+        rj = os.path.join(out, "rosters", "boxing", "roster.json")
+        ok_r = os.path.isfile(rj) and len(json.load(open(rj))["players"]) == 2 and g.status.get().startswith("2 players")
+        g.engine.set("godot")
+        g.export()
+        t0 = time.time()
+        while g._proc is not None and time.time() - t0 < 300:
+            root.update(); time.sleep(0.05)
+        root.update()
+        proj = os.path.join(out, "engines", "boxing", "godot")
+        ok_e = os.path.isfile(os.path.join(proj, "project.godot")) and \
+            len(json.load(open(os.path.join(proj, "characters", "index.json")))) == 2
+        rec("13 Build the cast and Export project from the tab", ok_r and ok_e, "%s | %s" % (g.status.get(), g.log.get("1.0", "end")[-300:]))
     finally:
         root.destroy()
         shutil.rmtree(out, ignore_errors=True)
