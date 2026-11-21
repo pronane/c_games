@@ -30,6 +30,8 @@ def _a(im):
 
 def check_move(name, frames, ground_y, loop=False, tol=3):
     issues = []
+    if frames and tol == 3:             # v11.25: 3 px at the usual 160 px cell, in proportion for HD cells
+        tol = max(3, int(round(3 * frames[0].height / 160.0)))
     cents, steps = [], []
     prev = None
     import cv2

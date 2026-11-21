@@ -59,6 +59,8 @@ STARTER = [
     ("kart_idle", "kart_idle"), ("steer_left", "steer_left"), ("steer_right", "steer_right"),
     ("boost", "boost"), ("item_throw", "item_throw"), ("kart_victory", "kart_victory"),
     ("kart_hit", "kart_hit"), ("gk_throw_out", "gk_throw_out"),
+    # v11.25: a sports player's idle (soft knees, slight lean, loose arms) for soccer, Gaelic, basketball, tennis
+    ("idle_athletic", "idle_athletic"),
 ]
 
 _SKIP = {"licence.json", "index.json", "set.json", "session_report.json"}

@@ -171,9 +171,19 @@ def look_argv(p, glb_path):
     return ["look", "--set", sets, "--kit", kit, "--glb", glb_path]
 
 
-def player_argv(game, p, out, glb=True, library="", look_glb=None):
-    """one player -> its `forge.py build` command line (look_glb: their look's character, kit already painted)"""
+def hd_frame(game, k=2):
+    """v11.25: the game's sprite frame k times larger ("256x320" for a 128x160 pack)"""
+    from . import gamepack as GP
+    w, h = GP.load(game)["frame"]
+    return "%dx%d" % (int(w) * k, int(h) * k)
+
+
+def player_argv(game, p, out, glb=True, library="", look_glb=None, hd=False):
+    """one player -> its `forge.py build` command line (look_glb: their look's character, kit already painted;
+    hd: sprites at twice the game's frame size)"""
     a = ["build", "--game", game, "--name", p["name"], "--out", out]
+    if hd:
+        a += ["--frame", hd_frame(game)]
     if look_glb:
         a += ["--rig", look_glb]
     elif p.get("rig"):
@@ -194,7 +204,7 @@ def player_argv(game, p, out, glb=True, library="", look_glb=None):
     return a
 
 
-def build(roster, out, glb=True, library="", log=print, run=None):
+def build(roster, out, glb=True, library="", log=print, run=None, hd=False):
     """build every player, then portraits, roster.json, select_screen.png and team_sheet.png. -> roster.json path"""
     from . import portrait as PT
     bad = validate(roster)
@@ -220,7 +230,7 @@ def build(roster, out, glb=True, library="", log=print, run=None):
                 look_glb = None
         log("roster: [%d/%d] %s (%s, %s)" % (i + 1, len(roster["players"]), p["name"], p.get("type") or "balanced",
                                               "look" if look_glb else (p.get("rig") or "mannequin")))
-        argv = player_argv(game, p, out, glb, library, look_glb)
+        argv = player_argv(game, p, out, glb, library, look_glb, hd=hd)
         if run is not None:
             rc = run(argv)
         else:
@@ -250,7 +260,7 @@ def build(roster, out, glb=True, library="", log=print, run=None):
     for p in done:
         if p.get("side", "Cast") not in sides:
             sides.append(p.get("side", "Cast"))
-    doc = dict(format="spriteforge.roster", version=1, game=game, sides=sides, players=done,
+    doc = dict(format="spriteforge.roster", version=1, game=game, sides=sides, players=done, hd=bool(hd),
                select_screen="select_screen.png", team_sheet="team_sheet.png")
     title = "SELECT YOUR FIGHTER" if game in FIGHT_GAMES else ("PICK YOUR PLAYER" if game in TEAM_GAMES else "SELECT CHARACTER")
     PT.select_screen([(os.path.join(out, p["portrait"]) if p["portrait"] else None, p["name"],
@@ -288,6 +298,7 @@ def main(argv):
     ap.add_argument("--out", default="rosters")
     ap.add_argument("--motion-library", dest="library", default="")
     ap.add_argument("--no-glb", action="store_true", help="no 3D models (portraits then come from the sprites)")
+    ap.add_argument("--hd", action="store_true", help="v11.25: sprites at twice the game's frame size (256x320 for soccer)")
     ap.add_argument("--show", action="store_true", help="print the roster that would be built, and stop")
     a = ap.parse_args(argv)
     if a.file:
@@ -305,7 +316,7 @@ def main(argv):
         print(json.dumps(r, indent=1)); return 0
     out = os.path.join(a.out, r["game"]) if not a.file else a.out
     try:
-        build(r, out, glb=not a.no_glb, library=a.library)
+        build(r, out, glb=not a.no_glb, library=a.library, hd=a.hd)
     except (RuntimeError, ValueError) as e:
         print(e); return 1
     return 0

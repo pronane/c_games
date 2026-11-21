@@ -334,13 +334,15 @@ def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
     def shorts_fn(P, base):
         y = P[:, 1]
         col = np.broadcast_to(Sh, base.shape).copy()
-        col[np.abs(y - 0.735 - 0.08 * np.abs(P[:, 0])) < 0.006] = A                         # piping above the hem
+        if not plain:       # v11.25: plain game kits have no piping (it sat on the hem and broke up into fragments)
+            col[np.abs(y - 0.735 - 0.08 * np.abs(P[:, 0])) < 0.006] = A                     # piping above the hem
         return col, np.zeros(len(P))
 
     def socks_fn(P, base):
         y = P[:, 1]
         col = np.broadcast_to(So, base.shape).copy()
-        col[((y > 0.41) & (y < 0.425)) | ((y > 0.385) & (y < 0.40))] = Bc                  # two hoops
+        if not plain:       # v11.25: plain game kits have plain socks (the hoops met the sock top in white fragments)
+            col[((y > 0.41) & (y < 0.425)) | ((y > 0.385) & (y < 0.40))] = Bc              # two hoops
         col[y > 0.445] = So * 0.85                                                          # turned-down top
         return col, np.zeros(len(P))
 

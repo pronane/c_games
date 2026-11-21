@@ -64,6 +64,7 @@ class BuildConfig:
     frame_w: int = 256
     frame_h: int = 256
     figure_h: int = 0                  # px height of a 180 cm standing figure (0 = 62% of frame_h)
+    figure_share: float = 0.0          # v11.25: a pack's figure height as a share of frame_h (0 = the default 62%)
     ground_y: int = 0                  # 0 = 94% of frame_h
     pivot_x: int = 0                   # 0 = frame_w / 2
     yaw: float = 65.0                  # mannequin camera: 90 = pure side profile, 0 = front
@@ -169,7 +170,7 @@ class BuildConfig:
     def resolved(self):
         if not self.figure_h:
             kart = _prop(self) == "kart" and self.mode in ("spec", "mannequin")
-            self.figure_h = int(self.frame_h * (0.50 if kart else 0.62))
+            self.figure_h = int(self.frame_h * (self.figure_share or (0.50 if kart else 0.62)))
         if not self.ground_y:
             self.ground_y = int(round(self.frame_h * 0.94))
         if not self.pivot_x:
@@ -913,8 +914,14 @@ def _ground_lock(cfg, frames, report):
        has its lowest solid pixel (alpha > 40, outline included) on ground_y;
     2) any single frame that still dips below the line is lifted onto it.
     Frames above the line (jumps) stay airborne."""
-    ref_mv = "idle" if "idle" in frames else next(iter(frames))
-    low = _lowest_solid(frames[ref_mv][0][0])
+    # v11.25: the reference is where the feet are planted across idle, walk and run (each move's most planted
+    # frame, then the median), not idle frame 0 alone - a crouched sports idle sits a pixel or two lower than the
+    # strides and lifted every other move off the ground
+    from .cellfit import ground_ref
+    low = ground_ref(frames)
+    if low is None:
+        ref_mv = "idle" if "idle" in frames else next(iter(frames))
+        low = _lowest_solid(frames[ref_mv][0][0])
     dy = (cfg.ground_y - low) if low else 0
     lifted = 0
     from .cellfit import pivot_of

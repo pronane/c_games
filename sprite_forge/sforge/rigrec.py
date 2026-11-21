@@ -356,7 +356,16 @@ class Rig:
             rs.follow_root = follow_root
         if not self.has_mesh():
             return render_skeleton(self, W, rs, rxz)
-        P = self.skin(W)[self.F] * scale
+        Vp = self.skin(W)
+        P = Vp[self.F] * scale
+        import os as _os
+        if self.fuv is not None and len(self.materials) and _os.environ.get("SF_FLAT_SPRITES", "0") != "1":
+            # v11.25: every texture drawn per pixel with smooth light (render_rich), not a flat colour per triangle
+            from .render_rich import render_rich, corner_normals
+            mats = self.rich_materials(kit)
+            CN, _ = corner_normals(Vp, self.F, self.smooth_groups())
+            return render_rich(P, self.fuv, self.fmat, mats, self.face_colors(kit), CN, rs,
+                               (rxz[0] * scale, rxz[1] * scale))
         tex = self.single_texture(kit)
         if tex is not None:
             from .render import render_textured
@@ -364,6 +373,36 @@ class Rig:
         vis = self.opaque_faces()
         return render_tris(P[vis], np.zeros(int(vis.sum()), int), None, rs, (rxz[0] * scale, rxz[1] * scale),
                            rgb=self.face_colors(kit)[vis], two_sided=True)
+
+    def smooth_groups(self):
+        """vertices at one bind position share a normal (UV seams split them)"""
+        if "_groups" not in self._tri_cache:
+            from .render_rich import smooth_groups
+            self._tri_cache["_groups"] = smooth_groups(self.V)
+        return self._tri_cache["_groups"]
+
+    CARD_NAMES = ("hair", "brow", "lash", "beard", "moustache", "stubble", "goatee", "fur")
+
+    def rich_materials(self, kit=None):
+        """per material: dict(tex=float RGBA (shrunk) or None, alpha=bool) under a kit, for render_rich. A material is
+        an alpha-tested card when its name says hair / brow / lash ... and much of its texture is see-through."""
+        key = "_rich:" + (json.dumps(kit, sort_keys=True) if kit else "")
+        if key in self._tri_cache:
+            return self._tri_cache[key]
+        from .render_rich import shrink
+        out = []
+        for mi, m in enumerate(self.materials):
+            img, flat = self.kit_texture(mi, kit) if kit else (self.textures.get(m.get("texture")) if m.get("texture") else None, None)
+            if img is None:
+                out.append(dict(tex=None, alpha=False)); continue
+            t = shrink(img)
+            if m.get("tint_texture"):
+                t[..., :3] *= np.array(m.get("color", [1, 1, 1])[:3], np.float32)
+            name = (m.get("name") or "").lower()
+            alpha = any(k in name for k in self.CARD_NAMES) and float((t[..., 3] < 0.5).mean()) > 0.2
+            out.append(dict(tex=t, alpha=alpha))
+        self._tri_cache[key] = out
+        return out
 
     def opaque_faces(self):
         """(nf,) bool: faces to draw. v11.24: hair / brow / lash cards are alpha-tested textures; drawn as flat colour

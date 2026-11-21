@@ -28,7 +28,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "idle_athletic"
+   ]
   },
   {
    "name": "walk",

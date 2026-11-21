@@ -34,7 +34,8 @@
   "item_throw",
   "kart_victory",
   "kart_hit",
-  "gk_throw_out"
+  "gk_throw_out",
+  "idle_athletic"
  ],
  "licence": "licence.json"
 }
