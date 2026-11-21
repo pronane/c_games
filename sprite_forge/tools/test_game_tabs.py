@@ -21,7 +21,8 @@ With a window:
  10 Build from the tab streams the log, then shows the sheet preview and colours the moves by their QA
  11 Shot list from the tab prints what to film for that game
  12 (v11.20) the preview plays the built character's own sprites, frame by frame
- 13 (v11.20) Build the team / cast from the tab: a roster with a select screen; Export project makes the engine project"""
+ 13 (v11.20) Build the team / cast from the tab: a roster with a select screen; Export project makes the engine project
+ 14 (v11.21) hit and hurt boxes drawn over the built character on a strike's hit frame"""
 from __future__ import annotations
 import argparse
 import json
@@ -229,6 +230,27 @@ def window_checks(GG, packs):
         ok_e = os.path.isfile(os.path.join(proj, "project.godot")) and \
             len(json.load(open(os.path.join(proj, "characters", "index.json")))) == 2
         rec("13 Build the cast and Export project from the tab", ok_r and ok_e, "%s | %s" % (g.status.get(), g.log.get("1.0", "end")[-300:]))
+
+        # 14: hit and hurt boxes over the built character (v11.21)
+        g.source.set("mannequin"); g.glb.set(False)
+        g.build()
+        t0 = time.time()
+        while g._proc is not None and time.time() - t0 < 300:
+            root.update(); time.sleep(0.05)
+        root.update()
+        g.tree.selection_set("hook"); root.update(); g.pick(); g.mode.set("character"); g.boxes.set(True)
+        a_rec = g.anim_record("hook") or {}
+        hit_frames = sorted({h["frame"] for h in a_rec.get("hitboxes", [])})
+        n_hook = a_rec.get("frames", 8)
+        got = (0, 0)
+        if hit_frames:
+            g.t.set((hit_frames[0] + 0.5) / n_hook); g.draw(); root.update()
+            got = (len(g.canvas.find_withtag("hurtbox")), len(g.canvas.find_withtag("hitbox")), getattr(g, "_frame_now", None))
+        g.boxes.set(False); g.draw(); root.update()
+        off = len(g.canvas.find_withtag("hitbox")) + len(g.canvas.find_withtag("hurtbox"))
+        rec("14 hit and hurt boxes are drawn over the built character on the hit frame (and hidden when off)",
+            bool(hit_frames) and got[0] > 0 and got[1] > 0 and off == 0, "hit frames %s, drawn %s, off %d" % (hit_frames, got, off))
+        g.mode.set("figure"); g.boxes.set(True)
     finally:
         root.destroy()
         shutil.rmtree(out, ignore_errors=True)

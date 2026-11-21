@@ -73,6 +73,8 @@ def write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names):
         src_n = int(getattr(m, "pack_frames", 0) or n)
         ev = scale_events(events_all.get(m.name) or _blank_events(), src_n, n)
         hits, hurts, box_note = _boxes(cells, m.name, m.fps)
+        from .cellfit import pivot_of
+        _piv = pivot_of(cfg, m.name)                     # v11.21: a move fitted into the cell may have its own pivot
         if box_note:
             notes.append("%s: %s" % (m.name, box_note))
         sheet = page_names[page] if page < len(page_names) else (page_names[0] if page_names else "atlas.png")
@@ -89,8 +91,8 @@ def write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names):
             "h": int(cfg.frame_h),
             "row": int(row),
             "col0": 0,
-            "pivot": {"x": int(cfg.pivot_x), "y": int(cfg.ground_y)},
-            "ground_y": int(cfg.ground_y),
+            "pivot": {"x": int(_piv[0]), "y": int(_piv[1])},
+            "ground_y": int(_piv[1]),
             "source": getattr(m, "motion_source", "") or sprite_src or "procedural",
             "library": ((m.motion or "").split(":", 1)[-1] if (m.motion or "").startswith("lib:") else "") or getattr(m, "library_name", ""),
             "events": ev,

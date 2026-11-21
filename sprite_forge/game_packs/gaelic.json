@@ -11,6 +11,7 @@
   128,
   160
  ],
+ "figure": 0.58,
  "moves": [
   {
    "name": "idle",
@@ -794,6 +795,6 @@
    ]
   }
  ],
- "notes": "This is the sprite move list. tools/gaelic_forge.py still builds the 3D sculpted player from the game skeleton and does not read this pack. profiles/gaelic36.json still builds the procedural sports motions if you do not pass --game. A shared clip (both dives use 'save') is a limit of the starter library, not a second dive animation.",
+ "notes": "This is the sprite move list. tools/gaelic_forge.py still builds the 3D sculpted player from the game skeleton and does not read this pack. profiles/gaelic36.json still builds the procedural sports motions if you do not pass --game. A shared clip (both dives use 'save') is a limit of the starter library, not a second dive animation. v11.21: \"figure\": 0.58 draws the player at 58% of the frame height (packs default to 62%) so the leap catch (jump and raised hands) stays inside the 160 px cell.",
  "yaw": 65
 }

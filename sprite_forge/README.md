@@ -54,6 +54,74 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.21: players who look different, every move inside its cell, hit boxes in the preview
+
+### Teams and casts that look like real rosters
+
+Every player in a default roster (`forge.py roster`, or **Build the team** / **Build the fighter cast** in the Games
+tab) gets a look of their own, made from MakeHuman appearance keys (`forge.py look --keys`):
+
+* hair style and colour, facial hair, skin tone, eye colour and eyebrows;
+* the face shape: nose, lips, jaw, chin, cheekbones, eyes, ears;
+* muscles to suit their type, so a heavy brawler is more muscular than a small agile fighter.
+
+Each player is built as a realistic MakeHuman character in the roster's kit, with their **squad number on the back**
+of the shirt. The looks are repeatable, so a roster rebuilds the same. A roster file can give any player a `"look"`
+of their own. Without the MakeHuman library (`forge.py human --setup --full`), players fall back to the mannequin
+with different bodies, and `roster.json` records which way each was built.
+
+Two bugs fixed on the way:
+
+* The look builder's GLB had grey hair in Unity, Unreal, raylib and Sprite Forge's own sprites. The colour was only a
+  vertex colour; it is now baked into the hair, brow and lash textures.
+* The look builder ignored `--kit`, so every look came out in the home kit. It now uses the kit you give.
+
+Sprites and portraits no longer draw the see-through parts of hair cards as solid, which hid faces behind long hair.
+
+### No move cut off at the edge of its cell
+
+Moves are drawn on a padded canvas, then fitted into the cell:
+
+1. **One shared shift.** The pivot and ground line move as little as possible so every move fits, and they stay the
+   same for every move, so every engine format stays right.
+2. **Its own pivot.** A move that can't fit alongside the others gets its own pivot and ground line, written per move
+   in `game_character.json` and `atlas.json`.
+3. **One smaller scale.** A rig too big for the cell (a tall rig's leap) is drawn smaller, once, for every move.
+
+A ball flying off on its own may still leave the cell: the fit and the QA look at the character, not the prop. The
+Gaelic pack draws its players at 58% of the frame height (new pack key `"figure"`, default 0.62) so the leap catch
+fits.
+
+Result: the sprite QA's **clipped** FAILs are gone from all 12 packs on the mannequin, and from the tall library rig
+on the packs with leaps and dives. Before, there were 9 clipped moves on the mannequin, plus the boxing KO, block and
+jumps on library rigs.
+
+### Hit boxes in the Games tab
+
+With **Show: built character**, the preview draws over the sprite:
+
+* the **hurt boxes** (head, body, legs) in blue;
+* the **hit box** on the frames where a strike can land, in red, marked "HIT";
+* the **pivot**, at the feet.
+
+These are the same boxes the engines get. Untick **hit boxes** to hide them.
+
+### Tests
+
+`tools/test_roster_look.py` has 9 checks and runs in CI:
+
+* every game's default roster gives every player a valid, distinct, repeatable look;
+* the look and build command lines are right;
+* hair colour is baked into its texture;
+* the squad number is readable on the back and not on the front;
+* see-through card faces are skipped;
+* cell fit works on synthetic frames;
+* all 12 packs on the mannequin and 4 on the tall rig have no clipped moves, and their pivots agree between
+  `game_character.json` and `atlas.json`;
+* a real roster is built from looks (when the MakeHuman library is installed).
+
+`test_game_tabs` adds check 14: hit boxes on the hit frame.
+
 ## New in v11.20: teams and casts, portraits, and ready-to-open engine projects (Godot, Unity, Unreal, raylib, web, pygame)
 
 ### Teams and fighter casts in one go

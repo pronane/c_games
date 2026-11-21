@@ -33,6 +33,8 @@ jobs:
       - run: xvfb-run -a python tools/test_game_tabs.py
       # v11.20: rosters, portraits and the engine projects (Godot / Unity / Unreal / raylib / web / pygame)
       - run: python tools/test_engines.py
+      # v11.21: distinct roster looks, every move inside its cell on every pack, numbered kits
+      - run: python tools/test_roster_look.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

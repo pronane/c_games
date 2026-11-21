@@ -40,9 +40,13 @@ def check_move(name, frames, ground_y, loop=False, tol=3):
             issues.append(("FAIL", "empty", i, "no pixels")); cents.append(None); prev = None; continue
         H, W = M.shape
         ys, xs = np.nonzero(M)
-        if xs.min() == 0 or xs.max() == W - 1 or ys.min() == 0 or (ys.max() == H - 1 and ground_y < H - 1):
-            edge = [n for n, c in (("left", xs.min() == 0), ("right", xs.max() == W - 1), ("top", ys.min() == 0),
-                                   ("bottom", ys.max() == H - 1)) if c]
+        # v11.21: the character itself must stay inside the cell; a ball flying off on its own may leave it
+        from .cellfit import body_box
+        bb = body_box(im) or (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+        bx0, by0, bx1, by1 = bb[0], bb[1], bb[2] - 1, bb[3] - 1
+        if bx0 == 0 or bx1 == W - 1 or by0 == 0 or (by1 == H - 1 and ground_y < H - 1):
+            edge = [n for n, c in (("left", bx0 == 0), ("right", bx1 == W - 1), ("top", by0 == 0),
+                                   ("bottom", by1 == H - 1)) if c]
             issues.append(("FAIL", "clipped", i, "touches the %s edge" % "/".join(edge)))
         if not AIR_RE.search(name):
             low = int(ys.max())
@@ -87,11 +91,11 @@ def check_move(name, frames, ground_y, loop=False, tol=3):
     return {"status": status, "issues": [{"level": s, "check": k, "frame": f, "detail": d} for s, k, f, d in issues]}
 
 
-def run(ordered, ground_y, loops=None, stand_px=None):
+def run(ordered, ground_y, loops=None, stand_px=None, grounds=None):
     loops = loops or {}
     res = {"moves": {}}
     for mv, fr in ordered:
-        res["moves"][mv] = check_move(mv, fr, ground_y, loops.get(mv, False))
+        res["moves"][mv] = check_move(mv, fr, (grounds or {}).get(mv, ground_y), loops.get(mv, False))
     idle = dict(ordered).get("idle")
     if idle and stand_px:
         ys = np.nonzero((_a(idle[0]) > 40).any(1))[0]
@@ -127,7 +131,8 @@ def report_text(res, name):
 def write_qa(cfg, out, ctx, report):
     loops = {m: s.loop for m, s in ctx["spec_by"].items()}
     stand = int(round(cfg.figure_h * ctx.get("scale", 1.0)))
-    res = run(ctx["ordered"], cfg.ground_y, loops, stand)
+    res = run(ctx["ordered"], cfg.ground_y, loops, stand,
+              {m: p[1] for m, p in (getattr(cfg, "move_pivots", None) or {}).items()})
     with open(os.path.join(out, "qa.json"), "w") as f:
         json.dump(res, f, indent=1)
     with open(os.path.join(out, "qa_report.txt"), "w") as f:

@@ -57,7 +57,8 @@ def render_portrait(rig, size=(256, 320), yaw=25.0, clip=None, t=0.0, bg=BG):
     if tex is not None:
         im = render_textured(sh, rig.fuv, tex, rs, (0.0, 0.0))
     else:
-        im = render_tris(sh, np.zeros(len(rig.F), int), None, rs, (0.0, 0.0), rgb=rig.face_colors(None), two_sided=True)
+        vis = rig.opaque_faces() if hasattr(rig, "opaque_faces") else np.ones(len(rig.F), bool)
+        im = render_tris(sh[vis], np.zeros(int(vis.sum()), int), None, rs, (0.0, 0.0), rgb=rig.face_colors(None)[vis], two_sided=True)
     im = im.resize((cw, ch), Image.LANCZOS)
     out = Image.new("RGBA", (cw, ch), bg)
     out.alpha_composite(im)
