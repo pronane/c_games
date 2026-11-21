@@ -153,6 +153,29 @@ public sealed class InputHub
         SaveBindings();
     }
 
+    /// <summary>Live button test: what each pad is sending right now, and what the game
+    /// reads it as.  If a button shows a number but no action, remap it.</summary>
+    public static string DescribeLive()
+    {
+        EnsureMappings();
+        var lines = new List<string>();
+        foreach (int dev in ConnectedDevices())
+        {
+            bool[] b = ReadButtons(dev);
+            float[] ax = ReadAxes(dev);
+            bool known = Input.IsJoyKnown(dev);
+            var binds = PadLayout.Bindings(Input.GetJoyName(dev), known, _saved);
+            var h = PadLayout.Held(b, ax, binds, known);
+            var pressed = Enumerable.Range(0, b.Length).Where(i => b[i]).Select(i => "b" + i).ToList();
+            var actions = h.Where(kv => kv.Value).Select(kv => kv.Key.ToUpperInvariant()).ToList();
+            var m = PadLayout.Move(b, ax, known);
+            lines.Add($"Pad {dev + 1} ({(known ? "mapped" : "raw")}): buttons [{string.Join(" ", pressed)}]   axes [{string.Join(" ", ax.Take(6).Select(a => a.ToString("0.0")))}]");
+            lines.Add($"   game reads: move ({m.X:0.0}, {m.Y:0.0})   {(actions.Count > 0 ? string.Join(" + ", actions) : "-")}");
+        }
+        if (lines.Count == 0) lines.Add("No pad detected - press a button on it once.");
+        return string.Join("\n", lines);
+    }
+
     /// <summary>Text for the CONTROLLER SETUP screen: connected pads, kind, layout and bindings.</summary>
     public static string DescribePads()
     {
@@ -366,6 +389,7 @@ public sealed class InputHub
         // LB / Z key = chip, double-tap shoot = low driven.
         bool shootEdge = shoot && !_pShootHeld;
         _pShootHeld = shoot;
+        cmd.ShootPress = shootEdge;
         double nowS = Time.GetTicksMsec() / 1000.0;
         if (shootEdge) { _lowShotArmed = nowS - _lastShootPress < .30; _lastShootPress = nowS; }
         bool finesseMod = padDribble || Input.IsPhysicalKeyPressed(Key.X);

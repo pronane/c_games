@@ -1483,6 +1483,40 @@ Section("Set pieces and crosses (7.2, 6.5)");
     Check("AI corners are delivered into the box or played short", corners > 0 && cornerCross == corners, $"{cornerCross}/{corners}");
 }
 
+Section("Human controls: kick-off, restarts, FC slide button");
+{
+    // You take your own kick-off (it was played for you the moment the whistle went).
+    var e = new MatchEngine(new MatchOptions { Seed = 7 }); var S = e.State; int firstPass = -1;
+    for (int t = 0; t < 240; t++)
+    {
+        e.Step(MatchEngine.Dt, new PlayerCommand { Pass = t == 150 });
+        if (firstPass < 0 && e.Events.Any(x => x.Kind == EventKind.Pass)) firstPass = t;
+    }
+    Check("a human kick-off waits for your pass", firstPass == 150, $"first pass at tick {firstPass}");
+    // Square / X without the ball is the slide tackle.
+    var e2 = new MatchEngine(new MatchOptions { Seed = 7 }); var S2 = e2.State;
+    for (int i = 0; i < 400 && S2.Phase != Phase.Play; i++) e2.Step(MatchEngine.Dt, new PlayerCommand { Pass = i % 30 == 0 });
+    var opp = S2.Players.First(q => q.Team == 1 && !q.IsKeeper && q.Role != Role.Defender);
+    var me = S2.Players.First(q => q.Team == 0 && q.Role == Role.Defender);
+    S2.Controlled = me.Index; S2.Ball.Owner = opp.Index; S2.Ball.Pos = opp.Pos; S2.Ball.HasPending = false;
+    me.Pos = opp.Pos + new Vector3(1.5f, 0, 0); S2.ControlLock = 5;
+    string act = "";
+    for (int t = 0; t < 10; t++) { e2.Step(MatchEngine.Dt, new PlayerCommand { ShootPress = t == 3, Move = new Vector2(-1, 0) }); if (t == 6) act = me.Action; }
+    Check("shoot button without the ball = slide tackle (as in FC)", act == "slide", act);
+    // At your restarts the ring is on the taker, and one press plays it.
+    int ours = 0, onTaker = 0;
+    var e3 = new MatchEngine(new MatchOptions { Seed = 2 }); var S3 = e3.State; var last = S3.Phase;
+    for (int t = 0; t < 60 * 60 * 3 && S3.Phase != Phase.FullTime; t++)
+    {
+        bool restart = last is Phase.ThrowIn or Phase.FreeKick or Phase.Corner or Phase.GoalKick && S3.Phase == Phase.Play;
+        last = S3.Phase;
+        var c = new PlayerCommand { Pass = S3.Ball.Owner >= 0 && S3.Ball.Owner == S3.Controlled && S3.Players[S3.Ball.Owner].MustPlayBall };
+        e3.Step(MatchEngine.Dt, c);
+        if (restart && S3.Ball.Owner >= 0 && S3.Players[S3.Ball.Owner].Team == 0) { ours++; if (S3.Ball.Owner == S3.Controlled) onTaker++; }
+    }
+    Check("your restarts put you on the taker", ours > 0 && onTaker == ours, $"{onTaker}/{ours}");
+}
+
 Section("Realism gate (0.1): four full AI matches stay inside football's bands");
 {
     // Per-match averages over four seeds.  The bands are deliberately wide (they
