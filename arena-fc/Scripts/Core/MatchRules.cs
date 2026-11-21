@@ -23,6 +23,28 @@ public sealed partial class MatchEngine
     /// throw-in, 9.15 m (10 yards) at free kicks, corners, goal kicks and penalties.</summary>
     private float RestartDistance(PlayerState taker) => IsThrowInHold(taker) ? 2f : 9.15f;
 
+    /// <summary>A spot on the restart circle, on the pitch: straight out from the ball
+    /// if that is on the pitch, otherwise walking round the circle.  (Pushing a
+    /// player straight out near a line put him off the pitch; the clamp then put him
+    /// back inside the circle and the AI was cautioned for encroaching.)</summary>
+    private static Vector3 OutsideCircle(Vector3 ball, Vector3 from, float r)
+    {
+        Vector3 d = Mx.FlatDir(ball, from);
+        if (d.LengthSquared() < .5f) d = Vector3.UnitX;
+        for (int k = 0; k <= 12; k++)
+        {
+            foreach (int sgn in new[] { 1, -1 })
+            {
+                float a = sgn * k * MathF.PI / 12f;
+                var dir = new Vector3(d.X * MathF.Cos(a) - d.Z * MathF.Sin(a), 0, d.X * MathF.Sin(a) + d.Z * MathF.Cos(a));
+                Vector3 c = ball + dir * r;
+                if (MathF.Abs(c.X) < Mx.HalfLength - .3f && MathF.Abs(c.Z) < Mx.HalfWidth - .3f) return new Vector3(c.X, 0, c.Z);
+                if (k == 0) break;
+            }
+        }
+        return new Vector3(ball.X + d.X * r, 0, ball.Z + d.Z * r);
+    }
+
     /// <summary>Caution a player; a second caution is a sending-off.</summary>
     private void Caution(PlayerState p, string reason)
     {
@@ -41,11 +63,11 @@ public sealed partial class MatchEngine
         if (b.Owner < 0 || b.Owner == p.Index) return;
         var holder = State.Players[b.Owner];
         if (!holder.MustPlayBall || holder.Team == p.Team) return;
-        float need = RestartDistance(holder) + .4f;
+        float need = RestartDistance(holder) + 1.4f;
         if (Mx.FlatDist(p.Target, b.Pos) < need)
         {
             Vector3 from = Mx.FlatDist(p.Pos, b.Pos) > .1f ? p.Pos : OwnGoalPos(p.Team);
-            p.Target = b.Pos + Mx.FlatDir(b.Pos, from) * need;
+            p.Target = OutsideCircle(b.Pos, from, need);
         }
         p.Pressing = false;
     }
@@ -107,12 +129,16 @@ public sealed partial class MatchEngine
             float d = Mx.FlatDist(q.Pos, b.Pos);
             if (d < need - .35f)
             {
-                Add(EventKind.Foul, $"Encroachment - {q.Spec.DisplayName} wasn't back the full {(need < 3f ? "2 metres" : "10 yards")}.");
-                Caution(q, "encroachment");
+                if (q.EncroachedAt != S.RestartId)
+                {
+                    q.EncroachedAt = S.RestartId;     // one caution per restart; after that he is just sent back
+                    Add(EventKind.Foul, $"Encroachment - {q.Spec.DisplayName} wasn't back the full {(need < 3f ? "2 metres" : "10 yards")}.");
+                    Caution(q, "encroachment");
+                }
                 if (!q.SentOff)
                 {
                     // The referee sends him back; the kick is retaken.
-                    q.Pos = b.Pos + Mx.FlatDir(b.Pos, d > .1f ? q.Pos : OwnGoalPos(q.Team)) * (need + .5f);
+                    q.Pos = OutsideCircle(b.Pos, d > .1f ? q.Pos : OwnGoalPos(q.Team), need + .5f);
                     q.Target = q.Pos; q.Vel = Vector3.Zero;
                 }
             }

@@ -103,6 +103,11 @@ public sealed class PlayerState
     public bool MustPlayBall;
     /// <summary>Seconds this player has stood over a set piece (human auto-take).</summary>
     public float RestartHold;
+    /// <summary>Stick direction / sprint held while a first touch is in progress.</summary>
+    public Vector2 TouchDir;
+    public bool TouchKnock;
+    /// <summary>RestartId at which this player was last cautioned for encroaching.</summary>
+    public int EncroachedAt = -1;
     public string Action = "idle";
     /// <summary>Phase 0 event sync: total duration of the current one-shot and the
     /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
@@ -206,6 +211,8 @@ public sealed class MatchState
     public readonly List<bool> ShootoutHome = new(), ShootoutAway = new();
     /// <summary>Set-piece taker being watched for a double touch.</summary>
     public int SetPieceTaker = -1;
+    /// <summary>Counts restarts, so an encroacher is cautioned once per restart.</summary>
+    public int RestartId;
     public bool SetPieceLeftFoot;
     public float SetPieceTimer;
     /// <summary>Unseen violent conduct waiting for VAR.</summary>
@@ -339,7 +346,9 @@ public sealed partial class MatchEngine
         }
         else if (b.PendingKind == 2)
         {
-            // Capture: first touch completes (trap/chest/header).
+            // Capture: first touch completes (trap/thigh/chest/header).  A steered
+            // touch knocks it into space; otherwise the ball is killed at his feet.
+            if (DirectedTouch(actor)) { actor.ActionReleased = true; b.HasPending = false; b.PendingKind = 0; b.PendingFrom = -1; return; }
             b.Owner = b.PendingFrom;
             b.Vel = Vector3.Zero;
             b.Spin = Vector3.Zero;
@@ -729,12 +738,13 @@ public sealed partial class MatchEngine
             // 0.08-0.18 s AI decision timer: that used to silently discard most
             // pass / shoot / tackle presses and made the controller look dead.
             if (human) HumanActions(p, pc);
+            else if (S.Ball.Owner < 0 && AiAttackHighBall(p)) continue;
             if (p.DecisionTimer <= 0)
             {
                 p.DecisionTimer = Rng.Range(.08f, .18f);
                 Decide(p, pc, human);
             }
-            if (!human) RespectRestartDistance(p);
+            RespectRestartDistance(p);          // AI targets, and the human's assist target
         }
 
         // ---- Movement ----
@@ -783,8 +793,11 @@ public sealed partial class MatchEngine
                 // A carried ball that crosses a line is released so BallPhysics can rule
                 // on it this tick: dribbling into the net used to be no goal, and
                 // dribbling over the touchline was never out of play.
+                // A keeper holding the ball only takes it over his line if he goes over
+                // himself (a catch on the line put the held ball 0.4 m behind it: own goal).
+                Vector3 lineCheck = owner.IsKeeper ? owner.Pos : S.Ball.Pos;
                 if (!owner.MustPlayBall // a throw-in taker stands behind the line by law
-                    && (MathF.Abs(S.Ball.Pos.X) > Mx.HalfLength + .02f || MathF.Abs(S.Ball.Pos.Z) > Mx.HalfWidth + .2f))
+                    && (MathF.Abs(lineCheck.X) > Mx.HalfLength + .02f || MathF.Abs(lineCheck.Z) > Mx.HalfWidth + .2f))
                 {
                     S.Ball.Owner = -1;
                     S.Ball.Vel = owner.Vel;
@@ -835,6 +848,19 @@ public sealed partial class MatchEngine
     private void HumanActions(PlayerState p, PlayerCommand cmd)
     {
         if (cmd.Punch || cmd.Headbutt) { ViolentConduct(p, cmd.Headbutt); return; }
+        RecordTouchIntent(p, cmd);
+        // First-time header / volley: shoot (at goal) or pass as a high ball
+        // arrives - also cancels a control touch that had already started.
+        if ((cmd.Shoot || cmd.Pass) && State.Ball.Owner != p.Index)
+        {
+            var bb = State.Ball;
+            bool capturing = bb.HasPending && bb.PendingKind == 2 && bb.PendingFrom == p.Index;
+            if (capturing) { bb.HasPending = false; bb.PendingKind = 0; bb.PendingFrom = -1; }
+            if (capturing || CanStrikeInAir(p))
+            {
+                if (bb.Pos.Y > .5f || capturing) { FirstTimeStrike(p, cmd.Shoot, MathF.Max(.3f, cmd.Charge), cmd.Move); return; }
+            }
+        }
         var S = State;
         var ball = S.Ball;
         bool owner = ball.Owner == p.Index;
@@ -1076,6 +1102,8 @@ public sealed partial class MatchEngine
                     }
                     return;
                 }
+                // Wide in the final third with a team-mate in the box: cross it.
+                if (AiCross(p)) return;
                 // Shoot when the chance is good: xG of this position, a lower bar under
                 // pressure, and the odd speculative long shot.  The old rule (2% per
                 // decision inside 26 m) produced ~2 shots a match.
@@ -1187,7 +1215,9 @@ public sealed partial class MatchEngine
                 }
                 else
                 {
-                    Vector3 intercept = ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
+                    Vector3 focus = BallFocus();
+                    Vector3 intercept = focus != ball.Pos ? focus
+                        : ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
                     p.Target = intercept;
                 }
                 p.Action = "run";
@@ -1317,8 +1347,9 @@ public sealed partial class MatchEngine
 
     private int ClosestToBall(int team, int rank)
     {
+        var focus = BallFocus();
         var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff)
-            .OrderBy(p => Mx.FlatDist2(p.Pos, State.Ball.Pos)).ToArray();
+            .OrderBy(p => Mx.FlatDist2(p.Pos, focus)).ToArray();
         return rank < list.Length ? list[rank].Index : (list.Length > 0 ? list[0].Index : -1);
     }
 
@@ -1872,6 +1903,7 @@ public sealed partial class MatchEngine
             }
         }
         var taker = State.Players[best];
+        State.RestartId++;
         State.Ball.Owner = best;
         bool throwIn = State.Phase == Phase.ThrowIn;
         taker.Pos = throwIn
@@ -1931,8 +1963,7 @@ public sealed partial class MatchEngine
             float qd = Mx.FlatDist(q.Pos, State.Ball.Pos);
             if (qd < keepOff)
             {
-                Vector3 away = qd > .05f ? Mx.FlatDir(State.Ball.Pos, q.Pos) : Mx.FlatDir(State.Ball.Pos, OwnGoalPos(q.Team));
-                q.Pos = State.Ball.Pos + away * (keepOff + .2f);
+                q.Pos = OutsideCircle(State.Ball.Pos, qd > .05f ? q.Pos : OwnGoalPos(q.Team), keepOff + .3f);
                 q.Target = q.Pos;
             }
         }
@@ -2014,7 +2045,28 @@ public sealed partial class MatchEngine
         // An AI taker stands over the ball until he plays it.  A human is free to
         // move: carrying it away is a free kick against him (EnforceRestartLaws),
         // and opponents are free to encroach and be cautioned for it.
-        if (p.MustPlayBall && !human) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }
+        bool stick = human && cmd.Move.LengthSquared() > .01f;
+        if (p.MustPlayBall && !stick) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }   // only the stick moves a taker
+        if (!stick && State.Ball.Owner >= 0 && State.Ball.Owner != p.Index)
+        {
+            // AI players (and the assist when a human lets go of the stick) go
+            // round the restart circle rather than through it - by choice; a human
+            // steering into it is free to, and is cautioned.
+            var holder = State.Players[State.Ball.Owner];
+            if (holder.MustPlayBall && holder.Team != p.Team && wish.LengthSquared() > 0f)
+            {
+                // Wide margin: players carry momentum (turns are weight-limited), so
+                // they must start steering away well before the 9.15 m line.
+                float need = RestartDistance(holder) + 1.6f;
+                Vector3 next = p.Pos + wish * 2f;
+                if (Mx.FlatDist(next, State.Ball.Pos) < need)
+                {
+                    Vector3 rim = State.Ball.Pos + Mx.FlatDir(State.Ball.Pos, p.Pos) * need;
+                    Vector3 tangent = new(-(rim - State.Ball.Pos).Z, 0, (rim - State.Ball.Pos).X);
+                    wish = Mx.Norm(Mx.Flat(rim - p.Pos) + Mx.Norm(tangent) * MathF.Sign(Vector3.Dot(tangent, wish) + 1e-4f));
+                }
+            }
+        }
         p.Sprinting = sprint;
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
         // Phase 2.9 preset: Authentic is slightly slower, Competitive faster.
@@ -2315,16 +2367,43 @@ public sealed partial class MatchEngine
     {
         var b = State.Ball;
         if (b.Owner >= 0) { b.FreeTime = 0; return; }
-        if (b.FreeTime < .08f || b.NoPickup > 0f || b.Pos.Y > 1.55f) return;
-        int best = -1; float bd = 1.05f * 1.05f;
+        // High balls (above 1.55 m) used to be unplayable by anyone: now they can be
+        // headed up to each player's jumping reach, and contested in the air.
+        if (b.FreeTime < .08f || b.NoPickup > 0f || b.Pos.Y > 2.6f) return;
+        bool high = b.Pos.Y > 1.55f;
+        int best = -1; float bd = 1.05f * 1.05f, bestAir = float.MinValue;
         foreach (var p in State.Players)
         {
             if (!IsActive(p)) continue;
             if (p.PossessionLock > 0f) continue;
             if (b.PassReceiver == p.Index && b.FreeTime < .05f) continue;
             float d = Mx.FlatDist2(p.Pos, b.Pos);
+            if (high)
+            {
+                if (p.IsKeeper || b.Pos.Y > HeaderReach(p) || d > 1.4f * 1.4f) continue;
+                float air = AerialScore(p, b.Pos);
+                if (air > bestAir) { bestAir = air; best = p.Index; }
+                continue;
+            }
             float radius = p.IsKeeper ? 1.5f : 1.0f;
             if (d < radius * radius && d < bd) { bd = d; best = p.Index; }
+        }
+        if (high && best >= 0)
+        {
+            var w = State.Players[best];
+            foreach (var q in State.Players)       // the loser of the duel jumps too
+                if (q.Index != best && !q.SentOff && q.Team != w.Team && Mx.FlatDist(q.Pos, b.Pos) < 1.6f)
+                    SetAction(q, "header", .5f, .5f);
+            bool human = w.Index == State.Controlled || (Options.AwayHuman && w.Index == State.ControlledAway);
+            if (!human)
+            {
+                // AI winners don't try to cushion a high ball: attackers go for goal,
+                // defenders head it clear, everyone else heads it on.
+                if (Mx.FlatDist(w.Pos, GoalPos(w.Team)) < 18f) { FirstTimeStrike(w, true, Rng.Range(.45f, .9f), Vector2.Zero); return; }
+                if (Mx.FlatDist(w.Pos, OwnGoalPos(w.Team)) < Mx.HalfLength) { HeaderClearance(w); if (b.HasPending) return; }
+                FirstTimeStrike(w, false, .5f, Vector2.Zero);
+                return;
+            }
         }
         if (best >= 0)
         {
@@ -2349,12 +2428,9 @@ public sealed partial class MatchEngine
             {
                 string touchAction;
                 float contactFrac;
-                if (b.Pos.Y > 1.05f)
-                {
-                    if (b.Vel.Y < -1.5f) { touchAction = "header"; contactFrac = .55f; }
-                    else { touchAction = "chest_control"; contactFrac = .55f; }
-                }
-                else { touchAction = "trap"; contactFrac = .60f; }
+                // Foot below 0.45 m, thigh/knee to 0.95 m, chest to 1.55 m, head above.
+                touchAction = TouchFor(b.Pos.Y, b.Vel.Y);
+                contactFrac = touchAction == "trap" ? .60f : .55f;
                 SetAction(p, touchAction, .50f, contactFrac);
                 p.Target = b.Pos; // plant feet on the spot
                 b.HasPending = true; b.PendingKind = 2; b.PendingFrom = best;
