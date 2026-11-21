@@ -164,7 +164,14 @@ public partial class MatchView : Node3D
         Rigs = new CharacterRig[Engine.State.Players.Length];
         _motion.EnsureCapacity(Rigs.Length);
         if (Godot.FileAccess.FileExists("res://Data/clips/clip_manifest.json"))
+        {
             _motion.LoadManifest(Godot.FileAccess.GetFileAsString("res://Data/clips/clip_manifest.json"));
+            // Pose-level motion matching (feature table + the actions that own a clip).
+            if (Godot.FileAccess.FileExists("res://Data/clips/motion_features.json"))
+                _motion.LoadFeatures(Godot.FileAccess.GetFileAsString("res://Data/clips/motion_features.json"),
+                    Godot.FileAccess.FileExists("res://Data/soccer_player_manifest.json")
+                        ? Godot.FileAccess.GetFileAsString("res://Data/soccer_player_manifest.json") : "");
+        }
         _ambient = new AmbientBehaviour[Rigs.Length];
         _face = new FacialExpression[Rigs.Length];
         _ambientTag = new AmbientAction[Rigs.Length];

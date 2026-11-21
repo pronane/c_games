@@ -165,10 +165,11 @@ def run_ivf(rows, vectors, queries, exact, k, nprobe, exact_candidates_per_query
 
 def profile(path, ks, nprobes):
     data = json.loads(path.read_text())
-    if data.get("featureSchemaVersion") != 1:
-        raise ValueError("Only motion feature schema v1 is supported")
+    if data.get("featureSchemaVersion") not in (1, 2):
+        raise ValueError("Only motion feature schemas v1/v2 are supported")
     dims = data["dimensions"]
-    rows = data["rows"]
+    # v2 also holds one-shot entry rows; this profile is about the gait search.
+    rows = [r for r in data["rows"] if r.get("category", "Locomotion") == "Locomotion"]
     mean = data["normalization"]["mean"]
     std = data["normalization"]["stdDev"]
     weights = data["weights"]

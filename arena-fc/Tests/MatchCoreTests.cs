@@ -437,7 +437,7 @@ var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_m
 var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
-      manifestEngine.ClipCount == 71 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      manifestEngine.ClipCount == 86 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
@@ -515,10 +515,12 @@ Check("same fixed inputs produce the same clip and normalized phase",
       && deterministicA.NextClipId == deterministicB.NextClipId
       && MathF.Abs(deterministicA.RenderPhase - deterministicB.RenderPhase) < 1e-6f);
 
-Section("Motion Matching feature database (Core only; runtime selector unchanged)");
+Section("Motion Matching feature database (schema v2: every clip, contact timing)");
 var motionDb = MotionDatabase.Parse(File.ReadAllText("Data/clips/motion_features.json"));
-Check("baked motion feature table loads with the versioned 23D layout",
-      motionDb.Count == 403 && motionDb.Dimensions == 23);
+Check("baked motion feature table loads with the versioned 24D layout over every category",
+      motionDb.Count > 1000 && motionDb.Dimensions == 24
+      && motionDb.Rows.Any(r => r.Category == ClipCategory.Kick) && motionDb.Rows.Any(r => r.Category == ClipCategory.Skill),
+      $"rows={motionDb.Count} dims={motionDb.Dimensions}");
 var poseFeatures = new float[8]; poseFeatures[0] = .12f; poseFeatures[4] = .3f;
 var builtQueryA = MotionQuery.BuildFeatures(poseFeatures, 1f, 0f, .1f, 2f, .5f, .8f);
 var builtQueryB = MotionQuery.BuildFeatures(poseFeatures, 1f, 0f, .1f, 2f, .5f, .8f);
@@ -527,7 +529,7 @@ Check("MotionQuery builds a repeatable facing-root trajectory from current and d
       && builtQueryA[0] == .12f && builtQueryA[8] == 1f
       && MathF.Abs(builtQueryA[17] - MathF.Sin(.16f)) < 1e-6f
       && MathF.Abs(builtQueryA[18] - MathF.Cos(.16f)) < 1e-6f);
-var probeRow = motionDb.GetRow(100);
+var probeRow = motionDb.Rows.Where(r => r.Category == ClipCategory.Locomotion).ElementAt(40);
 var probeQuery = new MotionQuery(probeRow.Features.Span.ToArray(), probeRow.Category, probeRow.Ball,
     PlayerIntent.Move, currentClipId: probeRow.ClipId, currentPhase: probeRow.Phase);
 var probeOk1 = motionDb.TrySearch(probeQuery, out var probeMatch1);
@@ -572,6 +574,55 @@ var shotQuery = new MotionQuery(zeroFeatures, ClipCategory.Locomotion,
     ArenaFC.Core.Animation.BallState.None, PlayerIntent.Shoot);
 Check("event-driven one-shots never enter motion database search",
       !fixtureDb.TrySearch(shotQuery, out _));
+// Step 1 of the HyperMotion-style roadmap: pose-level matching drives live selection.
+{
+    var mm = new MotionEngine();
+    mm.LoadClips(ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_manifest.json")));
+    mm.Database = motionDb;
+    // A shot whose ball contact is due in 0.1 s: the old selector started the clip at
+    // frame 0 and fast-forwarded the whole wind-up (~3x); matching enters late.
+    MotionState Shot(float untilContact, string? forced = null)
+    {
+        var st = new MotionState();
+        for (int i = 0; i < 20; i++)
+            mm.Update(st, 5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Move, 1f / 60f,
+                      localVelocity: new System.Numerics.Vector2(0, 5f), desiredLocalVelocity: new System.Numerics.Vector2(0, 5f));
+        mm.Update(st, 5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Shoot, 1f / 60f, untilContact,
+                  localVelocity: new System.Numerics.Vector2(0, 5f), desiredLocalVelocity: new System.Numerics.Vector2(0, 2f), forcedClipId: forced);
+        return st;
+    }
+    var late = Shot(.1f); var early = Shot(.6f);
+    mm.TryGetClip(late.RenderClipId, out var lateClip);
+    Check("a shot due in 0.1 s enters its clip late in the wind-up, at near-natural speed",
+          lateClip != null && lateClip.Category == ClipCategory.Kick && late.RenderPhase > .25f && late.PlaybackScale < 2f,
+          $"{late.RenderClipId} phase {late.RenderPhase:0.00} scale {late.PlaybackScale:0.00}");
+    Check("a shot with the full wind-up to come enters near the start",
+          early.RenderPhase < late.RenderPhase, $"early {early.RenderPhase:0.00} late {late.RenderPhase:0.00}");
+    var chip = Shot(.2f, "soccer_chip_shot");
+    Check("an action with its own clip plays that clip, entered at the matched frame",
+          chip.RenderClipId == "soccer_chip_shot" && chip.MotionMatchRowIndex >= 0, chip.RenderClipId);
+    bool dedicatedLeak = false;
+    foreach (float t in new[] { .05f, .15f, .3f, .5f, .8f })
+    {
+        var st = Shot(t);
+        if (mm.TryGetClip(st.RenderClipId, out var cm) && cm.Dedicated) dedicatedLeak = true;
+    }
+    Check("a plain shot never borrows a chip / trivela / bicycle clip", !dedicatedLeak);
+    // Running: the gait search follows speed (jog vs sprint) and is deterministic.
+    string Gait(float v)
+    {
+        var st = new MotionState();
+        for (int i = 0; i < 30; i++)
+            mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.None, v > 6f ? PlayerIntent.Sprint : PlayerIntent.Move, 1f / 60f,
+                      localVelocity: new System.Numerics.Vector2(0, v), desiredLocalVelocity: new System.Numerics.Vector2(0, v));
+        return st.RenderClipId;
+    }
+    string slow = Gait(2.5f), fast = Gait(8f);
+    Check("gait matching picks a slower cycle at 2.5 m/s and a faster one at 8 m/s", slow != fast
+          && mm.TryGetClip(slow, out var sm) && mm.TryGetClip(fast, out var fm) && sm.PreferredSpeed < fm.PreferredSpeed,
+          $"{slow} vs {fast}");
+    Check("matching is deterministic", Gait(8f) == fast && Shot(.1f).RenderPhase == late.RenderPhase);
+}
 var dribbleA = new DribbleState { TouchTimer = 0f };
 var dribbleB = new DribbleState { TouchTimer = 0f };
 var rngA = new Rng(1337); var rngB = new Rng(1337);

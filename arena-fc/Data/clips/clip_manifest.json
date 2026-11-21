@@ -30,6 +30,26 @@
       ]
     },
     {
+      "id": "soccer_bicycle_kick",
+      "poseDataKey": "soccer_bicycle_kick",
+      "category": "Kick",
+      "duration": 0.833333,
+      "contactFraction": 0.5,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Aerial",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
       "id": "soccer_block",
       "poseDataKey": "soccer_block",
       "category": "Tackle",
@@ -118,6 +138,26 @@
       "ballState": "Approaching",
       "tags": [
         "ball_contact"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
+      "id": "soccer_chip_shot",
+      "poseDataKey": "soccer_chip_shot",
+      "category": "Kick",
+      "duration": 0.833333,
+      "contactFraction": 0.5,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
       ],
       "boneCount": 18,
       "loop": false,
@@ -365,6 +405,26 @@
       "ballState": "Possessed",
       "tags": [
         "ball_possessed"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
+      "id": "soccer_headbutt",
+      "poseDataKey": "soccer_headbutt",
+      "category": "Conduct",
+      "duration": 0.833333,
+      "contactFraction": -1.0,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "None",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
       ],
       "boneCount": 18,
       "loop": false,
@@ -631,6 +691,26 @@
       "footPlantSides": []
     },
     {
+      "id": "soccer_keeper_penalty_set",
+      "poseDataKey": "soccer_keeper_penalty_set",
+      "category": "Keeper",
+      "duration": 1.033333,
+      "contactFraction": -1.0,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "None",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": true,
+      "footPlantSides": []
+    },
+    {
       "id": "soccer_keeper_punch",
       "poseDataKey": "soccer_keeper_punch",
       "category": "Keeper",
@@ -830,6 +910,26 @@
       "footPlantSides": []
     },
     {
+      "id": "soccer_punch",
+      "poseDataKey": "soccer_punch",
+      "category": "Conduct",
+      "duration": 0.833333,
+      "contactFraction": -1.0,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "None",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
       "id": "soccer_pushed",
       "poseDataKey": "soccer_pushed",
       "category": "Tackle",
@@ -995,6 +1095,198 @@
       "loop": false,
       "footPlantSides": [
         "Left"
+      ]
+    },
+    {
+      "id": "soccer_skill_ball_roll",
+      "poseDataKey": "soccer_skill_ball_roll",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": 0.35,
+      "footPlantFrames": [
+        0.68
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
+    },
+    {
+      "id": "soccer_skill_drag_back",
+      "poseDataKey": "soccer_skill_drag_back",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": 0.3,
+      "footPlantFrames": [
+        0.56
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
+    },
+    {
+      "id": "soccer_skill_elastico",
+      "poseDataKey": "soccer_skill_elastico",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": 0.3,
+      "footPlantFrames": [
+        0.72
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
+    },
+    {
+      "id": "soccer_skill_fake_shot",
+      "poseDataKey": "soccer_skill_fake_shot",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": -1.0,
+      "footPlantFrames": [
+        0.48
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
+    },
+    {
+      "id": "soccer_skill_heel_to_heel",
+      "poseDataKey": "soccer_skill_heel_to_heel",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": 0.35,
+      "footPlantFrames": [
+        0.64
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left"
+      ]
+    },
+    {
+      "id": "soccer_skill_rainbow",
+      "poseDataKey": "soccer_skill_rainbow",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": 0.42,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
+      "id": "soccer_skill_roulette",
+      "poseDataKey": "soccer_skill_roulette",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": 0.2,
+      "footPlantFrames": [
+        0.4,
+        0.8
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left",
+        "Right"
+      ]
+    },
+    {
+      "id": "soccer_skill_step_over",
+      "poseDataKey": "soccer_skill_step_over",
+      "category": "Skill",
+      "duration": 0.833333,
+      "contactFraction": -1.0,
+      "footPlantFrames": [
+        0.4,
+        0.8
+      ],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": [
+        "Left",
+        "Right"
       ]
     },
     {
@@ -1218,6 +1510,26 @@
       "footPlantSides": []
     },
     {
+      "id": "soccer_thigh_control",
+      "poseDataKey": "soccer_thigh_control",
+      "category": "FirstTouch",
+      "duration": 0.833333,
+      "contactFraction": 0.4,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Aerial",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
       "id": "soccer_through_ball",
       "poseDataKey": "soccer_through_ball",
       "category": "Pass",
@@ -1304,6 +1616,26 @@
       "preferredTurnRate": 0.0,
       "ballState": "None",
       "tags": [],
+      "boneCount": 18,
+      "loop": false,
+      "footPlantSides": []
+    },
+    {
+      "id": "soccer_trivela",
+      "poseDataKey": "soccer_trivela",
+      "category": "Kick",
+      "duration": 0.833333,
+      "contactFraction": 0.5,
+      "footPlantFrames": [],
+      "rootVelocityX": 0.0,
+      "rootVelocityZ": 0.0,
+      "preferredSpeed": 0.0,
+      "preferredTurnRate": 0.0,
+      "ballState": "Possessed",
+      "tags": [
+        "dedicated",
+        "sprite_forge_fieldsport"
+      ],
       "boneCount": 18,
       "loop": false,
       "footPlantSides": []

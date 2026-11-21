@@ -290,8 +290,11 @@ public sealed partial class SoccerClipRig : Node3D
         // An engine one-shot with its own clip (foul -> trip, catch, parry, header,
         // throw-in ...) wins over plain locomotion: the motion engine has no intent
         // for these and used to keep the player running through them.
-        if (motionDriven && p.ActionTimer > 0f && _aliases.ContainsKey(p.Action)
-            && (_motionState!.LastIntent is PlayerIntent.Move or PlayerIntent.Sprint || Dedicated(p.Action)))
+        if (motionDriven && p.ActionTimer > 0f && _aliases.TryGetValue(p.Action, out var own)
+            && (_motionState!.LastIntent is PlayerIntent.Move or PlayerIntent.Sprint
+                // A dedicated action the motion engine is not already playing (no
+                // feature table loaded): play its own clip directly.
+                || (Dedicated(p.Action) && _motionState.RenderClipId != own)))
             motionDriven = false;
         if (motionDriven)
         {
