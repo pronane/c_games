@@ -25,7 +25,8 @@ def test_probs_cover_only_strings_that_reach_the_note():
     assert probs[0] == pytest.approx([0, 0, 0, 0, 0, 1], abs=1e-6)        # low E open: only string 6
     assert sum(probs[1]) == pytest.approx(1, abs=1e-3)
     assert probs[1][5] == 0 and probs[1][4] == 0                          # E5 is out of reach on the low E and A strings
-    assert st.string_probs(audio, 22050, notes, [62, 57, 53, 48, 43, 38]) == [None, None]   # other tunings: not used
+    assert st.string_probs(audio, 22050, notes, [64, 59, 55, 50, 45, 38]) == [None, None]   # drop D: not used
+    assert st.uniform_shift([63, 58, 54, 49, 44, 39]) == 1 and st.uniform_shift([66, 61, 57, 52, 47, 42]) == -2
 
 
 def test_fingering_follows_a_clearly_heard_string():
