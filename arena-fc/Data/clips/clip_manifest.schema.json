@@ -54,7 +54,10 @@
               "KeeperDive",
               "Celebrate",
               "Idle",
-              "Recovery"
+              "Recovery",
+              "Keeper",
+              "Skill",
+              "Conduct"
             ]
           },
           "duration": {
