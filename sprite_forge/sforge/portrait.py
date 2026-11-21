@@ -1,4 +1,4 @@
-"""v11.20 portraits: a head-and-shoulders picture of a built character, for a fighter select screen, a team sheet or
+"""v11.23 portraits: a head-and-shoulders picture of a built character, for a fighter select screen, a team sheet or
 a HUD - and the select screen / team sheet themselves.
 
 The portrait is rendered from the character's own 3D model (model.glb - the mannequin, a library rig or a capture),

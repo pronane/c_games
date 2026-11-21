@@ -225,6 +225,228 @@
     "footsteps": []
    },
    "desc": ""
+  },
+  {
+   "name": "stepover",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     3,
+     6
+    ]
+   },
+   "desc": "step over the ball, outside-in, and drop the shoulder",
+   "own": [
+    "fs_stepover"
+   ]
+  },
+  {
+   "name": "roulette",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     3,
+     6
+    ]
+   },
+   "desc": "Marseille turn: drag back with one sole, spin, take it on with the other",
+   "own": [
+    "fs_roulette"
+   ]
+  },
+  {
+   "name": "elastico",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 2,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     5
+    ]
+   },
+   "desc": "outside of the foot one way, snap it back inside the other",
+   "own": [
+    "fs_elastico"
+   ]
+  },
+  {
+   "name": "drag_back",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 2,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     4
+    ]
+   },
+   "desc": "sole on the ball, roll it back and turn away",
+   "own": [
+    "fs_drag_back"
+   ]
+  },
+  {
+   "name": "rainbow_flick",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "roll it up the back of the calf and flick it over the head",
+   "own": [
+    "fs_rainbow_flick"
+   ]
+  },
+  {
+   "name": "fake_shot",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     4
+    ]
+   },
+   "desc": "full shooting back-swing, then stop and cut the ball the other way",
+   "own": [
+    "fs_fake_shot"
+   ]
+  },
+  {
+   "name": "thigh_control",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "cushion a dropping ball on the thigh",
+   "own": [
+    "fs_thigh_control"
+   ]
+  },
+  {
+   "name": "chip_shot",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "short back-swing, toe under the ball, lean back - a lob over the keeper",
+   "own": [
+    "fs_chip_shot"
+   ]
+  },
+  {
+   "name": "trivela",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "outside-of-the-boot strike swung across the body",
+   "own": [
+    "fs_trivela"
+   ]
+  },
+  {
+   "name": "bicycle_kick",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "overhead scissor kick, back to goal, landing on the back",
+   "own": [
+    "fs_bicycle_kick"
+   ]
   }
  ],
  "notes": "There is no header clip in the starter. header plays the jump clip and the game uses ball_contact. A recorded header (forge.py motion record) replaces it when that move is in the default set."

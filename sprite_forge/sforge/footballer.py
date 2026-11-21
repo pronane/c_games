@@ -242,7 +242,7 @@ def _rz(deg):
 
 
 def sf_kit(kit):
-    """v11.21: Sprite Forge's game kits (sforge.mesh.KITS: home, away, blue, red, black, gk) as "sf_<name>[#number]"
+    """v11.24: Sprite Forge's game kits (sforge.mesh.KITS: home, away, blue, red, black, gk) as "sf_<name>[#number]"
     -> (shirt, trim, shorts, socks) hex colours and the squad number (or None); None if kit is not one of them"""
     if not kit.startswith("sf_"):
         return None

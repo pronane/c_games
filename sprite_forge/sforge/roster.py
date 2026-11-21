@@ -1,4 +1,4 @@
-"""v11.20 rosters: a whole team, or a fighting game's cast, built in one go.
+"""v11.23 rosters: a whole team, or a fighting game's cast, built in one go.
 
     forge.py roster --game soccer --out teams/                  two sides (home and away), 5 players each, keeper in gk
     forge.py roster --game fighting --size 6 --out cast/        six fighters, every fighter type, different bodies
@@ -14,12 +14,12 @@ in OUT/<player>/. Then every player gets portrait.png (head and shoulders, from 
 A roster file is {"game": "soccer", "players": [{"name": "keeper", "side": "Home", "number": 1, "kit": "gk",
 "type": "keeper", "look": {"hair_style": "short02", "hair_colour": "black", "skin": "young_african_male"}},
 {"name": "mike", "rig": "captures/mike/out/mike.glb"}, {"name": "sub", "body": {"gender": 0, "muscle": 0.6}}, ...]}.
-"rig" is a library rig name or a GLB / FBX file (a capture). "look" (v11.21) is MakeHuman appearance keys
+"rig" is a library rig name or a GLB / FBX file (a capture). "look" (v11.24) is MakeHuman appearance keys
 (forge.py look --keys: hair style and colour, facial hair, skin, eyes, brows, face and muscle sliders): the player is
 a realistic MakeHuman character in the roster's kit with the squad number on the back. Without "rig" or "look" the
 player is the mannequin with that "body".
 
-v11.21: default rosters give every player a look of their own - hair style and colour, facial hair, skin tone, eye
+v11.24: default rosters give every player a look of their own - hair style and colour, facial hair, skin tone, eye
 colour, face shape, and muscles to suit their type - so a team or a cast no longer looks like copies of one figure.
 That needs the MakeHuman library (forge.py human --setup --full); without it the players fall back to the mannequin
 with different bodies, and roster.json says so.
@@ -37,7 +37,7 @@ FIGHTER_ORDER = ["balanced", "quick_striker", "heavy_brawler", "small_agile", "b
 FIGHTER_KITS = ["red", "blue", "black", "home", "away"]
 FIGHTER_NAMES = ["ace", "blaze", "brick", "pixie", "titan", "nova", "rook", "vex"]
 OUTFIELD = ["playmaker", "balanced", "quick_striker", "balanced", "playmaker", "quick_striker", "balanced"]
-# v11.21 looks: deterministic per player, so a roster rebuilds identically
+# v11.24 looks: deterministic per player, so a roster rebuilds identically
 # long01, bob01 and braid01 hang over the face on this body, so default looks leave them out (a roster file may use them)
 HAIR_STYLES = ["short02", "buzz", "short01", "afro01", "short04", "bald", "ponytail01", "short03"]
 HAIR_COLOURS = ["#1b1410", "#3b2614", "#6b4a2b", "#a8743f", "#c9a465", "#8a3b1c", "#2a2a2a", "#7a7570"]

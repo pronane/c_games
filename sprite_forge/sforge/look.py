@@ -141,7 +141,7 @@ class Builder:
         return res
 
     def glb(self, ch, path, kit="home"):
-        """v11.21: the kit the character was built in (was always "home"), and hair / brows / lashes coloured in their
+        """v11.24: the kit the character was built in (was always "home"), and hair / brows / lashes coloured in their
         textures - their colour was only a vertex colour, which most engines and FBX ignore (grey hair in Unity,
         Unreal, raylib and Sprite Forge's own sprites)."""
         from . import glbpack

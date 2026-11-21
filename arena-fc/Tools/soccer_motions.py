@@ -14,7 +14,9 @@ the same semantic pose channels as `sforge.rig.evaluate`.
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 
 from sforge.motions import (
     CROUCH,
@@ -178,25 +180,28 @@ CUSTOM = {
                         func=_soccer_loco(35, 78, 22, 48, 11, air=0.025)),
     "soccer_sprint": dict(category="Locomotion", desc="compact soccer sprint", loop=True,
                            func=_soccer_loco(46, 98, 26, 52, 15, air=0.06)),
-    # Feet-first slide: recline the torso, keep the head lifted, extend the lead
-    # leg toward the challenge and tuck the trailing leg. Match movement supplies
-    # the actual ground travel, so these poses deliberately contain no root run-up.
+    # Feet-first slide.  The old keys only reclined the pelvis ~10 deg, so the
+    # feet stayed the lowest point and the ground constraint left the player in
+    # a crouch with one leg out.  Now the pelvis reclines ~50 deg, the lead leg
+    # goes straight out along the turf, the trailing leg folds under and the
+    # support hand goes down behind - the ground constraint lays the body on
+    # the grass.  Match movement supplies the travel (no root run-up here).
     "soccer_slide_tackle": dict(category="Defence", desc="feet-first sliding tackle", loop=False, keys=K(
         (0.0, P(READY, arm_L=(16, -46, 0), arm_R=(16, -46, 0), elbow_L=40, elbow_R=40)),
-        (0.16, P(CROUCH, hips=(12, -4, 0), spine=(4, 0, 0), chest=(2, 0, 0), neck=(5, 0, 0),
-                 leg_L=(36, 8, 0), knee_L=82, leg_R=(18, -8, 0), knee_R=88,
-                 arm_L=(18, -50, 0), arm_R=(18, -50, 0), elbow_L=48, elbow_R=48)),
-        (0.38, P(CROUCH, hips=(-10, -6, 65), spine=(8, 0, 0), chest=(2, 0, 0), neck=(10, 0, 0),
-                 leg_L=(72, 10, 0), knee_L=16, ankle_L=-6,
-                 leg_R=(34, -8, 0), knee_R=72,
-                 arm_L=(8, -50, 0), arm_R=(8, -50, 0), elbow_L=42, elbow_R=42)),
-        (0.68, P(CROUCH, hips=(-8, -6, 60), spine=(6, 0, 0), chest=(2, 0, 0), neck=(8, 0, 0),
-                 leg_L=(68, 10, 0), knee_L=18, ankle_L=-4,
-                 leg_R=(32, -8, 0), knee_R=68,
-                 arm_L=(8, -50, 0), arm_R=(8, -50, 0), elbow_L=42, elbow_R=42)),
-        (0.86, P(CROUCH, hips=(-12, 0, 0), spine=(6, 0, 0), chest=(2, 0, 0), neck=(4, 0, 0),
-                 leg_L=(34, 6, 0), knee_L=68, leg_R=(24, -6, 0), knee_R=76,
-                 arm_L=(14, -46, 0), arm_R=(14, -46, 0), elbow_L=46, elbow_R=46)),
+        (0.14, P(READY, hips=(10, -4, 0), spine=(4, 0, 0), neck=(-6, 0, 0),
+                 leg_L=(42, 8, 0), knee_L=64, leg_R=(8, -6, 0), knee_R=76,
+                 arm_L=(20, 30, 0), arm_R=(-10, 30, 0), elbow_L=40, elbow_R=30)),
+        (0.32, P(STAND, hips=(-58, -4, 52), spine=(14, 0, 0), chest=(8, 0, 0), neck=(34, 0, 0),
+                 leg_L=(30, 6, 0), knee_L=6, ankle_L=-12,
+                 leg_R=(-22, -6, 0), knee_R=112, ankle_R=20,
+                 arm_L=(24, 34, 0), elbow_L=30, arm_R=(-38, 30, 0), elbow_R=14)),
+        (0.68, P(STAND, hips=(-54, -4, 50), spine=(14, 0, 0), chest=(8, 0, 0), neck=(32, 0, 0),
+                 leg_L=(28, 6, 0), knee_L=8, ankle_L=-10,
+                 leg_R=(-20, -6, 0), knee_R=108, ankle_R=20,
+                 arm_L=(22, 32, 0), elbow_L=30, arm_R=(-36, 30, 0), elbow_R=16)),
+        (0.86, P(CROUCH, hips=(-10, 0, 0), spine=(8, 0, 0), chest=(2, 0, 0), neck=(4, 0, 0),
+                 leg_L=(40, 6, 0), knee_L=70, leg_R=(20, -6, 0), knee_R=96,
+                 arm_L=(14, 20, 0), arm_R=(-16, 24, 0), elbow_L=46, elbow_R=30)),
         (1.0, P(READY)))),
     "soccer_volley": dict(category="Ball", desc="first-time volley", loop=False, keys=K(
         (0.0, P(READY, ball=("world", 0, 0.55, 0.45))),
@@ -344,7 +349,56 @@ CLIP_SPECS = [
     ("soccer_solo", "bounce_solo", True, "Ball", "solo / bounce"),
     ("soccer_fist_pass", "fist_pass", False, "Ball", "fist pass"),
     ("soccer_fist_shoot", "fist_shoot", False, "Ball", "fist shot"),
+    # Sprite Forge v11.21 field-sport pack (sforge/fieldsport_motions.py): clips the
+    # engine already asked for but played generic stand-ins for.
+    ("soccer_skill_step_over", "fs_stepover", False, "Skill", "step-over"),
+    ("soccer_skill_roulette", "fs_roulette", False, "Skill", "roulette / Marseille turn"),
+    ("soccer_skill_drag_back", "fs_drag_back", False, "Skill", "drag back"),
+    ("soccer_skill_elastico", "fs_elastico", False, "Skill", "elastico"),
+    ("soccer_skill_ball_roll", "fs_ball_roll", False, "Skill", "ball roll"),
+    ("soccer_skill_rainbow", "fs_rainbow_flick", False, "Skill", "rainbow flick"),
+    ("soccer_skill_fake_shot", "fs_fake_shot", False, "Skill", "fake shot"),
+    ("soccer_skill_heel_to_heel", "fs_heel_to_heel", False, "Skill", "heel to heel"),
+    ("soccer_thigh_control", "fs_thigh_control", False, "Ball", "thigh control"),
+    ("soccer_chip_shot", "fs_chip_shot", False, "Ball", "chip shot"),
+    ("soccer_trivela", "fs_trivela", False, "Ball", "outside-of-the-boot strike"),
+    ("soccer_bicycle_kick", "fs_bicycle_kick", False, "Ball", "bicycle kick"),
+    ("soccer_keeper_penalty_set", "fs_keeper_penalty_set", True, "Goalkeeper", "keeper set for a penalty"),
+    ("soccer_punch", "fs_punch", False, "Contact", "punch (violent conduct)"),
+    ("soccer_headbutt", "fs_headbutt", False, "Contact", "headbutt (violent conduct)"),
 ]
+
+# ---------------------------------------------------------------------------
+# Real motion capture (CMU Graphics Lab, via Tools/import_cmu_football.py):
+# Sprite Forge library moves in Data/mocap/cmu/.  Each becomes soccer_<name>.
+# ---------------------------------------------------------------------------
+MOCAP_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data", "mocap")
+MOCAP_DIR = os.path.join(MOCAP_ROOT, "cmu")
+# Real in-match motion (SkillCorner open body pose, via Tools/import_skillcorner_pose.py).
+MOCAP_SC_DIR = os.path.join(MOCAP_ROOT, "skillcorner")
+_MOCAP_CATEGORY = {"Kick": "Ball", "Locomotion": "Locomotion", "Cut": "Locomotion", "Recovery": "Locomotion",
+                   "Pass": "Ball", "FirstTouch": "Ball", "Dribble": "Ball", "Tackle": "Defence"}
+_MOCAP_SOURCE = {MOCAP_DIR: "CMU take", MOCAP_SC_DIR: "SkillCorner match event"}
+
+
+def _mocap_takes():
+    takes = []
+    for d in (MOCAP_DIR, MOCAP_SC_DIR):
+        path = os.path.join(d, "_import.json")
+        if not os.path.isfile(path):
+            continue
+        with open(path) as f:
+            for t in json.load(f).get("takes", []):
+                takes.append(dict(t, dir=d))
+    return takes
+
+
+MOCAP_TAKES = _mocap_takes()
+MOCAP_DIR_OF = {_t["name"]: _t["dir"] for _t in MOCAP_TAKES}
+for _t in MOCAP_TAKES:
+    CLIP_SPECS.append(("soccer_" + _t["name"], "mocap:" + _t["name"], bool(_t["loop"]),
+                       _MOCAP_CATEGORY.get(_t["category"], "Mocap"),
+                       "motion capture: %s %s (%s)" % (_MOCAP_SOURCE[_t["dir"]], _t["take"], _t["category"].lower())))
 
 # Match-engine / control actions -> clip name.  Keys cover the C# PlayerState
 # Action strings, the pad/keyboard actions and the restart phases.
@@ -380,7 +434,9 @@ ACTION_ALIASES = {
     "shoulder_charge": "soccer_shoulder_charge",
     "dispossess": "soccer_dispossess",
     "block": "soccer_block",
-    "foul": "soccer_foul",
+    # The fouled player goes down (soccer_foul is an arms-up appeal and was
+    # what showed at every free kick).
+    "foul": "soccer_trip",
     "stumble": "soccer_stumble",
     "trip": "soccer_trip",
     "fall": "soccer_fall",
@@ -432,6 +488,22 @@ ACTION_ALIASES = {
     "solo": "soccer_solo",
     "fist_pass": "soccer_fist_pass",
     "fist_shoot": "soccer_fist_shoot",
+    "skill_step_over": "soccer_skill_step_over",
+    "skill_roulette": "soccer_skill_roulette",
+    "skill_drag_back": "soccer_skill_drag_back",
+    "skill_elastico": "soccer_skill_elastico",
+    "skill_ball_roll": "soccer_skill_ball_roll",
+    "skill_rainbow": "soccer_skill_rainbow",
+    "skill_fake_shot": "soccer_skill_fake_shot",
+    "skill_heel_to_heel": "soccer_skill_heel_to_heel",
+    "thigh_control": "soccer_thigh_control",
+    "chip_shot": "soccer_chip_shot",
+    "trivela": "soccer_trivela",
+    "bicycle": "soccer_bicycle_kick",
+    "bicycle_kick": "soccer_bicycle_kick",
+    "keeper_penalty_set": "soccer_keeper_penalty_set",
+    "punch": "soccer_punch",
+    "headbutt": "soccer_headbutt",
 }
 
 ALL_CLIPS = [c[0] for c in CLIP_SPECS]
@@ -527,6 +599,36 @@ CLIP_EVENTS = {
     "soccer_fist_pass": _ev(ball_contact=0.50),
     "soccer_fist_shoot": _ev(ball_contact=0.50),
 }
+# Field-sport pack clips carry their own events in Sprite Forge.
+from sforge import fieldsport_motions as _fs  # noqa: E402
+for _name, _base, *_ in CLIP_SPECS:
+    if _base in _fs.EVENTS:
+        CLIP_EVENTS[_name] = dict(_fs.EVENTS[_base])
+def _mocap_events(name):
+    with open(os.path.join(MOCAP_DIR_OF.get(name, MOCAP_DIR), name + ".json")) as f:
+        rec = json.load(f)
+    imp = rec.get("import") or {}
+    canon = imp.get("canonical") or {}
+    dur = float(rec.get("duration") or canon.get("duration") or 1.0)
+    contact = -1.0
+    if canon.get("peak_s") is not None and canon.get("cut_s"):
+        contact = round((canon["peak_s"] - canon["cut_s"][0]) / dur, 3)
+    elif imp.get("contact") is not None and float(imp["contact"]) >= 0:
+        contact = round(float(imp["contact"]), 3)
+    # Foot plants: each leg's most-forward swing (heel strike) in the take.
+    steps = []
+    keys = rec["keys"]
+    for leg in ("leg_L", "leg_R"):
+        vals = [(k[0], (k[1].get(leg) or [0])[0]) for k in keys]
+        for i in range(1, len(vals) - 1):
+            if vals[i][1] > vals[i - 1][1] and vals[i][1] >= vals[i + 1][1] and vals[i][1] > 15:
+                steps.append(round(float(vals[i][0]), 3))
+    return _ev(ball_contact=contact, footsteps=tuple(sorted(s for s in steps if 0.0 <= s <= 1.0)))
+
+
+for _t in MOCAP_TAKES:
+    CLIP_EVENTS["soccer_" + _t["name"]] = _mocap_events(_t["name"])
+
 # Every clip must have an event entry (default: no events).
 for _n in ALL_CLIPS:
     CLIP_EVENTS.setdefault(_n, _ev())
@@ -541,6 +643,15 @@ def register() -> None:
           keys=spec.get("keys"), func=spec.get("func"), loop=spec.get("loop", False))
     for name, base, loop, category, desc in CLIP_SPECS:
         if name in LIB:
+            continue
+        if base and base.startswith("mocap:"):
+            from sforge.motionlib import as_motion
+            mv = base.split(":", 1)[1]
+            src = as_motion(mv, path=MOCAP_DIR_OF.get(mv, MOCAP_DIR))
+            if src is None:
+                raise KeyError("motion-capture move %s missing from %s" % (base, MOCAP_DIR_OF.get(mv, MOCAP_DIR)))
+            M(name, category, desc, keys=src.keys, loop=loop)
+            LIB[name].duration_s = getattr(src, "duration_s", None)
             continue
         if base is None:
             raise KeyError("custom clip %s missing from CUSTOM" % name)

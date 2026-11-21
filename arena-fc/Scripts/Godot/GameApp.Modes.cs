@@ -517,6 +517,14 @@ public partial class GameApp
     /// <summary>Everything that has to happen when a match ends, per mode.</summary>
     private void HandleMatchEnd(MatchState state)
     {
+        if (Mode == GameMode.SkillGames)
+        {
+            bool newBest = _save.RecordSkill(_skillGame, state.Score[0]);
+            _save.PushResult($"Skill game {MatchEngine.SkillTitle(_skillGame)}: {state.Score[0]} points");
+            SaveGameNow();
+            ShowSkillResult(_skillGame, state.Score[0], newBest);
+            return;
+        }
         int gf = state.Score[0], ga = state.Score[1];
         string line = $"{Options.HomeLabel} {gf}-{ga} {Options.AwayLabel}";
         UnlockAchievements(state, _context == MatchContext.Tournament, _context == MatchContext.Career);

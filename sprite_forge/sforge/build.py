@@ -326,7 +326,7 @@ def _mannequin_frames(cfg, sp, report, only=None):
     from . import cellfit as CF
     rs = render_settings(cfg, cfg.figure_h * sp.scale)
     rs0 = rs
-    pad = CF.pad_for(cfg) if only is None else 0       # v11.21: drawn padded, then every move fitted into the cell
+    pad = CF.pad_for(cfg) if only is None else 0       # v11.24: drawn padded, then every move fitted into the cell
     if pad:
         rs = CF.pad_rs(rs, pad)
     prop = _prop(cfg)
@@ -920,7 +920,7 @@ def _ground_lock(cfg, frames, report):
     from .cellfit import pivot_of
     for mv, (fr, src, note) in frames.items():
         new = []
-        gy = pivot_of(cfg, mv)[1]                      # v11.21: a move fitted into the cell has its own ground line
+        gy = pivot_of(cfg, mv)[1]                      # v11.24: a move fitted into the cell has its own ground line
         for im in fr:
             if dy:
                 im = _shift(im, dy)
@@ -1617,7 +1617,7 @@ def build(cfg: BuildConfig, log=print, progress=None):
         m = spec_by[mv]
         names = []
         from .cellfit import pivot_of
-        _px, _gy = pivot_of(cfg, mv)                     # v11.21: own pivot for a move fitted into the cell
+        _px, _gy = pivot_of(cfg, mv)                     # v11.24: own pivot for a move fitted into the cell
         _pn = {"x": round(_px / cfg.frame_w, 5), "y": round(_gy / cfg.frame_h, 5)}
         for i in range(n):
             fname = "%s_%02d" % (mv, i)

@@ -18,13 +18,17 @@ public sealed class MotionQuery
     public float CurrentPhase { get; }
     public float SwitchPenalty { get; }
     public float TemporalPenalty { get; }
+    /// <summary>When set, only this clip's rows are candidates (an action with its own
+    /// clip): the search picks the entry frame, not the clip.</summary>
+    public string ForcedClipId { get; }
 
     /// <summary>Build the shared 23D locomotion query from the last matched local foot
     /// pose, current/desired root motion, and a deterministic damped-pursuit trajectory.
     /// Velocity and facing inputs are already in the current facing-root XZ basis.</summary>
     public static float[] BuildFeatures(ReadOnlySpan<float> currentPoseFeatures,
         float rootVelX, float rootVelZ, float yawRate,
-        float desiredVelX, float desiredVelZ, float desiredYawRate)
+        float desiredVelX, float desiredVelZ, float desiredYawRate,
+        float timeToContact = MotionFeatureLayout.NoContact)
     {
         if (currentPoseFeatures.Length != 8)
             throw new ArgumentException("Current pose must contain the 8 foot position/velocity features.", nameof(currentPoseFeatures));
@@ -47,13 +51,15 @@ public sealed class MotionQuery
             features[17 + i * 2] = MathF.Sin(yaw);
             features[18 + i * 2] = MathF.Cos(yaw);
         }
+        features[MotionFeatureLayout.TimeToContact] = float.IsFinite(timeToContact) && timeToContact >= 0f
+            ? MathF.Min(timeToContact, MotionFeatureLayout.NoContact) : MotionFeatureLayout.NoContact;
         return features;
     }
 
     public MotionQuery(float[] features, ClipCategory category, BallState ball,
         PlayerIntent intent = PlayerIntent.Move, string? styleTag = null,
         string? currentClipId = null, float currentPhase = 0f,
-        float switchPenalty = .08f, float temporalPenalty = .12f)
+        float switchPenalty = .08f, float temporalPenalty = .12f, string? forcedClipId = null)
     {
         if (features == null) throw new ArgumentNullException(nameof(features));
         if (features.Length != MotionFeatureLayout.Dimensions)
@@ -74,5 +80,6 @@ public sealed class MotionQuery
         CurrentPhase = currentPhase;
         SwitchPenalty = switchPenalty;
         TemporalPenalty = temporalPenalty;
+        ForcedClipId = forcedClipId ?? "";
     }
 }

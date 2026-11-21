@@ -97,6 +97,39 @@ public partial class GameApp
         Ui.FocusFirst(v);
     }
 
+    /// <summary>2.4: pick one of the five skill games; best scores beside each.</summary>
+    public void ShowSkillGames()
+    {
+        var root = ModeBackdrop("SkillGames");
+        var v = Ui.VBox(8);
+        v.AddChild(Ui.Lbl("SKILL GAMES", 30, Ui.Accent));
+        v.AddChild(Ui.Lbl("Short scored challenges on the training ground.", 14, Ui.Sub));
+        foreach (SkillGame g in Enum.GetValues<SkillGame>())
+        {
+            var game = g;
+            int best = _save.BestSkill(g);
+            v.AddChild(Ui.Btn($"{MatchEngine.SkillTitle(g)}   ·   best {best}", () => StartSkillGame(game)));
+            v.AddChild(Ui.Lbl(MatchEngine.SkillRules(g), 13, Ui.Sub));
+        }
+        v.AddChild(Ui.Btn("BACK", ShowMenu, true));
+        ModePanel(root, v);
+        Ui.FocusFirst(v);
+    }
+
+    private void ShowSkillResult(SkillGame g, int score, bool newBest)
+    {
+        var root = ModeBackdrop("SkillResult");
+        var v = Ui.VBox(10);
+        v.AddChild(Ui.Lbl(MatchEngine.SkillTitle(g), 30, Ui.Accent));
+        v.AddChild(Ui.Lbl($"{score} points", 26));
+        v.AddChild(Ui.Lbl(newBest ? "NEW BEST!" : $"Best {_save.BestSkill(g)}", 16, newBest ? Ui.Accent : Ui.Sub));
+        v.AddChild(Ui.Btn("PLAY AGAIN", () => StartSkillGame(g), true));
+        v.AddChild(Ui.Btn("OTHER SKILL GAMES", ShowSkillGames));
+        v.AddChild(Ui.Btn("MAIN MENU", ShowMenu));
+        ModePanel(root, v);
+        Ui.FocusFirst(v);
+    }
+
     private void ShowAchievements()
     {
         var root = ModeBackdrop("Achievements");
@@ -127,7 +160,7 @@ public partial class GameApp
         v.AddChild(Ui.Lbl("CUSTOM TRAINING", 30, Ui.Accent));
         v.AddChild(Ui.Lbl($"{drill.Name} · {drill.Type} · target {drill.TargetScore}", 16));
         foreach (var step in drill.Steps) v.AddChild(Ui.Lbl("• " + step, 14, Ui.Sub));
-        v.AddChild(Ui.Btn("RUN THIS DRILL", () => { Mode = GameMode.SkillGames; StartSkillGames(); }, true));
+        v.AddChild(Ui.Btn("RUN THIS DRILL", () => StartSkillGame(drill.Type), true));
         v.AddChild(Ui.Btn("BACK", ShowExtras, true));
         ModePanel(root, v);
         Ui.FocusFirst(v);

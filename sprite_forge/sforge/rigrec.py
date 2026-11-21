@@ -366,7 +366,7 @@ class Rig:
                            rgb=self.face_colors(kit)[vis], two_sided=True)
 
     def opaque_faces(self):
-        """(nf,) bool: faces to draw. v11.21: hair / brow / lash cards are alpha-tested textures; drawn as flat colour
+        """(nf,) bool: faces to draw. v11.24: hair / brow / lash cards are alpha-tested textures; drawn as flat colour
         their see-through parts covered the face (long hair hid it). A face is kept when its texture is opaque at
         its centre or at any of the points halfway to its corners."""
         if "_opaque" in self._tri_cache:

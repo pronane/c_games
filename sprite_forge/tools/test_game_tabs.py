@@ -20,9 +20,9 @@ With a window:
   9 each game's page fills: header, moves table, the right character settings; every move plays in the preview
  10 Build from the tab streams the log, then shows the sheet preview and colours the moves by their QA
  11 Shot list from the tab prints what to film for that game
- 12 (v11.20) the preview plays the built character's own sprites, frame by frame
- 13 (v11.20) Build the team / cast from the tab: a roster with a select screen; Export project makes the engine project
- 14 (v11.21) hit and hurt boxes drawn over the built character on a strike's hit frame"""
+ 12 (v11.23) the preview plays the built character's own sprites, frame by frame
+ 13 (v11.23) Build the team / cast from the tab: a roster with a select screen; Export project makes the engine project
+ 14 (v11.24) hit and hurt boxes drawn over the built character on a strike's hit frame"""
 from __future__ import annotations
 import argparse
 import json
@@ -231,7 +231,7 @@ def window_checks(GG, packs):
             len(json.load(open(os.path.join(proj, "characters", "index.json")))) == 2
         rec("13 Build the cast and Export project from the tab", ok_r and ok_e, "%s | %s" % (g.status.get(), g.log.get("1.0", "end")[-300:]))
 
-        # 14: hit and hurt boxes over the built character (v11.21)
+        # 14: hit and hurt boxes over the built character (v11.24)
         g.source.set("mannequin"); g.glb.set(False)
         g.build()
         t0 = time.time()

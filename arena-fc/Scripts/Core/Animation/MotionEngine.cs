@@ -15,6 +15,14 @@ public sealed class MotionEngine
 
     public int ClipCount => _ordered.Count;
 
+    /// <summary>Pose-level motion matching (schema v2 feature table).  When set, every
+    /// clip switch - and running cycles about ten times a second - searches the
+    /// baked frames for the best continuation: the pose the body is in, the path it
+    /// is about to take and, for ball actions, the wind-up time left before contact.
+    /// Without it the rule selector below runs exactly as before.</summary>
+    public MotionDatabase? Database { get; set; }
+    public const float LocomotionQueryInterval = .1f;
+
     public void LoadClips(IEnumerable<ClipMeta> clips)
     {
         _clips.Clear();
@@ -47,7 +55,8 @@ public sealed class MotionEngine
     /// input derived from ActionDuration/ActionContactAt; it never schedules the sim event.</summary>
     public void Update(MotionState motion, float speed, float turnRate, BallState ball,
         PlayerIntent intent, float dt, float secondsUntilContact = -1f,
-        float bodyTypeFactor = 1f, string? styleTag = null)
+        float bodyTypeFactor = 1f, string? styleTag = null,
+        Vector2 localVelocity = default, Vector2 desiredLocalVelocity = default, string? forcedClipId = null)
     {
         if (motion == null) throw new ArgumentNullException(nameof(motion));
         dt = Math.Max(0f, dt);
@@ -59,6 +68,29 @@ public sealed class MotionEngine
         motion.TimeSinceContact += dt;
 
         ClipMeta? selected = SelectClip(intent, ball, speed, turnRate, bodyTypeFactor, styleTag);
+        if (forcedClipId != null && _clips.TryGetValue(forcedClipId, out var forcedClip)) selected = forcedClip;
+        float? matchedPhase = null;
+        motion.SinceQuery += dt;
+        if (selected != null && Database != null)
+        {
+            bool switching = !string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal);
+            bool gait = selected.Loop && IsLocomotion(selected.Category);
+            if (switching || (gait && motion.SinceQuery >= LocomotionQueryInterval))
+            {
+                motion.SinceQuery = 0f;
+                var m = Match(motion, selected, ball, intent, turnRate, styleTag, localVelocity,
+                              desiredLocalVelocity, secondsUntilContact, forcedClipId);
+                if (m != null && _clips.TryGetValue(m.Value.Row.ClipId, out var mc))
+                {
+                    // A running cycle that already plays the matched clip near the matched
+                    // phase carries on (no needless restart); anything else enters at the match.
+                    bool sameSpot = string.Equals(mc.Id, motion.RenderClipId, StringComparison.Ordinal)
+                                    && CircularDistance(motion.RenderPhase, m.Value.Row.Phase) < .15f;
+                    if (!sameSpot || switching) { selected = mc; matchedPhase = m.Value.Row.Phase; }
+                    motion.MotionMatchRowIndex = m.Value.RowIndex;
+                }
+            }
+        }
         if (selected == null)
         {
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
@@ -70,15 +102,15 @@ public sealed class MotionEngine
         if (motion.CurrentClipId.Length == 0 && motion.NextClipId.Length == 0)
         {
             motion.CurrentClipId = selected.Id;
-            motion.Phase = selected.Loop ? Wrap01(motion.Phase) : 0f;
+            motion.Phase = matchedPhase ?? (selected.Loop ? Wrap01(motion.Phase) : 0f);
             motion.BlendWeight = 1f;
         }
-        else if (!string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal))
+        else if (!string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal) || matchedPhase != null)
         {
             // If a transition is interrupted, begin from its visible destination phase.
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
             if (!_clips.TryGetValue(motion.CurrentClipId, out var from)) from = selected;
-            float start = ComputeStartPhase(from, selected, motion.Phase, intent);
+            float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent);
             motion.NextClipId = selected.Id;
             motion.NextPhase = selected.Loop ? Wrap01(start) : Clamp01(start);
             motion.CrossfadeDuration = DefaultCrossfadeSeconds;
@@ -87,14 +119,15 @@ public sealed class MotionEngine
         }
 
         var current = _clips.TryGetValue(motion.CurrentClipId, out var c) ? c : selected;
-        float scale = PlaybackScale(selected, speed, intent, secondsUntilContact);
+        float scale = PlaybackScale(selected, speed, intent, secondsUntilContact,
+            motion.NextClipId.Length > 0 ? motion.NextPhase : motion.Phase);
         motion.PlaybackScale = scale;
         float oldPhase = motion.NextClipId.Length > 0 ? motion.NextPhase : motion.Phase;
         if (motion.NextClipId.Length > 0)
         {
             if (_clips.TryGetValue(motion.NextClipId, out var next))
                 motion.NextPhase = AdvancePhase(next, motion.NextPhase, dt, scale);
-            motion.Phase = AdvancePhase(current, motion.Phase, dt, PlaybackScale(current, speed, intent, secondsUntilContact));
+            motion.Phase = AdvancePhase(current, motion.Phase, dt, PlaybackScale(current, speed, intent, secondsUntilContact, motion.Phase));
             motion.CrossfadeRemaining = Math.Max(0f, motion.CrossfadeRemaining - dt);
             motion.BlendWeight = motion.CrossfadeDuration <= 0f ? 1f
                 : Mx.Clamp(1f - motion.CrossfadeRemaining / motion.CrossfadeDuration, 0f, 1f);
@@ -113,12 +146,40 @@ public sealed class MotionEngine
             motion.TimeSinceContact = 0f;
         }
         UpdateFootPlants(motion, visible, visiblePhase);
+        motion.LastPoseClipId = motion.RenderClipId;
+        motion.LastPosePhase = motion.RenderPhase;
+    }
+
+    private MotionMatch? Match(MotionState motion, ClipMeta selected, BallState ball, PlayerIntent intent,
+        float turnRate, string? styleTag, Vector2 localVel, Vector2 desiredVel, float secondsUntilContact,
+        string? forcedClipId)
+    {
+        Span<float> pose = stackalloc float[8];
+        string poseClip = motion.RenderClipId.Length > 0 ? motion.RenderClipId : motion.LastPoseClipId;
+        float posePhase = motion.RenderClipId.Length > 0 ? motion.RenderPhase : motion.LastPosePhase;
+        if (poseClip.Length == 0 || !Database!.TryGetPoseFeatures(poseClip, posePhase, pose)) pose.Clear();
+        float ttc = secondsUntilContact > 0f ? secondsUntilContact : MotionFeatureLayout.NoContact;
+        var features = MotionQuery.BuildFeatures(pose, localVel.X, localVel.Y, turnRate,
+            desiredVel.X, desiredVel.Y, turnRate, ttc);
+        string? forced = forcedClipId != null && _clips.ContainsKey(forcedClipId) ? forcedClipId
+                       : selected.Dedicated ? selected.Id : null;
+        var query = new MotionQuery(features, selected.Category, ball, intent, styleTag,
+            selected.Loop ? motion.RenderClipId : null, motion.RenderPhase, forcedClipId: forced);
+        return Database!.TrySearch(query, out var m) ? m : null;
     }
 
     public ClipMeta? SelectClip(PlayerIntent intent, BallState ball, float speed, float turnRate,
         float bodyTypeFactor = 1f, string? styleTag = null)
     {
         ClipCategory category = SelectCategory(intent, ball);
+        // Standing still is idle, not the slowest "locomotion" clip: with blocks,
+        // appeals and victories filed under Locomotion at speed 0, stationary
+        // players stood with their arms in the air at every stoppage.
+        if (category == ClipCategory.Locomotion && ball != BallState.Possessed && speed < .35f)
+        {
+            ClipMeta? idle = SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, styleTag);
+            if (idle != null) return idle;
+        }
         ClipMeta? best = SelectBest(category, ball, speed, turnRate, bodyTypeFactor, styleTag);
         if (best != null) return best;
         if (category != ClipCategory.Locomotion)
@@ -213,6 +274,7 @@ public sealed class MotionEngine
         }
         foreach (var c in _ordered)
         {
+            if (c.Dedicated) continue;      // only ever played for the action that names it
             if (c.Category != category || (exactBallStateExists && c.BallState != ball)
                 || (!exactBallStateExists && neutralBallStateExists && c.BallState != BallState.None)) continue;
             float speedError = MathF.Abs(c.PreferredSpeed - speed) * Math.Clamp(bodyTypeFactor, .5f, 1.5f);
@@ -226,10 +288,16 @@ public sealed class MotionEngine
         return best;
     }
 
-    private static float PlaybackScale(ClipMeta clip, float speed, PlayerIntent intent, float secondsUntilContact)
+    private static float PlaybackScale(ClipMeta clip, float speed, PlayerIntent intent, float secondsUntilContact,
+        float phase = 0f)
     {
         if (clip.HasContact && secondsUntilContact > .001f)
-            return ContactAlignedPlaybackScale(clip, secondsUntilContact);
+        {
+            // Play the wind-up that is LEFT (from the entry frame) in the time left.
+            float remaining = (clip.ContactFraction - Clamp01(phase)) * clip.Duration;
+            if (remaining > .01f) return Math.Clamp(remaining / secondsUntilContact, .4f, 3f);
+            return 1f;
+        }
         if (IsLocomotion(clip.Category) && clip.PreferredSpeed > .1f)
             return Math.Clamp(speed / clip.PreferredSpeed, .45f, 2.8f);
         return 1f;

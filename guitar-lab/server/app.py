@@ -526,6 +526,68 @@ async def compare_performance(take: UploadFile | None = File(None), take_notes: 
         raise HTTPException(422, str(exc)) from exc
 
 
+def take_tempo(path, notes):
+    """Tempo and beat times of a take played to no click: (bpm, beats). The beats run from the
+    beat nearest the first note, so bar 1 starts where the playing starts."""
+    import librosa
+    audio, sr = librosa.load(str(path), sr=22050, mono=True)
+    tempo, frames = librosa.beat.beat_track(y=audio, sr=sr, hop_length=512, start_bpm=100)
+    beats = librosa.frames_to_time(frames, sr=sr, hop_length=512)
+    bpm = float(np.atleast_1d(tempo)[0]) if np.size(tempo) else 0.0
+    if len(beats) > 2:
+        bpm = 60.0/float(np.median(np.diff(beats)))
+    if not math.isfinite(bpm) or not 40 <= bpm <= 240:
+        bpm = 90.0
+    first = min((n['time'] for n in notes), default=0.0)
+    near = [b for b in beats if abs(b-first) < 30/bpm]
+    start = float(near[0]) if near else first
+    start = min(start, first) if first-start < 30/bpm else first
+    return round(bpm, 1), round(max(0.0, start), 3)
+
+
+@app.post('/api/takes/transcribe')
+async def transcribe_own_take(take: UploadFile = File(...), consent: bool = Form(False), transcriber: str = Form(''),
+                              standard_tuning: bool = Form(False), x_fretwork_client: str | None = Header(None)):
+    """Your own playing on its own (a riff, a phrase) -> the notes heard, plus a tempo guess.
+
+    For "your take to tab": the studio writes the tab and notation from these notes with
+    /api/tabs/notation, on the click the player recorded to or on this tempo guess. The audio is
+    deleted as soon as it is transcribed.
+    """
+    client(x_fretwork_client)
+    if not consent:
+        raise HTTPException(422, 'Explicit upload consent is required.')
+    from .transcribers import checked_backend
+    try:
+        backend = checked_backend(transcriber)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if not models.capabilities()['transcription']['configured']:
+        raise HTTPException(503, 'The note detector is not installed.')
+    from . import compare as take_diff
+    folder = ROOT/f'take-{uuid4().hex}'
+    folder.mkdir(mode=0o700, parents=True)
+    try:
+        path = folder/'take.wav'
+        duration = await save_audio(take, path)
+        notes = await asyncio.to_thread(take_diff.transcribe_take, path, backend)
+        notes = [{'time': round(float(n['time']), 4), 'duration': round(float(n['duration']), 4), 'midi': int(n['midi']),
+                  'amplitude': round(float(n.get('amplitude', 0.5)), 3)} for n in notes]
+        bpm, first_beat = await asyncio.to_thread(take_tempo, path, notes)
+        if standard_tuning:
+            # Which string each note was played on, heard from its sound (standard tuning only).
+            from . import string_timbre
+            import soundfile as sf
+            audio, rate = sf.read(path, dtype='float32')
+            for n, probs in zip(notes, await asyncio.to_thread(string_timbre.string_probs, audio, rate, notes, string_timbre.STANDARD)):
+                if probs:
+                    n['string_probs'] = probs
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+    return {'notes': notes, 'duration': round(duration, 3), 'bpm': bpm, 'first_beat': first_beat,
+            'detector': transcription_label(backend)}
+
+
 @app.post('/api/shutdown', status_code=202)
 def shutdown(request: Request, x_fretwork_client: str | None = Header(None)):
     """Let the Windows uninstaller/updater stop a running app. Only enabled by the local

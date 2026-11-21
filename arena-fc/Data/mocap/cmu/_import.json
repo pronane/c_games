@@ -1,0 +1,204 @@
+{
+ "source": "CMU Graphics Lab Motion Capture Database",
+ "licence": {
+  "spdx": "custom",
+  "custom_text": "CMU Graphics Lab Motion Capture Database: free for all uses; may be included in commercially-sold products; the data may not be resold directly, even in converted form.",
+  "author": "Carnegie Mellon University Graphics Lab",
+  "source_url": "http://mocap.cs.cmu.edu/",
+  "redistribution": "yes",
+  "attribution": "The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217.",
+  "notes": "BVH conversion by B. Hahne (cgspeed), mirrored at github.com/meshula/cmu-mocap."
+ },
+ "takes": [
+  {
+   "name": "mocap_kick_a",
+   "take": "10_01",
+   "loop": false,
+   "category": "Kick",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 1.8994,
+   "projection_m": 0.0013
+  },
+  {
+   "name": "mocap_kick_b",
+   "take": "10_02",
+   "loop": false,
+   "category": "Kick",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 1.9979,
+   "projection_m": 0.0013
+  },
+  {
+   "name": "mocap_kick_c",
+   "take": "10_03",
+   "loop": false,
+   "category": "Kick",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 2.4359,
+   "projection_m": 0.0014
+  },
+  {
+   "name": "mocap_kick_d",
+   "take": "10_05",
+   "loop": false,
+   "category": "Kick",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 2.0547,
+   "projection_m": 0.0014
+  },
+  {
+   "name": "mocap_kick_e",
+   "take": "10_06",
+   "loop": false,
+   "category": "Kick",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 2.0553,
+   "projection_m": 0.0014
+  },
+  {
+   "name": "mocap_kick_f",
+   "take": "11_01",
+   "loop": false,
+   "category": "Kick",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 3.1374,
+   "projection_m": 0.0017
+  },
+  {
+   "name": "mocap_run_a",
+   "take": "09_01",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7333,
+   "keys": 23,
+   "retarget_err_deg": 1.7387,
+   "projection_m": 0.0002
+  },
+  {
+   "name": "mocap_run_b",
+   "take": "09_02",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7333,
+   "keys": 23,
+   "retarget_err_deg": 1.8072,
+   "projection_m": 0.0003
+  },
+  {
+   "name": "mocap_run_c",
+   "take": "09_06",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7333,
+   "keys": 23,
+   "retarget_err_deg": 1.8944,
+   "projection_m": 0.0004
+  },
+  {
+   "name": "mocap_run_d",
+   "take": "16_55",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.5667,
+   "keys": 18,
+   "retarget_err_deg": 1.7461,
+   "projection_m": 0.0019
+  },
+  {
+   "name": "mocap_jog_a",
+   "take": "16_35",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.8,
+   "keys": 25,
+   "retarget_err_deg": 1.6614,
+   "projection_m": 0.002
+  },
+  {
+   "name": "mocap_jog_b",
+   "take": "16_36",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7667,
+   "keys": 24,
+   "retarget_err_deg": 1.7199,
+   "projection_m": 0.0021
+  },
+  {
+   "name": "mocap_jog_c",
+   "take": "02_03",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7667,
+   "keys": 24,
+   "retarget_err_deg": 1.2709,
+   "projection_m": 0.001
+  },
+  {
+   "name": "mocap_cut_left",
+   "take": "16_41",
+   "loop": false,
+   "category": "Cut",
+   "duration": 1.2667,
+   "keys": 39,
+   "retarget_err_deg": 1.9389,
+   "projection_m": 0.0016
+  },
+  {
+   "name": "mocap_cut_right",
+   "take": "16_43",
+   "loop": false,
+   "category": "Cut",
+   "duration": 1.7,
+   "keys": 52,
+   "retarget_err_deg": 2.0908,
+   "projection_m": 0.0017
+  },
+  {
+   "name": "mocap_cut_left_fast",
+   "take": "16_51",
+   "loop": false,
+   "category": "Cut",
+   "duration": 1.4333,
+   "keys": 44,
+   "retarget_err_deg": 2.3375,
+   "projection_m": 0.0013
+  },
+  {
+   "name": "mocap_cut_right_fast",
+   "take": "16_53",
+   "loop": false,
+   "category": "Cut",
+   "duration": 1.1333,
+   "keys": 35,
+   "retarget_err_deg": 2.2466,
+   "projection_m": 0.0014
+  },
+  {
+   "name": "mocap_stop_a",
+   "take": "16_08",
+   "loop": false,
+   "category": "Recovery",
+   "duration": 1.9333,
+   "keys": 59,
+   "retarget_err_deg": 1.8507,
+   "projection_m": 0.0018
+  },
+  {
+   "name": "mocap_stop_b",
+   "take": "16_57",
+   "loop": false,
+   "category": "Recovery",
+   "duration": 2.1667,
+   "keys": 66,
+   "retarget_err_deg": 1.7899,
+   "projection_m": 0.0017
+  }
+ ]
+}

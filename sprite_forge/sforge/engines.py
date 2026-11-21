@@ -1,4 +1,4 @@
-"""v11.20 one-click engine projects: a built character, or a whole roster, as a project each engine opens directly.
+"""v11.23 one-click engine projects: a built character, or a whole roster, as a project each engine opens directly.
 
     forge.py engine ENGINE SOURCE --out DIR      ENGINE: godot unity unreal raylib web pygame | all
                                                  SOURCE: a build folder (game_character.json) or a roster (roster.json)

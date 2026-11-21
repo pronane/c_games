@@ -43,6 +43,34 @@ namespace ArenaFC.Core.Input
 
         public static readonly string[] Actions = { "pass", "through", "shoot", "tackle", "switch", "sprint" };
 
+        /// <summary>5.7: the rest of the pad, remappable too.  Optional: a saved map
+        /// without them (older saves) keeps the defaults for these.</summary>
+        public static readonly string[] ExtraActions = { "lob", "dribble", "camera", "pause" };
+
+        /// <summary>Every remappable action, in the order the remap screen asks for them.</summary>
+        public static readonly string[] RemapOrder =
+            { "pass", "through", "shoot", "tackle", "switch", "sprint", "lob", "dribble", "camera", "pause" };
+
+        /// <summary>What the remap screen asks you to press, with the Xbox default and
+        /// everything the button does.</summary>
+        public static string RemapPrompt(string action)
+        {
+            switch (action)
+            {
+                case "pass": return "PASS / contain (Xbox A)";
+                case "through": return "THROUGH BALL / headbutt with LB+RB (Xbox Y)";
+                case "shoot": return "SHOOT - hold to power (Xbox X)";
+                case "tackle": return "TACKLE / slide with sprint (Xbox B)";
+                case "switch": return "SWITCH PLAYER / chip modifier (Xbox LB)";
+                case "sprint": return "SPRINT (Xbox RB; RT always sprints too)";
+                case "lob": return "LONG BALL / CROSS (Xbox VIEW)";
+                case "dribble": return "CLOSE CONTROL / FINESSE modifier (Xbox L3; LT always works too)";
+                case "camera": return "CAMERA (Xbox R3)";
+                case "pause": return "PAUSE (Xbox MENU)";
+                default: return action.ToUpperInvariant();
+            }
+        }
+
         // Godot JoyButton order for a pad with an SDL mapping (Xbox / XInput).
         public static readonly Dictionary<string, int> Standard = new Dictionary<string, int>
         {
@@ -205,6 +233,10 @@ namespace ArenaFC.Core.Input
                     foreach (string a in Actions)
                         if (!b.ContainsKey(a)) { complete = false; break; }
                     if (complete) return new Dictionary<string, int>(b);
+                    // Core incomplete: defaults, but keep any extras that were remapped.
+                    var d = new Dictionary<string, int>(known ? Standard : Raw);
+                    foreach (string a in ExtraActions) if (b.ContainsKey(a)) d[a] = b[a];
+                    return d;
                 }
             }
             return new Dictionary<string, int>(known ? Standard : Raw);
@@ -267,14 +299,17 @@ namespace ArenaFC.Core.Input
             foreach (string a in Actions)
                 result[a] = Button(buttons, binds != null && binds.ContainsKey(a) ? binds[a] : -1);
             Dictionary<string, int> sys = known ? SystemStandard : SystemRaw;
-            result["pause"] = Button(buttons, sys["pause"]);
-            result["camera"] = Button(buttons, sys["camera"]);
+            // A remapped button replaces the default one (5.7); the analogue
+            // triggers keep working for dribble (LT) and sprint (RT) either way.
+            int Bound(string a, int fallback) => binds != null && binds.ContainsKey(a) ? binds[a] : fallback;
+            result["pause"] = Button(buttons, Bound("pause", sys["pause"]));
+            result["camera"] = Button(buttons, Bound("camera", sys["camera"]));
             // Back/Select is a dedicated long ball / cross; LT or L3 is close
             // control.  RT / RB stays sprint.  Previously BOTH analogue triggers
             // meant sprint, so there was no reachable dribble button at all.
-            result["lob"] = Button(buttons, known ? 4 : 8);
+            result["lob"] = Button(buttons, Bound("lob", known ? 4 : 8));
             result["dribble"] = Axis(axes, TriggerAxes[0]) > 0.5f
-                                || Button(buttons, known ? 7 : 10);
+                                || Button(buttons, Bound("dribble", known ? 7 : 10));
             bool sprint = result["sprint"];
             if (Axis(axes, TriggerAxes[1]) > 0.5f) sprint = true;
             if (!known)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v11.21: rosters whose players look different, every move inside its cell, hit boxes in the preview.
+"""v11.24: rosters whose players look different, every move inside its cell, hit boxes in the preview.
 
     python tools/test_roster_look.py [--quick]        (--quick: 4 packs instead of all for check 7)
 

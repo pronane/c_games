@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://arena-fc.invalid/schemas/motion-features-v1.json",
+  "$id": "https://arena-fc.invalid/schemas/motion-features-v2.json",
   "title": "Arena FC Motion Feature Database",
   "type": "object",
   "required": ["version", "featureSchemaVersion", "dimensions", "layout", "trajectoryTimes", "space", "normalization", "weights", "rows"],
   "properties": {
-    "version": { "const": 1 },
-    "featureSchemaVersion": { "const": 1 },
-    "dimensions": { "const": 23 },
+    "version": { "const": 2 },
+    "featureSchemaVersion": { "const": 2 },
+    "dimensions": { "const": 24 },
     "layout": {
       "const": [
         "foot_l_pos_x", "foot_l_pos_z", "foot_r_pos_x", "foot_r_pos_z",
@@ -16,7 +16,8 @@
         "traj_pos_0_x", "traj_pos_0_z", "traj_pos_1_x", "traj_pos_1_z",
         "traj_pos_2_x", "traj_pos_2_z",
         "traj_dir_0_x", "traj_dir_0_z", "traj_dir_1_x", "traj_dir_1_z",
-        "traj_dir_2_x", "traj_dir_2_z"
+        "traj_dir_2_x", "traj_dir_2_z",
+        "time_to_contact"
       ]
     },
     "trajectoryTimes": { "const": [0.2, 0.4, 0.6] },
@@ -42,7 +43,7 @@
           "clipId": { "type": "string", "minLength": 1 },
           "frameIndex": { "type": "integer", "minimum": 0 },
           "phase": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
-          "category": { "const": "Locomotion" },
+          "category": { "enum": ["Locomotion", "Approach", "FirstTouch", "Shield", "Cut", "Kick", "Pass", "Tackle", "KeeperDive", "Celebrate", "Idle", "Recovery", "Keeper", "Skill", "Conduct"] },
           "ballState": { "enum": ["None", "Possessed", "Approaching", "Contested", "Aerial"] },
           "styleTag": { "type": "string" },
           "features": { "$ref": "#/$defs/vector" }
@@ -54,20 +55,20 @@
   "$defs": {
     "vector": {
       "type": "array",
-      "minItems": 23,
-      "maxItems": 23,
+      "minItems": 24,
+      "maxItems": 24,
       "items": { "type": "number" }
     },
     "positiveVector": {
       "type": "array",
-      "minItems": 23,
-      "maxItems": 23,
+      "minItems": 24,
+      "maxItems": 24,
       "items": { "type": "number", "exclusiveMinimum": 0 }
     },
     "weights": {
       "type": "array",
-      "minItems": 23,
-      "maxItems": 23,
+      "minItems": 24,
+      "maxItems": 24,
       "items": { "type": "number", "minimum": 0 }
     }
   },
