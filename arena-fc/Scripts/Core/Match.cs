@@ -1110,9 +1110,12 @@ public sealed partial class MatchEngine
                 float distGoal = Mx.FlatDist(p.Pos, goal);
                 bool pressed = press != null && pd < 2.6f;
                 float xgHere = XgFrom(p.Pos, p.Team, press == null || pd > 8f);
-                float bar = (pressed ? .055f : .085f) / (1f + Options.Difficulty * .08f);
-                bool chance = distGoal < 32f && xgHere > bar && Rng.Next() < .5f;
-                bool speculative = distGoal < 30f && xgHere > .03f && Rng.Next() < .015f;
+                // Real teams shoot at ~0.10 xG on average and take plenty of
+                // 0.03-0.06 chances; the old bar (0.085 / 0.055) left 3.7 shots
+                // from ~12 final-third entries a match.
+                float bar = (pressed ? .035f : .055f) / (1f + Options.Difficulty * .08f);
+                bool chance = distGoal < 32f && xgHere > bar && Rng.Next() < .45f;
+                bool speculative = distGoal < 30f && xgHere > .022f && Rng.Next() < .035f;
                 if (chance || speculative)
                 {
                     float power = distGoal < 12f ? Rng.Range(.42f, .72f) : Rng.Range(.58f, .92f);
@@ -1431,9 +1434,17 @@ public sealed partial class MatchEngine
         if (through) aim += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * 4f;
         Vector3 dir = Mx.FlatDir(b.Pos, aim);
         float skill = from.Spec.Passing;
-        float err = (1f - skill) * 2.2f + (through ? .8f : 0f);
-        dir = Mx.Norm(dir + new Vector3(Rng.Signed() * err * .12f, 0, Rng.Signed() * err * .12f));
         float dist = Mx.FlatDist(b.Pos, aim);
+        // Pass error grows with pressure, distance and difficulty (it was a flat
+        // ~4 deg from skill alone, so AI passes almost never strayed - the main
+        // source of throw-ins, corners and turnovers in real football).
+        NearestOpponent(from, out float pressDist);
+        float pressure = Mx.Clamp(1f - pressDist / 3f, 0f, 1f);
+        float err = ((1f - skill) * 2.2f + (through ? .8f : 0f) + (lob ? .6f : 0f))
+                    * (1f + pressure * .9f) * (1f + MathF.Max(0f, dist - 15f) / 30f);
+        dir = Mx.Norm(dir + new Vector3(Rng.Signed() * err * .12f, 0, Rng.Signed() * err * .12f));
+        // Weight error: slightly over- or under-hit.
+        float weightErr = 1f + Rng.Signed() * ((1f - skill) * .22f + pressure * .10f);
         // Phase 2.3: pass type by context — driven for short, lofted for long,
         // threaded for through, chip for short lob.
         PassType passType = lob ? PassType.Chip
@@ -1450,6 +1461,7 @@ public sealed partial class MatchEngine
             PassType.Chip => Mx.Clamp(dist * .8f / .65f, 6f, 20f),
             _ => Mx.Clamp(GroundSpeedFor(dist, arrive), 6f, 27f),
         };
+        speed = Mx.Clamp(speed * weightErr, 5f, 28f);
         float loftY = passType switch
         {
             PassType.Driven => .45f,
