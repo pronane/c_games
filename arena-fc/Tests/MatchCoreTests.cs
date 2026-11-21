@@ -704,7 +704,7 @@ Section("Goals, keeper and AI shooting");
 
 Section("Laws of the game at restarts (full matches)");
 {
-    int restarts = 0, tooClose = 0, ranWithBall = 0, throwOffLine = 0, penaltyCrowd = 0;
+    int restarts = 0, tooClose = 0, ranWithBall = 0, throwOffLine = 0, penaltyCrowd = 0, goalKicks = 0, gkAreaBreach = 0;
     for (int seed = 31; seed <= 33; seed++)
     {
         var m = new MatchEngine(new MatchOptions { Seed = seed });
@@ -724,12 +724,21 @@ Section("Laws of the game at restarts (full matches)");
                     if (q.Team != side && !q.SentOff && !(prev == Phase.Penalty && q.IsKeeper)
                         && Mx.FlatDist(q.Pos, S.Ball.Pos) < need - .05f) { tooClose++; break; }
                 if (prev == Phase.ThrowIn && MathF.Abs(S.Ball.Pos.Z) < Mx.HalfWidth - .6f) throwOffLine++;
+                if (prev == Phase.GoalKick) goalKicks++;
                 if (prev == Phase.Penalty)
                 {
                     float gx = MathF.Sign(S.Ball.Pos.X) * Mx.HalfLength;
                     foreach (var q in S.Players)
                         if (q.Index != taker && !(q.IsKeeper && q.Team != side) && MathF.Abs(q.Pos.X - gx) < 16.5f && MathF.Abs(q.Pos.Z) < 20.16f) { penaltyCrowd++; break; }
                 }
+            }
+            if (taker >= 0 && S.Ball.Owner == taker && S.Players[taker].MustPlayBall)
+            {
+                // Goal kick: opponents stay out of the area until the ball is played.
+                float gx = m.OwnGoalPos(S.Players[taker].Team).X;
+                if (MathF.Abs(S.Ball.Pos.X - gx) < 16.5f && MathF.Abs(S.Ball.Pos.Z) < 20.16f)
+                    foreach (var q in S.Players)
+                        if (q.Team != S.Players[taker].Team && !q.SentOff && MathF.Abs(q.Pos.X - gx) < 16.2f && MathF.Abs(q.Pos.Z) < 19.9f) { gkAreaBreach++; break; }
             }
             if (taker >= 0)
             {
@@ -744,6 +753,7 @@ Section("Laws of the game at restarts (full matches)");
     Check("set-piece takers play the ball, they don't run off with it", ranWithBall == 0, $"ran={ranWithBall}");
     Check("throw-ins are taken from the touchline", throwOffLine == 0, $"off line={throwOffLine}");
     Check("only the taker and keeper are in the area at a penalty", penaltyCrowd == 0, $"crowded={penaltyCrowd}");
+    Check("opponents stay outside the penalty area at a goal kick until it is taken", goalKicks > 0 && gkAreaBreach == 0, $"goal kicks={goalKicks} breach ticks={gkAreaBreach}");
 }
 {
     // A keeper's parry never sends the ball towards his own goal.

@@ -89,6 +89,7 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ✅ 7.6 (PR #5) **Violent conduct**: punch (hold LB+RB, then B / key G) and headbutt (LB+RB, then Y / key T), human-only. Seen by the referee (likelier near the ball) → straight red + direct free kick / penalty; unseen → **VAR** review at the next stoppage or within 6 s → red, and a goal the offending side scored in the meantime is disallowed.
 - ✅ 7.7 (PR #5) Skill moves and call-for-ball now work online (they were never sent over the wire).
 - ⬜ 7.4 Goal kicks: short or long choice.
+- ✅ 7.4a (PR #10) Law 16 / 13: opponents outside the penalty area at a goal kick (and a defending free kick in its own area) until the ball is played. Found in a 720p playtest: two attackers stood in the box. Referee waves them out; inside 10 yards is still a caution.
 
 ## 7b. Rules audit (PR #3)
 - ✅ Full-match restart audit in `Tests/MatchCoreTests` (opponents 9.15 m / 2 m, taker can't carry the ball, throw-ins on the line, penalty area clear, parry direction). Found and fixed: opponents only 4 m back; ~10% double touches; throw-ins 1 m inside the pitch; a throw-in taker loop; **keeper parries aimed at his own net**; tackles/fouls animations carrying through stoppages; an idle human could stall a set piece forever (now auto-taken after 8 s).

@@ -2036,6 +2036,13 @@ public sealed partial class MatchEngine
                 q.Target = q.Pos;
             }
         }
+        // Goal kick / defending free kick in its own area: opponents outside the area.
+        if (!penalty && !throwIn && taker.MustPlayBall && OwnAreaRestart(taker))
+        {
+            float ogx = OwnGoalPos(side).X;
+            foreach (var q in State.Players)
+                if (q.Team != side && !q.SentOff && InArea(q.Pos, ogx, .5f)) { q.Pos = OutsideArea(q.Pos, ogx); q.Target = q.Pos; }
+        }
         // Penalty in a match: everyone except the taker and the keeper outside the
         // area and the arc.
         if (penalty && Options.Mode != ModeShootout)
