@@ -17,6 +17,7 @@ public enum LessonGoal
     ShortPass, ThroughBall, LongBall, TeammateRun,
     Shots, Goals, Skill,
     Switch, TackleWin, Slide,
+    ShotEvent, JockeyTime, ContainTime, ShoulderCharge, SwitchDirection,
     FreePlay,
 }
 
@@ -32,6 +33,8 @@ public sealed class TrainingLesson
     public SkillMove Skill = SkillMove.None;
     /// <summary>Repetitions (or metres / seconds for the continuous goals).</summary>
     public float Target = 1f;
+    /// <summary>For ShotEvent: commentary text that marks success ("curls it").</summary>
+    public string EventText = "";
 }
 
 public sealed class TrainingCoach
@@ -54,7 +57,7 @@ public sealed class TrainingCoach
     private bool _switchPressed;
     private float _advanceTimer = -1f;
     private bool _started;
-    private bool _wasSliding;
+    private bool _wasSliding, _wasCharging;
 
     public static List<TrainingLesson> BuildLessons() => new()
     {
@@ -82,6 +85,15 @@ public sealed class TrainingCoach
         new() { Section = "SHOOTING", Title = "Shoot", Goal = LessonGoal.Shots, Target = 3f,
             Pad = "Hold [X] to power up, release to shoot. Aim with [LS]", Keys = "Hold <Space>, release to shoot",
             Tip = "Watch the power bar under the pitch. Release in the green zone for a well-timed shot; too much power goes over." },
+        new() { Section = "SHOOTING", Title = "Finesse (curled) shot", Goal = LessonGoal.ShotEvent, EventText = "curls it", Target = 1f,
+            Pad = "Hold [LT], then hold and release [X]", Keys = "Hold <X>, then <Space>",
+            Tip = "Inside-of-the-foot curl towards the far post: less power, more accuracy, bends round the keeper." },
+        new() { Section = "SHOOTING", Title = "Chip shot", Goal = LessonGoal.ShotEvent, EventText = "chips it", Target = 1f,
+            Pad = "Hold [LB], then hold and release [X]", Keys = "Hold <Z>, then <Space>",
+            Tip = "Lifts the ball over a keeper who has come off his line." },
+        new() { Section = "SHOOTING", Title = "Low driven shot", Goal = LessonGoal.ShotEvent, EventText = "drills it low", Target = 1f,
+            Pad = "Double-tap [X]", Keys = "Double-tap <Space>",
+            Tip = "Kept down along the turf - hard for a keeper to get down to." },
         new() { Section = "SHOOTING", Title = "Score two goals", Goal = LessonGoal.Goals, Target = 2f,
             Pad = "Get close, hold [LS] towards a post, then [X]", Keys = "Steer at a post, then <Space>",
             Tip = "Shots aimed at the corners beat the keeper far more often than shots down the middle." },
@@ -109,7 +121,19 @@ public sealed class TrainingCoach
         new() { Section = "DEFENDING", Title = "Switch player", Goal = LessonGoal.Switch, Target = 2f, Drill = TrainingDrill.Defend,
             Pad = "Press [LB]", Keys = "Press <Tab>",
             Tip = "Without the ball, LB changes you to the team-mate nearest the ball. Watch the yellow ring move." },
-        new() { Section = "DEFENDING", Title = "Standing tackle", Goal = LessonGoal.TackleWin, Target = 2f, Drill = TrainingDrill.Defend,
+        new() { Section = "DEFENDING", Title = "Switch with the right stick", Goal = LessonGoal.SwitchDirection, Target = 1f, Drill = TrainingDrill.Defend,
+            Pad = "Flick [RS] towards a team-mate", Keys = "(pad only - use <Tab> on keyboard)",
+            Tip = "Picks the team-mate in the direction you flick, not just the nearest one." },
+        new() { Section = "DEFENDING", Title = "Jockey", Goal = LessonGoal.JockeyTime, Target = 1.5f, Drill = TrainingDrill.Defend,
+            Pad = "Hold [LT] near the attacker", Keys = "Hold <X> near the attacker",
+            Tip = "Face up the attacker with short side-on steps: you stay goal-side and your tackle timing improves." },
+        new() { Section = "DEFENDING", Title = "Contain", Goal = LessonGoal.ContainTime, Target = 1.5f, Drill = TrainingDrill.Defend,
+            Pad = "Hold [A] (no stick)", Keys = "Hold <E> (no keys)",
+            Tip = "Your player moves goal-side of the carrier automatically and stays two metres off him." },
+        new() { Section = "DEFENDING", Title = "Shoulder charge", Goal = LessonGoal.ShoulderCharge, Target = 1f, Drill = TrainingDrill.Defend,
+            Pad = "Sprint alongside the attacker ([RT]) and press [B]", Keys = "Run alongside with <Shift>, press <F>",
+            Tip = "A fair shoulder-to-shoulder challenge: strength decides it. Not from behind." },
+        new() { Section = "DEFENDING", Title = "Standing tackle (poke - foot in, no slide)", Goal = LessonGoal.TackleWin, Target = 2f, Drill = TrainingDrill.Defend,
             Pad = "Get close, then press [B]", Keys = "Get close, then press <F>",
             Tip = "Run at the attacker and tackle when you are right next to him. Tackle too early and he skips past." },
         new() { Section = "DEFENDING", Title = "Slide tackle", Goal = LessonGoal.Slide, Target = 1f, Drill = TrainingDrill.Defend,
@@ -198,6 +222,24 @@ public sealed class TrainingCoach
                 break;
             case LessonGoal.Shots:
                 gained = S.Shots[0] - _shots;
+                break;
+            case LessonGoal.ShotEvent:
+                foreach (var ev in fresh) if (ev.Text.Contains(lesson.EventText)) gained += 1f;
+                if (S.Shots[0] > _shots && gained == 0f) LastFeedback = "That was a different shot - hold the modifier first.";
+                break;
+            case LessonGoal.JockeyTime:
+                if (me != null && me.JockeyState > 0) gained = dt;
+                break;
+            case LessonGoal.ContainTime:
+                if (me != null && cmd.Contain && !owner && S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 1) gained = dt;
+                break;
+            case LessonGoal.ShoulderCharge:
+                bool charging = me != null && me.Action == "shoulder_charge" && me.ActionTimer > 0f;
+                if (charging && !_wasCharging) gained = 1f;
+                _wasCharging = charging;
+                break;
+            case LessonGoal.SwitchDirection:
+                if (cmd.SwitchDir.LengthSquared() > .3f && S.Controlled != _controlled && S.Controlled >= 0) gained = 1f;
                 break;
             case LessonGoal.Goals:
                 gained = S.Score[0] - _goals;

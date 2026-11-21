@@ -66,10 +66,10 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` close control/shield · `A` pass · `Y` through · `X` shoot (hold) · `VIEW` long ball · `B` tackle · `RT+B` slide · `LB` switch (with ball: call a run) · `RS` flick skills (LT+RS advanced) · `X`→`A` fake shot.
 - ✅ 5.1 Skill moves wired to input (were unreachable): RS flicks + keys 1–7.
 - ✅ 5.2 Call a team-mate's run (LB / Tab with the ball).
-- ⬜ 5.3 Defending set: `B` stand tackle / poke (foot in, no slide) · `RT+B` slide · `LT` jockey (contain, face-up, stay goal-side) · `A` (held) contain by team-mate · `B` (held) push/pull · shoulder charge = move into carrier while jockeying.
-- ⬜ 5.4 Attacking extras: `RB` knock-on (speed burst touch) · `LB`+`Y` lofted through · `RB+X` finesse/curl shot · `LB+X` chip shot · `LT+X` low driven shot · `RB` (with pass) driven pass.
-- ⬜ 5.5 Switch play: `RS` flick off the ball = switch to the player in that direction (right-stick switching).
-- ⬜ 5.6 In-game control cards: pause-menu page with the full layout, plus first-time contextual prompts (“Press B to tackle”) in matches.
+- ✅ 5.3 (PR #8: B = poke tackle (foot in, no slide), RT+B = slide, hold LT = jockey, hold A = contain (auto goal-side), sprint alongside + B = shoulder charge — jockey/contain were AI-only) Defending set: `B` stand tackle / poke (foot in, no slide) · `RT+B` slide · `LT` jockey (contain, face-up, stay goal-side) · `A` (held) contain by team-mate · `B` (held) push/pull · shoulder charge = move into carrier while jockeying.
+- ✅ 5.4 (PR #8: LT+X finesse/curl, LB+X chip, double-tap X low driven — finesse was a hidden 50–65% power window; **the stick now aims shots**, the post was random) Attacking extras: `RB` knock-on (speed burst touch) · `LB`+`Y` lofted through · `RB+X` finesse/curl shot · `LB+X` chip shot · `LT+X` low driven shot · `RB` (with pass) driven pass.
+- ✅ 5.5 (PR #8) Switch play: `RS` flick off the ball = switch to the player in that direction (right-stick switching).
+- ✅ 5.6 (PR #8: pause menu → "Controls – every move", generated from the coach's lessons; coach now 27 lessons) In-game control cards: pause-menu page with the full layout, plus first-time contextual prompts (“Press B to tackle”) in matches.
 - ⬜ 5.7 Remap screen covers every action, not just six.
 
 ## 6. Team shape & AI
@@ -108,7 +108,7 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ⬜ 9.2 Match preview off-centre on a blank grey screen; shows “Arena Stadium” instead of the home ground.
 - ⬜ 9.3 Weather: “Rain” shown but not rendered.
 - ⬜ 9.4 HUD footprint at 720p (hint bar, commentary, minimap cover ~20% of the pitch); stats overlay wrapping.
-- ⬜ 9.5 Esc / Menu pause screen and clock (verify on real hardware).
+- ✅ 9.5 (PR #8: Input.Reset cleared the held state, so the Esc that opened pause read as a new press next frame and closed it) Esc / Menu pause screen and clock (verify on real hardware).
 - ⬜ 9.6 Training/shootout scoreboard shows a match clock.
 
 ## 10. Later (modes & platform) — unchanged from the existing docs

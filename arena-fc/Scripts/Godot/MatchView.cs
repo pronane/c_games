@@ -131,6 +131,9 @@ public partial class MatchView : Node3D
         _pending.Lob |= cmd.Lob;
         _pending.CallForBall |= cmd.CallForBall;
         _pending.Punch |= cmd.Punch;
+        _pending.Contain = cmd.Contain;
+        if (cmd.ShotStyle != ShotStyle.Auto) _pending.ShotStyle = cmd.ShotStyle;
+        if (cmd.SwitchDir.LengthSquared() > 0f) _pending.SwitchDir = cmd.SwitchDir;
         _pending.Headbutt |= cmd.Headbutt;
         if (cmd.Skill != SkillMove.None) _pending.Skill = cmd.Skill;
         if (cmd.Charge > _pending.Charge) _pending.Charge = cmd.Charge;
@@ -278,6 +281,11 @@ public partial class MatchView : Node3D
             var worldMove = right * cmd.Move.X + up * (-cmd.Move.Y);
             cmd.Move = worldMove.LengthSquared() > 1f
                 ? System.Numerics.Vector2.Normalize(worldMove) : worldMove;
+            if (cmd.SwitchDir.LengthSquared() > 0f)
+            {
+                var ws = right * cmd.SwitchDir.X + up * (-cmd.SwitchDir.Y);
+                cmd.SwitchDir = ws.LengthSquared() > 1e-4f ? System.Numerics.Vector2.Normalize(ws) : System.Numerics.Vector2.Zero;
+            }
         }
         if (Input.PausePressed)
         {

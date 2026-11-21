@@ -31,6 +31,10 @@ public sealed class CommandDto
     [JsonPropertyName("cb")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Cb { get; set; }
     [JsonPropertyName("pu")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Pu { get; set; }
     [JsonPropertyName("hb")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Hb { get; set; }
+    [JsonPropertyName("ss")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Ss { get; set; }
+    [JsonPropertyName("ct")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Ct { get; set; }
+    [JsonPropertyName("wx")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Wx { get; set; }
+    [JsonPropertyName("wy")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Wy { get; set; }
 
     private static float Q(float v) => MathF.Round(Math.Clamp(v, -1f, 1f) * 256f) / 256f;
 
@@ -40,6 +44,7 @@ public sealed class CommandDto
         Ch = Q(c.Charge), Th = c.Through, Ta = c.Tackle, Sw = c.Switch, Lo = c.Lob,
         Sl = c.Slide, Sd = c.Shield || c.Dribble,
         Sk = (int)c.Skill, Cb = c.CallForBall, Pu = c.Punch, Hb = c.Headbutt,
+        Ss = (int)c.ShotStyle, Ct = c.Contain, Wx = c.SwitchDir.X, Wy = c.SwitchDir.Y,
     };
 
     public PlayerCommand To() => new()
@@ -49,6 +54,8 @@ public sealed class CommandDto
         Shield = Sd, Dribble = Sd,
         Skill = Enum.IsDefined(typeof(SkillMove), Sk) ? (SkillMove)Sk : SkillMove.None,
         CallForBall = Cb, Punch = Pu, Headbutt = Hb,
+        ShotStyle = Enum.IsDefined(typeof(ShotStyle), Ss) ? (ShotStyle)Ss : ShotStyle.Auto,
+        Contain = Ct, SwitchDir = new System.Numerics.Vector2(Wx, Wy),
     };
 }
 

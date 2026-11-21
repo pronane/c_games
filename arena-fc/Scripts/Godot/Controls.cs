@@ -37,6 +37,8 @@ public sealed class InputHub
     private bool _fakeShotLatch;
     private readonly bool[] _pNum = new bool[8];
     private bool _pNext, _pPrev, _pPunch, _pHeadbutt;
+    private bool _lbHeld, _lbUsedAsModifier, _pShootHeld, _lowShotArmed;
+    private double _lastShootPress = -10;
 
     private readonly int _playerIndex;
     private readonly bool _twoPlayer;
@@ -326,7 +328,9 @@ public sealed class InputHub
         bool pass = Input.IsPhysicalKeyPressed(Key.E) || padPass || (TouchEnabled && TouchPass);
         bool through = Input.IsPhysicalKeyPressed(Key.Q) || padThrough || (TouchEnabled && TouchThrough);
         bool tackle = Input.IsPhysicalKeyPressed(Key.F) || padTackle || (TouchEnabled && TouchTackle);
-        bool sw = Input.IsPhysicalKeyPressed(Key.Tab) || padSwitch || (TouchEnabled && TouchSwitch);
+        // Pad LB switches on release, so it can also be held as the chip-shot and
+        // punch/headbutt modifier without switching player (or calling a run) too.
+        bool sw = Input.IsPhysicalKeyPressed(Key.Tab) || (TouchEnabled && TouchSwitch);
         bool shoot = Input.IsPhysicalKeyPressed(Key.Space) || padShoot || (TouchEnabled && TouchShoot);
         bool pause = Input.IsPhysicalKeyPressed(Key.Escape) || padPause;
         bool camera = Input.IsPhysicalKeyPressed(Key.C) || padCamera;
@@ -346,6 +350,10 @@ public sealed class InputHub
         cmd.Shield = shield;
         cmd.Dribble = dribble;
         cmd.Switch = Edge(sw, ref _pSwitch) || Input.IsMouseButtonPressed(MouseButton.Middle);
+        if (padSwitch) { if (!_lbHeld) { _lbHeld = true; _lbUsedAsModifier = false; } }
+        else if (_lbHeld) { _lbHeld = false; if (!_lbUsedAsModifier) cmd.Switch = true; }
+        // Contain: A / E held without the ball (the engine ignores it on the ball).
+        cmd.Contain = pass;
         cmd.Lob = Edge(lob, ref _pLob);
         PausePressed = Edge(pause, ref _pPause);
         // A stick click while steering must not cycle the camera repeatedly.
@@ -353,6 +361,15 @@ public sealed class InputHub
         bool cameraFire = Input.IsPhysicalKeyPressed(Key.C) || _cameraHold > .12f;
         CameraPressed = Edge(cameraFire, ref _pCamera);
 
+        // Shot modifiers, read as the shot is released: LT / X key = finesse (curl),
+        // LB / Z key = chip, double-tap shoot = low driven.
+        bool shootEdge = shoot && !_pShootHeld;
+        _pShootHeld = shoot;
+        double nowS = Time.GetTicksMsec() / 1000.0;
+        if (shootEdge) { _lowShotArmed = nowS - _lastShootPress < .30; _lastShootPress = nowS; }
+        bool finesseMod = padDribble || Input.IsPhysicalKeyPressed(Key.X);
+        bool chipMod = padSwitch || Input.IsPhysicalKeyPressed(Key.Z);
+        if (shoot && chipMod) _lbUsedAsModifier = true;
         // Fake shot: start charging a shot, then tap pass before letting go.
         if (_charge > 0f && cmd.Pass)
         {
@@ -365,7 +382,12 @@ public sealed class InputHub
 
         // Hold to charge a shot; release to shoot. Also works on touch & gamepad.
         if (shoot && !_fakeShotLatch) _charge = MathF.Min(1f, _charge + dt / .95f);
-        else if (!shoot && _charge > 0f) { cmd.Shoot = true; cmd.Charge = MathF.Max(.22f, _charge); _charge = 0f; }
+        else if (!shoot && _charge > 0f)
+        {
+            cmd.Shoot = true; cmd.Charge = MathF.Max(.22f, _charge); _charge = 0f;
+            cmd.ShotStyle = _lowShotArmed ? ShotStyle.Low : chipMod ? ShotStyle.Chip : finesseMod ? ShotStyle.Finesse : ShotStyle.Auto;
+            _lowShotArmed = false;
+        }
         _pShoot = shoot;
 
         // Skill moves: right-stick flick (LT/L3 held for the advanced set), or keys 1-7.
@@ -373,7 +395,10 @@ public sealed class InputHub
         var flick = SkillMoves.DetectFlick(rightStick.X, rightStick.Y, _rsPrevMag);
         _rsPrevMag = rsMag;
         if (flick != SkillMoves.Flick.None && cmd.Skill == SkillMove.None)
-            cmd.Skill = SkillMoves.FromFlick(flick, padDribble);
+        {
+            cmd.Skill = SkillMoves.FromFlick(flick, padDribble);     // on the ball: skill move
+            cmd.SwitchDir = rightStick;                              // off the ball: switch that way
+        }
         Key[] numKeys = { Key.Key1, Key.Key2, Key.Key3, Key.Key4, Key.Key5, Key.Key6, Key.Key7 };
         for (int i = 0; i < numKeys.Length; i++)
             if (Edge(Input.IsPhysicalKeyPressed(numKeys[i]), ref _pNum[i]) && cmd.Skill == SkillMove.None)
@@ -383,6 +408,7 @@ public sealed class InputHub
         // hold LB+RB then B = punch, Y = headbutt; keys G / T.
         if (padLB && padRB && (cmd.Tackle || cmd.Through))
         {
+            _lbUsedAsModifier = true;
             cmd.Punch = cmd.Tackle; cmd.Headbutt = cmd.Through;
             cmd.Tackle = cmd.Slide = cmd.Through = false;
         }
@@ -406,7 +432,10 @@ public sealed class InputHub
     {
         _charge = 0;
         _cameraHold = 0f;
-        _pShoot = _pPass = _pThrough = _pTackle = _pSlide = _pSwitch = _pPause = _pCamera = _pLob = false;
+        // Treat every button as still held: it must be released before it can fire
+        // again.  Clearing these made the Esc that opened the pause menu read as a
+        // fresh press on the next frame and close it again (pause never stayed open).
+        _pShoot = _pPass = _pThrough = _pTackle = _pSlide = _pSwitch = _pPause = _pCamera = _pLob = true;
         _fakeShotLatch = false;
         _rsPrevMag = 0f;
         _bumperHold = 0f;
