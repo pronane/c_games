@@ -78,7 +78,7 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - 🔧 6.3 (xG-based shooting PR #2: 1.4 → 4.8; shot bar lowered to real-football levels PR #7: → 8.4 shots, 1.7 goals/match) AI attacking decisions: shoot when in range and on angle (target ~6–15 shots per side), cross from wide, through balls into runs, keep possession under pressure.
 - 🔧 6.4 (one-challenger tackling done, PR #2: tackles 91 → 33/match) Carrier who can't be dispossessed (kept the ball ~80 s under repeated tackles) — check tackle odds vs shielding/close-control stacking.
 - 🔧 6.5 (1v1 off-the-line + smother done, PR #2) Goalkeeper: comes off the line to narrow the angle and smother 1v1s, claims crosses, sweeper behaviour on through balls; distribution.
-- ⬜ 6.6 Defensive player-switch stability (ring hops between team-mates).
+- ✅ 6.6 (PR #14) Defensive player-switch stability (ring hops between team-mates). While you steer, auto-switch needs a team-mate clearly closer (≥4 m or 40%): 18 → 9 switches a minute while defending, hops within 1 s 19% → 8%.
 - 🔧 6.7 (PR #3: attackers hold the onside line) Offside line held by the back four; offsides at realistic rates.
 
 ## 7. Set pieces
@@ -88,7 +88,7 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 - ✅ 7.5 (PR #5) **Rules are enforced, not physically prevented** (FIFA/PES behaviour): a human may encroach — caution and sent back (second = red); a human taker may run off with a set piece — free kick to the opposition (foul throw → throw-in to them); a double touch — indirect free kick. AI players keep the distance by choice.
 - ✅ 7.6 (PR #5) **Violent conduct**: punch (hold LB+RB, then B / key G) and headbutt (LB+RB, then Y / key T), human-only. Seen by the referee (likelier near the ball) → straight red + direct free kick / penalty; unseen → **VAR** review at the next stoppage or within 6 s → red, and a goal the offending side scored in the meantime is disallowed.
 - ✅ 7.7 (PR #5) Skill moves and call-for-ball now work online (they were never sent over the wire).
-- ⬜ 7.4 Goal kicks: short or long choice.
+- ✅ 7.4 Goal kicks: short or long choice (A short / VIEW long for you; the AI mixes them, measured 14 short and 6 long over six matches).
 - ✅ 7.4a (PR #10) Law 16 / 13: opponents outside the penalty area at a goal kick (and a defending free kick in its own area) until the ball is played. Found in a 720p playtest: two attackers stood in the box. Referee waves them out; inside 10 yards is still a caution.
 
 ## 7b. Rules audit (PR #3)

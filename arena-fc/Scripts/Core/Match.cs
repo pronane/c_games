@@ -717,8 +717,13 @@ public sealed partial class MatchEngine
                 {
                     float dCur = Mx.FlatDist(S.Players[S.Controlled].Pos, S.Ball.Pos);
                     float dBest = Mx.FlatDist(S.Players[best].Pos, S.Ball.Pos);
+                    // 6.6: while you are steering your defender, only take him off you
+                    // when a team-mate is clearly closer (the ring used to hop every
+                    // time someone got 1.6 m nearer, ~18 times a minute).
+                    bool steering = cmd.Move.LengthSquared() > .09f;
+                    float margin = steering ? MathF.Max(4f, dCur * .4f) : 1.6f;
                     if (S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0) S.Controlled = best;
-                    else if (dBest + 1.6f < dCur) S.Controlled = best;   // hysteresis: no flicker
+                    else if (dBest + margin < dCur) S.Controlled = best;   // hysteresis: no flicker
                 }
             }
         }

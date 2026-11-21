@@ -699,6 +699,26 @@ Check("shootout: no open-play passing", so.State.Passes[0] + so.State.Passes[1] 
           $"right {sameSaved}/{same} wrong {otherSaved}/{other}");
 }
 
+// 6.6: the defensive ring doesn't hop between team-mates while you chase the ball.
+{
+    int sw = 0, quick = 0; double defT = 0;
+    foreach (int seed in new[] { 1, 2 })
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = seed }); var S = e.State; int last = S.Controlled; double lastT = 0, t = 0;
+        while (S.Phase != Phase.FullTime)
+        {
+            var c = PlayerCommand.None;
+            if (S.Controlled >= 0) { var me = S.Players[S.Controlled]; var d = new Vector2(S.Ball.Pos.X - me.Pos.X, S.Ball.Pos.Z - me.Pos.Z); if (d.Length() > 1) c.Move = Vector2.Normalize(d); }
+            e.Step(MatchEngine.Dt, c); t += MatchEngine.Dt;
+            bool defending = S.Phase == Phase.Play && !(S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0);
+            if (defending) defT += MatchEngine.Dt;
+            if (S.Controlled != last) { if (defending) { sw++; if (t - lastT < 1.0) quick++; } last = S.Controlled; lastT = t; }
+        }
+    }
+    double perMin = sw / (defT / 60);
+    Check("defensive auto-switch doesn't hop while you steer (was 18/min, 19% within 1 s)", perMin < 13 && quick < sw * .12, $"{perMin:0.0}/min, quick {quick}/{sw}");
+}
+
 Section("Training ground (Mode 2)");
 var tr = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeTraining });
 Check("training starts in play with the ball at your feet",
