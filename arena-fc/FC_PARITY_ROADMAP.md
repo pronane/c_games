@@ -29,7 +29,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 
 - ✅ 0.3 (PR #7) `--ai-vs-ai`, `--size N`, `--seed N` for autoplay: full 11-a-side computer-vs-computer matches in the real app.
 - ✅ 0.2 `--autoplay` QA flag (PR #3): plays a whole match / shootout / training session unattended in the real Godot app (headless, `--fixed-fps 60`), logs every 5 game-minutes and a full-time summary, then quits. A 90-minute match takes ~25 s. Verified: full match, shootout (decided early, 5 v 4 kicks), Training, Practice Arena — no script errors.
-- ⬜ 0.1 Add the soak harness to `Tests/` and fail CI when a metric leaves its band (bands widen until the AI items below land).
+- ✅ 0.1 (PR #16) Add the soak harness to `Tests/` and fail CI when a metric leaves its band (bands widen until the AI items below land). MatchCoreTests now runs a realism gate: 4 full AI matches; shots 4–35, goals 0.5–6, passes 80–700, tackles 20–130, fouls 1–30, cards ≤ 8 per match.
 
 ## 1. Simulation correctness (PR #1)
 - ✅ 1.1 Ground-ball friction ~5× too high (full-power pass rolled 12 m). Now: 15 m/s rolls ~30 m.

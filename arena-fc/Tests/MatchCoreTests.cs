@@ -1120,5 +1120,33 @@ Section("Controls: every move reachable and doing what it says");
     Check("a new match resets the weather (no rain leaking into the next game)", !Weather.Raining && Weather.WindX == 0f);
 }
 
+Section("Realism gate (0.1): four full AI matches stay inside football's bands");
+{
+    // Per-match averages over four seeds.  The bands are deliberately wide (they
+    // tighten as the AI work lands); a change that knocks the simulation out of
+    // them - e.g. the old ~2 gShots or ~120 gTackles a match - fails CI.
+    double gShots = 0, gGoals = 0, gPasses = 0, gTackles = 0, gFouls = 0, gCards = 0;
+    int[] seeds = { 101, 102, 103, 104 };
+    foreach (int seed in seeds)
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = seed }); var S = e.State; int evc = 0;
+        while (S.Phase != Phase.FullTime)
+        {
+            S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None);
+            for (; evc < e.Events.Count; evc++) if (e.Events[evc].Kind == EventKind.Tackle) gTackles++;
+        }
+        gShots += S.Shots[0] + S.Shots[1]; gGoals += S.Score[0] + S.Score[1];
+        gPasses += S.Passes[0] + S.Passes[1]; gFouls += S.Fouls[0] + S.Fouls[1];
+        gCards += S.YellowCards[0] + S.YellowCards[1] + S.RedCards[0] + S.RedCards[1];
+    }
+    double n = seeds.Length;
+    Check("gate: shots per match 4-35", gShots / n is >= 4 and <= 35, $"{gShots / n:0.0}");
+    Check("gate: goals per match 0.5-6", gGoals / n is >= .5 and <= 6, $"{gGoals / n:0.0}");
+    Check("gate: passes per match 80-700", gPasses / n is >= 80 and <= 700, $"{gPasses / n:0}");
+    Check("gate: tackles per match 20-130", gTackles / n is >= 20 and <= 130, $"{gTackles / n:0}");
+    Check("gate: fouls per match 1-30", gFouls / n is >= 1 and <= 30, $"{gFouls / n:0.0}");
+    Check("gate: cards per match at most 8", gCards / n <= 8, $"{gCards / n:0.0}");
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
