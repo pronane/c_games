@@ -1437,6 +1437,52 @@ Section("Skill games (2.4): five scored challenges, not a plain match");
     Check("skill best scores save, only rise, and survive a save/load", b1 && !b2 && b3 && round.BestSkill(SkillGame.Shooting) == 9);
 }
 
+Section("Set pieces and crosses (7.2, 6.5)");
+{
+    // The keeper claims a high ball dropping into his six-yard box.
+    var e = new MatchEngine(new MatchOptions { Seed = 11 }); var S = e.State;
+    S.Phase = Phase.Play;
+    var gk = S.Players.First(q => q.IsKeeper && q.Team == 0);
+    var own = e.OwnGoalPos(0); float sg = MathF.Sign(own.X);
+    gk.Pos = own + new Vector3(-sg * 1.5f, 0, 0); gk.Target = gk.Pos;
+    foreach (var q in S.Players) if (!q.IsKeeper) q.Pos = new Vector3(-sg * 25f, 0, q.Pos.Z);
+    S.Ball.Owner = -1; S.Ball.HasPending = false; S.Ball.FreeTime = 1f; S.Ball.LastTouchSide = 1; S.Ball.PassReceiver = -1;
+    S.Ball.Pos = new Vector3(own.X - sg * 3f, 2f, Mx.HalfWidth - 6f);
+    var land = own + new Vector3(-sg * 4.5f, 0, 1.5f);
+    float T = 1.1f;
+    S.Ball.Vel = new Vector3((land.X - S.Ball.Pos.X) / T, (2.3f - 2f + .5f * 9.81f * T * T) / T, (land.Z - S.Ball.Pos.Z) / T);
+    bool claimed = false;
+    for (int i = 0; i < 120 && !claimed; i++)
+    {
+        S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None);
+        if (S.Ball.Owner == gk.Index || (S.Ball.LastTouch == gk.Index && e.Events.Any(x => x.Text.Contains("punches")))) claimed = true;
+    }
+    Check("keeper comes and claims a cross into his six-yard box (keepers were excluded from high balls)", claimed);
+
+    // A throw-in is thrown from above the head with the throw-in action.
+    int thrown = 0, kicked = 0, cornerCross = 0, corners = 0;
+    foreach (int seed in new[] { 101, 102, 103 })
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed }); var M = m.State; int evc = 0;
+        bool wasThrow = false, wasCorner = false;
+        while (M.Phase != Phase.FullTime)
+        {
+            M.Controlled = -1; m.Step(MatchEngine.Dt, PlayerCommand.None);
+            if (M.Phase == Phase.ThrowIn) wasThrow = true;
+            if (M.Phase == Phase.Corner) wasCorner = true;
+            for (; evc < m.Events.Count; evc++)
+            {
+                var ev = m.Events[evc];
+                if (ev.Kind != EventKind.Pass) continue;
+                if (wasThrow) { if (ev.Text.Contains("throws it") && M.Players[M.Ball.PendingFrom].Action == "throw_in" && M.Ball.PendingPos.Y > 1.8f) thrown++; else kicked++; wasThrow = false; }
+                if (wasCorner) { corners++; if (ev.Text.Contains("crosses it") || Mx.FlatDist(M.Ball.PendingTarget, M.Players[M.Ball.PendingFrom].Pos) < 15f) cornerCross++; wasCorner = false; }
+            }
+        }
+    }
+    Check("throw-ins are thrown (hands, from head height), not kicked", thrown > 0 && kicked == 0, $"thrown {thrown}, kicked {kicked}");
+    Check("AI corners are delivered into the box or played short", corners > 0 && cornerCross == corners, $"{cornerCross}/{corners}");
+}
+
 Section("Realism gate (0.1): four full AI matches stay inside football's bands");
 {
     // Per-match averages over four seeds.  The bands are deliberately wide (they
