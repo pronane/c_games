@@ -54,6 +54,8 @@ import type { TabSource } from "./TabLab";
 import type { BarMark } from "./feedback";
 import TakeReport from "./TakeReport";
 import YourSound from "./YourSound";
+import FollowAlong from "./FollowAlong";
+import type { BoardNote } from "./Fretboard";
 import Progress, { TrainerControls } from "./Progress";
 import { addEntry, clearProgress, DEFAULT_TRAINER, loadProgress, nextSpeed, saveProgress, songKey, trainerDone, type ProgressEntry, type Trainer } from "./progress";
 import { reamp, usePlayerSound } from "./liveTone";
@@ -81,7 +83,7 @@ type Props = {
 type Track = { id: string; label: string; verdict: string; isPart: boolean };
 /** A recorded take; `speed` is the playback speed it was played along to. */
 type Take = { buffer: AudioBuffer; start: number; end: number; speed: number; target: string; detail: string };
-type TakeCheck = { id: string; label: string; part: string; role: string; comparison: Comparison };
+type TakeCheck = { id: string; label: string; part: string; role: string; comparison: Comparison; start?: number; speed?: number };
 /** What the speakers play: the mixer as set, only the chosen part, or the band without it. */
 type Listen = "mixer" | "only" | "without";
 
@@ -133,7 +135,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
     [sound, setSound] = useGuitarSound(),
     [mySound, setMySound] = usePlayerSound(),
     [tryingSound, setTryingSound] = useState(false),
-    [tabParts, setTabParts] = useState<{ name: string; sections: { start: number; end: number }[] }[]>([]),
+    [tabParts, setTabParts] = useState<{ name: string; sections: { start: number; end: number }[]; notes: BoardNote[] }[]>([]),
     [markAgainst, setMarkAgainst] = useState(""),
     [trainer, setTrainerState] = useState<Trainer>(DEFAULT_TRAINER),
     [trainerStatus, setTrainerStatus] = useState(""),
@@ -680,6 +682,8 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
         part: learned.parts.length === 1 ? learned.parts[0] : "all",
         role: learned.role,
         comparison,
+        start: take.start,
+        speed: take.speed,
       };
       setChecks((prev) => rememberTake(prev, entry));
       setCheckAt(Math.min(checks.length, 4));
@@ -1091,6 +1095,26 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
               </button>
             ))}
           </div>
+
+          <FollowAlong
+            chords={result.chords}
+            time={position}
+            openStrings={profile.openStrings}
+            sources={[
+              ...tabParts.filter((p) => !/vocal|voice|bass|drum|percussion/i.test(p.name)).map((p) => ({ id: `tab:${p.name}`, label: `Your tab: ${p.name}`, notes: p.notes })),
+              ...(score ? [{ id: "score", label: `The app's transcription: ${score.label}`, notes: score.notes }] : []),
+            ]}
+            take={
+              checks[checkAt]?.start != null
+                ? {
+                    marks: shownReport(checks[checkAt].comparison)?.notes ?? [],
+                    start: checks[checkAt].start!,
+                    speed: checks[checkAt].speed ?? 1,
+                    label: checks[checkAt].label,
+                  }
+                : null
+            }
+          />
 
           <h3 className="section-title">Tab and notation</h3>
           <div className="score-controls">
