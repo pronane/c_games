@@ -1098,6 +1098,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
 
           <FollowAlong
             chords={result.chords}
+            trainedChords={!!result.provenance?.chords?.startsWith("BTC")}
             time={position}
             openStrings={profile.openStrings}
             sources={[

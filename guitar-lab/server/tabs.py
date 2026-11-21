@@ -183,6 +183,8 @@ class NoteIn(BaseModel):
     midi: int = Field(ge=21, le=108)
     string: int | None = Field(default=None, ge=1, le=8)
     fret: int | None = Field(default=None, ge=0, le=24)
+    # Strings 1..6 heard in the recording (server.string_timbre), used by the fingering.
+    string_probs: list[float] | None = Field(default=None, min_length=6, max_length=6)
 
 
 class NotesToScore(BaseModel):
@@ -210,7 +212,10 @@ def notes_to_notation(body: NotesToScore, x_fretwork_client: str | None = Header
         given = all(n['string'] and n['fret'] is not None and strings[n['string']-1]+n['fret'] == n['midi']
                     for n in notes if n['string'] and n['string'] <= len(strings))
         if not notes or not all(n['string'] for n in notes) or not given:
-            notes = sa.fingering([{k: n[k] for k in ('time', 'duration', 'midi')} for n in notes], strings, profile['max_fret'])
+            keep = ('time', 'duration', 'midi', 'string_probs')
+            notes = sa.fingering([{k: n[k] for k in keep if n.get(k) is not None} for n in notes], strings, profile['max_fret'])
+            for n in notes:
+                n.pop('string_probs', None)
     beat = 60/body.bpm
     end = max((n['time']+n['duration'] for n in notes), default=0)
     beats = [i*beat for i in range(int(end/beat)+5)]

@@ -158,6 +158,7 @@ export default function RiffToTab({ settings }: { settings: InstrumentSettings }
       body.set("take", encodeWav([take.buffer.getChannelData(0)], take.buffer.sampleRate), "take.wav");
       body.set("consent", String(consent));
       body.set("transcriber", transcriber);
+      body.set("standard_tuning", String(profile.id === "guitar" && settings.tuning === "standard" && settings.capo === 0));
       const result = await api<Heard>("/api/takes/transcribe", { method: "POST", body });
       if (!result.notes.length) throw Error("No notes were heard. Check the input level and record again.");
       setHeard(result);
@@ -245,6 +246,7 @@ export default function RiffToTab({ settings }: { settings: InstrumentSettings }
     [files],
   );
 
+  const heardStrings = !!heard?.notes.some((n) => n.string_probs);
   const fretted = written ? written.notes.filter((n) => n.string != null && n.fret != null).length : 0;
   return (
     <section className="panel song-lab riff-to-tab" id="riff-to-tab" aria-labelledby="riff-title-heading">
@@ -372,7 +374,9 @@ export default function RiffToTab({ settings }: { settings: InstrumentSettings }
               {take?.onClick
                 ? " Written on the click you played to."
                 : " Without a click the tempo is a guess (about 7 times in 10 it is right or exactly double or half). If the rhythm looks too busy or too slow, try the quick fixes."}{" "}
-              Frets are the app's choice of where to play each note; you may have played the same notes elsewhere on the neck.
+              {heardStrings
+                ? "Strings and frets come from listening to which string each note was played on (in tests about 9 notes in 10 land where they were played)."
+                : "Frets are the app's choice of where to play each note (it only listens for the string in standard tuning without a capo); you may have played some elsewhere on the neck."}
             </span>
           </div>
           <Suspense fallback={<p className="helper">Loading the notation view…</p>}>

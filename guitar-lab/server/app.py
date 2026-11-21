@@ -547,7 +547,7 @@ def take_tempo(path, notes):
 
 @app.post('/api/takes/transcribe')
 async def transcribe_own_take(take: UploadFile = File(...), consent: bool = Form(False), transcriber: str = Form(''),
-                              x_fretwork_client: str | None = Header(None)):
+                              standard_tuning: bool = Form(False), x_fretwork_client: str | None = Header(None)):
     """Your own playing on its own (a riff, a phrase) -> the notes heard, plus a tempo guess.
 
     For "your take to tab": the studio writes the tab and notation from these notes with
@@ -574,6 +574,14 @@ async def transcribe_own_take(take: UploadFile = File(...), consent: bool = Form
         notes = [{'time': round(float(n['time']), 4), 'duration': round(float(n['duration']), 4), 'midi': int(n['midi']),
                   'amplitude': round(float(n.get('amplitude', 0.5)), 3)} for n in notes]
         bpm, first_beat = await asyncio.to_thread(take_tempo, path, notes)
+        if standard_tuning:
+            # Which string each note was played on, heard from its sound (standard tuning only).
+            from . import string_timbre
+            import soundfile as sf
+            audio, rate = sf.read(path, dtype='float32')
+            for n, probs in zip(notes, await asyncio.to_thread(string_timbre.string_probs, audio, rate, notes, string_timbre.STANDARD)):
+                if probs:
+                    n['string_probs'] = probs
     finally:
         shutil.rmtree(folder, ignore_errors=True)
     return {'notes': notes, 'duration': round(duration, 3), 'bpm': bpm, 'first_beat': first_beat,

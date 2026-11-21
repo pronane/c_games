@@ -52,6 +52,8 @@ export type SongBreakdown = {
   tone?: ToneEstimate | null;
   warnings: string[];
   refinement?: Refinement | null;
+  /** How the chords were worked out (the trained model or templates). */
+  provenance?: { chords?: string };
 };
 export type Song = {
   id: string;

@@ -54,6 +54,8 @@ const A_SHAPE: Record<string, (number | null)[]> = {
   sus2: [x, 0, 2, 2, 0, 0],
   sus4: [x, 0, 2, 2, 3, 0],
   "5": [x, 0, 2, 2, x, x],
+  dim: [x, 0, 1, 2, 1, x],
+  aug: [x, 0, 3, 2, 2, 1],
 };
 
 const shift = (offsets: (number | null)[], by: number) => offsets.map((f) => (f == null ? null : f + by));

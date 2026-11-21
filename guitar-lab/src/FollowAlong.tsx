@@ -10,6 +10,7 @@ export type NoteSource = { id: string; label: string; notes: BoardNote[] };
  */
 export default function FollowAlong({
   chords,
+  trainedChords = false,
   time,
   sources,
   take,
@@ -17,6 +18,8 @@ export default function FollowAlong({
   maxFret = 22,
 }: {
   chords: ChordSpan[];
+  /** Chords from the trained chord model (better than the templates). */
+  trainedChords?: boolean;
   time: number;
   sources: NoteSource[];
   take?: { marks: TakeMark[]; start: number; speed: number; label: string } | null;
@@ -55,8 +58,11 @@ export default function FollowAlong({
               ))}
             </div>
             <p className="helper">
-              Chords are worked out from the recording, not read from a tab, and are right roughly half the time on band
-              recordings. Shapes are the common ones, lowest on the neck; the song may use other voicings.
+              Chords are worked out from the recording, not read from a tab.{" "}
+              {trainedChords
+                ? "Measured on band recordings, the chord model gets about 6 beats in 10 fully right and the root right on 7 in 10."
+                : "Measured on band recordings they are right roughly half the time (install the chord model for better chords)."}{" "}
+              Shapes are the common ones, lowest on the neck; the song may use other voicings.
             </p>
           </details>
         </div>
