@@ -106,6 +106,8 @@ public sealed class PlayerState
     /// <summary>Stick direction / sprint held while a first touch is in progress.</summary>
     public Vector2 TouchDir;
     public bool TouchKnock;
+    /// <summary>RestartId at which this player was last cautioned for encroaching.</summary>
+    public int EncroachedAt = -1;
     public string Action = "idle";
     /// <summary>Phase 0 event sync: total duration of the current one-shot and the
     /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
@@ -209,6 +211,8 @@ public sealed class MatchState
     public readonly List<bool> ShootoutHome = new(), ShootoutAway = new();
     /// <summary>Set-piece taker being watched for a double touch.</summary>
     public int SetPieceTaker = -1;
+    /// <summary>Counts restarts, so an encroacher is cautioned once per restart.</summary>
+    public int RestartId;
     public bool SetPieceLeftFoot;
     public float SetPieceTimer;
     /// <summary>Unseen violent conduct waiting for VAR.</summary>
@@ -740,7 +744,7 @@ public sealed partial class MatchEngine
                 p.DecisionTimer = Rng.Range(.08f, .18f);
                 Decide(p, pc, human);
             }
-            if (!human) RespectRestartDistance(p);
+            RespectRestartDistance(p);          // AI targets, and the human's assist target
         }
 
         // ---- Movement ----
@@ -789,8 +793,11 @@ public sealed partial class MatchEngine
                 // A carried ball that crosses a line is released so BallPhysics can rule
                 // on it this tick: dribbling into the net used to be no goal, and
                 // dribbling over the touchline was never out of play.
+                // A keeper holding the ball only takes it over his line if he goes over
+                // himself (a catch on the line put the held ball 0.4 m behind it: own goal).
+                Vector3 lineCheck = owner.IsKeeper ? owner.Pos : S.Ball.Pos;
                 if (!owner.MustPlayBall // a throw-in taker stands behind the line by law
-                    && (MathF.Abs(S.Ball.Pos.X) > Mx.HalfLength + .02f || MathF.Abs(S.Ball.Pos.Z) > Mx.HalfWidth + .2f))
+                    && (MathF.Abs(lineCheck.X) > Mx.HalfLength + .02f || MathF.Abs(lineCheck.Z) > Mx.HalfWidth + .2f))
                 {
                     S.Ball.Owner = -1;
                     S.Ball.Vel = owner.Vel;
@@ -1896,6 +1903,7 @@ public sealed partial class MatchEngine
             }
         }
         var taker = State.Players[best];
+        State.RestartId++;
         State.Ball.Owner = best;
         bool throwIn = State.Phase == Phase.ThrowIn;
         taker.Pos = throwIn
@@ -1955,8 +1963,7 @@ public sealed partial class MatchEngine
             float qd = Mx.FlatDist(q.Pos, State.Ball.Pos);
             if (qd < keepOff)
             {
-                Vector3 away = qd > .05f ? Mx.FlatDir(State.Ball.Pos, q.Pos) : Mx.FlatDir(State.Ball.Pos, OwnGoalPos(q.Team));
-                q.Pos = State.Ball.Pos + away * (keepOff + .2f);
+                q.Pos = OutsideCircle(State.Ball.Pos, qd > .05f ? q.Pos : OwnGoalPos(q.Team), keepOff + .3f);
                 q.Target = q.Pos;
             }
         }
@@ -2038,7 +2045,28 @@ public sealed partial class MatchEngine
         // An AI taker stands over the ball until he plays it.  A human is free to
         // move: carrying it away is a free kick against him (EnforceRestartLaws),
         // and opponents are free to encroach and be cautioned for it.
-        if (p.MustPlayBall && !human) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }
+        bool stick = human && cmd.Move.LengthSquared() > .01f;
+        if (p.MustPlayBall && !stick) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }   // only the stick moves a taker
+        if (!stick && State.Ball.Owner >= 0 && State.Ball.Owner != p.Index)
+        {
+            // AI players (and the assist when a human lets go of the stick) go
+            // round the restart circle rather than through it - by choice; a human
+            // steering into it is free to, and is cautioned.
+            var holder = State.Players[State.Ball.Owner];
+            if (holder.MustPlayBall && holder.Team != p.Team && wish.LengthSquared() > 0f)
+            {
+                // Wide margin: players carry momentum (turns are weight-limited), so
+                // they must start steering away well before the 9.15 m line.
+                float need = RestartDistance(holder) + 1.6f;
+                Vector3 next = p.Pos + wish * 2f;
+                if (Mx.FlatDist(next, State.Ball.Pos) < need)
+                {
+                    Vector3 rim = State.Ball.Pos + Mx.FlatDir(State.Ball.Pos, p.Pos) * need;
+                    Vector3 tangent = new(-(rim - State.Ball.Pos).Z, 0, (rim - State.Ball.Pos).X);
+                    wish = Mx.Norm(Mx.Flat(rim - p.Pos) + Mx.Norm(tangent) * MathF.Sign(Vector3.Dot(tangent, wish) + 1e-4f));
+                }
+            }
+        }
         p.Sprinting = sprint;
         float fatigue = Mx.Lerp(.72f, 1f, p.Stamina);
         // Phase 2.9 preset: Authentic is slightly slower, Competitive faster.

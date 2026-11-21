@@ -384,7 +384,10 @@ public partial class MatchView : Node3D
                    + $"fouls {S.Fouls[0]}-{S.Fouls[1]} corners {S.Corners[0]}-{S.Corners[1]} "
                    + $"(last {Engine.Events.Count} events: throw-ins {T("Throw-in")} goal kicks {T("Goal kick")} saves {K(EventKind.Save)}) "
                    + $"shootout {S.ShootoutKicksHome}/{S.ShootoutKicksAway} real {now - _autoplayStart:0}s");
-            GetTree().CreateTimer(3.0).Timeout += () => GetTree().Quit();
+            int from = Math.Max(0, Engine.Events.Count - 60);
+            for (int i = from; i < Engine.Events.Count; i++)
+                GD.Print($"[AUTOPLAY]   {Engine.Events[i].Clock:0}' {Engine.Events[i].Kind}: {Engine.Events[i].Text}");
+                        GetTree().CreateTimer(3.0).Timeout += () => GetTree().Quit();
         }
     }
 
