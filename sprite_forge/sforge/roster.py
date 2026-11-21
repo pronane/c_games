@@ -11,9 +11,18 @@ in OUT/<player>/. Then every player gets portrait.png (head and shoulders, from 
   select_screen.png  the portraits in a grid, a fighter select screen
   team_sheet.png     each side's line-up, full body (idle frame 0)
 
-A roster file is {"game": "soccer", "players": [{"name": "keeper", "side": "Home", "kit": "gk", "type": "keeper",
-"body": {"gender": 1, "muscle": 0.6, "weight": 0.6, "height": 0.7}}, {"name": "mike", "rig": "captures/mike/out/mike.glb"},
-...]}. "rig" is a library rig name or a GLB / FBX file (a capture); without it the player is the mannequin with that body.
+A roster file is {"game": "soccer", "players": [{"name": "keeper", "side": "Home", "number": 1, "kit": "gk",
+"type": "keeper", "look": {"hair_style": "short02", "hair_colour": "black", "skin": "young_african_male"}},
+{"name": "mike", "rig": "captures/mike/out/mike.glb"}, {"name": "sub", "body": {"gender": 0, "muscle": 0.6}}, ...]}.
+"rig" is a library rig name or a GLB / FBX file (a capture). "look" (v11.21) is MakeHuman appearance keys
+(forge.py look --keys: hair style and colour, facial hair, skin, eyes, brows, face and muscle sliders): the player is
+a realistic MakeHuman character in the roster's kit with the squad number on the back. Without "rig" or "look" the
+player is the mannequin with that "body".
+
+v11.21: default rosters give every player a look of their own - hair style and colour, facial hair, skin tone, eye
+colour, face shape, and muscles to suit their type - so a team or a cast no longer looks like copies of one figure.
+That needs the MakeHuman library (forge.py human --setup --full); without it the players fall back to the mannequin
+with different bodies, and roster.json says so.
 """
 from __future__ import annotations
 import json
@@ -28,6 +37,48 @@ FIGHTER_ORDER = ["balanced", "quick_striker", "heavy_brawler", "small_agile", "b
 FIGHTER_KITS = ["red", "blue", "black", "home", "away"]
 FIGHTER_NAMES = ["ace", "blaze", "brick", "pixie", "titan", "nova", "rook", "vex"]
 OUTFIELD = ["playmaker", "balanced", "quick_striker", "balanced", "playmaker", "quick_striker", "balanced"]
+# v11.21 looks: deterministic per player, so a roster rebuilds identically
+# long01, bob01 and braid01 hang over the face on this body, so default looks leave them out (a roster file may use them)
+HAIR_STYLES = ["short02", "buzz", "short01", "afro01", "short04", "bald", "ponytail01", "short03"]
+HAIR_COLOURS = ["#1b1410", "#3b2614", "#6b4a2b", "#a8743f", "#c9a465", "#8a3b1c", "#2a2a2a", "#7a7570"]
+SKINS = ["young_caucasian_male", "young_african_male", "young_asian_male", "young_caucasian_male2",
+         "middleage_african_male", "middleage_caucasian_male", "middleage_asian_male"]
+FACIAL = ["none", "stubble", "none", "goatee", "none", "beard", "moustache", "stubble"]
+EYES = ["brown", "blue", "green", "brownlight", "grey", "bluegreen", "lightblue"]
+FACE_KEYS = ["nose_size", "nose_width", "lips", "jaw", "chin", "cheekbones", "cheeks", "eye_size", "ears", "brow_height"]
+MUSCLE = {"heavy_brawler": 0.8, "big_boss": 0.9, "quick_striker": 0.35, "small_agile": -0.2, "keeper": 0.3,
+          "playmaker": 0.0, "balanced": 0.2}
+
+
+def look_for(i, t="balanced", salt=0):
+    """player i's look (appearance keys): hair, colour, facial hair, skin, eyes, brows, face shape, muscles for type t"""
+    import random
+    r = random.Random(1009 * (i + 1) + 7919 * salt)
+    hs = HAIR_STYLES[(i * 5 + salt) % len(HAIR_STYLES)]
+    lk = dict(hair_style=hs, hair_colour=HAIR_COLOURS[(i * 3 + salt) % len(HAIR_COLOURS)],
+              facial_hair=FACIAL[(i * 7 + salt) % len(FACIAL)], skin=SKINS[(i * 2 + salt) % len(SKINS)],
+              eye_colour=EYES[(i + salt) % len(EYES)], brow_style="eyebrow%03d" % (1 + (i * 5 + salt) % 12))
+    if hs == "bald":
+        lk["facial_hair"] = "beard"
+    for k in FACE_KEYS:
+        lk[k] = round(r.uniform(-0.6, 0.6), 2)
+    m = MUSCLE.get(t, 0.2)
+    for k in ("muscle_arms", "muscle_shoulders", "muscle_chest", "muscle_back", "muscle_legs"):
+        lk[k] = round(max(-1.0, min(1.0, m + r.uniform(-0.15, 0.15))), 2)
+    lk["shoulder_width"] = round(max(-1.0, min(1.0, m * 0.6 + r.uniform(-0.2, 0.2))), 2)
+    return lk
+
+
+def looks_available():
+    """the MakeHuman library and a template are here, so players can have looks"""
+    try:
+        from .mhlib import Library
+        from . import look as LK
+        return Library().available() and LK.default_template(make=True) is not None
+    except Exception:                                                      # noqa: BLE001
+        return False
+
+
 # body per character type (MakeHuman macros 0..1): a heavy brawler is big, a small agile fighter light
 BODY = {
     "balanced": dict(muscle=0.55, weight=0.5, height=0.5),
@@ -52,6 +103,7 @@ def default_roster(game, size=0):
                 body["height"] = round(min(1.0, body["height"] + 0.07 * ((i * 3) % 5 - 2)), 2)
                 players.append(dict(name="%s_%d" % (side.lower(), i + 1), side=side, number=i + 1,
                                     kit="gk" if t == "keeper" else kit, type=t, body=body,
+                                    look=look_for(i, t, salt=0 if side == "Home" else 3),
                                     role="Keeper" if t == "keeper" else t.replace("_", " ").title()))
     elif game in FIGHT_GAMES:
         n = size or 5
@@ -60,14 +112,15 @@ def default_roster(game, size=0):
             body = dict(BODY[t]); body["gender"] = 1.0 if i % 3 != 2 else 0.0
             players.append(dict(name=FIGHTER_NAMES[i % len(FIGHTER_NAMES)] + ("" if i < len(FIGHTER_NAMES) else str(i)),
                                 side="Cast", number=i + 1, kit=FIGHTER_KITS[i % len(FIGHTER_KITS)], type=t, body=body,
-                                role=t.replace("_", " ").title()))
+                                look=look_for(i, t, salt=1), role=t.replace("_", " ").title()))
     else:
         n = size or 4
         for i in range(n):
             t = ["balanced", "small_agile", "big_boss", "balanced"][i % 4]
             body = dict(BODY[t]); body["gender"] = 1.0 if i % 2 == 0 else 0.0
             players.append(dict(name="hero_%d" % (i + 1), side="Cast", number=i + 1,
-                                kit=FIGHTER_KITS[i % len(FIGHTER_KITS)], type=t, body=body, role=t.replace("_", " ").title()))
+                                kit=FIGHTER_KITS[i % len(FIGHTER_KITS)], type=t, body=body, look=look_for(i, t, salt=2),
+                                role=t.replace("_", " ").title()))
     return dict(game=game, players=players)
 
 
@@ -92,20 +145,45 @@ def validate(roster):
         for k, v in (p.get("body") or {}).items():
             if not isinstance(v, (int, float)) or not 0 <= v <= 1:
                 bad.append("%s: body %s=%r must be 0..1" % (n, k, v))
+        if p.get("look"):
+            from .appearance import Appearance, KEYS
+            unknown = [k for k in p["look"] if k not in KEYS]
+            if unknown:
+                bad.append("%s: unknown look keys %s (forge.py look --keys)" % (n, unknown))
+            else:
+                ap = Appearance()
+                for k, v in p["look"].items():
+                    try:
+                        ap.set(k, v)
+                    except Exception as e:                                 # noqa: BLE001
+                        bad.append("%s: look %s=%r: %s" % (n, k, v, e))
+        if p.get("number") is not None and (not isinstance(p["number"], int) or not 0 <= p["number"] <= 99):
+            bad.append("%s: number %r must be 0..99" % (n, p["number"]))
     return bad
 
 
-def player_argv(game, p, out, glb=True, library=""):
-    """one player -> its `forge.py build` command line"""
+def look_argv(p, glb_path):
+    """a player with a look -> the `forge.py look` command line that makes their character GLB in their kit"""
+    kit = "sf_%s" % (p.get("kit") or "home")
+    if p.get("number") is not None:
+        kit += "#%d" % int(p["number"])
+    sets = ",".join("%s=%s" % (k, v) for k, v in p["look"].items())
+    return ["look", "--set", sets, "--kit", kit, "--glb", glb_path]
+
+
+def player_argv(game, p, out, glb=True, library="", look_glb=None):
+    """one player -> its `forge.py build` command line (look_glb: their look's character, kit already painted)"""
     a = ["build", "--game", game, "--name", p["name"], "--out", out]
-    if p.get("rig"):
+    if look_glb:
+        a += ["--rig", look_glb]
+    elif p.get("rig"):
         a += ["--rig", p["rig"]]
     else:
         a.append("--mannequin")
         b = p.get("body") or {}
         if b:
             a += ["--human", ",".join("%s=%.2f" % (k, float(v)) for k, v in sorted(b.items()))]
-    if p.get("kit"):
+    if p.get("kit") and not look_glb:
         a += ["--kit", p["kit"]]
     if p.get("type") and p["type"] != "balanced":
         a += ["--character-type", p["type"]]
@@ -125,10 +203,24 @@ def build(roster, out, glb=True, library="", log=print, run=None):
     os.makedirs(out, exist_ok=True)
     game = roster["game"]
     done = []
+    use_looks = any(p.get("look") and not p.get("rig") for p in roster["players"]) and looks_available()
+    if any(p.get("look") and not p.get("rig") for p in roster["players"]) and not use_looks:
+        log("roster: no MakeHuman library here (forge.py human --setup --full) - players are mannequins with their bodies")
     for i, p in enumerate(roster["players"]):
+        look_glb = None
+        if use_looks and p.get("look") and not p.get("rig"):
+            look_glb = os.path.join(out, "_looks", p["name"] + ".glb")
+            os.makedirs(os.path.dirname(look_glb), exist_ok=True)
+            la = look_argv(p, look_glb)
+            r = run(la) if run is not None else subprocess.run([sys.executable, os.path.join(HERE, "forge.py")] + la,
+                                                                cwd=HERE, capture_output=True, text=True)
+            rc = r if isinstance(r, int) else r.returncode
+            if rc != 0 or not os.path.isfile(look_glb):
+                log("roster:   %s's look failed - mannequin instead%s" % (p["name"], "" if isinstance(r, int) else ": " + (r.stdout + r.stderr)[-300:]))
+                look_glb = None
         log("roster: [%d/%d] %s (%s, %s)" % (i + 1, len(roster["players"]), p["name"], p.get("type") or "balanced",
-                                              p.get("rig") or "mannequin"))
-        argv = player_argv(game, p, out, glb, library)
+                                              "look" if look_glb else (p.get("rig") or "mannequin")))
+        argv = player_argv(game, p, out, glb, library, look_glb)
         if run is not None:
             rc = run(argv)
         else:
@@ -148,6 +240,7 @@ def build(roster, out, glb=True, library="", log=print, run=None):
             pass
         rec = dict(p)
         rec.update(folder=p["name"], manifest=p["name"] + "/game_character.json",
+                   built_as="look" if look_glb else ("rig" if p.get("rig") else "mannequin"),
                    portrait=p["name"] + "/portrait.png" if por else "", portrait_from=how,
                    model=p["name"] + "/model.glb" if os.path.isfile(os.path.join(folder, "model.glb")) else "",
                    qa_score=q.get("score"), qa_fail=q.get("fail"))
@@ -161,7 +254,8 @@ def build(roster, out, glb=True, library="", log=print, run=None):
                select_screen="select_screen.png", team_sheet="team_sheet.png")
     title = "SELECT YOUR FIGHTER" if game in FIGHT_GAMES else ("PICK YOUR PLAYER" if game in TEAM_GAMES else "SELECT CHARACTER")
     PT.select_screen([(os.path.join(out, p["portrait"]) if p["portrait"] else None, p["name"],
-                       "%s%s" % ((p.get("side") + " - ") if game in TEAM_GAMES else "", p.get("role") or p.get("type") or ""))
+                       "%s%s%s" % (("#%d " % p["number"]) if game in TEAM_GAMES and p.get("number") is not None else "",
+                                   (p.get("side") + " - ") if game in TEAM_GAMES else "", p.get("role") or p.get("type") or ""))
                       for p in done], os.path.join(out, "select_screen.png"), title=title)
 
     def idle(p):
@@ -170,7 +264,7 @@ def build(roster, out, glb=True, library="", log=print, run=None):
         if not fs and os.path.isdir(mv):
             fs = sorted(os.listdir(mv))[:1]
         return os.path.join(mv, fs[0]) if fs else None
-    PT.team_sheet([(s, [(idle(p), p["name"], p.get("role") or "") for p in done if p.get("side", "Cast") == s]) for s in sides],
+    PT.team_sheet([(s, [(idle(p), p["name"], (("#%d " % p["number"]) if game in TEAM_GAMES and p.get("number") is not None else "") + (p.get("role") or "")) for p in done if p.get("side", "Cast") == s]) for s in sides],
                   os.path.join(out, "team_sheet.png"), title="%s roster" % game.replace("_", " ").title())
     path = os.path.join(out, "roster.json")
     json.dump(doc, open(path, "w"), indent=1)

@@ -202,6 +202,30 @@ def hard_alpha(png, cut=0.4):
     return _png(Image.fromarray(a, "RGBA"))
 
 
+def bake_tints(parts, images):
+    """parts whose colour is a vertex colour (hair, brows, lashes, facial hair) get it multiplied into a copy of their
+    texture instead, so every engine shows it. Alpha (a thinning hairline's fade) stays a vertex colour.
+    -> new part list; `images` gains the tinted textures"""
+    import dataclasses
+    out = []
+    for p in parts:
+        if p.C is None or not p.image or p.image not in images or p.role not in ("hair", "brows", "lashes"):
+            out.append(p); continue
+        rgb = np.clip(np.asarray(p.C[:, :3], float).mean(0), 0, 1)
+        if np.allclose(rgb, 1.0, atol=0.01):
+            out.append(p); continue
+        key = "%s_%02x%02x%02x" % ((p.image,) + tuple(int(round(c * 255)) for c in rgb))
+        if key not in images:
+            im = Image.open(io.BytesIO(images[p.image])).convert("RGBA")
+            a = np.asarray(im).astype(np.float32)
+            a[..., :3] = np.clip(a[..., :3] * rgb, 0, 255)
+            images[key] = _png(Image.fromarray(a.astype(np.uint8), "RGBA"))
+        C = np.ones_like(p.C); C[:, 3] = p.C[:, 3]
+        C = None if np.allclose(C[:, 3], 1.0) else C
+        out.append(dataclasses.replace(p, C=C, image=key))
+    return out
+
+
 def engine_images(images):
     """images for a GLB: card hair textures alpha-tested, everything else as is"""
     return {k: (hard_alpha(v) if k.startswith("hair_") else v) for k, v in images.items()}

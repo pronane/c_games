@@ -183,7 +183,8 @@ class GamesTab:
         self.status = tk.StringVar(value="")
         self.t = tk.DoubleVar(value=0.0)
         self.view = tk.StringVar(value="side")
-        self.mode = tk.StringVar(value="figure")         # figure: the move on the mannequin; character: the built sprites
+        self.mode = tk.StringVar(value="figure")
+        self.boxes = tk.BooleanVar(value=True)          # v11.21: hit / hurt boxes over the built character         # figure: the move on the mannequin; character: the built sprites
         self.size = tk.IntVar(value=0)
         self.engine = tk.StringVar(value="godot")
         self._strips = {}
@@ -248,6 +249,7 @@ class GamesTab:
         ttk.Label(mr, text="Show").pack(side=tk.LEFT)
         ttk.Radiobutton(mr, text="figure", value="figure", variable=self.mode, command=self.draw).pack(side=tk.LEFT)
         ttk.Radiobutton(mr, text="built character", value="character", variable=self.mode, command=self.draw).pack(side=tk.LEFT)
+        ttk.Checkbutton(mr, text="hit boxes", variable=self.boxes, command=self.draw).pack(side=tk.LEFT, padx=(6, 0))
         ttk.Scale(vr, from_=0.0, to=1.0, variable=self.t, command=lambda v: self.draw(), length=160).pack(side=tk.LEFT, padx=4)
 
         # character + build
@@ -464,8 +466,52 @@ class GamesTab:
         cell = cell.resize((max(1, int(fw * k)), max(1, int(fh * k))), Image.NEAREST)
         bg = Image.new("RGBA", cell.size, (246, 247, 249, 255)); bg.alpha_composite(cell)
         self._spr = ImageTk.PhotoImage(bg)
-        cv.create_image(W / 2, (Hh - 30) / 2 + 4, image=self._spr)
+        cx, cy = W / 2, (Hh - 30) / 2 + 4
+        cv.create_image(cx, cy, image=self._spr)
+        self._frame_now = f
+        if self.boxes.get():
+            x0, y0 = cx - cell.size[0] / 2.0, cy - cell.size[1] / 2.0
+            self._draw_boxes(cv, self.row["move"], f, x0, y0, cell.size[0] / float(fw))
         return True
+
+    def anim_record(self, move):
+        """the last build's game_character.json record of a move (pivot, hitboxes, hurtboxes...) or None"""
+        s = self.games.curselection()
+        if not s:
+            return None
+        p = os.path.join(build_folder(self._outdir(self.packs[s[0]])), "game_character.json")
+        if not os.path.isfile(p):
+            return None
+        key = (p, os.path.getmtime(p))
+        if getattr(self, "_man_key", None) != key:
+            self._man_key, self._man = key, {a["name"]: a for a in json.load(open(p)).get("animations", [])}
+        return self._man.get(move)
+
+    def _draw_boxes(self, cv, move, f, x0, y0, k):
+        """hurt boxes (blue: head / body / legs), hit boxes (red, the frames a strike can land) and the pivot (feet)"""
+        a = self.anim_record(move)
+        self._boxes_drawn = (0, 0)
+        if a is None:
+            return
+        hurt = [h for h in a.get("hurtboxes", []) if h.get("frame") == f]
+        hit = [h for h in a.get("hitboxes", []) if h.get("frame") == f]
+        for h in hurt:
+            bx, by, bw, bh = h["box"]
+            cv.create_rectangle(x0 + bx * k, y0 + by * k, x0 + (bx + bw) * k, y0 + (by + bh) * k, outline="#2463b3", width=2,
+                                tags=("hurtbox",))
+        for h in hit:
+            bx, by, bw, bh = h["box"]
+            cv.create_rectangle(x0 + bx * k, y0 + by * k, x0 + (bx + bw) * k, y0 + (by + bh) * k, outline="#c0392b", width=3,
+                                fill="#c0392b", stipple="gray25", tags=("hitbox",))
+        pv = a.get("pivot") or {}
+        if pv:
+            px, py = x0 + pv.get("x", 0) * k, y0 + pv.get("y", 0) * k
+            cv.create_line(px - 8, py, px + 8, py, fill="#1d5e20", width=2, tags=("pivot",))
+            cv.create_line(px, py - 8, px, py + 2, fill="#1d5e20", width=2, tags=("pivot",))
+        if hit:
+            cv.create_text(x0 + (a.get("w") or 128) * k - 4, y0 + 22, anchor="ne", text="HIT", fill="#c0392b",
+                           font=("Segoe UI", 10, "bold"), tags=("hitlabel",))
+        self._boxes_drawn = (len(hurt), len(hit))
 
     def _timeline(self, cv, W, Hh, t):
         # the timeline, with the move's events

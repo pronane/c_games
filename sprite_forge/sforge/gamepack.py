@@ -152,6 +152,8 @@ def load(name_or_path):
         "props": [str(x) for x in (d.get("props") or [])],
         "prop": str(d.get("prop") or "none"),
         "frame": [int(frame[0]), int(frame[1])],
+        # v11.21: figure height as a share of the frame height (default 0.62); lower for packs with high leaps
+        "figure": float(d.get("figure") or 0.0),
         "view_moves": [slug(x) for x in (d.get("view_moves") or [])],
         "notes": str(d.get("notes") or ""),
         "moves": norm,
@@ -212,6 +214,8 @@ def apply(cfg, name_or_path):
     cfg.moves = moves_of(pack)
     cfg.yaw = pack["yaw"]
     cfg.frame_w, cfg.frame_h = pack["frame"]
+    if pack.get("figure") and not cfg.figure_h:
+        cfg.figure_h = int(round(cfg.frame_h * pack["figure"]))
     if pack["prop"] in ("none", "kart", "auto"):
         cfg.prop = pack["prop"]
     if pack["camera"] == "topdown8":
