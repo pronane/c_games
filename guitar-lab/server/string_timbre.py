@@ -14,7 +14,16 @@ single-note lines). Written as tab with the fingering search (benchmarks/string_
 held out the same way), notes on the string and fret actually played: 70% -> 89% from the true
 notes, 55% -> 92% from the app's own transcription of 24 recordings. GuitarSet's players all play
 the same tunes, so held-out players are not held-out music; expect somewhat less on other songs.
-Standard tuning only: the model is not used for other tunings.
+Standard tuning, or every string moved by the same amount (E flat, D standard), measured as
+the same shape in standard tuning; not used for other tunings such as drop D. The studio only
+asks for it in standard tuning without a capo, the case that was measured.
+
+Not used for the song breakdown: on separated guitar from band recordings (5 of the user's
+songs, benchmarks/song_strings_eval.py) the model picks the right string for only 54% of tab
+notes, and adding it lowers tab positions from 77% to 70% on the tab's own notes (49% -> 50% on
+the transcription, within noise). Smaller weights and confidence cut-offs did not beat the
+fingering search alone. Several guitars in one stem, distortion and separation artefacts
+change the harmonic profile the model reads.
 
 The model is stored as plain arrays (server/data/string_timbre.npz) and evaluated with NumPy;
 nothing is unpickled.
@@ -33,8 +42,13 @@ MAX_FRET = 20
 MODEL = Path(__file__).resolve().parent/'data'/'string_timbre.npz'
 
 
-def note_features(audio, sr, note):
-    """Harmonic profile of one note, or None when the note is too short to measure."""
+def note_features(audio, sr, note, shift=0):
+    """Harmonic profile of one note, or None when the note is too short to measure.
+
+    ``shift``: semitones the guitar sits below standard tuning (1 for E flat, 2 for D standard,
+    -2 for a capo on 2). Pitch is measured as played; the pitch and fret features the model sees
+    are those of the same shape in standard tuning.
+    """
     f0 = 440.0*2**((note['midi']-69)/12)
     a = int((note['time']+.03)*sr)
     b = int((note['time']+min(.15, max(.06, note['duration'])))*sr)
@@ -55,12 +69,12 @@ def note_features(audio, sr, note):
         levels.append(20*np.log10(spec[i]+1e-9))
         cents.append((freqs[i]/fk-1)*1200 if k > 1 else 0.0)
     levels = np.array(levels)-levels[0]
-    midi = note['midi']
+    midi = note['midi']+shift
     frets = np.array([midi-o for o in STANDARD], dtype=float)
     return np.concatenate([levels[1:], np.array(cents[1:9]), [midi], frets])
 
 
-def features(audio, sr, notes):
+def features(audio, sr, notes, shift=0):
     """Feature rows for the notes (None where a note cannot be measured)."""
     import librosa
     audio = np.asarray(audio, dtype=np.float32)
@@ -68,7 +82,7 @@ def features(audio, sr, notes):
         audio = audio.mean(axis=1)
     if sr != SR:
         audio = librosa.resample(audio, orig_sr=sr, target_sr=SR)
-    return [note_features(audio, SR, n) for n in notes]
+    return [note_features(audio, SR, n, shift) for n in notes]
 
 
 def load(path):
@@ -108,15 +122,30 @@ def _raw(m, X):
     return raw
 
 
+def uniform_shift(open_strings):
+    """Semitones below standard when every string is moved by the same amount, else None."""
+    if open_strings is None:
+        return 0
+    if len(open_strings) != 6:
+        return None
+    gaps = {s-o for s, o in zip(STANDARD, open_strings)}
+    if len(gaps) != 1:
+        return None
+    shift = gaps.pop()
+    return shift if -7 <= shift <= 4 else None
+
+
 def string_probs(audio, sr, notes, open_strings=None, model=None):
     """Per note: probabilities for strings 1..6 (high e first), or None where not measured.
 
-    Only for standard tuning; returns all None for other tunings or when the model is missing.
+    For standard tuning and tunings that move every string by the same amount (E flat, D
+    standard, a capo); all None for other tunings (drop D, open G...) or when the model is missing.
     """
     m = model if model is not None else _model()
-    if m is None or (open_strings is not None and list(open_strings) != STANDARD) or not notes:
+    shift = uniform_shift(open_strings)
+    if m is None or shift is None or not notes:
         return [None]*len(notes)
-    rows = features(audio, sr, notes)
+    rows = features(audio, sr, notes, shift)
     keep = [i for i, r in enumerate(rows) if r is not None]
     out = [None]*len(notes)
     if not keep:
