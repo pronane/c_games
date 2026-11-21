@@ -619,7 +619,7 @@ public static class RigAnimator
         }
         // Action clips are added to the smoothed gait and eased in/out, instead
         // of overwriting every joint with a constant pose for N frames.
-        if ((p.Action == "kick" || p.Action == "volley") && p.ActionTimer > 0f)
+        if ((p.Action is "kick" or "volley" or "chip_shot" or "trivela" or "bicycle") && p.ActionTimer > 0f)
         {
             float env = ActionEnvelope();
             float kick = env * 1.25f;

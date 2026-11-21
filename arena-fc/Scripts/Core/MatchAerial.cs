@@ -90,12 +90,18 @@ public sealed partial class MatchEngine
     {
         var S = State; var b = S.Ball;
         bool header = b.Pos.Y > 1.25f;
+        // 4.4: back to goal with the ball at head height - a good finisher goes for
+        // the bicycle kick instead of a header (less accurate, much more power).
+        bool bicycle = atGoal && b.Pos.Y > 1.1f && b.Pos.Y < 2.1f && p.Spec.Shooting > .55f
+                       && Vector3.Dot(p.Facing, Mx.FlatDir(p.Pos, GoalPos(p.Team))) < -.3f;
+        if (bicycle) header = false;
         Vector3 target;
         if (atGoal)
         {
             var goal = GoalPos(p.Team);
             float side = aim.LengthSquared() > .1f ? MathF.Sign(aim.Y != 0 ? aim.Y : aim.X) : (Rng.Next() < .5f ? -1f : 1f);
             float accuracy = (header ? MathF.Max(p.Spec.Shooting, p.Spec.Defending) : p.Spec.Shooting) * .6f + .3f;
+            if (bicycle) accuracy *= .7f;
             float z = side * Mx.Lerp(Mx.GoalHalfWidth * .25f, Mx.GoalHalfWidth * .85f, accuracy * Rng.Next() + (1 - accuracy) * .5f);
             z += Rng.Signed() * (1.3f - accuracy) * 2.2f;
             target = new Vector3(goal.X, header ? .35f : Rng.Range(.3f, 1.6f), z);
@@ -118,15 +124,24 @@ public sealed partial class MatchEngine
         b.Owner = -1; b.HasPending = false; b.PendingKind = 0; b.PendingFrom = -1;
         b.Vel = dirFlat * speed + new Vector3(0, vy, 0);
         b.FreeTime = 0f; b.NoPickup = .15f;
+        if (bicycle)
+        {
+            // Struck over his own head: the ball leaves from the goal side of him (it
+            // used to fly back through him and he headed it clear), and he is on his
+            // back for a moment.
+            b.Pos = new Vector3(p.Pos.X, MathF.Max(b.Pos.Y, 1.2f), p.Pos.Z) + dirFlat * .6f;
+            b.NoPickup = .5f;
+        }
         b.LastTouch = p.Index; b.LastTouchSide = p.Team; b.LastTouchPos = b.Pos;
-        p.PossessionLock = .3f;
-        p.Facing = dirFlat;
-        SetAction(p, header ? "header" : "volley", .45f, .4f);
+        p.PossessionLock = bicycle ? .9f : .3f;
+        if (!bicycle) p.Facing = dirFlat;
+        SetAction(p, bicycle ? "bicycle" : header ? "header" : "volley", bicycle ? .9f : .45f, bicycle ? .5f : .4f);
         if (atGoal)
         {
             if (IsOnTarget(b.Pos, b.Vel, GoalPos(p.Team))) S.ShotsOnTarget[p.Team]++;
             S.Xg[p.Team] += XgFrom(p.Pos, p.Team, false) * (header ? .7f : .85f);
-            Add(EventKind.Shot, header ? $"{p.Spec.DisplayName} goes for goal with a header!" : $"{p.Spec.DisplayName} hits it first time on the volley!");
+            Add(EventKind.Shot, bicycle ? $"{p.Spec.DisplayName} goes for the bicycle kick!"
+                : header ? $"{p.Spec.DisplayName} goes for goal with a header!" : $"{p.Spec.DisplayName} hits it first time on the volley!");
         }
         else Add(EventKind.Pass, header ? $"{p.Spec.DisplayName} heads it on." : $"{p.Spec.DisplayName} volleys it on.");
     }

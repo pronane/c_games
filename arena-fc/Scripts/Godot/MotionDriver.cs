@@ -24,6 +24,36 @@ public sealed class MotionDriver
     private Slot[] _slots = Array.Empty<Slot>();
 
     public bool IsLoaded => _engine.ClipCount > 0;
+    public bool Matching => _engine.Database != null;
+    private readonly Dictionary<string, string> _dedicated = new(StringComparer.Ordinal);
+
+    /// <summary>Turn on pose-level motion matching: the baked feature table, and the
+    /// action -> clip aliases for actions authored with their own clip (skills, chip,
+    /// trivela, bicycle, thigh control, punch, headbutt ...).</summary>
+    public bool LoadFeatures(string featuresJson, string playerManifestJson)
+    {
+        try
+        {
+            _engine.Database = MotionDatabase.Parse(featuresJson);
+            if (playerManifestJson.Length > 0)
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(playerManifestJson);
+                if (doc.RootElement.TryGetProperty("action_aliases", out var al))
+                    foreach (var p in al.EnumerateObject())
+                    {
+                        string clip = p.Value.GetString() ?? "";
+                        if (_engine.TryGetClip(clip, out var meta) && meta.Dedicated) _dedicated[p.Name] = clip;
+                    }
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            GD.PushWarning($"Motion matching disabled (feature table): {ex.Message}");
+            _engine.Database = null;
+            return false;
+        }
+    }
     public int ClipCount => _engine.ClipCount;
 
     public bool LoadManifest(string json)
@@ -99,8 +129,20 @@ public sealed class MotionDriver
         float untilContact = player.ActionContactAt > 0f
             ? Math.Max(0f, player.ActionContactAt - elapsedAction) : -1f;
         float speed = Mx.Flat(player.Vel).Length();
+        // Facing-root XZ (x = right, z = forward), the space the feature table is baked in.
+        var fwd = Mx.Norm(Mx.Flat(player.Facing));
+        if (fwd.LengthSquared() < 1e-6f) fwd = new System.Numerics.Vector3(0, 0, 1);
+        var right = new System.Numerics.Vector3(-fwd.Z, 0, fwd.X);   // same handedness as SoccerClipRig's strafe test
+        var vel = Mx.Flat(player.Vel);
+        var toTarget = Mx.Flat(player.Target - player.Pos);
+        var desired = toTarget.LengthSquared() > .04f ? Mx.Norm(toTarget) * MathF.Max(speed, MathF.Min(toTarget.Length() * 2f, 8f))
+                                                       : System.Numerics.Vector3.Zero;
+        var localVel = new System.Numerics.Vector2(System.Numerics.Vector3.Dot(vel, right), System.Numerics.Vector3.Dot(vel, fwd));
+        var desiredVel = new System.Numerics.Vector2(System.Numerics.Vector3.Dot(desired, right), System.Numerics.Vector3.Dot(desired, fwd));
+        string? forced = player.ActionTimer > 0f && _dedicated.TryGetValue(player.Action, out var dc) ? dc : null;
         _engine.Update(slot.State, speed, turnRate, ballContext, intent, dt, untilContact,
-            styleTag: player.Spec.Archetype.ToString().ToLowerInvariant());
+            styleTag: player.Spec.Archetype.ToString().ToLowerInvariant(),
+            localVelocity: localVel, desiredLocalVelocity: desiredVel, forcedClipId: forced);
         return slot.State;
     }
 
@@ -110,7 +152,7 @@ public sealed class MotionDriver
         {
             return p.Action switch
             {
-                "kick" or "volley" or "shoot" => PlayerIntent.Shoot,
+                "kick" or "volley" or "shoot" or "chip_shot" or "trivela" or "bicycle" => PlayerIntent.Shoot,
                 "pass" or "short_pass" => PlayerIntent.Pass,
                 "through_ball" or "cross" or "throw_in" => PlayerIntent.ThroughBall,
                 "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
@@ -118,7 +160,8 @@ public sealed class MotionDriver
                 "dive" or "keeper_dive" => PlayerIntent.Dive,
                 "celebrate" => PlayerIntent.Celebrate,
                 "cut" or "turn" => PlayerIntent.Cut,
-                // No dedicated skill clips yet (Sprite Forge TODO): read as a sharp cut.
+                // Skill moves have their own Sprite Forge clips now (SoccerClipRig plays
+                // them directly); the motion engine still reads them as a cut.
                 _ when p.Action.StartsWith("skill_") => PlayerIntent.Cut,
                 _ => p.Shielding ? PlayerIntent.Shield : PlayerIntent.Move,
             };

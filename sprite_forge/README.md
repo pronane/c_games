@@ -54,6 +54,34 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.21: field-sport moves and bind-pose conform (fed back from Arena FC)
+
+Arena FC (the soccer game in `arena-fc/`) asked Sprite Forge for actions it had no clip for, and played
+stand-ins: every skill move came out as a sharp cut, thigh control as a toe flick, a punch as a fist *shot* and a
+headbutt as a jumping header. **`sforge/fieldsport_motions.py`** adds 15 clips for ball games on a pitch, authored for
+the action they name, with the ball keyed through each touch:
+
+- skill moves: `fs_stepover`, `fs_roulette`, `fs_drag_back`, `fs_elastico`, `fs_ball_roll`, `fs_rainbow_flick`,
+  `fs_fake_shot`, `fs_heel_to_heel`
+- aerial control and strikes: `fs_thigh_control`, `fs_chip_shot`, `fs_trivela` (outside of the boot),
+  `fs_bicycle_kick`, `fs_keeper_penalty_set`
+- violent conduct: `fs_punch`, `fs_headbutt`
+
+They register in the motion library automatically, carry event frames as fractions (`fieldsport_motions.EVENTS`:
+ball_contact, footsteps, hit window), and the **soccer** game pack offers ten of them as moves.
+
+**`fieldsport_motions.qa(name)`** checks a clip for the two bugs that hurt Arena most: an arm raised over the shoulder
+in a clip with no reason for it (players stood with their hands up at every free kick), and a ball clip with no ball
+at its contact frame.
+
+**`sforge/bindconform.py`** is the fix for Arena's worst animation bug. A mesh sculpted in one rest pose (MakeHuman's
+A-pose arms) but skinned to a skeleton bound in another (arms hanging) carries the difference into every frame of
+every clip: all 71 of Arena's clips had the arms 45-60 deg too far out and up. `conform_to_bind(V, N, J, W, src_heads,
+tgt_heads, parents)` re-poses the mesh into the target bind pose before skinning - rotation only, about the source's
+own joints, nothing stretched, aligned bones untouched. Any game that skins a sculpt to its own skeleton should call it.
+
+Test: `python tools/test_fieldsport.py` (clips, QA, game pack, conform).
+
 ## New in v11.19: a Games tab with a page per kind of game
 
 The Studio's **Games** tab (`sforge/gui_games.py`) lists every kind of game Sprite Forge builds characters for:

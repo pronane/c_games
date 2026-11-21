@@ -62,8 +62,8 @@ def main():
     try:
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
-        check("71 soccer clips", len(SM.ALL_CLIPS) == 71, str(len(SM.ALL_CLIPS)))
-        check("82 action aliases", len(SM.ACTION_ALIASES) == 82, str(len(SM.ACTION_ALIASES)))
+        check("105 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU motion capture)", len(SM.ALL_CLIPS) == 105, str(len(SM.ALL_CLIPS)))
+        check("98 action aliases", len(SM.ACTION_ALIASES) == 98, str(len(SM.ACTION_ALIASES)))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
               all(a in SM.ACTION_ALIASES for a in core_actions),
@@ -116,7 +116,7 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 71 soccer clips", len(anims) == 71, str(len(anims)))
+        check("GLB carries 105 soccer clips", len(anims) == 105, str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
@@ -181,7 +181,7 @@ def main():
         check("rig JSON bakes the clip keyframes", "clips" in d)
         if "clips" in d:
             clips = d["clips"]
-            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 71)
+            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 105)
             loco = ("soccer_idle", "soccer_walk", "soccer_jog", "soccer_run",
                     "soccer_sprint", "soccer_dribble", "soccer_run_ball")
             check("baked locomotion clips loop",
@@ -211,7 +211,7 @@ def main():
     check("manifest exists", os.path.isfile(man_path))
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
-        check("manifest lists 71 clips", len(man["clips"]) == 71)
+        check("manifest lists 105 clips", len(man["clips"]) == 105)
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
@@ -222,6 +222,20 @@ def main():
         check("manifest aliases include Phase 0 actions",
               all(a in man["action_aliases"] for a in
                   ("volley", "header", "chest_control", "trap", "parry", "cut")))
+        # 8.4: every action the engine emits for a skill move, a special strike or
+        # violent conduct plays a clip authored for it (they used to fall back to
+        # a cut / toe flick / fist shot / jumping header).
+        import re
+        skills_cs = open(os.path.join(ROOT, "Scripts", "Core", "SkillMoves.cs")).read()
+        engine_actions = set(re.findall(r'"(skill_[a-z_]+)"', skills_cs)) | {
+            "thigh_control", "chip_shot", "trivela", "bicycle", "punch", "headbutt", "keeper_penalty_set"}
+        stand_ins = {"soccer_change_direction", "soccer_toe_lift", "soccer_fist_shoot", "soccer_header", "soccer_kick_place"}
+        bad = sorted(a for a in engine_actions
+                     if man["action_aliases"].get(a) in (None, *stand_ins))
+        check("every skill / special-strike / conduct action has its own clip", not bad, str(bad))
+        clip_names = {c["name"] for c in man["clips"]}
+        check("those clips are in the GLB manifest",
+              all(man["action_aliases"][a] in clip_names for a in engine_actions if a in man["action_aliases"]))
 
     section("Runtime wiring (static checks)")
     soccer_cs = open(os.path.join(ROOT, "Scripts", "Godot", "SoccerClipRig.cs")).read()
