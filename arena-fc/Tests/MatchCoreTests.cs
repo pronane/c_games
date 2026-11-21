@@ -440,7 +440,7 @@ var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_m
 var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
-      manifestEngine.ClipCount == 105 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      manifestEngine.ClipCount == 161 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
@@ -448,8 +448,9 @@ Check("shared Sprite Forge clip manifest loads all 18-bone clips",
 // stances filed there at speed 0 made standing players hold arms-up poses.
 string[] gait = { "soccer_backpedal", "soccer_dribble", "soccer_jockey", "soccer_jog", "soccer_run",
     "soccer_run_ball", "soccer_sidestep", "soccer_sprint", "soccer_strafe_l", "soccer_strafe_r", "soccer_walk" };
-// (Motion-captured gait cycles - CMU runs and jogs, tagged "mocap" - are gaits too.)
-bool IsGait(string id) => gait.Contains(id) || (id.StartsWith("soccer_mocap_run") || id.StartsWith("soccer_mocap_jog"));
+// (Motion-captured gait cycles - CMU runs and jogs, SkillCorner match dribble loops - are gaits too.)
+bool IsGait(string id) => gait.Contains(id) || id.StartsWith("soccer_mocap_run") || id.StartsWith("soccer_mocap_jog")
+                          || (id.StartsWith("soccer_sc_carry_") && manifestClips.First(c => c.Id == id).Loop);
 var locoIds = manifestClips.Where(c => c.Category == ClipCategory.Locomotion).Select(c => c.Id).OrderBy(x => x).ToArray();
 Check("clip manifest: Locomotion holds only gait cycles", locoIds.All(IsGait) && gait.All(g => locoIds.Contains(g)),
       string.Join(",", locoIds.Where(x => !IsGait(x))));
@@ -641,6 +642,23 @@ Check("event-driven one-shots never enter motion database search",
             if (st.RenderClipId.StartsWith("soccer_mocap_kick")) mocapKick = true;
         }
     Check("motion-captured kicks are live candidates for shots", mocapKick);
+    // Real in-match motion (SkillCorner broadcast pose): shots, passes and first
+    // touches from A-League players are candidates in the same search.
+    var realHits = new HashSet<string>();
+    foreach (var intent in new[] { PlayerIntent.Shoot, PlayerIntent.Pass })
+        foreach (float v in new[] { 0f, 1.5f, 3f, 4.5f })
+            foreach (float t in new[] { .1f, .2f, .3f, .5f })
+                foreach (float lx in new[] { -1.5f, 0f, 1.5f })
+                {
+                    var st = new MotionState();
+                    var lv = new System.Numerics.Vector2(lx, v);
+                    for (int i = 0; i < 20; i++)
+                        mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f, localVelocity: lv, desiredLocalVelocity: lv);
+                    mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.Possessed, intent, 1f / 60f, t, localVelocity: lv, desiredLocalVelocity: lv);
+                    if (st.RenderClipId.StartsWith("soccer_sc_")) realHits.Add(intent + ":" + st.RenderClipId);
+                }
+    Check("real-match motion (SkillCorner) is picked for shots and passes",
+          realHits.Any(h => h.StartsWith("Shoot")) && realHits.Any(h => h.StartsWith("Pass")), string.Join(",", realHits));
 }
 var dribbleA = new DribbleState { TouchTimer = 0f };
 var dribbleB = new DribbleState { TouchTimer = 0f };

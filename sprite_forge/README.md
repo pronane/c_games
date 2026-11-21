@@ -54,6 +54,25 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.22: 3D joint tracks onto the shared skeleton (fed back from Arena FC)
+
+Body-pose datasets give named 3D joints per frame, not a rig. **`sforge/jointtrack.py`** fits them onto the shared
+skeleton with the same per-frame IK as `forge.py mocap`. It reads SkillCorner open body pose and OpenPose BODY_25
+names, with a Z-up or Y-up source. It returns motion-library keys and a fit report (bone error per segment), and
+`keys_record()` saves them as a library move with a licence record.
+
+- **Gaps:** missing joints borrow the nearest joint the source has, and short gaps in the track are interpolated.
+- **Facing:** the take is turned to face forward at a chosen frame, such as the contact frame of a kick.
+- **Root motion:** the root stays in place; the game supplies root motion.
+
+Arena FC uses it to import 56 real in-match moves from two A-League matches: shots, passes, lofted passes,
+clearances, first touches, ball wins and dribble loops (`arena-fc/Tools/import_skillcorner_pose.py`, MIT data).
+The fits have a mean bone error of 1.4–2.6°. `tools/test_jointtrack.py` checks the fitter end to end: a known clip
+is turned into joint tracks and fitted back.
+
+Limits: single-person tracks only. There are no finger, twist or face channels. The ankle comes from the
+heel-to-toe line. Precision is the source's: broadcast pose is accurate to 7–15 cm per joint.
+
 ## New in v11.21: field-sport moves and bind-pose conform (fed back from Arena FC)
 
 Arena FC (the soccer game in `arena-fc/`) asked Sprite Forge for actions it had no clip for, and played
