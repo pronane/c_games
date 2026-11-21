@@ -1,4 +1,4 @@
-"""v11.21: keep every move inside its sprite cell.
+"""v11.24: keep every move inside its sprite cell.
 
 A dive, a slide tackle, a fall or a leaping catch reached past the cell (128x160 by default) and was cut off at the
 edge: the QA's "clipped" FAIL. The moves are now drawn on a padded canvas first, then cut back to the cell size:
@@ -87,7 +87,7 @@ def fit(frames, cfg, pad, report=None):
     (shared shift) and sets cfg.move_pivots {move: (pivot_x, ground_y)} for moves that needed their own window."""
     W, H = cfg.frame_w, cfg.frame_h
     M = 3                                              # margin: the ground lock may still shift the set by a pixel or two
-    # v11.22: put the feet on the ground line first (what the ground lock does after), so the fit allows for it -
+    # v11.25: put the feet on the ground line first (what the ground lock does after), so the fit allows for it -
     # otherwise the lock's shift afterwards pushed a fitted leap back out of the top of the cell
     off = _ground_offset(frames, cfg.ground_y + pad)
     if off and abs(off) < pad // 2:

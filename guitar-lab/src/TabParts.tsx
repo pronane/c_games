@@ -8,7 +8,7 @@ import { useGuitarSound } from "./guitarTone";
 
 type Section = { start: number; end: number; first_bar: number | null; last_bar: number | null };
 type Match = { tab_notes: number; heard_matched: number; precision: number; recall: number; f1: number };
-type PlacedNote = { time: number; duration: number; midi: number; bar?: number; confirmed?: boolean };
+type PlacedNote = { time: number; duration: number; midi: number; bar?: number; confirmed?: boolean; string?: number | null; fret?: number | null };
 type Part = { name: string; track: number | null; sections: Section[]; notes: PlacedNote[]; match: Match; confirmed?: number | null };
 type Stretch = { start: number; end: number; notes: number; confirmed: number; control: number; status: "confirmed" | "partly" | "not_confirmed" };
 type Result = {
@@ -45,7 +45,7 @@ export default function TabParts({
   songId: string;
   songTitle: string;
   /** The tab parts now lined up with the song, with where each plays (empty when cleared). */
-  onParts?: (parts: { name: string; sections: { start: number; end: number }[] }[]) => void;
+  onParts?: (parts: { name: string; sections: { start: number; end: number }[]; notes: PlacedNote[] }[]) => void;
 }) {
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
@@ -70,7 +70,7 @@ export default function TabParts({
     mix.current = null;
   }, [songId]);
   useEffect(() => {
-    onParts?.(result ? result.parts.map((p) => ({ name: p.name, sections: p.sections.map(({ start, end }) => ({ start, end })) })) : []);
+    onParts?.(result ? result.parts.map((p) => ({ name: p.name, sections: p.sections.map(({ start, end }) => ({ start, end })), notes: p.notes })) : []);
   }, [result]);
 
   async function load(file: File) {

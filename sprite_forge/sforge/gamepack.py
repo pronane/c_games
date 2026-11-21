@@ -152,7 +152,7 @@ def load(name_or_path):
         "props": [str(x) for x in (d.get("props") or [])],
         "prop": str(d.get("prop") or "none"),
         "frame": [int(frame[0]), int(frame[1])],
-        # v11.21: figure height as a share of the frame height (default 0.62); lower for packs with high leaps
+        # v11.24: figure height as a share of the frame height (default 0.62); lower for packs with high leaps
         "figure": float(d.get("figure") or 0.0),
         "view_moves": [slug(x) for x in (d.get("view_moves") or [])],
         "notes": str(d.get("notes") or ""),

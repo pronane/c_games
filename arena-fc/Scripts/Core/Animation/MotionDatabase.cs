@@ -40,7 +40,7 @@ public readonly struct MotionMatch
 /// deterministic brute force; one-shot action queries are deliberately ineligible.</summary>
 public sealed class MotionDatabase
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
     private readonly MotionFeatureRow[] _rows;
     private readonly IReadOnlyList<MotionFeatureRow> _rowView;
     private readonly float[] _mean, _stdDev, _weights;
@@ -105,9 +105,11 @@ public sealed class MotionDatabase
             float phase = ReadSingle(item, "phase");
             if (frame < 0 || phase < 0f || phase >= 1f)
                 throw new FormatException($"Motion row '{clipId}' has invalid frameIndex or normalized phase.");
+            // v2: every category.  One-shot clips contribute their entry frames
+            // (up to the contact) so an action can start at the matching pose/timing.
             if (!Enum.TryParse(ReadString(item, "category"), true, out ClipCategory category)
-                || category != ClipCategory.Locomotion)
-                throw new FormatException($"Motion row '{clipId}' is not locomotion; one-shots are excluded from MM.");
+                || !Enum.IsDefined(typeof(ClipCategory), category))
+                throw new FormatException($"Motion row '{clipId}' has an unknown category.");
             if (!Enum.TryParse(ReadString(item, "ballState"), true, out BallState ball)
                 || !Enum.IsDefined(typeof(BallState), ball))
                 throw new FormatException($"Motion row '{clipId}' has an unknown ballState.");
@@ -130,11 +132,35 @@ public sealed class MotionDatabase
         return new MotionDatabase(rows.ToArray(), mean, stdDev, weights);
     }
 
+    /// <summary>The 8 foot position/velocity features of the row nearest a clip phase
+    /// (the pose the player is in now, for the next query).</summary>
+    public bool TryGetPoseFeatures(string clipId, float phase, Span<float> pose8)
+    {
+        if (pose8.Length < 8) throw new ArgumentException("Need 8 slots.", nameof(pose8));
+        int best = -1; float bestD = float.MaxValue;
+        for (int i = 0; i < _rows.Length; i++)
+        {
+            var r = _rows[i];
+            if (!string.Equals(r.ClipId, clipId, StringComparison.Ordinal)) continue;
+            float d = MathF.Abs(r.Phase - phase);
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        if (best < 0) return false;
+        _rows[best].FeatureSpan.Slice(0, 8).CopyTo(pose8);
+        return true;
+    }
+
     public bool TrySearch(MotionQuery query, out MotionMatch match)
     {
         if (query == null) throw new ArgumentNullException(nameof(query));
         match = default;
-        if (query.Category != ClipCategory.Locomotion || !IsLocomotionIntent(query.Intent)) return false;
+        bool forced = query.ForcedClipId.Length > 0;
+        bool locomotion = query.Category == ClipCategory.Locomotion;
+        // A locomotion search needs a locomotion intent: an event-driven action must
+        // name its own category (or clip), never borrow a running cycle.
+        if (!forced && locomotion && !IsLocomotionIntent(query.Intent)) return false;
+        if (!forced && !locomotion) return TrySearchAction(query, out match);
+        if (forced) return TrySearchForced(query, out match);
 
         bool exactBall = false, neutralBall = false;
         foreach (var row in _rows)
@@ -185,6 +211,69 @@ public sealed class MotionDatabase
         if (bestIndex < 0) return false;
         match = new MotionMatch(_rows[bestIndex], bestIndex, bestCost);
         return true;
+    }
+
+    /// <summary>One-shot entry search: rows of the query's category (dedicated clips
+    /// excluded), cost = pose + trajectory + contact timing.</summary>
+    private bool TrySearchAction(MotionQuery query, out MotionMatch match)
+    {
+        match = default;
+        // Ball context hard-filters when the category has rows for it (a volley is
+        // struck from the air, a shot off the floor); otherwise any row may serve.
+        bool exactBall = false;
+        foreach (var row in _rows)
+            if (row.Category == query.Category && row.StyleTag != "dedicated" && row.Ball == query.Ball) { exactBall = true; break; }
+        float bestCost = float.PositiveInfinity; int bestIndex = -1;
+        for (int i = 0; i < _rows.Length; i++)
+        {
+            var row = _rows[i];
+            if (row.Category != query.Category || row.StyleTag == "dedicated") continue;
+            if (exactBall && row.Ball != query.Ball) continue;
+            float cost = Cost(query.Features, row, ActionEntryScale);
+            if (cost < bestCost) { bestCost = cost; bestIndex = i; }
+        }
+        if (bestIndex < 0) return false;
+        match = new MotionMatch(_rows[bestIndex], bestIndex, bestCost);
+        return true;
+    }
+
+    private bool TrySearchForced(MotionQuery query, out MotionMatch match)
+    {
+        match = default;
+        float bestCost = float.PositiveInfinity; int bestIndex = -1;
+        for (int i = 0; i < _rows.Length; i++)
+        {
+            var row = _rows[i];
+            if (!string.Equals(row.ClipId, query.ForcedClipId, StringComparison.Ordinal)) continue;
+            float cost = Cost(query.Features, row, ActionEntryScale);
+            if (cost < bestCost) { bestCost = cost; bestIndex = i; }
+        }
+        if (bestIndex < 0) return false;
+        match = new MotionMatch(_rows[bestIndex], bestIndex, bestCost);
+        return true;
+    }
+
+    private float Cost(ReadOnlySpan<float> q, MotionFeatureRow row, float[]? scale = null)
+    {
+        float cost = 0f;
+        for (int d = 0; d < MotionFeatureLayout.Dimensions; d++)
+        {
+            float delta = (q[d] - row.FeatureSpan[d]) / _stdDev[d];
+            cost += delta * delta * _weights[d] * (scale != null ? scale[d] : 1f);
+        }
+        return cost;
+    }
+
+    /// <summary>Entering an action (shot, pass, tackle ...): the action itself sets where
+    /// the body goes next, so the gait's velocities and planned path count for little;
+    /// what matters is the wind-up time left and which foot is where.</summary>
+    private static readonly float[] ActionEntryScale = CreateActionEntryScale();
+    private static float[] CreateActionEntryScale()
+    {
+        var s = new float[MotionFeatureLayout.Dimensions];
+        for (int d = 0; d < s.Length; d++) s[d] = d < 4 ? 1f : d < 8 ? .3f : .15f;
+        s[MotionFeatureLayout.TimeToContact] = 5f;
+        return s;
     }
 
     private static bool EligibleBall(MotionFeatureRow row, MotionQuery query,

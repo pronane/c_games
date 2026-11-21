@@ -62,8 +62,8 @@ def main():
     try:
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
-        check("71 soccer clips", len(SM.ALL_CLIPS) == 71, str(len(SM.ALL_CLIPS)))
-        check("82 action aliases", len(SM.ACTION_ALIASES) == 82, str(len(SM.ACTION_ALIASES)))
+        check("161 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner real-match motion)", len(SM.ALL_CLIPS) == 161, str(len(SM.ALL_CLIPS)))
+        check("98 action aliases", len(SM.ACTION_ALIASES) == 98, str(len(SM.ACTION_ALIASES)))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
               all(a in SM.ACTION_ALIASES for a in core_actions),
@@ -116,7 +116,7 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 71 soccer clips", len(anims) == 71, str(len(anims)))
+        check("GLB carries 161 soccer clips", len(anims) == 161, str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
@@ -168,6 +168,11 @@ def main():
         check("rig JSON bone indices in range", max(d["bi"]) < len(d["bones"]) and min(d["bi"]) >= 0)
         ws = [sum(d["w"][i * 4:(i + 1) * 4]) for i in range(min(verts, 200))]
         check("rig JSON weights sum to 1", all(abs(s - 1) < 1e-3 for s in ws))
+        # Bind-pose arms hang at the sides: the sculpt's A-pose arms used to be
+        # skinned to a hanging-arm skeleton, adding ~35-55 deg to every clip.
+        xs = [abs(d["pos"][i * 3]) for i in range(verts)]
+        check("mesh is in Arena's bind pose (arms down, half-width <= 0.32 m)", max(xs) <= 0.32,
+              "half-width %.3f m" % max(xs))
         check("rig JSON material slots are Arena slots", set(d["mats"]) <= {0, 1, 2, 3, 6, 8}, str(d["mats"]))
         tris = sum(len(t) for t in d["idx"]) // 3
         check("rig JSON triangle budget", 8000 < tris <= 20000, str(tris))
@@ -176,7 +181,7 @@ def main():
         check("rig JSON bakes the clip keyframes", "clips" in d)
         if "clips" in d:
             clips = d["clips"]
-            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 71)
+            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 161)
             loco = ("soccer_idle", "soccer_walk", "soccer_jog", "soccer_run",
                     "soccer_sprint", "soccer_dribble", "soccer_run_ball")
             check("baked locomotion clips loop",
@@ -206,7 +211,7 @@ def main():
     check("manifest exists", os.path.isfile(man_path))
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
-        check("manifest lists 71 clips", len(man["clips"]) == 71)
+        check("manifest lists 161 clips", len(man["clips"]) == 161)
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
@@ -217,6 +222,20 @@ def main():
         check("manifest aliases include Phase 0 actions",
               all(a in man["action_aliases"] for a in
                   ("volley", "header", "chest_control", "trap", "parry", "cut")))
+        # 8.4: every action the engine emits for a skill move, a special strike or
+        # violent conduct plays a clip authored for it (they used to fall back to
+        # a cut / toe flick / fist shot / jumping header).
+        import re
+        skills_cs = open(os.path.join(ROOT, "Scripts", "Core", "SkillMoves.cs")).read()
+        engine_actions = set(re.findall(r'"(skill_[a-z_]+)"', skills_cs)) | {
+            "thigh_control", "chip_shot", "trivela", "bicycle", "punch", "headbutt", "keeper_penalty_set"}
+        stand_ins = {"soccer_change_direction", "soccer_toe_lift", "soccer_fist_shoot", "soccer_header", "soccer_kick_place"}
+        bad = sorted(a for a in engine_actions
+                     if man["action_aliases"].get(a) in (None, *stand_ins))
+        check("every skill / special-strike / conduct action has its own clip", not bad, str(bad))
+        clip_names = {c["name"] for c in man["clips"]}
+        check("those clips are in the GLB manifest",
+              all(man["action_aliases"][a] in clip_names for a in engine_actions if a in man["action_aliases"]))
 
     section("Runtime wiring (static checks)")
     soccer_cs = open(os.path.join(ROOT, "Scripts", "Godot", "SoccerClipRig.cs")).read()
@@ -259,8 +278,9 @@ def main():
           '"chest_control"' in match_cs and '"trap"' in match_cs and '"header"' in match_cs)
     check("C# scales dribble lead by speed",
           "Lerp(0.15f, 0.60f" in match_cs)
+    # (#207: hot or stretching saves are parried; shots at him at a sane pace are held)
     check("C# parries hot shots",
-          '"parry"' in match_cs and "spd > 18f" in match_cs)
+          '"parry"' in match_cs and "catchChance" in match_cs)
     check("desktop selects turns by turn rate",
           '"soccer_turn"' in soccer_cs and "turnRate" in soccer_cs)
     check("desktop directional clips", '"soccer_strafe_l"' in soccer_cs and '"soccer_backpedal"' in soccer_cs)

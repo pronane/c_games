@@ -975,6 +975,8 @@ CARRY_HAND = True
 # FRETWORK_FINGERING=prior. Other tunings always use the classic costs.
 HAND_SPAN = 3
 STRING_PRIOR_WEIGHT = .5
+# Weight of the string heard in the recording (server.string_timbre), when notes carry it.
+TIMBRE_WEIGHT = 1.0
 STANDARD_TUNING = [64, 59, 55, 50, 45, 40]
 _STRING_PRIOR = None
 
@@ -1041,6 +1043,9 @@ def fingering(notes, open_strings, max_fret=24):
             + (1.5*span if span > 4 else 0)
         if prior is not None:
             v += STRING_PRIOR_WEIGHT*sum(prior.get((n['midi'], s), 5.) for n, (s, _) in zip(g, c))/len(c)
+        heard = [(n['string_probs'][s], 1) for n, (s, _) in zip(g, c) if n.get('string_probs')]
+        if heard:
+            v += TIMBRE_WEIGHT*sum(-math.log(max(p, 1e-3)) for p, _ in heard)/len(c)
         return v
 
     def move(c, hand_state, prev):
@@ -1313,7 +1318,8 @@ def _harmony_xml(name):
     alter = 1 if name[1:2] == '#' else -1 if name[1:2] == 'b' else 0
     quality = name[1+(alter != 0):]
     kind = {'': 'major', 'm': 'minor', '7': 'dominant', 'maj7': 'major-seventh', 'm7': 'minor-seventh',
-            'sus2': 'suspended-second', 'sus4': 'suspended-fourth', '5': 'power'}.get(quality, 'major')
+            'sus2': 'suspended-second', 'sus4': 'suspended-fourth', '5': 'power', 'dim': 'diminished',
+            'aug': 'augmented'}.get(quality, 'major')
     alt = f'<root-alter>{alter}</root-alter>' if alter else ''
     return (f'<harmony><root><root-step>{root}</root-step>{alt}</root>'
             f'<kind text="{escape(quality)}">{kind}</kind></harmony>')

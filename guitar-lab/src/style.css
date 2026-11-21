@@ -2173,3 +2173,239 @@ footer span:first-child {
   width: auto;
   padding: 4px 6px;
 }
+
+/* Your take to tab */
+.riff-setup,
+.riff-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.riff-setup input[type="number"],
+.riff-grid input[type="number"] {
+  width: 70px;
+}
+.riff-setup input:not([type]) {
+  max-width: 180px;
+}
+.riff-file {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  max-width: 100%;
+}
+.riff-file input {
+  max-width: 100%;
+}
+.riff-text pre {
+  overflow-x: auto;
+  background: #f7f9f3;
+  border: 1px solid #e3e7e1;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.riff-result .downloads {
+  margin-top: 10px;
+}
+.tempo-fixes {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* Follow along: chord now/next and the animated neck. */
+.follow-along {
+  margin: 14px 0 6px;
+}
+.chord-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-start;
+}
+.chord-pair {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+.chord-pair > div > small {
+  display: block;
+  font-size: 11px;
+  color: #66736d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.chord-next {
+  opacity: 0.7;
+}
+.chord-diagram {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  color: #2f3d2b;
+}
+.chord-diagram b {
+  font-size: 15px;
+}
+.chord-diagram.empty {
+  min-width: 70px;
+  min-height: 90px;
+  justify-content: center;
+  color: #9aa39e;
+}
+.chord-diagram svg .fret,
+.chord-diagram svg .string {
+  stroke: #6d7a72;
+  stroke-width: 1;
+}
+.chord-diagram svg .nut {
+  stroke: #2f3d2b;
+  stroke-width: 3;
+}
+.chord-diagram svg .dot,
+.chord-diagram svg .barre {
+  fill: #283f2b;
+}
+.chord-diagram svg .open {
+  fill: none;
+  stroke: #283f2b;
+}
+.chord-diagram svg .mark {
+  font-size: 10px;
+  text-anchor: middle;
+  fill: #66736d;
+}
+.chord-diagram svg .base {
+  font-size: 9px;
+  text-anchor: end;
+  fill: #66736d;
+}
+.song-chords {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.song-chords summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.chord-shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.follow-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 10px 0 4px;
+  font-size: 13px;
+}
+.follow-controls select {
+  max-width: 100%;
+  margin-left: 6px;
+}
+.fretboard {
+  margin: 0;
+}
+.fretboard svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.fretboard .neck {
+  fill: #f3ead9;
+  stroke: #d8cbb0;
+}
+.fretboard .fret {
+  stroke: #b7aa8e;
+  stroke-width: 2;
+}
+.fretboard .nut {
+  stroke: #2f3d2b;
+  stroke-width: 5;
+}
+.fretboard .string {
+  stroke: #6d6656;
+}
+.fretboard .inlay {
+  fill: #ddd0b4;
+}
+.fretboard .fret-number {
+  font-size: 10px;
+  fill: #66736d;
+  text-anchor: middle;
+}
+.fretboard .note.now {
+  fill: #0f7b6c;
+}
+.fretboard .note.next {
+  fill: #0f7b6c;
+}
+.fretboard .note.mine {
+  fill: none;
+  stroke: #c8473a;
+  stroke-width: 2.5;
+}
+.fretboard .note-name {
+  font-size: 9px;
+  font-weight: 700;
+  fill: #fff;
+  text-anchor: middle;
+}
+.fretboard figcaption {
+  font-size: 12px;
+  color: #66736d;
+  margin-top: 2px;
+}
+
+/* Speed trainer and progress */
+.trainer {
+  padding: 8px 12px;
+  border: 1px dashed #cfd8c3;
+  border-radius: 8px;
+}
+.trainer .helper {
+  flex-basis: 100%;
+  margin: 0;
+}
+.trainer select {
+  width: auto;
+  padding: 3px 6px;
+}
+.progress-panel {
+  margin: 14px 0;
+  overflow-x: auto;
+}
+.progress-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.progress-panel table {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 560px;
+}
+.progress-panel th,
+.progress-panel td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e6ebdf;
+  vertical-align: middle;
+}
+.progress-panel td small {
+  display: block;
+  color: #7a8571;
+}
+.progress-panel .spark {
+  color: #4f7a35;
+}

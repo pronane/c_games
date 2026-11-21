@@ -31,11 +31,14 @@ jobs:
       - run: xvfb-run -a python tools/test_studio_tabs.py
       # v11.19: the Games tab - a page per kind of game, every pack in game_packs/
       - run: xvfb-run -a python tools/test_game_tabs.py
-      # v11.20: rosters, portraits and the engine projects (Godot / Unity / Unreal / raylib / web / pygame)
+      # v11.21: field-sport clips (skills, aerial control, chip/trivela/bicycle, conduct), their QA, bind conform
+      - run: python tools/test_fieldsport.py
+      - run: python tools/test_jointtrack.py
+      # v11.23: rosters, portraits and the engine projects (Godot / Unity / Unreal / raylib / web / pygame)
       - run: python tools/test_engines.py
-      # v11.21: distinct roster looks, every move inside its cell on every pack, numbered kits
+      # v11.24: distinct roster looks, every move inside its cell on every pack, numbered kits
       - run: python tools/test_roster_look.py
-      # v11.22: per-pixel textures and smooth light in sprites, HD frames on every pack, the sports idle
+      # v11.25: per-pixel textures and smooth light in sprites, HD frames on every pack, the sports idle
       - run: python tools/test_render_quality.py
       - uses: actions/upload-artifact@v4
         if: always()

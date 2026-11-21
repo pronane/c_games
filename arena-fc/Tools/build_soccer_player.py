@@ -106,6 +106,33 @@ def collapse_weights(J52, W52, sk, arena_heads: np.ndarray):
     return top.astype(np.uint16), tw.astype(np.float32), joint_map
 
 
+# Arena bone -> MakeHuman template joint.  Arena's left is -X; MakeHuman's
+# "_l" is +X, so the sides swap (the retarget's bonemap does the same).
+ARENA_TO_TEMPLATE = {
+    "Hips": "pelvis", "Spine": "spine_01", "Chest": "spine_03", "Neck": "neck_01",
+    "Head": "head", "Face": "head",
+    "LUpperArm": "upperarm_r", "LForearm": "lowerarm_r", "LHand": "hand_r",
+    "RUpperArm": "upperarm_l", "RForearm": "lowerarm_l", "RHand": "hand_l",
+    "LThigh": "thigh_r", "LShin": "calf_r", "LFoot": "foot_r",
+    "RThigh": "thigh_l", "RShin": "calf_l", "RFoot": "foot_l",
+}
+
+
+def conform_to_bind(V, N, J18, W18, tpl_joint, rig_json: dict, log=print):
+    """Re-pose the sculpted mesh (MakeHuman A-pose arms) into Arena's bind pose
+    (arms hanging) before skinning - the fix for the 45-60 deg arms-up bias in
+    every clip.  Now lives in Sprite Forge (sforge.bindconform) so every game
+    that skins a sculpt to its own skeleton gets it."""
+    from sforge.bindconform import conform_to_bind as _conform
+    bones = rig_json["bones"]
+    names = [b["n"] for b in bones]
+    tgt = np.array([b["h"] for b in bones], float)
+    src = np.array([tpl_joint(ARENA_TO_TEMPLATE[n]) for n in names], float)
+    V2, N2, report = _conform(V, N, J18, W18, src, tgt, [b["p"] for b in bones], names)
+    log("  conformed mesh to Arena bind pose (deg): " + (", ".join(report) or "none needed"))
+    return V2.astype(V.dtype), N2.astype(N.dtype)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tris", type=int, default=16000)
@@ -156,10 +183,18 @@ def main() -> int:
         print("  template faces -Z: mesh mirrored to +Z")
     lo.V, lo.N = V, N
     # Boots on the ground line (the sculpted soles sit a centimetre under y=0).
-    lo.V[:, 1] -= float(lo.V[:, 1].min())
+    _ground_shift = float(lo.V[:, 1].min())
+    lo.V[:, 1] -= _ground_shift
 
     J18, W18, joint_map = collapse_weights(J52, W52, sk, arena_heads)
     print("  weights collapsed 52 -> 18 bones")
+    # Template joints in the mesh's frame (same mirror and ground shift as the mesh).
+    def tpl_joint(n):
+        q = np.array(sk.p(n), float)
+        if flip_z: q[2] *= -1
+        q[1] -= _ground_shift
+        return q
+    lo.V, lo.N = conform_to_bind(lo.V, lo.N, J18, W18, tpl_joint, rig_json)
 
     # ---- 2. retarget every soccer clip mannequin -> Arena skeleton ---------
     src = RR.from_mannequin(name="soccer_src", clips=SM.ALL_CLIPS)

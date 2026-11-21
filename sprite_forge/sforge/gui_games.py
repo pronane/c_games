@@ -13,7 +13,7 @@ platformer, shooter, kart, top-down RPG - and any JSON you add) gets its own pag
   * Build: `forge.py build --game PACK ...` in the background with the log streamed, then the sheet preview and the
     sprite QA (clipping, feet drift, pops, loop seams...) per move;
   * Shot list: what to film to replace the stand-ins with your own moves.
-v11.20:
+v11.23:
   * the preview can show the built character's own sprites (the mannequin, a rig or your capture) instead of the figure;
   * Build the team / the fighter cast: `forge.py roster` - two sides for team sports, a cast for fighting games - with
     a portrait per player and a select screen;
@@ -183,12 +183,12 @@ class GamesTab:
         self.ctype = tk.StringVar(value="balanced")
         self.kit = tk.StringVar(value="home")
         self.glb = tk.BooleanVar(value=True)
-        self.hd = tk.BooleanVar(value=False)            # v11.22: sprites at twice the game's frame size
+        self.hd = tk.BooleanVar(value=False)            # v11.25: sprites at twice the game's frame size
         self.status = tk.StringVar(value="")
         self.t = tk.DoubleVar(value=0.0)
         self.view = tk.StringVar(value="side")
         self.mode = tk.StringVar(value="figure")
-        self.boxes = tk.BooleanVar(value=True)          # v11.21: hit / hurt boxes over the built character         # figure: the move on the mannequin; character: the built sprites
+        self.boxes = tk.BooleanVar(value=True)          # v11.24: hit / hurt boxes over the built character         # figure: the move on the mannequin; character: the built sprites
         self.size = tk.IntVar(value=0)
         self.engine = tk.StringVar(value="godot")
         self._strips = {}

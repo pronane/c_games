@@ -1,4 +1,4 @@
-"""v11.22 sprite drawing for rigs with any number of textures (MakeHuman looks, captures, downloaded or Meshy models).
+"""v11.25 sprite drawing for rigs with any number of textures (MakeHuman looks, captures, downloaded or Meshy models).
 
 Before, a rig with more than one texture (skin, hair, kit, eyes...) was drawn one flat colour per triangle, sampled
 at the triangle's centre, and lit per triangle: blotchy patches, a faceted, blocky body, the shirt number gone.

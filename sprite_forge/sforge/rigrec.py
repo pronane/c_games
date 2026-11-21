@@ -360,7 +360,7 @@ class Rig:
         P = Vp[self.F] * scale
         import os as _os
         if self.fuv is not None and len(self.materials) and _os.environ.get("SF_FLAT_SPRITES", "0") != "1":
-            # v11.22: every texture drawn per pixel with smooth light (render_rich), not a flat colour per triangle
+            # v11.25: every texture drawn per pixel with smooth light (render_rich), not a flat colour per triangle
             from .render_rich import render_rich, corner_normals
             mats = self.rich_materials(kit)
             CN, _ = corner_normals(Vp, self.F, self.smooth_groups())
@@ -405,7 +405,7 @@ class Rig:
         return out
 
     def opaque_faces(self):
-        """(nf,) bool: faces to draw. v11.21: hair / brow / lash cards are alpha-tested textures; drawn as flat colour
+        """(nf,) bool: faces to draw. v11.24: hair / brow / lash cards are alpha-tested textures; drawn as flat colour
         their see-through parts covered the face (long hair hid it). A face is kept when its texture is opaque at
         its centre or at any of the points halfway to its corners."""
         if "_opaque" in self._tri_cache:

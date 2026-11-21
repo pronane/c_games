@@ -15,7 +15,7 @@ const TEAM := 5
 # matched to ground speed per clip so feet plant instead of sliding.
 const CLIP_ALIASES := {"idle": "soccer_idle", "run": "soccer_run", "kick": "soccer_kick_place",
 	"tackle": "soccer_tackle", "slide": "soccer_slide_tackle", "dive": "soccer_keeper_dive_left",
-	"catch": "soccer_keeper_catch", "foul": "soccer_foul", "celebrate": "soccer_celebrate",
+	"catch": "soccer_keeper_catch", "foul": "soccer_trip", "celebrate": "soccer_celebrate",
 	"volley": "soccer_volley", "header": "soccer_header", "chest_control": "soccer_chest_control",
 	"trap": "soccer_trap", "parry": "soccer_keeper_save"}
 const CLIP_NATURAL := {"soccer_walk": 0.74, "soccer_jog": 1.01, "soccer_run": 1.01,

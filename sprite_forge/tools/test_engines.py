@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rosters, portraits and the one-click engine projects (v11.20).
+"""Rosters, portraits and the one-click engine projects (v11.23).
 
     python tools/test_engines.py [--godot BIN] [--raylib RAYLIB_SRC] [--keep DIR]
 

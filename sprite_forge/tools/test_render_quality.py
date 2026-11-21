@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v11.22: sprites that are not blocky or blotchy, bigger players, a sports idle.
+"""v11.25: sprites that are not blocky or blotchy, bigger players, a sports idle.
 
     python tools/test_render_quality.py [--quick]
 

@@ -242,7 +242,7 @@ def _rz(deg):
 
 
 def sf_kit(kit):
-    """v11.21: Sprite Forge's game kits (sforge.mesh.KITS: home, away, blue, red, black, gk) as "sf_<name>[#number]"
+    """v11.24: Sprite Forge's game kits (sforge.mesh.KITS: home, away, blue, red, black, gk) as "sf_<name>[#number]"
     -> (shirt, trim, shorts, socks) hex colours and the squad number (or None); None if kit is not one of them"""
     if not kit.startswith("sf_"):
         return None
@@ -334,14 +334,14 @@ def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
     def shorts_fn(P, base):
         y = P[:, 1]
         col = np.broadcast_to(Sh, base.shape).copy()
-        if not plain:       # v11.22: plain game kits have no piping (it sat on the hem and broke up into fragments)
+        if not plain:       # v11.25: plain game kits have no piping (it sat on the hem and broke up into fragments)
             col[np.abs(y - 0.735 - 0.08 * np.abs(P[:, 0])) < 0.006] = A                     # piping above the hem
         return col, np.zeros(len(P))
 
     def socks_fn(P, base):
         y = P[:, 1]
         col = np.broadcast_to(So, base.shape).copy()
-        if not plain:       # v11.22: plain game kits have plain socks (the hoops met the sock top in white fragments)
+        if not plain:       # v11.25: plain game kits have plain socks (the hoops met the sock top in white fragments)
             col[((y > 0.41) & (y < 0.425)) | ((y > 0.385) & (y < 0.40))] = Bc              # two hoops
         col[y > 0.445] = So * 0.85                                                          # turned-down top
         return col, np.zeros(len(P))

@@ -30,7 +30,7 @@ def _a(im):
 
 def check_move(name, frames, ground_y, loop=False, tol=3):
     issues = []
-    if frames and tol == 3:             # v11.22: 3 px at the usual 160 px cell, in proportion for HD cells
+    if frames and tol == 3:             # v11.25: 3 px at the usual 160 px cell, in proportion for HD cells
         tol = max(3, int(round(3 * frames[0].height / 160.0)))
     cents, steps = [], []
     prev = None
@@ -42,7 +42,7 @@ def check_move(name, frames, ground_y, loop=False, tol=3):
             issues.append(("FAIL", "empty", i, "no pixels")); cents.append(None); prev = None; continue
         H, W = M.shape
         ys, xs = np.nonzero(M)
-        # v11.21: the character itself must stay inside the cell; a ball flying off on its own may leave it
+        # v11.24: the character itself must stay inside the cell; a ball flying off on its own may leave it
         from .cellfit import body_box
         bb = body_box(im) or (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
         bx0, by0, bx1, by1 = bb[0], bb[1], bb[2] - 1, bb[3] - 1

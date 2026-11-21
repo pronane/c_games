@@ -41,6 +41,11 @@ public partial class Boot : Node3D
     {
         var args = OS.GetCmdlineUserArgs().Concat(OS.GetCmdlineArgs()).ToArray();
         bool Has(string a) => args.Any(x => x.Equals(a, StringComparison.OrdinalIgnoreCase));
+        int ArgInt(string name, int fallback)
+        {
+            int i = Array.FindIndex(args, x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int v) ? v : fallback;
+        }
         string? Value(string a)
         {
             for (int i = 0; i < args.Length; i++)
@@ -75,7 +80,16 @@ public partial class Boot : Node3D
             _profileWarmupFrames = 60;
         }
 
-        if (Has("--training") || Has("--shootout") || Has("--practice"))
+        if (Has("--skill"))
+        {
+            // Direct boot into one skill game (dev / QA): --skill shooting|passing|dribbling|crossing|freekicks
+            var game = Enum.TryParse<SkillGame>(Value("--skill") ?? "Shooting", true, out var g) ? g : SkillGame.Shooting;
+            var view = new MatchView();
+            view.Init(new MatchOptions { TeamSize = 11, Seed = 2026, TimeSpeed = 15f, Mode = MatchEngine.ModeSkill,
+                SkillGame = game, Fouls = false, Offside = false }, null, () => GetTree().Quit());
+            AddChild(view);
+        }
+        else if (Has("--training") || Has("--shootout") || Has("--practice"))
         {
             // Direct boot into a mode (dev / QA): same engine paths as the menu.
             var view = new MatchView();
@@ -87,7 +101,11 @@ public partial class Boot : Node3D
         else if (Has("--match") || _profiling)
         {
             var view = new MatchView();
-            view.Init(new MatchOptions { TeamSize = 5, Seed = 2026, TimeSpeed = 15f }, null, () => GetTree().Quit());
+            // --size N (5/7/11) and --seed N for QA runs; defaults unchanged.
+            int size = ArgInt("--size", 5); if (size != 7 && size != 11) size = 5;
+            // --weather rain|windy|snow|fog for QA of the weather visuals/physics.
+            var (wx, wind) = Presentation.WeatherFor(System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Value("--weather") ?? "clear"));
+            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f, Weather = wx, WindSpeed = wind }, null, () => GetTree().Quit());
             AddChild(view);
         }
         else if (Has("--editor"))

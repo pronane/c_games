@@ -206,7 +206,9 @@ public partial class ModeOverlay : CanvasLayer
                 hint = S.ShootoutShotTaken ? "…"
                     : "YOUR KICK: aim [LS] at a post, hold [X], release to shoot   ·   Keys: <WASD> + <Space>";
             else
-                hint = "Their kick — your keeper is on the line.";
+                hint = S.ShootoutShotTaken ? "…"
+                    : "THEIR KICK: hold [LS] left or right to dive, leave it centred to stay big   ·   Keys: <A>/<D>"
+                      + (S.ShootoutDive != 0 ? "   ·   DIVING" : "   ·   STAYING");
             string text = "[center]" + ToBbcode(hint) + "[/center]";
             if (_shootHint!.Text != text)
             {

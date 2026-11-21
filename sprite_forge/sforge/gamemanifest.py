@@ -74,7 +74,7 @@ def write(cfg, out, frames, placed, spec_by, view_info, stand_px, page_names):
         ev = scale_events(events_all.get(m.name) or _blank_events(), src_n, n)
         hits, hurts, box_note = _boxes(cells, m.name, m.fps)
         from .cellfit import pivot_of
-        _piv = pivot_of(cfg, m.name)                     # v11.21: a move fitted into the cell may have its own pivot
+        _piv = pivot_of(cfg, m.name)                     # v11.24: a move fitted into the cell may have its own pivot
         if box_note:
             notes.append("%s: %s" % (m.name, box_note))
         sheet = page_names[page] if page < len(page_names) else (page_names[0] if page_names else "atlas.png")

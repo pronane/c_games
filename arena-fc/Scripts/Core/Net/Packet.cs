@@ -25,6 +25,16 @@ public sealed class CommandDto
     [JsonPropertyName("lo")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Lo { get; set; }
     [JsonPropertyName("sl")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Sl { get; set; }
     [JsonPropertyName("sd")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Sd { get; set; }
+    // Skill moves and call-for-ball never went over the wire (they silently did
+    // nothing online); punch/headbutt are new.  All optional for old clients.
+    [JsonPropertyName("sk")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Sk { get; set; }
+    [JsonPropertyName("cb")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Cb { get; set; }
+    [JsonPropertyName("pu")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Pu { get; set; }
+    [JsonPropertyName("hb")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Hb { get; set; }
+    [JsonPropertyName("ss")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Ss { get; set; }
+    [JsonPropertyName("ct")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Ct { get; set; }
+    [JsonPropertyName("wx")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Wx { get; set; }
+    [JsonPropertyName("wy")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Wy { get; set; }
 
     private static float Q(float v) => MathF.Round(Math.Clamp(v, -1f, 1f) * 256f) / 256f;
 
@@ -33,6 +43,8 @@ public sealed class CommandDto
         Mx = Q(c.Move.X), My = Q(c.Move.Y), Sp = c.Sprint, Pa = c.Pass, Sh = c.Shoot,
         Ch = Q(c.Charge), Th = c.Through, Ta = c.Tackle, Sw = c.Switch, Lo = c.Lob,
         Sl = c.Slide, Sd = c.Shield || c.Dribble,
+        Sk = (int)c.Skill, Cb = c.CallForBall, Pu = c.Punch, Hb = c.Headbutt,
+        Ss = (int)c.ShotStyle, Ct = c.Contain, Wx = c.SwitchDir.X, Wy = c.SwitchDir.Y,
     };
 
     public PlayerCommand To() => new()
@@ -40,6 +52,10 @@ public sealed class CommandDto
         Move = new Vector2(Mx, My), Sprint = Sp, Pass = Pa, Shoot = Sh, Charge = Ch,
         Through = Th, Tackle = Ta, Switch = Sw, Lob = Lo, Slide = Sl,
         Shield = Sd, Dribble = Sd,
+        Skill = Enum.IsDefined(typeof(SkillMove), Sk) ? (SkillMove)Sk : SkillMove.None,
+        CallForBall = Cb, Punch = Pu, Headbutt = Hb,
+        ShotStyle = Enum.IsDefined(typeof(ShotStyle), Ss) ? (ShotStyle)Ss : ShotStyle.Auto,
+        Contain = Ct, SwitchDir = new System.Numerics.Vector2(Wx, Wy),
     };
 }
 

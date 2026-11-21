@@ -221,6 +221,7 @@ public sealed partial class MatchEngine
         Stamina = p.Stamina, AnimPhase = p.AnimPhase, ActionTimer = p.ActionTimer,
         ActionDuration = p.ActionDuration, ActionContactAt = p.ActionContactAt,
         ActionReleased = p.ActionReleased, MustPlayBall = p.MustPlayBall, RestartHold = p.RestartHold,
+        TouchDir = p.TouchDir, TouchKnock = p.TouchKnock, EncroachedAt = p.EncroachedAt,
         DecisionTimer = p.DecisionTimer, PossessionLock = p.PossessionLock,
         TackleLock = p.TackleLock, Action = p.Action, IsKeeper = p.IsKeeper,
         Pressing = p.Pressing, Shielding = p.Shielding,
@@ -266,7 +267,10 @@ public sealed partial class MatchEngine
             ShootoutTimer = s.ShootoutTimer,
             Ball = CloneBall(s.Ball),
             Controlled = s.Controlled, ControlledAway = s.ControlledAway,
-            KickoffSide = s.KickoffSide, RestartSide = s.RestartSide,
+            KickoffSide = s.KickoffSide, RestartSide = s.RestartSide, RestartId = s.RestartId,
+            SetPieceTaker = s.SetPieceTaker, SetPieceLeftFoot = s.SetPieceLeftFoot, SetPieceTimer = s.SetPieceTimer,
+            VarOffender = s.VarOffender, VarVictimTeam = s.VarVictimTeam, VarSpot = s.VarSpot, VarTimer = s.VarTimer,
+            ShootoutTaker = s.ShootoutTaker,
             AttackSign = s.AttackSign, ControlLock = s.ControlLock,
             RestartPos = s.RestartPos, Commentary = s.Commentary, GoalScorer = s.GoalScorer,
         };
@@ -292,10 +296,13 @@ public sealed partial class MatchEngine
         s.Xg = (float[])src.Xg.Clone();
         s.ShootoutKicksHome = src.ShootoutKicksHome; s.ShootoutKicksAway = src.ShootoutKicksAway;
         s.ShootoutTakerSide = src.ShootoutTakerSide; s.ShootoutShotTaken = src.ShootoutShotTaken;
-        s.ShootoutTimer = src.ShootoutTimer;
+        s.ShootoutTimer = src.ShootoutTimer; s.ShootoutDive = src.ShootoutDive;
         s.Ball = CloneBall(src.Ball);
         s.Controlled = src.Controlled; s.ControlledAway = src.ControlledAway;
-        s.KickoffSide = src.KickoffSide; s.RestartSide = src.RestartSide;
+        s.KickoffSide = src.KickoffSide; s.RestartSide = src.RestartSide; s.RestartId = src.RestartId;
+        s.SetPieceTaker = src.SetPieceTaker; s.SetPieceLeftFoot = src.SetPieceLeftFoot; s.SetPieceTimer = src.SetPieceTimer;
+        s.VarOffender = src.VarOffender; s.VarVictimTeam = src.VarVictimTeam; s.VarSpot = src.VarSpot; s.VarTimer = src.VarTimer;
+        s.ShootoutTaker = src.ShootoutTaker;
         s.AttackSign = src.AttackSign; s.ControlLock = src.ControlLock;
         s.RestartPos = src.RestartPos; s.Commentary = src.Commentary; s.GoalScorer = src.GoalScorer;
         s.Players = new PlayerState[src.Players.Length];

@@ -81,6 +81,23 @@ public class Presentation
     private readonly Random _rng = new(123);
 
     /// <summary>Generate pre-match data.</summary>
+    /// <summary>Home club's ground (9.2); falls back to the neutral arena.</summary>
+    public static string StadiumFor(string homeTeam)
+    {
+        foreach (var c in Clubs.All) if (c.Name == homeTeam) return c.Stadium;
+        return "Arena Stadium";
+    }
+
+    /// <summary>Preview weather text → engine weather + wind (9.3).</summary>
+    public static (WeatherType type, float wind) WeatherFor(string text) => text switch
+    {
+        "Rain" => (WeatherType.Rain, 1f),
+        "Windy" => (WeatherType.Windy, 3f),
+        "Snow" => (WeatherType.Snow, 1f),
+        "Fog" => (WeatherType.Fog, 0f),
+        _ => (WeatherType.Clear, 0f),
+    };
+
     public PreMatchData GeneratePreMatch(string homeTeam, string awayTeam, string homeFormation, string awayFormation)
     {
         var data = new PreMatchData
@@ -100,6 +117,7 @@ public class Presentation
                 2 => "Rain",
                 _ => "Windy",
             },
+            Stadium = StadiumFor(homeTeam),
             HeadToHead = $"{homeTeam} { _rng.Next(3) }-{ _rng.Next(3) } {awayTeam} (last meeting)",
         };
         // Generate lineups (11 players each)

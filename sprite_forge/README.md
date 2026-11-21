@@ -54,7 +54,7 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
-## New in v11.22: sprites that are not blocky or blotchy, HD players, a sports idle
+## New in v11.25: sprites that are not blocky or blotchy, HD players, a sports idle
 
 ### Drawing (`sforge/render_rich.py`)
 
@@ -110,7 +110,7 @@ move off the ground, and the ground lock no longer pushes a fitted leap out of t
 * every game pack at HD on the mannequin: twice the size and no clipped move;
 * the sports idle builds and passes the QA.
 
-## New in v11.21: players who look different, every move inside its cell, hit boxes in the preview
+## New in v11.24: players who look different, every move inside its cell, hit boxes in the preview
 
 ### Teams and casts that look like real rosters
 
@@ -178,7 +178,7 @@ These are the same boxes the engines get. Untick **hit boxes** to hide them.
 
 `test_game_tabs` adds check 14: hit boxes on the hit frame.
 
-## New in v11.20: teams and casts, portraits, and ready-to-open engine projects (Godot, Unity, Unreal, raylib, web, pygame)
+## New in v11.23: teams and casts, portraits, and ready-to-open engine projects (Godot, Unity, Unreal, raylib, web, pygame)
 
 ### Teams and fighter casts in one go
 
@@ -251,6 +251,53 @@ change the move.
 
 **Not run inside Unity or Unreal.** Neither engine runs on this machine. Godot 4.3, raylib 5.5, Chromium and pygame
 were run.
+
+## New in v11.22: 3D joint tracks onto the shared skeleton (fed back from Arena FC)
+
+Body-pose datasets give named 3D joints per frame, not a rig. **`sforge/jointtrack.py`** fits them onto the shared
+skeleton with the same per-frame IK as `forge.py mocap`. It reads SkillCorner open body pose and OpenPose BODY_25
+names, with a Z-up or Y-up source. It returns motion-library keys and a fit report (bone error per segment), and
+`keys_record()` saves them as a library move with a licence record.
+
+- **Gaps:** missing joints borrow the nearest joint the source has, and short gaps in the track are interpolated.
+- **Facing:** the take is turned to face forward at a chosen frame, such as the contact frame of a kick.
+- **Root motion:** the root stays in place; the game supplies root motion.
+
+Arena FC uses it to import 56 real in-match moves from two A-League matches: shots, passes, lofted passes,
+clearances, first touches, ball wins and dribble loops (`arena-fc/Tools/import_skillcorner_pose.py`, MIT data).
+The fits have a mean bone error of 1.4–2.6°. `tools/test_jointtrack.py` checks the fitter end to end: a known clip
+is turned into joint tracks and fitted back.
+
+Limits: single-person tracks only. There are no finger, twist or face channels. The ankle comes from the
+heel-to-toe line. Precision is the source's: broadcast pose is accurate to 7–15 cm per joint.
+
+## New in v11.21: field-sport moves and bind-pose conform (fed back from Arena FC)
+
+Arena FC (the soccer game in `arena-fc/`) asked Sprite Forge for actions it had no clip for, and played
+stand-ins: every skill move came out as a sharp cut, thigh control as a toe flick, a punch as a fist *shot* and a
+headbutt as a jumping header. **`sforge/fieldsport_motions.py`** adds 15 clips for ball games on a pitch, authored for
+the action they name, with the ball keyed through each touch:
+
+- skill moves: `fs_stepover`, `fs_roulette`, `fs_drag_back`, `fs_elastico`, `fs_ball_roll`, `fs_rainbow_flick`,
+  `fs_fake_shot`, `fs_heel_to_heel`
+- aerial control and strikes: `fs_thigh_control`, `fs_chip_shot`, `fs_trivela` (outside of the boot),
+  `fs_bicycle_kick`, `fs_keeper_penalty_set`
+- violent conduct: `fs_punch`, `fs_headbutt`
+
+They register in the motion library automatically, carry event frames as fractions (`fieldsport_motions.EVENTS`:
+ball_contact, footsteps, hit window), and the **soccer** game pack offers ten of them as moves.
+
+**`fieldsport_motions.qa(name)`** checks a clip for the two bugs that hurt Arena most: an arm raised over the shoulder
+in a clip with no reason for it (players stood with their hands up at every free kick), and a ball clip with no ball
+at its contact frame.
+
+**`sforge/bindconform.py`** is the fix for Arena's worst animation bug. A mesh sculpted in one rest pose (MakeHuman's
+A-pose arms) but skinned to a skeleton bound in another (arms hanging) carries the difference into every frame of
+every clip: all 71 of Arena's clips had the arms 45-60 deg too far out and up. `conform_to_bind(V, N, J, W, src_heads,
+tgt_heads, parents)` re-poses the mesh into the target bind pose before skinning - rotation only, about the source's
+own joints, nothing stretched, aligned bones untouched. Any game that skins a sculpt to its own skeleton should call it.
+
+Test: `python tools/test_fieldsport.py` (clips, QA, game pack, conform).
 
 ## New in v11.19: a Games tab with a page per kind of game
 

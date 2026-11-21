@@ -202,7 +202,7 @@ class LibContext:
         want = (m.motion or "").split(":", 1)[-1]
         if want and want != m.name and want not in self.rig.clips and mo is not None \
                 and mo.name == want and cfg.fill != "skip":
-            # v11.22: the pack asks for a particular motion (idle_athletic for a sports idle): it wins over the rig's
+            # v11.25: the pack asks for a particular motion (idle_athletic for a sports idle): it wins over the rig's
             # own clip that merely shares the move's name (a template's stiff "idle")
             cl = self._procedural(mo.name, m, mo)
             if cl is not None:
@@ -263,7 +263,7 @@ def library_frames(cfg, report):
     from .build import render_settings, move_key, _clipped
     import time as _t
     from . import cellfit as CF
-    pad = CF.pad_for(cfg)                              # v11.21: drawn padded, then every move fitted into the cell
+    pad = CF.pad_for(cfg)                              # v11.24: drawn padded, then every move fitted into the cell
     rs = CF.pad_rs(render_settings(cfg, cfg.figure_h), pad)
     use_cache = cfg.cache and C.enabled()
     base = C.hkey(C.frame_base_key(cfg), cfg.quality, "lib", "pad%d" % pad) if use_cache else ""
@@ -296,7 +296,7 @@ def library_frames(cfg, report):
     res = {m.name: out[m.name] for m in cfg.moves if m.name in out}
     k = CF.scale_needed(res, cfg)
     if k < 0.999:
-        # v11.21: a tall rig's leap or reach is larger than the cell: draw the whole character smaller, once, so every
+        # v11.24: a tall rig's leap or reach is larger than the cell: draw the whole character smaller, once, so every
         # move fits at one size (no cache: the frames depend on this scale)
         k = max(0.5, k * 0.98)
         rs = CF.pad_rs(render_settings(cfg, cfg.figure_h * k), pad)

@@ -1,9 +1,9 @@
 name: Arena FC tests
 on:
   push:
-    paths: ['arena-fc/**', 'shared/netplay/server/**', '.github/workflows/arena-fc-tests.yml']
+    paths: ['arena-fc/**', 'sprite_forge/sforge/**', 'shared/netplay/server/**', '.github/workflows/arena-fc-tests.yml']
   pull_request:
-    paths: ['arena-fc/**', 'shared/netplay/server/**', '.github/workflows/arena-fc-tests.yml']
+    paths: ['arena-fc/**', 'sprite_forge/sforge/**', 'shared/netplay/server/**', '.github/workflows/arena-fc-tests.yml']
 
 jobs:
   # Audio, replay, set-piece aim, rig builder and the browser edition's game loop, headless in Godot.

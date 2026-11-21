@@ -450,7 +450,7 @@ def boundary_edges(F):
 
 def _smooth_hem(V, bd, iters=40, lam=0.5, mu=-0.53):
     """relax the hem (boundary loop) so it runs straight instead of stepping along the triangles.
-    v11.22: Taubin smoothing (a shrink step then an inflate step) for 40 rounds, was 6 plain rounds: the hems
+    v11.25: Taubin smoothing (a shrink step then an inflate step) for 40 rounds, was 6 plain rounds: the hems
     (sleeves, shirt, shorts, sock tops) zig-zagged one triangle up, one down - the jagged edges in sprites - and more
     plain rounds would pull a sleeve's ring smaller into the arm"""
     V = V.copy()

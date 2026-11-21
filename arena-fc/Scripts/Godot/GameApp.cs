@@ -152,7 +152,8 @@ public partial class GameApp : Node3D
         Place(title, 0, 0, 60, 60, 460, 90);
         root.AddChild(title);
         var sub = Ui.Lbl("3D FOOTBALL  ·  RIGGED CHARACTER STUDIO  ·  BUILD FOR ANY DEVICE", 16, Ui.Sub);
-        Place(sub, 0, 0, 66, 146, 520, 28);
+        Place(sub, 0, 0, 66, 146, 900, 28);
+        sub.AutowrapMode = TextServer.AutowrapMode.Off;
         root.AddChild(sub);
 
         var menu = Ui.VBox(10);
@@ -181,7 +182,10 @@ public partial class GameApp : Node3D
         var scroll = new ScrollContainer();
         scroll.AddChild(menu);
         var panel = Ui.PanelC(scroll, Ui.Panel);
-        Place(panel, 0, .5f, 60, -220, 330, 360);
+        // 9.1: anchored below the subtitle (ends at y=174) and stretched to the
+        // bottom, so it never overlaps the title at 720p.
+        panel.AnchorLeft = panel.AnchorRight = 0; panel.AnchorTop = 0; panel.AnchorBottom = 1;
+        panel.OffsetLeft = 60; panel.OffsetRight = 390; panel.OffsetTop = 188; panel.OffsetBottom = -24;
         root.AddChild(panel);
         // Seed GUI focus: arrow keys / Enter / the pad d-pad all act on the focused Control.
         Ui.FocusFirst(root);
@@ -240,9 +244,14 @@ public partial class GameApp : Node3D
         string awayName = Clubs.All[Options.AwayClub].Name;
         var pre = presentation.GeneratePreMatch(homeName, awayName, Options.HomeFormation, Options.AwayFormation);
 
+        (_weather, _wind) = Presentation.WeatherFor(pre.Weather);
         var root = new Control { Name = "PreMatch" };
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(root);
+        // 9.2: a dark pitch-green backdrop instead of the blank grey clear colour.
+        var bgRect = new ColorRect { Color = new Color(.03f, .09f, .06f), MouseFilter = Control.MouseFilterEnum.Ignore };
+        bgRect.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        root.AddChild(bgRect);
 
         var box = Ui.VBox(10);
         box.AddChild(Ui.Lbl("MATCH PREVIEW", 32, Ui.Accent));
@@ -256,8 +265,12 @@ public partial class GameApp : Node3D
         box.AddChild(Ui.Btn("BACK", ShowMenu));
 
         var panel = Ui.PanelC(box);
-        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        // Grow both ways from the centre anchor; the default grew right/down only,
+        // which left the preview off-centre (9.2).
         panel.CustomMinimumSize = new Vector2(600, 400);
+        panel.GrowHorizontal = Control.GrowDirection.Both;
+        panel.GrowVertical = Control.GrowDirection.Both;
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center, Control.LayoutPresetMode.Minsize);
         root.AddChild(panel);
         PadMenuNavigator.Active = true;
         Ui.FocusFirst(box);
@@ -308,8 +321,15 @@ public partial class GameApp : Node3D
         StartMatchInternal();
     }
 
-    public void StartSkillGames() {
-        _context = MatchContext.Friendly; Mode = GameMode.SkillGames; StartMatchInternal(); }
+    /// <summary>2.4: the skill-game picker (it used to start a plain friendly).</summary>
+    public void StartSkillGames() => ShowSkillGames();
+
+    private SkillGame _skillGame = SkillGame.Shooting;
+
+    public void StartSkillGame(SkillGame g)
+    {
+        _context = MatchContext.Friendly; Mode = GameMode.SkillGames; _skillGame = g; StartMatchInternal();
+    }
     public void StartPracticeArena() {
         _context = MatchContext.Friendly; Mode = GameMode.PracticeArena; StartMatchInternal(); }
 
@@ -374,12 +394,15 @@ public partial class GameApp : Node3D
         Ui.FocusFirst(box);
     }
 
+    private WeatherType _weather = WeatherType.Clear;
+    private float _wind;
+
     private void StartMatchInternal()
     {
         Clear();
         PadMenuNavigator.Active = false;
         var view = new MatchView();
-        bool isTraining = Mode == GameMode.Training || Mode == GameMode.PracticeArena;
+        bool isTraining = Mode == GameMode.Training || Mode == GameMode.PracticeArena || Mode == GameMode.SkillGames;
         var opts = new MatchOptions
         {
             TeamSize = Options.TeamSize, HalfMinutes = Options.HalfMinutes, TimeSpeed = Options.TimeSpeed,
@@ -395,6 +418,10 @@ public partial class GameApp : Node3D
             // Practice Arena runs on the training ground (free practice); it used to
             // be a normal match with fouls switched off.
             Mode = Mode == GameMode.PracticeArena ? (int)GameMode.Training : (int)Mode,
+            SkillGame = _skillGame,
+            // Only the friendly preview picks weather; other modes play in the clear.
+            Weather = Mode == GameMode.Kickoff ? _weather : WeatherType.Clear,
+            WindSpeed = Mode == GameMode.Kickoff ? _wind : 0f,
         };
         view.Init(opts, CustomHome, ShowMenu);
         view.OnMatchEnd = HandleMatchEnd;
@@ -689,8 +716,12 @@ public partial class GameApp : Node3D
         _remapDevice = pads[slot];
         _remapStep = 0;
         _remapLabel = info;
-        UpdateRemapLabel($"Press the button for {PadLayout.Actions[0].ToUpperInvariant()} (pad {slot + 1})");
+        UpdateRemapLabel(RemapAsk(slot + 1));
     }
+
+    private string RemapAsk(int pad)
+        => $"Pad {pad} - step {_remapStep + 1}/{PadLayout.RemapOrder.Length}: press the button for\n" +
+           $"{PadLayout.RemapPrompt(PadLayout.RemapOrder[_remapStep])}\n(Space on the keyboard keeps the default for this one)";
 
     private void UpdateRemapLabel(string prompt)
     {
@@ -700,11 +731,25 @@ public partial class GameApp : Node3D
 
     public override void _Input(InputEvent @event)
     {
-        if (_remapStep < 0 || @event is not InputEventJoypadButton jb || !jb.Pressed) return;
-        if (jb.Device != _remapDevice) return;
-        InputHub.SetBinding(Input.GetJoyName(_remapDevice), PadLayout.Actions[_remapStep], (int)jb.ButtonIndex);
+        if (_remapStep < 0) return;
+        // 5.7: every action is remappable (it was the first six only).  Space keeps
+        // the default for a step - LT/RT are axes on many pads and can't be "pressed".
+        bool skip = @event is InputEventKey k && k.Pressed && !k.Echo && k.PhysicalKeycode == Key.Space;
+        if (!skip)
+        {
+            if (@event is not InputEventJoypadButton jb || !jb.Pressed || jb.Device != _remapDevice) return;
+            InputHub.SetBinding(Input.GetJoyName(_remapDevice), PadLayout.RemapOrder[_remapStep], (int)jb.ButtonIndex);
+        }
+        else
+        {
+            // Keep the default: core actions need a value, so store it explicitly.
+            string a = PadLayout.RemapOrder[_remapStep];
+            bool known = Input.IsJoyKnown(_remapDevice);
+            var def = PadLayout.Bindings("", known, null!);
+            if (def.ContainsKey(a)) InputHub.SetBinding(Input.GetJoyName(_remapDevice), a, def[a]);
+        }
         _remapStep++;
-        if (_remapStep >= PadLayout.Actions.Length)
+        if (_remapStep >= PadLayout.RemapOrder.Length)
         {
             _remapStep = -1;
             _remapDevice = -1;
@@ -713,7 +758,7 @@ public partial class GameApp : Node3D
         }
         else
         {
-            UpdateRemapLabel($"Press the button for {PadLayout.Actions[_remapStep].ToUpperInvariant()}");
+            UpdateRemapLabel(RemapAsk(System.Array.IndexOf(InputHub.ConnectedDevices(), _remapDevice) + 1));
         }
         GetViewport().SetInputAsHandled();
     }

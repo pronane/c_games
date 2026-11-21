@@ -19,8 +19,14 @@ public sealed class MotionState
     public float CrossfadeRemaining;
     public float CrossfadeDuration = .12f;
     public float PlaybackScale = 1f;
-    /// <summary>Optional baked feature-row payload for a future MM selector; -1 means rule selector.</summary>
+    /// <summary>Feature row the last motion-matching search chose; -1 = rule selector.</summary>
     public int MotionMatchRowIndex = -1;
+    /// <summary>Seconds since the last motion-matching search (locomotion re-queries ~10x/s).</summary>
+    public float SinceQuery;
+    /// <summary>The pose shown on the previous update (survives a one-shot reset), so
+    /// the next search starts from where the body actually is.</summary>
+    public string LastPoseClipId = "";
+    public float LastPosePhase;
     public float Speed;
     public float TurnRate;
     public BallState Ball;

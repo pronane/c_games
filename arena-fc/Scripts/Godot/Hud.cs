@@ -127,7 +127,14 @@ public partial class Hud : CanvasLayer
     private ProgressBar _power = null!, _stamina = null!;
     private Label? _chargeFeedback;
     private PanelContainer _pauseMenu = null!;
-    private PanelContainer _statsPanel = null!, _hintPanel = null!;
+    private PanelContainer _statsPanel = null!, _hintPanel = null!, _feedPanel = null!;
+    // 9.4 HUD footprint: the legend tucks away after the opening seconds (H/F1
+    // brings it back for good) and the commentary fades when nothing is new.
+    private float _feedAge;
+    private Phase _toastPhase = Phase.Kickoff;
+    private bool _toastFromPhase;
+    private bool _hintPinned;
+    private string _lastFeed = "";
     private PanelContainer _fpsCounterPanel = null!;
     private Label _fpsCounterLabel = null!;
     private Control _pauseButtons = null!;
@@ -142,6 +149,7 @@ public partial class Hud : CanvasLayer
     public override void _Ready()
     {
         var root = new Control { Name = "HudRoot", MouseFilter = Control.MouseFilterEnum.Ignore };
+        _root = root;
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(root);
 
@@ -204,16 +212,16 @@ public partial class Hud : CanvasLayer
 
         // Commentary feed (bottom left)
         _feed = Ui.Lbl("", 14, Ui.Sub);
-        var feedPanel = Ui.PanelC(_feed);
-        feedPanel.Name = "CommentaryPanel";
-        Place(feedPanel, 0f, 1f, 16, -182, 430, 96);
-        root.AddChild(feedPanel);
+        _feedPanel = Ui.PanelC(_feed);
+        _feedPanel.Name = "CommentaryPanel";
+        Place(_feedPanel, 0f, 1f, 16, -170, 400, 84);
+        root.AddChild(_feedPanel);
 
         // Minimap (bottom right) - larger and higher contrast than the tiny 210px map.
-        _minimap = new Minimap { CustomMinimumSize = new Vector2(250, 164) };
+        _minimap = new Minimap { CustomMinimumSize = new Vector2(214, 140) };
         _minimapPanel = Ui.PanelC(_minimap);
         _minimapPanel.Name = "MinimapPanel";
-        Place(_minimapPanel, 1f, 1f, -292, -280, 276, 196);
+        Place(_minimapPanel, 1f, 1f, -252, -252, 236, 166);
         root.AddChild(_minimapPanel);
 
         // Bars sit above the action legend instead of obscuring it.
@@ -230,8 +238,10 @@ public partial class Hud : CanvasLayer
 
         // Compact two-line legend.  "pad R3 camera" stays advertised, but the
         // actions the player complained about are now impossible to miss.
-        _hint = Ui.Lbl("E / A SHORT PASS  ·  R / SELECT LONG BALL  ·  SPACE / X SHOOT (hold)  ·  X / LT CLOSE CONTROL  ·  SHIFT / RT SPRINT\n" +
-                       "F / B TACKLE  ·  SHIFT+F / RB+B SLIDE  ·  Q / Y THROUGH  ·  TAB / LB SWITCH  ·  C / R3 camera (4 = tactical)  ·  ESC pause  ·  H hide / F2 stats",
+        // Two lines that actually fit in two lines at 720p; every move is on the
+        // pause menu's Controls page and in Training.
+        _hint = Ui.Lbl("A/E PASS  ·  X/SPACE SHOOT  ·  Y/Q THROUGH  ·  VIEW/R LOB  ·  RT/SHIFT SPRINT  ·  LT/X DRIBBLE\n" +
+                       "B/F TACKLE  ·  RT+B SLIDE  ·  LB/TAB SWITCH  ·  R3/C CAMERA  ·  ESC PAUSE (all controls)  ·  H HIDE",
                        13, Ui.Sub);
         _hint.HorizontalAlignment = HorizontalAlignment.Center;
         _hintPanel = Ui.PanelC(_hint);
@@ -275,6 +285,7 @@ public partial class Hud : CanvasLayer
 
     public void ToggleControls()
     {
+        _hintPinned = true;
         if (_hintPanel != null) _hintPanel.Visible = !_hintPanel.Visible;
     }
 
@@ -347,6 +358,7 @@ public partial class Hud : CanvasLayer
         var v = Ui.VBox(10);
         v.AddChild(Ui.Lbl("PAUSED", 30, Ui.Accent));
         v.AddChild(Ui.Btn("Resume", () => { SetPaused(false); OnResume?.Invoke(); }, true));
+        v.AddChild(Ui.Btn("Controls - every move", ShowControlsCard));
         v.AddChild(Ui.Btn("Substitutions", ShowSubstitutions));
         v.AddChild(Ui.Btn("Match analysis", ShowAnalysis));
         v.AddChild(Ui.Btn("Photo mode", TogglePhotoMode));
@@ -365,6 +377,44 @@ public partial class Hud : CanvasLayer
         _pauseButtons = v;
     }
 
+    private Control? _controlsCard;
+    private Control? _root;
+
+    /// <summary>Every move with its Xbox-layout (EasySMX etc.) button and keyboard key,
+    /// from the same list the Training coach teaches, so the two can never disagree.</summary>
+    private void ShowControlsCard()
+    {
+        if (_pauseMenu != null) _pauseMenu.Visible = false;   // the card replaces the pause list
+        if (_controlsCard != null) { _controlsCard.Visible = true; return; }
+        var list = new VBoxContainer();
+        list.AddThemeConstantOverride("separation", 4);
+        list.AddChild(Ui.Lbl("CONTROLS", 24, Ui.Accent));
+        string section = "";
+        foreach (var l in TrainingCoach.BuildLessons())
+        {
+            if (l.Goal == LessonGoal.FreePlay) continue;
+            if (l.Section != section) { section = l.Section; list.AddChild(Ui.Lbl(section, 13, Ui.Accent)); }
+            var row = new RichTextLabel { BbcodeEnabled = true, FitContent = true, ScrollActive = false,
+                AutowrapMode = TextServer.AutowrapMode.Off, CustomMinimumSize = new Vector2(820, 22),
+                MouseFilter = Control.MouseFilterEnum.Ignore };
+            row.AddThemeFontSizeOverride("normal_font_size", 14);
+            row.AddThemeFontSizeOverride("bold_font_size", 14);
+            row.Text = $"[b]{l.Title}[/b]   " + ModeOverlay.ToBbcode(l.Pad) + "   [color=#8fb3ad]|[/color]   " + ModeOverlay.ToBbcode(l.Keys);
+            list.AddChild(row);
+        }
+        list.AddChild(Ui.Lbl("Violent conduct (straight red, VAR if unseen): hold LB+RB then B = punch, Y = headbutt; keys G / T.", 12, Ui.Sub));
+        list.AddChild(Ui.Btn("Back", () =>
+        {
+            if (_controlsCard != null) _controlsCard.Visible = false;
+            if (_pauseMenu != null) _pauseMenu.Visible = Paused;
+        }, true));
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(880, 600) };
+        scroll.AddChild(list);
+        _controlsCard = Ui.PanelC(scroll, new Color(.03f, .05f, .06f, .97f));
+        Place(_controlsCard, .5f, .5f, -450, -320, 900, 640);
+        _root?.AddChild(_controlsCard);
+    }
+
     public void SetTouch(bool on)
     {
         Input.TouchEnabled = on;
@@ -376,6 +426,7 @@ public partial class Hud : CanvasLayer
     {
         Paused = on;
         if (_pauseMenu != null) _pauseMenu.Visible = on;
+        if (!on && _controlsCard != null) _controlsCard.Visible = false;
         // The pause menu is a menu: hand control to the pad navigator and focus
         // "Resume" so A / d-pad / arrow keys work without a mouse.
         PadMenuNavigator.Active = on;
@@ -430,13 +481,26 @@ public partial class Hud : CanvasLayer
         string home = e.ShortFor(0), away = e.ShortFor(1);
         _score.Text = $"{home}   {s.Score[0]}  -  {s.Score[1]}   {away}";
         string stoppage = e.InStoppageTime ? $"  +{e.AddedMinutesShown}'" : "";
-        _clock.Text = $"{e.ClockString()}{stoppage}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
+        // Training and shootouts have no match clock or halves (9.6).
+        _clock.Text = e.IsSkill
+                    ? (e.Skill == SkillGame.FreeKicks
+                        ? $"SKILL GAME · {MatchEngine.SkillTitle(e.Skill)}   ·   {e.SkillScore} pts   ·   kicks left {e.SkillAttemptsLeft}   ·   {e.SkillMessage}"
+                        : $"SKILL GAME · {MatchEngine.SkillTitle(e.Skill)}   ·   {e.SkillScore} pts   ·   {MathF.Max(0f, e.SkillTimeLeft):0}s   ·   {e.SkillMessage}")
+                    : e.IsShootout ? "PENALTY SHOOTOUT"
+                    : e.IsTraining ? "TRAINING GROUND   ·   no clock"
+                    : $"{e.ClockString()}{stoppage}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
         _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}   |   xG {s.Xg[0]:0.00}-{s.Xg[1]:0.00}"
                     + (s.YellowCards[0] + s.YellowCards[1] + s.RedCards[0] + s.RedCards[1] > 0
                         ? $"   |   Yellow {s.YellowCards[0]}-{s.YellowCards[1]}  Red {s.RedCards[0]}-{s.RedCards[1]}"
                         : "");
         var recent = e.Events.Count > 0 ? e.Events.Skip(Math.Max(0, e.Events.Count - 3)).Select(x => x.Text) : Array.Empty<string>();
         _feed.Text = string.Join("\n", recent);
+        if (_feed.Text != _lastFeed) { _lastFeed = _feed.Text; _feedAge = 0f; } else _feedAge += dt;
+        _feedPanel.Modulate = new Color(1, 1, 1, Math.Clamp(1.6f - _feedAge / 5f, 0f, 1f));
+        // Hide once five match minutes have been played (~20 s at normal speed);
+        // keyed to the match clock so slow frames don't keep it up longer.
+        if (!_hintPinned && s.Phase == Phase.Play && s.Clock >= 300f && _hintPanel.Visible)
+        { _hintPanel.Visible = false; _hintPinned = true; }
         _cam.Text = cameraName;
         // Phase 4: lower third timer
         if (_lowerThirdTimer > 0)
@@ -489,12 +553,22 @@ public partial class Hud : CanvasLayer
         _minimap.Engine = e;
         _minimap.QueueRedraw();
 
-        if (s.Phase == Phase.Goal && _toastTimer <= 0) ShowToast("GOAL!", 2.8f);
-        else if (s.Phase == Phase.HalfTime && _toastTimer <= 0) ShowToast("HALF TIME", 2.8f);
-        else if (s.Phase == Phase.FullTime) ShowToast($"FULL TIME   {s.Score[0]} - {s.Score[1]}", 99f);
-        // A free kick used to appear from nowhere: make the whistle decision visible.
-        else if (s.Phase == Phase.Penalty && _toastTimer <= 0) ShowToast("FOUL · PENALTY!", 2.2f);
-        else if (s.Phase == Phase.FreeKick && _toastTimer <= 0) ShowToast("FOUL · FREE KICK", 1.8f);
+        // Phase banners fire once, on entering the phase, and go when the phase does:
+        // re-firing whenever the timer ran out kept "GOAL!" on screen through a long
+        // goal phase and into the next shootout kick.
+        if (s.Phase != _toastPhase)
+        {
+            if (_toastFromPhase && s.Phase != Phase.FullTime) { _toast.Visible = false; _toastTimer = 0f; }
+            _toastFromPhase = true;
+            if (s.Phase == Phase.Goal) ShowToast("GOAL!", 2.8f);
+            else if (s.Phase == Phase.HalfTime) ShowToast("HALF TIME", 2.8f);
+            else if (s.Phase == Phase.FullTime) ShowToast($"FULL TIME   {s.Score[0]} - {s.Score[1]}", 99f);
+            // A free kick used to appear from nowhere: make the whistle decision visible.
+            else if (s.Phase == Phase.Penalty && !e.IsShootout) ShowToast("FOUL · PENALTY!", 2.2f);
+            else if (s.Phase == Phase.FreeKick) ShowToast("FOUL · FREE KICK", 1.8f);
+            else _toastFromPhase = false;   // Play, Kickoff, throw-ins...: no banner
+            _toastPhase = s.Phase;
+        }
         if (_toastTimer > 0)
         {
             _toastTimer -= dt;

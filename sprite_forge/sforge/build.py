@@ -64,7 +64,7 @@ class BuildConfig:
     frame_w: int = 256
     frame_h: int = 256
     figure_h: int = 0                  # px height of a 180 cm standing figure (0 = 62% of frame_h)
-    figure_share: float = 0.0          # v11.22: a pack's figure height as a share of frame_h (0 = the default 62%)
+    figure_share: float = 0.0          # v11.25: a pack's figure height as a share of frame_h (0 = the default 62%)
     ground_y: int = 0                  # 0 = 94% of frame_h
     pivot_x: int = 0                   # 0 = frame_w / 2
     yaw: float = 65.0                  # mannequin camera: 90 = pure side profile, 0 = front
@@ -327,7 +327,7 @@ def _mannequin_frames(cfg, sp, report, only=None):
     from . import cellfit as CF
     rs = render_settings(cfg, cfg.figure_h * sp.scale)
     rs0 = rs
-    pad = CF.pad_for(cfg) if only is None else 0       # v11.21: drawn padded, then every move fitted into the cell
+    pad = CF.pad_for(cfg) if only is None else 0       # v11.24: drawn padded, then every move fitted into the cell
     if pad:
         rs = CF.pad_rs(rs, pad)
     prop = _prop(cfg)
@@ -914,7 +914,7 @@ def _ground_lock(cfg, frames, report):
        has its lowest solid pixel (alpha > 40, outline included) on ground_y;
     2) any single frame that still dips below the line is lifted onto it.
     Frames above the line (jumps) stay airborne."""
-    # v11.22: the reference is where the feet are planted across idle, walk and run (each move's most planted
+    # v11.25: the reference is where the feet are planted across idle, walk and run (each move's most planted
     # frame, then the median), not idle frame 0 alone - a crouched sports idle sits a pixel or two lower than the
     # strides and lifted every other move off the ground
     from .cellfit import ground_ref
@@ -927,7 +927,7 @@ def _ground_lock(cfg, frames, report):
     from .cellfit import pivot_of
     for mv, (fr, src, note) in frames.items():
         new = []
-        gy = pivot_of(cfg, mv)[1]                      # v11.21: a move fitted into the cell has its own ground line
+        gy = pivot_of(cfg, mv)[1]                      # v11.24: a move fitted into the cell has its own ground line
         for im in fr:
             if dy:
                 im = _shift(im, dy)
@@ -1624,7 +1624,7 @@ def build(cfg: BuildConfig, log=print, progress=None):
         m = spec_by[mv]
         names = []
         from .cellfit import pivot_of
-        _px, _gy = pivot_of(cfg, mv)                     # v11.21: own pivot for a move fitted into the cell
+        _px, _gy = pivot_of(cfg, mv)                     # v11.24: own pivot for a move fitted into the cell
         _pn = {"x": round(_px / cfg.frame_w, 5), "y": round(_gy / cfg.frame_h, 5)}
         for i in range(n):
             fname = "%s_%02d" % (mv, i)

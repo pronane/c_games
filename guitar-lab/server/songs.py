@@ -292,6 +292,16 @@ def run_song(song: Song):
         bounds = list(frames)+[chord_chroma.shape[1]]
         synced = np.stack([np.median(chord_chroma[:, a:max(b, a+1)], axis=1) for a, b in zip(bounds[:-1], bounds[1:])], axis=1)
         labels = sa.chords_per_beat(synced, key)
+        chord_source, chord_note = 'chord templates on the separated instruments', None
+        from . import chord_model
+        if chord_model.status()[0]:
+            # The trained model, on the whole mix (measured better than templates on stems).
+            try:
+                labels = chord_model.chords_per_beat(librosa.resample(sa.mono(audio), orig_sr=sr, target_sr=22050),
+                                                     beat_times, duration, flats=key.get('fifths', 0) < 0 if key else False)
+                chord_source = chord_model.NAME
+            except Exception as exc:  # keep the template chords
+                chord_note = f'The trained chord model failed ({exc}); chords are from templates.'
         chords = sa.chord_segments(labels, beat_times)
         key = sa.resolve_mode(key, chords)
         check(song)
@@ -409,6 +419,7 @@ def run_song(song: Song):
             'tuning': tuning, 'reference_cents': round(cents, 1), 'tone': tone,
             'effects_detected': effects_detected,
             'provenance': dict(provenance,
+                               chords=chord_source,
                                transcription=_tx_label(song.transcriber),
                                onset_threshold=thresholds[0],
                                frame_threshold=thresholds[1]),
@@ -418,7 +429,7 @@ def run_song(song: Song):
                 'Every result here is an automatic estimate. Check notes and chords by ear and correct them.',
                 'Parts panned to the same place and playing at the same time cannot be separated.',
                 'Tab positions are suggestions: the same note can be played on several strings.',
-            ]+([tone['detail']] if tone and tone['tone'] == 'distorted' and song.tone == 'auto' else [])
+            ]+([chord_note] if chord_note else [])+([tone['detail']] if tone and tone['tone'] == 'distorted' and song.tone == 'auto' else [])
              + ([f'Transcribed for a {sound} guitar sound (onset {thresholds[0]}, note {thresholds[1]}).'] if sound != 'clean' else []),
             'refinement': combine_refinements(refine_logs) if refine_logs else skipped_refinement(
                 refine_gate or 'no guitar part to refine', requested=bool(song.refine)),

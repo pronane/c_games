@@ -142,7 +142,7 @@ def M(name, category, desc, keys=None, func=None, loop=False):
 
 # --- locomotion
 M("idle", "Locomotion", "default standing pose", func=idle_func(STAND), loop=True)
-# v11.22: a sports player's idle - weight on the balls of the feet, knees soft, slight forward lean with the head
+# v11.25: a sports player's idle - weight on the balls of the feet, knees soft, slight forward lean with the head
 # level, arms loose and a little bent, weight rocking from foot to foot. The plain idle stands to attention.
 ATHLETIC = dict(hips=(0, 10, 0), spine=(7, -3, 0), chest=(4, -5, 0), neck=(-6, -2, 0),
                 leg_L=(22, 9, 0), leg_R=(18, 10, 0), knee_L=22, knee_R=18,
@@ -465,7 +465,7 @@ def find_motion(name):
         m = as_motion(raw.split(":", 1)[1])
         if m is not None:
             return m
-        name = raw.split(":", 1)[1]              # v11.22: not a library clip - the procedural motion of that name
+        name = raw.split(":", 1)[1]              # v11.25: not a library clip - the procedural motion of that name
     s = slug(name)
     if s.startswith("hd_") and s not in LIB:       # v10: HD Fighter hand-posed frame library
         from .hdfighter import register
@@ -626,3 +626,11 @@ M("die", "NPC", "fall forward and stay down", keys=K(
     (0.55, P(CROUCH, neck=(10, 0, 0), arm_L=(10, 20, 0), arm_R=(10, 20, 0))),
     (0.85, P(LIE_FRONT, pos=(0.3, 0))), (1, P(LIE_FRONT, pos=(0.3, 0)))))
 M("sit", "NPC", "sitting idle (shopkeepers, villagers)", func=idle_func(dict(SEAT), 0.5), loop=True)
+
+# ---------------------------------------------------------------- v11.21 field-sport pack
+# Skill moves, thigh control, chip / trivela / bicycle kick, keeper penalty set,
+# punch and headbutt - fed back from Arena FC (see sforge/fieldsport_motions.py).
+# (If fieldsport_motions is imported first it is only half-built here; it then
+# registers itself at the end of its own module.)
+from . import fieldsport_motions as _fieldsport  # noqa: E402  (needs LIB, P, K, M above)
+getattr(_fieldsport, "register", lambda: None)()
