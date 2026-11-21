@@ -608,6 +608,55 @@ Check("shootout: no match clock", so.State.Clock == 0f && so.State.Half == 1);
 Check("shootout: no open-play passing", so.State.Passes[0] + so.State.Passes[1] == 0,
       $"passes={so.State.Passes[0] + so.State.Passes[1]}");
 
+// 2.5: you dive on the computer's kicks.  Always dive to +Z: shots that side get
+// saved far more often than shots to the other side, which is the point of guessing.
+{
+    int sameSide = 0, sameSaved = 0, otherSide = 0, otherSaved = 0, waited = 0;
+    for (int seed = 200; seed < 260; seed++)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed, Mode = MatchEngine.ModeShootout });
+        var M = m.State;
+        // Skip to the first computer kick: shoot our own straight away.
+        int guard = 0;
+        while (M.ShootoutTakerSide != 1 && guard++ < 60 * 30)
+        {
+            var c = PlayerCommand.None;
+            if (M.Phase == Phase.Play && M.Ball.Owner == M.Controlled && !M.ShootoutShotTaken) { c.Shoot = true; c.Charge = .6f; }
+            m.Step(MatchEngine.Dt, c);
+        }
+        int kicks = M.ShootoutKicksAway; float strikeZ = 0f; bool struck = false; int preTicks = 0;
+        guard = 0;
+        while (M.ShootoutKicksAway == kicks && M.Phase != Phase.FullTime && guard++ < 60 * 20)
+        {
+            if (M.Phase == Phase.Play && !M.ShootoutShotTaken) preTicks++;
+            m.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1f) });
+            if (!struck && M.Ball.Owner < 0 && M.Ball.Vel.LengthSquared() > 100f) { struck = true; strikeZ = M.Ball.Vel.Z; }
+        }
+        if (preTicks > 60) waited++;
+        if (!struck || M.ShootoutAway.Count == 0) continue;
+        bool saved = !M.ShootoutAway[^1];
+        if (strikeZ > .5f) { sameSide++; if (saved) sameSaved++; }
+        else if (strikeZ < -.5f) { otherSide++; if (saved) otherSaved++; }
+    }
+    float rs = sameSide > 0 ? (float)sameSaved / sameSide : 0f, ro = otherSide > 0 ? (float)otherSaved / otherSide : 1f;
+    Check("computer's penalty waits for a run-up so you can pick a dive", waited > 40, $"waited={waited}/60");
+    Check("diving the right way saves far more than diving the wrong way", sameSide >= 8 && otherSide >= 8 && rs > ro + .25f,
+          $"right way {sameSaved}/{sameSide}, wrong way {otherSaved}/{otherSide}");
+}
+
+{
+    // Holding the stick on your own kick aims it; it never walks the taker off the
+    // spot (that used to give a free kick and turn the shootout into open play).
+    var m = new MatchEngine(new MatchOptions { Seed = 77, Mode = MatchEngine.ModeShootout });
+    var M = m.State; int guard = 0;
+    while (!(M.Phase == Phase.Play && M.Ball.Owner == M.Controlled) && guard++ < 600) m.Step(MatchEngine.Dt, PlayerCommand.None);
+    var spot = M.Ball.Pos;
+    for (int i = 0; i < 240; i++) m.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(-1f, 0f) });
+    Check("shootout: the stick aims, the taker stays on the spot (no free kick, no open play)",
+          Mx.FlatDist(M.Ball.Pos, spot) < 1.0f && !m.Events.Any(ev => ev.Text.Contains("free kick")) && M.Phase == Phase.Play,
+          $"moved {Mx.FlatDist(M.Ball.Pos, spot):0.0} m, phase {M.Phase}");
+}
+
 Section("Training ground (Mode 2)");
 var tr = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeTraining });
 Check("training starts in play with the ball at your feet",

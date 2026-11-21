@@ -551,7 +551,7 @@ public partial class Hud : CanvasLayer
         else if (s.Phase == Phase.HalfTime && _toastTimer <= 0) ShowToast("HALF TIME", 2.8f);
         else if (s.Phase == Phase.FullTime) ShowToast($"FULL TIME   {s.Score[0]} - {s.Score[1]}", 99f);
         // A free kick used to appear from nowhere: make the whistle decision visible.
-        else if (s.Phase == Phase.Penalty && _toastTimer <= 0) ShowToast("FOUL · PENALTY!", 2.2f);
+        else if (s.Phase == Phase.Penalty && _toastTimer <= 0 && !e.IsShootout) ShowToast("FOUL · PENALTY!", 2.2f);
         else if (s.Phase == Phase.FreeKick && _toastTimer <= 0) ShowToast("FOUL · FREE KICK", 1.8f);
         if (_toastTimer > 0)
         {

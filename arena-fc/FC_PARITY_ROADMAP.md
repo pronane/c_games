@@ -47,7 +47,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 - ✅ 2.2 Training was a normal match with fouls off → Training ground with drills (Attack / Defend) and a coach that teaches every move with pad + keyboard prompts and auto-detects completion.
 - ✅ 2.3 Starting Training / Practice Arena switched fouls + offside off for every later match.
 - 🔧 2.4 Practice Arena now opens the training ground on free practice (PR #3). Skill Games is still a plain match.
-- ⬜ 2.5 You control your keeper (dive left/right/stay) on the computer's penalties.
+- ✅ 2.5 (PR #12) You control your keeper (dive left/right/stay) on the computer's penalties. The computer now takes a ~1.5 s run-up; the stick held at the strike picks the dive (centre = stay big). Also fixed: the keeper was walked round the 10-yard circle (off-centre) and rushed the penalty taker; and in a shootout the human taker could walk off the spot, which gave a free kick and turned the shootout into open play.
 
 ## 3. Ball physics & goal detection
 - ✅ 3.1 Running the ball into the net while dribbling is not a goal (goal check only runs on a free ball).
@@ -116,4 +116,4 @@ Current scheme (Xbox / EasySMX labels): `LS` move · `RT/RB` sprint · `LT/L3` c
 Career skeleton, ranked online, replay editor, browser-edition parity (the GDScript web build has its own ball physics and needs 1.1/1.2 ported).
 
 ## Engineering housekeeping
-- ⬜ H.1 Build outputs (`obj/`, `bin/`, `.godot/`) are committed; add to `.gitignore` and remove from the index.
+- ✅ H.1 (PR #11) Build outputs (`obj/`, `bin/`, `.godot/`) are committed; add to `.gitignore` and remove from the index.

@@ -216,6 +216,9 @@ public sealed class MatchState
     public int ShootoutTakerSide;
     public bool ShootoutShotTaken;
     public float ShootoutTimer;
+    /// <summary>2.5: your keeper's dive on the computer's kicks, from the stick held
+    /// as the ball is struck (-1 / +1 = world -Z / +Z side, 0 = stay big).</summary>
+    public int ShootoutDive;
     /// <summary>Player taking the current shootout kick.</summary>
     public int ShootoutTaker = -1;
     /// <summary>Kick-by-kick shootout results (true = scored) for the HUD tally.</summary>
@@ -617,6 +620,17 @@ public sealed partial class MatchEngine
                     break;
             }
             return;
+        }
+
+        // Shootout, computer's kick: the human keeper picks a side with the stick
+        // during the run-up; the kick is struck after ~1.5 s.
+        if (Options.Mode == 3 && !S.ShootoutShotTaken && S.Phase == Phase.Play && S.ShootoutTakerSide == 1
+            && S.ShootoutTaker >= 0 && S.Ball.Owner == S.ShootoutTaker)
+        {
+            if (netCmds == null)
+                S.ShootoutDive = MathF.Abs(cmd.Move.Y) > .45f ? MathF.Sign(cmd.Move.Y) : 0;
+            S.ShootoutTimer += dt;
+            if (S.ShootoutTimer >= 1.5f) Shoot(S.Players[S.ShootoutTaker], Rng.Range(.45f, .72f));
         }
 
         // Shootout: a saved or dead penalty counts as a miss.
@@ -1053,13 +1067,22 @@ public sealed partial class MatchEngine
             Vector3 cutPos = goalCentre - ballToGoal * cutDist;
             float tx = cutPos.X;
             float tz = Mx.Clamp(ball.Pos.Z * .62f, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
+            // 2.5: on the computer's shootout kicks the human picks the dive.
+            bool humanKeeper = IsShootout && S.ShootoutTakerSide == 1 && p.Team == 0;
+            // He goes as the ball is struck, not during the wind-up (the taker reads an
+            // early keeper and puts it the other way).
+            if (humanKeeper && S.ShootoutShotTaken && ball.Owner < 0) tz = S.ShootoutDive * Mx.GoalHalfWidth * .8f;
             // Rush: if the ball is loose and close, charge it (1v1).
             bool rush = ball.Owner < 0 && distToGoal < 8f && Mx.FlatDist(p.Pos, ball.Pos) < 6f;
             // 1v1: an opponent carrying the ball in on goal with no defender left
             // between him and the goal.  The keeper comes off his line to narrow the
             // angle and, once close, goes down at the attacker's feet.
             bool oneOnOne = false;
-            if (ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team && distToGoal < 20f
+            // A set piece against him (penalty, free kick): he holds his line - at a
+            // penalty the Law says so, and nobody rushes a dead ball.
+            bool setPieceAgainst = ball.Owner >= 0 && S.Players[ball.Owner].MustPlayBall && S.Players[ball.Owner].Team != p.Team;
+            if (setPieceAgainst && distToGoal < 13f) tx = gx + MathF.Sign(-gx) * .3f;
+            if (!setPieceAgainst && ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team && distToGoal < 20f
                 && MathF.Abs(ball.Pos.Z) < 18f)
             {
                 oneOnOne = true;
@@ -1109,7 +1132,7 @@ public sealed partial class MatchEngine
             if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f && p.ActionTimer <= 0)
             {
                 SetAction(p, "dive", .65f, .50f);
-                p.Target += Mx.FlatDir(p.Pos, ball.Pos) * 1.6f;
+                p.Target += humanKeeper ? new Vector3(0, 0, S.ShootoutDive * 2.2f) : Mx.FlatDir(p.Pos, ball.Pos) * 1.6f;
             }
             return;
         }
@@ -1129,6 +1152,7 @@ public sealed partial class MatchEngine
                 // else is a pass (long balls allowed), taken within about a second.
                 if (p.MustPlayBall)
                 {
+                    if (IsShootout) return;   // the shootout strikes the kick after the run-up
                     float dg = Mx.FlatDist(p.Pos, goal);
                     bool throwIn = IsThrowInHold(p);
                     if (!throwIn && dg < 28f && MathF.Abs(p.Pos.Z) < 18f && XgFrom(p.Pos, p.Team, false) > .03f && Rng.Next() < .5f)
@@ -2066,8 +2090,9 @@ public sealed partial class MatchEngine
         if (penalty)
         {
             // Shootout: the human side takes their own penalties; AI shoots at once.
-            if (!(Options.Mode == 3 && side == 0)) Shoot(taker, Options.Mode == 3 ? Rng.Range(.45f, .72f) : .9f);
-            else Add(EventKind.Info, "Your penalty — aim and shoot!");
+            if (Options.Mode != 3) Shoot(taker, .9f);
+            else if (side == 0) Add(EventKind.Info, "Your penalty — aim and shoot!");
+            else { State.ShootoutDive = 0; Add(EventKind.Info, "Their penalty — hold left or right to dive, centre to stay big."); }
         }
         Add(EventKind.Info, penalty ? "Penalty!" : "Back under way.");
     }
@@ -2133,6 +2158,9 @@ public sealed partial class MatchEngine
         }
         if (human && p.JockeyState > 0) { sprint = false; }
         if (p.MustPlayBall && !stick) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }   // only the stick moves a taker
+        // Shootout: the stick aims the kick; the taker stays on the spot.  Walking
+        // off with it turned the shootout into a free kick and open play.
+        if (IsShootout && p.MustPlayBall) { wish = Vector3.Zero; p.Vel = Vector3.Zero; }
         if (!stick && State.Ball.Owner >= 0 && State.Ball.Owner != p.Index)
         {
             // AI players (and the assist when a human lets go of the stick) go
