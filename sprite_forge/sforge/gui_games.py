@@ -13,6 +13,12 @@ platformer, shooter, kart, top-down RPG - and any JSON you add) gets its own pag
   * Build: `forge.py build --game PACK ...` in the background with the log streamed, then the sheet preview and the
     sprite QA (clipping, feet drift, pops, loop seams...) per move;
   * Shot list: what to film to replace the stand-ins with your own moves.
+v11.20:
+  * the preview can show the built character's own sprites (the mannequin, a rig or your capture) instead of the figure;
+  * Build the team / the fighter cast: `forge.py roster` - two sides for team sports, a cast for fighting games - with
+    a portrait per player and a select screen;
+  * Export project: `forge.py engine` - Godot, Unity, Unreal, raylib, web or pygame, ready to open, for the last
+    build or roster.
 """
 from __future__ import annotations
 import json
@@ -177,6 +183,10 @@ class GamesTab:
         self.status = tk.StringVar(value="")
         self.t = tk.DoubleVar(value=0.0)
         self.view = tk.StringVar(value="side")
+        self.mode = tk.StringVar(value="figure")         # figure: the move on the mannequin; character: the built sprites
+        self.size = tk.IntVar(value=0)
+        self.engine = tk.StringVar(value="godot")
+        self._strips = {}
         self.pack = None
         self.rows = []
         self.motion = None
@@ -234,6 +244,10 @@ class GamesTab:
         vr = ttk.Frame(pv); vr.pack(fill=tk.X)
         for v in ("side", "front"):
             ttk.Radiobutton(vr, text=v, value=v, variable=self.view, command=self.draw).pack(side=tk.LEFT)
+        mr = ttk.Frame(pv); mr.pack(fill=tk.X)
+        ttk.Label(mr, text="Show").pack(side=tk.LEFT)
+        ttk.Radiobutton(mr, text="figure", value="figure", variable=self.mode, command=self.draw).pack(side=tk.LEFT)
+        ttk.Radiobutton(mr, text="built character", value="character", variable=self.mode, command=self.draw).pack(side=tk.LEFT)
         ttk.Scale(vr, from_=0.0, to=1.0, variable=self.t, command=lambda v: self.draw(), length=160).pack(side=tk.LEFT, padx=4)
 
         # character + build
@@ -261,6 +275,15 @@ class GamesTab:
         self.build_b = ttk.Button(r3, text="Build this game's character", command=self.build); self.build_b.pack(side=tk.LEFT)
         ttk.Button(r3, text="Shot list", command=self.shotlist).pack(side=tk.LEFT, padx=4)
         ttk.Label(r3, textvariable=self.status, foreground="#333", wraplength=640).pack(side=tk.LEFT, padx=8)
+        r4 = ttk.Frame(cb); r4.pack(fill=tk.X, padx=6, pady=3)
+        self.size_lab = ttk.Label(r4, text="Team size"); self.size_lab.pack(side=tk.LEFT)
+        ttk.Spinbox(r4, from_=0, to=11, textvariable=self.size, width=4).pack(side=tk.LEFT, padx=4)
+        self.roster_b = ttk.Button(r4, text="Build the team", command=self.roster); self.roster_b.pack(side=tk.LEFT)
+        ttk.Label(r4, text="  Engine").pack(side=tk.LEFT, padx=(16, 2))
+        from .engines import ENGINES
+        ttk.Combobox(r4, textvariable=self.engine, values=ENGINES + ["all"], width=9, state="readonly").pack(side=tk.LEFT)
+        ttk.Button(r4, text="Export project", command=self.export).pack(side=tk.LEFT, padx=4)
+        ttk.Button(r4, text="Open folder", command=self.open_folder).pack(side=tk.LEFT, padx=4)
 
         res = ttk.Frame(main); res.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
         self.sheet = ttk.Label(res); self.sheet.pack(side=tk.LEFT, anchor="n")
@@ -313,6 +336,10 @@ class GamesTab:
         self.kit_box.configure(state="readonly" if kit else tk.DISABLED)
         self.kit_lab.configure(foreground="#000" if kit else "#999")
         self.view.set("front" if p.get("camera") == "topdown8" else "side")
+        from .roster import TEAM_GAMES, FIGHT_GAMES
+        team = name in TEAM_GAMES
+        self.size_lab.configure(text="Players per side" if team else ("Fighters" if name in FIGHT_GAMES else "Characters"))
+        self.roster_b.configure(text="Build both teams" if team else ("Build the fighter cast" if name in FIGHT_GAMES else "Build the cast"))
         self._fill()
         self._show_build(name)
         kids = self.tree.get_children()
@@ -384,6 +411,11 @@ class GamesTab:
         if self.motion is None:
             cv.create_text(W / 2, Hh / 2, text="Pick a move", fill="#778"); return
         t = float(self.t.get())
+        if self.mode.get() == "character":
+            if self._draw_sprite(cv, W, Hh, t):
+                self._timeline(cv, W, Hh, t)
+                return
+            cv.create_text(W / 2, 40, text="Build this game's character first -\nthe figure is shown until then", fill="#a33")
         try:
             pts = pose_points(self.motion, t)
         except Exception as e:                                             # noqa: BLE001
@@ -398,6 +430,44 @@ class GamesTab:
                 cv.create_line(x1, y1, x2, y2, fill=col, width=4, capstyle=tk.ROUND)
         if "head" in p2:
             x, y = p2["head"]; cv.create_oval(x - 9, y - 18, x + 9, y, outline="#333", width=2)
+        self._timeline(cv, W, Hh, t)
+
+    def _strip(self, move):
+        """the last build's strip of a move -> (PIL image, frame w, h, frames) or None"""
+        s = self.games.curselection()
+        if not s:
+            return None
+        folder = build_folder(self._outdir(self.packs[s[0]]))
+        p = os.path.join(folder, "strips", move + ".png")
+        if not os.path.isfile(p):
+            return None
+        key = (p, os.path.getmtime(p))
+        if key not in self._strips:
+            from PIL import Image
+            im = Image.open(p).convert("RGBA")
+            n = max(1, self.row["frames"])
+            src = read_sources(folder).get(move)
+            if src:
+                n = src[1]
+            self._strips = {key: (im, im.width // n, im.height, n)}
+        return self._strips[key]
+
+    def _draw_sprite(self, cv, W, Hh, t):
+        st = self._strip(self.row["move"])
+        if st is None:
+            return False
+        from PIL import Image, ImageTk
+        im, fw, fh, n = st
+        f = min(n - 1, int(t * n)) if not self.row["loop"] else int(t * n) % n
+        cell = im.crop((f * fw, 0, (f + 1) * fw, fh))
+        k = min((W - 20) / float(fw), (Hh - 40) / float(fh))
+        cell = cell.resize((max(1, int(fw * k)), max(1, int(fh * k))), Image.NEAREST)
+        bg = Image.new("RGBA", cell.size, (246, 247, 249, 255)); bg.alpha_composite(cell)
+        self._spr = ImageTk.PhotoImage(bg)
+        cv.create_image(W / 2, (Hh - 30) / 2 + 4, image=self._spr)
+        return True
+
+    def _timeline(self, cv, W, Hh, t):
         # the timeline, with the move's events
         y0 = Hh - 16
         cv.create_line(10, y0, W - 10, y0, fill="#99a", width=2)
@@ -409,7 +479,7 @@ class GamesTab:
                 now = lab
         x = 10 + t * (W - 20)
         cv.create_oval(x - 4, y0 - 4, x + 4, y0 + 4, fill="#333")
-        cv.create_text(8, 10, anchor="w", text="%s - %s" % (self.row["move"], self.view.get()), fill="#556")
+        cv.create_text(8, 10, anchor="w", text="%s - %s" % (self.row["move"], self.view.get() if self.mode.get() == "figure" else "built character"), fill="#556")
         if now:
             cv.create_text(W - 8, 10, anchor="e", text=now, fill="#d35400", font=("Segoe UI", 10, "bold"))
 
@@ -432,6 +502,55 @@ class GamesTab:
         if self.source.get() == "rig" and not self.rig.get().strip():
             self.status.set("Choose a rig from the list or a GLB / FBX file, or pick Mannequin."); return
         self._run(a, "Building the %s character (about 20 s, longer with GLB)..." % name, then=("built", name))
+
+    def _roster_dir(self, name):
+        return os.path.join(self.out.get().strip() or os.path.join(HERE, "games_out"), "rosters", name)
+
+    def roster(self):
+        name, _ = self.argv()
+        a = ["roster", "--game", name, "--out", os.path.dirname(self._roster_dir(name))]
+        if self.size.get() > 0:
+            a += ["--size", str(int(self.size.get()))]
+        if self.lib.get().strip():
+            a += ["--motion-library", self.lib.get().strip()]
+        if not self.glb.get():
+            a.append("--no-glb")
+        self._run(a, "Building the %s roster - a few seconds per player..." % name, then=("roster", name))
+
+    def export_source(self, name):
+        """what Export sends: the roster when it is newer than the single build, else the build"""
+        r = os.path.join(self._roster_dir(name), "roster.json")
+        b = build_folder(self._outdir(name))
+        bj = os.path.join(b, "game_character.json")
+        if os.path.isfile(r) and (not os.path.isfile(bj) or os.path.getmtime(r) >= os.path.getmtime(bj)):
+            return os.path.dirname(r)
+        return b if os.path.isfile(bj) else None
+
+    def export(self):
+        name, _ = self.argv()
+        src = self.export_source(name)
+        if src is None:
+            self.status.set("Build the character or the team first, then export it."); return
+        dst = os.path.join(self.out.get().strip() or os.path.join(HERE, "games_out"), "engines", name)
+        if self.engine.get() != "all":
+            dst = os.path.join(dst, self.engine.get())
+        self._last_export = dst
+        self._run(["engine", self.engine.get(), src, "--out", dst], "Making the %s project from %s..." % (self.engine.get(), src),
+                  then=("export", name))
+
+    def open_folder(self):
+        name, _ = self.argv()
+        d = getattr(self, "_last_export", None) or self.export_source(name) or self._outdir(name)
+        if not os.path.isdir(d):
+            self.status.set("Nothing built yet for %s." % name); return
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(d)                                            # noqa: S606
+            else:
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", d])
+        except OSError:
+            pass
+        self.status.set(d)
 
     def shotlist(self):
         name, _ = self.argv()
@@ -471,11 +590,30 @@ class GamesTab:
                     elif what == "built":
                         self.status.set("Built -> %s" % build_folder(self._outdir(name)))
                         self._show_build(name)
+                    elif what == "roster":
+                        self._show_roster(name)
+                    elif what == "export":
+                        self.status.set("Engine project ready -> %s (its README says how to open it)" % self._last_export)
                     else:
                         self.status.set("")
                         self.log.see("1.0")
         except queue.Empty:
             pass
+
+    def _show_roster(self, name):
+        d = self._roster_dir(name)
+        p = os.path.join(d, "select_screen.png")
+        try:
+            r = json.load(open(os.path.join(d, "roster.json")))
+        except (OSError, ValueError):
+            self.status.set("The roster did not finish - the log says why."); return
+        fails = [x["name"] for x in r["players"] if x.get("qa_fail")]
+        self.status.set("%d players -> %s%s" % (len(r["players"]), d, ("  (sprite QA fails in " + ", ".join(fails) + ")") if fails else ""))
+        if os.path.isfile(p):
+            from PIL import Image, ImageTk
+            im = Image.open(p); im.thumbnail((620, 220))
+            self._img = ImageTk.PhotoImage(im)
+            self.sheet.configure(image=self._img)
 
     def _show_build(self, name):
         folder = build_folder(self._outdir(name))

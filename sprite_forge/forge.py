@@ -532,6 +532,18 @@ def main(argv=None):
     if argv and argv[0] == "library":
         from sforge import library_cli
         return library_cli.main(argv[1:])
+    if argv and argv[0] == "roster":      # v11.20: a team / a fighting game's cast in one go, with portraits
+        from sforge import roster as _R
+        return _R.main(argv[1:])
+    if argv and argv[0] == "engine":      # v11.20: ready-to-open engine projects (Godot, Unity, Unreal, raylib, web, pygame)
+        from sforge import engines as _E
+        return _E.main(argv[1:])
+    if argv and argv[0] == "portrait":    # v11.20: forge.py portrait BUILD_DIR [OUT.png]
+        from sforge import portrait as _P
+        if len(argv) < 2:
+            print("usage: forge.py portrait BUILD_DIR [OUT.png]"); return 2
+        p, how = _P.portrait(argv[1], argv[2] if len(argv) > 2 else None)
+        print("portrait (%s) -> %s" % (how, p)); return 0 if p else 1
     if argv and argv[0] == "build" and "--consoles" in argv:     # v8: build several console versions at once
         i = argv.index("--consoles"); cons = [x.strip() for x in argv[i + 1].split(",") if x.strip()]
         rest = argv[:i] + argv[i + 2:]

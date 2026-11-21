@@ -31,6 +31,8 @@ jobs:
       - run: xvfb-run -a python tools/test_studio_tabs.py
       # v11.19: the Games tab - a page per kind of game, every pack in game_packs/
       - run: xvfb-run -a python tools/test_game_tabs.py
+      # v11.20: rosters, portraits and the engine projects (Godot / Unity / Unreal / raylib / web / pygame)
+      - run: python tools/test_engines.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
