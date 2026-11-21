@@ -115,7 +115,10 @@ public sealed partial class SoccerClipRig : Node3D
         ["idle"] = "soccer_idle", ["run"] = "soccer_run", ["kick"] = "soccer_kick_place",
         ["tackle"] = "soccer_tackle", ["slide"] = "soccer_slide_tackle", ["dive"] = "soccer_keeper_dive_left",
         ["catch"] = "soccer_keeper_catch", ["foul"] = "soccer_trip", ["celebrate"] = "soccer_celebrate",
-        ["punch"] = "soccer_fist_shoot", ["headbutt"] = "soccer_header", ["knocked_down"] = "soccer_knocked_down",
+        ["thigh_control"] = "soccer_thigh_control", ["chest_control"] = "soccer_chest_control", ["volley"] = "soccer_volley",
+        ["header"] = "soccer_header",
+        ["punch"] = "soccer_punch", ["headbutt"] = "soccer_headbutt", ["knocked_down"] = "soccer_knocked_down",
+        ["chip_shot"] = "soccer_chip_shot", ["trivela"] = "soccer_trivela", ["bicycle"] = "soccer_bicycle_kick",
     };
 
     public bool Load(CharacterSpec spec)
@@ -287,8 +290,11 @@ public sealed partial class SoccerClipRig : Node3D
         // An engine one-shot with its own clip (foul -> trip, catch, parry, header,
         // throw-in ...) wins over plain locomotion: the motion engine has no intent
         // for these and used to keep the player running through them.
-        if (motionDriven && p.ActionTimer > 0f && _aliases.ContainsKey(p.Action)
-            && _motionState!.LastIntent is PlayerIntent.Move or PlayerIntent.Sprint)
+        if (motionDriven && p.ActionTimer > 0f && _aliases.TryGetValue(p.Action, out var own)
+            && (_motionState!.LastIntent is PlayerIntent.Move or PlayerIntent.Sprint
+                // A dedicated action the motion engine is not already playing (no
+                // feature table loaded): play its own clip directly.
+                || (Dedicated(p.Action) && _motionState.RenderClipId != own)))
             motionDriven = false;
         if (motionDriven)
         {
@@ -364,6 +370,14 @@ public sealed partial class SoccerClipRig : Node3D
         _prevFacing = Mx.Norm(Mx.Flat(p.Facing));
         if (_prevFacing.LengthSquared() < 0.001f) _prevFacing = new System.Numerics.Vector3(0, 0, 1);
     }
+
+    /// <summary>Actions with a clip authored for exactly that action (Sprite Forge
+    /// field-sport pack): play it rather than the motion engine's nearest match in
+    /// the broad category (every skill move used to come out as a generic cut, a
+    /// header as a trap).</summary>
+    private static bool Dedicated(string action)
+        => action.StartsWith("skill_") || action is "chip_shot" or "trivela" or "bicycle" or "thigh_control"
+           or "chest_control" or "header" or "volley" or "punch" or "headbutt" or "keeper_penalty_set";
 
     private string SelectClip(PlayerState p, float speed, out bool oneShot)
     {

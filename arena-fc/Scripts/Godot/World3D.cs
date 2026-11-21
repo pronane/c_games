@@ -305,7 +305,7 @@ public partial class Stadium : Node3D
         _rain = new CpuParticles3D
         {
             Name = "Rain",
-            Amount = 2000,
+            Amount = quality == QualityPreset.Low ? 1500 : 5000,
             Lifetime = 1.2f,
             Preprocess = 1.2f,
             EmissionShape = CpuParticles3D.EmissionShapeEnum.Box,
@@ -315,8 +315,10 @@ public partial class Stadium : Node3D
             InitialVelocityMin = 18f,
             InitialVelocityMax = 22f,
             Gravity = new Vector3(0, -9.8f, 0),
-            ScaleAmountMin = 0.02f,
-            ScaleAmountMax = 0.04f,
+            // A CpuParticles3D with no Mesh draws nothing: rain was "on" but invisible.
+            Mesh = new BoxMesh { Size = new Vector3(.025f, .55f, .025f), Material = ParticleMat(new Color(.75f, .82f, .92f, .55f)) },
+            ScaleAmountMin = 0.8f,
+            ScaleAmountMax = 1.2f,
             Color = new Color(.7f, .8f, .9f, .6f),
             Emitting = false, // Toggled by UpdateWeather()
         };
@@ -337,8 +339,9 @@ public partial class Stadium : Node3D
             InitialVelocityMin = 2f,
             InitialVelocityMax = 4f,
             Gravity = new Vector3(0, -1f, 0),
-            ScaleAmountMin = 0.05f,
-            ScaleAmountMax = 0.1f,
+            Mesh = new SphereMesh { Radius = .045f, Height = .09f, RadialSegments = 4, Rings = 2, Material = ParticleMat(new Color(1f, 1f, 1f, .85f)) },
+            ScaleAmountMin = 0.7f,
+            ScaleAmountMax = 1.3f,
             Color = new Color(1f, 1f, 1f, 0.8f),
             Emitting = false,
         };
@@ -466,6 +469,12 @@ public partial class Stadium : Node3D
                 _crowdMaterial.SetShaderParameter("celebrate", 0.0f);
         }
     }
+
+    private static StandardMaterial3D ParticleMat(Color c) => new()
+    {
+        AlbedoColor = c, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha, VertexColorUseAsAlbedo = false,
+    };
 
     public static StandardMaterial3D Mat(Color color, float roughness = .8f, float metallic = 0f, Color? emission = null)
     {
@@ -610,7 +619,7 @@ public static class RigAnimator
         }
         // Action clips are added to the smoothed gait and eased in/out, instead
         // of overwriting every joint with a constant pose for N frames.
-        if ((p.Action == "kick" || p.Action == "volley") && p.ActionTimer > 0f)
+        if ((p.Action is "kick" or "volley" or "chip_shot" or "trivela" or "bicycle") && p.ActionTimer > 0f)
         {
             float env = ActionEnvelope();
             float kick = env * 1.25f;

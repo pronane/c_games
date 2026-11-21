@@ -14,7 +14,9 @@ the same semantic pose channels as `sforge.rig.evaluate`.
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 
 from sforge.motions import (
     CROUCH,
@@ -347,7 +349,46 @@ CLIP_SPECS = [
     ("soccer_solo", "bounce_solo", True, "Ball", "solo / bounce"),
     ("soccer_fist_pass", "fist_pass", False, "Ball", "fist pass"),
     ("soccer_fist_shoot", "fist_shoot", False, "Ball", "fist shot"),
+    # Sprite Forge v11.21 field-sport pack (sforge/fieldsport_motions.py): clips the
+    # engine already asked for but played generic stand-ins for.
+    ("soccer_skill_step_over", "fs_stepover", False, "Skill", "step-over"),
+    ("soccer_skill_roulette", "fs_roulette", False, "Skill", "roulette / Marseille turn"),
+    ("soccer_skill_drag_back", "fs_drag_back", False, "Skill", "drag back"),
+    ("soccer_skill_elastico", "fs_elastico", False, "Skill", "elastico"),
+    ("soccer_skill_ball_roll", "fs_ball_roll", False, "Skill", "ball roll"),
+    ("soccer_skill_rainbow", "fs_rainbow_flick", False, "Skill", "rainbow flick"),
+    ("soccer_skill_fake_shot", "fs_fake_shot", False, "Skill", "fake shot"),
+    ("soccer_skill_heel_to_heel", "fs_heel_to_heel", False, "Skill", "heel to heel"),
+    ("soccer_thigh_control", "fs_thigh_control", False, "Ball", "thigh control"),
+    ("soccer_chip_shot", "fs_chip_shot", False, "Ball", "chip shot"),
+    ("soccer_trivela", "fs_trivela", False, "Ball", "outside-of-the-boot strike"),
+    ("soccer_bicycle_kick", "fs_bicycle_kick", False, "Ball", "bicycle kick"),
+    ("soccer_keeper_penalty_set", "fs_keeper_penalty_set", True, "Goalkeeper", "keeper set for a penalty"),
+    ("soccer_punch", "fs_punch", False, "Contact", "punch (violent conduct)"),
+    ("soccer_headbutt", "fs_headbutt", False, "Contact", "headbutt (violent conduct)"),
 ]
+
+# ---------------------------------------------------------------------------
+# Real motion capture (CMU Graphics Lab, via Tools/import_cmu_football.py):
+# Sprite Forge library moves in Data/mocap/cmu/.  Each becomes soccer_<name>.
+# ---------------------------------------------------------------------------
+MOCAP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data", "mocap", "cmu")
+_MOCAP_CATEGORY = {"Kick": "Ball", "Locomotion": "Locomotion", "Cut": "Locomotion", "Recovery": "Locomotion"}
+
+
+def _mocap_takes():
+    path = os.path.join(MOCAP_DIR, "_import.json")
+    if not os.path.isfile(path):
+        return []
+    with open(path) as f:
+        return json.load(f).get("takes", [])
+
+
+MOCAP_TAKES = _mocap_takes()
+for _t in MOCAP_TAKES:
+    CLIP_SPECS.append(("soccer_" + _t["name"], "mocap:" + _t["name"], bool(_t["loop"]),
+                       _MOCAP_CATEGORY.get(_t["category"], "Mocap"),
+                       "motion capture: CMU take %s (%s)" % (_t["take"], _t["category"].lower())))
 
 # Match-engine / control actions -> clip name.  Keys cover the C# PlayerState
 # Action strings, the pad/keyboard actions and the restart phases.
@@ -437,6 +478,22 @@ ACTION_ALIASES = {
     "solo": "soccer_solo",
     "fist_pass": "soccer_fist_pass",
     "fist_shoot": "soccer_fist_shoot",
+    "skill_step_over": "soccer_skill_step_over",
+    "skill_roulette": "soccer_skill_roulette",
+    "skill_drag_back": "soccer_skill_drag_back",
+    "skill_elastico": "soccer_skill_elastico",
+    "skill_ball_roll": "soccer_skill_ball_roll",
+    "skill_rainbow": "soccer_skill_rainbow",
+    "skill_fake_shot": "soccer_skill_fake_shot",
+    "skill_heel_to_heel": "soccer_skill_heel_to_heel",
+    "thigh_control": "soccer_thigh_control",
+    "chip_shot": "soccer_chip_shot",
+    "trivela": "soccer_trivela",
+    "bicycle": "soccer_bicycle_kick",
+    "bicycle_kick": "soccer_bicycle_kick",
+    "keeper_penalty_set": "soccer_keeper_penalty_set",
+    "punch": "soccer_punch",
+    "headbutt": "soccer_headbutt",
 }
 
 ALL_CLIPS = [c[0] for c in CLIP_SPECS]
@@ -532,6 +589,33 @@ CLIP_EVENTS = {
     "soccer_fist_pass": _ev(ball_contact=0.50),
     "soccer_fist_shoot": _ev(ball_contact=0.50),
 }
+# Field-sport pack clips carry their own events in Sprite Forge.
+from sforge import fieldsport_motions as _fs  # noqa: E402
+for _name, _base, *_ in CLIP_SPECS:
+    if _base in _fs.EVENTS:
+        CLIP_EVENTS[_name] = dict(_fs.EVENTS[_base])
+def _mocap_events(name):
+    with open(os.path.join(MOCAP_DIR, name + ".json")) as f:
+        rec = json.load(f)
+    canon = (rec.get("import") or {}).get("canonical") or {}
+    dur = float(rec.get("duration") or canon.get("duration") or 1.0)
+    contact = -1.0
+    if canon.get("peak_s") is not None and canon.get("cut_s"):
+        contact = round((canon["peak_s"] - canon["cut_s"][0]) / dur, 3)
+    # Foot plants: each leg's most-forward swing (heel strike) in the take.
+    steps = []
+    keys = rec["keys"]
+    for leg in ("leg_L", "leg_R"):
+        vals = [(k[0], (k[1].get(leg) or [0])[0]) for k in keys]
+        for i in range(1, len(vals) - 1):
+            if vals[i][1] > vals[i - 1][1] and vals[i][1] >= vals[i + 1][1] and vals[i][1] > 15:
+                steps.append(round(float(vals[i][0]), 3))
+    return _ev(ball_contact=contact, footsteps=tuple(sorted(s for s in steps if 0.0 <= s <= 1.0)))
+
+
+for _t in MOCAP_TAKES:
+    CLIP_EVENTS["soccer_" + _t["name"]] = _mocap_events(_t["name"])
+
 # Every clip must have an event entry (default: no events).
 for _n in ALL_CLIPS:
     CLIP_EVENTS.setdefault(_n, _ev())
@@ -546,6 +630,14 @@ def register() -> None:
           keys=spec.get("keys"), func=spec.get("func"), loop=spec.get("loop", False))
     for name, base, loop, category, desc in CLIP_SPECS:
         if name in LIB:
+            continue
+        if base and base.startswith("mocap:"):
+            from sforge.motionlib import as_motion
+            src = as_motion(base.split(":", 1)[1], path=MOCAP_DIR)
+            if src is None:
+                raise KeyError("motion-capture move %s missing from %s" % (base, MOCAP_DIR))
+            M(name, category, desc, keys=src.keys, loop=loop)
+            LIB[name].duration_s = getattr(src, "duration_s", None)
             continue
         if base is None:
             raise KeyError("custom clip %s missing from CUSTOM" % name)

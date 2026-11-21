@@ -67,6 +67,9 @@ const shots = process.env.SCREENSHOT_DIR;
   console.log("Your sound:", (await lab.locator(".your-sound .helper").innerText()).replace(/\s+/g, " ").slice(0, 200));
   if (shots) await lab.locator(".your-sound").screenshot({ path: `${shots}/your-sound.png` });
 
+  // The speed trainer: start slow; the take is reviewed straight away.
+  await lab.locator("#trainer-on").check();
+  console.log("Trainer on at", await lab.locator("#speed").inputValue());
   // Record a few bars along with the band, hearing yourself through the amp.
   await lab.locator("#loop-on").check();
   await lab.getByLabel("Loop from bar").fill(process.env.LOOP_FROM ?? "12");
@@ -80,11 +83,22 @@ const shots = process.env.SCREENSHOT_DIR;
   }
   console.log("Listened three ways.");
 
+  // The trainer reviewed the take on its own and set the next speed; the take is in the history.
+  await lab.locator(".take-diff").waitFor({ timeout: 300000 });
+  console.log("Trainer:", await lab.locator(".trainer .helper").innerText());
+  const auto = await lab.locator(".take-diff .diff-score small").first().innerText();
+  console.log("Trainer's review marked against:", auto);
+  if (!auto.toLowerCase().startsWith("your tab:")) throw Error("The trainer's review did not use the tab.");
+  await lab.locator(".progress-panel tbody tr").first().waitFor({ timeout: 10000 });
+  console.log("Progress:", (await lab.locator(".progress-panel tbody").innerText()).replace(/\s+/g, " "));
+  await lab.locator("#trainer-on").uncheck();
+
   // Marked against the tab.
   const options = await lab.locator("#mark-against option").allInnerTexts();
   console.log("Mark against:", options.join(" | "));
   if (!options.some((o) => o.startsWith("Your tab:"))) throw Error("No tab part offered to mark against.");
   await lab.getByRole("button", { name: "Review my take" }).click();
+  await lab.getByRole("button", { name: "Checking the take…" }).waitFor({ state: "detached", timeout: 300000 });
   await lab.locator(".take-diff, .take-card ~ .error, section .error").first().waitFor({ timeout: 300000 });
   if (!(await lab.locator(".take-diff").count())) throw Error("Review failed: " + (await lab.locator(".error").first().innerText()));
   const cards = await lab.locator(".take-diff .diff-score small").allInnerTexts();

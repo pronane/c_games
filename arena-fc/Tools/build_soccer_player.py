@@ -106,19 +106,6 @@ def collapse_weights(J52, W52, sk, arena_heads: np.ndarray):
     return top.astype(np.uint16), tw.astype(np.float32), joint_map
 
 
-def _minrot(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Smallest rotation matrix taking direction a onto direction b."""
-    a = a / np.linalg.norm(a); b = b / np.linalg.norm(b)
-    v = np.cross(a, b); c = float(np.dot(a, b))
-    if np.linalg.norm(v) < 1e-8:
-        if c > 0: return np.eye(3)
-        # 180 degrees: any perpendicular axis
-        ax = np.cross(a, [1, 0, 0] if abs(a[0]) < .9 else [0, 1, 0]); ax /= np.linalg.norm(ax)
-        return 2 * np.outer(ax, ax) - np.eye(3)
-    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-    return np.eye(3) + vx + vx @ vx * (1 / (1 + c))
-
-
 # Arena bone -> MakeHuman template joint.  Arena's left is -X; MakeHuman's
 # "_l" is +X, so the sides swap (the retarget's bonemap does the same).
 ARENA_TO_TEMPLATE = {
@@ -132,53 +119,16 @@ ARENA_TO_TEMPLATE = {
 
 
 def conform_to_bind(V, N, J18, W18, tpl_joint, rig_json: dict, log=print):
-    """Re-pose the sculpted mesh so each limb points the way Arena's bind
-    skeleton does, before it is skinned to that skeleton.
-
-    The mesh is sculpted on the MakeHuman template, whose arms are in an A-pose
-    (upper arm ~49 deg below horizontal, forearm ~29 deg), but it is skinned to
-    Arena's skeleton bound with the arms hanging (~84 deg).  Skinning a mesh to
-    a bind pose it is not in adds the difference to every frame: all 71 clips
-    showed the arms 45-60 deg too far out/up (boxer arms when running, A/T pose
-    at idle, both arms overhead when passing or shooting).
-
-    Rotation only, about the template's own joints (FK in the template's
-    proportions), so the geometry is not stretched; bones that already line up
-    within 3 deg (spine, legs) are left exactly as they are."""
+    """Re-pose the sculpted mesh (MakeHuman A-pose arms) into Arena's bind pose
+    (arms hanging) before skinning - the fix for the 45-60 deg arms-up bias in
+    every clip.  Now lives in Sprite Forge (sforge.bindconform) so every game
+    that skins a sculpt to its own skeleton gets it."""
+    from sforge.bindconform import conform_to_bind as _conform
     bones = rig_json["bones"]
     names = [b["n"] for b in bones]
-    heads = np.array([b["h"] for b in bones], float)
-    parent = [b["p"] for b in bones]
-    children = {i: [j for j in range(len(bones)) if parent[j] == i] for i in range(len(bones))}
-    tpl = np.array([tpl_joint(ARENA_TO_TEMPLATE[n]) for n in names], float)
-    world = [np.eye(3) for _ in bones]
-    new_head = tpl.copy()
-    report = []
-    for i in range(len(bones)):                    # parent-first order
-        pi = parent[i]
-        Wp = world[pi] if pi >= 0 else np.eye(3)
-        if pi >= 0:
-            new_head[i] = new_head[pi] + world[pi] @ (tpl[i] - tpl[pi])
-        kids = children[i]
-        C = np.eye(3)
-        if len(kids) == 1 and np.linalg.norm(tpl[kids[0]] - tpl[i]) > 1e-5:
-            d_now = Wp @ (tpl[kids[0]] - tpl[i])
-            d_arena = heads[kids[0]] - heads[i]
-            cosang = np.dot(d_now, d_arena) / np.linalg.norm(d_now) / np.linalg.norm(d_arena)
-            angle = float(np.degrees(np.arccos(np.clip(cosang, -1, 1))))
-            if angle >= 3.0:
-                C = _minrot(d_now, d_arena)
-                report.append("%s %.0f" % (names[i], angle))
-        world[i] = C @ Wp
-    Rs = np.stack(world)
-    V2 = np.zeros_like(V, dtype=float); N2 = np.zeros_like(N, dtype=float)
-    for k in range(J18.shape[1]):
-        w = W18[:, k:k + 1].astype(float)
-        idx = J18[:, k].astype(int)
-        R = Rs[idx]
-        V2 += w * (np.einsum("nij,nj->ni", R, V - tpl[idx]) + new_head[idx])
-        N2 += w * np.einsum("nij,nj->ni", R, N)
-    N2 /= np.maximum(np.linalg.norm(N2, axis=1, keepdims=True), 1e-9)
+    tgt = np.array([b["h"] for b in bones], float)
+    src = np.array([tpl_joint(ARENA_TO_TEMPLATE[n]) for n in names], float)
+    V2, N2, report = _conform(V, N, J18, W18, src, tgt, [b["p"] for b in bones], names)
     log("  conformed mesh to Arena bind pose (deg): " + (", ".join(report) or "none needed"))
     return V2.astype(V.dtype), N2.astype(N.dtype)
 

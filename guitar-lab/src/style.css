@@ -2320,3 +2320,47 @@ footer span:first-child {
   color: #66736d;
   margin-top: 2px;
 }
+
+/* Speed trainer and progress */
+.trainer {
+  padding: 8px 12px;
+  border: 1px dashed #cfd8c3;
+  border-radius: 8px;
+}
+.trainer .helper {
+  flex-basis: 100%;
+  margin: 0;
+}
+.trainer select {
+  width: auto;
+  padding: 3px 6px;
+}
+.progress-panel {
+  margin: 14px 0;
+  overflow-x: auto;
+}
+.progress-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.progress-panel table {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 560px;
+}
+.progress-panel th,
+.progress-panel td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e6ebdf;
+  vertical-align: middle;
+}
+.progress-panel td small {
+  display: block;
+  color: #7a8571;
+}
+.progress-panel .spark {
+  color: #4f7a35;
+}

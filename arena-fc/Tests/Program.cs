@@ -16,7 +16,13 @@ void Section(string s) => Console.WriteLine($"\n== {s} ==");
 void Invoke(object o, string method, params object[] args)
 {
     var mi = o.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
-    mi.Invoke(o, args);
+    // Fill optional parameters the test leaves out with their defaults, so adding
+    // an optional parameter to an engine method doesn't crash the whole suite.
+    var ps = mi.GetParameters();
+    var full = new object?[ps.Length];
+    for (int i = 0; i < ps.Length; i++)
+        full[i] = i < args.Length ? args[i] : ps[i].HasDefaultValue ? ps[i].DefaultValue : Type.Missing;
+    mi.Invoke(o, full);
 }
 
 Section("Procedural rig / skeleton / skin weights");
@@ -530,6 +536,23 @@ OnlineMatch.Interpolate(interpEng, snaps[^1], snaps[^1], .5f);
 Check("interpolation of identical frames reproduces the authoritative hash",
       NetProtocol.Hash(interpEng.State) == NetProtocol.Hash(auth.State));
 om.Close();
+
+Section("5.7: every action remappable");
+{
+    Check("remap screen asks for all ten actions", PadLayout.RemapOrder.Length == 10
+          && PadLayout.Actions.All(a => PadLayout.RemapOrder.Contains(a)) && PadLayout.ExtraActions.All(a => PadLayout.RemapOrder.Contains(a)));
+    Check("every remap step has a prompt with the Xbox default", PadLayout.RemapOrder.All(a => PadLayout.RemapPrompt(a).Contains("Xbox")));
+    var saved = new Dictionary<string, Dictionary<string, int>> { ["Pad X"] = new(PadLayout.Standard) { ["lob"] = 2, ["camera"] = 5 } };
+    var bnd = PadLayout.Bindings("Pad X", true, saved);
+    var btn = new bool[16]; btn[2] = true;
+    var held = PadLayout.Held(btn, new float[8], bnd, true);
+    Check("a remapped long-ball button works", held["lob"]);
+    btn = new bool[16]; btn[4] = true;
+    Check("the old default no longer fires once remapped", !PadLayout.Held(btn, new float[8], bnd, true)["lob"]);
+    var old = new Dictionary<string, Dictionary<string, int>> { ["Pad Y"] = new(PadLayout.Standard) };
+    btn = new bool[16]; btn[4] = true;
+    Check("older saves (core six only) keep the default extras", PadLayout.Held(btn, new float[8], PadLayout.Bindings("Pad Y", true, old), true)["lob"]);
+}
 
 Section("USB / EasySMX gamepad support (PadLayout)");
 var noSaved = new Dictionary<string, Dictionary<string, int>>();

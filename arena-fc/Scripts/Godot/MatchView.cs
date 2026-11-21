@@ -131,6 +131,9 @@ public partial class MatchView : Node3D
         _pending.Lob |= cmd.Lob;
         _pending.CallForBall |= cmd.CallForBall;
         _pending.Punch |= cmd.Punch;
+        _pending.Contain = cmd.Contain;
+        if (cmd.ShotStyle != ShotStyle.Auto) _pending.ShotStyle = cmd.ShotStyle;
+        if (cmd.SwitchDir.LengthSquared() > 0f) _pending.SwitchDir = cmd.SwitchDir;
         _pending.Headbutt |= cmd.Headbutt;
         if (cmd.Skill != SkillMove.None) _pending.Skill = cmd.Skill;
         if (cmd.Charge > _pending.Charge) _pending.Charge = cmd.Charge;
@@ -144,7 +147,9 @@ public partial class MatchView : Node3D
 
         // The home club's own ground: World3D used to be built with the default
         // index, so every fixture in the game was played at "Lions Den".
-        var stadium = new Stadium();
+        // Named so the per-frame weather/crowd hooks find it (they looked for a
+        // sibling "../Stadium", so rain never showed and the crowd never celebrated).
+        var stadium = new Stadium { Name = "Stadium" };
         _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
         // Empty grounds still get the stadium, just not the crowd.
         stadium.Build(_crowd.GetCrowdCount() > 0, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
@@ -159,7 +164,14 @@ public partial class MatchView : Node3D
         Rigs = new CharacterRig[Engine.State.Players.Length];
         _motion.EnsureCapacity(Rigs.Length);
         if (Godot.FileAccess.FileExists("res://Data/clips/clip_manifest.json"))
+        {
             _motion.LoadManifest(Godot.FileAccess.GetFileAsString("res://Data/clips/clip_manifest.json"));
+            // Pose-level motion matching (feature table + the actions that own a clip).
+            if (Godot.FileAccess.FileExists("res://Data/clips/motion_features.json"))
+                _motion.LoadFeatures(Godot.FileAccess.GetFileAsString("res://Data/clips/motion_features.json"),
+                    Godot.FileAccess.FileExists("res://Data/soccer_player_manifest.json")
+                        ? Godot.FileAccess.GetFileAsString("res://Data/soccer_player_manifest.json") : "");
+        }
         _ambient = new AmbientBehaviour[Rigs.Length];
         _face = new FacialExpression[Rigs.Length];
         _ambientTag = new AmbientAction[Rigs.Length];
@@ -278,6 +290,11 @@ public partial class MatchView : Node3D
             var worldMove = right * cmd.Move.X + up * (-cmd.Move.Y);
             cmd.Move = worldMove.LengthSquared() > 1f
                 ? System.Numerics.Vector2.Normalize(worldMove) : worldMove;
+            if (cmd.SwitchDir.LengthSquared() > 0f)
+            {
+                var ws = right * cmd.SwitchDir.X + up * (-cmd.SwitchDir.Y);
+                cmd.SwitchDir = ws.LengthSquared() > 1e-4f ? System.Numerics.Vector2.Normalize(ws) : System.Numerics.Vector2.Zero;
+            }
         }
         if (Input.PausePressed)
         {
@@ -308,6 +325,7 @@ public partial class MatchView : Node3D
             // Engine.Step() uses a fixed-tick accumulator.  When a physics frame
             // produces no tick, buffer the one-shot edges until one does.
             MergePending(cmd);
+            if (_aiVsAi) { Engine.State.Controlled = -1; _pending = PlayerCommand.None; }
             int before = Engine.CurrentTick;
             var stepped = _pending;
             Engine.Step(dt, _pending);
@@ -337,7 +355,7 @@ public partial class MatchView : Node3D
         _lastGoals = goals;
         _crowd.Update(dt);
         RecordBlendClips();
-        var stadium = GetNodeOrNull<Stadium>("../Stadium");
+        var stadium = GetNodeOrNull<Stadium>("Stadium");
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
@@ -358,6 +376,7 @@ public partial class MatchView : Node3D
     // progress every 5 game-minutes and a summary at the end, then quits.
     private readonly bool _autoplay = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--autoplay") >= 0;
     private int _autoplayBucket = -1;
+    private readonly bool _aiVsAi = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--ai-vs-ai") >= 0;
     private bool _autoplayDone;
     private double _autoplayStart = -1;
     private void AutoplayReport()
@@ -384,7 +403,10 @@ public partial class MatchView : Node3D
                    + $"fouls {S.Fouls[0]}-{S.Fouls[1]} corners {S.Corners[0]}-{S.Corners[1]} "
                    + $"(last {Engine.Events.Count} events: throw-ins {T("Throw-in")} goal kicks {T("Goal kick")} saves {K(EventKind.Save)}) "
                    + $"shootout {S.ShootoutKicksHome}/{S.ShootoutKicksAway} real {now - _autoplayStart:0}s");
-            GetTree().CreateTimer(3.0).Timeout += () => GetTree().Quit();
+            int from = Math.Max(0, Engine.Events.Count - 60);
+            for (int i = from; i < Engine.Events.Count; i++)
+                GD.Print($"[AUTOPLAY]   {Engine.Events[i].Clock:0}' {Engine.Events[i].Kind}: {Engine.Events[i].Text}");
+                        GetTree().CreateTimer(3.0).Timeout += () => GetTree().Quit();
         }
     }
 
@@ -462,7 +484,7 @@ public partial class MatchView : Node3D
             Replay.RecordEvent(evt, Engine.CurrentTick);
             if (evt.Kind == EventKind.Goal)
             {
-                var stadium = GetNodeOrNull<Stadium>("../Stadium");
+                var stadium = GetNodeOrNull<Stadium>("Stadium");
                 stadium?.CelebrateCrowd(5f);
                 // Update commentary context with score.
                 _commentaryCtx.HomeScore = Engine.State.Score[0];

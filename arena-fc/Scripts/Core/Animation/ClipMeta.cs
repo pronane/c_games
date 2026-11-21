@@ -15,7 +15,11 @@ public enum ClipCategory
     Locomotion, Approach, FirstTouch, Shield, Cut, Kick, Pass, Tackle,
     KeeperDive, Celebrate, Idle, Recovery,
     /// <summary>Goalkeeper-only stances and handling (never chosen for outfield movement).</summary>
-    Keeper
+    Keeper,
+    /// <summary>Skill moves: only ever played for the skill that names them.</summary>
+    Skill,
+    /// <summary>Violent conduct (punch, headbutt): only ever played for that action.</summary>
+    Conduct
 }
 
 /// <summary>Metadata only; actual poses stay in the Sprite Forge GLB / baked JSON.</summary>
@@ -43,4 +47,6 @@ public sealed class ClipMeta
     public bool Loop { get; set; }
 
     public bool HasContact => ContactFraction >= 0f && ContactFraction <= 1f;
+    /// <summary>Authored for one engine action (tag "dedicated"): never picked by category.</summary>
+    public bool Dedicated => Array.Exists(Tags, t => string.Equals(t, "dedicated", StringComparison.OrdinalIgnoreCase));
 }

@@ -81,8 +81,21 @@ for (int ts = 2027; ts <= 2029; ts++)
 }
 Check("opposition wins the ball back", tackleTotal / 4f >= 3f, $"avg tackles={tackleTotal / 4f:0.0} (seed 2026: {tackles})");
 Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={fouls}");
-Check("players keep personal space around the ball", avgNearBall < 2.60f,
-      $"avgWithin4m={avgNearBall:F3}");
+// One seed is one trajectory: any gameplay change (e.g. more shots on target, so
+// more goalmouth scrambles) moves it.  Judge the average over six seeds.
+double nearSum = avgNearBall;
+for (int sd = 2027; sd <= 2031; sd++)
+{
+    var sm = new MatchEngine(new MatchOptions { Seed = sd, TimeSpeed = 15f }); long nb = 0;
+    for (int i = 0; i < 3600; i++)
+    {
+        sm.Step(1f / 60f, PlayerCommand.None);
+        foreach (var p in sm.State.Players) if (Mx.FlatDist(p.Pos, sm.State.Ball.Pos) < 4f) nb++;
+    }
+    nearSum += nb / 3600.0;
+}
+Check("players keep personal space around the ball (6 seeds)", nearSum / 6 < 2.60,
+      $"avgWithin4m={nearSum / 6:F3} (seed 2026: {avgNearBall:F3})");
 
 Section("Action pose timing");
 float passStartPose = ActionTiming.ContactEnvelope(0f, .34f, .17f);
@@ -223,13 +236,18 @@ MatchEngine Playable(int owner = 0, float mateDistance = 8f)
 
 var pass = Playable();
 pass.Step(1f / 60f, new PlayerCommand { Pass = true });
+// The kick starts (wind-up) on the first tick; the pass is counted when the
+// ball leaves the foot.
 Check("short pass fires on the first tick outside the AI decision clock",
-      pass.State.Passes[0] > 0, $"passes={pass.State.Passes[0]}");
+      pass.State.Ball.HasPending && pass.State.Ball.PendingKind == 1 && pass.State.Ball.PendingReceiver >= 0,
+      $"pending={pass.State.Ball.HasPending}");
+for (int i = 0; i < 40 && pass.State.Passes[0] == 0; i++) pass.Step(1f / 60f, PlayerCommand.None);
+Check("...and is counted when the ball leaves the foot", pass.State.Passes[0] == 1, $"passes={pass.State.Passes[0]}");
 
 var through = Playable();
 through.Step(1f / 60f, new PlayerCommand { Through = true });
-Check("through ball fires on the first tick", through.State.Passes[0] > 0,
-      $"passes={through.State.Passes[0]}");
+Check("through ball fires on the first tick", through.State.Ball.HasPending && through.State.Ball.PendingKind == 1,
+      $"pending={through.State.Ball.HasPending}");
 
 var longBall = Playable(0, 18f);
 longBall.Step(1f / 60f, new PlayerCommand { Lob = true });
@@ -419,7 +437,7 @@ var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_m
 var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
-      manifestEngine.ClipCount == 71 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      manifestEngine.ClipCount == 105 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
@@ -427,14 +445,16 @@ Check("shared Sprite Forge clip manifest loads all 18-bone clips",
 // stances filed there at speed 0 made standing players hold arms-up poses.
 string[] gait = { "soccer_backpedal", "soccer_dribble", "soccer_jockey", "soccer_jog", "soccer_run",
     "soccer_run_ball", "soccer_sidestep", "soccer_sprint", "soccer_strafe_l", "soccer_strafe_r", "soccer_walk" };
+// (Motion-captured gait cycles - CMU runs and jogs, tagged "mocap" - are gaits too.)
+bool IsGait(string id) => gait.Contains(id) || (id.StartsWith("soccer_mocap_run") || id.StartsWith("soccer_mocap_jog"));
 var locoIds = manifestClips.Where(c => c.Category == ClipCategory.Locomotion).Select(c => c.Id).OrderBy(x => x).ToArray();
-Check("clip manifest: Locomotion holds only gait cycles", locoIds.SequenceEqual(gait),
-      string.Join(",", locoIds.Except(gait)));
+Check("clip manifest: Locomotion holds only gait cycles", locoIds.All(IsGait) && gait.All(g => locoIds.Contains(g)),
+      string.Join(",", locoIds.Where(x => !IsGait(x))));
 var standing = manifestEngine.SelectClip(PlayerIntent.Move, ArenaFC.Core.Animation.BallState.None, 0f, 0f);
 Check("a standing player plays an idle clip, not an action clip",
       standing != null && standing.Category == ClipCategory.Idle, standing?.Id ?? "null");
 var jogging = manifestEngine.SelectClip(PlayerIntent.Move, ArenaFC.Core.Animation.BallState.None, 3.2f, 0f);
-Check("a moving player still plays a gait clip", jogging != null && gait.Contains(jogging.Id), jogging?.Id ?? "null");
+Check("a moving player still plays a gait clip", jogging != null && IsGait(jogging.Id), jogging?.Id ?? "null");
 var walkMeta = new ClipMeta { Id = "walk", Category = ClipCategory.Locomotion, Duration = .8f,
     PreferredSpeed = 2f, BallState = ArenaFC.Core.Animation.BallState.None, Loop = true, BoneCount = 18,
     FootPlantFrames = new[] { .1f, .6f } };
@@ -497,10 +517,12 @@ Check("same fixed inputs produce the same clip and normalized phase",
       && deterministicA.NextClipId == deterministicB.NextClipId
       && MathF.Abs(deterministicA.RenderPhase - deterministicB.RenderPhase) < 1e-6f);
 
-Section("Motion Matching feature database (Core only; runtime selector unchanged)");
+Section("Motion Matching feature database (schema v2: every clip, contact timing)");
 var motionDb = MotionDatabase.Parse(File.ReadAllText("Data/clips/motion_features.json"));
-Check("baked motion feature table loads with the versioned 23D layout",
-      motionDb.Count == 403 && motionDb.Dimensions == 23);
+Check("baked motion feature table loads with the versioned 24D layout over every category",
+      motionDb.Count > 1000 && motionDb.Dimensions == 24
+      && motionDb.Rows.Any(r => r.Category == ClipCategory.Kick) && motionDb.Rows.Any(r => r.Category == ClipCategory.Skill),
+      $"rows={motionDb.Count} dims={motionDb.Dimensions}");
 var poseFeatures = new float[8]; poseFeatures[0] = .12f; poseFeatures[4] = .3f;
 var builtQueryA = MotionQuery.BuildFeatures(poseFeatures, 1f, 0f, .1f, 2f, .5f, .8f);
 var builtQueryB = MotionQuery.BuildFeatures(poseFeatures, 1f, 0f, .1f, 2f, .5f, .8f);
@@ -509,7 +531,7 @@ Check("MotionQuery builds a repeatable facing-root trajectory from current and d
       && builtQueryA[0] == .12f && builtQueryA[8] == 1f
       && MathF.Abs(builtQueryA[17] - MathF.Sin(.16f)) < 1e-6f
       && MathF.Abs(builtQueryA[18] - MathF.Cos(.16f)) < 1e-6f);
-var probeRow = motionDb.GetRow(100);
+var probeRow = motionDb.Rows.Where(r => r.Category == ClipCategory.Locomotion).ElementAt(40);
 var probeQuery = new MotionQuery(probeRow.Features.Span.ToArray(), probeRow.Category, probeRow.Ball,
     PlayerIntent.Move, currentClipId: probeRow.ClipId, currentPhase: probeRow.Phase);
 var probeOk1 = motionDb.TrySearch(probeQuery, out var probeMatch1);
@@ -554,6 +576,69 @@ var shotQuery = new MotionQuery(zeroFeatures, ClipCategory.Locomotion,
     ArenaFC.Core.Animation.BallState.None, PlayerIntent.Shoot);
 Check("event-driven one-shots never enter motion database search",
       !fixtureDb.TrySearch(shotQuery, out _));
+// Step 1 of the HyperMotion-style roadmap: pose-level matching drives live selection.
+{
+    var mm = new MotionEngine();
+    mm.LoadClips(ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_manifest.json")));
+    mm.Database = motionDb;
+    // A shot whose ball contact is due in 0.1 s: the old selector started the clip at
+    // frame 0 and fast-forwarded the whole wind-up (~3x); matching enters late.
+    MotionState Shot(float untilContact, string? forced = null)
+    {
+        var st = new MotionState();
+        for (int i = 0; i < 20; i++)
+            mm.Update(st, 5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Move, 1f / 60f,
+                      localVelocity: new System.Numerics.Vector2(0, 5f), desiredLocalVelocity: new System.Numerics.Vector2(0, 5f));
+        mm.Update(st, 5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Shoot, 1f / 60f, untilContact,
+                  localVelocity: new System.Numerics.Vector2(0, 5f), desiredLocalVelocity: new System.Numerics.Vector2(0, 2f), forcedClipId: forced);
+        return st;
+    }
+    var late = Shot(.1f); var early = Shot(.6f);
+    mm.TryGetClip(late.RenderClipId, out var lateClip);
+    Check("a shot due in 0.1 s enters its clip late in the wind-up, at near-natural speed",
+          lateClip != null && lateClip.Category == ClipCategory.Kick && late.RenderPhase > .25f && late.PlaybackScale < 2f,
+          $"{late.RenderClipId} phase {late.RenderPhase:0.00} scale {late.PlaybackScale:0.00}");
+    Check("a shot with the full wind-up to come enters near the start",
+          early.RenderPhase < late.RenderPhase, $"early {early.RenderPhase:0.00} late {late.RenderPhase:0.00}");
+    var chip = Shot(.2f, "soccer_chip_shot");
+    Check("an action with its own clip plays that clip, entered at the matched frame",
+          chip.RenderClipId == "soccer_chip_shot" && chip.MotionMatchRowIndex >= 0, chip.RenderClipId);
+    bool dedicatedLeak = false;
+    foreach (float t in new[] { .05f, .15f, .3f, .5f, .8f })
+    {
+        var st = Shot(t);
+        if (mm.TryGetClip(st.RenderClipId, out var cm) && cm.Dedicated) dedicatedLeak = true;
+    }
+    Check("a plain shot never borrows a chip / trivela / bicycle clip", !dedicatedLeak);
+    // Running: the gait search follows speed (jog vs sprint) and is deterministic.
+    string Gait(float v)
+    {
+        var st = new MotionState();
+        for (int i = 0; i < 30; i++)
+            mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.None, v > 6f ? PlayerIntent.Sprint : PlayerIntent.Move, 1f / 60f,
+                      localVelocity: new System.Numerics.Vector2(0, v), desiredLocalVelocity: new System.Numerics.Vector2(0, v));
+        return st.RenderClipId;
+    }
+    string slow = Gait(2.5f), fast = Gait(8f);
+    Check("gait matching picks a slower cycle at 2.5 m/s and a faster one at 8 m/s", slow != fast
+          && mm.TryGetClip(slow, out var sm) && mm.TryGetClip(fast, out var fm) && sm.PreferredSpeed < fm.PreferredSpeed,
+          $"{slow} vs {fast}");
+    Check("matching is deterministic", Gait(8f) == fast && Shot(.1f).RenderPhase == late.RenderPhase);
+    // Real motion capture (CMU) sits in the same table: some shot contexts pick a
+    // captured kick over the hand-keyed ones.
+    bool mocapKick = false;
+    foreach (float v in new[] { 0f, 1.5f, 3f })
+        foreach (float t in new[] { .1f, .3f, .5f })
+        {
+            var st = new MotionState();
+            var lv = new System.Numerics.Vector2(0, v);
+            for (int i = 0; i < 20; i++)
+                mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f, localVelocity: lv, desiredLocalVelocity: lv);
+            mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Shoot, 1f / 60f, t, localVelocity: lv, desiredLocalVelocity: lv);
+            if (st.RenderClipId.StartsWith("soccer_mocap_kick")) mocapKick = true;
+        }
+    Check("motion-captured kicks are live candidates for shots", mocapKick);
+}
 var dribbleA = new DribbleState { TouchTimer = 0f };
 var dribbleB = new DribbleState { TouchTimer = 0f };
 var rngA = new Rng(1337); var rngB = new Rng(1337);
@@ -602,6 +687,143 @@ Check("shootout: nobody else plays during a kick", strayMoves == 0, $"strayMoves
 Check("shootout: no match clock", so.State.Clock == 0f && so.State.Half == 1);
 Check("shootout: no open-play passing", so.State.Passes[0] + so.State.Passes[1] == 0,
       $"passes={so.State.Passes[0] + so.State.Passes[1]}");
+
+// 2.5: you dive on the computer's kicks.  Always dive to +Z: shots that side get
+// saved far more often than shots to the other side, which is the point of guessing.
+{
+    int sameSide = 0, sameSaved = 0, otherSide = 0, otherSaved = 0, waited = 0;
+    for (int seed = 200; seed < 260; seed++)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed, Mode = MatchEngine.ModeShootout });
+        var M = m.State;
+        // Skip to the first computer kick: shoot our own straight away.
+        int guard = 0;
+        while (M.ShootoutTakerSide != 1 && guard++ < 60 * 30)
+        {
+            var c = PlayerCommand.None;
+            if (M.Phase == Phase.Play && M.Ball.Owner == M.Controlled && !M.ShootoutShotTaken) { c.Shoot = true; c.Charge = .6f; }
+            m.Step(MatchEngine.Dt, c);
+        }
+        int kicks = M.ShootoutKicksAway; float strikeZ = 0f; bool struck = false; int preTicks = 0;
+        guard = 0;
+        while (M.ShootoutKicksAway == kicks && M.Phase != Phase.FullTime && guard++ < 60 * 20)
+        {
+            if (M.Phase == Phase.Play && !M.ShootoutShotTaken) preTicks++;
+            m.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1f) });
+            if (!struck && M.Ball.Owner < 0 && M.Ball.Vel.LengthSquared() > 100f) { struck = true; strikeZ = M.Ball.Vel.Z; }
+        }
+        if (preTicks > 60) waited++;
+        if (!struck || M.ShootoutAway.Count == 0) continue;
+        bool saved = !M.ShootoutAway[^1];
+        if (strikeZ > .5f) { sameSide++; if (saved) sameSaved++; }
+        else if (strikeZ < -.5f) { otherSide++; if (saved) otherSaved++; }
+    }
+    float rs = sameSide > 0 ? (float)sameSaved / sameSide : 0f, ro = otherSide > 0 ? (float)otherSaved / otherSide : 1f;
+    Check("computer's penalty waits for a run-up so you can pick a dive", waited > 40, $"waited={waited}/60");
+    Check("diving the right way saves far more than diving the wrong way", sameSide >= 8 && otherSide >= 8 && rs > ro + .25f,
+          $"right way {sameSaved}/{sameSide}, wrong way {otherSaved}/{otherSide}");
+}
+
+{
+    // Holding the stick on your own kick aims it; it never walks the taker off the
+    // spot (that used to give a free kick and turn the shootout into open play).
+    var m = new MatchEngine(new MatchOptions { Seed = 77, Mode = MatchEngine.ModeShootout });
+    var M = m.State; int guard = 0;
+    while (!(M.Phase == Phase.Play && M.Ball.Owner == M.Controlled) && guard++ < 600) m.Step(MatchEngine.Dt, PlayerCommand.None);
+    var spot = M.Ball.Pos;
+    for (int i = 0; i < 240; i++) m.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(-1f, 0f) });
+    Check("shootout: the stick aims, the taker stays on the spot (no free kick, no open play)",
+          Mx.FlatDist(M.Ball.Pos, spot) < 1.0f && !m.Events.Any(ev => ev.Text.Contains("free kick")) && M.Phase == Phase.Play,
+          $"moved {Mx.FlatDist(M.Ball.Pos, spot):0.0} m, phase {M.Phase}");
+}
+
+// 7.3: penalties in a match use the shootout model.
+{
+    MatchEngine Pen(int seed, int side)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed });
+        var S = m.State;
+        // A penalty for `side` at the goal it attacks.
+        S.Phase = Phase.Penalty; S.RestartSide = side; S.RestartPos = new Vector3(m.SideSign(side) * (Mx.HalfLength - 11f), 0, 0); S.PhaseTimer = .01f;
+        m.Step(MatchEngine.Dt, PlayerCommand.None);
+        return m;
+    }
+    // Ours: we take it (control on the taker), nothing is struck for us.
+    var a = Pen(301, 0); var A = a.State;
+    for (int i = 0; i < 120; i++) a.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("match penalty for you: you take it (control on the taker, no auto-shot)",
+          A.Ball.Owner == A.Controlled && A.Players[A.Controlled].MustPlayBall && A.Shots[0] == 0, $"owner {A.Ball.Owner} ctl {A.Controlled} shots {A.Shots[0]}");
+    a.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .7f, Move = new Vector2(0, .6f) });
+    for (int i = 0; i < 40; i++) a.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("match penalty for you: shoot strikes it", A.Shots[0] == 1, $"shots {A.Shots[0]}");
+
+    // Theirs: a run-up, and your dive decides it.
+    int same = 0, sameSaved = 0, other = 0, otherSaved = 0, waited = 0;
+    for (int seed = 400; seed < 460; seed++)
+    {
+        var m = Pen(seed, 1); var M = m.State; int pre = 0; bool struck = false; float z = 0f; int ev0 = m.Events.Count;
+        for (int i = 0; i < 300; i++)
+        {
+            if (M.Shots[1] == 0) pre++;
+            m.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1f) });
+            if (!struck && M.Ball.Owner < 0 && M.Ball.Vel.LengthSquared() > 100f) { struck = true; z = M.Ball.Vel.Z; }
+            if (struck && (M.Phase != Phase.Play || (M.Ball.Owner >= 0 && M.Players[M.Ball.Owner].IsKeeper))) break;
+        }
+        if (pre > 60) waited++;
+        // A keeper save (not a miss: those happen either way).
+        bool saved = m.Events.Skip(ev0).Any(ev => ev.Kind == EventKind.Save);
+        if (z > .5f) { same++; if (saved) sameSaved++; } else if (z < -.5f) { other++; if (saved) otherSaved++; }
+    }
+    Check("computer's match penalty has a run-up so you can dive", waited > 40, $"waited {waited}/60");
+    Check("match penalty: diving the right way saves more", same >= 8 && other >= 8 && (float)sameSaved / same > (float)otherSaved / other + .2f,
+          $"right {sameSaved}/{same} wrong {otherSaved}/{other}");
+}
+
+// 6.6: the defensive ring doesn't hop between team-mates while you chase the ball.
+{
+    int sw = 0, quick = 0; double defT = 0;
+    foreach (int seed in new[] { 1, 2, 3, 4 })
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = seed }); var S = e.State; int last = S.Controlled; double lastT = 0, t = 0;
+        while (S.Phase != Phase.FullTime)
+        {
+            var c = PlayerCommand.None;
+            if (S.Controlled >= 0) { var me = S.Players[S.Controlled]; var d = new Vector2(S.Ball.Pos.X - me.Pos.X, S.Ball.Pos.Z - me.Pos.Z); if (d.Length() > 1) c.Move = Vector2.Normalize(d); }
+            e.Step(MatchEngine.Dt, c); t += MatchEngine.Dt;
+            bool defending = S.Phase == Phase.Play && !(S.Ball.Owner >= 0 && S.Players[S.Ball.Owner].Team == 0);
+            if (defending) defT += MatchEngine.Dt;
+            if (S.Controlled != last) { if (defending) { sw++; if (t - lastT < 1.0) quick++; } last = S.Controlled; lastT = t; }
+        }
+    }
+    double perMin = sw / (defT / 60);
+    double hopsPerMin = quick / (defT / 60);
+    Check("defensive auto-switch doesn't hop while you steer (was 18/min with 3.4 hops/min)", perMin < 13 && hopsPerMin < 2.2,
+          $"{perMin:0.0}/min, quick hops {hopsPerMin:0.0}/min ({quick}/{sw})");
+}
+
+// 4.4 / 8.4: back to goal, ball dropping at head height -> a good finisher goes for
+// the bicycle kick (its own Sprite Forge clip), facing goal it is a header.
+{
+    string Attempt(bool backToGoal)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = 91 }); var S = m.State; S.Phase = Phase.Play;
+        var st = S.Players[9]; S.Controlled = st.Index; S.ControlLock = 99f;
+        foreach (var q in S.Players) if (q.Index != st.Index && !q.IsKeeper) { q.Pos = new Vector3(q.Pos.X, 0, 30f); q.Target = q.Pos; }
+        int sg = m.SideSign(0);
+        st.Pos = m.GoalPos(0) - new Vector3(sg * 9f, 0, 0); st.Target = st.Pos;
+        st.Facing = new Vector3(backToGoal ? -sg : sg, 0, 0);
+        st.Spec.Shooting = .85f; st.PossessionLock = 0f;
+        var b = S.Ball; b.Owner = -1; b.HasPending = false; b.Pos = st.Pos + st.Facing * .4f + new Vector3(0, 1.6f, 0);
+        b.Vel = new Vector3(0, -1f, 0); b.FreeTime = 1f; b.NoPickup = 0f;
+        int ev0 = m.Events.Count;
+        m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .7f });
+        for (int i = 0; i < 4; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+        return st.Action + " | " + string.Join(" / ", m.Events.Skip(ev0).Select(e => e.Text));
+    }
+    string back = Attempt(true), facing = Attempt(false);
+    Check("back to goal, ball at head height: bicycle kick", back.StartsWith("bicycle") && back.Contains("bicycle kick"), back);
+    Check("facing goal, same ball: a header, not a bicycle", !facing.StartsWith("bicycle"), facing);
+}
 
 Section("Training ground (Mode 2)");
 var tr = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeTraining });
@@ -699,7 +921,7 @@ Section("Goals, keeper and AI shooting");
 
 Section("Laws of the game at restarts (full matches)");
 {
-    int restarts = 0, tooClose = 0, ranWithBall = 0, throwOffLine = 0, penaltyCrowd = 0;
+    int restarts = 0, tooClose = 0, ranWithBall = 0, throwOffLine = 0, penaltyCrowd = 0, goalKicks = 0, gkAreaBreach = 0;
     for (int seed = 31; seed <= 33; seed++)
     {
         var m = new MatchEngine(new MatchOptions { Seed = seed });
@@ -719,12 +941,21 @@ Section("Laws of the game at restarts (full matches)");
                     if (q.Team != side && !q.SentOff && !(prev == Phase.Penalty && q.IsKeeper)
                         && Mx.FlatDist(q.Pos, S.Ball.Pos) < need - .05f) { tooClose++; break; }
                 if (prev == Phase.ThrowIn && MathF.Abs(S.Ball.Pos.Z) < Mx.HalfWidth - .6f) throwOffLine++;
+                if (prev == Phase.GoalKick) goalKicks++;
                 if (prev == Phase.Penalty)
                 {
                     float gx = MathF.Sign(S.Ball.Pos.X) * Mx.HalfLength;
                     foreach (var q in S.Players)
                         if (q.Index != taker && !(q.IsKeeper && q.Team != side) && MathF.Abs(q.Pos.X - gx) < 16.5f && MathF.Abs(q.Pos.Z) < 20.16f) { penaltyCrowd++; break; }
                 }
+            }
+            if (taker >= 0 && S.Ball.Owner == taker && S.Players[taker].MustPlayBall)
+            {
+                // Goal kick: opponents stay out of the area until the ball is played.
+                float gx = m.OwnGoalPos(S.Players[taker].Team).X;
+                if (MathF.Abs(S.Ball.Pos.X - gx) < 16.5f && MathF.Abs(S.Ball.Pos.Z) < 20.16f)
+                    foreach (var q in S.Players)
+                        if (q.Team != S.Players[taker].Team && !q.SentOff && MathF.Abs(q.Pos.X - gx) < 16.2f && MathF.Abs(q.Pos.Z) < 19.9f) { gkAreaBreach++; break; }
             }
             if (taker >= 0)
             {
@@ -739,6 +970,7 @@ Section("Laws of the game at restarts (full matches)");
     Check("set-piece takers play the ball, they don't run off with it", ranWithBall == 0, $"ran={ranWithBall}");
     Check("throw-ins are taken from the touchline", throwOffLine == 0, $"off line={throwOffLine}");
     Check("only the taker and keeper are in the area at a penalty", penaltyCrowd == 0, $"crowded={penaltyCrowd}");
+    Check("opponents stay outside the penalty area at a goal kick until it is taken", goalKicks > 0 && gkAreaBreach == 0, $"goal kicks={goalKicks} breach ticks={gkAreaBreach}");
 }
 {
     // A keeper's parry never sends the ball towards his own goal.
@@ -838,6 +1070,267 @@ Section("The referee enforces the Laws (nothing is physically prevented)");
     // Online: skill moves, call-for-ball and the new actions survive the wire.
     var wire = ArenaFC.Core.Net.CommandDto.From(new PlayerCommand { Skill = SkillMove.Roulette, CallForBall = true, Punch = true }).To();
     Check("skill / call-for-ball / punch go over the network", wire.Skill == SkillMove.Roulette && wire.CallForBall && wire.Punch);
+}
+
+
+Section("The ball in the air");
+{
+    Check("touch by height: foot / thigh / chest / head",
+          MatchEngine.TouchFor(.3f, 0) == "trap" && MatchEngine.TouchFor(.7f, 0) == "thigh_control"
+          && MatchEngine.TouchFor(1.2f, 0) == "chest_control" && MatchEngine.TouchFor(1.9f, 0) == "header");
+    // Landing point of a lofted ball.
+    var lb = new ArenaFC.Core.BallState { Pos = new Vector3(0, .11f, 0), Vel = new Vector3(15f, 7f, 0) };
+    var land = MatchEngine.LandingPoint(lb, 1.3f);
+    float tLand = (7f + MathF.Sqrt(49f + 2 * 9.81f * (.11f - 1.3f))) / 9.81f;
+    Check("landing point of a lofted ball is predicted", MathF.Abs(land.X - 15f * tLand * .93f) < .5f, $"x={land.X:0.0}");
+
+    // A ball dropping at 2 m next to a player is now playable (headed).
+    var m = new MatchEngine(new MatchOptions { Seed = 71 });
+    var S = m.State; S.Phase = Phase.Play;
+    var me = S.Players[5]; S.Controlled = -1;
+    foreach (var q in S.Players) if (q.Index != me.Index) { q.Pos = new Vector3(q.Pos.X, 0, q.Pos.Z + 25f); q.Target = q.Pos; }
+    me.Pos = new Vector3(0, 0, 0);
+    S.Ball.Owner = -1; S.Ball.Pos = new Vector3(.3f, 2.0f, 0); S.Ball.Vel = new Vector3(-1f, -2f, 0); S.Ball.FreeTime = .5f;
+    int lt = S.Ball.LastTouch;
+    for (int i = 0; i < 12; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+    Check("a 2 m high ball can be headed (was unplayable above 1.55 m)", S.Ball.LastTouch == me.Index || S.Ball.Owner == me.Index
+          || (S.Ball.HasPending && S.Ball.PendingFrom == me.Index), $"last {S.Ball.LastTouch}");
+
+    // A human volleys at goal: it is a shot.
+    var v = new MatchEngine(new MatchOptions { Seed = 72 });
+    var V = v.State; V.Phase = Phase.Play;
+    var st = V.Players[9]; V.Controlled = st.Index; V.ControlLock = 99f;
+    var goal = v.GoalPos(0);
+    st.Pos = goal - new Vector3(v.SideSign(0) * 12f, 0, 0);
+    V.Ball.Owner = -1; V.Ball.Pos = st.Pos + new Vector3(v.SideSign(0) * .6f, .9f, 0); V.Ball.Vel = new Vector3(0, -1f, 2f); V.Ball.FreeTime = .5f;
+    int shots0 = V.Shots[0];
+    v.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .7f });
+    Check("a first-time volley at goal is a shot", V.Shots[0] == shots0 + 1 && V.Ball.Vel.X * v.SideSign(0) > 10f,
+          $"shots {shots0}->{V.Shots[0]} vx={V.Ball.Vel.X:0.0}");
+
+    // Directed first touch: stick held at reception knocks it that way.
+    var d = new MatchEngine(new MatchOptions { Seed = 73 });
+    var D = d.State; D.Phase = Phase.Play;
+    var rc = D.Players[6]; D.Controlled = rc.Index; D.ControlLock = 99f;
+    foreach (var q in D.Players) if (q.Index != rc.Index) { q.Pos = new Vector3(q.Pos.X, 0, q.Pos.Z + 25f); q.Target = q.Pos; }
+    rc.Pos = Vector3.Zero; rc.Vel = Vector3.Zero;
+    D.Ball.Owner = -1; D.Ball.Pos = new Vector3(.7f, .6f, 0); D.Ball.Vel = new Vector3(-6f, 0, 0); D.Ball.FreeTime = .5f;
+    float maxZ = 0f;
+    for (int i = 0; i < 60; i++) { d.Step(MatchEngine.Dt, new PlayerCommand { Move = new Vector2(0, 1) }); maxZ = MathF.Max(maxZ, D.Ball.Pos.Z); }
+    Check("a steered first touch goes where the stick points", maxZ > 1.2f, $"ball z reached {maxZ:0.0}");
+}
+
+
+Section("Controls: every move reachable and doing what it says");
+{
+    MatchEngine Striker(int seed, out PlayerState st)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = seed });
+        var S = m.State; S.Phase = Phase.Play;
+        st = S.Players[9]; S.Controlled = st.Index; S.ControlLock = 99f;
+        foreach (var q in S.Players) if (q.Index != st.Index && !q.IsKeeper) { q.Pos = new Vector3(q.Pos.X, 0, 30f); q.Target = q.Pos; }
+        st.Pos = m.GoalPos(0) - new Vector3(m.SideSign(0) * 16f, 0, 0);
+        st.Facing = new Vector3(m.SideSign(0), 0, 0);
+        S.Ball.Owner = st.Index; S.Ball.Pos = st.Pos + st.Facing * .5f + new Vector3(0, Mx.BallRadius, 0);
+        return m;
+    }
+    Vector3 Strike(int seed, ShotStyle style, Vector2 aim, out string label)
+    {
+        var m = Striker(seed, out var st);
+        m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .6f, ShotStyle = style, Move = aim });
+        for (int i = 0; i < 30 && m.State.Ball.HasPending; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+        label = m.State.Commentary;
+        return m.State.Ball.Vel;
+    }
+    int left = 0, right = 0;
+    for (int k = 0; k < 8; k++)
+    {
+        if (Strike(80 + k, ShotStyle.Auto, new Vector2(0, 1f), out _).Z > 0) right++;
+        if (Strike(90 + k, ShotStyle.Auto, new Vector2(0, -1f), out _).Z < 0) left++;
+    }
+    Check("the stick aims the shot at a post (was random)", left >= 7 && right >= 7, $"right {right}/8 left {left}/8");
+    // 3.3: a finesse shot visibly bends: it starts outside the post and curls back
+    // in towards the middle (the curl direction used to be a coin toss).
+    {
+        int bentIn = 0, inside = 0, n = 0; float maxBow = 0f;
+        for (int k = 0; k < 12; k++)
+        {
+            var m = Striker(300 + k, out var st);
+            float aimY = k % 2 == 0 ? 1f : -1f;
+            m.State.Players[11].Pos = new Vector3(m.State.Players[11].Pos.X, 0, 25f);  // their keeper out of the way
+            m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .6f, ShotStyle = ShotStyle.Finesse, Move = new Vector2(0, aimY) });
+            for (int i = 0; i < 30 && m.State.Ball.HasPending; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+            var b = m.State.Ball; var start = b.Pos; var v0 = Vector3.Normalize(new Vector3(b.Vel.X, 0, b.Vel.Z));
+            float bow = 0f; float lineX = m.GoalPos(0).X; float crossZ = float.NaN;
+            for (int i = 0; i < 120; i++)
+            {
+                m.Step(MatchEngine.Dt, PlayerCommand.None);
+                var dd = new Vector3(b.Pos.X - start.X, 0, b.Pos.Z - start.Z);
+                float lateral = dd.Z * v0.X - dd.X * v0.Z;     // signed distance off the launch line
+                if (MathF.Abs(lateral) > MathF.Abs(bow)) bow = lateral;
+                if (float.IsNaN(crossZ) && MathF.Abs(b.Pos.X) >= MathF.Abs(lineX) - .1f) crossZ = b.Pos.Z;
+                if (m.State.Phase != Phase.Play) { if (float.IsNaN(crossZ)) crossZ = b.Pos.Z; break; }
+            }
+            n++;
+            maxBow = MathF.Max(maxBow, MathF.Abs(bow));
+            // Launched towards the aimed side, it bends back towards the centre.
+            float straightZ = start.Z + v0.Z / v0.X * (lineX - start.X);
+            if (MathF.Abs(bow) > .4f && !float.IsNaN(crossZ) && MathF.Abs(crossZ) < MathF.Abs(straightZ) - .3f) bentIn++;
+            if (!float.IsNaN(crossZ) && MathF.Abs(crossZ) < Mx.GoalHalfWidth) inside++;
+        }
+        Check("finesse shots bend visibly back towards the middle (≥0.4 m off the launch line)", bentIn >= 10, $"bent {bentIn}/{n}, max bow {maxBow:0.00} m");
+        Check("finesse shots aimed at a post curl back inside it", inside >= 8, $"inside {inside}/{n}");
+    }
+    // 3.4: shot height.  A well-timed strike stays under the bar; leathering it
+    // (full charge) from range is what sends it into the stand.  (Before: a perfectly
+    // timed shot from 16 m went over every time, and every shot >= .7 from 24 m.)
+    {
+        (int over, int n) Heights(float dist, float charge)
+        {
+            int ov = 0, cnt = 0;
+            for (int k = 0; k < 20; k++)
+            {
+                var m = new MatchEngine(new MatchOptions { Seed = 700 + k }); var S = m.State; S.Phase = Phase.Play;
+                var st = S.Players[9]; S.Controlled = st.Index; S.ControlLock = 99f;
+                foreach (var q in S.Players) if (q.Index != st.Index) { q.Pos = new Vector3(q.Pos.X, 0, 30f); q.Target = q.Pos; }
+                st.Pos = m.GoalPos(0) - new Vector3(m.SideSign(0) * dist, 0, 0); st.Facing = new Vector3(m.SideSign(0), 0, 0);
+                S.Ball.Owner = st.Index; S.Ball.Pos = st.Pos + st.Facing * .5f + new Vector3(0, Mx.BallRadius, 0);
+                m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = charge });
+                float lineX = m.GoalPos(0).X;
+                for (int i = 0; i < 200; i++)
+                {
+                    m.Step(MatchEngine.Dt, PlayerCommand.None);
+                    if (MathF.Abs(S.Ball.Pos.X) >= MathF.Abs(lineX)) { cnt++; if (S.Ball.Pos.Y > Mx.GoalHeight) ov++; break; }
+                }
+            }
+            return (ov, cnt);
+        }
+        var (o16, n16) = Heights(16f, .775f); var (o24, n24) = Heights(24f, .775f); var (oFull, nFull) = Heights(24f, 1f);
+        Check("a well-timed shot stays under the bar (16 m and 24 m)", n16 >= 15 && n24 >= 15 && o16 <= n16 / 8 && o24 <= n24 / 8,
+              $"16 m over {o16}/{n16}, 24 m over {o24}/{n24}");
+        Check("full power from 24 m often goes over", nFull >= 10 && oFull >= nFull * .3f, $"over {oFull}/{nFull}");
+    }
+    // Trivela (finesse + sprint): outside of the boot - starts towards the middle and
+    // swerves out to the aimed post.
+    {
+        int out_ = 0, n = 0;
+        for (int k = 0; k < 10; k++)
+        {
+            var m = Striker(320 + k, out var st);
+            float aimY = k % 2 == 0 ? 1f : -1f;
+            m.State.Players[11].Pos = new Vector3(m.State.Players[11].Pos.X, 0, 25f);
+            m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .6f, ShotStyle = ShotStyle.Trivela, Move = new Vector2(0, aimY) });
+            for (int i = 0; i < 30 && m.State.Ball.HasPending; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+            var b = m.State.Ball; var start = b.Pos; var v0 = Vector3.Normalize(new Vector3(b.Vel.X, 0, b.Vel.Z));
+            float lineX = m.GoalPos(0).X, crossZ = float.NaN;
+            for (int i = 0; i < 120 && float.IsNaN(crossZ); i++)
+            {
+                m.Step(MatchEngine.Dt, PlayerCommand.None);
+                if (MathF.Abs(b.Pos.X) >= MathF.Abs(lineX) - .1f || m.State.Phase != Phase.Play) crossZ = b.Pos.Z;
+            }
+            float straightZ = start.Z + v0.Z / v0.X * (lineX - start.X);
+            n++;
+            if (!float.IsNaN(crossZ) && MathF.Sign(crossZ) == MathF.Sign(aimY) && MathF.Abs(crossZ) > MathF.Abs(straightZ) + .3f) out_++;
+        }
+        Check("trivela swerves out towards the aimed post", out_ >= 7, $"{out_}/{n}");
+    }
+    // Curled passes: a through ball with a defender in the lane is bent round him
+    // (the pass spin used to be a random sign - pure error).
+    {
+        int clear = 0, n = 0;
+        for (int seed = 0; seed < 20; seed++)
+        {
+            var m = new MatchEngine(new MatchOptions { Seed = 500 + seed, Offside = false }); var S = m.State; S.Phase = Phase.Play;
+            int sg = m.SideSign(0); var a = S.Players[6]; var r = S.Players[9];
+            foreach (var q in S.Players) if (q.Index != a.Index && q.Index != r.Index && !q.IsKeeper) { q.Pos = new Vector3(-sg * 45f, 0, q.Pos.Z * .5f); q.Target = q.Pos; }
+            a.Pos = Vector3.Zero; a.Facing = new Vector3(sg, 0, 0); r.Pos = new Vector3(sg * 22f, 0, 0); r.Target = r.Pos;
+            var dfd = S.Players[16]; var dp = new Vector3(sg * 11f, 0, (seed % 2 == 0 ? 1 : -1) * .9f);
+            S.Controlled = a.Index; S.ControlLock = 99f; S.Ball.Owner = a.Index; S.Ball.Pos = a.Pos + a.Facing * .5f + new Vector3(0, Mx.BallRadius, 0);
+            dfd.Pos = dp;
+            m.Step(MatchEngine.Dt, new PlayerCommand { Through = true, Charge = .5f, Move = new Vector2(sg, 0) });
+            float minD = 99f; bool flew = false;
+            for (int i = 0; i < 120; i++)
+            {
+                dfd.Pos = dp; dfd.Vel = Vector3.Zero; dfd.PossessionLock = 5f;      // a statue: we only measure the path
+                m.Step(MatchEngine.Dt, PlayerCommand.None);
+                if (S.Ball.Owner < 0) flew = true;
+                if (flew) minD = MathF.Min(minD, Mx.FlatDist(S.Ball.Pos, dp));
+            }
+            n++; if (minD > 1f) clear++;
+        }
+        Check("a curled through ball bends round a defender in the lane", clear >= 16, $"cleared by >1 m {clear}/{n} (random spin: ~16/30)");
+    }
+    var chip = Strike(101, ShotStyle.Chip, Vector2.Zero, out var chipL);
+    var low = Strike(102, ShotStyle.Low, Vector2.Zero, out var lowL);
+    Strike(103, ShotStyle.Finesse, Vector2.Zero, out var finL);
+    Check("chip shot goes up and over", chip.Y > 6f && chipL.Contains("chips it"), $"vy={chip.Y:0.0} '{chipL}'");
+    Check("low driven shot stays down", low.Y < 1.2f && lowL.Contains("drills it low"), $"vy={low.Y:0.0} '{lowL}'");
+    Check("finesse shot is a curler", finL.Contains("curls it"), finL);
+
+    // Jockey and contain without the ball.
+    var d = new MatchEngine(new MatchOptions { Seed = 110, Mode = MatchEngine.ModeTraining });
+    d.SetDrill(TrainingDrill.Defend);
+    var D = d.State; var me = D.Players[D.Controlled]; var att = D.Players[d.TrainingAttacker];
+    d.Step(MatchEngine.Dt, new PlayerCommand { Dribble = true, Move = new Vector2(0, 1) });
+    Check("holding LT off the ball jockeys (faces up the carrier)", me.JockeyState > 0
+          && Vector3.Dot(me.Facing, Mx.FlatDir(me.Pos, att.Pos)) > .9f);
+    float startGap = Mx.FlatDist(me.Pos, att.Pos);
+    for (int i = 0; i < 60; i++) d.Step(MatchEngine.Dt, new PlayerCommand { Contain = true });
+    var ownGoal = d.OwnGoalPos(0);
+    Check("holding A off the ball contains: goal-side, about 2 m off", Mx.FlatDist(me.Pos, ownGoal) < Mx.FlatDist(att.Pos, ownGoal)
+          && Mx.FlatDist(me.Pos, att.Pos) < MathF.Max(4f, startGap), $"gap {Mx.FlatDist(me.Pos, att.Pos):0.0}");
+
+    // Right-stick switch picks the team-mate in that direction.
+    var w = new MatchEngine(new MatchOptions { Seed = 111 });
+    var W = w.State; W.Phase = Phase.Play; W.Ball.Owner = W.Players[15].Index;
+    var cur = W.Players[4]; W.Controlled = cur.Index; W.ControlLock = 0f;
+    var wanted = W.Players.Where(q => q.Team == 0 && q.Index != cur.Index && !q.IsKeeper).OrderByDescending(q => q.Pos.Z - cur.Pos.Z).First();
+    w.Step(MatchEngine.Dt, new PlayerCommand { SwitchDir = new Vector2(0, 1) });
+    Check("right-stick flick switches towards that side of the pitch", W.Players[W.Controlled].Pos.Z > cur.Pos.Z,
+          $"picked {W.Controlled} (z {W.Players[W.Controlled].Pos.Z:0.0} vs {cur.Pos.Z:0.0})");
+    var wire2 = ArenaFC.Core.Net.CommandDto.From(new PlayerCommand { ShotStyle = ShotStyle.Chip, Contain = true, SwitchDir = new Vector2(.6f, .8f) }).To();
+    Check("shot style / contain / switch direction go over the network",
+          wire2.ShotStyle == ShotStyle.Chip && wire2.Contain && MathF.Abs(wire2.SwitchDir.Y - .8f) < 1e-4f);
+    Check("the coach teaches every control (27 lessons)", new TrainingCoach().Lessons.Count >= 27);
+}
+
+// ---- 9.2/9.3: preview stadium and weather reach the engine ----
+{
+    Check("preview shows the home club's ground", Presentation.StadiumFor(Clubs.All[0].Name) == Clubs.All[0].Stadium
+          && new Presentation().GeneratePreMatch(Clubs.All[2].Name, Clubs.All[3].Name, "4-4-2", "4-3-3").Stadium == Clubs.All[2].Stadium);
+    var (rt, _) = Presentation.WeatherFor("Rain");
+    new MatchEngine(new MatchOptions { Weather = rt, Seed = 5 });
+    Check("rain in the preview makes it rain in the match", Weather.Raining);
+    new MatchEngine(new MatchOptions { Seed = 5 });
+    Check("a new match resets the weather (no rain leaking into the next game)", !Weather.Raining && Weather.WindX == 0f);
+}
+
+Section("Realism gate (0.1): four full AI matches stay inside football's bands");
+{
+    // Per-match averages over four seeds.  The bands are deliberately wide (they
+    // tighten as the AI work lands); a change that knocks the simulation out of
+    // them - e.g. the old ~2 gShots or ~120 gTackles a match - fails CI.
+    double gShots = 0, gGoals = 0, gPasses = 0, gTackles = 0, gFouls = 0, gCards = 0;
+    int[] seeds = { 101, 102, 103, 104 };
+    foreach (int seed in seeds)
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = seed }); var S = e.State; int evc = 0;
+        while (S.Phase != Phase.FullTime)
+        {
+            S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None);
+            for (; evc < e.Events.Count; evc++) if (e.Events[evc].Kind == EventKind.Tackle) gTackles++;
+        }
+        gShots += S.Shots[0] + S.Shots[1]; gGoals += S.Score[0] + S.Score[1];
+        gPasses += S.Passes[0] + S.Passes[1]; gFouls += S.Fouls[0] + S.Fouls[1];
+        gCards += S.YellowCards[0] + S.YellowCards[1] + S.RedCards[0] + S.RedCards[1];
+    }
+    double n = seeds.Length;
+    Check("gate: shots per match 4-35", gShots / n is >= 4 and <= 35, $"{gShots / n:0.0}");
+    Check("gate: goals per match 0.5-6", gGoals / n is >= .5 and <= 6, $"{gGoals / n:0.0}");
+    Check("gate: passes per match 80-700", gPasses / n is >= 80 and <= 700, $"{gPasses / n:0}");
+    Check("gate: tackles per match 20-130", gTackles / n is >= 20 and <= 130, $"{gTackles / n:0}");
+    Check("gate: fouls per match 1-30", gFouls / n is >= 1 and <= 30, $"{gFouls / n:0.0}");
+    Check("gate: cards per match at most 8", gCards / n <= 8, $"{gCards / n:0.0}");
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

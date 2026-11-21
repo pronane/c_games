@@ -3,6 +3,14 @@
 
 Usage: python3 Tools/build_motion_features.py
 The output contains features/payloads only; it does not add or alter pose assets.
+
+Schema v2: every clip, not just locomotion.  Looping clips contribute every frame;
+one-shot clips contribute their entry frames (up to the ball contact, or the first
+35% when there is none), each with `time_to_contact` - the seconds of wind-up left
+before the touch - so a ball action enters its clip at the frame whose remaining
+wind-up matches the time the simulation has left (instead of always starting at
+frame 0 and fast-forwarding), and picks between variants (shot / running shot /
+volley ...) by pose, approach and timing.
 """
 from __future__ import annotations
 
@@ -23,13 +31,17 @@ LAYOUT = [
     "traj_pos_2_x", "traj_pos_2_z",
     "traj_dir_0_x", "traj_dir_0_z", "traj_dir_1_x", "traj_dir_1_z",
     "traj_dir_2_x", "traj_dir_2_z",
+    "time_to_contact",
 ]
+NO_CONTACT = 1.5
+ENTRY_WINDOW = 0.35        # one-shots without a contact: the first 35% are entry frames
 WEIGHTS = [1.0] * len(LAYOUT)
 for _i in range(4, 8): WEIGHTS[_i] = 1.3
 WEIGHTS[8:10] = [0.8, 0.8]
 WEIGHTS[10] = 0.7
 WEIGHTS[11:17] = [1.5] * 6
 WEIGHTS[17:23] = [1.2] * 6
+WEIGHTS[23] = 12.0   # z-scored over the whole table (mostly 1.5 = no contact), so it needs a big weight
 
 
 def qmul(a, b):
@@ -150,6 +162,11 @@ def features_for_clip(bones, bone_index, clip, meta):
         for horizon in TIMES:
             relative = turn_rate * horizon
             feat.extend((math.sin(relative), math.cos(relative)))
+        contact = float(meta.get("contactFraction", -1.0))
+        phase = i / count
+        duration = float(meta.get("duration", count / fps))
+        ttc = (contact - phase) * duration if 0.0 <= phase <= contact else NO_CONTACT
+        feat.append(min(max(ttc, 0.0), NO_CONTACT))
         if len(feat) != len(LAYOUT):
             raise AssertionError(f"{clip['id']}: expected {len(LAYOUT)} features, got {len(feat)}")
         rows.append(feat)
@@ -167,16 +184,25 @@ def main():
     for clip_id in sorted(pose_clips):
         source = pose_clips[clip_id]
         meta = meta_by_id.get(clip_id)
-        if not meta or meta["category"] != "Locomotion" or not source["loop"]:
+        if not meta:
             continue
+        loop = bool(source["loop"])
+        # Non-looping "locomotion" clips (stop, turn ...) are not part of the gait search.
+        if meta["category"] == "Locomotion" and not loop:
+            continue
+        contact = float(meta.get("contactFraction", -1.0))
+        dedicated = "dedicated" in meta.get("tags", [])
         for frame, feature in enumerate(features_for_clip(bones, bone_index, source, meta)):
+            phase = frame / source["frames"]
+            if not loop and phase > (contact if contact >= 0 else ENTRY_WINDOW) + 1e-6:
+                continue                     # one-shots: entry frames only
             rows.append({
                 "clipId": clip_id,
                 "frameIndex": frame,
-                "phase": frame / source["frames"],
-                "category": "Locomotion",
+                "phase": phase,
+                "category": meta["category"],
                 "ballState": meta["ballState"],
-                "styleTag": "",
+                "styleTag": "dedicated" if dedicated else "",
                 "features": [round(float(x), 6) for x in feature],
             })
     if not rows:
@@ -190,8 +216,8 @@ def main():
         sigma = math.sqrt(variance)
         std_dev.append(round(max(sigma, 1e-3), 8))
     output = {
-        "version": 1,
-        "featureSchemaVersion": 1,
+        "version": 2,
+        "featureSchemaVersion": 2,
         "dimensions": len(LAYOUT),
         "layout": LAYOUT,
         "trajectoryTimes": list(TIMES),
