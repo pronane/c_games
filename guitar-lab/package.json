@@ -17,7 +17,8 @@
     "test:reference-editor": "node tests/reference-editor-smoke.mjs",
     "test:practice": "node tests/practice-smoke.mjs",
     "test:review": "node benchmarks/holdout/review-smoke.mjs",
-    "test:play-along": "node tests/play-along-tab-smoke.mjs"
+    "test:play-along": "node tests/play-along-tab-smoke.mjs",
+    "test:riff": "node tests/riff-to-tab-smoke.mjs"
   },
   "dependencies": {
     "@coderline/alphatab": "~1.8.4",

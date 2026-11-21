@@ -2174,6 +2174,51 @@ footer span:first-child {
   padding: 4px 6px;
 }
 
+/* Your take to tab */
+.riff-setup,
+.riff-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.riff-setup input[type="number"],
+.riff-grid input[type="number"] {
+  width: 70px;
+}
+.riff-setup input:not([type]) {
+  max-width: 180px;
+}
+.riff-file {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  max-width: 100%;
+}
+.riff-file input {
+  max-width: 100%;
+}
+.riff-text pre {
+  overflow-x: auto;
+  background: #f7f9f3;
+  border: 1px solid #e3e7e1;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.riff-result .downloads {
+  margin-top: 10px;
+}
+.tempo-fixes {
+  display: inline-flex;
+  gap: 4px;
+}
+
 /* Follow along: chord now/next and the animated neck. */
 .follow-along {
   margin: 14px 0 6px;
