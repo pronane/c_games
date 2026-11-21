@@ -1039,7 +1039,7 @@ export default function SongLab({ settings, onSettings, onCompare, processing = 
             time={position}
             openStrings={profile.openStrings}
             sources={[
-              ...tabParts.map((p) => ({ id: `tab:${p.name}`, label: `Your tab: ${p.name}`, notes: p.notes })),
+              ...tabParts.filter((p) => !/vocal|voice|bass|drum|percussion/i.test(p.name)).map((p) => ({ id: `tab:${p.name}`, label: `Your tab: ${p.name}`, notes: p.notes })),
               ...(score ? [{ id: "score", label: `The app's transcription: ${score.label}`, notes: score.notes }] : []),
             ]}
             take={
