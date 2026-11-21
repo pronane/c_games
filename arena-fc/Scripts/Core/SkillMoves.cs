@@ -5,7 +5,7 @@ using System;
 namespace ArenaFC.Core;
 
 /// <summary>Explicit shot modifiers.</summary>
-public enum ShotStyle { Auto, Finesse, Chip, Low }
+public enum ShotStyle { Auto, Finesse, Chip, Low, Trivela }
 
 /// <summary>Skill move types.</summary>
 public enum SkillMove

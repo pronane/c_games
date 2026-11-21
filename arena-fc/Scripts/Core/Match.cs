@@ -1564,8 +1564,34 @@ public sealed partial class MatchEngine
             PassType.Chip => 3.2f,
             _ => .45f,
         };
-        // Curve: spin on the ball (Magnus effect in BallPhysics).
-        float curve = Rng.Signed() * (passType == PassType.Threaded ? .8f : .4f) * skill;
+        // 3.3 curled passes: the spin used to be a random sign (pure error).  A
+        // through ball or a long pass with an opponent in the lane is now bent
+        // round him: launched on the far side of the line and curled back onto
+        // the target (Magnus: accel = -spin * |v| * n, n = left of the pass line).
+        float curve = 0f;
+        if ((passType == PassType.Threaded || passType == PassType.Lofted) && skill > .45f && dist > 10f)
+        {
+            Vector3 n = new(-dir.Z, 0, dir.X);
+            PlayerState? blocker = null; float bestPerp = 1.6f, blockSide = 0f;
+            foreach (var q in State.Players)
+            {
+                if (q.Team == from.Team || q.SentOff || q.IsKeeper) continue;
+                Vector3 rel = Mx.Flat(q.Pos - b.Pos);
+                float along = Vector3.Dot(rel, dir), perp = Vector3.Dot(rel, n);
+                if (along < dist * .15f || along > dist * .85f || MathF.Abs(perp) >= bestPerp) continue;
+                bestPerp = MathF.Abs(perp); blocker = q; blockSide = perp >= 0f ? 1f : -1f;
+            }
+            if (blocker != null)
+            {
+                float launchSide = -blockSide;                        // go round the far side of him
+                float spinMag = (passType == PassType.Threaded ? 4.5f : 3.5f) + 3f * skill;
+                float t = dist / MathF.Max(6f, speed);
+                float bend = MathF.Min(.5f * .055f * spinMag * speed * t * t * .6f, dist * .3f);
+                Vector3 offsetAim = aim + n * (launchSide * bend);
+                dir = Mx.Norm(Mx.FlatDir(b.Pos, offsetAim) + (dir - Mx.FlatDir(b.Pos, aim)));
+                curve = launchSide * spinMag;
+            }
+        }
         b.HasPending = true; b.PendingKind = 1; b.PendingFrom = from.Index;
         b.PendingVel = dir * speed + new Vector3(0, loftY, 0);
         b.PendingSpin = new Vector3(0, curve, 0);
@@ -1592,7 +1618,7 @@ public sealed partial class MatchEngine
 
     /// <summary>Phase 2.4 shot type: Power (full charge), Placement (low
     /// charge, corners), Control (mid, skill-based), Volley (first-time aerial).</summary>
-    private enum ShotType { Power, Placement, Control, Volley, Finesse, Chip, Low }
+    private enum ShotType { Power, Placement, Control, Volley, Finesse, Chip, Low, Trivela }
 
     private void Shoot(PlayerState p, float charge, bool volley = false, ShotStyle style = ShotStyle.Auto, Vector2 aim = default)
     {
@@ -1614,6 +1640,7 @@ public sealed partial class MatchEngine
         // Shot type: an explicit modifier (finesse LT+X, chip LB+X, low double-tap X),
         // otherwise by power.  Finesse used to be a hidden 50-65% power window.
         ShotType shotType = style == ShotStyle.Finesse ? ShotType.Finesse
+            : style == ShotStyle.Trivela ? ShotType.Trivela
             : style == ShotStyle.Chip ? ShotType.Chip
             : style == ShotStyle.Low ? ShotType.Low
             : isVolley ? ShotType.Volley
@@ -1640,7 +1667,7 @@ public sealed partial class MatchEngine
                 weakFootPenalty = 1.4f; // 40% more error with weak foot
         }
         // Aim for the corners when skill is high (placement) or power (far post).
-        float cornerBias = shotType == ShotType.Placement || shotType == ShotType.Finesse ? .9f : .6f;
+        float cornerBias = shotType == ShotType.Placement || shotType == ShotType.Finesse || shotType == ShotType.Trivela ? .9f : .6f;
         target.Z = MathF.Sign(target.Z) * Mx.Lerp(Mx.GoalHalfWidth * .2f, Mx.GoalHalfWidth * .86f, p.Spec.Shooting * cornerBias * Rng.Next());
         // The stick aims the shot: across the goal = that post (the side used to be
         // random, so "aim with the left stick" did nothing).
@@ -1656,6 +1683,7 @@ public sealed partial class MatchEngine
         // Placement/finesse shots are more accurate; power shots less so.
         if (shotType == ShotType.Placement) err *= .6f;
         if (shotType == ShotType.Finesse) err *= .5f;
+        if (shotType == ShotType.Trivela) err *= .7f;          // harder to strike cleanly
         if (shotType == ShotType.Power) err *= 1.3f;
         err *= weakFootPenalty;
         err *= (2f - timingQuality); // poor timing = more error
@@ -1663,6 +1691,7 @@ public sealed partial class MatchEngine
         float power = Mx.Lerp(17f, 31f, charge) * Mx.Lerp(.82f, 1.12f, p.Spec.Shooting);
         if (shotType == ShotType.Placement) power *= .75f;
         if (shotType == ShotType.Finesse) power *= .8f;
+        if (shotType == ShotType.Trivela) power *= .9f;
         if (shotType == ShotType.Volley) power *= 1.05f;
         if (shotType == ShotType.Chip) power = Mx.Lerp(10f, 15f, charge) + dist * .12f;
         if (shotType == ShotType.Low) { power *= .95f; err *= .9f; }
@@ -1670,6 +1699,7 @@ public sealed partial class MatchEngine
         float loft = Mx.Lerp(.08f, .30f, charge) + (dist > 20f ? .06f : 0f);
         if (shotType == ShotType.Placement) loft *= .5f;
         if (shotType == ShotType.Finesse) loft *= .6f;
+        if (shotType == ShotType.Trivela) loft *= .7f;
         if (shotType == ShotType.Volley) loft = .35f;
         if (shotType == ShotType.Chip) loft = .62f;                // up and over the keeper
         if (shotType == ShotType.Low) loft = .015f;                // skidding along the turf
@@ -1678,13 +1708,16 @@ public sealed partial class MatchEngine
         // finesse shot starts outside the post and bends back in).
         bool onTarget = IsOnTarget(b.Pos, dir * power + new Vector3(0, power * loft, 0), GoalPos(p.Team));
         Vector3 spin;
-        if (shotType == ShotType.Finesse)
+        if (shotType == ShotType.Finesse || shotType == ShotType.Trivela)
         {
             // 3.3: inside-foot curl.  Start the ball outside the far post and let
             // the Magnus force bend it back: a = k * spin * v (BallPhysics), so
             // the bend over the flight is ~0.5 a t^2.  Spin sign makes it curve
             // towards the middle of the goal (Cross(spin, v).Z = -spin * v.X).
+            // Trivela (outside of the boot): the opposite shape - it starts on the
+            // inside, towards the middle, and swerves out to the aimed post.
             float side = target.Z >= 0f ? 1f : -1f;
+            if (shotType == ShotType.Trivela) side = -side;
             float spinMag = 3.2f + p.Spec.Shooting * 2.4f;
             float t = dist / MathF.Max(8f, power);
             float bend = MathF.Min(.5f * .055f * spinMag * power * t * t * .6f, dist * .2f);
@@ -1705,6 +1738,7 @@ public sealed partial class MatchEngine
             ShotType.Power => "smashes it",
             ShotType.Placement => "places it",
             ShotType.Finesse => "curls it",
+            ShotType.Trivela => "goes outside of the boot",
             ShotType.Chip => "chips it",
             ShotType.Low => "drills it low",
             ShotType.Control => "shoots",

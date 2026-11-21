@@ -1075,6 +1075,56 @@ Section("Controls: every move reachable and doing what it says");
         Check("finesse shots bend visibly back towards the middle (≥0.4 m off the launch line)", bentIn >= 10, $"bent {bentIn}/{n}, max bow {maxBow:0.00} m");
         Check("finesse shots aimed at a post curl back inside it", inside >= 8, $"inside {inside}/{n}");
     }
+    // Trivela (finesse + sprint): outside of the boot - starts towards the middle and
+    // swerves out to the aimed post.
+    {
+        int out_ = 0, n = 0;
+        for (int k = 0; k < 10; k++)
+        {
+            var m = Striker(320 + k, out var st);
+            float aimY = k % 2 == 0 ? 1f : -1f;
+            m.State.Players[11].Pos = new Vector3(m.State.Players[11].Pos.X, 0, 25f);
+            m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .6f, ShotStyle = ShotStyle.Trivela, Move = new Vector2(0, aimY) });
+            for (int i = 0; i < 30 && m.State.Ball.HasPending; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+            var b = m.State.Ball; var start = b.Pos; var v0 = Vector3.Normalize(new Vector3(b.Vel.X, 0, b.Vel.Z));
+            float lineX = m.GoalPos(0).X, crossZ = float.NaN;
+            for (int i = 0; i < 120 && float.IsNaN(crossZ); i++)
+            {
+                m.Step(MatchEngine.Dt, PlayerCommand.None);
+                if (MathF.Abs(b.Pos.X) >= MathF.Abs(lineX) - .1f || m.State.Phase != Phase.Play) crossZ = b.Pos.Z;
+            }
+            float straightZ = start.Z + v0.Z / v0.X * (lineX - start.X);
+            n++;
+            if (!float.IsNaN(crossZ) && MathF.Sign(crossZ) == MathF.Sign(aimY) && MathF.Abs(crossZ) > MathF.Abs(straightZ) + .3f) out_++;
+        }
+        Check("trivela swerves out towards the aimed post", out_ >= 7, $"{out_}/{n}");
+    }
+    // Curled passes: a through ball with a defender in the lane is bent round him
+    // (the pass spin used to be a random sign - pure error).
+    {
+        int clear = 0, n = 0;
+        for (int seed = 0; seed < 20; seed++)
+        {
+            var m = new MatchEngine(new MatchOptions { Seed = 500 + seed, Offside = false }); var S = m.State; S.Phase = Phase.Play;
+            int sg = m.SideSign(0); var a = S.Players[6]; var r = S.Players[9];
+            foreach (var q in S.Players) if (q.Index != a.Index && q.Index != r.Index && !q.IsKeeper) { q.Pos = new Vector3(-sg * 45f, 0, q.Pos.Z * .5f); q.Target = q.Pos; }
+            a.Pos = Vector3.Zero; a.Facing = new Vector3(sg, 0, 0); r.Pos = new Vector3(sg * 22f, 0, 0); r.Target = r.Pos;
+            var dfd = S.Players[16]; var dp = new Vector3(sg * 11f, 0, (seed % 2 == 0 ? 1 : -1) * .9f);
+            S.Controlled = a.Index; S.ControlLock = 99f; S.Ball.Owner = a.Index; S.Ball.Pos = a.Pos + a.Facing * .5f + new Vector3(0, Mx.BallRadius, 0);
+            dfd.Pos = dp;
+            m.Step(MatchEngine.Dt, new PlayerCommand { Through = true, Charge = .5f, Move = new Vector2(sg, 0) });
+            float minD = 99f; bool flew = false;
+            for (int i = 0; i < 120; i++)
+            {
+                dfd.Pos = dp; dfd.Vel = Vector3.Zero; dfd.PossessionLock = 5f;      // a statue: we only measure the path
+                m.Step(MatchEngine.Dt, PlayerCommand.None);
+                if (S.Ball.Owner < 0) flew = true;
+                if (flew) minD = MathF.Min(minD, Mx.FlatDist(S.Ball.Pos, dp));
+            }
+            n++; if (minD > 1f) clear++;
+        }
+        Check("a curled through ball bends round a defender in the lane", clear >= 16, $"cleared by >1 m {clear}/{n} (random spin: ~16/30)");
+    }
     var chip = Strike(101, ShotStyle.Chip, Vector2.Zero, out var chipL);
     var low = Strike(102, ShotStyle.Low, Vector2.Zero, out var lowL);
     Strike(103, ShotStyle.Finesse, Vector2.Zero, out var finL);
