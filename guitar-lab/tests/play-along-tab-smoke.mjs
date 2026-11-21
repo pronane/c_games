@@ -38,6 +38,24 @@ const shots = process.env.SCREENSHOT_DIR;
   await lab.locator(".tab-parts .tab-check, .tab-parts table, .tab-parts .parts").first().waitFor({ timeout: 600000 });
   console.log("Tab lined up:", (await lab.locator(".tab-parts").innerText()).replace(/\s+/g, " ").slice(400, 900));
 
+  // Follow along: the chord now and next, and the tab's notes on the neck as the song moves.
+  const follow = lab.getByRole("region", { name: "Follow along" });
+  await follow.waitFor();
+  const sourcesOffered = await follow.locator("#board-source option").allInnerTexts().catch(() => []);
+  console.log("Neck shows:", sourcesOffered.join(" | ") || "(one source)");
+  let lit = 0;
+  const seek = lab.getByLabel("Song position");
+  const max = Number(await seek.getAttribute("max"));
+  for (const f of [0.2, 0.3, 0.4, 0.5, 0.6]) {
+    await seek.fill(String(Math.round(max * f)));
+    await page.waitForTimeout(150);
+    lit = Math.max(lit, await follow.locator(".fretboard .note").count());
+  }
+  const chordNames = await follow.locator(".chord-pair .chord-diagram b").allInnerTexts();
+  console.log("Notes on the neck (most at once):", lit, "Chords now/next:", chordNames.join(" → "));
+  if (!lit) throw Error("No notes lit on the fretboard.");
+  if (shots) await follow.screenshot({ path: `${shots}/follow-along.png` });
+
   // Your sound: crunch with reverb, heard live.
   await lab.locator("#your-drive").selectOption("crunch");
   await lab.locator("#your-reverb").check();
@@ -73,6 +91,10 @@ const shots = process.env.SCREENSHOT_DIR;
   console.log("Scored against:", cards.join(" | "));
   if (!cards[0]?.toLowerCase().startsWith("your tab:")) throw Error("The tab is not the first score.");
   if (shots) await lab.locator(".take-card").screenshot({ path: `${shots}/marked-against-tab.png` });
+
+  // Your take over the tab on the neck.
+  if (!(await lab.locator("#board-take").count())) throw Error("No take overlay offered on the neck.");
+  console.log("Take overlay offered:", await lab.locator("#board-take + span").innerText());
 
   // Practise the weak bars.
   const loopButton = lab.getByRole("button", { name: "Loop the weakest bars, slower" });
