@@ -41,7 +41,7 @@ WEIGHTS[8:10] = [0.8, 0.8]
 WEIGHTS[10] = 0.7
 WEIGHTS[11:17] = [1.5] * 6
 WEIGHTS[17:23] = [1.2] * 6
-WEIGHTS[23] = 4.0
+WEIGHTS[23] = 12.0   # z-scored over the whole table (mostly 1.5 = no contact), so it needs a big weight
 
 
 def qmul(a, b):

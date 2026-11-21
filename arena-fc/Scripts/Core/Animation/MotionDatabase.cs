@@ -218,12 +218,18 @@ public sealed class MotionDatabase
     private bool TrySearchAction(MotionQuery query, out MotionMatch match)
     {
         match = default;
+        // Ball context hard-filters when the category has rows for it (a volley is
+        // struck from the air, a shot off the floor); otherwise any row may serve.
+        bool exactBall = false;
+        foreach (var row in _rows)
+            if (row.Category == query.Category && row.StyleTag != "dedicated" && row.Ball == query.Ball) { exactBall = true; break; }
         float bestCost = float.PositiveInfinity; int bestIndex = -1;
         for (int i = 0; i < _rows.Length; i++)
         {
             var row = _rows[i];
             if (row.Category != query.Category || row.StyleTag == "dedicated") continue;
-            float cost = Cost(query.Features, row);
+            if (exactBall && row.Ball != query.Ball) continue;
+            float cost = Cost(query.Features, row, ActionEntryScale);
             if (cost < bestCost) { bestCost = cost; bestIndex = i; }
         }
         if (bestIndex < 0) return false;
@@ -239,7 +245,7 @@ public sealed class MotionDatabase
         {
             var row = _rows[i];
             if (!string.Equals(row.ClipId, query.ForcedClipId, StringComparison.Ordinal)) continue;
-            float cost = Cost(query.Features, row);
+            float cost = Cost(query.Features, row, ActionEntryScale);
             if (cost < bestCost) { bestCost = cost; bestIndex = i; }
         }
         if (bestIndex < 0) return false;
@@ -247,15 +253,27 @@ public sealed class MotionDatabase
         return true;
     }
 
-    private float Cost(ReadOnlySpan<float> q, MotionFeatureRow row)
+    private float Cost(ReadOnlySpan<float> q, MotionFeatureRow row, float[]? scale = null)
     {
         float cost = 0f;
         for (int d = 0; d < MotionFeatureLayout.Dimensions; d++)
         {
             float delta = (q[d] - row.FeatureSpan[d]) / _stdDev[d];
-            cost += delta * delta * _weights[d];
+            cost += delta * delta * _weights[d] * (scale != null ? scale[d] : 1f);
         }
         return cost;
+    }
+
+    /// <summary>Entering an action (shot, pass, tackle ...): the action itself sets where
+    /// the body goes next, so the gait's velocities and planned path count for little;
+    /// what matters is the wind-up time left and which foot is where.</summary>
+    private static readonly float[] ActionEntryScale = CreateActionEntryScale();
+    private static float[] CreateActionEntryScale()
+    {
+        var s = new float[MotionFeatureLayout.Dimensions];
+        for (int d = 0; d < s.Length; d++) s[d] = d < 4 ? 1f : d < 8 ? .3f : .15f;
+        s[MotionFeatureLayout.TimeToContact] = 5f;
+        return s;
     }
 
     private static bool EligibleBall(MotionFeatureRow row, MotionQuery query,

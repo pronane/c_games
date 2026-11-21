@@ -437,7 +437,7 @@ var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_m
 var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
-      manifestEngine.ClipCount == 86 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      manifestEngine.ClipCount == 105 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
@@ -445,14 +445,16 @@ Check("shared Sprite Forge clip manifest loads all 18-bone clips",
 // stances filed there at speed 0 made standing players hold arms-up poses.
 string[] gait = { "soccer_backpedal", "soccer_dribble", "soccer_jockey", "soccer_jog", "soccer_run",
     "soccer_run_ball", "soccer_sidestep", "soccer_sprint", "soccer_strafe_l", "soccer_strafe_r", "soccer_walk" };
+// (Motion-captured gait cycles - CMU runs and jogs, tagged "mocap" - are gaits too.)
+bool IsGait(string id) => gait.Contains(id) || (id.StartsWith("soccer_mocap_run") || id.StartsWith("soccer_mocap_jog"));
 var locoIds = manifestClips.Where(c => c.Category == ClipCategory.Locomotion).Select(c => c.Id).OrderBy(x => x).ToArray();
-Check("clip manifest: Locomotion holds only gait cycles", locoIds.SequenceEqual(gait),
-      string.Join(",", locoIds.Except(gait)));
+Check("clip manifest: Locomotion holds only gait cycles", locoIds.All(IsGait) && gait.All(g => locoIds.Contains(g)),
+      string.Join(",", locoIds.Where(x => !IsGait(x))));
 var standing = manifestEngine.SelectClip(PlayerIntent.Move, ArenaFC.Core.Animation.BallState.None, 0f, 0f);
 Check("a standing player plays an idle clip, not an action clip",
       standing != null && standing.Category == ClipCategory.Idle, standing?.Id ?? "null");
 var jogging = manifestEngine.SelectClip(PlayerIntent.Move, ArenaFC.Core.Animation.BallState.None, 3.2f, 0f);
-Check("a moving player still plays a gait clip", jogging != null && gait.Contains(jogging.Id), jogging?.Id ?? "null");
+Check("a moving player still plays a gait clip", jogging != null && IsGait(jogging.Id), jogging?.Id ?? "null");
 var walkMeta = new ClipMeta { Id = "walk", Category = ClipCategory.Locomotion, Duration = .8f,
     PreferredSpeed = 2f, BallState = ArenaFC.Core.Animation.BallState.None, Loop = true, BoneCount = 18,
     FootPlantFrames = new[] { .1f, .6f } };
@@ -622,6 +624,20 @@ Check("event-driven one-shots never enter motion database search",
           && mm.TryGetClip(slow, out var sm) && mm.TryGetClip(fast, out var fm) && sm.PreferredSpeed < fm.PreferredSpeed,
           $"{slow} vs {fast}");
     Check("matching is deterministic", Gait(8f) == fast && Shot(.1f).RenderPhase == late.RenderPhase);
+    // Real motion capture (CMU) sits in the same table: some shot contexts pick a
+    // captured kick over the hand-keyed ones.
+    bool mocapKick = false;
+    foreach (float v in new[] { 0f, 1.5f, 3f })
+        foreach (float t in new[] { .1f, .3f, .5f })
+        {
+            var st = new MotionState();
+            var lv = new System.Numerics.Vector2(0, v);
+            for (int i = 0; i < 20; i++)
+                mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.None, PlayerIntent.Move, 1f / 60f, localVelocity: lv, desiredLocalVelocity: lv);
+            mm.Update(st, v, 0f, ArenaFC.Core.Animation.BallState.Possessed, PlayerIntent.Shoot, 1f / 60f, t, localVelocity: lv, desiredLocalVelocity: lv);
+            if (st.RenderClipId.StartsWith("soccer_mocap_kick")) mocapKick = true;
+        }
+    Check("motion-captured kicks are live candidates for shots", mocapKick);
 }
 var dribbleA = new DribbleState { TouchTimer = 0f };
 var dribbleB = new DribbleState { TouchTimer = 0f };

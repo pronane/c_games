@@ -1387,6 +1387,387 @@
     "hit_start": 11,
     "hit_end": 14
    }
+  },
+  {
+   "name": "soccer_mocap_kick_a",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:mocap_kick_a",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     11,
+     17,
+     30
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_kick_b",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:mocap_kick_b",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     4,
+     10,
+     20,
+     27,
+     29
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_kick_c",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:mocap_kick_c",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     3,
+     13,
+     20,
+     27,
+     33
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_kick_d",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:mocap_kick_d",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     4,
+     14,
+     19,
+     26,
+     33
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_kick_e",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:mocap_kick_e",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     3,
+     11,
+     19,
+     26
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_kick_f",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:mocap_kick_f",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     3,
+     13,
+     17,
+     30
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_run_a",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_run_a",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     13
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_run_b",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_run_b",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_run_c",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_run_c",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_run_d",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_run_d",
+   "frames": 18,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     9
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_jog_a",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_jog_a",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_jog_b",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_jog_b",
+   "frames": 24,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     11,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_jog_c",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:mocap_jog_c",
+   "frames": 24,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     19
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_cut_left",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "mocap:mocap_cut_left",
+   "frames": 39,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     13,
+     19,
+     23,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_cut_right",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "mocap:mocap_cut_right",
+   "frames": 52,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     4,
+     14,
+     21,
+     27,
+     34,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_cut_left_fast",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "mocap:mocap_cut_left_fast",
+   "frames": 44,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     6,
+     11,
+     14,
+     17,
+     20,
+     30,
+     38
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_cut_right_fast",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "mocap:mocap_cut_right_fast",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     4,
+     5,
+     11,
+     19,
+     26
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_stop_a",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "mocap:mocap_stop_a",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     7,
+     13,
+     20,
+     20,
+     22,
+     27
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_mocap_stop_b",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "mocap:mocap_stop_b",
+   "frames": 66,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     11,
+     16,
+     21,
+     28,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   }
  ],
  "action_aliases": {
@@ -1504,6 +1885,6 @@
    0.2116
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 8.1
+  "seconds": 9.2
  }
 }
