@@ -1146,6 +1146,247 @@
     "hit_start": -1,
     "hit_end": -1
    }
+  },
+  {
+   "name": "soccer_skill_step_over",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_stepover",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     10,
+     20
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_roulette",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_roulette",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 5,
+    "ball_contact_frac": 0.2,
+    "footsteps": [
+     10,
+     20
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_drag_back",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_drag_back",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 7,
+    "ball_contact_frac": 0.3,
+    "footsteps": [
+     14
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_elastico",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_elastico",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 7,
+    "ball_contact_frac": 0.3,
+    "footsteps": [
+     18
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_ball_roll",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_ball_roll",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 8,
+    "ball_contact_frac": 0.35,
+    "footsteps": [
+     17
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_rainbow",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_rainbow_flick",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 10,
+    "ball_contact_frac": 0.42,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_fake_shot",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_fake_shot",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_skill_heel_to_heel",
+   "loop": false,
+   "category": "Skill",
+   "source": "fs_heel_to_heel",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 8,
+    "ball_contact_frac": 0.35,
+    "footsteps": [
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_thigh_control",
+   "loop": false,
+   "category": "Ball",
+   "source": "fs_thigh_control",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 10,
+    "ball_contact_frac": 0.4,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_chip_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "fs_chip_shot",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_trivela",
+   "loop": false,
+   "category": "Ball",
+   "source": "fs_trivela",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_bicycle_kick",
+   "loop": false,
+   "category": "Ball",
+   "source": "fs_bicycle_kick",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.5,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_keeper_penalty_set",
+   "loop": true,
+   "category": "Goalkeeper",
+   "source": "fs_keeper_penalty_set",
+   "frames": 31,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_punch",
+   "loop": false,
+   "category": "Contact",
+   "source": "fs_punch",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 10,
+    "hit_end": 13
+   }
+  },
+  {
+   "name": "soccer_headbutt",
+   "loop": false,
+   "category": "Contact",
+   "source": "fs_headbutt",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": 11,
+    "hit_end": 14
+   }
   }
  ],
  "action_aliases": {
@@ -1230,7 +1471,23 @@
   "hand_pass": "soccer_hand_pass",
   "solo": "soccer_solo",
   "fist_pass": "soccer_fist_pass",
-  "fist_shoot": "soccer_fist_shoot"
+  "fist_shoot": "soccer_fist_shoot",
+  "skill_step_over": "soccer_skill_step_over",
+  "skill_roulette": "soccer_skill_roulette",
+  "skill_drag_back": "soccer_skill_drag_back",
+  "skill_elastico": "soccer_skill_elastico",
+  "skill_ball_roll": "soccer_skill_ball_roll",
+  "skill_rainbow": "soccer_skill_rainbow",
+  "skill_fake_shot": "soccer_skill_fake_shot",
+  "skill_heel_to_heel": "soccer_skill_heel_to_heel",
+  "thigh_control": "soccer_thigh_control",
+  "chip_shot": "soccer_chip_shot",
+  "trivela": "soccer_trivela",
+  "bicycle": "soccer_bicycle_kick",
+  "bicycle_kick": "soccer_bicycle_kick",
+  "keeper_penalty_set": "soccer_keeper_penalty_set",
+  "punch": "soccer_punch",
+  "headbutt": "soccer_headbutt"
  },
  "stats": {
   "tris": 16000,
@@ -1247,6 +1504,6 @@
    0.2116
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 6.3
+  "seconds": 8.1
  }
 }

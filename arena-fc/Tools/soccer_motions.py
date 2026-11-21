@@ -347,6 +347,23 @@ CLIP_SPECS = [
     ("soccer_solo", "bounce_solo", True, "Ball", "solo / bounce"),
     ("soccer_fist_pass", "fist_pass", False, "Ball", "fist pass"),
     ("soccer_fist_shoot", "fist_shoot", False, "Ball", "fist shot"),
+    # Sprite Forge v11.21 field-sport pack (sforge/fieldsport_motions.py): clips the
+    # engine already asked for but played generic stand-ins for.
+    ("soccer_skill_step_over", "fs_stepover", False, "Skill", "step-over"),
+    ("soccer_skill_roulette", "fs_roulette", False, "Skill", "roulette / Marseille turn"),
+    ("soccer_skill_drag_back", "fs_drag_back", False, "Skill", "drag back"),
+    ("soccer_skill_elastico", "fs_elastico", False, "Skill", "elastico"),
+    ("soccer_skill_ball_roll", "fs_ball_roll", False, "Skill", "ball roll"),
+    ("soccer_skill_rainbow", "fs_rainbow_flick", False, "Skill", "rainbow flick"),
+    ("soccer_skill_fake_shot", "fs_fake_shot", False, "Skill", "fake shot"),
+    ("soccer_skill_heel_to_heel", "fs_heel_to_heel", False, "Skill", "heel to heel"),
+    ("soccer_thigh_control", "fs_thigh_control", False, "Ball", "thigh control"),
+    ("soccer_chip_shot", "fs_chip_shot", False, "Ball", "chip shot"),
+    ("soccer_trivela", "fs_trivela", False, "Ball", "outside-of-the-boot strike"),
+    ("soccer_bicycle_kick", "fs_bicycle_kick", False, "Ball", "bicycle kick"),
+    ("soccer_keeper_penalty_set", "fs_keeper_penalty_set", True, "Goalkeeper", "keeper set for a penalty"),
+    ("soccer_punch", "fs_punch", False, "Contact", "punch (violent conduct)"),
+    ("soccer_headbutt", "fs_headbutt", False, "Contact", "headbutt (violent conduct)"),
 ]
 
 # Match-engine / control actions -> clip name.  Keys cover the C# PlayerState
@@ -437,6 +454,22 @@ ACTION_ALIASES = {
     "solo": "soccer_solo",
     "fist_pass": "soccer_fist_pass",
     "fist_shoot": "soccer_fist_shoot",
+    "skill_step_over": "soccer_skill_step_over",
+    "skill_roulette": "soccer_skill_roulette",
+    "skill_drag_back": "soccer_skill_drag_back",
+    "skill_elastico": "soccer_skill_elastico",
+    "skill_ball_roll": "soccer_skill_ball_roll",
+    "skill_rainbow": "soccer_skill_rainbow",
+    "skill_fake_shot": "soccer_skill_fake_shot",
+    "skill_heel_to_heel": "soccer_skill_heel_to_heel",
+    "thigh_control": "soccer_thigh_control",
+    "chip_shot": "soccer_chip_shot",
+    "trivela": "soccer_trivela",
+    "bicycle": "soccer_bicycle_kick",
+    "bicycle_kick": "soccer_bicycle_kick",
+    "keeper_penalty_set": "soccer_keeper_penalty_set",
+    "punch": "soccer_punch",
+    "headbutt": "soccer_headbutt",
 }
 
 ALL_CLIPS = [c[0] for c in CLIP_SPECS]
@@ -532,6 +565,11 @@ CLIP_EVENTS = {
     "soccer_fist_pass": _ev(ball_contact=0.50),
     "soccer_fist_shoot": _ev(ball_contact=0.50),
 }
+# Field-sport pack clips carry their own events in Sprite Forge.
+from sforge import fieldsport_motions as _fs  # noqa: E402
+for _name, _base, *_ in CLIP_SPECS:
+    if _base in _fs.EVENTS:
+        CLIP_EVENTS[_name] = dict(_fs.EVENTS[_base])
 # Every clip must have an event entry (default: no events).
 for _n in ALL_CLIPS:
     CLIP_EVENTS.setdefault(_n, _ev())
