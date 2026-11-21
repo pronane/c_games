@@ -385,7 +385,9 @@ public sealed class InputHub
         else if (!shoot && _charge > 0f)
         {
             cmd.Shoot = true; cmd.Charge = MathF.Max(.22f, _charge); _charge = 0f;
-            cmd.ShotStyle = _lowShotArmed ? ShotStyle.Low : chipMod ? ShotStyle.Chip : finesseMod ? ShotStyle.Finesse : ShotStyle.Auto;
+            // Finesse modifier + sprint = trivela (outside of the boot).
+            cmd.ShotStyle = _lowShotArmed ? ShotStyle.Low : chipMod ? ShotStyle.Chip
+                : finesseMod && cmd.Sprint ? ShotStyle.Trivela : finesseMod ? ShotStyle.Finesse : ShotStyle.Auto;
             _lowShotArmed = false;
         }
         _pShoot = shoot;
