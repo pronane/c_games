@@ -46,7 +46,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do
 - ✅ 2.1 Penalty shootout restarted into open play after kick 1 → proper shootout (only taker + keeper move, no clock, best-of-5 + sudden death, early finish, kick tally on screen).
 - ✅ 2.2 Training was a normal match with fouls off → Training ground with drills (Attack / Defend) and a coach that teaches every move with pad + keyboard prompts and auto-detects completion.
 - ✅ 2.3 Starting Training / Practice Arena switched fouls + offside off for every later match.
-- 🔧 2.4 Practice Arena now opens the training ground on free practice (PR #3). Skill Games is still a plain match.
+- ✅ 2.4 (#208) Skill Games are real scored challenges, not a plain match: Shooting, Passing, Dribbling, Crossing (60 s each) and Free Kicks (six over a wall), run by the match engine on the training ground; picker with best scores, HUD timer/points, result screen with new-best, bests saved. `--skill <game>` boots straight in for QA.
 - ✅ 2.5 (PR #12) You control your keeper (dive left/right/stay) on the computer's penalties. The computer now takes a ~1.5 s run-up; the stick held at the strike picks the dive (centre = stay big). Also fixed: the keeper was walked round the 10-yard circle (off-centre) and rushed the penalty taker; and in a shootout the human taker could walk off the spot, which gave a free kick and turned the shootout into open play.
 
 ## 3. Ball physics & goal detection

@@ -97,6 +97,19 @@ public sealed class SaveGame
     public List<string> Achievements = new();
     /// <summary>Saved replay clips: description plus the trimmed frame range.</summary>
     public List<string> ReplayClips = new();
+    /// <summary>Best score per skill game (key: SkillGame name).</summary>
+    public Dictionary<string, int> SkillBest = new();
+
+    /// <summary>Record a skill-game score; true when it is a new best.</summary>
+    public bool RecordSkill(SkillGame game, int score)
+    {
+        string k = game.ToString();
+        bool best = !SkillBest.TryGetValue(k, out int old) || score > old;
+        if (best) SkillBest[k] = score;
+        return best;
+    }
+
+    public int BestSkill(SkillGame game) => SkillBest.TryGetValue(game.ToString(), out int v) ? v : 0;
 
     public static readonly JsonSerializerOptions Json = new()
     {

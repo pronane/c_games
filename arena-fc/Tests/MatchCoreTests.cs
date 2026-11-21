@@ -1391,6 +1391,52 @@ Section("Keeper lets a wide shot go");
           $"touched={touched} phase={S.Phase}");
 }
 
+Section("Skill games (2.4): five scored challenges, not a plain match");
+{
+    foreach (SkillGame g in Enum.GetValues<SkillGame>())
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeSkill, SkillGame = g, Fouls = false, Offside = false });
+        var S = e.State; int t = 0;
+        while (S.Phase != Phase.FullTime && t < 60 * 90)
+        {
+            t++;
+            var c = PlayerCommand.None; var me = S.Players[S.Controlled]; var goal = e.GoalPos(0);
+            if (S.Ball.Owner == S.Controlled)
+            {
+                Vector3 d;
+                switch (g)
+                {
+                    case SkillGame.Shooting: case SkillGame.FreeKicks:
+                        d = Vector3.Normalize(new Vector3(goal.X, 0, me.Pos.Z > 0 ? -2.8f : 2.8f) - me.Pos);
+                        c.Move = new Vector2(d.X, d.Z); if (t % 40 == 0) { c.Shoot = true; c.Charge = .65f; } break;
+                    case SkillGame.Passing:
+                        if (e.SkillTarget >= 0 && t % 30 == 0) { d = Vector3.Normalize(S.Players[e.SkillTarget].Pos - me.Pos); c.Move = new Vector2(d.X, d.Z); c.Pass = true; } break;
+                    case SkillGame.Dribbling:
+                        Vector3 tgt = e.SkillSlalom.Count > 0
+                            ? S.Players[e.SkillSlalom[0]].Pos + new Vector3(e.SideSign(0) * 1.5f, 0, -MathF.Sign(S.Players[e.SkillSlalom[0]].Pos.Z) * 1.6f) : goal;
+                        d = Vector3.Normalize(tgt - me.Pos); c.Move = new Vector2(d.X, d.Z);
+                        if (e.SkillSlalom.Count == 0 && Mx.FlatDist(me.Pos, goal) < 16 && t % 20 == 0) { c.Shoot = true; c.Charge = .5f; } break;
+                    default:
+                        if (MathF.Abs(goal.X - me.Pos.X) > 12) { c.Move = new Vector2(MathF.Sign(goal.X), 0); c.Sprint = true; } else if (t % 20 == 0) c.Lob = true; break;
+                }
+            }
+            e.Step(MatchEngine.Dt, c);
+        }
+        Check($"skill game {g}: ends on its own (60 s or six kicks)", S.Phase == Phase.FullTime, $"t={t / 60f:0}s");
+        Check($"skill game {g}: no match clock, no opposition team in play", S.Clock == 0f
+              && S.Players.Count(q => q.Team == 1 && !q.IsKeeper && e.IsActive(q)) <= 2);
+        if (g is SkillGame.Shooting or SkillGame.Passing or SkillGame.Dribbling)
+            Check($"skill game {g}: a scripted player scores points", e.SkillScore > 0, $"{e.SkillScore} pts");
+        if (g == SkillGame.FreeKicks)
+            Check("skill game FreeKicks: six attempts over a four-man wall", e.SkillAttempts == 6, $"{e.SkillAttempts}");
+        Check($"skill game {g}: score is the full-time score", S.Score[0] == e.SkillScore);
+    }
+    var sv = new SaveGame();
+    bool b1 = sv.RecordSkill(SkillGame.Shooting, 7), b2 = sv.RecordSkill(SkillGame.Shooting, 5), b3 = sv.RecordSkill(SkillGame.Shooting, 9);
+    var round = SaveGame.FromJson(sv.ToJson());
+    Check("skill best scores save, only rise, and survive a save/load", b1 && !b2 && b3 && round.BestSkill(SkillGame.Shooting) == 9);
+}
+
 Section("Realism gate (0.1): four full AI matches stay inside football's bands");
 {
     // Per-match averages over four seeds.  The bands are deliberately wide (they
