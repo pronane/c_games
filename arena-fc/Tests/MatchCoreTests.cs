@@ -956,5 +956,16 @@ Section("Controls: every move reachable and doing what it says");
     Check("the coach teaches every control (27 lessons)", new TrainingCoach().Lessons.Count >= 27);
 }
 
+// ---- 9.2/9.3: preview stadium and weather reach the engine ----
+{
+    Check("preview shows the home club's ground", Presentation.StadiumFor(Clubs.All[0].Name) == Clubs.All[0].Stadium
+          && new Presentation().GeneratePreMatch(Clubs.All[2].Name, Clubs.All[3].Name, "4-4-2", "4-3-3").Stadium == Clubs.All[2].Stadium);
+    var (rt, _) = Presentation.WeatherFor("Rain");
+    new MatchEngine(new MatchOptions { Weather = rt, Seed = 5 });
+    Check("rain in the preview makes it rain in the match", Weather.Raining);
+    new MatchEngine(new MatchOptions { Seed = 5 });
+    Check("a new match resets the weather (no rain leaking into the next game)", !Weather.Raining && Weather.WindX == 0f);
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

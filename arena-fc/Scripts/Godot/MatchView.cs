@@ -147,7 +147,9 @@ public partial class MatchView : Node3D
 
         // The home club's own ground: World3D used to be built with the default
         // index, so every fixture in the game was played at "Lions Den".
-        var stadium = new Stadium();
+        // Named so the per-frame weather/crowd hooks find it (they looked for a
+        // sibling "../Stadium", so rain never showed and the crowd never celebrated).
+        var stadium = new Stadium { Name = "Stadium" };
         _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
         // Empty grounds still get the stadium, just not the crowd.
         stadium.Build(_crowd.GetCrowdCount() > 0, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
@@ -346,7 +348,7 @@ public partial class MatchView : Node3D
         _lastGoals = goals;
         _crowd.Update(dt);
         RecordBlendClips();
-        var stadium = GetNodeOrNull<Stadium>("../Stadium");
+        var stadium = GetNodeOrNull<Stadium>("Stadium");
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
@@ -475,7 +477,7 @@ public partial class MatchView : Node3D
             Replay.RecordEvent(evt, Engine.CurrentTick);
             if (evt.Kind == EventKind.Goal)
             {
-                var stadium = GetNodeOrNull<Stadium>("../Stadium");
+                var stadium = GetNodeOrNull<Stadium>("Stadium");
                 stadium?.CelebrateCrowd(5f);
                 // Update commentary context with score.
                 _commentaryCtx.HomeScore = Engine.State.Score[0];

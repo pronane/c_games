@@ -94,7 +94,9 @@ public partial class Boot : Node3D
             var view = new MatchView();
             // --size N (5/7/11) and --seed N for QA runs; defaults unchanged.
             int size = ArgInt("--size", 5); if (size != 7 && size != 11) size = 5;
-            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f }, null, () => GetTree().Quit());
+            // --weather rain|windy|snow|fog for QA of the weather visuals/physics.
+            var (wx, wind) = Presentation.WeatherFor(System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Value("--weather") ?? "clear"));
+            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f, Weather = wx, WindSpeed = wind }, null, () => GetTree().Quit());
             AddChild(view);
         }
         else if (Has("--editor"))

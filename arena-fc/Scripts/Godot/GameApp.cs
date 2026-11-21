@@ -152,7 +152,8 @@ public partial class GameApp : Node3D
         Place(title, 0, 0, 60, 60, 460, 90);
         root.AddChild(title);
         var sub = Ui.Lbl("3D FOOTBALL  ·  RIGGED CHARACTER STUDIO  ·  BUILD FOR ANY DEVICE", 16, Ui.Sub);
-        Place(sub, 0, 0, 66, 146, 520, 28);
+        Place(sub, 0, 0, 66, 146, 900, 28);
+        sub.AutowrapMode = TextServer.AutowrapMode.Off;
         root.AddChild(sub);
 
         var menu = Ui.VBox(10);
@@ -181,7 +182,10 @@ public partial class GameApp : Node3D
         var scroll = new ScrollContainer();
         scroll.AddChild(menu);
         var panel = Ui.PanelC(scroll, Ui.Panel);
-        Place(panel, 0, .5f, 60, -220, 330, 360);
+        // 9.1: anchored below the subtitle (ends at y=174) and stretched to the
+        // bottom, so it never overlaps the title at 720p.
+        panel.AnchorLeft = panel.AnchorRight = 0; panel.AnchorTop = 0; panel.AnchorBottom = 1;
+        panel.OffsetLeft = 60; panel.OffsetRight = 390; panel.OffsetTop = 188; panel.OffsetBottom = -24;
         root.AddChild(panel);
         // Seed GUI focus: arrow keys / Enter / the pad d-pad all act on the focused Control.
         Ui.FocusFirst(root);
@@ -240,9 +244,14 @@ public partial class GameApp : Node3D
         string awayName = Clubs.All[Options.AwayClub].Name;
         var pre = presentation.GeneratePreMatch(homeName, awayName, Options.HomeFormation, Options.AwayFormation);
 
+        (_weather, _wind) = Presentation.WeatherFor(pre.Weather);
         var root = new Control { Name = "PreMatch" };
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(root);
+        // 9.2: a dark pitch-green backdrop instead of the blank grey clear colour.
+        var bgRect = new ColorRect { Color = new Color(.03f, .09f, .06f), MouseFilter = Control.MouseFilterEnum.Ignore };
+        bgRect.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        root.AddChild(bgRect);
 
         var box = Ui.VBox(10);
         box.AddChild(Ui.Lbl("MATCH PREVIEW", 32, Ui.Accent));
@@ -256,8 +265,12 @@ public partial class GameApp : Node3D
         box.AddChild(Ui.Btn("BACK", ShowMenu));
 
         var panel = Ui.PanelC(box);
-        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
+        // Grow both ways from the centre anchor; the default grew right/down only,
+        // which left the preview off-centre (9.2).
         panel.CustomMinimumSize = new Vector2(600, 400);
+        panel.GrowHorizontal = Control.GrowDirection.Both;
+        panel.GrowVertical = Control.GrowDirection.Both;
+        panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center, Control.LayoutPresetMode.Minsize);
         root.AddChild(panel);
         PadMenuNavigator.Active = true;
         Ui.FocusFirst(box);
@@ -374,6 +387,9 @@ public partial class GameApp : Node3D
         Ui.FocusFirst(box);
     }
 
+    private WeatherType _weather = WeatherType.Clear;
+    private float _wind;
+
     private void StartMatchInternal()
     {
         Clear();
@@ -395,6 +411,9 @@ public partial class GameApp : Node3D
             // Practice Arena runs on the training ground (free practice); it used to
             // be a normal match with fouls switched off.
             Mode = Mode == GameMode.PracticeArena ? (int)GameMode.Training : (int)Mode,
+            // Only the friendly preview picks weather; other modes play in the clear.
+            Weather = Mode == GameMode.Kickoff ? _weather : WeatherType.Clear,
+            WindSpeed = Mode == GameMode.Kickoff ? _wind : 0f,
         };
         view.Init(opts, CustomHome, ShowMenu);
         view.OnMatchEnd = HandleMatchEnd;
