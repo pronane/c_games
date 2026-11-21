@@ -1703,6 +1703,30 @@ public sealed partial class MatchEngine
         if (shotType == ShotType.Volley) loft = .35f;
         if (shotType == ShotType.Chip) loft = .62f;                // up and over the keeper
         if (shotType == ShotType.Low) loft = .015f;                // skidding along the turf
+        if (shotType is ShotType.Power or ShotType.Placement or ShotType.Control or ShotType.Finesse or ShotType.Trivela)
+        {
+            // 3.4: the shot is struck at a height at the goal line, not with a fixed
+            // launch angle.  The old angle meant a well-timed shot from 16 m (charge
+            // .78) cleared the bar every time and anything >=.7 from 24 m went over.
+            // Aimed height by shot type, then what goes wrong: over-hitting (charge
+            // past .85) leans back and lifts it, bad timing scatters it, sprinting
+            // through the shot gets under it, the weak foot is less clean.
+            float hT = shotType switch
+            {
+                ShotType.Placement => target.Y * .55f,
+                ShotType.Finesse or ShotType.Trivela => Mx.Lerp(.9f, 2.1f, Rng.Next()),
+                _ => target.Y,
+            };
+            float overHit = MathF.Max(0f, charge - .85f) / .15f;
+            hT += overHit * Rng.Range(.5f, 2.4f) * (1f + dist / 30f);   // worse from range
+            hT += Rng.Signed() * (1f - timingQuality) * 1.1f;
+            if (p.Sprinting) hT += .3f;
+            hT += Rng.Signed() * (weakFootPenalty - 1f) * .8f;
+            hT = MathF.Max(.12f, hT);
+            float tFlight = dist / MathF.Max(8f, power) * 1.06f;
+            float vy = (hT - b.Pos.Y) / tFlight - .5f * Mx.Gravity * tFlight;
+            loft = Mx.Clamp(vy, 0f, power * .5f) / power;
+        }
         b.HasPending = true; b.PendingKind = 1; b.PendingFrom = p.Index;
         // On target is judged on the line the shot is meant to finish on (a
         // finesse shot starts outside the post and bends back in).
