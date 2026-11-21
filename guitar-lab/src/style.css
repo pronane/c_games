@@ -2214,3 +2214,7 @@ footer span:first-child {
 .riff-result .downloads {
   margin-top: 10px;
 }
+.tempo-fixes {
+  display: inline-flex;
+  gap: 4px;
+}

@@ -51,12 +51,13 @@ const shots = process.env.SCREENSHOT_DIR;
   console.log("Guitar Pro file:", size, "bytes");
   if (size < 500) throw Error("Guitar Pro file is empty.");
 
-  // Halve the tempo and rewrite.
+  // Halve the tempo with the quick fix.
   const bpm = Number(await panel.locator("#riff-grid-bpm").inputValue());
-  await panel.locator("#riff-grid-bpm").fill(String(Math.round(bpm / 2)));
-  await panel.getByRole("button", { name: "Rewrite with this tempo" }).click();
+  await panel.getByRole("button", { name: "½×" }).click();
   await page.waitForTimeout(3000);
-  console.log("Rewritten at", Math.round(bpm / 2), "BPM:", (await panel.getByLabel("Text tab").innerText()).split("\n")[0].slice(0, 80));
+  const halved = Number(await panel.locator("#riff-grid-bpm").inputValue());
+  console.log("Rewritten at", halved, "BPM:", (await panel.getByLabel("Text tab").innerText()).split("\n")[0].slice(0, 80));
+  if (halved !== Math.round(bpm / 2)) throw Error("Quick tempo fix did not halve the tempo.");
   if (shots) await panel.screenshot({ path: `${shots}/riff-to-tab.png` });
 
   await page.setViewportSize({ width: 390, height: 844 });

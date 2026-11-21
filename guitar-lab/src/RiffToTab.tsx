@@ -345,10 +345,34 @@ export default function RiffToTab({ settings }: { settings: InstrumentSettings }
             <button disabled={!!busy} onClick={() => write()}>
               Rewrite with this tempo
             </button>
+            {!take?.onClick && (
+              <span className="tempo-fixes" aria-label="Quick tempo fixes">
+                {([["½×", 0.5], ["⅔×", 2 / 3], ["1.5×", 1.5], ["2×", 2]] as const).map(([label, k]) => {
+                  const next = Math.round(grid.bpm * k);
+                  return (
+                    <button
+                      key={label}
+                      disabled={!!busy || next < 40 || next > 240}
+                      title={`Rewrite at ${next} BPM`}
+                      onClick={() => {
+                        const g = { ...grid, bpm: next };
+                        setGrid(g);
+                        write(heard, g);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </span>
+            )}
             <span className="helper">
               {heard.notes.length} notes heard ({heard.detector}){written.key?.key ? `, key ${written.key.key}` : ""}
-              {written.unplayable_notes ? `; ${written.unplayable_notes} outside this tuning, left out` : ""}. If the rhythm looks doubled or halved, halve or
-              double the tempo.
+              {written.unplayable_notes ? `; ${written.unplayable_notes} outside this tuning, left out` : ""}.
+              {take?.onClick
+                ? " Written on the click you played to."
+                : " Without a click the tempo is a guess (about 7 times in 10 it is right or exactly double or half). If the rhythm looks too busy or too slow, try the quick fixes."}{" "}
+              Frets are the app's choice of where to play each note; you may have played the same notes elsewhere on the neck.
             </span>
           </div>
           <Suspense fallback={<p className="helper">Loading the notation view…</p>}>

@@ -10,6 +10,12 @@ writes the tab. Reported per file and overall:
 - tab: of the matched notes, the share written on the same string and fret the player used.
 
     python -m benchmarks.take_to_tab_eval <guitarset mic dir> <annotation dir> [count]
+
+Result (21 Nov 2026, 24 recordings, 6 players, 4 styles, first 30 s): notes 0.91 F1; tempo guess
+right 54%, right or exactly double/half 71%; with the panel's x1.5 and x2/3 fixes too, 88% are one
+click away. Tab position: 55% of matched notes on the same string and fret as the player (the
+same note can be played in several places; the rest are playable, just not where they were
+played). Played to the app's click, the tempo is known and only the note and position figures apply.
 """
 from __future__ import annotations
 
