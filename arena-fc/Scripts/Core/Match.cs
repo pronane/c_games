@@ -52,8 +52,10 @@ public sealed class MatchOptions
     public MatchPreset Preset = MatchPreset.Competitive;
     /// <summary>Phase 3.7: quality preset.  Auto-detects from device.</summary>
     public QualityPreset Quality = QualityPreset.Auto;
-    /// <summary>Game mode: 0=Kickoff, 1=Tournament, 2=Training, 3=Shootout.</summary>
+    /// <summary>Game mode: 0=Kickoff, 1=Tournament, 2=Training, 3=Shootout, 4=Skill games.</summary>
     public int Mode;
+    /// <summary>Which skill game (Mode 4).</summary>
+    public SkillGame SkillGame = SkillGame.Shooting;
     /// <summary>Phase 3: player switching mode (0=assisted, 1=manual, 2=directional).</summary>
     public int SwitchMode = 0;
     /// <summary>Phase 3: timed finishing enabled.</summary>
@@ -538,8 +540,9 @@ public sealed partial class MatchEngine
 
         // Training and shootouts have no match clock (it used to run on into
         // half-time and full-time in the middle of a shootout).
-        if (!IsTraining && !IsShootout) S.Clock += dt * Options.TimeSpeed;
+        if (!IsTraining && !IsShootout && !IsSkill) S.Clock += dt * Options.TimeSpeed;
         if (IsTraining) TrainingTick(dt);
+        if (IsSkill) { SkillTick(dt); if (S.Phase == Phase.FullTime) return; }
         if (_tick % 30 == 0) Heat.AddPosition(S.Ball.Pos.X, S.Ball.Pos.Z);
         // Phase 7: AI substitutions (tired players after 60')
         int minute = (int)(S.Clock / 60f);
@@ -593,6 +596,7 @@ public sealed partial class MatchEngine
             if (S.PhaseTimer > 0) { AnimateOnly(dt); return; }
             // Training: a goal or the ball going out just resets the drill.
             if (IsTraining) { SetupDrill(Drill); return; }
+            if (IsSkill) { SkillNext(); return; }
             switch (S.Phase)
             {
                 case Phase.Kickoff:
@@ -2866,6 +2870,7 @@ public sealed partial class MatchEngine
         State.KickoffSide = 1 - side;
         State.Phase = Phase.Goal;
         State.PhaseTimer = 3.4f;
+        if (IsSkill) { SkillGoal(side); State.PhaseTimer = 1.4f; }
         State.Ball.Vel = Vector3.Zero;
         State.Ball.HasPending = false; State.Ball.PendingKind = 0; State.Ball.PendingFrom = -1;
         foreach (var p in State.Players)

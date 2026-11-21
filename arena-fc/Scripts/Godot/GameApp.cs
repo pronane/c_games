@@ -321,8 +321,15 @@ public partial class GameApp : Node3D
         StartMatchInternal();
     }
 
-    public void StartSkillGames() {
-        _context = MatchContext.Friendly; Mode = GameMode.SkillGames; StartMatchInternal(); }
+    /// <summary>2.4: the skill-game picker (it used to start a plain friendly).</summary>
+    public void StartSkillGames() => ShowSkillGames();
+
+    private SkillGame _skillGame = SkillGame.Shooting;
+
+    public void StartSkillGame(SkillGame g)
+    {
+        _context = MatchContext.Friendly; Mode = GameMode.SkillGames; _skillGame = g; StartMatchInternal();
+    }
     public void StartPracticeArena() {
         _context = MatchContext.Friendly; Mode = GameMode.PracticeArena; StartMatchInternal(); }
 
@@ -395,7 +402,7 @@ public partial class GameApp : Node3D
         Clear();
         PadMenuNavigator.Active = false;
         var view = new MatchView();
-        bool isTraining = Mode == GameMode.Training || Mode == GameMode.PracticeArena;
+        bool isTraining = Mode == GameMode.Training || Mode == GameMode.PracticeArena || Mode == GameMode.SkillGames;
         var opts = new MatchOptions
         {
             TeamSize = Options.TeamSize, HalfMinutes = Options.HalfMinutes, TimeSpeed = Options.TimeSpeed,
@@ -411,6 +418,7 @@ public partial class GameApp : Node3D
             // Practice Arena runs on the training ground (free practice); it used to
             // be a normal match with fouls switched off.
             Mode = Mode == GameMode.PracticeArena ? (int)GameMode.Training : (int)Mode,
+            SkillGame = _skillGame,
             // Only the friendly preview picks weather; other modes play in the clear.
             Weather = Mode == GameMode.Kickoff ? _weather : WeatherType.Clear,
             WindSpeed = Mode == GameMode.Kickoff ? _wind : 0f,

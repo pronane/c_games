@@ -482,7 +482,11 @@ public partial class Hud : CanvasLayer
         _score.Text = $"{home}   {s.Score[0]}  -  {s.Score[1]}   {away}";
         string stoppage = e.InStoppageTime ? $"  +{e.AddedMinutesShown}'" : "";
         // Training and shootouts have no match clock or halves (9.6).
-        _clock.Text = e.IsShootout ? "PENALTY SHOOTOUT"
+        _clock.Text = e.IsSkill
+                    ? (e.Skill == SkillGame.FreeKicks
+                        ? $"SKILL GAME · {MatchEngine.SkillTitle(e.Skill)}   ·   {e.SkillScore} pts   ·   kicks left {e.SkillAttemptsLeft}   ·   {e.SkillMessage}"
+                        : $"SKILL GAME · {MatchEngine.SkillTitle(e.Skill)}   ·   {e.SkillScore} pts   ·   {MathF.Max(0f, e.SkillTimeLeft):0}s   ·   {e.SkillMessage}")
+                    : e.IsShootout ? "PENALTY SHOOTOUT"
                     : e.IsTraining ? "TRAINING GROUND   ·   no clock"
                     : $"{e.ClockString()}{stoppage}   {(s.Half == 1 ? "1st" : "2nd")} HALF   ·   {e.Options.TeamSize}v{e.Options.TeamSize}";
         _stats.Text = $"Poss {e.PossessionPct(0):0}% - {e.PossessionPct(1):0}%   |   Shots {s.Shots[0]}-{s.Shots[1]}   |   Fouls {s.Fouls[0]}-{s.Fouls[1]}   |   Corners {s.Corners[0]}-{s.Corners[1]}   |   xG {s.Xg[0]:0.00}-{s.Xg[1]:0.00}"

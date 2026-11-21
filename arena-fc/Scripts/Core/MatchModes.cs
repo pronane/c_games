@@ -49,6 +49,7 @@ public sealed partial class MatchEngine
             if (p.IsKeeper) return p.Team != S.ShootoutTakerSide;
             return p.Index == S.ShootoutTaker && !S.ShootoutShotTaken;
         }
+        if (IsSkill) return SkillActive(p);
         if (IsTraining)
         {
             if (p.IsKeeper) return true;
