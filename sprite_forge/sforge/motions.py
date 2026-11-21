@@ -600,3 +600,11 @@ M("die", "NPC", "fall forward and stay down", keys=K(
     (0.55, P(CROUCH, neck=(10, 0, 0), arm_L=(10, 20, 0), arm_R=(10, 20, 0))),
     (0.85, P(LIE_FRONT, pos=(0.3, 0))), (1, P(LIE_FRONT, pos=(0.3, 0)))))
 M("sit", "NPC", "sitting idle (shopkeepers, villagers)", func=idle_func(dict(SEAT), 0.5), loop=True)
+
+# ---------------------------------------------------------------- v11.21 field-sport pack
+# Skill moves, thigh control, chip / trivela / bicycle kick, keeper penalty set,
+# punch and headbutt - fed back from Arena FC (see sforge/fieldsport_motions.py).
+# (If fieldsport_motions is imported first it is only half-built here; it then
+# registers itself at the end of its own module.)
+from . import fieldsport_motions as _fieldsport  # noqa: E402  (needs LIB, P, K, M above)
+getattr(_fieldsport, "register", lambda: None)()

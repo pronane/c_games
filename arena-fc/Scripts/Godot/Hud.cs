@@ -131,6 +131,8 @@ public partial class Hud : CanvasLayer
     // 9.4 HUD footprint: the legend tucks away after the opening seconds (H/F1
     // brings it back for good) and the commentary fades when nothing is new.
     private float _feedAge;
+    private Phase _toastPhase = Phase.Kickoff;
+    private bool _toastFromPhase;
     private bool _hintPinned;
     private string _lastFeed = "";
     private PanelContainer _fpsCounterPanel = null!;
@@ -547,12 +549,22 @@ public partial class Hud : CanvasLayer
         _minimap.Engine = e;
         _minimap.QueueRedraw();
 
-        if (s.Phase == Phase.Goal && _toastTimer <= 0) ShowToast("GOAL!", 2.8f);
-        else if (s.Phase == Phase.HalfTime && _toastTimer <= 0) ShowToast("HALF TIME", 2.8f);
-        else if (s.Phase == Phase.FullTime) ShowToast($"FULL TIME   {s.Score[0]} - {s.Score[1]}", 99f);
-        // A free kick used to appear from nowhere: make the whistle decision visible.
-        else if (s.Phase == Phase.Penalty && _toastTimer <= 0 && !e.IsShootout) ShowToast("FOUL · PENALTY!", 2.2f);
-        else if (s.Phase == Phase.FreeKick && _toastTimer <= 0) ShowToast("FOUL · FREE KICK", 1.8f);
+        // Phase banners fire once, on entering the phase, and go when the phase does:
+        // re-firing whenever the timer ran out kept "GOAL!" on screen through a long
+        // goal phase and into the next shootout kick.
+        if (s.Phase != _toastPhase)
+        {
+            if (_toastFromPhase && s.Phase != Phase.FullTime) { _toast.Visible = false; _toastTimer = 0f; }
+            _toastFromPhase = true;
+            if (s.Phase == Phase.Goal) ShowToast("GOAL!", 2.8f);
+            else if (s.Phase == Phase.HalfTime) ShowToast("HALF TIME", 2.8f);
+            else if (s.Phase == Phase.FullTime) ShowToast($"FULL TIME   {s.Score[0]} - {s.Score[1]}", 99f);
+            // A free kick used to appear from nowhere: make the whistle decision visible.
+            else if (s.Phase == Phase.Penalty && !e.IsShootout) ShowToast("FOUL · PENALTY!", 2.2f);
+            else if (s.Phase == Phase.FreeKick) ShowToast("FOUL · FREE KICK", 1.8f);
+            else _toastFromPhase = false;   // Play, Kickoff, throw-ins...: no banner
+            _toastPhase = s.Phase;
+        }
         if (_toastTimer > 0)
         {
             _toastTimer -= dt;

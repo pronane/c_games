@@ -110,7 +110,7 @@ public sealed class MotionDriver
         {
             return p.Action switch
             {
-                "kick" or "volley" or "shoot" => PlayerIntent.Shoot,
+                "kick" or "volley" or "shoot" or "chip_shot" or "trivela" or "bicycle" => PlayerIntent.Shoot,
                 "pass" or "short_pass" => PlayerIntent.Pass,
                 "through_ball" or "cross" or "throw_in" => PlayerIntent.ThroughBall,
                 "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
@@ -118,7 +118,8 @@ public sealed class MotionDriver
                 "dive" or "keeper_dive" => PlayerIntent.Dive,
                 "celebrate" => PlayerIntent.Celebrate,
                 "cut" or "turn" => PlayerIntent.Cut,
-                // No dedicated skill clips yet (Sprite Forge TODO): read as a sharp cut.
+                // Skill moves have their own Sprite Forge clips now (SoccerClipRig plays
+                // them directly); the motion engine still reads them as a cut.
                 _ when p.Action.StartsWith("skill_") => PlayerIntent.Cut,
                 _ => p.Shielding ? PlayerIntent.Shield : PlayerIntent.Move,
             };

@@ -31,6 +31,8 @@ jobs:
       - run: xvfb-run -a python tools/test_studio_tabs.py
       # v11.19: the Games tab - a page per kind of game, every pack in game_packs/
       - run: xvfb-run -a python tools/test_game_tabs.py
+      # v11.21: field-sport clips (skills, aerial control, chip/trivela/bicycle, conduct), their QA, bind conform
+      - run: python tools/test_fieldsport.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

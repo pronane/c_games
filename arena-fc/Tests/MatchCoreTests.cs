@@ -734,6 +734,30 @@ Check("shootout: no open-play passing", so.State.Passes[0] + so.State.Passes[1] 
           $"{perMin:0.0}/min, quick hops {hopsPerMin:0.0}/min ({quick}/{sw})");
 }
 
+// 4.4 / 8.4: back to goal, ball dropping at head height -> a good finisher goes for
+// the bicycle kick (its own Sprite Forge clip), facing goal it is a header.
+{
+    string Attempt(bool backToGoal)
+    {
+        var m = new MatchEngine(new MatchOptions { Seed = 91 }); var S = m.State; S.Phase = Phase.Play;
+        var st = S.Players[9]; S.Controlled = st.Index; S.ControlLock = 99f;
+        foreach (var q in S.Players) if (q.Index != st.Index && !q.IsKeeper) { q.Pos = new Vector3(q.Pos.X, 0, 30f); q.Target = q.Pos; }
+        int sg = m.SideSign(0);
+        st.Pos = m.GoalPos(0) - new Vector3(sg * 9f, 0, 0); st.Target = st.Pos;
+        st.Facing = new Vector3(backToGoal ? -sg : sg, 0, 0);
+        st.Spec.Shooting = .85f; st.PossessionLock = 0f;
+        var b = S.Ball; b.Owner = -1; b.HasPending = false; b.Pos = st.Pos + st.Facing * .4f + new Vector3(0, 1.6f, 0);
+        b.Vel = new Vector3(0, -1f, 0); b.FreeTime = 1f; b.NoPickup = 0f;
+        int ev0 = m.Events.Count;
+        m.Step(MatchEngine.Dt, new PlayerCommand { Shoot = true, Charge = .7f });
+        for (int i = 0; i < 4; i++) m.Step(MatchEngine.Dt, PlayerCommand.None);
+        return st.Action + " | " + string.Join(" / ", m.Events.Skip(ev0).Select(e => e.Text));
+    }
+    string back = Attempt(true), facing = Attempt(false);
+    Check("back to goal, ball at head height: bicycle kick", back.StartsWith("bicycle") && back.Contains("bicycle kick"), back);
+    Check("facing goal, same ball: a header, not a bicycle", !facing.StartsWith("bicycle"), facing);
+}
+
 Section("Training ground (Mode 2)");
 var tr = new MatchEngine(new MatchOptions { Seed = 5, Mode = MatchEngine.ModeTraining });
 Check("training starts in play with the ball at your feet",

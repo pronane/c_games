@@ -991,6 +991,7 @@ public sealed partial class MatchEngine
         // Phase 3: Header clearance — defender heads aerial ball.
         if (ball.Pos.Y > 0.8f && ball.Pos.Y < 2.5f && ball.Owner < 0
             && Mx.FlatDist(p.Pos, ball.Pos) < 1.5f && p.TackleLock <= 0f
+            && p.PossessionLock <= 0f && ball.NoPickup <= 0f       // not the ball he has just struck
             && !p.IsKeeper && p.Spec.Defending > 0.5f)
         {
             HeaderClearance(p);
@@ -1097,7 +1098,12 @@ public sealed partial class MatchEngine
             // A set piece against him (penalty, free kick): he holds his line - at a
             // penalty the Law says so, and nobody rushes a dead ball.
             bool setPieceAgainst = ball.Owner >= 0 && S.Players[ball.Owner].MustPlayBall && S.Players[ball.Owner].Team != p.Team;
-            if (setPieceAgainst && distToGoal < 13f) tx = gx + MathF.Sign(-gx) * .3f;
+            if (setPieceAgainst && distToGoal < 13f)
+            {
+                tx = gx + MathF.Sign(-gx) * .3f;
+                // Set on the line for a penalty (Sprite Forge keeper_penalty_set clip).
+                if (AtPenaltySpot(S.RestartPos) && p.ActionTimer <= 0f) SetAction(p, "keeper_penalty_set", .5f, 1f);
+            }
             if (!setPieceAgainst && ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team && distToGoal < 20f
                 && MathF.Abs(ball.Pos.Z) < 18f)
             {
@@ -1145,7 +1151,7 @@ public sealed partial class MatchEngine
             }
             if (p.ActionTimer <= 0f) p.Action = "idle";
             float danger = Mx.FlatDist(ball.Pos, OwnGoalPos(p.Team));
-            if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f && p.ActionTimer <= 0)
+            if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f && (p.ActionTimer <= 0 || p.Action == "keeper_penalty_set"))
             {
                 SetAction(p, "dive", .65f, .50f);
                 p.Target += humanKeeper ? new Vector3(0, 0, S.ShootoutDive * 2.2f) : Mx.FlatDir(p.Pos, ball.Pos) * 1.6f;
@@ -1647,6 +1653,9 @@ public sealed partial class MatchEngine
             : charge > .75f ? ShotType.Power
             : charge < .35f ? ShotType.Placement
             : ShotType.Control;
+        // Dedicated Sprite Forge clips for the chip and the trivela (same timing as "kick").
+        if (shotType == ShotType.Chip) p.Action = "chip_shot";
+        else if (shotType == ShotType.Trivela) p.Action = "trivela";
         // Phase 3: timed finishing — perfect timing window (charge 0.7-0.85).
         float timingQuality = 1f;
         if (Options.TimedFinishing)
