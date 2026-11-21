@@ -101,9 +101,12 @@ def event_marks(row):
     return sorted(out)
 
 
-def build_argv(pack, out, source="mannequin", rig="", human="", ctype="balanced", kit="", glb=True, library=""):
-    """the `forge.py build` command line for one game's character"""
+def build_argv(pack, out, source="mannequin", rig="", human="", ctype="balanced", kit="", glb=True, library="", hd=False):
+    """the `forge.py build` command line for one game's character (hd: sprites at twice the game's frame size)"""
     a = ["build", "--game", pack, "--out", out]
+    if hd:
+        from .roster import hd_frame
+        a += ["--frame", hd_frame(pack)]
     if source == "rig" and rig:
         a += ["--rig", rig]
     else:
@@ -180,6 +183,7 @@ class GamesTab:
         self.ctype = tk.StringVar(value="balanced")
         self.kit = tk.StringVar(value="home")
         self.glb = tk.BooleanVar(value=True)
+        self.hd = tk.BooleanVar(value=False)            # v11.22: sprites at twice the game's frame size
         self.status = tk.StringVar(value="")
         self.t = tk.DoubleVar(value=0.0)
         self.view = tk.StringVar(value="side")
@@ -268,6 +272,7 @@ class GamesTab:
         self.kit_lab = ttk.Label(r2, text="Kit"); self.kit_lab.pack(side=tk.LEFT, padx=(10, 0))
         self.kit_box = ttk.Combobox(r2, textvariable=self.kit, values=KITS, width=8, state="readonly"); self.kit_box.pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(r2, text="3D GLB too", variable=self.glb).pack(side=tk.LEFT, padx=10)
+        ttk.Checkbutton(r2, text="HD sprites (2x)", variable=self.hd).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Label(r2, text="Motions").pack(side=tk.LEFT)
         ttk.Entry(r2, textvariable=self.lib, width=24).pack(side=tk.LEFT, padx=2)
         ttk.Button(r2, text="...", width=3, command=self._browse_lib).pack(side=tk.LEFT)
@@ -541,7 +546,8 @@ class GamesTab:
         name = self.packs[s[0]] if s else "soccer"
         return name, build_argv(name, self._outdir(name), source=self.source.get(), rig=self.rig.get().strip(),
                                 human=self._human(), ctype=self.ctype.get(),
-                                kit=self.kit.get() if has_kits(name) else "", glb=self.glb.get(), library=self.lib.get().strip())
+                                kit=self.kit.get() if has_kits(name) else "", glb=self.glb.get(), library=self.lib.get().strip(),
+                                hd=self.hd.get())
 
     def build(self):
         name, a = self.argv()
@@ -561,6 +567,8 @@ class GamesTab:
             a += ["--motion-library", self.lib.get().strip()]
         if not self.glb.get():
             a.append("--no-glb")
+        if self.hd.get():
+            a.append("--hd")
         self._run(a, "Building the %s roster - a few seconds per player..." % name, then=("roster", name))
 
     def export_source(self, name):

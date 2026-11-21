@@ -87,6 +87,11 @@ def fit(frames, cfg, pad, report=None):
     (shared shift) and sets cfg.move_pivots {move: (pivot_x, ground_y)} for moves that needed their own window."""
     W, H = cfg.frame_w, cfg.frame_h
     M = 3                                              # margin: the ground lock may still shift the set by a pixel or two
+    # v11.22: put the feet on the ground line first (what the ground lock does after), so the fit allows for it -
+    # otherwise the lock's shift afterwards pushed a fitted leap back out of the top of the cell
+    off = _ground_offset(frames, cfg.ground_y + pad)
+    if off and abs(off) < pad // 2:
+        frames = {m: ([_shift(im, off) for im in v[0]],) + tuple(v[1:]) for m, v in frames.items()}
     boxes = {m: _union(v[0]) for m, v in frames.items()}
     have = {m: b for m, b in boxes.items() if b is not None}
     cfg.move_pivots = {}
@@ -131,6 +136,36 @@ def fit(frames, cfg, pad, report=None):
         if moved:
             report.note("cell fit: own pivot for %s (in game_character.json and atlas.json)" % ", ".join(moved))
     return out
+
+
+def _lowest(im, thr=40):
+    import numpy as np
+    a = np.asarray(im.getchannel("A"))
+    rows = np.nonzero((a > thr).any(1))[0]
+    return int(rows.max()) + 1 if len(rows) else None
+
+
+def _shift(im, dy):
+    from PIL import Image
+    out = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    out.paste(im, (0, int(dy)))
+    return out
+
+
+def ground_ref(frames):
+    """where the feet are planted: each of idle / walk / run's most planted frame, then the median (None if none)"""
+    lows = []
+    for mv in ("idle", "walk", "run", "fight_idle", "idle_athletic"):
+        if mv in frames:
+            ls = [v for v in (_lowest(im) for im in frames[mv][0]) if v]
+            if ls:
+                lows.append(max(ls))
+    return int(sorted(lows)[len(lows) // 2]) if lows else None
+
+
+def _ground_offset(frames, line):
+    ref = ground_ref(frames)
+    return 0 if ref is None else line - ref
 
 
 def _clipped(ims):

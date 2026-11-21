@@ -199,6 +199,14 @@ class LibContext:
             if cl is not None:
                 return cl, "library:%s" % mo.name + (":" + m.character_type if getattr(m, "character_type", "") else "")
         names = [m.name] + ([m.motion] if m.motion else []) + ([mo.name] if mo else [])
+        want = (m.motion or "").split(":", 1)[-1]
+        if want and want != m.name and want not in self.rig.clips and mo is not None \
+                and mo.name == want and cfg.fill != "skip":
+            # v11.22: the pack asks for a particular motion (idle_athletic for a sports idle): it wins over the rig's
+            # own clip that merely shares the move's name (a template's stiff "idle")
+            cl = self._procedural(mo.name, m, mo)
+            if cl is not None:
+                return cl, "motion:%s" % mo.name
         for n in names:
             if n in self.rig.clips:
                 return self.rig.clips[n], "rig:%s" % n

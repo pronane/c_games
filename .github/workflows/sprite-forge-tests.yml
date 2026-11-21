@@ -35,6 +35,8 @@ jobs:
       - run: python tools/test_engines.py
       # v11.21: distinct roster looks, every move inside its cell on every pack, numbered kits
       - run: python tools/test_roster_look.py
+      # v11.22: per-pixel textures and smooth light in sprites, HD frames on every pack, the sports idle
+      - run: python tools/test_render_quality.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -448,8 +448,11 @@ def boundary_edges(F):
     return E[cnt[inv.ravel()] == 1]
 
 
-def _smooth_hem(V, bd, iters=6, lam=0.5):
-    """relax the hem (boundary loop) so it runs straight instead of stepping along the triangles"""
+def _smooth_hem(V, bd, iters=40, lam=0.5, mu=-0.53):
+    """relax the hem (boundary loop) so it runs straight instead of stepping along the triangles.
+    v11.22: Taubin smoothing (a shrink step then an inflate step) for 40 rounds, was 6 plain rounds: the hems
+    (sleeves, shirt, shorts, sock tops) zig-zagged one triangle up, one down - the jagged edges in sprites - and more
+    plain rounds would pull a sleeve's ring smaller into the arm"""
     V = V.copy()
     nb = {}
     for a, b in bd:
@@ -458,8 +461,13 @@ def _smooth_hem(V, bd, iters=6, lam=0.5):
     if not len(keys):
         return V
     pairs = np.array([nb[k][:2] if len(nb[k]) >= 2 else [nb[k][0], nb[k][0]] for k in keys])
+    V0 = V[keys].copy()
     for _ in range(iters):
-        V[keys] = V[keys] * (1 - lam) + lam * 0.5 * (V[pairs[:, 0]] + V[pairs[:, 1]])
+        for f in (lam, mu):
+            V[keys] = V[keys] * (1 - f) + f * 0.5 * (V[pairs[:, 0]] + V[pairs[:, 1]])
+    d = V[keys] - V0                                   # a hem vertex moves at most 1.5 cm (a loop that branches, as
+    n = np.linalg.norm(d, axis=1, keepdims=True)       # where the shirt front meets the shorts, must not be dragged)
+    V[keys] = V0 + d * np.minimum(1.0, 0.015 / (n + 1e-12))
     return V
 
 
