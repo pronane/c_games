@@ -1,0 +1,1078 @@
+{
+ "source": "SkillCorner Open Data - Body Pose",
+ "licence": {
+  "spdx": "MIT",
+  "custom_text": "",
+  "author": "SkillCorner (with PySport)",
+  "source_url": "https://huggingface.co/datasets/SkillCorner/opendata-bodypose",
+  "redistribution": "yes",
+  "attribution": "Body pose and event data: SkillCorner Open Data (MIT licence).",
+  "notes": "3D joints estimated from broadcast video (7-15 cm per joint). Events from github.com/SkillCorner/opendata. Fitted onto the shared skeleton with sforge.jointtrack."
+ },
+ "takes": [
+  {
+   "name": "sc_win_ball_01",
+   "take": "1925299:8_71",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    1.428,
+    6.51
+   ],
+   "fit_err_deg": 1.94,
+   "joint_mae_cm": 10.4,
+   "player": "J. O'Shea"
+  },
+  {
+   "name": "sc_pass_01",
+   "take": "1996435:8_869",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6757,
+   "foot": "L",
+   "root_velocity": [
+    2.086,
+    3.431
+   ],
+   "fit_err_deg": 1.68,
+   "joint_mae_cm": 10.4,
+   "player": "Isaias"
+  },
+  {
+   "name": "sc_pass_02",
+   "take": "1925299:8_402",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.7027,
+   "foot": "R",
+   "root_velocity": [
+    -0.113,
+    1.913
+   ],
+   "fit_err_deg": 2.06,
+   "joint_mae_cm": 10.4,
+   "player": "J. O'Shea"
+  },
+  {
+   "name": "sc_receive_01",
+   "take": "1996435:8_480",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    -0.48,
+    5.109
+   ],
+   "fit_err_deg": 1.78,
+   "joint_mae_cm": 10.4,
+   "player": "Z. de Jesus"
+  },
+  {
+   "name": "sc_pass_03",
+   "take": "1925299:8_564",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.3784,
+   "foot": "L",
+   "root_velocity": [
+    0.122,
+    2.799
+   ],
+   "fit_err_deg": 1.56,
+   "joint_mae_cm": 10.5,
+   "player": "N. Pennington"
+  },
+  {
+   "name": "sc_receive_02",
+   "take": "1996435:8_138",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    -2.284,
+    4.055
+   ],
+   "fit_err_deg": 1.45,
+   "joint_mae_cm": 10.5,
+   "player": "A. C\u00e1ceres"
+  },
+  {
+   "name": "sc_receive_03",
+   "take": "1925299:8_957",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    2.165,
+    1.576
+   ],
+   "fit_err_deg": 1.71,
+   "joint_mae_cm": 10.5,
+   "player": "Walid Shour"
+  },
+  {
+   "name": "sc_carry_01",
+   "take": "1925299:8_169",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.64,
+   "keys": 17,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.855,
+    5.852
+   ],
+   "fit_err_deg": 2.08,
+   "joint_mae_cm": 10.5,
+   "player": "H. Van Der Saag"
+  },
+  {
+   "name": "sc_pass_04",
+   "take": "1996435:8_983",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.5135,
+   "foot": "L",
+   "root_velocity": [
+    2.564,
+    4.541
+   ],
+   "fit_err_deg": 2.03,
+   "joint_mae_cm": 10.6,
+   "player": "B. Vriends"
+  },
+  {
+   "name": "sc_receive_04",
+   "take": "1996435:8_288",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    0.818,
+    3.099
+   ],
+   "fit_err_deg": 1.71,
+   "joint_mae_cm": 10.6,
+   "player": "L\u00e9o Sena"
+  },
+  {
+   "name": "sc_pass_05",
+   "take": "1996435:8_76",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6486,
+   "foot": "R",
+   "root_velocity": [
+    0.35,
+    0.85
+   ],
+   "fit_err_deg": 1.57,
+   "joint_mae_cm": 10.6,
+   "player": "L\u00e9o Sena"
+  },
+  {
+   "name": "sc_receive_05",
+   "take": "1996435:8_477",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    -0.152,
+    0.619
+   ],
+   "fit_err_deg": 1.68,
+   "joint_mae_cm": 10.6,
+   "player": "L\u00e9o Sena"
+  },
+  {
+   "name": "sc_receive_06",
+   "take": "1925299:8_586",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    0.789,
+    0.99
+   ],
+   "fit_err_deg": 1.4,
+   "joint_mae_cm": 10.6,
+   "player": "L. Herrington"
+  },
+  {
+   "name": "sc_pass_06",
+   "take": "1996435:8_754",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6216,
+   "foot": "R",
+   "root_velocity": [
+    0.552,
+    1.783
+   ],
+   "fit_err_deg": 1.72,
+   "joint_mae_cm": 10.7,
+   "player": "L\u00e9o Sena"
+  },
+  {
+   "name": "sc_receive_07",
+   "take": "1925299:8_1045",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    -1.359,
+    1.805
+   ],
+   "fit_err_deg": 1.74,
+   "joint_mae_cm": 10.7,
+   "player": "J. O'Shea"
+  },
+  {
+   "name": "sc_receive_08",
+   "take": "1925299:8_744",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    0.848,
+    0.918
+   ],
+   "fit_err_deg": 1.59,
+   "joint_mae_cm": 10.7,
+   "player": "K. Jelacic"
+  },
+  {
+   "name": "sc_receive_09",
+   "take": "1925299:8_326",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    0.308,
+    1.805
+   ],
+   "fit_err_deg": 1.66,
+   "joint_mae_cm": 10.7,
+   "player": "F. B\u00e9renguer"
+  },
+  {
+   "name": "sc_receive_10",
+   "take": "1996435:8_806",
+   "loop": false,
+   "category": "FirstTouch",
+   "game_category": "FirstTouch",
+   "ball_state": "Approaching",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.4286,
+   "foot": "",
+   "root_velocity": [
+    0.336,
+    1.409
+   ],
+   "fit_err_deg": 2.02,
+   "joint_mae_cm": 10.7,
+   "player": "B. Vriends"
+  },
+  {
+   "name": "sc_pass_07",
+   "take": "1925299:8_73",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.4865,
+   "foot": "L",
+   "root_velocity": [
+    2.152,
+    1.184
+   ],
+   "fit_err_deg": 1.52,
+   "joint_mae_cm": 10.7,
+   "player": "K. Jelacic"
+  },
+  {
+   "name": "sc_win_ball_02",
+   "take": "1925299:8_849",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.72,
+    1.343
+   ],
+   "fit_err_deg": 2.14,
+   "joint_mae_cm": 10.7,
+   "player": "J. O'Shea"
+  },
+  {
+   "name": "sc_pass_08",
+   "take": "1996435:8_889",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6216,
+   "foot": "R",
+   "root_velocity": [
+    1.714,
+    4.789
+   ],
+   "fit_err_deg": 1.76,
+   "joint_mae_cm": 10.7,
+   "player": "J. Yull"
+  },
+  {
+   "name": "sc_pass_09",
+   "take": "1925299:8_744",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.5946,
+   "foot": "L",
+   "root_velocity": [
+    -1.157,
+    3.807
+   ],
+   "fit_err_deg": 1.58,
+   "joint_mae_cm": 10.7,
+   "player": "K. Jelacic"
+  },
+  {
+   "name": "sc_pass_10",
+   "take": "1925299:8_31",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6216,
+   "foot": "R",
+   "root_velocity": [
+    0.843,
+    1.636
+   ],
+   "fit_err_deg": 1.76,
+   "joint_mae_cm": 10.7,
+   "player": "J. Risdon"
+  },
+  {
+   "name": "sc_win_ball_03",
+   "take": "1925299:8_169",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.812,
+    5.489
+   ],
+   "fit_err_deg": 1.88,
+   "joint_mae_cm": 10.8,
+   "player": "H. Van Der Saag"
+  },
+  {
+   "name": "sc_win_ball_04",
+   "take": "1996435:8_983",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    1.331,
+    6.554
+   ],
+   "fit_err_deg": 2.06,
+   "joint_mae_cm": 10.9,
+   "player": "B. Vriends"
+  },
+  {
+   "name": "sc_carry_02",
+   "take": "1925299:8_476",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.56,
+   "keys": 15,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    1.558,
+    4.046
+   ],
+   "fit_err_deg": 1.55,
+   "joint_mae_cm": 10.9,
+   "player": "F. B\u00e9renguer"
+  },
+  {
+   "name": "sc_pass_high_01",
+   "take": "1996435:8_207",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6757,
+   "foot": "R",
+   "root_velocity": [
+    -3.081,
+    4.714
+   ],
+   "fit_err_deg": 2.03,
+   "joint_mae_cm": 11.0,
+   "player": "A. C\u00e1ceres"
+  },
+  {
+   "name": "sc_win_ball_05",
+   "take": "1925299:8_313",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    1.202,
+    6.281
+   ],
+   "fit_err_deg": 2.01,
+   "joint_mae_cm": 11.1,
+   "player": "B. Warland"
+  },
+  {
+   "name": "sc_win_ball_06",
+   "take": "1996435:8_318",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    -1.046,
+    6.558
+   ],
+   "fit_err_deg": 1.97,
+   "joint_mae_cm": 11.1,
+   "player": "A. C\u00e1ceres"
+  },
+  {
+   "name": "sc_win_ball_07",
+   "take": "1996435:8_880",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    1.487,
+    0.871
+   ],
+   "fit_err_deg": 1.57,
+   "joint_mae_cm": 11.1,
+   "player": "L\u00e9o Sena"
+  },
+  {
+   "name": "sc_carry_03",
+   "take": "1996435:8_333",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.8,
+   "keys": 21,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    -1.685,
+    2.073
+   ],
+   "fit_err_deg": 1.9,
+   "joint_mae_cm": 11.1,
+   "player": "P. Kikianis"
+  },
+  {
+   "name": "sc_carry_04",
+   "take": "1996435:8_436",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    -2.22,
+    4.5
+   ],
+   "fit_err_deg": 1.71,
+   "joint_mae_cm": 11.1,
+   "player": "P. Kikianis"
+  },
+  {
+   "name": "sc_carry_05",
+   "take": "1925299:8_585",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.6,
+   "keys": 16,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    -1.417,
+    2.972
+   ],
+   "fit_err_deg": 2.6,
+   "joint_mae_cm": 11.2,
+   "player": "H. Van Der Saag"
+  },
+  {
+   "name": "sc_carry_06",
+   "take": "1925299:8_629",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    -1.046,
+    3.995
+   ],
+   "fit_err_deg": 1.47,
+   "joint_mae_cm": 11.2,
+   "player": "L. Herrington"
+  },
+  {
+   "name": "sc_carry_07",
+   "take": "1996435:8_423",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.56,
+   "keys": 15,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    3.42,
+    -1.406
+   ],
+   "fit_err_deg": 2.33,
+   "joint_mae_cm": 11.2,
+   "player": "F. Talladira"
+  },
+  {
+   "name": "sc_carry_08",
+   "take": "1996435:8_889",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 1.08,
+   "keys": 28,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    -1.248,
+    4.199
+   ],
+   "fit_err_deg": 1.68,
+   "joint_mae_cm": 11.3,
+   "player": "J. Yull"
+  },
+  {
+   "name": "sc_win_ball_08",
+   "take": "1996435:8_170",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.615,
+    1.679
+   ],
+   "fit_err_deg": 1.4,
+   "joint_mae_cm": 11.3,
+   "player": "A. Goodwin"
+  },
+  {
+   "name": "sc_pass_high_02",
+   "take": "1996435:8_441",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6216,
+   "foot": "R",
+   "root_velocity": [
+    0.134,
+    2.16
+   ],
+   "fit_err_deg": 1.41,
+   "joint_mae_cm": 11.4,
+   "player": "L\u00e9o Sena"
+  },
+  {
+   "name": "sc_shot_01",
+   "take": "1925299:8_804",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.4762,
+   "foot": "R",
+   "root_velocity": [
+    -0.28,
+    3.347
+   ],
+   "fit_err_deg": 1.61,
+   "joint_mae_cm": 11.9,
+   "player": "Q. MacNicol"
+  },
+  {
+   "name": "sc_pass_high_03",
+   "take": "1925299:8_917",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6486,
+   "foot": "R",
+   "root_velocity": [
+    0.791,
+    3.793
+   ],
+   "fit_err_deg": 1.59,
+   "joint_mae_cm": 11.9,
+   "player": "K. Jelacic"
+  },
+  {
+   "name": "sc_shot_02",
+   "take": "1996435:8_914",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6429,
+   "foot": "R",
+   "root_velocity": [
+    0.693,
+    4.419
+   ],
+   "fit_err_deg": 1.93,
+   "joint_mae_cm": 12.0,
+   "player": "A. C\u00e1ceres"
+  },
+  {
+   "name": "sc_pass_high_04",
+   "take": "1996435:8_669",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.5946,
+   "foot": "R",
+   "root_velocity": [
+    1.322,
+    0.677
+   ],
+   "fit_err_deg": 1.77,
+   "joint_mae_cm": 12.0,
+   "player": "A. C\u00e1ceres"
+  },
+  {
+   "name": "sc_pass_high_05",
+   "take": "1925299:8_287",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.4595,
+   "foot": "L",
+   "root_velocity": [
+    1.434,
+    1.815
+   ],
+   "fit_err_deg": 1.75,
+   "joint_mae_cm": 12.1,
+   "player": "Walid Shour"
+  },
+  {
+   "name": "sc_shot_03",
+   "take": "1996435:8_835",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.4762,
+   "foot": "L",
+   "root_velocity": [
+    -0.257,
+    1.695
+   ],
+   "fit_err_deg": 1.36,
+   "joint_mae_cm": 12.1,
+   "player": "A. Segecic"
+  },
+  {
+   "name": "sc_pass_high_06",
+   "take": "1996435:8_272",
+   "loop": false,
+   "category": "Pass",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.5946,
+   "foot": "R",
+   "root_velocity": [
+    -2.712,
+    4.028
+   ],
+   "fit_err_deg": 2.02,
+   "joint_mae_cm": 12.1,
+   "player": "J. Barnett"
+  },
+  {
+   "name": "sc_shot_04",
+   "take": "1925299:8_746",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6429,
+   "foot": "R",
+   "root_velocity": [
+    2.297,
+    1.293
+   ],
+   "fit_err_deg": 1.99,
+   "joint_mae_cm": 12.3,
+   "player": "H. Van Der Saag"
+  },
+  {
+   "name": "sc_clearance_01",
+   "take": "1925299:8_208",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.7027,
+   "foot": "L",
+   "root_velocity": [
+    -1.767,
+    3.544
+   ],
+   "fit_err_deg": 2.12,
+   "joint_mae_cm": 12.3,
+   "player": "A. Zimarino"
+  },
+  {
+   "name": "sc_clearance_02",
+   "take": "1925299:8_967",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.5676,
+   "foot": "L",
+   "root_velocity": [
+    -3.469,
+    0.424
+   ],
+   "fit_err_deg": 2.04,
+   "joint_mae_cm": 12.5,
+   "player": "J. Carluccio"
+  },
+  {
+   "name": "sc_shot_05",
+   "take": "1996435:8_578",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6429,
+   "foot": "R",
+   "root_velocity": [
+    -0.146,
+    7.93
+   ],
+   "fit_err_deg": 1.95,
+   "joint_mae_cm": 12.6,
+   "player": "D. Pierias"
+  },
+  {
+   "name": "sc_clearance_03",
+   "take": "1925299:8_875",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6757,
+   "foot": "L",
+   "root_velocity": [
+    2.297,
+    0.271
+   ],
+   "fit_err_deg": 2.37,
+   "joint_mae_cm": 13.0,
+   "player": "J. Hingert"
+  },
+  {
+   "name": "sc_shot_06",
+   "take": "1996435:8_829",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6667,
+   "foot": "R",
+   "root_velocity": [
+    -0.865,
+    -1.113
+   ],
+   "fit_err_deg": 1.87,
+   "joint_mae_cm": 13.2,
+   "player": "L. Jovanovic"
+  },
+  {
+   "name": "sc_shot_07",
+   "take": "1925299:8_970",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6667,
+   "foot": "R",
+   "root_velocity": [
+    2.291,
+    -0.604
+   ],
+   "fit_err_deg": 1.91,
+   "joint_mae_cm": 13.3,
+   "player": "J. O'Shea"
+  },
+  {
+   "name": "sc_clearance_04",
+   "take": "1996435:8_154",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.48,
+   "keys": 38,
+   "contact": 0.6486,
+   "foot": "R",
+   "root_velocity": [
+    -1.914,
+    3.217
+   ],
+   "fit_err_deg": 1.88,
+   "joint_mae_cm": 13.3,
+   "player": "K. Shaw"
+  },
+  {
+   "name": "sc_shot_08",
+   "take": "1925299:8_317",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6905,
+   "foot": "R",
+   "root_velocity": [
+    0.429,
+    4.749
+   ],
+   "fit_err_deg": 2.38,
+   "joint_mae_cm": 13.3,
+   "player": "K. Jelacic"
+  },
+  {
+   "name": "sc_shot_09",
+   "take": "1996435:8_390",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.6429,
+   "foot": "R",
+   "root_velocity": [
+    1.154,
+    0.877
+   ],
+   "fit_err_deg": 1.79,
+   "joint_mae_cm": 13.7,
+   "player": "A. Ouahim"
+  },
+  {
+   "name": "sc_shot_10",
+   "take": "1925299:8_805",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.68,
+   "keys": 43,
+   "contact": 0.5952,
+   "foot": "L",
+   "root_velocity": [
+    -0.321,
+    2.133
+   ],
+   "fit_err_deg": 1.91,
+   "joint_mae_cm": 14.2,
+   "player": "K. Jelacic"
+  }
+ ]
+}

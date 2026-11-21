@@ -372,23 +372,33 @@ CLIP_SPECS = [
 # Real motion capture (CMU Graphics Lab, via Tools/import_cmu_football.py):
 # Sprite Forge library moves in Data/mocap/cmu/.  Each becomes soccer_<name>.
 # ---------------------------------------------------------------------------
-MOCAP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data", "mocap", "cmu")
-_MOCAP_CATEGORY = {"Kick": "Ball", "Locomotion": "Locomotion", "Cut": "Locomotion", "Recovery": "Locomotion"}
+MOCAP_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data", "mocap")
+MOCAP_DIR = os.path.join(MOCAP_ROOT, "cmu")
+# Real in-match motion (SkillCorner open body pose, via Tools/import_skillcorner_pose.py).
+MOCAP_SC_DIR = os.path.join(MOCAP_ROOT, "skillcorner")
+_MOCAP_CATEGORY = {"Kick": "Ball", "Locomotion": "Locomotion", "Cut": "Locomotion", "Recovery": "Locomotion",
+                   "Pass": "Ball", "FirstTouch": "Ball", "Dribble": "Ball", "Tackle": "Defence"}
+_MOCAP_SOURCE = {MOCAP_DIR: "CMU take", MOCAP_SC_DIR: "SkillCorner match event"}
 
 
 def _mocap_takes():
-    path = os.path.join(MOCAP_DIR, "_import.json")
-    if not os.path.isfile(path):
-        return []
-    with open(path) as f:
-        return json.load(f).get("takes", [])
+    takes = []
+    for d in (MOCAP_DIR, MOCAP_SC_DIR):
+        path = os.path.join(d, "_import.json")
+        if not os.path.isfile(path):
+            continue
+        with open(path) as f:
+            for t in json.load(f).get("takes", []):
+                takes.append(dict(t, dir=d))
+    return takes
 
 
 MOCAP_TAKES = _mocap_takes()
+MOCAP_DIR_OF = {_t["name"]: _t["dir"] for _t in MOCAP_TAKES}
 for _t in MOCAP_TAKES:
     CLIP_SPECS.append(("soccer_" + _t["name"], "mocap:" + _t["name"], bool(_t["loop"]),
                        _MOCAP_CATEGORY.get(_t["category"], "Mocap"),
-                       "motion capture: CMU take %s (%s)" % (_t["take"], _t["category"].lower())))
+                       "motion capture: %s %s (%s)" % (_MOCAP_SOURCE[_t["dir"]], _t["take"], _t["category"].lower())))
 
 # Match-engine / control actions -> clip name.  Keys cover the C# PlayerState
 # Action strings, the pad/keyboard actions and the restart phases.
@@ -595,13 +605,16 @@ for _name, _base, *_ in CLIP_SPECS:
     if _base in _fs.EVENTS:
         CLIP_EVENTS[_name] = dict(_fs.EVENTS[_base])
 def _mocap_events(name):
-    with open(os.path.join(MOCAP_DIR, name + ".json")) as f:
+    with open(os.path.join(MOCAP_DIR_OF.get(name, MOCAP_DIR), name + ".json")) as f:
         rec = json.load(f)
-    canon = (rec.get("import") or {}).get("canonical") or {}
+    imp = rec.get("import") or {}
+    canon = imp.get("canonical") or {}
     dur = float(rec.get("duration") or canon.get("duration") or 1.0)
     contact = -1.0
     if canon.get("peak_s") is not None and canon.get("cut_s"):
         contact = round((canon["peak_s"] - canon["cut_s"][0]) / dur, 3)
+    elif imp.get("contact") is not None and float(imp["contact"]) >= 0:
+        contact = round(float(imp["contact"]), 3)
     # Foot plants: each leg's most-forward swing (heel strike) in the take.
     steps = []
     keys = rec["keys"]
@@ -633,9 +646,10 @@ def register() -> None:
             continue
         if base and base.startswith("mocap:"):
             from sforge.motionlib import as_motion
-            src = as_motion(base.split(":", 1)[1], path=MOCAP_DIR)
+            mv = base.split(":", 1)[1]
+            src = as_motion(mv, path=MOCAP_DIR_OF.get(mv, MOCAP_DIR))
             if src is None:
-                raise KeyError("motion-capture move %s missing from %s" % (base, MOCAP_DIR))
+                raise KeyError("motion-capture move %s missing from %s" % (base, MOCAP_DIR_OF.get(mv, MOCAP_DIR)))
             M(name, category, desc, keys=src.keys, loop=loop)
             LIB[name].duration_s = getattr(src, "duration_s", None)
             continue
