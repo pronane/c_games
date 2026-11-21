@@ -1,0 +1,62 @@
+{
+ "source": "SkillCorner open data (MIT), A-League 2024/25 broadcast tracking",
+ "matches": [
+  "1925299",
+  "1996435",
+  "2011166"
+ ],
+ "per_match": {
+  "1925299": {
+   "length_in": 34.339999999999996,
+   "length_out": 28.16,
+   "width_in": 43.31,
+   "width_out": 33.01,
+   "def_line_from_gk": 19.96,
+   "press_median": 7.063065906530958,
+   "press_under2m": 0.06118230673832162,
+   "speed_mean": 2.079402029591961,
+   "share_over_5_5": 0.02028860520015578,
+   "share_over_7": 0.0024880478690804454,
+   "speed_p95": 4.6238512086787615
+  },
+  "1996435": {
+   "length_in": 33.935,
+   "length_out": 31.46,
+   "width_in": 44.989999999999995,
+   "width_out": 34.8,
+   "def_line_from_gk": 22.115,
+   "press_median": 6.32026898161779,
+   "press_under2m": 0.054302807179015186,
+   "speed_mean": 2.167461435964273,
+   "share_over_5_5": 0.030845711616584042,
+   "share_over_7": 0.005530391844426523,
+   "speed_p95": 4.973932046178356
+  },
+  "2011166": {
+   "length_in": 33.910000000000004,
+   "length_out": 31.07,
+   "width_in": 39.98,
+   "width_out": 32.56,
+   "def_line_from_gk": 21.669999999999998,
+   "press_median": 6.265466328259306,
+   "press_under2m": 0.06572164948453608,
+   "speed_mean": 2.148868314412639,
+   "share_over_5_5": 0.03915452625090692,
+   "share_over_7": 0.009152022189833513,
+   "speed_p95": 5.189412298131664
+  }
+ },
+ "average": {
+  "length_in": 34.062,
+  "length_out": 30.23,
+  "width_in": 42.76,
+  "width_out": 33.457,
+  "def_line_from_gk": 21.248,
+  "press_median": 6.55,
+  "press_under2m": 0.06,
+  "speed_mean": 2.132,
+  "share_over_5_5": 0.03,
+  "share_over_7": 0.006,
+  "speed_p95": 4.929
+ }
+}

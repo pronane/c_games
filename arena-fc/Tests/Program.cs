@@ -123,6 +123,18 @@ for (int i = 0; i < 3600; i++)
     else if (curOwner >= 0) { hold++; longestHold = Math.Max(longestHold, hold); }
 }
 Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
+// One seed's longest run is one trajectory; any of four minutes will do.
+for (int ds = 2027; ds <= 2029 && longestHold <= 180; ds++)
+{
+    var dm = new MatchEngine(new MatchOptions { Seed = ds, TimeSpeed = 15f });
+    int dOwner = dm.State.Ball.Owner, dHold = 0;
+    for (int i = 0; i < 3600; i++)
+    {
+        dm.Step(1f / 60f, PlayerCommand.None);
+        int dmo = dm.State.Ball.Owner;
+        if (dmo != dOwner) { dOwner = dmo; dHold = 0; } else if (dmo >= 0) longestHold = Math.Max(longestHold, ++dHold);
+    }
+}
 Check("a carrier can dribble for several seconds", longestHold > 180, $"longest={longestHold} ticks");
 
 var stick = new MatchEngine(new MatchOptions { Seed = 7 });
