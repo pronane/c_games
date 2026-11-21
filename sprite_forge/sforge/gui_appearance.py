@@ -187,7 +187,7 @@ class AppearanceTab:
         if not path:
             return
         self.read_controls(); ap = self._copy()
-        self._bg(lambda b: (b.glb(b.character(ap, self.kit.get()), path), "GLB -> " + path)[1])
+        self._bg(lambda b: (b.glb(b.character(ap, self.kit.get()), path, self.kit.get()), "GLB -> " + path)[1])
 
     def export_sprites(self, folder=None, clips=None, frames=8):
         folder = folder or filedialog.askdirectory(title="Sprites folder")

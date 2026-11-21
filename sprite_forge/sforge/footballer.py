@@ -241,9 +241,56 @@ def _rz(deg):
     return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
 
 
+def sf_kit(kit):
+    """v11.24: Sprite Forge's game kits (sforge.mesh.KITS: home, away, blue, red, black, gk) as "sf_<name>[#number]"
+    -> (shirt, trim, shorts, socks) hex colours and the squad number (or None); None if kit is not one of them"""
+    if not kit.startswith("sf_"):
+        return None
+    name, _, num = kit[3:].partition("#")
+    from .mesh import KITS as GK
+    if name not in GK:
+        raise KeyError("unknown kit %r (%s)" % (name, ", ".join(GK)))
+    k = GK[name]
+    hx = lambda c: "#%02x%02x%02x" % tuple(int(round(v * 255)) for v in c)
+    return (hx(k["shirt"]), hx(k["trim"]), hx(k["shorts"]), hx(k["socks"])), (int(num) if num.isdigit() else None)
+
+
+def number_mask(n, w=96, h=110):
+    """a squad number as a (h, w) 0..1 mask, bold digits filling the box"""
+    from PIL import Image, ImageDraw, ImageFont
+    txt = str(int(n))
+    im = Image.new("L", (w * 2, h * 2), 0)
+    d = ImageDraw.Draw(im)
+    font = None
+    for f in ("DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "Arial Bold.ttf", "arialbd.ttf"):
+        try:
+            font = ImageFont.truetype(f, int(h * 1.9)); break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+    bb = d.textbbox((0, 0), txt, font=font)
+    d.text((w - (bb[0] + bb[2]) / 2, h - (bb[1] + bb[3]) / 2), txt, fill=255, font=font)
+    bb = im.getbbox()
+    if bb:                                   # the digits fill the box (8% margin)
+        im = im.crop(bb)
+        pw, ph = int(im.width * 0.08) + 1, int(im.height * 0.08) + 1
+        pad = Image.new("L", (im.width + 2 * pw, im.height + 2 * ph), 0); pad.paste(im, (pw, ph)); im = pad
+    im = im.resize((w, h), Image.LANCZOS)
+    return np.asarray(im, float) / 255.0
+
+
 def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
     """paint functions in world bind coords for one kit"""
-    A, Bc, Sh, So = (hexc(c) for c in KITS[kit])
+    sfk = sf_kit(kit)
+    number = None
+    if sfk is not None:
+        cols, number = sfk
+        A, Bc, Sh, So = (hexc(c) for c in cols)
+    else:
+        A, Bc, Sh, So = (hexc(c) for c in KITS[kit])
+    plain = sfk is not None
+    nmask = number_mask(number) if number is not None else None
     skin = hexc(skin); hairc = hexc(hair); eyec = hexc(eye)
     face_fn = face_paint(skin, eyec, hairc * 1.25, scowl=0.1, stubble=np.array([0.90, 0.85, 0.83]),
                          lips_rgb=skin * np.array([0.88, 0.66, 0.62]))
@@ -267,10 +314,20 @@ def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
         x, y, z = P[:, 0], P[:, 1], P[:, 2]
         col = np.broadcast_to(A, base.shape).copy()
         ax = np.abs(x)
-        col[(y > 1.17) & (y < 1.27) & (ax < 0.30)] = Bc                                    # hoop, chest and back
+        if not plain:
+            col[(y > 1.17) & (y < 1.27) & (ax < 0.30)] = Bc                                # hoop, chest and back
         col[(ax > 0.215) & (np.abs(_arm_t(P) - 0.50) < 0.035)] = Bc                        # sleeve cuffs
         col[(y > 1.435) & (y < 1.49) & (ax < 0.088) & ((z > 0.0) | (y > 1.45))] = Bc     # collar
-        col = mix(col, Bc, ellmask(x, y, 0.085, 1.33, 0.022, 0.026, 0.12) * (z > 0.08))     # crest
+        if not plain:
+            col = mix(col, Bc, ellmask(x, y, 0.085, 1.33, 0.022, 0.026, 0.12) * (z > 0.08))  # crest
+        if nmask is not None:                                                             # squad number on the back
+            h, w = nmask.shape
+            bw = 0.075 * min(2, len(str(number)))                                       # half width: 1 or 2 digits
+            sel = (z < 0.08) & (ax < bw) & (y > 1.06) & (y < 1.34)                       # the torso mid-plane is z~0.09
+            u = np.clip(((bw - x[sel]) / (2 * bw) * w).astype(int), 0, w - 1)           # seen from behind: -x is right
+            v = np.clip(((1.34 - y[sel]) / 0.28 * h).astype(int), 0, h - 1)
+            m = np.zeros(len(P)); m[sel] = nmask[v, u]
+            col = mix(col, Bc, m)
         col[(y < 0.885) & (ax < 0.30)] = A * 0.93                                           # hem
         return col, np.zeros(len(P))
 

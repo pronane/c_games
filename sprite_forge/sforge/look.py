@@ -96,7 +96,7 @@ class Builder:
     def kit(self, name="home"):
         from . import mhchar, footballer as FB
         if name not in self._kits:
-            if name not in FB.KITS:
+            if name not in FB.KITS and FB.sf_kit(name) is None if name.startswith("sf_") else name not in FB.KITS:
                 name = "home"
             self._kits[name] = mhchar.kit_textures(self.tm, [name], lambda k: FB.paints(k), res=1024)[name]
         return self._kits[name]
@@ -140,12 +140,16 @@ class Builder:
             log("sprites: %d clips x %d frames -> %s" % (len(res), frames, out_dir))
         return res
 
-    def glb(self, ch, path):
+    def glb(self, ch, path, kit="home"):
+        """v11.24: the kit the character was built in (was always "home"), and hair / brows / lashes coloured in their
+        textures - their colour was only a vertex colour, which most engines and FBX ignore (grey hair in Unity,
+        Unreal, raylib and Sprite Forge's own sprites)."""
         from . import glbpack
-        bio = io.BytesIO(); self.kit("home").save(bio, "PNG")
+        bio = io.BytesIO(); self.kit(kit).save(bio, "PNG")
         from . import mhchar
         images = mhchar.engine_images(ch.images); images["kit"] = bio.getvalue()
-        return glbpack.pack_parts(self.template_path, path, ch.parts, images,
+        parts = mhchar.bake_tints(ch.parts, images)
+        return glbpack.pack_parts(self.template_path, path, parts, images,
                                   alpha_keys=("hair_", "eyebrows_", "eyelashes_", "facial_hair", "beard_shell"),
                                   extras={"generator": "sprite_forge forge.py look"})
 
@@ -214,7 +218,7 @@ def main(argv):
     if a.preview:
         b.preview(ch).save(a.preview); print("preview ->", a.preview)
     if a.glb:
-        n = b.glb(ch, a.glb); print("GLB -> %s (%.1f MB, %d meshes)" % (a.glb, n / 1e6, len(ch.parts)))
+        n = b.glb(ch, a.glb, a.kit); print("GLB -> %s (%.1f MB, %d meshes)" % (a.glb, n / 1e6, len(ch.parts)))
     if a.sprites:
         clips = [c.strip() for c in a.clips.split(",") if c.strip()] or pick_clips(b.poser.clips)
         b.sprites(ch, clips, a.frames, a.sprites)

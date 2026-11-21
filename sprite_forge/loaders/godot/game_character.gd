@@ -54,6 +54,11 @@ func load_dir(path: String) -> bool:
 	return anims.size() > 0
 
 func _load_strip(p: String) -> Texture2D:
+	# inside a project the strip is an imported texture (works in exported games too); a folder outside it is read raw
+	if p.begins_with("res://") and ResourceLoader.exists(p):
+		var t = load(p)
+		if t is Texture2D:
+			return t
 	if not FileAccess.file_exists(p):
 		return null
 	var img := Image.new()

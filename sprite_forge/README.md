@@ -54,6 +54,148 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.24: players who look different, every move inside its cell, hit boxes in the preview
+
+### Teams and casts that look like real rosters
+
+Every player in a default roster (`forge.py roster`, or **Build the team** / **Build the fighter cast** in the Games
+tab) gets a look of their own, made from MakeHuman appearance keys (`forge.py look --keys`):
+
+* hair style and colour, facial hair, skin tone, eye colour and eyebrows;
+* the face shape: nose, lips, jaw, chin, cheekbones, eyes, ears;
+* muscles to suit their type, so a heavy brawler is more muscular than a small agile fighter.
+
+Each player is built as a realistic MakeHuman character in the roster's kit, with their **squad number on the back**
+of the shirt. The looks are repeatable, so a roster rebuilds the same. A roster file can give any player a `"look"`
+of their own. Without the MakeHuman library (`forge.py human --setup --full`), players fall back to the mannequin
+with different bodies, and `roster.json` records which way each was built.
+
+Two bugs fixed on the way:
+
+* The look builder's GLB had grey hair in Unity, Unreal, raylib and Sprite Forge's own sprites. The colour was only a
+  vertex colour; it is now baked into the hair, brow and lash textures.
+* The look builder ignored `--kit`, so every look came out in the home kit. It now uses the kit you give.
+
+Sprites and portraits no longer draw the see-through parts of hair cards as solid, which hid faces behind long hair.
+
+### No move cut off at the edge of its cell
+
+Moves are drawn on a padded canvas, then fitted into the cell:
+
+1. **One shared shift.** The pivot and ground line move as little as possible so every move fits, and they stay the
+   same for every move, so every engine format stays right.
+2. **Its own pivot.** A move that can't fit alongside the others gets its own pivot and ground line, written per move
+   in `game_character.json` and `atlas.json`.
+3. **One smaller scale.** A rig too big for the cell (a tall rig's leap) is drawn smaller, once, for every move.
+
+A ball flying off on its own may still leave the cell: the fit and the QA look at the character, not the prop. The
+Gaelic pack draws its players at 58% of the frame height (new pack key `"figure"`, default 0.62) so the leap catch
+fits.
+
+Result: the sprite QA's **clipped** FAILs are gone from all 12 packs on the mannequin, and from the tall library rig
+on the packs with leaps and dives. Before, there were 9 clipped moves on the mannequin, plus the boxing KO, block and
+jumps on library rigs.
+
+### Hit boxes in the Games tab
+
+With **Show: built character**, the preview draws over the sprite:
+
+* the **hurt boxes** (head, body, legs) in blue;
+* the **hit box** on the frames where a strike can land, in red, marked "HIT";
+* the **pivot**, at the feet.
+
+These are the same boxes the engines get. Untick **hit boxes** to hide them.
+
+### Tests
+
+`tools/test_roster_look.py` has 9 checks and runs in CI:
+
+* every game's default roster gives every player a valid, distinct, repeatable look;
+* the look and build command lines are right;
+* hair colour is baked into its texture;
+* the squad number is readable on the back and not on the front;
+* see-through card faces are skipped;
+* cell fit works on synthetic frames;
+* all 12 packs on the mannequin and 4 on the tall rig have no clipped moves, and their pivots agree between
+  `game_character.json` and `atlas.json`;
+* a real roster is built from looks (when the MakeHuman library is installed).
+
+`test_game_tabs` adds check 14: hit boxes on the hit frame.
+
+## New in v11.23: teams and casts, portraits, and ready-to-open engine projects (Godot, Unity, Unreal, raylib, web, pygame)
+
+### Teams and fighter casts in one go
+
+```
+forge.py roster --game soccer --out rosters/
+forge.py roster --game fighting --size 6 --out rosters/
+forge.py roster --file my_roster.json --out rosters/
+```
+
+* **`--game soccer`** builds two sides, Home and Away, with 5 players each by default. The keeper wears the keeper's
+  kit and the others are playmakers, strikers and all-rounders with different builds.
+* **`--game fighting --size 6`** builds a cast of six fighters: every fighter type, each with its own body.
+* **`--file`** takes your own list, mixing mannequins, library rigs and your captures. The format is in
+  `sforge/roster.py`.
+
+Every player is an ordinary build, with sprites, an atlas, `game_character.json` and the 3D model, plus a
+**portrait**. The portrait is a head-and-shoulders render from the player's own model; a build without a model gets a
+crop of its idle sprite instead. `forge.py portrait BUILD_DIR` makes one for any build.
+
+The roster itself gets:
+
+* `roster.json`: the sides, and for each player the name, kit, type, body, files and QA;
+* `select_screen.png`: the portraits in a select-screen grid;
+* `team_sheet.png`: each side's line-up.
+
+### One-click engine projects
+
+```
+forge.py engine ENGINE BUILD_OR_ROSTER --out DIR
+```
+
+`ENGINE` is godot, unity, unreal, raylib, web, pygame, or all. It turns one character or a whole roster into a
+project that engine opens directly. Each project holds the characters (sprites, move events, hit and hurt boxes,
+portraits, and the 3D model with every move as an animation) and a demo that plays them side by side. LEFT / RIGHT
+change the move.
+
+| Engine | Open it | What you get |
+|---|---|---|
+| Godot 4 | `project.godot`, then Play | `main.tscn` plays the sprites with the move events. `demo3d.tscn` loads each model at run time and plays its animations. The Sprite Forge addon is enabled. |
+| Unity 2021.3+ | Add the folder in Unity Hub | On first open, every character is imported: sliced sprites, clips, prefab, hit and hurt boxes, `model.fbx` with an Animator. `Assets/Scenes/SpriteForgeDemo.unity` is saved. |
+| Unreal Engine 5 | `SpriteForgeDemo.uproject` | On first open, every character is imported: a Paper2D sprite per frame, a flipbook per move at its fps, the skeletal mesh with every move as an animation, the move events as sync markers. The level `/Game/SpriteForge/Demo` is saved. |
+| raylib 5.5+ | `make`, then `./demo` and `./demo3d` | Sprites with the hit window, and the models with their animations. Joints are rewritten as 8-bit indices for raylib. |
+| Web | `python serve.py` | `index.html` plays the sprites in a canvas; `viewer3d.html` shows the models in three.js. |
+| pygame | `python play.py` | A small player; its `Character` class is a loader you can copy. |
+
+### In the Studio's Games tab
+
+* **Build the team** or **Build the fighter cast**, with a size. The select screen shows when it's done.
+* **Export project** for any engine, or all of them, from the last build or roster. **Open folder** opens it.
+* **Show: built character** plays the last build's own sprites in the preview instead of the figure. That build can
+  be the mannequin, a library rig or your capture.
+
+### Tests
+
+`tools/test_engines.py` (11 checks, in CI):
+
+* every game's default roster validates, and bad rosters are refused;
+* a real two-fighter roster builds, with portraits from the models;
+* all six projects are made from a roster and from a single build;
+* raylib's 8-bit-joint models read back identical;
+* the Godot project runs headless (`--godot BIN`) and loads every character and animation in 2D and 3D;
+* the Unity project agrees with the bundled importer;
+* the Unreal import script runs against a recording stand-in of UE5's Python API (`tools/unreal_stub.py`), with
+  every flipbook, frame rect, fps, animation and event marker checked;
+* the raylib demos compile and run (`--raylib PATH`);
+* the web page loads in a browser;
+* the pygame player runs.
+
+`test_game_tabs` gains the preview, roster and export checks from the tab.
+
+**Not run inside Unity or Unreal.** Neither engine runs on this machine. Godot 4.3, raylib 5.5, Chromium and pygame
+were run.
+
 ## New in v11.22: 3D joint tracks onto the shared skeleton (fed back from Arena FC)
 
 Body-pose datasets give named 3D joints per frame, not a rig. **`sforge/jointtrack.py`** fits them onto the shared

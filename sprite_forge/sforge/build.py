@@ -323,10 +323,15 @@ def render_settings(cfg, figure_h):
 
 def _mannequin_frames(cfg, sp, report, only=None):
     from . import cache as C
+    from . import cellfit as CF
     rs = render_settings(cfg, cfg.figure_h * sp.scale)
+    rs0 = rs
+    pad = CF.pad_for(cfg) if only is None else 0       # v11.24: drawn padded, then every move fitted into the cell
+    if pad:
+        rs = CF.pad_rs(rs, pad)
     prop = _prop(cfg)
     use_cache = cfg.cache and C.enabled()
-    base = C.hkey(C.frame_base_key(cfg), sp.to_dict(), prop, cfg.quality) if use_cache else ""
+    base = C.hkey(C.frame_base_key(cfg), sp.to_dict(), prop, cfg.quality, "pad%d" % pad) if use_cache else ""
     out, todo = {}, []
     from . import expressions as X
     from . import physics as PH
@@ -380,7 +385,7 @@ def _mannequin_frames(cfg, sp, report, only=None):
                 parts.append("%s %.1f->%.1f cm" % (m.name, inf["before_cm"], inf["after_cm"]))
         report.note("footlock: planted-foot slide (mean) " + (", ".join(parts) if parts else "no planted feet found"))
     if faces_on:
-        def _face_render(e, _sp=sp, _prop=prop, _rs=rs, _phys=phys):
+        def _face_render(e, _sp=sp, _prop=prop, _rs=rs0, _phys=phys):
             from . import moves as MV
             idle = next((m for m in cfg.moves if m.name in ("idle", "fight_idle")), cfg.moves[0])
             m1 = idle.clone(frames=1)
@@ -399,7 +404,10 @@ def _mannequin_frames(cfg, sp, report, only=None):
     if phys:
         report.note("physics: %s swing as verlet chains" % ", ".join(c.name for c in PH.chains_for(sp)))
     # keep the move order of cfg.moves
-    return {m.name: out[m.name] for m in cfg.moves if m.name in out}
+    res = {m.name: out[m.name] for m in cfg.moves if m.name in out}
+    if pad:
+        res = CF.fit(res, cfg, pad, report)
+    return res
 
 
 def _cut(path, cfg, report):
@@ -909,14 +917,16 @@ def _ground_lock(cfg, frames, report):
     low = _lowest_solid(frames[ref_mv][0][0])
     dy = (cfg.ground_y - low) if low else 0
     lifted = 0
+    from .cellfit import pivot_of
     for mv, (fr, src, note) in frames.items():
         new = []
+        gy = pivot_of(cfg, mv)[1]                      # v11.24: a move fitted into the cell has its own ground line
         for im in fr:
             if dy:
                 im = _shift(im, dy)
             lo = _lowest_solid(im)
-            if lo and lo > cfg.ground_y:
-                im = _shift(im, cfg.ground_y - lo); lifted += 1
+            if lo and lo > gy:
+                im = _shift(im, gy - lo); lifted += 1
             new.append(im)
         fr[:] = new
     if dy or lifted:
@@ -1606,6 +1616,9 @@ def build(cfg: BuildConfig, log=print, progress=None):
     for mv, page, row, n in placed:
         m = spec_by[mv]
         names = []
+        from .cellfit import pivot_of
+        _px, _gy = pivot_of(cfg, mv)                     # v11.24: own pivot for a move fitted into the cell
+        _pn = {"x": round(_px / cfg.frame_w, 5), "y": round(_gy / cfg.frame_h, 5)}
         for i in range(n):
             fname = "%s_%02d" % (mv, i)
             names.append(fname)
@@ -1613,7 +1626,7 @@ def build(cfg: BuildConfig, log=print, progress=None):
                                    "page": page, "rotated": False, "trimmed": False,
                                    "spriteSourceSize": {"x": 0, "y": 0, "w": cfg.frame_w, "h": cfg.frame_h},
                                    "sourceSize": {"w": cfg.frame_w, "h": cfg.frame_h},
-                                   "pivot": js["meta"]["pivot_norm"], "duration": int(round(1000 / max(1, m.fps)))}
+                                   "pivot": _pn, "duration": int(round(1000 / max(1, m.fps)))}
         js["animations"][mv] = {"label": m.label or mv, "category": m.category, "frames": names, "fps": m.fps, "loop": bool(m.loop),
                                 "page": page, "image": page_names[page], "row": row, "count": n, "source": frames[mv][1]}
     if view_info:

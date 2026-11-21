@@ -361,7 +361,37 @@ class Rig:
         if tex is not None:
             from .render import render_textured
             return render_textured(P, self.fuv, tex, rs, (rxz[0] * scale, rxz[1] * scale))
-        return render_tris(P, np.zeros(len(self.F), int), None, rs, (rxz[0] * scale, rxz[1] * scale), rgb=self.face_colors(kit), two_sided=True)
+        vis = self.opaque_faces()
+        return render_tris(P[vis], np.zeros(int(vis.sum()), int), None, rs, (rxz[0] * scale, rxz[1] * scale),
+                           rgb=self.face_colors(kit)[vis], two_sided=True)
+
+    def opaque_faces(self):
+        """(nf,) bool: faces to draw. v11.24: hair / brow / lash cards are alpha-tested textures; drawn as flat colour
+        their see-through parts covered the face (long hair hid it). A face is kept when its texture is opaque at
+        its centre or at any of the points halfway to its corners."""
+        if "_opaque" in self._tri_cache:
+            return self._tri_cache["_opaque"]
+        keep = np.ones(len(self.F), bool)
+        if self.fuv is not None:
+            for mi, m in enumerate(self.materials):
+                tex = self.textures.get(m.get("texture")) if m.get("texture") else None
+                if tex is None or tex.mode not in ("RGBA", "LA"):
+                    continue
+                al = np.asarray(tex.getchannel("A"), float) / 255.0
+                if al.min() > 0.5:
+                    continue
+                sel = np.nonzero(self.fmat == mi)[0]
+                if not len(sel):
+                    continue
+                uv = self.fuv[sel]
+                c = uv.mean(1, keepdims=True)
+                pts = np.concatenate([c, (uv + c) / 2.0], 1)                  # centre + 3 half-way points
+                h, w = al.shape
+                x = np.clip((np.mod(pts[..., 0], 1.0) * w).astype(int), 0, w - 1)
+                y = np.clip((np.mod(pts[..., 1], 1.0) * h).astype(int), 0, h - 1)
+                keep[sel] = (al[y, x] >= 0.5).any(1)
+        self._tri_cache["_opaque"] = keep
+        return keep
 
     # ---------- transforms
     def apply_global(self, G):
