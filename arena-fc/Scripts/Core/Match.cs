@@ -1080,6 +1080,9 @@ public sealed partial class MatchEngine
             float distToGoal = Mx.FlatDist(ball.Pos, goalCentre);
             // Angle-cut: step toward the ball along the ball->goal line.
             float cutDist = Mx.Clamp((distToGoal - 6f) * .12f, 0f, 2.5f);
+            // Sweeper-keeper: with the ball far away he stands well off his line
+            // behind his defence (real keepers sit ~20 m behind the back line).
+            if (distToGoal > 25f) cutDist = MathF.Max(cutDist, Mx.Clamp((distToGoal - 25f) * .40f, 0f, 16f));
             Vector3 cutPos = goalCentre - ballToGoal * cutDist;
             float tx = cutPos.X;
             float tz = Mx.Clamp(ball.Pos.Z * .62f, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
@@ -1222,7 +1225,10 @@ public sealed partial class MatchEngine
                     Shoot(p, power);
                     return;
                 }
-                if ((press != null && pd < 2.1f && Rng.Next() < .20f) || Rng.Next() < .012f)
+                // Carriers with open grass ahead run with it; closed down at 2-9 m they move
+                // it on after a couple of touches (real median ~2 s on the ball).
+                float passRate = press == null || pd > 9f ? .012f : pd < 2.1f ? .20f : pd < 5f ? .07f : .03f;
+                if (Rng.Next() < passRate)
                 {
                     int t = FindBestPassTarget(p, Rng.Next() < .25f);
                     if (t >= 0) { PassTo(p, S.Players[t], 14f, false); return; }
@@ -1237,7 +1243,17 @@ public sealed partial class MatchEngine
         bool oppOwns = ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team;
         int chaser1 = ClosestToBall(p.Team, 0), chaser2 = ClosestToBall(p.Team, 1);
         int chaser3 = oppOwns ? ClosestToBall(p.Team, 2) : -1;
+        // Their pass in flight: one man goes for the interception, the rest hold shape
+        // (the passing side still sends two, so a team-mate can tidy up a loose one).
+        if (!oppOwns && PossessionTeam() >= 0 && PossessionTeam() != p.Team) chaser2 = -1;
         p.Pressing = false;
+        // The intended receiver of a pass in flight comes to meet it.
+        if (ball.Owner < 0 && ball.PassReceiver == p.Index && PossessionTeam() == p.Team)
+        {
+            p.Target = BallFocus();
+            p.Action = "run";
+            return;
+        }
         if (ourBall)
         {
             // Phase 2.7: off-ball runs — overlap/underlap/decoy/third-man.
@@ -1298,8 +1314,14 @@ public sealed partial class MatchEngine
                     if (p.Index != chaser1)
                     {
                         p.JockeyState = 1; // jockeying
-                        float lane = p.Index == chaser2 ? -1.1f : -2.4f;
-                        Vector3 side = new Vector3(0, 0, p.Index == chaser2 ? 2.4f : -2.4f);
+                        // Cover, not crowd: real carriers have their nearest opponent
+                        // ~6.5 m away (median) and within 2 m only 6% of the time; ours
+                        // were mobbed at 1.4 m by three players.
+                        // Near our box the cover tightens: there is no room to give.
+                        bool nearBox = Mx.FlatDist(carrier.Pos, GoalPos(carrier.Team)) < 30f;
+                        float lane = p.Index == chaser2 ? (nearBox ? -3f : -5.5f) : (nearBox ? -5f : -9f);
+                        float sz = nearBox ? 3f : 5f;
+                        Vector3 side = new Vector3(0, 0, p.Index == chaser2 ? sz : -sz);
                         p.Target = carrier.Pos + goalDir * lane + side;
                         // Contain: stay between carrier and goal.
                         if (Mx.FlatDist(p.Pos, carrier.Pos) < 3f)
@@ -1311,9 +1333,19 @@ public sealed partial class MatchEngine
                         p.JockeyState = 0;
                         // High pressing closes the carrier down; a low block
                         // stands off and invites the pass.
-                        float lane = .55f / Mx.Clamp(p.TacticsPressMult, .6f, 1.7f);
+                        // The presser closes to a standoff and jockeys (goal-side); he
+                        // steps in when the tackle logic says so.  High press = tighter.
+                        float lane = 2.6f / Mx.Clamp(p.TacticsPressMult, .6f, 1.7f);
+                        float gap = Mx.FlatDist(p.Pos, carrier.Pos);
+                        // Step in to challenge: on a heavy touch, near our goal, or in
+                        // short engagement windows (real defenders jockey, then commit).
+                        bool heavy = Mx.FlatDist(carrier.Pos, ball.Pos) > 1.1f || carrier.FirstTouchQuality < .4f;
+                        bool danger = Mx.FlatDist(carrier.Pos, GoalPos(carrier.Team)) < 28f;
+                        float phase = (S.Clock / MathF.Max(1f, Options.TimeSpeed) * .5f + p.Index * .37f) % 1f;
+                        if (heavy || danger || phase < .12f) lane = .9f;
                         p.Target = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f;
-                        p.Pressing = true;
+                        p.Pressing = gap > lane + 1.5f;   // sprint to close down, then contain
+                        p.JockeyState = gap <= lane + 1.5f ? 2 : 0;
                     }
                 }
                 else
@@ -1361,7 +1393,7 @@ public sealed partial class MatchEngine
                 bool presser = p.Index == ClosestToBall(p.Team, 0);
                 float looseTouch = Mx.FlatDist(carrier.Pos, ball.Pos) > .45f || carrier.FirstTouchQuality < .5f ? .22f : 0f;
                 float aggression = presser
-                    ? .10f + Options.Difficulty * .03f + (p.Spec.Defending - .5f) * .06f + looseTouch
+                    ? .22f + Options.Difficulty * .04f + (p.Spec.Defending - .5f) * .08f + looseTouch
                     : .01f;
                 if (p.Team != carrier.Team && d < 2.0f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
@@ -1387,17 +1419,20 @@ public sealed partial class MatchEngine
         float scale = Mx.HalfLength * .94f;
         float bx = Mx.Clamp(ballPos.X * attack / scale, -1f, 1f);        // ball, own frame
         float progress = (bx + 1f) * .5f;                                 // 0 own goal .. 1 their goal
-        bool inPossession = State.Ball.Owner >= 0 && State.Players[State.Ball.Owner].Team == p.Team;
+        bool inPossession = PossessionTeam() == p.Team;
         float width = Mx.Clamp(p.TacticsWidthMult, .6f, 1.4f);
         float bz = Mx.Clamp(ballPos.Z / Mx.HalfWidth, -1f, 1f);
         float x, z;
         if (inPossession)
         {
-            float push = .20f + .62f * progress;
+            // Defenders step up less than the rest: real teams in possession are
+            // ~34 m long back-to-front (ours were 23 m - the back line pushed up to
+            // the forwards).
+            float push = p.Role == Role.Defender ? .10f + .45f * progress : .22f + .66f * progress;
             x = slot.x + push;
             // Wide players and full-backs stretch to the touchline in possession
             // (the ball used to never go wider than ~25 m from the centre line).
-            float zs = MathF.Abs(slot.z) > .45f ? slot.z * 1.48f : slot.z * 1.08f;
+            float zs = MathF.Abs(slot.z) > .45f ? slot.z * 1.55f : slot.z * 1.25f;
             z = Mx.Clamp((zs + bz * .12f) * width, -.97f, .97f);
             if (p.Role == Role.Forward || p.Role == Role.Midfielder)
             {
@@ -1408,9 +1443,10 @@ public sealed partial class MatchEngine
         else
         {
             // Compact block centred a little goal-side of the ball.
-            float centre = bx * .55f - .12f;
-            x = centre + (slot.x + .34f) * .62f;
-            z = (slot.z * .80f + bz * .30f) * width;
+            // Real blocks out of possession: ~30 m long, ~33 m wide (ours: 23 / 39).
+            float centre = bx * .50f - .16f;
+            x = centre + (slot.x + .34f) * .76f;
+            z = (slot.z * .66f + bz * .28f) * width;
             if (p.Role == Role.Defender) x = MathF.Min(x, bx - .03f);
             x = MathF.Max(x, -.80f);
         }
@@ -1434,6 +1470,19 @@ public sealed partial class MatchEngine
         }
         // Never behind halfway (you can't be offside in your own half).
         return MathF.Max(second == float.MinValue ? 0f : second, 0f);
+    }
+
+    /// <summary>The team that has the ball - including a pass on its way to a team-mate
+    /// (both teams used to drop into their out-of-possession block, and chase, every
+    /// time a pass was in the air).  -1 for a genuinely loose ball.</summary>
+    private int PossessionTeam()
+    {
+        var b = State.Ball;
+        if (b.Owner >= 0) return State.Players[b.Owner].Team;
+        if (b.PassReceiver >= 0 && b.PassReceiver < State.Players.Length && b.FreeTime < 3f && b.LastTouchSide >= 0
+            && State.Players[b.PassReceiver].Team == b.LastTouchSide)
+            return b.LastTouchSide;
+        return -1;
     }
 
     private PlayerState? NearestOpponent(PlayerState p, out float dist)
@@ -2280,7 +2329,22 @@ public sealed partial class MatchEngine
             if (d.Length() > .35f) wish = Mx.Norm(d);
             // Assisted dribble/positioning keeps the match flowing when the human lets
             // go of the stick; active stick input always overrides p.Target above.
-            sprint = !human && (Mx.FlatDist(p.Pos, p.Target) > 5f || p.Pressing) && p.Stamina > .25f;
+            // Calibrated against real tracking (SkillCorner open data, A-League): players
+            // averaged 2.1 m/s and sprinted (>7 m/s) 0.6% of the time; ours ran 4.3 m/s
+            // and sprinted 11%.  Off the ball a player now walks/jogs to a target that is
+            // close, runs to one further away, and sprints only to a far target or a duel.
+            float dist = d.Length();
+            bool urgent = p.Pressing || State.Ball.Owner == p.Index
+                          || (State.Ball.Owner < 0 && Mx.FlatDist(p.Target, BallFocus()) < 3f);
+            sprint = !human && (dist > (urgent ? 5f : 20f) || p.Pressing) && p.Stamina > .25f;
+            if (!urgent && !sprint && wish.LengthSquared() > 0f)
+            {
+                // Arrival in real units: walk (<2 m away), jog (~2.5-3.5 m/s up to 10 m),
+                // run (~5 m/s) to 20 m; sprint beyond (above).
+                float want = dist < 2f ? 1.0f + dist * .35f : dist < 10f ? 2.2f + (dist - 2f) * .16f : 3.5f + MathF.Min(1f, (dist - 10f) / 10f) * 1.6f;
+                float top = p.MaxSpeed * Mx.Lerp(.72f, 1f, p.Stamina);
+                wish *= MathF.Min(1f, want / MathF.Max(1f, top));
+            }
         }
         // Restart taker must play the ball, not run off with it.
         // An AI taker stands over the ball until he plays it.  A human is free to

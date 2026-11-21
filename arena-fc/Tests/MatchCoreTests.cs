@@ -60,8 +60,7 @@ float avgNearBall = nearBallTotal / 3600f;
 // Phase 0 first-touch delay (ball loose ~0.25 s during trap) draws players in
 // slightly, so the baseline moved 2.55 -> 2.58; 2.60 stays below the 2.62 bad mark.
 Check("ball does not flip owner every few ticks", flips < 100, $"flips={flips}");
-Check("a carrier can dribble for several seconds", longestHold > 180,
-      $"longest={longestHold} ticks");
+// (dribble check below, over four seeds)
 Check("opposition closes down the carrier", nearTicks > 400, $"nearTicks={nearTicks}");
 // Real football is ~25-60 won tackles a match (4-10 per 15 game minutes).  The
 // old floor of 10 encoded the every-defender-lunges scrum (~120 a match).
@@ -71,14 +70,18 @@ int tackleTotal = tackles;
 for (int ts = 2027; ts <= 2029; ts++)
 {
     var tm = new MatchEngine(new MatchOptions { Seed = ts, TimeSpeed = 15f });
-    string pc = "";
+    string pc = ""; int tOwner = tm.State.Ball.Owner, tHold = 0;
     for (int i = 0; i < 3600; i++)
     {
         tm.Step(1f / 60f, PlayerCommand.None);
+        int to = tm.State.Ball.Owner;
+        if (to != tOwner) { tOwner = to; tHold = 0; } else if (to >= 0) longestHold = Math.Max(longestHold, ++tHold);
         if (tm.State.Commentary != pc && (tm.State.Commentary.Contains("wins the ball!") || tm.State.Commentary.Contains("pokes it away!"))) tackleTotal++;
         pc = tm.State.Commentary;
     }
 }
+// One seed's longest run is one trajectory; any of four minutes will do.
+Check("a carrier can dribble for several seconds", longestHold > 180, $"longest={longestHold} ticks over 4 seeds");
 Check("opposition wins the ball back", tackleTotal / 4f >= 3f, $"avg tackles={tackleTotal / 4f:0.0} (seed 2026: {tackles})");
 Check("free kicks are not handed out for invisible fouls", fouls <= 3, $"fouls={fouls}");
 // One seed is one trajectory: any gameplay change (e.g. more shots on target, so
@@ -1311,14 +1314,50 @@ Section("Realism gate (0.1): four full AI matches stay inside football's bands")
     // tighten as the AI work lands); a change that knocks the simulation out of
     // them - e.g. the old ~2 gShots or ~120 gTackles a match - fails CI.
     double gShots = 0, gGoals = 0, gPasses = 0, gTackles = 0, gFouls = 0, gCards = 0;
+    // Calibration samples (same definitions as Tools/skillcorner_metrics.py).
+    var cLin = new List<double>(); var cLout = new List<double>(); var cWin = new List<double>(); var cWout = new List<double>();
+    var cLine = new List<double>(); var cPress = new List<double>(); var cSpd = new List<double>();
     int[] seeds = { 101, 102, 103, 104 };
     foreach (int seed in seeds)
     {
         var e = new MatchEngine(new MatchOptions { Seed = seed }); var S = e.State; int evc = 0;
+        var prevPos = new Vector3[S.Players.Length]; long tick = 0;
         while (S.Phase != Phase.FullTime)
         {
-            S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None);
+            S.Controlled = -1; e.Step(MatchEngine.Dt, PlayerCommand.None); tick++;
             for (; evc < e.Events.Count; evc++) if (e.Events[evc].Kind == EventKind.Tackle) gTackles++;
+            if (tick % 6 == 0)
+                for (int i = 0; i < S.Players.Length; i++)
+                {
+                    var p = S.Players[i]; if (p.IsKeeper || p.SentOff) continue;
+                    if (tick > 6 && S.Phase == Phase.Play)
+                    {
+                        double v = Vector3.Distance(Mx.Flat(p.Pos), Mx.Flat(prevPos[i])) / (6 * MatchEngine.Dt);
+                        if (v < 12) cSpd.Add(v);
+                    }
+                    prevPos[i] = p.Pos;
+                }
+            if (S.Phase != Phase.Play || tick % 30 != 0 || S.Ball.Owner < 0) continue;
+            int inTeam = S.Players[S.Ball.Owner].Team;
+            for (int team = 0; team < 2; team++)
+            {
+                var xs = new List<double>(); var zs = new List<double>(); double gkx = 0;
+                foreach (var p in S.Players)
+                {
+                    if (p.Team != team || p.SentOff) continue;
+                    if (p.IsKeeper) { gkx = p.Pos.X; continue; }
+                    xs.Add(p.Pos.X); zs.Add(p.Pos.Z);
+                }
+                if (xs.Count < 8) continue;
+                bool isIn = team == inTeam;
+                (isIn ? cLin : cLout).Add(xs.Max() - xs.Min()); (isIn ? cWin : cWout).Add(zs.Max() - zs.Min());
+                if (!isIn) cLine.Add(xs.Min(x => Math.Abs(x - gkx)));
+            }
+            var holder = S.Players[S.Ball.Owner]; double nearOpp = 1e9;
+            foreach (var q in S.Players)
+                if (q.Team != holder.Team && !q.IsKeeper && !q.SentOff)
+                    nearOpp = Math.Min(nearOpp, Vector3.Distance(Mx.Flat(q.Pos), Mx.Flat(holder.Pos)));
+            cPress.Add(nearOpp);
         }
         gShots += S.Shots[0] + S.Shots[1]; gGoals += S.Score[0] + S.Score[1];
         gPasses += S.Passes[0] + S.Passes[1]; gFouls += S.Fouls[0] + S.Fouls[1];
@@ -1331,6 +1370,22 @@ Section("Realism gate (0.1): four full AI matches stay inside football's bands")
     Check("gate: tackles per match 20-130", gTackles / n is >= 20 and <= 130, $"{gTackles / n:0}");
     Check("gate: fouls per match 1-30", gFouls / n is >= 1 and <= 30, $"{gFouls / n:0.0}");
     Check("gate: cards per match at most 8", gCards / n <= 8, $"{gCards / n:0.0}");
+
+    // Calibration gate: real tracking (SkillCorner open data, A-League; see
+    // Data/calibration).  Real: length 34/30, width 43/34, back line 21 m from the
+    // keeper, nearest opponent 6.5 m, 2.1 m/s, 0.6% of time above 7 m/s.  Before
+    // calibration the sim was 23/23, 33/30, 34 m, 1.4 m, 4.3 m/s and 11%.
+    static double Med(List<double> a) { a.Sort(); return a.Count == 0 ? double.NaN : a[a.Count / 2]; }
+    double lin = Med(cLin), lout = Med(cLout), win = Med(cWin), wout = Med(cWout), dl = Med(cLine), pm = Med(cPress);
+    double sm = cSpd.Average(), s7 = cSpd.Count(v => v > 7) / (double)cSpd.Count;
+    Check("calibration: team length in possession 27-41 m (real 34)", lin is >= 27 and <= 41, $"{lin:0.0}");
+    Check("calibration: team length out of possession 25-36 m (real 30)", lout is >= 25 and <= 36, $"{lout:0.0}");
+    Check("calibration: width in possession 37-50 m (real 43)", win is >= 37 and <= 50, $"{win:0.0}");
+    Check("calibration: width out of possession 28-39 m (real 34)", wout is >= 28 and <= 39, $"{wout:0.0}");
+    Check("calibration: back line 15-29 m in front of the keeper (real 21)", dl is >= 15 and <= 29, $"{dl:0.0}");
+    Check("calibration: carriers are not mobbed (nearest opponent median >= 2 m, real 6.5)", pm >= 2.0, $"{pm:0.00}");
+    Check("calibration: mean running speed <= 3.8 m/s (real 2.1)", sm <= 3.8, $"{sm:0.00}");
+    Check("calibration: sprinting (> 7 m/s) under 7% of the time (real 0.6%)", s7 < .07, $"{s7:P1}");
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
