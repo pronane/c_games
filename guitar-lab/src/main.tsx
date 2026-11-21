@@ -22,6 +22,7 @@ import MidiInput from "./MidiInput";
 import InstrumentSetup from "./InstrumentSetup";
 import SongLab from "./SongLab";
 import PracticeStudio from "./PracticeStudio";
+import RiffToTab from "./RiffToTab";
 import ListeningReviewer from "./ListeningReviewer";
 import type { PracticeSeed } from "./practiceProject";
 import { MEDIA_ACCEPT } from "./audioFiles";
@@ -365,6 +366,7 @@ function App() {
           }}
         />
         <PracticeStudio seed={practiceSeed} />
+        <RiffToTab settings={settings} />
         <div className="step-line" id="compare">
           <span className="step selected">
             1 <b>Set up your session</b>
