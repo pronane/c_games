@@ -12,9 +12,12 @@ export function onGrid(notes: HeardNote[], firstBeat: number, slack = 0.08): Hea
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-/** String labels, top line first (string 1 = highest); the top E is written lower-case as tabs do. */
+/**
+ * String labels, top line first. `openStrings` is the instrument profile's order: string 1
+ * (the highest) first. The top E is written lower-case as tabs do.
+ */
 export function stringLabels(openStrings: number[]) {
-  const high = [...openStrings].reverse().map((m) => NAMES[m % 12]);
+  const high = openStrings.map((m) => NAMES[m % 12]);
   if (high.length > 1 && high[0] === high[high.length - 1]) high[0] = high[0].toLowerCase();
   const width = Math.max(...high.map((h) => h.length));
   return high.map((h) => h.padEnd(width));

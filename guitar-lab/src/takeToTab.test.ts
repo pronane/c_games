@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { onGrid, stringLabels, tabText } from "./takeToTab";
 
-const STD = [40, 45, 50, 55, 59, 64];
+const STD = [64, 59, 55, 50, 45, 40]; // string 1 (high e) first, as the instrument profile gives it
 
 test("notes move so bar 1 starts at 0", () => {
   const out = onGrid(
@@ -18,7 +18,7 @@ test("notes move so bar 1 starts at 0", () => {
 
 test("string labels, high e first", () => {
   assert.deepEqual(stringLabels(STD), ["e", "B", "G", "D", "A", "E"]);
-  assert.deepEqual(stringLabels([38, 45, 50, 55, 59, 64]), ["E", "B", "G", "D", "A", "D"]);
+  assert.deepEqual(stringLabels([64, 59, 55, 50, 45, 38]), ["E", "B", "G", "D", "A", "D"]);
 });
 
 test("text tab on a 16th grid", () => {
