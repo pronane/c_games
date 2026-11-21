@@ -9,7 +9,7 @@ const INLAYS = [3, 5, 7, 9, 15, 17, 19, 21];
 export function place(n: BoardNote, openStrings: number[], maxFret: number): Pos | null {
   if (n.string && n.fret != null && n.string >= 1 && n.string <= openStrings.length) return { string: n.string, fret: n.fret };
   const options = openStrings
-    .map((open, i) => ({ string: openStrings.length - i, fret: n.midi - open }))
+    .map((open, i) => ({ string: i + 1, fret: n.midi - open }))
     .filter((p) => p.fret >= 0 && p.fret <= maxFret)
     .sort((a, b) => a.fret - b.fret);
   return options[0] ?? null;
@@ -17,7 +17,7 @@ export function place(n: BoardNote, openStrings: number[], maxFret: number): Pos
 
 /**
  * The neck, high e at the top, with the notes sounding now lit and the next ones fading in.
- * `openStrings` is low to high (MIDI), as the instrument profile gives it; string 1 is the highest.
+ * `openStrings` is in the instrument profile's order: string 1 (the highest) first.
  */
 export default function Fretboard({
   notes,

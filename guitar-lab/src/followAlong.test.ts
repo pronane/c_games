@@ -40,7 +40,7 @@ test("take notes land on the song clock", () => {
 });
 
 test("notes are placed on the tab's string, else the lowest fret", () => {
-  const std = [40, 45, 50, 55, 59, 64];
+  const std = [64, 59, 55, 50, 45, 40]; // string 1 (high e) first, as the profile gives it
   assert.deepEqual(place({ time: 0, duration: 1, midi: 64, string: 2, fret: 5 }, std, 22), { string: 2, fret: 5 });
   assert.deepEqual(place({ time: 0, duration: 1, midi: 64 }, std, 22), { string: 1, fret: 0 });
   assert.deepEqual(place({ time: 0, duration: 1, midi: 41 }, std, 22), { string: 6, fret: 1 });
