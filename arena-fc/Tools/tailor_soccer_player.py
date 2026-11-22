@@ -50,8 +50,8 @@ def tailor_glb(src, dst=GLB, check=False, log=print):
     for pre in man.get("variant_prefixes", ["v0_"]):
         parts = T.read_parts(src, pre)
         log(pre)
-        # the keeper's long-sleeved base layer and gloves ride along hidden; SoccerClipRig shows them on keepers
-        out[pre] = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments(), log=log)
+        # the keeper's base layer and gloves, and staff trousers, ride along hidden; SoccerClipRig shows them per role
+        out[pre] = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments() + T.staff_garments(), log=log)
         errs += ["%s%s" % (pre, e) for e in T.qa(out[pre], bones)]
     if errs or check:
         return errs

@@ -25,6 +25,8 @@ public partial class Boot : Node3D
     private MatchView? _view;
     private int _offShot = -1;
     private Camera3D? _offCam;
+    private int _touchShot = -1;
+    private Camera3D? _touchCam;
     private int _shotFrame = 24;
     private int _frames;
 
@@ -158,6 +160,14 @@ public partial class Boot : Node3D
                 _offCam = new Camera3D { Fov = 40, Far = 400f };
                 AddChild(_offCam);
             }
+            // --touchline-shot K: QA cameras on the touchline (0 home dugout, 1 photographers at a goal,
+            // 2 corner flag, 3 a goal bulging the net)
+            if (Has("--touchline-shot"))
+            {
+                _touchShot = Math.Clamp(ArgInt("--touchline-shot", 0), 0, 3);
+                _touchCam = new Camera3D { Fov = 42, Far = 400f };
+                AddChild(_touchCam);
+            }
             // --camera N: start on a given broadcast camera (QA captures of close-ups / officials)
             if (Has("--camera")) view.Cam.Mode = Math.Clamp(ArgInt("--camera", 0), 0, BroadcastCamera.ModeCount - 1);
         }
@@ -225,6 +235,24 @@ public partial class Boot : Node3D
             _offCam.Position = r.GlobalPosition + f * 4.2f + new Vector3(1.2f, 1.5f, 0);
             _offCam.LookAt(r.GlobalPosition + new Vector3(0, 1.0f, 0), Vector3.Up);
             _offCam.MakeCurrent();
+        }
+
+        if (_touchCam != null && _view != null)
+        {
+            float hl = Mx.HalfLength, hw = Mx.HalfWidth;
+            var stadium = _view.GetNodeOrNull<Stadium>("Stadium");
+            (Vector3 eye, Vector3 at) = _touchShot switch
+            {
+                0 => (new Vector3(-6.5f, 1.7f, -hw - 0.6f), new Vector3(-9.5f, .7f, -hw - 3.9f)),
+                1 => (new Vector3(hl - 9f, 1.9f, 10.5f), new Vector3(hl + 2f, .7f, 5f)),
+                2 => (new Vector3(hl - 3.2f, 1.3f, hw - 2.6f), new Vector3(hl, .9f, hw)),
+                _ => (new Vector3(hl + 5.5f, 1.8f, 6.5f), new Vector3(hl + 1.2f, 1.1f, 0f)),
+            };
+            _touchCam.Position = eye;
+            _touchCam.LookAt(at, Vector3.Up);
+            _touchCam.MakeCurrent();
+            if (_touchShot == 3 && _frames == Math.Max(1, _shotFrame - 4))
+                stadium?.NetImpact(new Vector3(hl + .4f, 1.3f, .8f), new Vector3(26f, 1.5f, 1f));
         }
 
         if (!_shot) return;

@@ -349,8 +349,9 @@ public sealed partial class SoccerClipRig : Node3D
         {
             string n = mi.Name.ToString();
             if (n.Length > 3 && n[0] == 'v' && n[2] == '_')
-                mi.Visible = n.StartsWith(pick) && (spec.IsKeeper || !IsKeeperOnly(n));
+                mi.Visible = n.StartsWith(pick) && OptionalLayerShown(n, spec.IsKeeper, spec.IsKeeper || spec.LongSleeves, false);
         }
+        _pick = pick;
         foreach (var mi in _meshes) if (mi.Visible) { Mesh = mi; break; }
         ApplyLods(pick);
     }
@@ -395,8 +396,66 @@ public sealed partial class SoccerClipRig : Node3D
     }
     private static bool _lodLogged;
 
-    /// <summary>Goalkeeper-only garments (Sprite Forge tailor.keeper_garments): long-sleeved base layer, gloves.</summary>
-    private static bool IsKeeperOnly(string node) => node.Contains("_sleeves") || node.Contains("_gloves");
+    /// <summary>Optional garments (Sprite Forge tailor.keeper_garments / staff_garments): the long-sleeved base
+    /// layer, gloves and trousers ride along in every identity, hidden unless the role wears them.</summary>
+    private static bool OptionalLayerShown(string node, bool gloves, bool sleeves, bool trousers)
+        => node.Contains("_gloves") ? gloves : node.Contains("_sleeves") ? sleeves : !node.Contains("_trousers") || trousers;
+    private string _pick = "";
+
+    // ---- Touchline figures (Sprite Forge pitchside v11.38): a role's clothes and a looping clip ----
+    /// <summary>Show the identity's optional layers for a pitch-side role (base layer, trousers, gloves).</summary>
+    public void Wear(bool sleeves, bool trousers, bool gloves = false)
+    {
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (_pick == "" || !n.StartsWith(_pick)) continue;
+            if (n.Contains("_sleeves") || n.Contains("_trousers") || n.Contains("_gloves"))
+                mi.Visible = OptionalLayerShown(n, gloves, sleeves, trousers);
+        }
+    }
+
+    /// <summary>Recolour one non-kit layer of this player (e.g. a sub's sleeves in the team colour under his bib).</summary>
+    public void SetLayerColor(string layer, Color c)
+    {
+        foreach (var mi in _meshes)
+        {
+            if (mi.Mesh == null) continue;
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+                if (mi.GetSurfaceOverrideMaterial(i) is StandardMaterial3D m && m.ResourceName == layer) m.AlbedoColor = c;
+        }
+    }
+
+    /// <summary>Play a looping clip from `phase` (0..1) at `speed`; no locomotion, no match state.</summary>
+    public void PlayLoop(string clip, float phase, float speed = 1f)
+    {
+        if (Player == null || !Player.HasAnimation(clip)) return;
+        var anim = Player.GetAnimation(clip);
+        anim.LoopMode = Animation.LoopModeEnum.Linear;
+        Player.Play(clip, .3f);
+        Player.Seek(phase * anim.Length, true);
+        Player.SpeedScale = speed;
+        _current = clip;
+    }
+
+    /// <summary>Play a one-shot clip once; -> its length in seconds (0 when missing).</summary>
+    public float PlayOnce(string clip)
+    {
+        if (Player == null || !Player.HasAnimation(clip)) return 0f;
+        Player.Play(clip, .15f);
+        Player.Seek(0, true);
+        Player.SpeedScale = 1f;
+        _current = clip;
+        return (float)Player.GetAnimation(clip).Length;
+    }
+
+    /// <summary>World position of the hips (for sitting a figure on a seat).</summary>
+    public Vector3 HipsWorld()
+    {
+        if (Skel == null) return Vector3.Zero;
+        int b = FindBoneLoose(Skel, "Hips");
+        return b < 0 ? Vector3.Zero : (Skel.GlobalTransform * Skel.GetBoneGlobalPose(b)).Origin;
+    }
 
     /// <summary>Club / character colour for a material name, or null to keep it as authored:
     /// kit slots take the club colours, the hair family the player's hair colour, a flat
@@ -412,6 +471,7 @@ public sealed partial class SoccerClipRig : Node3D
             case "hair": case "beard_shell": case "facial_hair": return spec.HairColor;
             case "skin": return spec.SkinHex;
             case "sleeves": return spec.KitPrimary;      // keeper base layer in the shirt colour
+            case "trousers": return spec.ShortsColor;    // staff trousers (pitch-side roles)
             case "gloves": return spec.GlovesColor;
         }
         if (layer.StartsWith("hair_") || layer.StartsWith("eyebrows_") || layer.StartsWith("eyelashes_")) return spec.HairColor;

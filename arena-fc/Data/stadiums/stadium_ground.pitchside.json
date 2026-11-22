@@ -1,0 +1,371 @@
+{
+ "pack": "sforge.pitchside v11.38",
+ "spots": [
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -10.07,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.18294445528102166,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -9.36,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.17030274486018906,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -8.649999999999999,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.1576058318238399,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -7.9399999999999995,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.14485747319749426,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -7.2299999999999995,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.13206152336099128,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -6.52,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.11922192782631921,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 0,
+   "pos": [
+    -5.81,
+    0.52,
+    -38.1
+   ],
+   "yaw": 0.1063427165923979,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "manager",
+   "team": 0,
+   "pos": [
+    -10.6,
+    0.0,
+    -35.120000000000005
+   ],
+   "yaw": 0.29312781119930276,
+   "clip": "manager_watch"
+  },
+  {
+   "role": "assistant",
+   "team": 0,
+   "pos": [
+    -6.2,
+    0.0,
+    -36.02
+   ],
+   "yaw": 0.17045629220175557,
+   "clip": "staff_stand"
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    5.8,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.10616105594469079,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    6.51,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.11904079598631578,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    7.22,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.1318809776592785,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    8.64,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.1574266257317351,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    10.059999999999999,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.1827668032147152,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    10.77,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.19535051096860243,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "sub",
+   "team": 1,
+   "pos": [
+    12.19,
+    0.52,
+    -38.1
+   ],
+   "yaw": -0.2203274343218334,
+   "clip": "sub_sit",
+   "seated": true
+  },
+  {
+   "role": "manager",
+   "team": 1,
+   "pos": [
+    10.6,
+    0.0,
+    -35.120000000000005
+   ],
+   "yaw": -0.29312781119930276,
+   "clip": "manager_watch"
+  },
+  {
+   "role": "assistant",
+   "team": 1,
+   "pos": [
+    6.2,
+    0.0,
+    -36.02
+   ],
+   "yaw": -0.17045629220175557,
+   "clip": "staff_stand"
+  },
+  {
+   "role": "ballkid",
+   "team": -1,
+   "pos": [
+    -23.625,
+    0.0,
+    37.2
+   ],
+   "yaw": 2.5757771546476658,
+   "clip": "ballkid_ready"
+  },
+  {
+   "role": "ballkid",
+   "team": -1,
+   "pos": [
+    23.625,
+    0.0,
+    37.2
+   ],
+   "yaw": -2.5757771546476658,
+   "clip": "ballkid_ready"
+  },
+  {
+   "role": "ballkid",
+   "team": -1,
+   "pos": [
+    -55.5,
+    0.0,
+    -20.4
+   ],
+   "yaw": 1.218557630131845,
+   "clip": "ballkid_ready"
+  },
+  {
+   "role": "ballkid",
+   "team": -1,
+   "pos": [
+    -55.5,
+    0.0,
+    20.4
+   ],
+   "yaw": 1.9230350234579483,
+   "clip": "ballkid_ready"
+  },
+  {
+   "role": "ballkid",
+   "team": -1,
+   "pos": [
+    55.5,
+    0.0,
+    -20.4
+   ],
+   "yaw": -1.218557630131845,
+   "clip": "ballkid_ready"
+  },
+  {
+   "role": "ballkid",
+   "team": -1,
+   "pos": [
+    55.5,
+    0.0,
+    20.4
+   ],
+   "yaw": -1.9230350234579483,
+   "clip": "ballkid_ready"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    -55.152274129478975,
+    0.0,
+    -5.567045783529587
+   ],
+   "yaw": 1.490219525006367,
+   "clip": "photographer_kneel"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    -55.3977501417172,
+    0.0,
+    5.632098411244695
+   ],
+   "yaw": 1.6519509368418284,
+   "clip": "photographer_kneel"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    -55.21108961472058,
+    0.0,
+    -7.675597151528252
+   ],
+   "yaw": 1.4600333290505154,
+   "clip": "photographer_stand"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    -55.0076543491178,
+    0.0,
+    7.793376088609131
+   ],
+   "yaw": 1.6836571062973789,
+   "clip": "photographer_kneel"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    55.20626980213651,
+    0.0,
+    -5.396127220314707
+   ],
+   "yaw": -1.492759262652,
+   "clip": "photographer_kneel"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    54.9178401393868,
+    0.0,
+    5.326365204776829
+   ],
+   "yaw": -1.648231490905217,
+   "clip": "photographer_kneel"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    55.133103012662644,
+    0.0,
+    -7.508933292162822
+   ],
+   "yaw": -1.4622672834340154,
+   "clip": "photographer_stand"
+  },
+  {
+   "role": "photographer",
+   "team": -1,
+   "pos": [
+    55.21461312724551,
+    0.0,
+    7.750300663915711
+   ],
+   "yaw": -1.682621336278173,
+   "clip": "photographer_kneel"
+  }
+ ]
+}

@@ -54,7 +54,7 @@ def main() -> int:
     for v in todo:
         mine = {p["name"][len(v) + 1:]: T.Part(p["name"], p["V"], p["N"], p["UV"], p["J"], p["W"], p["F"], p["material"])
                 for p in parts if p["name"].startswith(v + "_")}
-        kit = T.tailor(mine, bones, garments=T.soccer_garments() + T.keeper_garments(), log=lambda *a: None)
+        kit = T.tailor(mine, bones, garments=T.soccer_garments() + T.keeper_garments() + T.staff_garments(), log=lambda *a: None)
         errs = T.qa(kit, bones)
         if errs:
             print(v, "kit QA failed:", errs)
