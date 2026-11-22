@@ -1,0 +1,2294 @@
+{
+ "source": "SoccerTrack v2 (CC BY 4.0) via sforge.matchcapture events",
+ "licence": {
+  "spdx": "CC-BY-4.0",
+  "custom_text": "",
+  "author": "Atom Scott, Ikuma Uchida, Kento Kuroda, Yufi Kim, Keisuke Fujii (SoccerTrack v2)",
+  "source_url": "https://huggingface.co/datasets/atomscott/soccertrack-v2",
+  "redistribution": "yes",
+  "attribution": "Motion derived from SoccerTrack v2 (Scott et al., CC BY 4.0); changed: 3D pose estimated and fitted to a game skeleton.",
+  "notes": "Anonymous joint motion from match video (no images kept). Models: RTMPose-l body + feet (Halpe-26), OpenMMLab (Apache-2.0 (code and weights release)); Sprite Forge 2D->3D pose lifter v1 (trained here) (MIT (derived from SkillCorner Open Data body pose, MIT))"
+ },
+ "candidates": 3631,
+ "rejected": {
+  "kick swing not seen": 624,
+  "legs hidden": 58,
+  "not running": 969,
+  "shaky": 80,
+  "fit error": 191,
+  "kind not imported: throw_in": 53,
+  "checks: loop": 19,
+  "checks: move": 30,
+  "checks: loop,turning": 1
+ },
+ "takes": [
+  {
+   "name": "st_pass_01",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.475,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.27,
+   "leg_visibility": 0.767
+  },
+  {
+   "name": "st_pass_02",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.63,
+   "leg_visibility": 0.742
+  },
+  {
+   "name": "st_free_kick_01",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.5625,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.93,
+   "leg_visibility": 0.73
+  },
+  {
+   "name": "st_pass_03",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.575,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.68,
+   "leg_visibility": 0.716
+  },
+  {
+   "name": "st_lofted_01",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6977,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.86,
+   "leg_visibility": 0.748
+  },
+  {
+   "name": "st_pass_04",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.6,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.63,
+   "leg_visibility": 0.753
+  },
+  {
+   "name": "st_pass_05",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.68,
+   "leg_visibility": 0.748
+  },
+  {
+   "name": "st_pass_06",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.65,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.75
+  },
+  {
+   "name": "st_pass_07",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.96,
+   "leg_visibility": 0.697
+  },
+  {
+   "name": "st_pass_08",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.7,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.08,
+   "leg_visibility": 0.759
+  },
+  {
+   "name": "st_pass_09",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.86,
+   "leg_visibility": 0.694
+  },
+  {
+   "name": "st_lofted_02",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6512,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.24,
+   "leg_visibility": 0.726
+  },
+  {
+   "name": "st_pass_10",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.775,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.82,
+   "leg_visibility": 0.743
+  },
+  {
+   "name": "st_pass_11",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.675,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.7,
+   "leg_visibility": 0.765
+  },
+  {
+   "name": "st_pass_12",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.7,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.39,
+   "leg_visibility": 0.702
+  },
+  {
+   "name": "st_pass_13",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.65,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.62,
+   "leg_visibility": 0.721
+  },
+  {
+   "name": "st_pass_14",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.6,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.52,
+   "leg_visibility": 0.713
+  },
+  {
+   "name": "st_pass_15",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.775,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.09,
+   "leg_visibility": 0.776
+  },
+  {
+   "name": "st_pass_16",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.81,
+   "leg_visibility": 0.792
+  },
+  {
+   "name": "st_pass_17",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.5,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.58,
+   "leg_visibility": 0.729
+  },
+  {
+   "name": "st_pass_18",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.775,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.98,
+   "leg_visibility": 0.732
+  },
+  {
+   "name": "st_pass_19",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.6,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.06,
+   "leg_visibility": 0.744
+  },
+  {
+   "name": "st_pass_20",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.775,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.48,
+   "leg_visibility": 0.742
+  },
+  {
+   "name": "st_pass_21",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.6,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.94,
+   "leg_visibility": 0.743
+  },
+  {
+   "name": "st_lofted_03",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5581,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.14,
+   "leg_visibility": 0.745
+  },
+  {
+   "name": "st_pass_22",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.86,
+   "leg_visibility": 0.742
+  },
+  {
+   "name": "st_pass_23",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.03,
+   "leg_visibility": 0.747
+  },
+  {
+   "name": "st_lofted_04",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6512,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.96,
+   "leg_visibility": 0.747
+  },
+  {
+   "name": "st_pass_24",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.7,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.8,
+   "leg_visibility": 0.746
+  },
+  {
+   "name": "st_pass_25",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.6,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.64,
+   "leg_visibility": 0.749
+  },
+  {
+   "name": "st_lofted_05",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6279,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.82,
+   "leg_visibility": 0.728
+  },
+  {
+   "name": "st_pass_26",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.66,
+   "leg_visibility": 0.761
+  },
+  {
+   "name": "st_pass_27",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.63,
+   "leg_visibility": 0.73
+  },
+  {
+   "name": "st_pass_28",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.7,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.03,
+   "leg_visibility": 0.745
+  },
+  {
+   "name": "st_pass_29",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.675,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.15,
+   "leg_visibility": 0.731
+  },
+  {
+   "name": "st_pass_30",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.64,
+   "leg_visibility": 0.789
+  },
+  {
+   "name": "st_pass_31",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.63,
+   "leg_visibility": 0.75
+  },
+  {
+   "name": "st_pass_32",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.5,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.14,
+   "leg_visibility": 0.746
+  },
+  {
+   "name": "st_pass_33",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.775,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.67,
+   "leg_visibility": 0.652
+  },
+  {
+   "name": "st_pass_34",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.65,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.48,
+   "leg_visibility": 0.712
+  },
+  {
+   "name": "st_pass_35",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.7,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.59,
+   "leg_visibility": 0.716
+  },
+  {
+   "name": "st_pass_36",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.95,
+   "leg_visibility": 0.728
+  },
+  {
+   "name": "st_pass_37",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.65,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.702
+  },
+  {
+   "name": "st_pass_38",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.725,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.28,
+   "leg_visibility": 0.745
+  },
+  {
+   "name": "st_pass_39",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.7,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.66,
+   "leg_visibility": 0.728
+  },
+  {
+   "name": "st_pass_40",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.88,
+   "leg_visibility": 0.705
+  },
+  {
+   "name": "st_pass_41",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.775,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.65,
+   "leg_visibility": 0.704
+  },
+  {
+   "name": "st_lofted_06",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6977,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.44,
+   "leg_visibility": 0.713
+  },
+  {
+   "name": "st_lofted_07",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6047,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.0,
+   "leg_visibility": 0.743
+  },
+  {
+   "name": "st_pass_42",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.475,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.79,
+   "leg_visibility": 0.741
+  },
+  {
+   "name": "st_pass_43",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.53,
+   "leg_visibility": 0.755
+  },
+  {
+   "name": "st_pass_44",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.525,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.89,
+   "leg_visibility": 0.751
+  },
+  {
+   "name": "st_pass_45",
+   "take": "match video pass",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.625,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.32,
+   "leg_visibility": 0.76
+  },
+  {
+   "name": "st_lofted_08",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.4884,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.09,
+   "leg_visibility": 0.736
+  },
+  {
+   "name": "st_lofted_09",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6279,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.74,
+   "leg_visibility": 0.661
+  },
+  {
+   "name": "st_lofted_10",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5814,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.85,
+   "leg_visibility": 0.699
+  },
+  {
+   "name": "st_lofted_11",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.4419,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.74,
+   "leg_visibility": 0.749
+  },
+  {
+   "name": "st_lofted_12",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6279,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.86,
+   "leg_visibility": 0.75
+  },
+  {
+   "name": "st_carry_01",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.637
+   ],
+   "fit_err_deg": 1.54,
+   "leg_visibility": 0.743
+  },
+  {
+   "name": "st_lofted_13",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5581,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.94,
+   "leg_visibility": 0.698
+  },
+  {
+   "name": "st_lofted_14",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6047,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.95,
+   "leg_visibility": 0.709
+  },
+  {
+   "name": "st_lofted_15",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.4884,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.1,
+   "leg_visibility": 0.715
+  },
+  {
+   "name": "st_free_kick_02",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.7083,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.93,
+   "leg_visibility": 0.715
+  },
+  {
+   "name": "st_carry_02",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.053
+   ],
+   "fit_err_deg": 1.67,
+   "leg_visibility": 0.709
+  },
+  {
+   "name": "st_lofted_16",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6744,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.87,
+   "leg_visibility": 0.667
+  },
+  {
+   "name": "st_carry_03",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.88,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.13
+   ],
+   "fit_err_deg": 1.69,
+   "leg_visibility": 0.736
+  },
+  {
+   "name": "st_lofted_17",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6512,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.39,
+   "leg_visibility": 0.744
+  },
+  {
+   "name": "st_lofted_18",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6279,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.11,
+   "leg_visibility": 0.738
+  },
+  {
+   "name": "st_free_kick_03",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.6875,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.39,
+   "leg_visibility": 0.692
+  },
+  {
+   "name": "st_lofted_19",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5581,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.29,
+   "leg_visibility": 0.664
+  },
+  {
+   "name": "st_tackle_01",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.95,
+   "leg_visibility": 0.679
+  },
+  {
+   "name": "st_lofted_20",
+   "take": "match video lofted",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6512,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.711
+  },
+  {
+   "name": "st_free_kick_04",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.6458,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.6,
+   "leg_visibility": 0.695
+  },
+  {
+   "name": "st_carry_04",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.769
+   ],
+   "fit_err_deg": 1.51,
+   "leg_visibility": 0.705
+  },
+  {
+   "name": "st_block_01",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.98,
+   "leg_visibility": 0.711
+  },
+  {
+   "name": "st_tackle_02",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.7,
+   "leg_visibility": 0.627
+  },
+  {
+   "name": "st_cross_01",
+   "take": "match video cross",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5116,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.02,
+   "leg_visibility": 0.717
+  },
+  {
+   "name": "st_tackle_03",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.11,
+   "leg_visibility": 0.691
+  },
+  {
+   "name": "st_carry_05",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.68,
+   "keys": 18,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.333
+   ],
+   "fit_err_deg": 1.6,
+   "leg_visibility": 0.694
+  },
+  {
+   "name": "st_block_02",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.07,
+   "leg_visibility": 0.705
+  },
+  {
+   "name": "st_carry_06",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.6,
+   "keys": 16,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.015
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.706
+  },
+  {
+   "name": "st_block_03",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.9,
+   "leg_visibility": 0.711
+  },
+  {
+   "name": "st_tackle_04",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.25,
+   "leg_visibility": 0.704
+  },
+  {
+   "name": "st_free_kick_05",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.6667,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.97,
+   "leg_visibility": 0.687
+  },
+  {
+   "name": "st_block_04",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.21,
+   "leg_visibility": 0.762
+  },
+  {
+   "name": "st_carry_07",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.6,
+   "keys": 16,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.819
+   ],
+   "fit_err_deg": 1.71,
+   "leg_visibility": 0.715
+  },
+  {
+   "name": "st_carry_08",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.56,
+   "keys": 15,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.616
+   ],
+   "fit_err_deg": 1.79,
+   "leg_visibility": 0.714
+  },
+  {
+   "name": "st_tackle_05",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.01,
+   "leg_visibility": 0.637
+  },
+  {
+   "name": "st_carry_09",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.68,
+   "keys": 18,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.35
+   ],
+   "fit_err_deg": 1.89,
+   "leg_visibility": 0.707
+  },
+  {
+   "name": "st_free_kick_06",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.5833,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.15,
+   "leg_visibility": 0.655
+  },
+  {
+   "name": "st_carry_10",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.68,
+   "keys": 18,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.284
+   ],
+   "fit_err_deg": 1.6,
+   "leg_visibility": 0.718
+  },
+  {
+   "name": "st_carry_11",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.64,
+   "keys": 17,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.964
+   ],
+   "fit_err_deg": 1.58,
+   "leg_visibility": 0.661
+  },
+  {
+   "name": "st_carry_12",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.88,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.073
+   ],
+   "fit_err_deg": 1.67,
+   "leg_visibility": 0.693
+  },
+  {
+   "name": "st_block_05",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.03,
+   "leg_visibility": 0.711
+  },
+  {
+   "name": "st_tackle_06",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.688
+  },
+  {
+   "name": "st_carry_13",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.64,
+   "keys": 17,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.942
+   ],
+   "fit_err_deg": 2.19,
+   "leg_visibility": 0.708
+  },
+  {
+   "name": "st_block_06",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.36,
+   "leg_visibility": 0.745
+  },
+  {
+   "name": "st_carry_14",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.68,
+   "keys": 18,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.652
+   ],
+   "fit_err_deg": 1.81,
+   "leg_visibility": 0.711
+  },
+  {
+   "name": "st_free_kick_07",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.75,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.89,
+   "leg_visibility": 0.706
+  },
+  {
+   "name": "st_carry_15",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.76,
+   "keys": 20,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.495
+   ],
+   "fit_err_deg": 1.92,
+   "leg_visibility": 0.679
+  },
+  {
+   "name": "st_carry_16",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.148
+   ],
+   "fit_err_deg": 2.09,
+   "leg_visibility": 0.684
+  },
+  {
+   "name": "st_free_kick_08",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.6667,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.97,
+   "leg_visibility": 0.69
+  },
+  {
+   "name": "st_carry_17",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.68,
+   "keys": 18,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.47
+   ],
+   "fit_err_deg": 1.96,
+   "leg_visibility": 0.639
+  },
+  {
+   "name": "st_block_07",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.67,
+   "leg_visibility": 0.675
+  },
+  {
+   "name": "st_cross_02",
+   "take": "match video cross",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5814,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.96,
+   "leg_visibility": 0.697
+  },
+  {
+   "name": "st_carry_18",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.64,
+   "keys": 17,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.181
+   ],
+   "fit_err_deg": 1.85,
+   "leg_visibility": 0.713
+  },
+  {
+   "name": "st_block_08",
+   "take": "match video block",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.4,
+   "keys": 36,
+   "contact": 0.5714,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.11,
+   "leg_visibility": 0.701
+  },
+  {
+   "name": "st_carry_19",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.64,
+   "keys": 17,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.146
+   ],
+   "fit_err_deg": 2.11,
+   "leg_visibility": 0.733
+  },
+  {
+   "name": "st_carry_20",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.56,
+   "keys": 15,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.25
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.705
+  },
+  {
+   "name": "st_tackle_07",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.88,
+   "leg_visibility": 0.676
+  },
+  {
+   "name": "st_tackle_08",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.27,
+   "leg_visibility": 0.642
+  },
+  {
+   "name": "st_tackle_09",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.05,
+   "leg_visibility": 0.682
+  },
+  {
+   "name": "st_cross_03",
+   "take": "match video cross",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5814,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.31,
+   "leg_visibility": 0.635
+  },
+  {
+   "name": "st_free_kick_09",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.75,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.92,
+   "leg_visibility": 0.633
+  },
+  {
+   "name": "st_carry_21",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.52,
+   "keys": 14,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.761
+   ],
+   "fit_err_deg": 1.67,
+   "leg_visibility": 0.688
+  },
+  {
+   "name": "st_carry_22",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.88,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.542
+   ],
+   "fit_err_deg": 1.88,
+   "leg_visibility": 0.632
+  },
+  {
+   "name": "st_tackle_10",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.72,
+   "leg_visibility": 0.64
+  },
+  {
+   "name": "st_carry_23",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.72,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.59
+   ],
+   "fit_err_deg": 1.82,
+   "leg_visibility": 0.671
+  },
+  {
+   "name": "st_carry_24",
+   "take": "match video carry",
+   "loop": true,
+   "category": "Dribble",
+   "game_category": "Locomotion",
+   "ball_state": "Possessed",
+   "duration": 0.48,
+   "keys": 13,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    4.287
+   ],
+   "fit_err_deg": 1.86,
+   "leg_visibility": 0.723
+  },
+  {
+   "name": "st_tackle_11",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.13,
+   "leg_visibility": 0.704
+  },
+  {
+   "name": "st_tackle_12",
+   "take": "match video tackle",
+   "loop": false,
+   "category": "Tackle",
+   "game_category": "Tackle",
+   "ball_state": "None",
+   "duration": 1.6,
+   "keys": 41,
+   "contact": 0.55,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.14,
+   "leg_visibility": 0.709
+  },
+  {
+   "name": "st_cross_04",
+   "take": "match video cross",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5116,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.24,
+   "leg_visibility": 0.635
+  },
+  {
+   "name": "st_free_kick_10",
+   "take": "match video free_kick",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.92,
+   "keys": 49,
+   "contact": 0.5625,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.3,
+   "leg_visibility": 0.625
+  },
+  {
+   "name": "st_cross_05",
+   "take": "match video cross",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.6744,
+   "foot": "L",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.15,
+   "leg_visibility": 0.615
+  },
+  {
+   "name": "st_shot_01",
+   "take": "match video shot",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5349,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 2.56,
+   "leg_visibility": 0.554
+  },
+  {
+   "name": "st_cross_06",
+   "take": "match video cross",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Pass",
+   "ball_state": "Possessed",
+   "duration": 1.72,
+   "keys": 44,
+   "contact": 0.5349,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 3.82,
+   "leg_visibility": 0.559
+  }
+ ]
+}

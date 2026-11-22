@@ -88,7 +88,7 @@ void fragment() {
 	if (!is_boot) col = mix(col, trim, det.r);
 	else col = mix(col, boot_detail, step(0.2, det.g));
 	// printing: number on the back, front and shorts, name across the shoulders
-	int ndig = number >= 10 ? 2 : 1;
+	int ndig = number >= 10 ? 2 : (number > 0 ? 1 : 0);   // 0 = no number (officials)
 	vec2 p = print_text(uv, BACK_NUMBER, ndig, 1);
 	p = max(p, print_text(uv, FRONT_NUMBER, ndig, 1));
 	p = max(p, print_text(uv, SHORTS_NUMBER, ndig, 1));

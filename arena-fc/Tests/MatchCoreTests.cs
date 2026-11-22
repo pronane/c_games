@@ -440,7 +440,7 @@ var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_m
 var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
-      manifestEngine.ClipCount == 186 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      manifestEngine.ClipCount == 312 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
@@ -1623,6 +1623,99 @@ Section("Realism gate (0.1): four full AI matches stay inside football's bands")
     Check("calibration: carriers are not mobbed (nearest opponent median >= 2 m, real 6.5)", pm >= 2.0, $"{pm:0.00}");
     Check("calibration: mean running speed <= 3.8 m/s (real 2.1)", sm <= 3.8, $"{sm:0.00}");
     Check("calibration: sprinting (> 7 m/s) under 7% of the time (real 0.6%)", s7 < .07, $"{s7:P1}");
+}
+
+
+Section("Match officials on the pitch (presentation only, 22.11.2026)");
+{
+    // Two identical matches, one watched by the officials director: the simulation must not change.
+    var plain = new MatchEngine(new MatchOptions { Seed = 77, TimeSpeed = 15f, TeamSize = 11 });
+    var refd = new MatchEngine(new MatchOptions { Seed = 77, TimeSpeed = 15f, TeamSize = 11 });
+    var kit = OfficialsDirector.KitFor(refd.State.Players[1].Spec.KitPrimary, refd.State.Players[^1].Spec.KitPrimary);
+    var dir = new OfficialsDirector(kit.primary, kit.trim, kit.shorts, kit.pattern);
+    var refDist = new List<float>();
+    int arOffTouchline = 0, arWrongHalf = 0, arTicks = 0, offsides = 0;
+    var lastSeen = (MatchEvent?)null;
+    for (int i = 0; i < 60 * 240; i++)
+    {
+        plain.Step(1f / 60f, PlayerCommand.None);
+        refd.Step(1f / 60f, PlayerCommand.None);
+        dir.Update(refd, 1f / 60f);
+        if (refd.Events.Count > 0 && !ReferenceEquals(refd.Events[^1], lastSeen))
+        {
+            if (refd.Events[^1].Kind == EventKind.Offside) offsides++;
+            lastSeen = refd.Events[^1];
+        }
+        if (i > 120 && refd.State.Phase == Phase.Play)
+            refDist.Add(Mx.FlatDist(dir.Officials[0].Pos, refd.State.Ball.Pos));
+        for (int a = 1; a <= 2; a++)
+        {
+            var o = dir.Officials[a];
+            float half = OfficialsDirector.AssistantHalf((OfficialRole)a);
+            arTicks++;
+            if (MathF.Abs(MathF.Abs(o.Pos.Z) - (Mx.HalfWidth + 1.2f)) > .6f) arOffTouchline++;
+            if (o.Pos.X * half < -1f) arWrongHalf++;
+        }
+    }
+    bool same = plain.State.Score[0] == refd.State.Score[0] && plain.State.Score[1] == refd.State.Score[1]
+                && plain.State.Ball.Pos == refd.State.Ball.Pos && plain.State.Passes[0] == refd.State.Passes[0];
+    Check("officials never change the simulation (same score, ball, passes)", same);
+    Check("officials are not in State.Players", refd.State.Players.All(p => p.Index < 1000));
+    refDist.Sort();
+    float med = refDist.Count > 0 ? refDist[refDist.Count / 2] : 0f;
+    Check("referee keeps 8-25 m from the ball in open play (median)", med is >= 8f and <= 25f, $"{med:0.0} m");
+    Check("referee is never on top of the ball (5th pct >= 4 m)", refDist.Count > 0 && refDist[refDist.Count / 20] >= 4f,
+          refDist.Count > 0 ? $"{refDist[refDist.Count / 20]:0.0} m" : "");
+    Check("assistants stay on their touchline", arOffTouchline < arTicks / 50, $"{arOffTouchline}/{arTicks}");
+    Check("assistants stay in their own half", arWrongHalf == 0, $"{arWrongHalf}");
+    Check("the referee whistles", dir.Calls.Any(c => c.who == OfficialRole.Referee && c.action == "off_ref_whistle"));
+    bool anyCard = refd.State.YellowCards.Sum() + refd.State.RedCards.Sum() > 0;
+    Check("every card is shown by the referee", !anyCard || dir.Calls.Any(c => c.action == "off_ref_card"));
+    Check("offsides are flagged by an assistant", refd.Events.All(e => e.Kind != EventKind.Offside)
+          || dir.Calls.Any(c => c.action == "off_ar_offside"), $"offside events {offsides}");
+    // The C# kit table mirrors sforge.officials.KITS (written into the manifest by Tools/add_official_clips.py).
+    var manPath = Path.Combine(AppContext.BaseDirectory, "../../../../Data/soccer_player_manifest.json");
+    if (!File.Exists(manPath)) manPath = "Data/soccer_player_manifest.json";
+    if (File.Exists(manPath))
+    {
+        using var man = JsonDocument.Parse(File.ReadAllText(manPath));
+        bool kitsMatch = man.RootElement.TryGetProperty("officials", out var off)
+            && off.GetProperty("kits").GetProperty("classic").GetProperty("primary").GetString() == "#111318"
+            && off.GetProperty("kits").GetProperty("volt").GetProperty("primary").GetString() == "#d9f99d";
+        Check("official kits match Sprite Forge's sforge.officials.KITS", kitsMatch);
+        bool aliases = man.RootElement.GetProperty("action_aliases").TryGetProperty("off_ar_offside", out _);
+        Check("officials clips are in the player manifest", aliases);
+    }
+    Console.WriteLine($"  info  referee median {med:0.0} m from the ball; {dir.Calls.Count} calls: " +
+        string.Join(", ", dir.Calls.GroupBy(c => c.action).Select(g => $"{g.Key}×{g.Count()}")));
+}
+
+Section("Kit clash: away kit, keepers clear of both sides (22.11.2026)");
+{
+    int har = Array.FindIndex(Clubs.All, c => c.Short == "HAR"), cri = Array.FindIndex(Clubs.All, c => c.Short == "CRI");
+    var clash = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 5 });
+    string hs = clash.State.Players.First(p => p.Team == 0 && !p.IsKeeper).Spec.KitPrimary;
+    string aw = clash.State.Players.First(p => p.Team == 1 && !p.IsKeeper).Spec.KitPrimary;
+    Check("red v red: the away side changes into its away kit", Clubs.ColourDistance(hs, aw) >= Clubs.ClashDistance, $"{hs} v {aw}");
+    var noClash = new MatchEngine(new MatchOptions { HomeClub = 0, AwayClub = 1, TeamSize = 11, Seed = 5 });
+    Check("red v blue: both sides keep their home kits",
+          noClash.State.Players.First(p => p.Team == 1 && !p.IsKeeper).Spec.KitPrimary == Clubs.All[1].Primary);
+    bool keepersClear = true;
+    for (int h = 0; h < Clubs.All.Length; h++)
+        for (int a = 0; a < Clubs.All.Length; a += 3)
+        {
+            if (h == a) continue;
+            var m = new MatchEngine(new MatchOptions { HomeClub = h, AwayClub = a, TeamSize = 5, Seed = 1 });
+            var outfield = m.State.Players.Where(p => !p.IsKeeper).Select(p => p.Spec.KitPrimary).Distinct().ToList();
+            foreach (var k in m.State.Players.Where(p => p.IsKeeper))
+                if (outfield.Any(o => Clubs.ColourDistance(o, k.Spec.KitPrimary) < Clubs.ClashDistance)) keepersClear = false;
+        }
+    Check("keepers never clash with either side's outfield kit (every fixture)", keepersClear);
+    // the clash rule changes colours only: same seed, same match
+    var a1 = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 9 });
+    var a2 = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 9 });
+    for (int i = 0; i < 1800; i++) { a1.Step(1f / 60f, PlayerCommand.None); a2.Step(1f / 60f, PlayerCommand.None); }
+    Check("kit changes are deterministic and colour-only", a1.State.Ball.Pos == a2.State.Ball.Pos);
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

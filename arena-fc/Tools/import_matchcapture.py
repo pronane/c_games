@@ -69,6 +69,7 @@ GAME_CATEGORY = {"pass": ("Pass", "Possessed"), "lofted": ("Pass", "Possessed"),
                  "tackle": ("Tackle", "None"), "block": ("Tackle", "None"), "carry": ("Locomotion", "Possessed"),
                  "strike": ("Kick", "Possessed"), "run": ("Locomotion", "None")}
 LABELLED_QUOTA = dict(kick=40, header=10, tackle=10, block=6, carry=12)
+SUB_QUOTA = {"pass": 45, "lofted": 20, "cross": 10, "free_kick": 10, "shot": 4}
 LABELLED_CAP = dict(kick=6, header=2, tackle=2, block=2, carry=2)          # per match half
 LEG = 0.9          # hip to ankle on the rig, metres
 FLIGHT = 1.25      # running strides are longer than the leg sweep (both feet off the ground)
@@ -277,6 +278,9 @@ def main() -> int:
         kind = t["kind"]
         if count[kind] >= quota.get(kind, 0):
             continue
+        sub0 = (rec.get("import") or {}).get("sub")
+        if sub0 and sub0 in SUB_QUOTA and count["name:" + sub0] >= SUB_QUOTA[sub0]:
+            continue                                   # keep the kick mix varied, not all short passes
         clip = str(t.get("clip", "")) + "@" + str(round(float(rec["import"].get("fps", 0))))   # per pass
         if per_clip[(kind, clip)] >= per_clip_cap[kind]:
             continue

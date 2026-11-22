@@ -95,7 +95,8 @@ public sealed class CharacterSpec
         ArmLength = Mx.Clamp(ArmLength, 0.82f, 1.20f);
         HeadScale = Mx.Clamp(HeadScale, 0.80f, 1.25f);
         ShoulderWidth = Mx.Clamp(ShoulderWidth, 0.80f, 1.25f);
-        Number = Math.Clamp(Number, 1, 99);
+        // 0 = no number (match officials); players keep 1..99
+        Number = Math.Clamp(Number, 0, 99);
         if (Array.IndexOf(KitPatterns, KitPattern) < 0) KitPattern = "plain";
         SkinTone = Math.Clamp(SkinTone, 0, SkinPalette.Length - 1);
         HairStyle = Math.Clamp(HairStyle, 0, 4);

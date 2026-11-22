@@ -111,7 +111,21 @@ public static class SelfTest
         var stadium = new Stadium();
         stadium.Build(false);
         root.AddChild(stadium);
-        Check("stadium built with goals + stands", stadium.GetChildCount() > 25, $"children={stadium.GetChildCount()}");
+        // Sprite Forge ground (sforge.stadium v11.32) when Data/stadiums is built, else the procedural stands
+        var groundNode = stadium.GetNodeOrNull<Node3D>("Ground");
+        if (stadium.GroundPreset != "")
+        {
+            bool parts = groundNode != null && groundNode.FindChild("stand_seats", true, false) != null
+                         && groundNode.FindChild("ad_ring", true, false) != null && groundNode.FindChild("roof", true, false) != null;
+            Check("stadium built with goals + Sprite Forge ground (seats, boards, roof)",
+                  parts && stadium.FindChild("GoalLeft", false, false) != null, $"preset={stadium.GroundPreset}");
+            var crowdStadium = new Stadium();
+            crowdStadium.Build(true);
+            root.AddChild(crowdStadium);
+            Check("crowd instanced on the seat map", crowdStadium.CrowdShown > 1000, $"spectators={crowdStadium.CrowdShown}");
+            crowdStadium.QueueFree();
+        }
+        else Check("stadium built with goals + stands", stadium.GetChildCount() > 25, $"children={stadium.GetChildCount()}");
         Check("pitch uses procedural line shader", stadium.GetNodeOrNull<MeshInstance3D>("Pitch")?.MaterialOverride is ShaderMaterial);
         var hud = new Hud();
         root.AddChild(hud);
