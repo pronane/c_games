@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 import { MatchState, PlayerState, TeamId } from '../rules/types';
+import { MotionBinding, type MotionAssets } from './motionBinding';
 
 export interface PlayerView {
   root: THREE.Group;
@@ -29,6 +30,8 @@ export interface PlayerView {
   chevron: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
   /** Ground-hugging blob shadow (fades with jump height; counter-set in sync). */
   shadow: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  /** Arena Motion Engine binding — null when baked assets failed to load (legacy path). */
+  motion: MotionBinding | null;
 }
 
 export interface Teams {
@@ -145,7 +148,8 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
 export function createPlayerViews(
   gltf: GLTF,
   state: MatchState,
-  teams: Teams
+  teams: Teams,
+  motionAssets: MotionAssets | null = null
 ): Map<number, PlayerView> {
   const views = new Map<number, PlayerView>();
   const clips = new Map<string, THREE.AnimationClip>();
@@ -186,6 +190,9 @@ export function createPlayerViews(
     }
     const idle = actions.get('idle');
     idle?.play();
+    const motion = motionAssets
+      ? new MotionBinding(mixer, gltf, motionAssets, p.id, p.facing)
+      : null;
 
     // ground ring: light-blue (home) / pink (away), yellow + pulse when controlled
     const ring = new THREE.Mesh(
@@ -279,6 +286,7 @@ export function createPlayerViews(
       flashRing,
       chevron,
       shadow,
+      motion,
     });
   }
   return views;
@@ -297,6 +305,20 @@ export function playAnim(view: PlayerView, anim: PlayerAnim, fade = 0.18): void 
   next.play();
   if (prev && prev !== next) prev.crossFadeTo(next, fade, false);
   view.current = anim;
+}
+
+/** Gait intent for the motion engine (one-shot actions force their clip instead). */
+function pickIntent(p: PlayerState, celebrating: boolean, controlled: boolean): import('../motion').PlayerIntent {
+  void controlled;
+  if (celebrating) return 'celebrate';
+  const speed = Math.hypot(p.vx, p.vz);
+  return speed > 6.2 ? 'sprint' : 'move';
+}
+
+/** Ball context for clip matching. Loose balls read as 'None': the Approach rows are
+ * one-shot pickup wind-ups, not a gait, and must only fire from explicit events. */
+function pickBallState(p: PlayerState, ball: { holderId: number | null }): import('../motion/clipMeta').BallState {
+  return ball.holderId === p.id ? 'Possessed' : 'None';
 }
 
 /** Decide which clip a player should be showing right now. */
@@ -406,17 +428,24 @@ export function syncPlayerViews(
     }
 
     const b = state.ball;
-    // ball carrier animates with the ball; others react to movement
-    const anim = chooseAnim(p, view, b, false, celebrating);
-    if (
-      view.current !== 'kick' &&
-      view.current !== 'handball' &&
-      view.current !== 'tackle' &&
-      view.current !== 'mark_jump' &&
-      view.current !== 'hit_deck' ||
-      view.actions.get(view.current)?.isRunning() === false
-    ) {
-      playAnim(view, anim);
+    if (view.motion) {
+      // Arena Motion Engine path: engine selects clip + phase every frame.
+      const celebratingThis = celebrating && b.holderId === p.id;
+      const intent = pickIntent(p, celebratingThis, false);
+      view.motion.update(dt, p, pickBallState(p, b), intent, -1);
+    } else {
+      // Legacy path: hand-written anim names + crossfade.
+      const anim = chooseAnim(p, view, b, false, celebrating);
+      if (
+        view.current !== 'kick' &&
+        view.current !== 'handball' &&
+        view.current !== 'tackle' &&
+        view.current !== 'mark_jump' &&
+        view.current !== 'hit_deck' ||
+        view.actions.get(view.current)?.isRunning() === false
+      ) {
+        playAnim(view, anim);
+      }
     }
 
     view.root.position.set(p.x, p.y, p.z);
@@ -432,5 +461,9 @@ export function syncPlayerViews(
 }
 
 export function triggerOneShot(view: PlayerView, anim: PlayerAnim): void {
+  if (view.motion) {
+    view.motion.forceOneShot(anim);
+    return;
+  }
   playAnim(view, anim, 0.08);
 }

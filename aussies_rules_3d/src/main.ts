@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadMotionAssets, type MotionAssets } from './render/motionBinding';
 import { MatchSim, HumanIntent, emptyHumanIntent } from './sim/match';
 import type { PlayerState } from './rules/types';
 import { RulesEngine } from './rules/engine';
@@ -79,6 +80,7 @@ class Game {
   private scoreboardTimer = 0;
   private touchButtons = new Map<string, HTMLElement>();
   private playerGltf: Awaited<ReturnType<GLTFLoader['loadAsync']>> | null = null;
+  private motionAssets: MotionAssets | null = null;
   private menuFocusIndex = 0;
   private menuFocusedScreen = '';
   private menuNavDir = 0;
@@ -105,6 +107,7 @@ class Game {
     this.menus.setLoading(0.45, 'Rigging the players…');
     const loader = new GLTFLoader();
     this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
+    this.motionAssets = await loadMotionAssets();
     this.menus.setLoading(0.75, 'Inflating the Sherrin…');
     const ballGltf = await loader.loadAsync('./assets/ball.glb');
     this.ballMesh = ballGltf.scene;
@@ -229,7 +232,7 @@ class Game {
     for (const v of this.views.values()) {
       this.world.scene.remove(v.root);
     }
-    this.views = createPlayerViews(this.playerGltf!, this.sim.state, this.teams);
+    this.views = createPlayerViews(this.playerGltf!, this.sim.state, this.teams, this.motionAssets);
     for (const v of this.views.values()) this.world.scene.add(v.root);
 
     this.hud.show();
@@ -262,10 +265,11 @@ class Game {
     this.demoAccum = 0;
     this.demoTime = 0;
     this.menuCamT = 0;
-    this.demoViews = createPlayerViews(this.playerGltf!, sim.state, {
-      home: { ...CLUBS[0] },
-      away: { ...CLUBS[1] },
-    });
+    this.demoViews = createPlayerViews(
+      this.playerGltf!, sim.state,
+      { home: { ...CLUBS[0] }, away: { ...CLUBS[1] } },
+      this.motionAssets
+    );
     for (const v of this.demoViews.values()) this.world.scene.add(v.root);
   }
 
