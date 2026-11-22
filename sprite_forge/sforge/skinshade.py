@@ -1,4 +1,4 @@
-"""Close-up shading for game characters: skin pores, hair, eyes (v11.35, fed back from Arena FC).
+"""Close-up shading for game characters: skin pores, hair, eyes (v11.36, fed back from Arena FC).
 
 A skin atlas from a 1-2k MakeHuman texture holds colour, not skin: up close it reads as plastic.  Real-time
 engines fix that with a tiling *detail* normal map (pores, fine creases) laid over the atlas at a high UV
@@ -118,7 +118,7 @@ def export(out_dir, n=512):
     rough = np.clip(.5 + (1 - h) * .35, 0, 1)                # pores a little rougher than the skin between them
     Image.fromarray((rough * 255).astype(np.uint8), "L").save(os.path.join(out_dir, "skin_detail_rough.png"))
     with open(os.path.join(out_dir, "materials.json"), "w") as f:
-        json.dump({"version": "11.35", "presets": PRESETS,
+        json.dump({"version": "11.36", "presets": PRESETS,
                    "maps": {"skin_detail_normal": "tangent-space, tileable, OpenGL (+Y) convention",
                             "skin_detail_rough": "tileable roughness modulation"}}, f, indent=1)
     return PRESETS

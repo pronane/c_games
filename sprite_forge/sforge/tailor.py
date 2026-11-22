@@ -1,6 +1,6 @@
 """Garment shells for a skinned body: shirts, shorts, socks and boots with clean hems (v11.30).
 
-v11.36: flutter weights for the free hems (TEXCOORD_1) and `keeper_garments` (long-sleeved base layer,
+v11.37: flutter weights for the free hems (TEXCOORD_1) and `keeper_garments` (long-sleeved base layer,
 padded gloves) cut from the body's own arms and hands.
 
 Fed back from Arena FC.  Its squad wore its kit as body paint: the MakeHuman clothes hug every
