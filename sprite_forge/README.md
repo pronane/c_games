@@ -54,6 +54,18 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.34: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
+
+Arena FC shipped five of the nine squad identities, and its faces read as plastic up close: a 1-2k MakeHuman
+atlas holds colour, not skin. **`sforge/skinshade.py`** writes a tileable skin-detail normal map (pores, fine
+creases, a soft undulation) and roughness map for a high-repeat detail layer, and engine-neutral material
+presets for skin (subsurface, rim), hair (alpha-to-coverage, anisotropic highlight), eyes (clearcoat catch-light),
+lashes and beards. **`tailor.replace_parts`** can now add parts that bring their own textured materials
+(`materials` with `image` keys plus `images`), so a game adds identities to a squad GLB without rebuilding it
+or losing its clips.
+
+Test: `python tools/test_skinshade.py`.
+
 ## New in v11.33: turf for field sports - markings, mowing patterns, wear (fed back from Arena FC)
 
 Arena FC drew one stripe pattern with soccer lines hard-coded in a shader. **`sforge/pitch.py`** writes a turf
