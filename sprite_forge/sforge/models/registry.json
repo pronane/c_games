@@ -1,0 +1,72 @@
+{
+  "note": "Models Sprite Forge uses (or has trained). Weights are downloaded by tools/fetch_models.py, not committed. Every move made with them records the models and licences in its import block. Trained models (learned motion matching, motion generators) are added here with their training data and licence.",
+  "models": {
+    "mediapipe_pose_heavy": {
+      "name": "MediaPipe Pose Landmarker (heavy)",
+      "file": "pose_landmarker_heavy.task",
+      "url": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task",
+      "licence": "Apache-2.0",
+      "role": "3D world landmarks (33) for one person per crop",
+      "used_by": [
+        "forge.py mocap (single person filling the frame)"
+      ],
+      "note": "Not used for match footage: its own person finder misses 60-120 px players."
+    },
+    "yolox_m_humanart": {
+      "name": "YOLOX-m person detector (OpenMMLab, COCO + Human-Art)",
+      "file": "20230928/yolox_onnx/yolox_m_8xb8-300e_humanart-c2c7a14a/end2end.onnx",
+      "zip": "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/yolox_m_8xb8-300e_humanart-c2c7a14a.zip",
+      "licence": "Apache-2.0 (code and weights release)",
+      "check": "Training data includes Human-Art; confirm its terms before a commercial release.",
+      "role": "person boxes, 640 px input",
+      "used_by": [
+        "sforge.matchcapture --detector yolox"
+      ]
+    },
+    "rtmdet_nano_person": {
+      "name": "RTMDet-nano person detector (OpenMMLab, COCO + Objects365)",
+      "file": "20230831/rtmdet_onnx/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e/end2end.onnx",
+      "zip": "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmdet_nano_8xb32-100e_coco-obj365-person-05d8511e.zip",
+      "licence": "Apache-2.0 (code and weights release)",
+      "role": "fast person boxes, 320 px input",
+      "used_by": [
+        "sforge.matchcapture --detector rtmdet"
+      ]
+    },
+    "rtmpose_l_halpe26": {
+      "name": "RTMPose-l body + feet (Halpe-26), OpenMMLab",
+      "file": "20230831/rtmpose_onnx/rtmpose-l_simcc-body7_pt-body7-halpe26_700e-384x288-734182ce_20230605/end2end.onnx",
+      "zip": "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-l_simcc-body7_pt-body7-halpe26_700e-384x288-734182ce_20230605.zip",
+      "licence": "Apache-2.0 (code and weights release)",
+      "check": "Trained on Body7 (COCO, AI Challenger, CrowdPose, MPII, sub-JHMDB, Halpe, PoseTrack18); confirm each dataset's terms before a commercial release.",
+      "role": "2D body + feet keypoints on a given box (top-down), 384x288",
+      "used_by": [
+        "sforge.matchcapture"
+      ]
+    },
+    "rtmpose_m_halpe26": {
+      "name": "RTMPose-m body + feet (Halpe-26), OpenMMLab",
+      "file": "20230831/rtmpose_onnx/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605/end2end.onnx",
+      "zip": "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip",
+      "licence": "Apache-2.0 (code and weights release)",
+      "check": "Trained on Body7 (COCO, AI Challenger, CrowdPose, MPII, sub-JHMDB, Halpe, PoseTrack18); confirm each dataset's terms before a commercial release.",
+      "role": "faster 2D keypoints, 256x192",
+      "used_by": [
+        "sforge.matchcapture"
+      ]
+    },
+    "lifter_v1": {
+      "name": "Sprite Forge 2D->3D pose lifter v1 (trained here)",
+      "file": "lifter_v1.onnx",
+      "licence": "MIT (derived from SkillCorner Open Data body pose, MIT)",
+      "role": "9-frame 2D window -> centre-frame 3D pose, 19 joints",
+      "trained_by": "tools/train_lifter.py",
+      "training_data": "SkillCorner opendata-bodypose match 1925299 (validated on 1996435)",
+      "val_mpjpe_cm": 10.6,
+      "used_by": [
+        "sforge.matchcapture"
+      ],
+      "committed": true
+    }
+  }
+}

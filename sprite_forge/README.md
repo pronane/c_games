@@ -54,6 +54,29 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.26: match capture - real match video to library moves (fed back from Arena FC)
+
+`python -m sforge.matchcapture VIDEO OUT_DIR --models MODELS_DIR` turns a wide-angle match
+recording (e.g. a Veo camera, players 60-150 px tall) into anonymous library moves:
+
+1. **people**: YOLOX-m (Human-Art) person boxes on the whole frame plus two half tiles, NMS
+2. **tracks**: a small SORT-style tracker joins boxes across frames
+3. **2D pose**: RTMPose Halpe-26 top-down on each box (`--pose rtmpose_l_halpe26` on GPU, `_m_` on CPU)
+4. **3D**: Sprite Forge's own 2D->3D lifter (`sforge/models/lifter_v1.onnx`, 9-frame window, 19 joints,
+   trained by `tools/train_lifter.py` on SkillCorner's MIT pose data, 10.6 cm validation error)
+5. **moves**: kicks found from 2D foot speed + knee straightening, run loops from the cleanest stride,
+   then fitted with `jointtrack.fit_landmarks` (the same IK as v11.22) into `.json` moves + `_import.json`
+
+MediaPipe is not used here: its person finder sees nothing at Veo player sizes.
+
+* `tools/fetch_models.py MODELS_DIR` downloads the detector / pose ONNX files listed in
+  `sforge/models/registry.json` (each with its licence - check it before shipping moves made with it)
+* `tools/matchcapture_batch.py FOOTAGE OUT --workers N` runs every clip (zips are unpacked), merges the
+  per-clip folders with renumbered names and packs `moves.tgz`; `--purge` deletes each video once done
+* `tools/runpod_matchcapture.sh` does the same on a GPU pod (footage on a network volume)
+* **privacy**: only joint angles leave the pipeline - no video, faces, names, numbers or per-player
+  tracks are written; `--footage-licence` records who owns the footage in each move
+* test: `python tools/test_matchcapture.py` (tracker, kick detector, lifter round trip, merge, registry)
 ## New in v11.25: sprites that are not blocky or blotchy, HD players, a sports idle
 
 ### Drawing (`sforge/render_rich.py`)
