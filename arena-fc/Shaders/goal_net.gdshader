@@ -1,4 +1,4 @@
-// Arena FC - goal net on the Sprite Forge goalnet mesh (v11.38).  UV = position on the net in mesh cells,
+// Arena FC - goal net on the Sprite Forge goalnet mesh (v11.39).  UV = position on the net in mesh cells,
 // UV2.x = how free the net is to move (0 on the frame / pegged ground line), UV2.y = panel.
 // A goal bulges the net where the ball hits (impact, along the ball's direction) and a ripple runs out
 // from there; the wind sways it a little.

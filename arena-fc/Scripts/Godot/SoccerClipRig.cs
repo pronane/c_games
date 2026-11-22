@@ -356,7 +356,7 @@ public sealed partial class SoccerClipRig : Node3D
         ApplyLods(pick);
     }
 
-    // ---- Levels of detail (Sprite Forge skinlod v11.37, Tools/add_lods.py) ----
+    // ---- Levels of detail (Sprite Forge skinlod v11.38, Tools/add_lods.py) ----
     private static Dictionary<string, int[]>? _lodParts;
     private static Dictionary<string, float[]>? _lodDistances;
 
@@ -402,7 +402,7 @@ public sealed partial class SoccerClipRig : Node3D
         => node.Contains("_gloves") ? gloves : node.Contains("_sleeves") ? sleeves : !node.Contains("_trousers") || trousers;
     private string _pick = "";
 
-    // ---- Touchline figures (Sprite Forge pitchside v11.38): a role's clothes and a looping clip ----
+    // ---- Touchline figures (Sprite Forge pitchside v11.39): a role's clothes and a looping clip ----
     /// <summary>Show the identity's optional layers for a pitch-side role (base layer, trousers, gloves).</summary>
     public void Wear(bool sleeves, bool trousers, bool gloves = false)
     {
@@ -635,7 +635,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.35) ----------------------------------------
+    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.36) ----------------------------------------
     private static Texture2D? _skinDetailN, _skinDetailR;
     private static readonly Dictionary<string, StandardMaterial3D> _shaded = new();
 

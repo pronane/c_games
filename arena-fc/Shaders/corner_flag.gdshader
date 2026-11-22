@@ -1,4 +1,4 @@
-// Arena FC - corner flag cloth (Sprite Forge goalnet.corner_flag, v11.38): UV2.x = distance from the pole.
+// Arena FC - corner flag cloth (Sprite Forge goalnet.corner_flag, v11.39): UV2.x = distance from the pole.
 shader_type spatial;
 render_mode cull_disabled;
 uniform vec3 colour : source_color = vec3(0.98, 0.82, 0.1);

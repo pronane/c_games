@@ -1,4 +1,4 @@
-// Arena FC - goals with real nets and corner flags from Sprite Forge (sforge.goalnet, v11.38).
+// Arena FC - goals with real nets and corner flags from Sprite Forge (sforge.goalnet, v11.39).
 // The net bulges where a goal goes in (goal_net.gdshader); presentation only.
 using System;
 using ArenaFC.Core;

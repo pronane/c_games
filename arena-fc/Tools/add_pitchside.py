@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add Sprite Forge's touchline pack (v11.38) to Arena FC.
+"""Add Sprite Forge's touchline pack (v11.39) to Arena FC.
 
   * the pitch-side clips (sforge.pitchside: subs on the bench, managers, staff, ball kids, photographers),
     retargeted onto Arena's 18-bone skeleton and appended to Data/models/soccer_player.glb - every clip
@@ -69,18 +69,18 @@ def main() -> int:
             spots = PS.placements(st, *st["pitch_half"])
             out = os.path.join(sd, f[:-5] + ".pitchside.json")
             with open(out, "w") as fh:
-                json.dump({"pack": "sforge.pitchside v11.38", "spots": spots}, fh, indent=1)
+                json.dump({"pack": "sforge.pitchside v11.39", "spots": spots}, fh, indent=1)
             print("wrote %s (%d people)" % (out, len(spots)))
     man = json.load(open(MANIFEST))
     man["clips"] = [c for c in man["clips"] if c["name"] not in PS.CLIPS]
     for name, cl in clips.items():
         ev = PS.EVENTS[name]
         man["clips"].append({"name": name, "loop": bool(PS.CLIPS[name]["loop"]), "category": "Pitchside",
-                             "source": "sforge.pitchside v11.38", "frames": int(cl.frames), "fps": float(cl.fps),
+                             "source": "sforge.pitchside v11.39", "frames": int(cl.frames), "fps": float(cl.fps),
                              "events": {"ball_contact": -1, "ball_contact_frac": -1.0, "footsteps": [],
                                         "hit_start": -1, "hit_end": -1,
                                         **({"peak": int(round(ev["peak"] * (cl.frames - 1)))} if "peak" in ev else {})}})
-    man["pitchside"] = {"pack": "sforge.pitchside v11.38", "props": "models/pitchside_props.glb",
+    man["pitchside"] = {"pack": "sforge.pitchside v11.39", "props": "models/pitchside_props.glb",
                         "goal": "models/goal_soccer.glb", "looks": PS.LOOKS}
     with open(MANIFEST, "w") as f:
         json.dump(man, f, indent=1)
