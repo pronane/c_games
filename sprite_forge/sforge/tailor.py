@@ -128,6 +128,15 @@ def keeper_garments():
     ]
 
 
+def staff_garments():
+    """Long trousers (v11.38): cut from the body's own legs like the base layer, for managers, coaches,
+    ball kids and photographers (a tracksuit or a suit with `keeper_garments`' sleeves).  Own material
+    `trousers`; it stands just outside the socks so it covers them."""
+    legs = tuple(sd + b for sd in SIDES for b in ("Thigh", "Shin"))
+    return [Garment("trousers", "body", ease=.0085, smooth=6, lip=.004, region=legs,
+                    region_t=(("Shin", -1.0, .9),), body_clearance=0, hem_band=2, panel="own")]
+
+
 def body_region(part, bones, names, limits=(), joint_names=None):
     """The faces of `part` whose every corner follows one of the bones `names` (by skin weight); `limits`
     ((bone suffix, t0, t1), ...) keeps only that stretch along the bones ending in the suffix (a body's
