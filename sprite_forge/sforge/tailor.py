@@ -385,10 +385,14 @@ def _add_lips(V, N, F, J, W, loops, depth):
         c = V[lp].mean(0)
         _, _, vt = np.linalg.svd(V[lp] - c)
         n = vt[2]
+        if (c - V.mean(0)) @ n < 0:           # the opening's normal points out of the garment
+            n = -n
         r = V[lp] - c
         r -= (r @ n)[:, None] * n
         r /= np.maximum(np.linalg.norm(r, axis=1, keepdims=True), 1e-9)
-        inner = V[lp] - r * depth            # straight in towards the middle of the opening
+        # a hem folds back inside the garment along the cloth (not straight in: on a tight collar that
+        # ran into the neck and poked out of the skin as a row of teeth), sitting just inside the shell
+        inner = V[lp] - n * depth - N[lp] * min(.003, depth * .3)
         k = len(lp)
         base = n0
         Vs.append(inner); Ns.append(-r); Js.append(J[lp]); Ws.append(W[lp])
