@@ -32,8 +32,10 @@ from .motions import LIB, STAND, K, M, P
 # ------------------------------------------------------------------ poses
 SIT = dict(hips=(-4, 0, 0), spine=(-3, 0, 0), chest=(2, 0, 0), neck=(4, 0, 0),
            leg_L=(84, 9, 0), leg_R=(82, 11, 0), knee_L=86, knee_R=82, ankle_L=-4, ankle_R=-2,
-           arm_L=(36, 10, 0), arm_R=(38, 12, 0), elbow_L=48, elbow_R=46)                 # hands on the thighs
+           arm_L=(22, 12, 0), arm_R=(24, 14, 0), elbow_L=34, elbow_R=32)                 # hands on the thighs
+# leaning in, the pelvis tips forward: the hips flex less so the thighs stay flat on the seat
 LEAN = dict(SIT, hips=(18, 0, 0), spine=(14, 0, 0), chest=(10, 0, 0), neck=(-22, 0, 0),
+            leg_L=(66, 9, 0), leg_R=(64, 11, 0),
             arm_L=(64, 4, 0), arm_R=(62, 6, 0), elbow_L=96, elbow_R=98)                   # elbows on the knees
 FOLDED = dict(STAND, arm_L=(38, -26, 0), arm_R=(36, -28, 0), elbow_L=118, elbow_R=122, chest=(-2, 0, 0))
 CAMERA = dict(arm_L=(72, -22, 0), arm_R=(66, -6, 0), elbow_L=124, elbow_R=128, neck=(-4, 0, 0))
@@ -47,7 +49,7 @@ CLIPS = {
     "sub_sit": dict(desc="substitute sitting on the bench, watching the play go by", dur=6.0, loop=True, keys=K(
         (0.0, P(SIT)),
         (0.25, P(SIT, neck=(4, 14, 0), chest=(2, 4, 0))),
-        (0.5, P(SIT, neck=(2, 2, 0), arm_R=(40, 12, 0), elbow_R=60)),
+        (0.5, P(SIT, neck=(2, 2, 0), arm_R=(30, 14, 0), elbow_R=44)),
         (0.75, P(SIT, neck=(4, -12, 0), chest=(2, -3, 0))),
         (1.0, P(SIT)))),
     "sub_lean": dict(desc="substitute leaning forward, elbows on the knees", dur=5.0, loop=True, keys=K(
@@ -142,7 +144,8 @@ def qa(name: str, samples: int = 24) -> list[str]:
                 break
     if name in SEATED:
         for p in poses:
-            if min(ch(p, "leg_L"), ch(p, "leg_R")) < 70 or min(ch(p, "knee_L"), ch(p, "knee_R")) < 70:
+            thigh = min(ch(p, "leg_L"), ch(p, "leg_R")) + ch(p, "hips")          # thigh angle from vertical
+            if not 70 <= thigh <= 100 or min(ch(p, "knee_L"), ch(p, "knee_R")) < 70:
                 errs.append(name + ": not sitting (hips / knees straighten)")
                 break
     if name in KNEELING:
@@ -318,12 +321,12 @@ def placements(stadium, half_length, half_width, subs=7, ball_kids=6, photograph
         bench = d.get("bench")
         if not bench:
             n = int(d.get("seats", 10))
-            bench = [[cx - 3.2 + s * .71, d.get("seat_top", .48), cz - .35] for s in range(n)]
+            bench = [[cx - 3.2 + s * .71, d.get("seat_top", .52), cz - .35] for s in range(n)]
         pick = sorted(rng.choice(len(bench), size=min(subs, len(bench)), replace=False))
         for k, i in enumerate(pick):
             x, y, z = bench[i]
             out.append({"role": "sub", "team": team, "pos": [float(x), float(y), float(z)],
-                        "yaw": face(x, z, x * .3, 0.0), "clip": "sub_lean" if k % 3 == 1 else "sub_sit", "seated": True})
+                        "yaw": face(x, z, x * .3, 0.0), "clip": "sub_sit", "seated": True})
         fz = float(d.get("front_z", cz + 1.0))
         mx = cx + (-1.6 if cx < 0 else 1.6)
         out.append({"role": "manager", "team": team, "pos": [float(mx), 0.0, fz + 1.6],

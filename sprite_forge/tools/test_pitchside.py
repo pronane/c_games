@@ -51,7 +51,7 @@ def main():
         st = json.load(open(gp[:-4] + ".json"))
     dug = st.get("dugouts", [])
     rec("dugouts list their seats at chair height", dug and all(len(d.get("bench", [])) == d["seats"] and
-        abs(d.get("seat_top", 0) - .48) < .01 for d in dug))
+        abs(d.get("seat_top", 0) - .52) < .01 for d in dug))
     hl, hw = st["pitch_half"]
     sp = PS.placements(st, hl, hw)
     roles = {}

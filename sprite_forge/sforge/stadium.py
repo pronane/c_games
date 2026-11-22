@@ -351,20 +351,20 @@ def build(spec: StadiumSpec):
         for k, xc in enumerate((-9.0, 9.0)):
             M["dugouts"].box((xc, .02, zb - .4), (7.5, .04, 2.0), col=(.18, .19, .2))           # floor
             M["dugouts"].box((xc, .55, zb - 1.3), (7.5, 1.1, .2), col=(.12, .13, .15))           # back wall
-            M["dugouts"].box((xc, .215, zb - 1.0), (7.5, .43, .5), col=(.12, .13, .15))          # seat block
+            M["dugouts"].box((xc, .235, zb - 1.0), (7.5, .47, .5), col=(.12, .13, .15))          # seat block
             bench = []
             for s in range(10):
                 # padded seats at chair height (a seated figure's hips land on them, feet on the floor)
-                M["dugouts"].box((xc - 3.2 + s * .71, .45, zb - .95), (.55, .06, .45), col=tuple(_rgb(spec.seat_colour)))
+                M["dugouts"].box((xc - 3.2 + s * .71, .49, zb - .95), (.55, .06, .45), col=tuple(_rgb(spec.seat_colour)))
                 M["dugouts"].box((xc - 3.2 + s * .71, .78, zb - 1.17), (.55, .6, .08), col=tuple(_rgb(spec.seat_colour)))
-                bench.append([float(xc - 3.2 + s * .71), .48, float(zb - .9)])
+                bench.append([float(xc - 3.2 + s * .71), .52, float(zb - .9)])
             M["dugouts"].box((xc, 2.25, zb - .6), (7.7, .08, 2.2), col=(.75, .77, .8))           # roof
             M["dugouts"].box((xc - 3.85, 1.12, zb - .6), (.06, 2.25, 2.2), col=(.75, .77, .8))
             M["dugouts"].box((xc + 3.85, 1.12, zb - .6), (.06, 2.25, 2.2), col=(.75, .77, .8))
             M["dugout_glass"].quad((xc - 3.85, .4, zb + .48), (xc + 3.85, .4, zb + .48), (xc + 3.85, 2.2, zb + .48),
                                    (xc - 3.85, 2.2, zb + .48), col=(.8, .9, 1.0))
             dug.append({"centre": [xc, 0.0, zb - .6], "seats": 10, "team": k, "front_z": float(zb + .48),
-                        "bench": bench, "seat_top": .48})
+                        "bench": bench, "seat_top": .52})
         zt = -(hw + spec.runoff_z)
         M["tunnel"].box((0, 1.4, zt - .3), (4.5, 2.8, .6), col=(.03, .03, .04))
         M["tunnel"].box((0, 2.9, zt + .8), (5.2, .15, 3.0), col=(.7, .72, .76))
