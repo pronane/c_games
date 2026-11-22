@@ -86,6 +86,15 @@ def main():
     sh = lods["socks"]
     culled = len(SL.cull_covered(parts["body"], [parts[o] for o in SL.LOD_PLAN["under"]["body"] if o in parts]).F)
     rec("hidden skin under the kit is cut", culled < len(parts["body"].F), "%d -> %d" % (len(parts["body"].F), culled))
+    # with the keeper's (optional) base layer and gloves in the identity, the arms and hands still stay
+    kp = dict(parts)
+    kp.update(T.tailor(parts, bones, garments=T.keeper_garments(), joint_names=jn, log=lambda *a: None))
+    near, _t = T.dominant_bone(parts["body"], bones, jn)
+    arm = np.char.endswith(near.astype(str), ("Hand", "Forearm"))
+    kb = SL.lod_parts({k: kp[k] for k in ("body", "jersey", "shorts", "socks", "boots", "sleeves", "gloves")})["body"][0]
+    hv = parts["body"].V[arm]
+    lo, hi = hv.min(0), hv.max(0)
+    rec("optional layers (keeper sleeves, gloves) never cut the skin", ((kb.V >= lo) & (kb.V <= hi)).all(1).sum() > .3 * arm.sum())
     drop = [n for n in SL.LOD_PLAN["drop"][2] if n in parts]
     rec("tiny parts drop out of the far level", all(lods[n][1] is None for n in drop) and sh[1] is not None, ",".join(drop))
     # 6 into a GLB

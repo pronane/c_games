@@ -27,7 +27,8 @@ from .tailor import Part
 # through: the shins inside the socks, the shirt tail inside the shorts)
 LOD_PLAN = {
     "ratios": (0.45, 0.22),
-    "under": {"body": ("jersey", "shorts", "socks", "boots", "sleeves", "gloves"), "jersey": ("shorts",),
+    # (optional layers - a keeper's base layer and gloves - never hide the skin: outfield players show it)
+    "under": {"body": ("jersey", "shorts", "socks", "boots"), "jersey": ("shorts",),
               "socks": ("boots",), "sleeves": ("gloves",)},
     "drop": {2: ("lashes", "brows", "hairinner", "beardshell1")},
     "keep_full": ("eyes",),
