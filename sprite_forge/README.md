@@ -54,6 +54,66 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.33: turf for field sports - markings, mowing patterns, wear (fed back from Arena FC)
+
+Arena FC drew one stripe pattern with soccer lines hard-coded in a shader. **`sforge/pitch.py`** writes a turf
+texture a game's grass shader reads: R the line markings for the sport (soccer; Gaelic / hurling with the 13 /
+20 / 45 (65) m lines, both rectangles and the 13 m arc; rugby with the 22, the dashed 10 m, 5 m and 15 m lines),
+G the mowing pattern (`stripes`, `checker`, `diagonal`, `rings` round the centre spot, `wide_stripes`) as two
+directions a shader shades by viewing angle like real cut grass, and B the wear (goalmouths, the spots, the edge
+of the box, the assistants' channels, the centre spot, broken up with noise). `export()` adds the layout JSON so
+a shader maps world x / z to the texture.
+
+Test: `python tools/test_pitch.py`.
+
+## New in v11.32: stadiums, crowds and pitch-side boards for field sports (fed back from Arena FC)
+
+Arena FC's desktop ground was stacked boxes, its crowd coloured boxes, and its boards read "GODOT 4.7".
+Three new modules build the match-day setting any field-sport game needs:
+
+- **`sforge/stadium.py`** builds a whole ground from a `StadiumSpec`: a stand ring round the pitch (curved
+  corners, or four stands with open corners), any number of tiers with an aisle and vomitories between them,
+  aisle stairs, front and back walls, a roof with a lit fascia and columns, floodlight masts or roof-edge lamps,
+  a continuous LED advertising ring (kept clear of the technical area), big screens, dugouts with benches and a
+  glass front, the tunnel and the concourse - and a **seat map** (`.seats`: x, y, z, yaw, tier, end) for the crowd.
+  The pitch comes from the sport (`PITCH`: soccer, Gaelic / hurling, rugby, Aussie rules), so the same presets
+  build a GAA ground round 145 x 90 m. The ends are baked as a grey level marked in vertex alpha, so a game tints
+  them with whichever clubs are playing. Presets: `bowl` (two tiers, masts), `classic` (open corners, roof
+  lights), `ground` (one tier, partial roof). `export()` writes the GLB, the seat map and a JSON with the
+  lights, screens, dugouts and tunnel.
+- **`sforge/crowd.py`**: low-poly spectators (114 triangles seated, 102 standing), a waving flag and a scarf,
+  with part and arm channels baked in `TEXCOORD_1` so a game instances thousands and animates them in a vertex
+  shader (arms up about the shoulder, out of the seat, bounce, Mexican wave).
+- **`sforge/adboards.py`**: an atlas of original, fictional sponsor panels (and a fair-play message) for an LED
+  shader to scroll and cut between.
+
+Arena FC builds them with `arena-fc/Tools/build_stadiums.py` and picks the preset from the home club's ground.
+
+Test: `python tools/test_stadium.py`.
+
+## New in v11.31: match officials - signals, kits and props (fed back from Arena FC)
+
+Arena FC refereed every match invisibly: fouls, cards, offsides and VAR were given with nobody on the pitch.
+**`sforge/officials.py`** is what a game needs to put a referee, two assistants and a fourth official on the field:
+
+- **clips** (right-handed, semantic pose channels, registered in the motion library): `ref_whistle`, `ref_card`
+  (from the back pocket, held high), `ref_advantage`, `ref_penalty`, `ref_direct`, `ref_indirect`, `ref_goal`,
+  `ar_flag_up`, `ar_offside` (flag up, then held level across the pitch), `ar_flag_corner`, `ar_flag_throw`,
+  `fourth_board`, each with a `signal` event fraction; `qa()` checks the signal is reached and held and the clip
+  starts and ends neutral;
+- **kits**: five original official colourways on the v11.30 kit atlas (no number, no name), and `kit_for(home,
+  away)` to pick one that clashes with neither team;
+- **props**: `props_glb()` writes the assistant's two-tone flag, the yellow and red cards, the whistle and the
+  fourth official's board, grips at the origin, ready to hang off a hand bone;
+- **`append_clips(glb_in, glb_out, rig, clips)`** adds baked clips to an existing skinned GLB and keeps its meshes
+  and every clip already in it - for a squad GLB whose motion-capture sources are not at hand;
+- **`ROLES`** writes down where officials stand (the diagonal system; an assistant level with the second-last
+  defender of his half), so games place them the same way.
+
+Arena FC adds them with `arena-fc/Tools/add_official_clips.py`.
+
+Test: `python tools/test_officials.py`.
+
 ## New in v11.30: tailored kits and boots, and a kit atlas (fed back from Arena FC)
 
 Arena FC's squad wore its kit as body paint. The MakeHuman clothes hugged every muscle (pecs and abs through the
