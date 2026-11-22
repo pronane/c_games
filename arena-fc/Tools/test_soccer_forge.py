@@ -116,7 +116,7 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 345 clips (333 soccer + 12 officials signals)", len(anims) == 345, str(len(anims)))
+        check("GLB carries 354 clips (333 soccer + 12 officials signals + 9 pitch-side)", len(anims) == 354, str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
@@ -218,7 +218,7 @@ def main():
         man = json.load(open(man_path))
         glb_clips = [a["name"] for a in j.get("animations", [])] if "j" in dir() else []
         check("manifest lists every GLB clip (at least 345: 333 soccer + 12 officials)",
-              len(man["clips"]) >= 345 and (not glb_clips or sorted(c["name"] for c in man["clips"]) == sorted(glb_clips)),
+              len(man["clips"]) >= 354 and (not glb_clips or sorted(c["name"] for c in man["clips"]) == sorted(glb_clips)),
               str(len(man["clips"])))
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in

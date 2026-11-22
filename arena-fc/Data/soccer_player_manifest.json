@@ -47,6 +47,7 @@
   "hair_afro01",
   "sleeves",
   "gloves",
+  "trousers",
   "skin_v3",
   "hair_ponytail01",
   "skin_v4",
@@ -6671,6 +6672,142 @@
     "hit_end": -1,
     "signal": 14
    }
+  },
+  {
+   "name": "sub_sit",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 181,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "sub_lean",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 151,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "sub_cheer",
+   "loop": false,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 91,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "peak": 34
+   }
+  },
+  {
+   "name": "manager_watch",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 211,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "manager_shout",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 97,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "staff_stand",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 181,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "ballkid_ready",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 151,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "photographer_kneel",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 181,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "photographer_stand",
+   "loop": true,
+   "category": "Pitchside",
+   "source": "sforge.pitchside v11.39",
+   "frames": 151,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   }
   }
  ],
  "action_aliases": {
@@ -6912,6 +7049,10 @@
     1,
     1
    ],
+   "trousers": [
+    1,
+    1
+   ],
    "beardshell0": [
     1,
     1
@@ -6938,6 +7079,88 @@
     11.0,
     26.0
    ]
+  }
+ },
+ "pitchside": {
+  "pack": "sforge.pitchside v11.39",
+  "props": "models/pitchside_props.glb",
+  "goal": "models/goal_soccer.glb",
+  "looks": {
+   "sub": {
+    "jersey": "bib",
+    "sleeves": "team",
+    "shorts": "team_shorts",
+    "socks": "team_socks",
+    "boots": "team_boots",
+    "garments": [
+     "sleeves"
+    ],
+    "bibs": [
+     "#d9f99d",
+     "#fb923c",
+     "#f472b6",
+     "#fde047",
+     "#67e8f9"
+    ]
+   },
+   "manager": {
+    "jersey": "#1c1f26",
+    "trim": "#2a2f3a",
+    "sleeves": "#1c1f26",
+    "trousers": "#22252d",
+    "socks": "#22252d",
+    "boots": "#0b0b0d",
+    "garments": [
+     "sleeves",
+     "trousers"
+    ],
+    "number": 0,
+    "name": false
+   },
+   "assistant": {
+    "jersey": "team_dark",
+    "trim": "team",
+    "sleeves": "team_dark",
+    "trousers": "#1f2229",
+    "socks": "#1f2229",
+    "boots": "#0b0b0d",
+    "garments": [
+     "sleeves",
+     "trousers"
+    ],
+    "number": 0,
+    "name": false
+   },
+   "ballkid": {
+    "jersey": "#0f2b46",
+    "trim": "#e9eaee",
+    "sleeves": "#0f2b46",
+    "trousers": "#0f2b46",
+    "socks": "#0f2b46",
+    "boots": "#e9eaee",
+    "garments": [
+     "sleeves",
+     "trousers"
+    ],
+    "number": 0,
+    "name": false,
+    "height": 1.48
+   },
+   "photographer": {
+    "jersey": "#f97316",
+    "trim": "#1f2937",
+    "sleeves": "#2b2f36",
+    "trousers": "#2b2f36",
+    "socks": "#2b2f36",
+    "boots": "#111111",
+    "garments": [
+     "sleeves",
+     "trousers"
+    ],
+    "number": 0,
+    "name": false,
+    "prop": "camera"
+   }
   }
  }
 }

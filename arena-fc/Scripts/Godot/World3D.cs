@@ -177,8 +177,9 @@ public partial class Stadium : Node3D
         };
         AddChild(pitch);
 
-        // --- Goals ---
-        foreach (int sign in new[] { -1, 1 })
+        // --- Goals: Sprite Forge goals with real nets and corner flags (v11.38), else posts and flat nets ---
+        bool sfGoals = BuildSpriteForgeGoals();
+        foreach (int sign in sfGoals ? Array.Empty<int>() : new[] { -1, 1 })
         {
             var goal = new Node3D { Name = sign < 0 ? "GoalLeft" : "GoalRight" };
             AddChild(goal);
@@ -486,6 +487,7 @@ public partial class Stadium : Node3D
     private float _excite = .12f;
     public void UpdateCrowd(float dt)
     {
+        UpdateNets(dt);
         _excite = Mathf.Lerp(_excite, _celebrateTimer > 0f ? 1f : .12f, Math.Min(1f, dt * (_celebrateTimer > 0f ? 4f : .6f)));
         UpdateFigureCrowd(dt, _excite);
         if (_celebrateTimer > 0f)
