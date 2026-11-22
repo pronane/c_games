@@ -335,6 +335,12 @@ def main() -> int:
         realistic = dict(materials=[m["name"] for m in rmats], variants=list(REALISTIC_VARIANTS), height=rheight,
                          tris=int(sum(len(p["F"]) for p in parts)) // len(REALISTIC_VARIANTS))
         print("  wrote %s (%.1f MB, realistic)" % (glb_path, os.path.getsize(glb_path) / 1e6))
+        # Sprite Forge v11.30: straight hems, draped cloth, boots with soles, kit atlas UVs
+        import tailor_soccer_player as TSP
+        errs = TSP.tailor_glb(glb_path, glb_path)
+        if errs:
+            print("kit tailor QA failed:", errs)
+            return 1
     elif not a.skip_glb:
         tgt.V = lo.V
         tgt.F = lo.F

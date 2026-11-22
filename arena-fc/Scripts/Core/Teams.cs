@@ -22,6 +22,9 @@ public sealed class ClubInfo
     public string Stadium = "Arena Stadium";
     public int LeagueId;
     public string Style = "Balanced"; // Attacking, Defensive, Possession, Counter
+    /// <summary>Shirt design (CharacterSpec.KitPatterns) and trim; set from the club index in Clubs.</summary>
+    public string Pattern = "plain";
+    public string Trim = "";
 }
 
 public static class Clubs
@@ -50,6 +53,53 @@ public static class Clubs
         new() { Name="Verdant FC",         Short="VER", Primary="#16a34a", Secondary="#f0fdf4", Shorts="#14532d", Socks="#16a34a", Strength=.73f, AwayPrimary="#f0fdf4", AwaySecondary="#16a34a", ThirdPrimary="#dc2626", Stadium="Verdant Park", LeagueId=4, Style="Possession" },
         new() { Name="Obsidian SC",        Short="OBS", Primary="#111827", Secondary="#f9fafb", Shorts="#f9fafb", Socks="#111827", Strength=.75f, AwayPrimary="#f9fafb", AwaySecondary="#111827", ThirdPrimary="#7c3aed", Stadium="Obsidian Dome", LeagueId=4, Style="Defensive" },
     };
+
+    // Shirt designs and trims per club (index-aligned with All).  Original designs; set here rather
+    // than drawn from the roster RNG so squads, attributes and match results are unchanged.
+    private static readonly string[] ClubPatterns =
+    {
+        "band", "plain", "hoops", "halves", "stripes", "chevron", "fade", "sash", "pinstripes", "quarters",
+        "plain", "stripes", "hoops", "fade", "pinstripes", "band", "sash", "plain", "stripes", "chevron",
+    };
+
+    // Goalkeeper kits: a colour no outfield kit of either club wears, with contrasting gloves.
+    private static readonly (string shirt, string shorts, string socks, string gloves, string pattern)[] KeeperKits =
+    {
+        ("#a3e635", "#1a2e05", "#a3e635", "#f97316", "chevron"),
+        ("#f97316", "#1c1917", "#f97316", "#38bdf8", "fade"),
+        ("#facc15", "#1f2937", "#facc15", "#111827", "band"),
+        ("#18181b", "#18181b", "#18181b", "#a3e635", "pinstripes"),
+        ("#ec4899", "#3b0764", "#ec4899", "#f8fafc", "fade"),
+        ("#14b8a6", "#042f2e", "#14b8a6", "#fde047", "chevron"),
+    };
+
+    static Clubs()
+    {
+        for (int i = 0; i < All.Length; i++)
+        {
+            All[i].Pattern = ClubPatterns[i % ClubPatterns.Length];
+            if (All[i].Trim == "") All[i].Trim = All[i].Shorts == All[i].Primary ? All[i].Secondary : All[i].Shorts;
+        }
+    }
+
+    /// <summary>The keeper's kit for a club, chosen to stay clear of both teams' outfield colours.</summary>
+    public static (string shirt, string shorts, string socks, string gloves, string pattern) KeeperKit(int clubIndex)
+    {
+        var club = All[Math.Clamp(clubIndex, 0, All.Length - 1)];
+        for (int k = 0; k < KeeperKits.Length; k++)
+        {
+            var kit = KeeperKits[(clubIndex + k) % KeeperKits.Length];
+            if (ColourDistance(kit.shirt, club.Primary) > .35f && ColourDistance(kit.shirt, club.Secondary) > .35f) return kit;
+        }
+        return KeeperKits[clubIndex % KeeperKits.Length];
+    }
+
+    public static float ColourDistance(string a, string b)
+    {
+        Mx.HexToRgb(a, out float ar, out float ag, out float ab);
+        Mx.HexToRgb(b, out float br, out float bg, out float bb);
+        return MathF.Sqrt(((ar - br) * (ar - br) + (ag - bg) * (ag - bg) + (ab - bb) * (ab - bb)) / 3f);
+    }
 
     public static readonly string[] FirstNames =
     { "Alex","Marco","Nico","Jamie","Rafael","Yuki","Omar","Luca","Elias","Tomas","Kai","Ivan","Samir","Diego","Felix","Noah","Milan","Ruben","Theo","Amir","Hugo","Leon" };
@@ -236,6 +286,15 @@ public static class Clubs
                 Role.Midfielder => p.Pace > .82f ? Archetype.Explosive : Archetype.Controlled,
                 _ => Archetype.Controlled,
             };
+            p.KitPattern = club.Pattern;
+            p.KitTrim = club.Trim;
+            if (slot.role == Role.Goalkeeper)
+            {
+                var gk = KeeperKit(Array.IndexOf(All, club));
+                p.KitPrimary = gk.shirt; p.KitSecondary = gk.shorts; p.ShortsColor = gk.shorts;
+                p.SocksColor = gk.socks; p.GlovesColor = gk.gloves; p.KitPattern = gk.pattern; p.KitTrim = gk.shorts;
+                p.LongSleeves = true;
+            }
             p.Sanitize();
             list.Add(p);
         }

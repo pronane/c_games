@@ -28,3 +28,8 @@ sprite_forge/models/
 sprite_forge/captures/
 # Local guitar-lab benchmark audio that cannot be redistributed
 guitar-lab/benchmarks/regression/data/private/
+# Arena FC: textures Godot extracts when importing the player GLB, and the tailor's local source copy
+arena-fc/Data/models/soccer_player_*.png
+arena-fc/Data/models/soccer_player_*.jpg
+arena-fc/Data/models/soccer_player_*.import
+arena-fc/Data/models/soccer_player.src.glb
