@@ -187,8 +187,8 @@ M("sidestep", "Locomotion", "evasive move", keys=K(
     (0, P(READY)),
     (0.35, P(READY, hips=(10, 0, 14), leg_L=(30, 32, 0), leg_R=(25, -6, 0), knee_L=30, knee_R=60, chest=(4, 0, -12),
              arm_L=(15, 40, 0), arm_R=(30, 20, 0), pos=(0.15, 0))),
-    (0.7, P(READY, hips=(10, 0, -6), leg_L=(30, 10, 0), leg_R=(25, 20, 0), pos=(0.25, 0))),
-    (1, P(READY))))
+    (0.7, P(READY, hips=(10, 0, -6), leg_L=(30, 10, 0), leg_R=(25, 20, 0), pos=(0.30, 0))),
+    (1, P(READY, pos=(0.34, 0)))))     # v11.27: the cut keeps its ground (it used to slide back to where it began)
 M("juke_feint", "Locomotion", "fake move", keys=K(
     (0, P(READY, HOLD)),
     (0.3, P(READY, HOLD, hips=(14, -30, -14), chest=(8, -20, -8), leg_R=(40, -20, 0), knee_R=70, leg_L=(10, 10, 0), knee_L=25)),
@@ -331,6 +331,155 @@ M("hit", "Contact", "take a hit / flinch", keys=K(
 M("ko", "Contact", "knocked out", keys=K(
     (0, P(FIGHT)), (0.35, P(FIGHT, hips=(-35, 0, 0), neck=(30, 0, 0), arm_L=(60, 70, 0), arm_R=(60, 70, 0), lift=0.1, pos=(0, -0.3))),
     (0.7, P(LIE_BACK, pos=(0, -0.7))), (1, P(LIE_BACK, pos=(0, -0.7)))))
+
+# --- v11.27 hurling, rugby and Aussie rules (CC0, made here). The hurley is a prop on the right hand (equip),
+#     so the strikes swing the right hand through the ball's plane with the left hand on the handle above it.
+HURL_READY = P(READY, arm_L=(40, -18, 0), elbow_L=45, arm_R=(32, 8, 0), elbow_R=55, wrist_R=-10)
+
+
+def _hurl_strike(low=False, power=1.0):
+    """lift-and-strike (from the hand, low=False) or a ground stroke (low=True); right-handed, swinging left"""
+    dip = 22 if low else 0
+    return K(
+        (0, P(HURL_READY)),
+        (0.3, P(HURL_READY, hips=(6 + dip, -38 * power, 0), chest=(2, -28 * power, 0), leg_R=(10, 5, 0), knee_R=25 + dip,
+                arm_L=(105 - dip, -35, 0), elbow_L=60, arm_R=(125 - 2 * dip, -25, 0), elbow_R=95, neck=(-10 - dip / 2, 20, 0),
+                ball=None if low else "hand_L")),
+        (0.5, P(HURL_READY, hips=(12 + dip, 18 * power, 0), chest=(6, 22 * power, 0), leg_L=(32, 5, 0), knee_L=28 + dip,
+                leg_R=(-14, 5, 0), knee_R=20 + dip, arm_L=(58 - 2 * dip, 8, 0), elbow_L=12, arm_R=(66 - 2 * dip, 18, 0),
+                elbow_R=14, neck=(-18 - dip / 2, -10, 0), ball=("world", 0.05, 0.12 if low else 1.0, 0.55))),
+        (0.75, P(HURL_READY, hips=(10 + dip / 2, 45 * power, 0), chest=(4, 40 * power, 0), leg_L=(28, 5, 0), knee_L=22,
+                 leg_R=(-20, 5, 0), knee_R=15, arm_L=(120, 40, 0), elbow_L=30, arm_R=(130, 42, 0), elbow_R=40,
+                 neck=(-8, -25, 0), ball=("world", 0.0, 0.5 if low else 2.2, 3.0))),
+        (1, P(HURL_READY, ball=None)))
+
+
+M("hurl_strike", "Hurling", "lift and strike the sliotar from the hand", keys=_hurl_strike())
+M("hurl_ground", "Hurling", "ground stroke: pull on the moving sliotar", keys=_hurl_strike(low=True))
+M("hurl_puckout", "Hurling", "keeper's puck-out: a full strike from the hand", keys=_hurl_strike(power=1.25))
+M("hurl_free", "Hurling", "a free: a measured strike from the hand, chest square to the posts", keys=_hurl_strike(power=1.1))
+M("hurl_hook", "Hurling", "hook: reach the hurley down across the striker's swing", keys=K(
+    (0, P(HURL_READY)),
+    (0.4, P(HURL_READY, hips=(28, -10, 0), spine=(10, 0, 0), leg_L=(55, 6, 0), knee_L=55, leg_R=(-15, 6, 0), knee_R=25,
+            arm_R=(85, -12, 0), elbow_R=5, arm_L=(70, 10, 0), elbow_L=25, neck=(-30, 0, 0), pos=(0, 0.15))),
+    (0.6, P(HURL_READY, hips=(30, -18, 0), spine=(10, 0, 0), leg_L=(58, 6, 0), knee_L=60, leg_R=(-18, 6, 0), knee_R=25,
+            arm_R=(70, -30, 0), elbow_R=5, arm_L=(60, 0, 0), elbow_L=30, neck=(-30, 0, 0), pos=(0, 0.2))),
+    (1, P(HURL_READY, pos=(0, 0.2)))))
+M("hurl_block", "Hurling", "block: hurley up in front of the striker", keys=K(
+    (0, P(HURL_READY)),
+    (0.35, P(HURL_READY, hips=(8, -5, 0), leg_L=(30, 5, 0), knee_L=25, arm_R=(120, 5, 0), elbow_R=55, arm_L=(110, 10, 0),
+             elbow_L=60, neck=(-12, 0, 0), pos=(0, 0.1))),
+    (0.65, P(HURL_READY, hips=(10, -5, 0), leg_L=(32, 5, 0), knee_L=28, arm_R=(128, 5, 0), elbow_R=45, arm_L=(118, 10, 0),
+             elbow_L=55, neck=(-12, 0, 0), pos=(0, 0.15))),
+    (1, P(HURL_READY, pos=(0, 0.15)))))
+M("hurl_catch", "Hurling", "high catch with the free hand, hurley held low", keys=K(
+    (0, P(HURL_READY, ball=("world", 0, 2.8, 1.2))),
+    (0.3, P(CROUCH, arm_R=(25, 10, 0), elbow_R=40, arm_L=(-25, 10, 0), ball=("world", 0, 2.8, 0.7))),
+    (0.55, P(STAND, arm_L=(172, -5, 0), elbow_L=10, arm_R=(40, 15, 0), elbow_R=40, leg_L=(45, 5, 0), knee_L=80,
+             neck=(-30, 0, 0), lift=0.35, ball="hand_L")),
+    (0.8, P(STAND, arm_L=(120, -5, 0), elbow_L=40, arm_R=(40, 15, 0), elbow_R=40, leg_L=(30, 5, 0), knee_L=50,
+            lift=0.15, ball="hand_L")),
+    (1, P(HURL_READY, ball="hand_L"))))
+M("hurl_lift", "Hurling", "jab / roll lift: the hurley under the ball on the ground", keys=K(
+    (0, P(HURL_READY, ball=("world", 0, 0.05, 0.7))),
+    (0.35, P(HURL_READY, hips=(40, 0, 0), spine=(10, 0, 0), leg_L=(70, 6, 0), knee_L=60, leg_R=(20, 6, 0), knee_R=30,
+             arm_R=(70, -5, 0), elbow_R=5, arm_L=(60, 5, 0), elbow_L=20, neck=(-30, 0, 0), ball=("world", 0, 0.05, 0.62))),
+    (0.55, P(HURL_READY, hips=(30, 0, 0), arm_R=(85, -5, 0), elbow_R=10, arm_L=(80, 5, 0), elbow_L=40,
+             ball=("world", 0, 0.9, 0.45))),
+    (0.75, P(HURL_READY, arm_L=(70, -5, 0), elbow_L=50, ball="hand_L")),
+    (1, P(HURL_READY, ball="hand_L"))))
+
+
+def _hurl_solo():
+    run = loco(40, 85, 30, 70, 12, air=0.04)
+
+    def f(t):
+        p = run(t)                                    # the hurley out in front, the sliotar balanced on the bas
+        p["arm_R"] = (62, -6, 0); p["elbow_R"] = 18; p["wrist_R"] = 10
+        p["arm_L"] = (40, -12, 0); p["elbow_L"] = 70
+        p["ball"] = ("world", 0.05, 1.0, 0.95)
+        return p
+    return f
+
+
+M("hurl_solo", "Hurling", "solo run: the sliotar balanced on the hurley", func=_hurl_solo(), loop=True)
+
+RUGBY_READY = P(READY, HOLD)
+M("rugby_pass", "Rugby", "spin pass off the hip to the left", keys=K(
+    (0, P(RUGBY_READY)),
+    (0.35, P(RUGBY_READY, hips=(8, 35, 0), chest=(4, 25, 0), arm_L=(45, 35, 0), elbow_L=70, arm_R=(35, 40, 0),
+             elbow_R=80, neck=(-12, -40, 0), ball=("world", 0.28, 0.95, 0.25))),
+    (0.55, P(RUGBY_READY, hips=(8, -30, 0), chest=(4, -30, 0), arm_L=(70, -40, 0), elbow_L=12, arm_R=(75, -45, 0),
+             elbow_R=15, neck=(-12, -40, 0), ball=("world", -0.4, 1.05, 0.55))),
+    (1, P(RUGBY_READY, hips=(6, -15, 0), arm_L=(60, -30, 0), elbow_L=20, arm_R=(60, -30, 0), elbow_R=20,
+          ball=("world", -2.6, 1.2, 1.2)))))
+M("rugby_scrum", "Rugby", "scrum: bound and driving, back flat", keys=K(
+    (0, P(READY)),
+    (0.4, P(READY, hips=(72, 0, 0), spine=(8, 0, 0), chest=(4, 0, 0), neck=(-55, 0, 0), leg_L=(85, 8, 0), leg_R=(70, 8, 0),
+            knee_L=85, knee_R=70, arm_L=(95, 35, 0), elbow_L=70, arm_R=(95, 35, 0), elbow_R=70, lift=-0.08)),
+    (0.7, P(READY, hips=(75, 0, 0), spine=(8, 0, 0), chest=(4, 0, 0), neck=(-58, 0, 0), leg_L=(78, 8, 0), leg_R=(62, 8, 0),
+            knee_L=75, knee_R=58, arm_L=(95, 35, 0), elbow_L=70, arm_R=(95, 35, 0), elbow_R=70, lift=-0.06, pos=(0, 0.08))),
+    (1, P(READY, hips=(75, 0, 0), spine=(8, 0, 0), chest=(4, 0, 0), neck=(-58, 0, 0), leg_L=(80, 8, 0), leg_R=(66, 8, 0),
+          knee_L=78, knee_R=62, arm_L=(95, 35, 0), elbow_L=70, arm_R=(95, 35, 0), elbow_R=70, lift=-0.07, pos=(0, 0.1)))))
+M("rugby_ruck", "Rugby", "ruck / jackal: over the ball, hands on it", keys=K(
+    (0, P(READY)),
+    (0.45, P(READY, hips=(60, 0, 0), spine=(12, 0, 0), neck=(-40, 0, 0), leg_L=(80, 10, 0), leg_R=(55, 10, 0),
+             knee_L=80, knee_R=55, arm_L=(80, 5, 0), elbow_L=10, arm_R=(80, 5, 0), elbow_R=10, lift=-0.07,
+             ball=("world", 0, 0.11, 0.5))),
+    (1, P(READY, hips=(62, 0, 0), spine=(12, 0, 0), neck=(-42, 0, 0), leg_L=(82, 10, 0), leg_R=(58, 10, 0),
+          knee_L=82, knee_R=58, arm_L=(82, 5, 0), elbow_L=10, arm_R=(82, 5, 0), elbow_R=10, lift=-0.08,
+          ball=("world", 0, 0.11, 0.48)))))
+M("rugby_try", "Rugby", "dive over the line, ball grounded in front", keys=K(
+    (0, P(READY, HOLD)),
+    (0.3, P(CROUCH, HOLD, hips=(35, 0, 0), leg_R=(-30, 6, 0), knee_R=20, pos=(0, 0.2))),
+    (0.55, P(LIE_FRONT, hips=(65, 0, 0), arm_L=(150, 5, 0), arm_R=(150, 5, 0), elbow_L=15, elbow_R=15, lift=0.25,
+             pos=(0, 0.9), ball="hands")),
+    (0.8, P(LIE_FRONT, arm_L=(160, 5, 0), arm_R=(160, 5, 0), elbow_L=10, elbow_R=10, pos=(0, 1.3),
+            ball=("world", 0, 0.11, 2.4))),
+    (1, P(LIE_FRONT, pos=(0, 1.3), ball=("world", 0, 0.11, 2.4)))))
+M("rugby_hand_off", "Rugby", "hand-off: the free arm straight out at the tackler", keys=K(
+    (0, P(READY, arm_R=(38, -14, 0), elbow_R=88, ball="hand_R")),
+    (0.4, P(READY, hips=(14, 15, 0), arm_L=(95, -25, 0), elbow_L=40, arm_R=(38, -14, 0), elbow_R=88, ball="hand_R")),
+    (0.6, P(READY, hips=(14, 20, 0), arm_L=(92, -30, 0), elbow_L=0, wrist_L=-50, arm_R=(38, -14, 0), elbow_R=88,
+            ball="hand_R", pos=(0, 0.1))),
+    (1, P(READY, arm_R=(38, -14, 0), elbow_R=88, ball="hand_R", pos=(0, 0.15)))))
+M("lineout_lift", "Rugby", "line-out jump: lifted, both arms up for the throw", keys=K(
+    (0, P(STAND, arm_L=(30, 10, 0), arm_R=(30, 10, 0), ball=("world", 0, 3.4, 2.0))),
+    (0.3, P(CROUCH, arm_L=(-20, 10, 0), arm_R=(-20, 10, 0), ball=("world", 0, 3.3, 1.2))),
+    (0.55, P(STAND, arm_L=(175, -5, 0), arm_R=(175, -5, 0), elbow_L=5, elbow_R=5, leg_L=(10, 5, 0), leg_R=(10, 5, 0),
+             knee_L=10, knee_R=10, neck=(-30, 0, 0), lift=0.85, ball="hands")),
+    (0.8, P(STAND, HOLD, lift=0.6)),
+    (1, P(READY, HOLD))))
+M("aussie_mark", "Aussie rules", "mark: a clean chest-high catch, then 'mark!' arm up", keys=K(
+    (0, P(READY, ball=("world", 0, 1.8, 2.0))),
+    (0.4, P(READY, arm_L=(95, -5, 0), arm_R=(95, -5, 0), elbow_L=60, elbow_R=60, ball=("world", 0, 1.3, 0.6))),
+    (0.55, P(READY, HOLD)),
+    (0.8, P(STAND, arm_L=(38, -14, 0), elbow_L=88, arm_R=(170, 10, 0), elbow_R=5, ball="hand_L")),
+    (1, P(STAND, arm_L=(38, -14, 0), elbow_L=88, arm_R=(170, 10, 0), elbow_R=5, ball="hand_L"))))
+M("aussie_speccy", "Aussie rules", "spectacular mark: knee in a back, high over the pack", keys=K(
+    (0, P(READY, ball=("world", 0, 3.4, 1.6))),
+    (0.25, P(CROUCH, arm_L=(-35, 10, 0), arm_R=(-35, 10, 0), ball=("world", 0, 3.4, 1.0))),
+    (0.5, P(STAND, arm_L=(172, -5, 0), arm_R=(172, -5, 0), elbow_L=10, elbow_R=10, leg_L=(95, 5, 0), knee_L=120,
+            leg_R=(-15, 5, 0), knee_R=25, neck=(-35, 0, 0), lift=0.95, ball=("world", 0, 3.25, 0.25))),
+    (0.62, P(STAND, arm_L=(165, -5, 0), arm_R=(165, -5, 0), elbow_L=20, elbow_R=20, leg_L=(95, 5, 0), knee_L=120,
+             neck=(-30, 0, 0), lift=0.95, ball="hands")),
+    (0.85, P(STAND, HOLD, leg_L=(30, 5, 0), knee_L=50, lift=0.3)),
+    (1, P(READY, HOLD))))
+M("aussie_ruck_tap", "Aussie rules", "ruckman's tap: leap and palm the ball down with one hand", keys=K(
+    (0, P(READY, ball=("world", 0, 3.4, 0.6))),
+    (0.3, P(CROUCH, arm_R=(-30, 10, 0), ball=("world", 0, 3.3, 0.4))),
+    (0.55, P(STAND, arm_R=(175, -5, 0), elbow_R=5, arm_L=(60, 30, 0), elbow_L=40, leg_L=(40, 5, 0), knee_L=60,
+             neck=(-35, 0, 0), lift=0.7, ball=("world", 0, 3.0, 0.25))),
+    (0.75, P(STAND, arm_R=(140, -5, 0), elbow_R=10, arm_L=(50, 30, 0), elbow_L=40, lift=0.4,
+             ball=("world", 0, 1.8, 1.6))),
+    (1, P(READY))))
+M("aussie_shepherd", "Aussie rules", "shepherd: arms in, side-on, blocking the runner", keys=K(
+    (0, P(READY)),
+    (0.4, P(READY, hips=(12, 60, 0), chest=(4, 15, 0), arm_L=(30, 20, 0), elbow_L=100, arm_R=(30, 20, 0), elbow_R=100,
+            leg_L=(25, 15, 0), knee_L=30, neck=(-14, -50, 0), pos=(0.1, 0))),
+    (0.7, P(READY, hips=(14, 65, 0), chest=(4, 15, 0), arm_L=(30, 20, 0), elbow_L=100, arm_R=(30, 20, 0), elbow_R=100,
+            leg_L=(28, 15, 0), knee_L=35, neck=(-14, -55, 0), pos=(0.15, 0))),
+    (1, P(READY, pos=(0.15, 0)))))
 
 # --- celebrations
 M("celebrate_point", "Celebration", "short celebration", keys=K(

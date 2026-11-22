@@ -246,13 +246,30 @@ def sf_kit(kit):
     -> (shirt, trim, shorts, socks) hex colours and the squad number (or None); None if kit is not one of them"""
     if not kit.startswith("sf_"):
         return None
-    name, _, num = kit[3:].partition("#")
+    name, _, num = kit[3:].partition("@")[0].partition("#")
     from .mesh import KITS as GK
     if name not in GK:
         raise KeyError("unknown kit %r (%s)" % (name, ", ".join(GK)))
     k = GK[name]
     hx = lambda c: "#%02x%02x%02x" % tuple(int(round(v * 255)) for v in c)
     return (hx(k["shirt"]), hx(k["trim"]), hx(k["shorts"]), hx(k["socks"])), (int(num) if num.isdigit() else None)
+
+
+KIT_STYLES = {
+    "football": "short sleeves, small collar (soccer, Gaelic football, hurling - the default)",
+    "rugby": "rugby jersey: a deep collar in the trim colour, hooped socks",
+    "guernsey": "Aussie rules guernsey: sleeveless, a contrasting yoke across the shoulders",
+}
+
+
+def kit_style(kit):
+    """v11.26: the cut of a game kit, "sf_<kit>[#number][@style]" -> 'football' / 'rugby' / 'guernsey'"""
+    if not (kit or "").startswith("sf_") or "@" not in kit:
+        return "football"
+    st = kit.split("@", 1)[1].strip().lower()
+    if st not in KIT_STYLES:
+        raise KeyError("unknown kit style %r (%s)" % (st, ", ".join(KIT_STYLES)))
+    return st
 
 
 def number_mask(n, w=96, h=110):
@@ -290,6 +307,7 @@ def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
     else:
         A, Bc, Sh, So = (hexc(c) for c in KITS[kit])
     plain = sfk is not None
+    style = kit_style(kit)
     nmask = number_mask(number) if number is not None else None
     skin = hexc(skin); hairc = hexc(hair); eyec = hexc(eye)
     face_fn = face_paint(skin, eyec, hairc * 1.25, scowl=0.1, stubble=np.array([0.90, 0.85, 0.83]),
@@ -318,6 +336,11 @@ def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
             col[(y > 1.17) & (y < 1.27) & (ax < 0.30)] = Bc                                # hoop, chest and back
         col[(ax > 0.215) & (np.abs(_arm_t(P) - 0.50) < 0.035)] = Bc                        # sleeve cuffs
         col[(y > 1.435) & (y < 1.49) & (ax < 0.088) & ((z > 0.0) | (y > 1.45))] = Bc     # collar
+        if style == "rugby":                                                              # v11.26: deep rugby collar + placket
+            col[(y > 1.405) & (ax < 0.10)] = Bc
+            col[(z > 0.08) & (ax < 0.012) & (y > 1.33) & (y < 1.43)] = Bc
+        elif style == "guernsey":                                                         # v11.26: yoke across the shoulders
+            col[(y > 1.36) & (y < 1.40)] = Bc
         if not plain:
             col = mix(col, Bc, ellmask(x, y, 0.085, 1.33, 0.022, 0.026, 0.12) * (z > 0.08))  # crest
         if nmask is not None:                                                             # squad number on the back
@@ -341,7 +364,9 @@ def paints(kit="home", skin=SKIN, hair=HAIR, eye=EYE):
     def socks_fn(P, base):
         y = P[:, 1]
         col = np.broadcast_to(So, base.shape).copy()
-        if not plain:       # v11.25: plain game kits have plain socks (the hoops met the sock top in white fragments)
+        if style == "rugby":    # v11.26: rugby socks are hooped all the way down (broad bands, no fragments)
+            col[(np.floor((0.445 - y) / 0.035) % 2 == 1) & (y > 0.16)] = Bc
+        elif not plain:     # v11.25: plain game kits have plain socks (the hoops met the sock top in white fragments)
             col[((y > 0.41) & (y < 0.425)) | ((y > 0.385) & (y < 0.40))] = Bc              # two hoops
         col[y > 0.445] = So * 0.85                                                          # turned-down top
         return col, np.zeros(len(P))

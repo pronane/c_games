@@ -35,12 +35,15 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # which character types and kits make sense for each kind of game
 FIGHTER_TYPES = ["balanced", "quick_striker", "heavy_brawler", "small_agile", "big_boss"]
 PLAYER_TYPES = ["balanced", "playmaker", "keeper"]
+# v11.26: contact sports pick forwards and backs too (rugby props and locks, the Aussie rules ruckman)
+CONTACT_TYPES = PLAYER_TYPES + ["quick_striker", "heavy_brawler", "big_boss", "small_agile"]
 GENERAL_TYPES = ["balanced", "small_agile", "big_boss"]
 KITS = ["home", "away", "blue", "red", "black", "gk"]
 STYLE = {
     "soccer": ("players", True), "gaelic": ("players", True), "basketball": ("players", True), "tennis": ("players", False),
     "boxing": ("fighters", False), "fighting": ("fighters", False), "wrestling": ("fighters", False),
     "beat_em_up": ("fighters", False),
+    "hurling": ("contact", True), "aussie_rules": ("contact", True), "rugby": ("contact", True),
 }
 EVENT_LABEL = {"ball_contact": "ball contact", "hit_start": "hit starts", "hit_end": "hit ends", "throw_release": "release",
                "shoot": "shot", "reload": "reload", "footsteps": "footstep"}
@@ -48,7 +51,7 @@ EVENT_LABEL = {"ball_contact": "ball contact", "hit_start": "hit starts", "hit_e
 
 def types_for(pack_name):
     kind = STYLE.get(pack_name, ("general", False))[0]
-    return {"fighters": FIGHTER_TYPES, "players": PLAYER_TYPES}.get(kind, GENERAL_TYPES)
+    return {"fighters": FIGHTER_TYPES, "players": PLAYER_TYPES, "contact": CONTACT_TYPES}.get(kind, GENERAL_TYPES)
 
 
 def has_kits(pack_name):
@@ -338,7 +341,7 @@ class GamesTab:
         self.type_box.configure(values=types_for(name))
         if self.ctype.get() not in types_for(name):
             self.ctype.set("balanced")
-        self.type_lab.configure(text={"fighters": "Fighter type", "players": "Player type"}.get(STYLE.get(name, ("",))[0], "Type"))
+        self.type_lab.configure(text={"fighters": "Fighter type", "players": "Player type", "contact": "Player type"}.get(STYLE.get(name, ("",))[0], "Type"))
         kit = has_kits(name)
         self.kit_box.configure(state="readonly" if kit else tk.DISABLED)
         self.kit_lab.configure(foreground="#000" if kit else "#999")

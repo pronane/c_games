@@ -54,6 +54,59 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.27: hurling, Aussie rules and rugby; the hurley and helmet; rugby and guernsey kits
+
+### Three new game packs
+
+`forge.py build --game hurling | aussie_rules | rugby`, `forge.py roster --game ...` and the Games tab all take them,
+with the same QA, cell fit, HD frames, rosters, portraits and engine projects (Godot, Unity, Unreal, raylib, web,
+pygame) as the other packs. Every move has its own motion; none borrows another move's clip.
+
+| Pack | Moves |
+|------|-------|
+| `hurling` (21) | idle, walk, run, sprint, **solo** (sliotar on the bas), **strike**, **ground_strike**, **puckout**, **free**, **lift**, **catch** (hurley up to guard the hand), hand_pass, **hook**, **block**, shoulder, sidestep, fall, get_up, hit, celebrate_point, celebrate_goal |
+| `aussie_rules` (21) | idle, walk, run, sprint, bounce, drop_punt, set_shot, snap, handball, **mark** (chest), **speccy**, **ruck_tap**, tackle, **shepherd**, smother, pick_up, sidestep, fall, get_up, hit, celebrate |
+| `rugby` (23) | idle, walk, run, sprint, carry, **pass** (spin pass), offload, kick, drop_goal, place_kick, catch, **lineout**, tackle, **hand_off**, **scrum**, **ruck**, **try**, pick_up, sidestep, fall, get_up, hit, celebrate |
+
+The bold moves are new procedural motions (`hurl_*`, `aussie_*`, `rugby_*`, `lineout_lift` in `sforge/motions.py`).
+The events (`ball_contact` when the bas meets the sliotar, `throw_release`, `hit_start` / `hit_end`) are in
+`game_character.json` like every pack's.
+
+### The hurley and helmet (`"equip"` in a game pack)
+
+A pack can now list props the player always carries: the hurling pack has
+`"equip": ["sport_hurley@hand_r", "sport_hurl_helmet@head"]`, so every hurler holds a hurley and wears a helmet in
+every move, in the sprites and in `model.glb` / `model.fbx`. `--attach` replaces them and `--no-equip` leaves them
+off. Both props are CC0, made from boxes and a dome by `tools/make_sport_props.py` (no third-party content).
+A mannequin build with props draws the mannequin as a library rig, which the props need.
+
+### Kit cuts on the look builder
+
+`--kit sf_<kit>[#number][@cut]`:
+
+* `@rugby`: a deep collar and placket in the trim colour, hooped socks.
+* `@guernsey`: Aussie rules, sleeveless (the arms are bare skin), with a yoke across the shoulders.
+* no cut: the football shirt (soccer, Gaelic, hurling).
+
+The number on the back works with every cut. Rosters pick the game's cut by themselves (`roster.KIT_STYLE`), and a
+player in a roster file can set its own `"kit_style"`.
+
+### Rosters
+
+The new games are team games with real positions: hurling (goalkeeper in the keeper's kit, full back, midfield,
+forwards), Aussie rules (ruckman, key defender, midfielder, small and key forwards) and rugby (prop, lock, flanker,
+fly-half, winger, hooker, scrum-half), each with a body type to suit. The Games tab offers forward and back types
+(heavy, big, quick, small) for these sports.
+
+### Fix: the Games tab and `check_motion --pack` show the clip the build really plays
+
+They used to guess a move's clip from its `prefer` list and generic `library` name, and missed a pack's `"own"`
+motion: a move like rugby's `try` showed as missing, and a strike as the generic shot. They now ask the build's own
+resolver (`sforge.motionset`).
+
+Test: `python tools/test_new_sports.py` (all 15 packs validated; new motions, equip, props, kit cuts, rosters; the
+three packs built on the mannequin with no QA FAIL and nothing clipped; the helmet on the head).
+
 ## New in v11.26: match capture - real match video to library moves (fed back from Arena FC)
 
 `python -m sforge.matchcapture VIDEO OUT_DIR --models MODELS_DIR` turns a wide-angle match

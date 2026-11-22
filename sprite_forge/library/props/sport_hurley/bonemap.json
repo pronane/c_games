@@ -1,0 +1,25 @@
+{
+ "convention": "generic",
+ "map": {},
+ "unmapped": [
+  "prop"
+ ],
+ "missing": [
+  "hips",
+  "spine",
+  "head",
+  "upperarm_L",
+  "forearm_L",
+  "hand_L",
+  "upperarm_R",
+  "forearm_R",
+  "hand_R",
+  "thigh_L",
+  "shin_L",
+  "foot_L",
+  "thigh_R",
+  "shin_R",
+  "foot_R"
+ ],
+ "edited": false
+}

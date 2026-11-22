@@ -9,6 +9,9 @@ build exactly as before). A pack says:
             when the move's name would hit a different one (kart idle -> kart_idle).
   camera    side | three_quarter | topdown8
   props     things the GAME draws (a ball, a kart). Sprite Forge does not draw them.
+  equip     (v11.27) library props the PLAYER carries in every move, drawn by Sprite Forge:
+            ["sport_hurley@hand_r", "sport_hurl_helmet@head"]. --attach replaces them,
+            --no-equip leaves them off.
   events    gameplay frames: hit_start / hit_end, ball_contact, footsteps, throw_release,
             shoot, reload. -1 or [] means "this move has none". Extra numeric keys are
             kept for a pack you write yourself; the small loaders read the known ones.
@@ -155,6 +158,8 @@ def load(name_or_path):
         # v11.24: figure height as a share of the frame height (default 0.62); lower for packs with high leaps
         "figure": float(d.get("figure") or 0.0),
         "view_moves": [slug(x) for x in (d.get("view_moves") or [])],
+        # v11.27: library props the player holds / wears in every move ("sport_hurley@hand_r"), see sforge/equip.py
+        "equip": [str(x) for x in (d.get("equip") or []) if str(x).strip()],
         "notes": str(d.get("notes") or ""),
         "moves": norm,
         "path": p,
@@ -218,6 +223,10 @@ def apply(cfg, name_or_path):
         cfg.figure_share = float(pack["figure"])
     if pack["prop"] in ("none", "kart", "auto"):
         cfg.prop = pack["prop"]
+    if pack["equip"] and not getattr(cfg, "props", None):
+        # v11.27: the pack's own kit (a hurley in the hand, a helmet on the head). --attach still replaces it and
+        # --no-equip drops it. Props need a skinned mesh, so a mannequin build draws the mannequin as a library rig.
+        cfg.props = list(pack["equip"])
     if pack["camera"] == "topdown8":
         cfg.billboard8 = True
         cfg.view_moves = pack["view_moves"] or [m["name"] for m in pack["moves"][:3]]

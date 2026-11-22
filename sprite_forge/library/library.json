@@ -1,7 +1,7 @@
 {
  "format": "sforge-library",
  "version": 1,
- "updated": "2026-10-29T08:54:47",
+ "updated": "2026-11-21T23:01:15",
  "dir": "/workspace/sprite_forge_v9/library",
  "assets": [
   {
@@ -384,6 +384,80 @@
    "licence_ok": true,
    "description": "",
    "thumb": "props/sample_sword/thumb.png"
+  },
+  {
+   "kind": "props",
+   "name": "sport_hurl_helmet",
+   "path": "props/sport_hurl_helmet",
+   "bones": 1,
+   "tris": 396,
+   "height_m": 0.18,
+   "clips": [],
+   "convention": "generic",
+   "unmapped": 1,
+   "missing": [
+    "hips",
+    "spine",
+    "head",
+    "upperarm_L",
+    "forearm_L",
+    "hand_L",
+    "upperarm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "props/sport_hurl_helmet/thumb.png"
+  },
+  {
+   "kind": "props",
+   "name": "sport_hurley",
+   "path": "props/sport_hurley",
+   "bones": 1,
+   "tris": 88,
+   "height_m": 0.86,
+   "clips": [],
+   "convention": "generic",
+   "unmapped": 1,
+   "missing": [
+    "hips",
+    "spine",
+    "head",
+    "upperarm_L",
+    "forearm_L",
+    "hand_L",
+    "upperarm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+   ],
+   "licence": {
+    "spdx": "CC0-1.0",
+    "redistribution": "yes",
+    "owner_confirmed": false,
+    "redistributable": true
+   },
+   "licence_ok": true,
+   "description": "",
+   "thumb": "props/sport_hurley/thumb.png"
   }
  ]
 }
