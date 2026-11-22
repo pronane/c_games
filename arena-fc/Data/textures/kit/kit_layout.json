@@ -1,0 +1,124 @@
+{
+ "version": "11.30",
+ "panels": {
+  "torso_front": [
+   0.0,
+   0.0,
+   0.5,
+   0.5
+  ],
+  "torso_back": [
+   0.5,
+   0.0,
+   1.0,
+   0.5
+  ],
+  "sleeve_L": [
+   0.0,
+   0.5,
+   0.25,
+   0.75
+  ],
+  "sleeve_R": [
+   0.25,
+   0.5,
+   0.5,
+   0.75
+  ],
+  "shorts_L": [
+   0.5,
+   0.5,
+   0.75,
+   0.75
+  ],
+  "shorts_R": [
+   0.75,
+   0.5,
+   1.0,
+   0.75
+  ],
+  "socks_L": [
+   0.0,
+   0.75,
+   0.25,
+   1.0
+  ],
+  "socks_R": [
+   0.25,
+   0.75,
+   0.5,
+   1.0
+  ],
+  "boots_L": [
+   0.5,
+   0.75,
+   0.75,
+   1.0
+  ],
+  "boots_R": [
+   0.75,
+   0.75,
+   1.0,
+   1.0
+  ]
+ },
+ "print": {
+  "back_name": [
+   0.6,
+   0.075,
+   0.9,
+   0.135
+  ],
+  "back_number": [
+   0.62,
+   0.15,
+   0.88,
+   0.36
+  ],
+  "front_number": [
+   0.21,
+   0.17,
+   0.29,
+   0.25
+  ],
+  "crest": [
+   0.31,
+   0.065,
+   0.37,
+   0.125
+  ],
+  "shorts_number": [
+   0.53,
+   0.53,
+   0.58,
+   0.58
+  ]
+ },
+ "styles": [
+  "plain",
+  "stripes",
+  "hoops",
+  "sash",
+  "halves",
+  "pinstripes",
+  "chevron",
+  "fade",
+  "quarters",
+  "band"
+ ],
+ "glyphs": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.-' ",
+ "glyph_grid": [
+  8,
+  5
+ ],
+ "glyph_cell": [
+  96,
+  144
+ ],
+ "font": "Big Shoulders Bold (SIL OFL 1.1)",
+ "channels": {
+  "pattern": "L: secondary colour on shirt panels",
+  "detail": "R trim, G boot detail (1 sole, .66 flash, .33 heel), B fabric multiply",
+  "glyphs": "R fill, G outline"
+ }
+}

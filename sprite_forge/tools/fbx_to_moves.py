@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v11.30: FBX motion capture -> Sprite Forge moves (any skeleton Godot can read).
+"""v11.34: FBX motion capture -> Sprite Forge moves (any skeleton Godot can read).
 
     GODOT=/path/to/godot python tools/fbx_to_moves.py OUT a.fbx b.fbx ... [--fps 30] [--licence JSON]
 

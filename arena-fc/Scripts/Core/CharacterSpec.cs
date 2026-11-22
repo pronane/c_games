@@ -40,6 +40,13 @@ public sealed class CharacterSpec
     public int HairStyle { get; set; } = 0;         // 0 crop,1 short,2 curly,3 bald,4 long
     public string HairColor { get; set; } = "#241811";
     public string KitPrimary { get; set; } = "#d7263d";
+    /// <summary>Shirt design on the Sprite Forge kit atlas: plain, stripes, hoops, sash, halves,
+    /// pinstripes, chevron, fade, quarters, band (sforge.kitdesign.STYLES).</summary>
+    public string KitPattern { get; set; } = "plain";
+    /// <summary>Collar / cuff / hem colour; empty = the shorts colour.</summary>
+    public string KitTrim { get; set; } = "";
+    public static readonly string[] KitPatterns =
+        { "plain", "stripes", "hoops", "sash", "halves", "pinstripes", "chevron", "fade", "quarters", "band" };
     public string KitSecondary { get; set; } = "#f7f7f2";
     public string ShortsColor { get; set; } = "#14213d";
     public string SocksColor { get; set; } = "#f7f7f2";
@@ -88,7 +95,9 @@ public sealed class CharacterSpec
         ArmLength = Mx.Clamp(ArmLength, 0.82f, 1.20f);
         HeadScale = Mx.Clamp(HeadScale, 0.80f, 1.25f);
         ShoulderWidth = Mx.Clamp(ShoulderWidth, 0.80f, 1.25f);
-        Number = Math.Clamp(Number, 1, 99);
+        // 0 = no number (match officials); players keep 1..99
+        Number = Math.Clamp(Number, 0, 99);
+        if (Array.IndexOf(KitPatterns, KitPattern) < 0) KitPattern = "plain";
         SkinTone = Math.Clamp(SkinTone, 0, SkinPalette.Length - 1);
         HairStyle = Math.Clamp(HairStyle, 0, 4);
         Pace = Mx.Clamp(Pace, 0.1f, 1f);

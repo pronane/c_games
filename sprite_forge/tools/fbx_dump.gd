@@ -1,5 +1,5 @@
 extends SceneTree
-# Sprite Forge v11.30 - FBX mocap -> named world joint positions per frame (metres, Y up),
+# Sprite Forge v11.34 - FBX mocap -> named world joint positions per frame (metres, Y up),
 # using Godot 4.3+'s built-in FBX reader (ufbx).  Run by tools/fbx_to_moves.py:
 #   godot --headless --path <any project dir> --script fbx_dump.gd -- OUT_DIR a.fbx b.fbx ...
 # Joint names are the SkillCorner set sforge.jointtrack reads.  The bone map below is Rokoko's

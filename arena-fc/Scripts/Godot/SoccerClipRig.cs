@@ -266,17 +266,131 @@ public sealed partial class SoccerClipRig : Node3D
         return null;
     }
 
+    // ---- Kit on the Sprite Forge tailor atlas (sforge.tailor / sforge.kitdesign v11.30) ----
+    public const string KitDir = "res://Data/textures/kit/";
+    private static Shader? _kitShader;
+    private static Texture2D? _kitDetail, _kitGlyphs;
+    private static readonly Dictionary<string, Texture2D> _kitPatterns = new();
+    private const string Glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.-' ";
+
+    /// <summary>True when the GLB carries tailored kit (atlas UVs) and the Sprite Forge masks are present.</summary>
+    public static bool KitAtlasAvailable => Godot.FileAccess.FileExists(KitDir + "kit_detail.png")
+                                            && Godot.FileAccess.FileExists("res://Shaders/kit.gdshader");
+
+    private static Texture2D? KitTex(string file)
+    {
+        string path = KitDir + file;
+        if (!Godot.FileAccess.FileExists(path)) return null;
+        return GD.Load<Texture2D>(path);
+    }
+
+    /// <summary>The player's name as glyph indices for the shirt (kit_layout.json "glyphs").</summary>
+    public static int[] ShirtGlyphs(string name, out int len)
+    {
+        var g = new int[14];
+        string up = (name ?? "").ToUpperInvariant();
+        len = Math.Min(up.Length, 14);
+        for (int i = 0; i < 14; i++)
+        {
+            int k = i < len ? Glyphs.IndexOf(up[i]) : -1;
+            g[i] = k < 0 ? Glyphs.Length - 1 : k;
+        }
+        return g;
+    }
+
+    /// <summary>One ShaderMaterial for shirt/shorts/socks/boots: every kit surface samples the same atlas.</summary>
+    public static ShaderMaterial? KitMaterial(CharacterSpec spec, float wet = 0f)
+    {
+        if (!KitAtlasAvailable) return null;
+        _kitShader ??= GD.Load<Shader>("res://Shaders/kit.gdshader");
+        _kitDetail ??= KitTex("kit_detail.png");
+        _kitGlyphs ??= KitTex("kit_glyphs.png");
+        string style = string.IsNullOrEmpty(spec.KitPattern) ? "plain" : spec.KitPattern;
+        if (!_kitPatterns.TryGetValue(style, out var pat))
+        {
+            pat = KitTex($"kit_pattern_{style}.png") ?? KitTex("kit_pattern_plain.png")!;
+            _kitPatterns[style] = pat;
+        }
+        var m = new ShaderMaterial { Shader = _kitShader };
+        m.SetShaderParameter("pattern_tex", pat);
+        m.SetShaderParameter("detail_tex", _kitDetail);
+        m.SetShaderParameter("glyph_tex", _kitGlyphs);
+        var prim = CharacterRig.C(spec.KitPrimary);
+        var sec = CharacterRig.C(spec.KitSecondary);
+        m.SetShaderParameter("primary", prim);
+        m.SetShaderParameter("secondary", sec);
+        string trimHex = string.IsNullOrEmpty(spec.KitTrim) ? spec.ShortsColor : spec.KitTrim;
+        var trim = CharacterRig.C(trimHex);
+        // a trim that vanishes into the shirt reads as no trim: fall back to the secondary
+        if (Lum(trim) - Lum(prim) is > -.06f and < .06f) trim = sec;
+        m.SetShaderParameter("trim", trim);
+        m.SetShaderParameter("shorts", CharacterRig.C(spec.ShortsColor));
+        m.SetShaderParameter("socks", CharacterRig.C(spec.SocksColor));
+        m.SetShaderParameter("boots", CharacterRig.C(spec.BootsColor));
+        m.SetShaderParameter("boot_detail", Lum(CharacterRig.C(spec.BootsColor)) > .55f ? new Color(.08f, .09f, .12f) : new Color(.93f, .94f, .96f));
+        // print in whichever of the kit colours stands out from the shirt, outlined in the other
+        bool lightShirt = Lum(prim) > .55f;
+        var fill = lightShirt ? (Lum(sec) < .45f ? sec : new Color(.06f, .07f, .1f)) : (Lum(sec) > .55f ? sec : new Color(1, 1, 1));
+        if (spec.KitPattern is "stripes" or "hoops" or "halves" or "quarters" or "pinstripes")
+            fill = lightShirt && Lum(sec) > .55f ? new Color(.06f, .07f, .1f) : new Color(1, 1, 1);
+        var edge = Lum(fill) > .5f ? trim.Darkened(.35f) : new Color(1, 1, 1);
+        m.SetShaderParameter("print_fill", fill);
+        m.SetShaderParameter("print_edge", edge);
+        m.SetShaderParameter("number", Math.Clamp(spec.Number, 0, 99));   // 0: officials, no number
+        var glyphs = ShirtGlyphs(spec.DisplayName, out int len);
+        m.SetShaderParameter("name_chars", glyphs);
+        m.SetShaderParameter("name_len", len);
+        m.SetShaderParameter("wet", wet);
+        return m;
+    }
+
+    /// <summary>A tailored garment's UVs span the kit atlas panels; the old skin-tight kits used
+    /// a small corner of the MakeHuman clothes atlas.  Old GLBs keep the flat tint.</summary>
+    private static readonly Dictionary<ulong, bool> _atlasUv = new();
+    private static bool HasAtlasUv(MeshInstance3D mi, int surface)
+    {
+        ulong key = mi.Mesh.GetInstanceId() * 8UL + (ulong)surface;
+        if (_atlasUv.TryGetValue(key, out bool known)) return known;
+        bool r = AtlasUvScan(mi, surface);
+        _atlasUv[key] = r;
+        return r;
+    }
+
+    private static bool AtlasUvScan(MeshInstance3D mi, int surface)
+    {
+        var arr = mi.Mesh.SurfaceGetArrays(surface);
+        if (arr.Count <= (int)Godot.Mesh.ArrayType.TexUV || arr[(int)Godot.Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil) return false;
+        var uv = arr[(int)Godot.Mesh.ArrayType.TexUV].AsVector2Array();
+        float maxU = 0, maxV = 0;
+        foreach (var p in uv) { if (p.X > maxU) maxU = p.X; if (p.Y > maxV) maxV = p.Y; }
+        return maxU > .55f || maxV > .76f;
+    }
+
+    private static float Lum(Color c) => .2126f * c.R + .7152f * c.G + .0722f * c.B;
+
+    private ShaderMaterial? _kit;
+    /// <summary>The live kit material (weather / dirt are set on it during a match).</summary>
+    public ShaderMaterial? KitShader => _kit;
+
     /// <summary>Retint the GLB materials from the character spec (per club), by material name.</summary>
     public void Tint(CharacterSpec spec)
     {
+        _kit = KitMaterial(spec);
         foreach (var mi in _meshes)
         {
             if (mi.Mesh == null) continue;
             for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
             {
                 var src = mi.GetSurfaceOverrideMaterial(i) ?? mi.Mesh.SurfaceGetMaterial(i);
+                if (src is not BaseMaterial3D && src is not ShaderMaterial) continue;
+                string layer = src.ResourceName ?? "";
+                if (layer == "" && _materialOrder.Count > i) layer = _materialOrder[i];
+                if (_kit != null && layer is "jersey" or "shorts" or "socks" or "boots" && HasAtlasUv(mi, i))
+                {
+                    mi.SetSurfaceOverrideMaterial(i, _kit);
+                    continue;
+                }
                 if (src is not StandardMaterial3D std) continue;
-                string layer = std.ResourceName ?? "";
                 if (layer == "" && _materialOrder.Count > i) layer = _materialOrder[i];   // older sculpt GLBs
                 string? hex = TintHexFor(layer, spec);
                 if (hex == null) continue;

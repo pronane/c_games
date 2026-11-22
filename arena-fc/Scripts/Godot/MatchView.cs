@@ -30,6 +30,8 @@ public partial class MatchView : Node3D
     public Hud Hud = null!;
     public BroadcastCamera Cam = null!;
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
+    /// <summary>Referee, assistants and fourth official (presentation only; not in State.Players).</summary>
+    public OfficialsView? Officials;
     public MeshInstance3D Ball = null!, BallShadow = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
                           ControlArrow = null!, OwnerArrow = null!, PressureRing = null!;
     /// <summary>Billboarded, always-visible nameplates for the controlled player,
@@ -151,6 +153,14 @@ public partial class MatchView : Node3D
         // Named so the per-frame weather/crowd hooks find it (they looked for a
         // sibling "../Stadium", so rain never showed and the crowd never celebrated).
         var stadium = new Stadium { Name = "Stadium" };
+        // ends, crowd and flags in the two clubs' colours (Sprite Forge ground, v11.32)
+        stadium.HomeColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.HomeClub, 0, Clubs.All.Length - 1)].Primary);
+        var awayClub = Clubs.All[Math.Clamp(_opts.AwayClub, 0, Clubs.All.Length - 1)];
+        var homeClub = Clubs.All[Math.Clamp(_opts.HomeClub, 0, Clubs.All.Length - 1)];
+        // the away end wears what its team wears today (away kit on a clash - Clubs.ResolveKitClash)
+        bool clash = Clubs.ColourDistance(homeClub.Primary, awayClub.Primary) < Clubs.ClashDistance && awayClub.AwayPrimary != "";
+        stadium.AwayColour = CharacterRig.C(clash ? awayClub.AwayPrimary : awayClub.Primary);
+        stadium.Lighting = _opts.Lighting;
         _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
         // Empty grounds still get the stadium, just not the crowd.
         stadium.Build(_crowd.GetCrowdCount() > 0, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
@@ -187,6 +197,14 @@ public partial class MatchView : Node3D
             Rigs[i] = RigFactory.Create(Engine.State.Players[i].Spec);
             Rigs[i].Name = "Player_" + i;
             AddChild(Rigs[i]);
+        }
+
+        // Match officials on the pitch (Sprite Forge sforge.officials, v11.31).  Not on the training ground.
+        if (_opts.Mode != MatchEngine.ModeTraining && SoccerClipRig.Available)
+        {
+            Officials = new OfficialsView();
+            AddChild(Officials);
+            Officials.Init(Engine);
         }
 
         Ball = BallFactory.Create();
@@ -359,6 +377,7 @@ public partial class MatchView : Node3D
         var stadium = GetNodeOrNull<Stadium>("Stadium");
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
+        UpdateKitWeathering(dt);
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
         _modeOverlay?.UpdateOverlay(Engine, _coach);
         AutoplayReport();
@@ -531,6 +550,30 @@ public partial class MatchView : Node3D
         _lastSoundEvent = newest;
     }
 
+    private float _kitTimer;
+    /// <summary>Kits soak in the rain and pick up grass stains as the match goes on (kit.gdshader wet / dirt).
+    /// Players who go to ground (slides, tackles, dives, falls) get dirtier.  Presentation only.</summary>
+    private void UpdateKitWeathering(float dt)
+    {
+        _kitTimer -= dt;
+        if (_kitTimer > 0f) return;
+        _kitTimer = .5f;
+        float wet = ArenaFC.Core.Weather.Raining ? .85f : 0f;
+        float played = Math.Clamp(Engine.State.Clock / (Math.Max(1f, _opts.HalfMinutes) * 120f), 0f, 1f);
+        for (int i = 0; i < Rigs.Length; i++)
+        {
+            var kit = Rigs[i].Soccer?.KitShader;
+            if (kit == null) continue;
+            var p = Engine.State.Players[i];
+            if (p.Action is "slide" or "tackle" or "dive" or "fall" or "foul" || p.Action.StartsWith("keeper_dive"))
+                _grime[i] = Math.Min(1f, _grime[i] + .12f);
+            float dirt = Math.Clamp(played * .35f + _grime[i] * .55f + wet * .2f, 0f, .9f);
+            kit.SetShaderParameter("wet", wet);
+            kit.SetShaderParameter("dirt", dirt);
+        }
+    }
+    private float[] _grime = new float[64];
+
     private void Sync(float dt)
     {
         var b = Engine.State.Ball;
@@ -567,6 +610,7 @@ public partial class MatchView : Node3D
             // the rig's own duplicate label to avoid stacked text over key players.
             rig.NameLabel.Visible = false;
         }
+        Officials?.Sync(Engine, dt, _time);
         Ball.Position = G(b.Pos);
         float shadowHeight = Math.Clamp(b.Pos.Y, 0f, 8f);
         float shadowRadius = .62f + shadowHeight * .045f;

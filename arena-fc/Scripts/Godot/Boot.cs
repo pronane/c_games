@@ -22,6 +22,10 @@ namespace ArenaFC.GodotGame;
 public partial class Boot : Node3D
 {
     private bool _shot;
+    private MatchView? _view;
+    private int _offShot = -1;
+    private Camera3D? _offCam;
+    private int _shotFrame = 24;
     private int _frames;
 
     // Deterministic frame recorder used to produce real gameplay videos.
@@ -60,11 +64,22 @@ public partial class Boot : Node3D
 
         if (Has("--rigshot"))
         {
-            var env = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(.08f, .12f, .15f), AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(1, 1, 1), AmbientLightEnergy = 1f };
+            // --rigshot [--rigshot-club N] [--rigshot-player K] [--rigshot-back] [--rigshot-far]
+            // close-up of one squad player in his club kit (kit / boots / face QA).
+            var env = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(.08f, .12f, .15f), AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(1, 1, 1), AmbientLightEnergy = 1f, TonemapMode = Godot.Environment.ToneMapper.Aces };
             AddChild(new WorldEnvironment { Environment = env });
             AddChild(new DirectionalLight3D { LightEnergy = 2f, RotationDegrees = new Vector3(-35, -35, 0) });
-            AddChild(RigFactory.Create(new CharacterSpec { KitPrimary = "#d7263d", KitSecondary = "#ffffff", ShortsColor = "#14213d" }));
-            var c = new Camera3D { Position = new Vector3(1.7f, 1.5f, 3.1f), Fov = 45 };
+            AddChild(new DirectionalLight3D { LightEnergy = .8f, RotationDegrees = new Vector3(-25, 145, 0) });
+            var spec = new CharacterSpec { KitPrimary = "#d7263d", KitSecondary = "#ffffff", ShortsColor = "#14213d" };
+            if (Has("--rigshot-club"))
+            {
+                var squad = Clubs.CreateRoster(ArgInt("--rigshot-club", 0), 11);
+                spec = squad[Math.Clamp(ArgInt("--rigshot-player", 9), 0, squad.Count - 1)];
+            }
+            AddChild(RigFactory.Create(spec));
+            bool back = Has("--rigshot-back"), far = Has("--rigshot-far");
+            float d = far ? 4.2f : 2.3f;
+            var c = new Camera3D { Position = new Vector3(back ? -.9f : .9f, 1.25f, back ? -d : d), Fov = 45 };
             c.LookAtFromPosition(c.Position, new Vector3(0, .95f, 0), Vector3.Up);
             AddChild(c);
             c.MakeCurrent();
@@ -105,8 +120,19 @@ public partial class Boot : Node3D
             int size = ArgInt("--size", 5); if (size != 7 && size != 11) size = 5;
             // --weather rain|windy|snow|fog for QA of the weather visuals/physics.
             var (wx, wind) = Presentation.WeatherFor(System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Value("--weather") ?? "clear"));
-            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f, Weather = wx, WindSpeed = wind }, null, () => GetTree().Quit());
+            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f, Weather = wx, WindSpeed = wind,
+                Lighting = (Value("--light") ?? "day").ToLowerInvariant() }, null, () => GetTree().Quit());
             AddChild(view);
+            _view = view;
+            // --officials-shot K: a QA camera that follows official K (0 ref, 1/2 assistants, 3 fourth)
+            if (Has("--officials-shot"))
+            {
+                _offShot = Math.Clamp(ArgInt("--officials-shot", 1), 0, 3);
+                _offCam = new Camera3D { Fov = 40, Far = 400f };
+                AddChild(_offCam);
+            }
+            // --camera N: start on a given broadcast camera (QA captures of close-ups / officials)
+            if (Has("--camera")) view.Cam.Mode = Math.Clamp(ArgInt("--camera", 0), 0, BroadcastCamera.ModeCount - 1);
         }
         else if (Has("--editor"))
         {
@@ -117,6 +143,8 @@ public partial class Boot : Node3D
         else GameApp.Create(this);
 
         _shot = Has("--screenshot");
+        // --shot-frame N: take the screenshot N rendered frames in (default 24)
+        _shotFrame = Math.Max(2, ArgInt("--shot-frame", 24));
         var rec = Value("--record");
         if (!string.IsNullOrEmpty(rec))
         {
@@ -155,8 +183,17 @@ public partial class Boot : Node3D
             }
         }
 
+        if (_offCam != null && _view?.Officials != null)
+        {
+            var r = _view.Officials.Rigs[_offShot];
+            var f = new Vector3(Mathf.Sin(r.Rotation.Y), 0, Mathf.Cos(r.Rotation.Y));
+            _offCam.Position = r.GlobalPosition + f * 4.2f + new Vector3(1.2f, 1.5f, 0);
+            _offCam.LookAt(r.GlobalPosition + new Vector3(0, 1.0f, 0), Vector3.Up);
+            _offCam.MakeCurrent();
+        }
+
         if (!_shot) return;
-        if (++_frames < 24) return;
+        if (++_frames < _shotFrame) return;
         _shot = false;
         var tex = GetViewport().GetTexture();
         if (tex == null) { GD.Print("ARENA_FC_SCREENSHOT_SKIPPED (headless)"); GetTree().Quit(0); return; }

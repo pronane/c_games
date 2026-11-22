@@ -159,7 +159,13 @@ public partial class CharacterRig : Node3D
         if (EditorMode || !SoccerClipRig.Available) return;
         Soccer = new SoccerClipRig { Name = "SoccerPlayer" };
         AddChild(Soccer);
-        if (Soccer.Load(spec)) Mesh.Visible = false;
+        if (Soccer.Load(spec))
+        {
+            Mesh.Visible = false;
+            // the name and number are printed on the tailored kit; the floating label was the
+            // procedural rig's stand-in and hung off the GLB player's back
+            if (NameLabel != null && SoccerClipRig.KitAtlasAvailable) NameLabel.Visible = false;
+        }
         else { Soccer.QueueFree(); Soccer = null; }
     }
 
