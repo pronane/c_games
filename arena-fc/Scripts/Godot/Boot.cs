@@ -60,11 +60,22 @@ public partial class Boot : Node3D
 
         if (Has("--rigshot"))
         {
-            var env = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(.08f, .12f, .15f), AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(1, 1, 1), AmbientLightEnergy = 1f };
+            // --rigshot [--rigshot-club N] [--rigshot-player K] [--rigshot-back] [--rigshot-far]
+            // close-up of one squad player in his club kit (kit / boots / face QA).
+            var env = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(.08f, .12f, .15f), AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(1, 1, 1), AmbientLightEnergy = 1f, TonemapMode = Godot.Environment.ToneMapper.Aces };
             AddChild(new WorldEnvironment { Environment = env });
             AddChild(new DirectionalLight3D { LightEnergy = 2f, RotationDegrees = new Vector3(-35, -35, 0) });
-            AddChild(RigFactory.Create(new CharacterSpec { KitPrimary = "#d7263d", KitSecondary = "#ffffff", ShortsColor = "#14213d" }));
-            var c = new Camera3D { Position = new Vector3(1.7f, 1.5f, 3.1f), Fov = 45 };
+            AddChild(new DirectionalLight3D { LightEnergy = .8f, RotationDegrees = new Vector3(-25, 145, 0) });
+            var spec = new CharacterSpec { KitPrimary = "#d7263d", KitSecondary = "#ffffff", ShortsColor = "#14213d" };
+            if (Has("--rigshot-club"))
+            {
+                var squad = Clubs.CreateRoster(ArgInt("--rigshot-club", 0), 11);
+                spec = squad[Math.Clamp(ArgInt("--rigshot-player", 9), 0, squad.Count - 1)];
+            }
+            AddChild(RigFactory.Create(spec));
+            bool back = Has("--rigshot-back"), far = Has("--rigshot-far");
+            float d = far ? 4.2f : 2.3f;
+            var c = new Camera3D { Position = new Vector3(back ? -.9f : .9f, 1.25f, back ? -d : d), Fov = 45 };
             c.LookAtFromPosition(c.Position, new Vector3(0, .95f, 0), Vector3.Up);
             AddChild(c);
             c.MakeCurrent();
