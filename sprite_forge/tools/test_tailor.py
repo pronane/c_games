@@ -131,8 +131,8 @@ def main():
     leg = sh.V[:, 1] < sh.V[:, 1].min() + .01
     g = {x.name: x for x in T.soccer_garments()}
     rec("flutter: collar and waistband held, free hems move",
-        je.UV2[top, 0].max() < 1e-6 and sh.UV2[wst, 0].max() < 1e-6 and sh.UV2[leg, 0].min() > g["shorts"].flutter * .8
-        and je.UV2[:, 0].max() > g["jersey"].flutter * .95, "shorts leg %.4f" % sh.UV2[leg, 0].min())
+        np.abs(je.UV2[top, 0]).max() < 1e-6 and np.abs(sh.UV2[wst, 0]).max() < 1e-6 and np.abs(sh.UV2[leg, 0]).min() > g["shorts"].flutter * .8
+        and je.UV2[:, 0].max() > g["jersey"].flutter * .95, "shorts leg %.4f" % np.abs(sh.UV2[leg, 0]).min())
     kp = T.tailor(parts, bones, garments=T.keeper_garments(), joint_names=jn, log=lambda *a: None)
     near, _t = T.dominant_bone(parts["body"], bones, jn)
     hand = np.char.endswith(near.astype(str), "Hand")

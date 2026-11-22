@@ -70,7 +70,7 @@ class Part:
     image: str = ""
     C: np.ndarray | None = None
     extras: dict = field(default_factory=dict)
-    UV2: np.ndarray | None = None    # TEXCOORD_1: (flutter amplitude m, phase round its hem 0..1) on garments
+    UV2: np.ndarray | None = None    # TEXCOORD_1: (flutter amplitude m along the normal, negative on turned-in lips; phase 0..1)
 
 
 @dataclass
@@ -471,7 +471,9 @@ def cut_garment(src, g, tuck_y=None, body=None):
     fl = flutter_weights(V, lip_loops, free, g.flutter, g.flutter_len)
     n_core = len(V)
     V, N, F, J, W, lipsrc = _add_lips(V, N, F, J, W, lip_loops, g.ease + g.lip)
-    fl = np.concatenate([fl, fl[lipsrc]]) if len(lipsrc) else fl
+    # the lip's normal points into the opening, the shell's out of it: a negative amplitude moves the
+    # turned-in hem the same way as the shell it hangs from (a game displaces along the normal)
+    fl = np.concatenate([fl, fl[lipsrc] * np.array([-1.0, 1.0])]) if len(lipsrc) else fl
     return Part(g.name, V, N, np.zeros((len(V), 2)), J, W, F, material=g.name,
                 extras={"lip_src": lipsrc, "n_core": n_core}, UV2=fl)
 
