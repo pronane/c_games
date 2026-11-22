@@ -116,7 +116,11 @@ public partial class Stadium
             var spot = new SpotLight3D
             {
                 Name = "Floodlight", LightColor = new Color(1f, .96f, .88f), LightEnergy = (mast ? .9f : .45f) * FloodMul,
-                SpotRange = 220f, SpotAngle = mast ? 38f : 46f, SpotAttenuation = .6f, ShadowEnabled = false,
+                SpotRange = 220f, SpotAngle = mast ? 38f : 46f, SpotAttenuation = .6f,
+                // Ultra at night: every mast throws its own shadow - the four-shadow look of a floodlit game
+                ShadowEnabled = mast && RenderProfile.FloodlightShadows(Lighting),
+                ShadowBlur = 1.5f,
+                LightVolumetricFogEnergy = 1.6f,
             };
             AddChild(spot);
             spot.LookAtFromPosition(pos, new Vector3(pos.X * .15f, 0, pos.Z * .15f), Vector3.Up);

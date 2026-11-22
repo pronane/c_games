@@ -43,6 +43,8 @@ public partial class Boot : Node3D
 
     public override void _Ready()
     {
+        // Graphics tier first: a machine that can't carry Forward+ restarts on the GL renderer right here.
+        if (RenderProfile.EnsureRenderer()) return;
         var args = OS.GetCmdlineUserArgs().Concat(OS.GetCmdlineArgs()).ToArray();
         bool Has(string a) => args.Any(x => x.Equals(a, StringComparison.OrdinalIgnoreCase));
         int ArgInt(string name, int fallback)
@@ -59,6 +61,11 @@ public partial class Boot : Node3D
         }
 
         if (Has("--selftest")) { CallDeferred(nameof(RunSelfTest)); return; }
+        if (Has("--render-profile"))
+        {
+            // QA: --render-profile ultra|high|performance (this run only; Forward+ tiers need --rendering-method forward_plus)
+            RenderProfile.ForceTier(Value("--render-profile") ?? "ultra");
+        }
         if (Has("--no-game")) { GD.Print("ARENA_FC_HEADLESS_OK"); CallDeferred(nameof(QuitClean)); return; }
         if (Has("--dump-rig")) { DumpRig(); CallDeferred(nameof(QuitClean)); return; }
 
@@ -140,6 +147,13 @@ public partial class Boot : Node3D
             ed.Init(Clubs.CreateRoster(0, 11));
             AddChild(ed);
         }
+        else if (RenderProfile.NeedsBenchmark(OS.GetCmdlineUserArgs()))
+        {
+            // first launch on Auto: measure this machine on a real match, then on to the menu (or restart on GL)
+            var bench = new GraphicsBenchmark();
+            AddChild(bench);
+            bench.Done = () => { bench.QueueFree(); GameApp.Create(this); };
+        }
         else GameApp.Create(this);
 
         _shot = Has("--screenshot");
@@ -159,6 +173,7 @@ public partial class Boot : Node3D
                      $"driver={RenderingServer.GetCurrentRenderingDriverName()} " +
                      $"adapter={RenderingServer.GetVideoAdapterName()} " +
                      $"warmup={_profileWarmupFrames} frames={_profileFrameTarget}");
+        GD.Print("ARENA_FC_RENDER " + RenderProfile.Describe());
         GD.Print("ARENA_FC_BOOT_OK");
     }
 

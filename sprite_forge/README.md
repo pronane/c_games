@@ -95,6 +95,27 @@ lashes and beards. **`tailor.replace_parts`** can now add parts that bring their
 or losing its clips.
 
 Test: `python tools/test_skinshade.py`.
+## New in v11.35: classic BVH bone names - 100STYLE locomotion (fed back from Arena FC)
+
+`bonemap` now recognises the classic BVH mocap naming used by 100STYLE and many studio and academic
+exports. In this style, each joint is named after where its bone starts:
+
+| Name | Bone |
+|---|---|
+| {S}Collar | clavicle |
+| {S}Shoulder | upper arm |
+| {S}Elbow | forearm |
+| {S}Wrist | hand |
+| {S}Hip | thigh |
+| {S}Knee | shin |
+| {S}Ankle | foot |
+| Chest, Chest2 ... | spine |
+
+Before this, such skeletons were read with the Unity-style rules. Those took "RightHip" for the spine
+and lost both thighs and both upper arms, so the figure folded up to 0.77 m tall. The new convention
+only wins where those joint names really occur, so Mixamo, Unity and UE skeletons are unchanged.
+
+Test: `python tools/test_bonemap_conventions.py`.
 
 ## New in v11.34: FBX mocap packs, and SoccerTrack v2 on real files
 
