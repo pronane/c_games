@@ -79,6 +79,47 @@ Locomotion...). Each move also gets structured tags (`sforge/motiontags.py`):
 * The built-in `motion_library` is tagged, with `ml_training = yes` (all CC0 procedural moves).
 * Tests: `python3 tools/test_motiontags.py` (in CI).
 
+## New in v11.38: LODs for skinned characters (fed back from Arena FC)
+
+`sforge.skinlod` takes any skinned part down by quadric-error half-edge collapses: every vertex left is an
+original one, so UVs, skin weights, normals and flutter weights stay exact. Hems and UV seams are locked,
+flips and slivers are refused. `lod_parts` follows `LOD_PLAN`:
+- faces hidden under the kit are cut first;
+- skin just inside an opening keeps full detail;
+- the shirt and shorts keep more of their shape;
+- coarse garments stand off a hair so their chords don't sink into the body;
+- lashes, brows and the inner hair layer drop out of the far level.
+
+The plan also suggests switch distances per quality tier. `tailor.replace_parts(clips_from=)` takes the clips
+of another GLB of the same skeleton (matched by node name), so meshes rebuilt on an older copy keep a game's
+newest clips.
+
+    lods = SL.lod_parts(parts)       # {"body": [lod1, lod2], ...}
+    T.replace_parts(glb, out, {"v0_": {"body_lod1": lods["body"][0], ...}})
+
+## New in v11.37: cloth flutter weights and keeper garments (fed back from Arena FC)
+
+- `tailor` writes a flutter weight per garment vertex as `TEXCOORD_1` (amplitude in metres, phase round its
+  hem): sleeve and shorts-leg hems move, the collar and the waistband are held. A game's kit shader ripples
+  the cloth by it with the player's speed and the wind (Arena FC: `Shaders/kit.gdshader`).
+- `tailor.keeper_garments()`: a long-sleeved base layer and padded goalkeeper gloves, cut from each identity's
+  own arms and hands (`Garment.region` / `region_t`), on materials of their own (`sleeves`, `gloves`).
+- Kit fit: cloth pushed clear of the skin, hem snaps carried into the rows behind, offsets along smoothed
+  normals (no skin teeth at the collar, no folded hems); `skinshade.grade_iris` for MakeHuman's red-brown eyes.
+
+    out = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments())
+
+## New in v11.36: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
+
+Arena FC shipped five of the nine squad identities, and its faces read as plastic up close: a 1-2k MakeHuman
+atlas holds colour, not skin. **`sforge/skinshade.py`** writes a tileable skin-detail normal map (pores, fine
+creases, a soft undulation) and roughness map for a high-repeat detail layer, and engine-neutral material
+presets for skin (subsurface, rim), hair (alpha-to-coverage, anisotropic highlight), eyes (clearcoat catch-light),
+lashes and beards. **`tailor.replace_parts`** can now add parts that bring their own textured materials
+(`materials` with `image` keys plus `images`), so a game adds identities to a squad GLB without rebuilding it
+or losing its clips.
+
+Test: `python tools/test_skinshade.py`.
 ## New in v11.35: classic BVH bone names - 100STYLE locomotion (fed back from Arena FC)
 
 `bonemap` now recognises the classic BVH mocap naming used by 100STYLE and many studio and academic

@@ -1,5 +1,8 @@
 """Garment shells for a skinned body: shirts, shorts, socks and boots with clean hems (v11.30).
 
+v11.37: flutter weights for the free hems (TEXCOORD_1) and `keeper_garments` (long-sleeved base layer,
+padded gloves) cut from the body's own arms and hands.
+
 Fed back from Arena FC.  Its squad wore its kit as body paint: the MakeHuman clothes hug every
 muscle, the hems are a staircase of whole triangles, and the "boots" are the bare feet with toes.
 `tailor` cuts each garment out of the body by bone region, snaps every hem onto a straight cut,
@@ -67,6 +70,7 @@ class Part:
     image: str = ""
     C: np.ndarray | None = None
     extras: dict = field(default_factory=dict)
+    UV2: np.ndarray | None = None    # TEXCOORD_1: (flutter amplitude m along the normal, negative on turned-in lips; phase 0..1)
 
 
 @dataclass
@@ -87,18 +91,81 @@ class Garment:
     skip_lip_below: float = -1.0     # no lip on openings lower than this (a tucked-in shirt tail)
     extend: float = 0.0              # push every opening this much further (covers a body hole's ragged edge)
     tuck_into: str = ""              # cut the tail off where it is inside this garment (shirt -> shorts)
+    hem_falloff: int = 5             # rings behind each hem that follow its snap (no folded last row)
+    hem_band: int = 4                # rings next to each opening relaxed after easing (no teeth at the hem)
+    body_clearance: float = .004     # the cloth stays at least this far outside the skin (0 = off)
+    weight_smooth: int = 6           # passes that even out the skin weights (cloth follows the body, no spikes)
     flare_above: float = -1.0        # only openings higher than this flare (a tucked shirt stays inside the shorts)
+    flutter: float = 0.0             # how far the free hems may flutter (m), written to TEXCOORD_1 for the game
+    flutter_len: float = .10         # over how far behind a free hem the flutter fades out
+    region: tuple = ()               # cut from the source by bone instead of taking all of it, e.g. the arms
+    region_t: tuple = ()             # ... limited along some of them: ((bone suffix, t0, t1), ...) (0 head, 1 tail)
+    panel: str = "atlas"             # "atlas": laid out on the kit atlas; "own": its own material, simple UVs
 
 
 def soccer_garments():
     """Football kit: shirt tucked into the shorts, short sleeves; loose shorts; socks; boots."""
     return [
         Garment("jersey", "jersey", ease=.008, flare=.010, flare_len=.08, smooth=24, flare_above=1.1,
-                skip_lip_below=1.0, extend=.006, tuck_into="shorts"),
-        Garment("shorts", "shorts", ease=.013, flare=.010, flare_len=.10, smooth=12),
+                skip_lip_below=1.0, extend=.006, tuck_into="shorts", flutter=.011, flutter_len=.09),
+        Garment("shorts", "shorts", ease=.013, flare=.010, flare_len=.10, smooth=12, flutter=.010, flutter_len=.12),
         Garment("socks", "socks", ease=.0065, smooth=5, lip=.004, extend=.018),
-        Garment("boots", "boots", ease=.004, smooth=400, lip=.004, flat_sole=True),
+        Garment("boots", "boots", ease=.004, smooth=400, lip=.004, flat_sole=True, body_clearance=0),
     ]
+
+
+def keeper_garments():
+    """What a goalkeeper (or an outfield player in the cold) adds: a long-sleeved base layer under the
+    shirt and padded gloves.  Both are cut from the body's own arms and hands, so they fit every identity,
+    and both get a material of their own (the game tints them: shirt colour, glove colour)."""
+    arms = tuple(sd + b for sd in SIDES for b in ("UpperArm", "Forearm"))
+    hands = tuple(sd + "Hand" for sd in SIDES)
+    return [
+        Garment("sleeves", "body", ease=.0045, smooth=6, lip=.004, region=arms, region_t=(("Forearm", -1.0, 1.12),),
+                body_clearance=0, hem_band=2, panel="own"),
+        Garment("gloves", "body", ease=.007, smooth=3, lip=.005, region=hands + tuple(sd + "Forearm" for sd in SIDES),
+                region_t=(("Forearm", .94, 9.0),), body_clearance=0, hem_band=0, hem_falloff=2, weight_smooth=1, panel="own"),
+    ]
+
+
+def body_region(part, bones, names, limits=(), joint_names=None):
+    """The faces of `part` whose every corner follows one of the bones `names` (by skin weight); `limits`
+    ((bone suffix, t0, t1), ...) keeps only that stretch along the bones ending in the suffix (a body's
+    limbs rarely match the rig's bone lengths, so only cut where it matters: the wrist)."""
+    near, t = dominant_bone(part, bones, joint_names)
+    ok = np.isin(near, list(names))
+    nm = near.astype(str)
+    for suf, t0, t1 in limits:
+        on = np.char.endswith(nm, suf)
+        ok &= ~on | ((t >= t0) & (t <= t1))
+    keep = ok[part.F].all(1)
+    return Part(part.name, part.V, part.N, part.UV, part.J, part.W, part.F[keep], part.material)
+
+
+def flutter_weights(V, loops, free, amp, length):
+    """(n, 2) per vertex: flutter amplitude (fading in over `length` before each free hem, eased so the
+    cloth near the shoulder or waistband stays put) and the phase round that hem, 0..1, so a game can run
+    a ripple round the opening."""
+    out = np.zeros((len(V), 2))
+    if amp <= 0 or not free:
+        return out
+    best = np.full(len(V), np.inf)
+    for k in free:
+        lp = loops[k]
+        c = V[lp].mean(0)
+        _, _, vt = np.linalg.svd(V[lp] - c)
+        n, e1 = vt[2], vt[0]
+        e2 = np.cross(n, e1)
+        # distance to the hem itself (its plane would also catch the chest beside a sleeve)
+        d = np.sqrt(((V[:, None, :] - V[lp][None, :, :]) ** 2).sum(-1).min(1))
+        closer = d < best
+        best[closer] = d[closer]
+        r = V - c
+        ph = (np.arctan2(r @ e2, r @ e1) / (2 * np.pi)) % 1.0
+        out[closer, 1] = ph[closer]
+    w = np.clip(1 - best / length, 0, 1) ** 1.5
+    out[:, 0] = amp * w
+    return out
 
 
 # ---------------------------------------------------------------- reading / bones
@@ -165,7 +232,8 @@ def read_parts(glb_path, prefix):
         out[nd["name"][len(prefix):]] = Part(
             nd["name"], acc(at["POSITION"], 3).astype(float), acc(at["NORMAL"], 3).astype(float),
             acc(at["TEXCOORD_0"], 2).astype(float), acc(at["JOINTS_0"], 4).astype(int),
-            acc(at["WEIGHTS_0"], 4).astype(float), acc(pr["indices"], 1).reshape(-1, 3).astype(np.int64), mat)
+            acc(at["WEIGHTS_0"], 4).astype(float), acc(pr["indices"], 1).reshape(-1, 3).astype(np.int64), mat,
+            UV2=acc(at["TEXCOORD_1"], 2).astype(float) if "TEXCOORD_1" in at else None)
     return out
 
 
@@ -303,9 +371,10 @@ def hem_plane(P, centre):
     return c + n * d, n
 
 
-def cut_garment(src, g, tuck_y=None):
+def cut_garment(src, g, tuck_y=None, body=None):
     """-> Part (welded, hemmed, smoothed, eased, lipped) from a skin-tight source garment.
-    `tuck_y`: faces wholly below this height are dropped (the tail tucked inside the shorts)."""
+    `tuck_y`: faces wholly below this height are dropped (the tail tucked inside the shorts).
+    `body`: the skin Part underneath - the cloth is pushed clear of it (`clear_body`)."""
     if tuck_y is not None:
         keep = src.V[src.F][:, :, 1].mean(1) > tuck_y
         src = Part(src.name, src.V, src.N, src.UV, src.J, src.W, src.F[keep], src.material)
@@ -324,6 +393,7 @@ def cut_garment(src, g, tuck_y=None):
         onb[lp] = True
     centre = V.mean(0)
     planes = []
+    Vsrc = V.copy()
     for lp in loops:
         o, n = hem_plane(V[lp], centre)
         o = o + n * g.extend
@@ -340,7 +410,13 @@ def cut_garment(src, g, tuck_y=None):
         r1 = np.linalg.norm(V[lp] - c1, axis=1).mean()
         V[lp] = c1 + (V[lp] - c1) * (r0 / max(r1, 1e-9))
         planes.append((o, n, float(V[lp, 1].mean())))
-    V0 = V.copy()
+    if g.hem_falloff > 0 and loops:
+        # carry each hem's move into the rows behind it (a harmonic blend out to `hem_falloff` rings):
+        # moving the hem alone stretches the last row of a staircase edge and folds triangles over
+        V = _carry(Vsrc, V - Vsrc, nb, onb, g.hem_falloff)
+    # the reference the cloth rests on: the source with its small features (nipples, navel, toe knuckles)
+    # smoothed out first, so only real high points - chest, shoulder blades, calves - hold the cloth up
+    V0 = taubin(V, nb, onb, 6)
     V = taubin(V, nb, onb, g.smooth)
     N = vertex_normals(V, F)
     # cloth rests on the high points (pecs, shoulder blades, calves) and spans the hollows between
@@ -352,15 +428,15 @@ def cut_garment(src, g, tuck_y=None):
     A = _avg_matrix(nb)
     for _ in range(4):
         h = .5 * h + .5 * (A @ h)
-    V = V + N * h[:, None]
+    V = V + smooth_normals(N, nb, 8) * h[:, None]
     N = vertex_normals(V, F)
     fpl = [(o, n) for o, n, y in planes if y > g.flare_above]
     if g.flare > 0 and fpl:
         dist = np.min(np.stack([np.abs((V - o) @ n) for o, n in fpl], 1), 1)
         fl = np.clip(1 - dist / g.flare_len, 0, 1) ** 1.6
-        V = V + N * (g.ease + g.flare * fl)[:, None]
+        V = V + smooth_normals(N, nb, 8) * (g.ease + g.flare * fl)[:, None]
     else:
-        V = V + N * g.ease
+        V = V + smooth_normals(N, nb, 8) * g.ease
     if g.flat_sole:
         low = V[:, 1] < .010
         V[:, 1] = np.maximum(V[:, 1], 0.0)
@@ -368,10 +444,117 @@ def cut_garment(src, g, tuck_y=None):
         V = taubin(V, nb, onb | low, 6)
         V[low, 1] = 0.0
     N = vertex_normals(V, F)
+    if body is not None and g.body_clearance > 0:
+        V = clear_body(V, N, nb, body, g.body_clearance, J=J, W=W)
+        N = vertex_normals(V, F)
+    if g.hem_band > 0:
+        # the last rows before an opening are a few long, thin source triangles: easing them out along
+        # noisy normals leaves teeth round the collar.  Relax that band with the hem itself held.
+        band = onb.copy()
+        for _ in range(g.hem_band):
+            band = band | (_avg_matrix(nb) @ band.astype(float) > 0)
+        V = taubin(V, nb, ~band | onb, 12)
+        N = vertex_normals(V, F)
+        if body is not None and g.body_clearance > 0:
+            V = clear_body(V, N, nb, body, g.body_clearance * .75, J=J, W=W)
+            # easing and clearing moved each hem a little unevenly: lay it flat again, the rows behind following
+    Vb = V.copy()
+    for lp in loops:
+        o, n = hem_plane(V[lp], V.mean(0))
+        V[lp] -= ((V[lp] - o) @ n)[:, None] * n
+    V = _carry(Vb, V - Vb, nb, onb, g.hem_falloff)
+    N = vertex_normals(V, F)
+    J, W = smooth_weights(J, W, nb, g.weight_smooth)
     lip_loops = [lp for lp in loops if V[lp, 1].mean() > g.skip_lip_below]
+    # the free hems flutter (sleeves, shorts legs); the highest opening (collar, waistband) is held
+    top = int(np.argmax([V[lp, 1].mean() for lp in lip_loops])) if lip_loops else -1
+    free = [k for k in range(len(lip_loops)) if k != top] if g.region == () else []
+    fl = flutter_weights(V, lip_loops, free, g.flutter, g.flutter_len)
+    n_core = len(V)
     V, N, F, J, W, lipsrc = _add_lips(V, N, F, J, W, lip_loops, g.ease + g.lip)
+    # the lip's normal points into the opening, the shell's out of it: a negative amplitude moves the
+    # turned-in hem the same way as the shell it hangs from (a game displaces along the normal)
+    fl = np.concatenate([fl, fl[lipsrc] * np.array([-1.0, 1.0])]) if len(lipsrc) else fl
     return Part(g.name, V, N, np.zeros((len(V), 2)), J, W, F, material=g.name,
-                extras={"lip_src": lipsrc, "n_core": len(used)})
+                extras={"lip_src": lipsrc, "n_core": n_core}, UV2=fl)
+
+
+def _carry(V, D, nb, fixed, rings):
+    """V + D, with the moves D of the `fixed` vertices blended harmonically into the `rings` rows
+    around them (moves elsewhere in that band are recomputed, beyond it they are zero)."""
+    if rings <= 0:
+        return V + D
+    A = _avg_matrix(nb)
+    ring, band = fixed.copy(), fixed.copy()
+    for _ in range(rings):
+        ring = (A @ ring.astype(float) > 0) & ~band
+        band |= ring
+    D = D.copy()
+    D[~band] = 0
+    free = band & ~fixed
+    for _ in range(12 * rings):
+        D[free] = (A @ D)[free]
+    return V + D
+
+
+def smooth_normals(N, nb, iters):
+    """Vertex normals averaged over their neighbours: offsetting a surface along its raw normals folds it
+    wherever it curves tighter than the offset (the hollow at the base of the neck)."""
+    A = _avg_matrix(nb)
+    for _ in range(iters):
+        N = .5 * N + .5 * (A @ N)
+    return N / np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+
+
+def clear_body(V, N, nb, body, clearance, reach=.03, J=None, W=None):
+    """Push cloth vertices out along their normal until the skin underneath is `clearance` behind them.
+    Smoothing takes the muscles out of the cloth, but the body keeps them: where the trapezius or the
+    neck base stands proud of the smoothed sheet the skin pokes through as teeth round the collar.
+    The push is spread to the neighbours so the cloth bulges over the high point instead of tenting."""
+    # only skin on the bones the garment itself follows: a hand hanging by the shorts, or a forearm by
+    # the shirt, is outside the cloth and must not push it
+    dom = body.J[np.arange(len(body.J)), body.W.argmax(1)]
+    keep = np.isin(dom, np.unique(J[W > .25])) if J is not None else np.ones(len(body.V), bool)
+    BV = body.V[keep]
+    BN = body.N[keep] / np.maximum(np.linalg.norm(body.N[keep], axis=1, keepdims=True), 1e-9)
+    push = np.zeros(len(V))
+    for a in range(0, len(V), 512):
+        P = V[a:a + 512]
+        d2 = ((P[:, None, :] - BV[None, :, :]) ** 2).sum(-1)
+        # only skin facing the same way counts: the inside of an arm hanging by the torso is near the
+        # shirt's flank but faces it, and must not inflate it
+        d2[(N[a:a + 512] @ BN.T) < .5] = np.inf
+        k = d2.argmin(1)
+        near = d2[np.arange(len(P)), k] < reach * reach
+        s = ((P - BV[k]) * BN[k]).sum(1)                       # how far the cloth is outside the skin
+        push[a:a + 512] = np.where(near, np.maximum(clearance - s, 0), 0)
+    need = push.copy()
+    idx = [np.array(x, int) for x in nb]
+    for _ in range(2):
+        push = np.array([max(push[q], push[i].max()) if len(i) else push[q] for q, i in enumerate(idx)])
+    A = _avg_matrix(nb)
+    for _ in range(3):
+        push = .5 * push + .5 * (A @ push)
+    push = np.maximum(push, need)
+    return V + smooth_normals(N, nb, 8) * push[:, None]
+
+
+def smooth_weights(J, W, nb, iters):
+    """Average each vertex's skin weights with its neighbours': a skin-tight source garment carries the
+    body's sharp weight boundaries (collar vertices following the neck while the next row follows the chest),
+    which pull a looser shell into spikes when the head turns.  Keeps the top four influences."""
+    if iters <= 0:
+        return J, W
+    nb_bones = int(J.max()) + 1
+    D = np.zeros((len(J), nb_bones))
+    np.add.at(D, (np.repeat(np.arange(len(J)), 4), J.reshape(-1)), W.reshape(-1))
+    A = _avg_matrix(nb)
+    for _ in range(iters):
+        D = .5 * D + .5 * (A @ D)
+    top = np.argsort(-D, axis=1)[:, :4]
+    Wn = np.take_along_axis(D, top, 1)
+    Wn /= np.maximum(Wn.sum(1, keepdims=True), 1e-9)
+    return top.astype(J.dtype), Wn
 
 
 def _add_lips(V, N, F, J, W, loops, depth):
@@ -383,10 +566,14 @@ def _add_lips(V, N, F, J, W, loops, depth):
         c = V[lp].mean(0)
         _, _, vt = np.linalg.svd(V[lp] - c)
         n = vt[2]
+        if (c - V.mean(0)) @ n < 0:           # the opening's normal points out of the garment
+            n = -n
         r = V[lp] - c
         r -= (r @ n)[:, None] * n
         r /= np.maximum(np.linalg.norm(r, axis=1, keepdims=True), 1e-9)
-        inner = V[lp] - r * depth            # straight in towards the middle of the opening
+        # a hem folds back inside the garment along the cloth (not straight in: on a tight collar that
+        # ran into the neck and poked out of the skin as a row of teeth), sitting just inside the shell
+        inner = V[lp] - n * depth - N[lp] * min(.003, depth * .3)
         k = len(lp)
         base = n0
         Vs.append(inner); Ns.append(-r); Js.append(J[lp]); Ws.append(W[lp])
@@ -461,7 +648,7 @@ def unwrap(part, bones, joint_names=None):
     lm = {"top": float(part.V[:, 1].max()), "bottom": float(part.V[:, 1].min())}
     F = part.F
     panels = _face_panel(part.name, F, near, part.V)
-    newV, newN, newJ, newW, newUV, newF = [], [], [], [], [], []
+    newV, newN, newJ, newW, newUV, newF, new2 = [], [], [], [], [], [], []
     key = {}
     for fi, f in enumerate(F):
         pn = str(panels[fi])
@@ -479,10 +666,34 @@ def unwrap(part, bones, joint_names=None):
                 key[kk] = len(newV)
                 newV.append(part.V[vi]); newN.append(part.N[vi]); newJ.append(part.J[vi]); newW.append(part.W[vi])
                 newUV.append(uv[c])
+                if part.UV2 is not None:
+                    new2.append(part.UV2[vi])
             tri.append(key[kk])
         newF.append(tri)
     return Part(part.name, np.array(newV), np.array(newN), np.array(newUV), np.array(newJ), np.array(newW),
-                np.array(newF, np.int64), material=part.material)
+                np.array(newF, np.int64), material=part.material, UV2=np.array(new2) if new2 else None)
+
+
+def own_uv(part, bones, joint_names=None):
+    """Simple UVs for a garment on its own material: round the limb and along it (fabric / grip tiling)."""
+    near, t = dominant_bone(part, bones, joint_names)
+    UV = np.zeros((len(part.V), 2))
+    for b in set(near):
+        if b not in bones:
+            continue
+        m = near == b
+        h, tl = bones[b]
+        ax = (tl - h) / max(np.linalg.norm(tl - h), 1e-9)
+        e1 = np.cross(ax, [0, 0, 1.0])
+        if np.linalg.norm(e1) < 1e-6:
+            e1 = np.cross(ax, [1.0, 0, 0])
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(ax, e1)
+        r = part.V[m] - h
+        UV[m, 0] = (np.arctan2(r @ e2, r @ e1) / (2 * np.pi)) % 1.0
+        UV[m, 1] = r @ ax
+    return Part(part.name, part.V, part.N, UV, part.J, part.W, part.F, material=part.material,
+                UV2=part.UV2 if part.UV2 is not None else None)
 
 
 def tailor(parts, bones, garments=None, log=print, joint_names=None):
@@ -496,8 +707,11 @@ def tailor(parts, bones, garments=None, log=print, joint_names=None):
         tuck = None
         if g.tuck_into and g.tuck_into in parts:
             tuck = float(np.percentile(parts[g.tuck_into].V[:, 1], 99)) - .022
-        p = cut_garment(parts[g.source], g, tuck)
-        out[g.name] = unwrap(p, bones, joint_names)
+        src = parts[g.source]
+        if g.region:
+            src = body_region(src, bones, g.region, g.region_t, joint_names)
+        p = cut_garment(src, g, tuck, parts.get("body") if g.source != "body" else None)
+        out[g.name] = unwrap(p, bones, joint_names) if g.panel == "atlas" else own_uv(p, bones, joint_names)
         log("  tailor %-7s %5d -> %5d verts, %5d tris" % (g.name, len(parts[g.source].V), len(out[g.name].V), len(out[g.name].F)))
     return out
 
@@ -521,11 +735,15 @@ def qa(out, bones):
 
 
 # ---------------------------------------------------------------- write back into a GLB
-def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None):
+def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, images=None, image_filter=None,
+                  clips_from=None):
     """Swap mesh nodes in a skinned GLB.  `by_prefix` = {"v0_": {"jersey": Part, "body": Part, ...}}:
     each named part replaces prefix+name (or is added).  Nodes, skin, animations, images and other
     meshes are kept; buffers are rebuilt so dropped geometry is not carried.  New garment parts get
-    the material named like the part (created plain white if missing)."""
+    the material named like the part (created plain white if missing).  `image_filter(index, image, bytes)`
+    may return new PNG bytes for any image the GLB already holds (e.g. skinshade.grade_iris on eye maps).
+    `clips_from`: another GLB of the same skeleton whose animations replace this one's (matched to nodes by
+    name) - how a game keeps its newest clips when the meshes were rebuilt on an older copy (v11.38)."""
     j, buf = read_glb(glb_in)
     out = _Out()
     acc_map = {}
@@ -536,10 +754,33 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None):
         return acc_map[i]
     mats = [dict(m) for m in j.get("materials", [])]
     mat_ix = {m["name"]: k for k, m in enumerate(mats)}
-    for nm in (materials or {}):
-        if nm not in mat_ix:
-            mats.append(dict(materials[nm], name=nm))
-            mat_ix[nm] = len(mats) - 1
+    texs = [dict(t) for t in j.get("textures", [])]
+    new_imgs = []                 # (image dict, bytes) appended after the GLB's own images
+    img_ix = {im.get("name"): k for k, im in enumerate(j.get("images", []))}
+    for key, data in (images or {}).items():
+        if key in img_ix:
+            continue
+        raw, mime = data if isinstance(data, tuple) else (data, "image/png")
+        img_ix[key] = len(j.get("images", [])) + len(new_imgs)
+        new_imgs.append(({"mimeType": mime, "name": key}, raw))
+    tex_for = {}
+    for nm, m in (materials or {}).items():
+        if nm in mat_ix:
+            continue
+        md = {"name": nm, "pbrMetallicRoughness": {"baseColorFactor": list(m.get("color", [1, 1, 1]))[:3] + [1.0],
+                                                    "metallicFactor": 0.0, "roughnessFactor": float(m.get("roughness", .8))}}
+        key = m.get("image")
+        if key in img_ix:
+            if key not in tex_for:
+                texs.append({"source": img_ix[key], "sampler": 0})
+                tex_for[key] = len(texs) - 1
+            md["pbrMetallicRoughness"]["baseColorTexture"] = {"index": tex_for[key]}
+        if m.get("alpha") == "MASK":
+            md["alphaMode"] = "MASK"; md["alphaCutoff"] = float(m.get("cutoff", .5))
+        if m.get("double"):
+            md["doubleSided"] = True
+        mats.append(md)
+        mat_ix[nm] = len(mats) - 1
     meshes, nodes = [], [dict(n) for n in j["nodes"]]
     scene = dict(j["scenes"][j.get("scene", 0)])
     scene["nodes"] = list(scene["nodes"])
@@ -583,19 +824,53 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None):
     sk = dict(j["skins"][0])
     sk["inverseBindMatrices"] = keep_acc(sk["inverseBindMatrices"])
     anims = []
-    for an in j.get("animations", []):
-        sm = [{"input": keep_acc(s["input"]), "output": keep_acc(s["output"]),
-               "interpolation": s.get("interpolation", "LINEAR")} for s in an["samplers"]]
-        anims.append({"name": an.get("name", "anim"), "channels": an["channels"], "samplers": sm})
+    if clips_from is not None:
+        jc, bc = read_glb(clips_from)
+        by_name = {nd.get("name"): k for k, nd in enumerate(nodes)}
+        missing = set()
+        for an in jc.get("animations", []):
+            ch, used = [], {}
+            for c in an["channels"]:
+                nm = jc["nodes"][c["target"]["node"]].get("name")
+                if nm not in by_name:
+                    missing.add(nm)
+                    continue
+                used.setdefault(c["sampler"], len(used))
+                ch.append({"sampler": used[c["sampler"]], "target": dict(c["target"], node=by_name[nm])})
+            sm = [None] * len(used)
+            for si, k in used.items():
+                s0 = an["samplers"][si]
+                sm[k] = {"input": out.copy_acc(jc, bc, s0["input"]), "output": out.copy_acc(jc, bc, s0["output"]),
+                         "interpolation": s0.get("interpolation", "LINEAR")}
+            if ch:
+                anims.append({"name": an.get("name", "anim"), "channels": ch, "samplers": sm})
+        if missing:
+            raise ValueError("clips_from targets nodes this GLB lacks: %s" % sorted(missing)[:8])
+    else:
+        for an in j.get("animations", []):
+            sm = [{"input": keep_acc(s["input"]), "output": keep_acc(s["output"]),
+                   "interpolation": s.get("interpolation", "LINEAR")} for s in an["samplers"]]
+            anims.append({"name": an.get("name", "anim"), "channels": an["channels"], "samplers": sm})
     imgs = []
     for im in j.get("images", []):
         im2 = dict(im)
         if "bufferView" in im:
             bv = j["bufferViews"][im["bufferView"]]
             o = bv.get("byteOffset", 0)
-            im2["bufferView"] = out.view(bytes(buf[o:o + bv["byteLength"]]))
+            raw = bytes(buf[o:o + bv["byteLength"]])
+            if image_filter is not None:
+                new_raw = image_filter(len(imgs), im, raw)
+                if new_raw is not None and new_raw is not raw:
+                    raw = new_raw
+                    im2["mimeType"] = "image/png"
+            im2["bufferView"] = out.view(raw)
         imgs.append(im2)
+    for im, raw in new_imgs:
+        imgs.append(dict(im, bufferView=out.view(raw)))
     gl = dict(j)
+    if texs:
+        gl["textures"] = texs
+        gl.setdefault("samplers", [{"magFilter": 9729, "minFilter": 9987}])
     gl.update({"scenes": [scene], "scene": 0, "nodes": nodes, "meshes": meshes, "materials": mats,
                "skins": [sk] + j["skins"][1:], "animations": anims, "images": imgs,
                "accessors": out.acc, "bufferViews": out.views, "buffers": [{"byteLength": 0}]})
@@ -635,6 +910,8 @@ def _mesh(out, name, p, mat):
     attrs = {"POSITION": out.add(V, 5126, "VEC3", 34962, True), "NORMAL": out.add(N, 5126, "VEC3", 34962),
              "JOINTS_0": out.add(J.astype(jt[0]), jt[1], "VEC4", 34962), "WEIGHTS_0": out.add(W, 5126, "VEC4", 34962),
              "TEXCOORD_0": out.add(np.asarray(p.UV, np.float32), 5126, "VEC2", 34962)}
+    if getattr(p, "UV2", None) is not None and len(p.UV2) == len(V):
+        attrs["TEXCOORD_1"] = out.add(np.asarray(p.UV2, np.float32), 5126, "VEC2", 34962)
     ind = out.add(np.asarray(p.F).astype(it[0]).reshape(-1), it[1], "SCALAR", 34963)
     return {"name": name, "primitives": [{"attributes": attrs, "indices": ind, "material": int(mat), "mode": 4}]}
 
