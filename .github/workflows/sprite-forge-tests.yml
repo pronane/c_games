@@ -48,6 +48,12 @@ jobs:
       - run: python tools/test_glb_parts.py
       # v11.30: tailored kits (straight hems, draped cloth, boots without toes) and the kit atlas
       - run: python tools/test_tailor.py
+      # v11.31: match officials (signal clips, kits, props, appending clips to a squad GLB)
+      - run: python tools/test_officials.py
+      # v11.32: stadiums (bowl / classic / ground, any sport's pitch), seat maps, crowd, LED boards
+      - run: python tools/test_stadium.py
+      # v11.33: turf masks (markings per sport, mowing patterns, wear)
+      - run: python tools/test_pitch.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

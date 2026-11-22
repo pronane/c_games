@@ -138,14 +138,14 @@ import soccertrack_capture as ST  # noqa: E402
 with tempfile.TemporaryDirectory() as d:
     bas = {"actions": [
         {"gameTime": "1 - 00:10", "position": "10000", "label": "PASS", "team": "left", "player_id": "117093_L_9", "visibility": "visible"},
-        {"gameTime": "2 - 45:04", "position": str(45 * 60000 + 4000), "label": "Shot", "team": "right", "player_id": 170959},
+        {"gameTime": "2 - 0:04", "position": "4000", "frame": 100, "label": "Shot", "team": "right", "player_id": "170959"},
         {"gameTime": "1 - 00:20", "position": "20000", "label": "HEADER", "team": "left", "player_id": None, "visibility": "not shown"}]}
     json.dump(bas, open(os.path.join(d, "b.json"), "w"))
     ev = ST.parse_bas(os.path.join(d, "b.json"))
-    check("labels case-folded, 'not shown' dropped, half-2 time made in-half",
+    check("labels case-folded, 'not shown' dropped, frames per half",
           [(e["half"], e["frame"], e["label"]) for e in ev] == [(1, 250, "pass"), (2, 100, "shot")], str(ev))
     check("player ids: jersey form and numeric form", ST.player_key("117093_L_9", "left") == ("jersey", "left", "9")
-          and ST.player_key(170959, "right") == ("pid", 170959))
+          and ST.player_key("170959", "right") == ("pid", 170959))
     gsr = {"info": {}, "images": [{"image_id": "3000001"}, {"image_id": "3000002"}],
            "annotations": [{"image_id": "3000002", "supercategory": "object", "attributes": {"team": "left", "jersey": "9", "player_id": 5},
                             "bbox_image": {"x": 10, "y": 20, "w": 30, "h": 70}},

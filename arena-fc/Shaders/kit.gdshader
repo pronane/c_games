@@ -22,7 +22,7 @@ uniform float roughness_boot = 0.32;
 uniform float wet = 0.0;          // rain darkens and glosses the cloth
 uniform float dirt = 0.0;         // grass and mud stains build up on shorts and socks
 
-// cloth flutter (Sprite Forge tailor v11.35): UV2.x = amplitude along the normal (m, negative on the
+// cloth flutter (Sprite Forge tailor v11.36): UV2.x = amplitude along the normal (m, negative on the
 // turned-in hems), UV2.y = phase round the hem.  Zero on the collar, waistband, socks and boots.
 uniform float flutter_speed = 0.0;   // 0 standing .. 1 sprinting (set per player each frame)
 uniform float wind = 0.0;            // 0 calm .. 1 gale

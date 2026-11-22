@@ -60,7 +60,7 @@ def tailor_glb(src, dst=GLB, check=False, log=print):
     KD.export(KIT)
     log("wrote %s" % KIT)
     man["kit_atlas"] = "textures/kit/kit_layout.json"
-    man["sprite_forge_tailor"] = "v11.35 sforge.tailor (flutter, keeper garments) + sforge.kitdesign"
+    man["sprite_forge_tailor"] = "v11.36 sforge.tailor (flutter, keeper garments) + sforge.kitdesign"
     with open(MANIFEST, "w") as f:
         json.dump(man, f, indent=1)
     return []
