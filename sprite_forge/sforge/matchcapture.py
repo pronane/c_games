@@ -32,6 +32,7 @@ import math
 import os
 import sys
 import time
+import zlib
 
 import numpy as np
 
@@ -314,7 +315,7 @@ def process(video, out_dir, models_dir, detector="yolox", fps=15.0, min_height=8
               if len(t["frames"]) >= 1.5 * fps_eff
               and np.median([b[3] - b[1] for b in t["frames"].values()]) >= min_height]
     t_det = time.time() - t0
-    clip_id = "%08x" % (abs(hash(os.path.basename(video))) & 0xffffffff)
+    clip_id = "%08x" % (zlib.crc32(os.path.basename(video).encode()) & 0xffffffff)   # stable across runs
     takes, stats = [], dict(tracks=len(tracks), strikes=0, runs=0, rejected=0)
     for t in tracks:
         idx = sorted(t["frames"])
