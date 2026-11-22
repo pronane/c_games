@@ -90,7 +90,7 @@ def main():
     kp = dict(parts)
     kp.update(T.tailor(parts, bones, garments=T.keeper_garments(), joint_names=jn, log=lambda *a: None))
     near, _t = T.dominant_bone(parts["body"], bones, jn)
-    arm = np.char.endswith(near.astype(str), ("Hand", "Forearm"))
+    arm = np.char.endswith(near.astype(str), "Hand") | np.char.endswith(near.astype(str), "Forearm")
     kb = SL.lod_parts({k: kp[k] for k in ("body", "jersey", "shorts", "socks", "boots", "sleeves", "gloves")})["body"][0]
     hv = parts["body"].V[arm]
     lo, hi = hv.min(0), hv.max(0)
