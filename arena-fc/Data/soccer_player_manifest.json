@@ -3433,6 +3433,198 @@
     "hit_start": -1,
     "hit_end": -1
    }
+  },
+  {
+   "name": "ref_whistle",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 31,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 14
+   }
+  },
+  {
+   "name": "ref_card",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 55,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 27
+   }
+  },
+  {
+   "name": "ref_advantage",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 37,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 20
+   }
+  },
+  {
+   "name": "ref_penalty",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 20
+   }
+  },
+  {
+   "name": "ref_direct",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 13
+   }
+  },
+  {
+   "name": "ref_indirect",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 55,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 14
+   }
+  },
+  {
+   "name": "ref_goal",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 13
+   }
+  },
+  {
+   "name": "ar_flag_up",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 10
+   }
+  },
+  {
+   "name": "ar_offside",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 73,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 43
+   }
+  },
+  {
+   "name": "ar_flag_corner",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 13
+   }
+  },
+  {
+   "name": "ar_flag_throw",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 13
+   }
+  },
+  {
+   "name": "fourth_board",
+   "loop": false,
+   "category": "Official",
+   "source": "sforge.officials v11.31",
+   "frames": 73,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1,
+    "signal": 14
+   }
   }
  ],
  "action_aliases": {
@@ -3533,7 +3725,19 @@
   "bicycle_kick": "soccer_bicycle_kick",
   "keeper_penalty_set": "soccer_keeper_penalty_set",
   "punch": "soccer_punch",
-  "headbutt": "soccer_headbutt"
+  "headbutt": "soccer_headbutt",
+  "off_ref_whistle": "ref_whistle",
+  "off_ref_card": "ref_card",
+  "off_ref_advantage": "ref_advantage",
+  "off_ref_penalty": "ref_penalty",
+  "off_ref_direct": "ref_direct",
+  "off_ref_indirect": "ref_indirect",
+  "off_ref_goal": "ref_goal",
+  "off_ar_flag_up": "ar_flag_up",
+  "off_ar_offside": "ar_offside",
+  "off_ar_flag_corner": "ar_flag_corner",
+  "off_ar_flag_throw": "ar_flag_throw",
+  "off_fourth_board": "fourth_board"
  },
  "stats": {
   "tris": 16000,
@@ -3553,5 +3757,61 @@
   "seconds": 12.7
  },
  "kit_atlas": "textures/kit/kit_layout.json",
- "sprite_forge_tailor": "v11.30 sforge.tailor + sforge.kitdesign"
+ "sprite_forge_tailor": "v11.30 sforge.tailor + sforge.kitdesign",
+ "officials": {
+  "pack": "sforge.officials v11.31",
+  "props": "models/officials_props.glb",
+  "kits": {
+   "classic": {
+    "primary": "#111318",
+    "secondary": "#111318",
+    "trim": "#e9eaee",
+    "shorts": "#111318",
+    "socks": "#111318",
+    "pattern": "plain",
+    "boots": "#111318"
+   },
+   "volt": {
+    "primary": "#d9f99d",
+    "secondary": "#bef264",
+    "trim": "#111318",
+    "shorts": "#111318",
+    "socks": "#111318",
+    "pattern": "pinstripes",
+    "boots": "#111318"
+   },
+   "crimson": {
+    "primary": "#b91c1c",
+    "secondary": "#991b1b",
+    "trim": "#111318",
+    "shorts": "#111318",
+    "socks": "#111318",
+    "pattern": "band",
+    "boots": "#111318"
+   },
+   "teal": {
+    "primary": "#0f766e",
+    "secondary": "#115e59",
+    "trim": "#e9eaee",
+    "shorts": "#111318",
+    "socks": "#0f766e",
+    "pattern": "chevron",
+    "boots": "#111318"
+   },
+   "royal": {
+    "primary": "#1e3a8a",
+    "secondary": "#1e40af",
+    "trim": "#facc15",
+    "shorts": "#111318",
+    "socks": "#1e3a8a",
+    "pattern": "plain",
+    "boots": "#111318"
+   }
+  },
+  "roles": {
+   "referee": "diagonal system: stays 12-20 m from the ball on the line from the near-right corner to the far-left corner (as seen from his own half), goal-side of play, out of passing lanes; faces the ball.",
+   "assistant": "one per touchline, each owning one half: level with the second-last defender of the side defending his half (or the ball if it is nearer the goal line), on the line, facing the pitch; sidesteps, sprints when play breaks.",
+   "fourth": "between the technical areas at the halfway line; holds up the board for substitutions and added time."
+  }
+ }
 }

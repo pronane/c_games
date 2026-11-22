@@ -30,6 +30,8 @@ public partial class MatchView : Node3D
     public Hud Hud = null!;
     public BroadcastCamera Cam = null!;
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
+    /// <summary>Referee, assistants and fourth official (presentation only; not in State.Players).</summary>
+    public OfficialsView? Officials;
     public MeshInstance3D Ball = null!, BallShadow = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
                           ControlArrow = null!, OwnerArrow = null!, PressureRing = null!;
     /// <summary>Billboarded, always-visible nameplates for the controlled player,
@@ -187,6 +189,14 @@ public partial class MatchView : Node3D
             Rigs[i] = RigFactory.Create(Engine.State.Players[i].Spec);
             Rigs[i].Name = "Player_" + i;
             AddChild(Rigs[i]);
+        }
+
+        // Match officials on the pitch (Sprite Forge sforge.officials, v11.31).  Not on the training ground.
+        if (_opts.Mode != MatchEngine.ModeTraining && SoccerClipRig.Available)
+        {
+            Officials = new OfficialsView();
+            AddChild(Officials);
+            Officials.Init(Engine);
         }
 
         Ball = BallFactory.Create();
@@ -567,6 +577,7 @@ public partial class MatchView : Node3D
             // the rig's own duplicate label to avoid stacked text over key players.
             rig.NameLabel.Visible = false;
         }
+        Officials?.Sync(Engine, dt, _time);
         Ball.Position = G(b.Pos);
         float shadowHeight = Math.Clamp(b.Pos.Y, 0f, 8f);
         float shadowRadius = .62f + shadowHeight * .045f;

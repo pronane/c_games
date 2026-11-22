@@ -33,8 +33,8 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 ## B. Match officials
 | # | Gap | P | Status |
 |---|---|---|---|
-| B1 | **No referee, assistant referees or fourth official on screen.** The rules engine refs the game invisibly. | P1 | ⬜ |
-| B2 | Official animations: whistle, yellow/red card shown, advantage signal, penalty point, AR flag up for offside, substitution board. | P1 | ⬜ Sprite Forge field-sport clips |
+| B1 | **No referee, assistant referees or fourth official on screen.** The rules engine refs the game invisibly. | P1 | ✅ `Core/OfficialsDirector` (diagonal system; assistants level with the second-last defender) + `OfficialsView`; presentation only, simulation unchanged (tested) |
+| B2 | Official animations: whistle, yellow/red card shown, advantage signal, penalty point, AR flag up for offside, substitution board. | P1 | ✅ Sprite Forge v11.31 `sforge.officials` (12 clips, kits, flag / cards / board props); calls driven by the match events |
 | B3 | Vanishing spray at free kicks, VAR pitch-side monitor. | P3 | ⬜ |
 
 ## C. Stadium and crowd
@@ -74,7 +74,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 
 ## Order of work
 1. A1–A4 kits, boots, numbers, keepers — **done in the first pair of PRs**.
-2. B1–B2 officials on the pitch, with their own kit and clips.
+2. B1–B2 officials on the pitch, with their own kit and clips — **done**.
 3. C1, C2, C4 stadium bowl, crowd and boards on desktop.
 4. D1–D2 turf and lighting presets; A9 wet / dirty kits.
 5. A5 away kits on a clash; C3 benches and touchline life.
