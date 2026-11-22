@@ -50,7 +50,8 @@ def tailor_glb(src, dst=GLB, check=False, log=print):
     for pre in man.get("variant_prefixes", ["v0_"]):
         parts = T.read_parts(src, pre)
         log(pre)
-        out[pre] = T.tailor(parts, bones, log=log)
+        # the keeper's long-sleeved base layer and gloves ride along hidden; SoccerClipRig shows them on keepers
+        out[pre] = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments(), log=log)
         errs += ["%s%s" % (pre, e) for e in T.qa(out[pre], bones)]
     if errs or check:
         return errs
@@ -59,7 +60,7 @@ def tailor_glb(src, dst=GLB, check=False, log=print):
     KD.export(KIT)
     log("wrote %s" % KIT)
     man["kit_atlas"] = "textures/kit/kit_layout.json"
-    man["sprite_forge_tailor"] = "v11.30 sforge.tailor + sforge.kitdesign"
+    man["sprite_forge_tailor"] = "v11.35 sforge.tailor (flutter, keeper garments) + sforge.kitdesign"
     with open(MANIFEST, "w") as f:
         json.dump(man, f, indent=1)
     return []

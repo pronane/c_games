@@ -571,6 +571,7 @@ public partial class MatchView : Node3D
             float dirt = Math.Clamp(played * .35f + _grime[i] * .55f + wet * .2f, 0f, .9f);
             kit.SetShaderParameter("wet", wet);
             kit.SetShaderParameter("dirt", dirt);
+            kit.SetShaderParameter("wind", Math.Clamp(_opts.WindSpeed / 14f, 0f, 1f));
         }
     }
     private float[] _grime = new float[64];

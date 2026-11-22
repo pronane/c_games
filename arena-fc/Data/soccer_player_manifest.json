@@ -3765,7 +3765,7 @@
   "seconds": 12.7
  },
  "kit_atlas": "textures/kit/kit_layout.json",
- "sprite_forge_tailor": "v11.30 sforge.tailor + sforge.kitdesign",
+ "sprite_forge_tailor": "v11.35 sforge.tailor (flutter, keeper garments) + sforge.kitdesign",
  "officials": {
   "pack": "sforge.officials v11.31",
   "props": "models/officials_props.glb",
