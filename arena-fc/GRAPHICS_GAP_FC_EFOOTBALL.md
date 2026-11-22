@@ -28,7 +28,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 | A8 | Cloth doesn't move (shirt flutter, sleeves, shorts). | P2 | ✅ Sprite Forge tailor v11.35 writes a flutter weight + hem phase (TEXCOORD_1): sleeve and shorts-leg hems ripple in `kit.gdshader` with the player's speed and the match wind, collar / waistband / chest held, per-player phase. Not a cloth sim: no folds from contact |
 | A9 | Kit doesn't get wet or dirty. FC 25 does both. | P2 | ✅ kits soak in the rain and pick up grass stains with time played and every slide, tackle, dive or fall |
 | A10 | Accessories: captain's armband, tape, undershirts, snoods, keeper caps. | P3 | ⬜ |
-| A11 | No LODs: 22 full-detail players. | P3 | ⬜ Sprite Forge `lod` for player GLB (two levels + far impostor) |
+| A11 | No LODs: 22 full-detail players. | P3 | ✅ Sprite Forge `skinlod` v11.36 (`Tools/add_lods.py`): every identity carries two levels (about 50% and 35% of the triangles; faces hidden under the kit cut, hems / seams / weights exact). `SoccerClipRig.ApplyLods` sets visibility ranges per quality tier (Ultra 22 / 48 m, High 16 / 36 m, Performance 11 / 26 m), so close-ups and replays stay full detail. Far impostor still open |
 
 ## B. Match officials
 | # | Gap | P | Status |

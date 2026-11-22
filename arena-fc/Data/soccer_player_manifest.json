@@ -3822,5 +3822,84 @@
    "fourth": "between the technical areas at the halfway line; holds up the board for substitutions and added time."
   }
  },
- "skin_shading": "textures/skin/materials.json"
+ "skin_shading": "textures/skin/materials.json",
+ "lod": {
+  "sprite_forge": "v11.36 sforge.skinlod",
+  "parts": {
+   "body": [
+    1,
+    1
+   ],
+   "jersey": [
+    1,
+    1
+   ],
+   "shorts": [
+    1,
+    1
+   ],
+   "socks": [
+    1,
+    1
+   ],
+   "boots": [
+    1,
+    1
+   ],
+   "eyes": [
+    0,
+    0
+   ],
+   "lashes": [
+    1,
+    -1
+   ],
+   "brows": [
+    0,
+    -1
+   ],
+   "hairinner": [
+    1,
+    -1
+   ],
+   "hair": [
+    1,
+    1
+   ],
+   "sleeves": [
+    1,
+    1
+   ],
+   "gloves": [
+    1,
+    1
+   ],
+   "beardshell0": [
+    1,
+    1
+   ],
+   "beardshell1": [
+    1,
+    -1
+   ],
+   "facialhair": [
+    1,
+    1
+   ]
+  },
+  "distances_m": {
+   "ultra": [
+    22.0,
+    48.0
+   ],
+   "high": [
+    16.0,
+    36.0
+   ],
+   "performance": [
+    11.0,
+    26.0
+   ]
+  }
+ }
 }
