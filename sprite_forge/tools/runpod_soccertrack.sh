@@ -9,7 +9,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 WORK=$1; shift; WORKERS=${1:-6}; [ $# -gt 0 ] && shift
 mkdir -p "$WORK/data" "$WORK/out" "$WORK/models"
 python3 -m pip install -q "onnxruntime-gpu==1.22.*" opencv-python-headless numpy scipy ijson huggingface_hub
-python3 "$HERE/tools/fetch_models.py" --dir "$WORK/models" rtmpose_l_halpe26
+python3 "$HERE/tools/fetch_models.py" --dir "$WORK/models" yolox_m_humanart rtmpose_l_halpe26
 cp "$HERE/sforge/models/lifter_v1.onnx" "$HERE/sforge/models/lifter_v1.json" "$HERE/sforge/models/registry.json" "$WORK/models/"
 PATTERNS='["bas/*","gsr/*","videos/*"]'
 if [ $# -gt 0 ]; then PATTERNS=$(python3 -c "import json,sys; print(json.dumps([p % m for m in sys.argv[1:] for p in ('bas/%s/*','gsr/%s/*','videos/%s/*')]))" "$@"); fi

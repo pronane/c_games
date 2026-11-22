@@ -54,7 +54,7 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
-## New in v11.36: LODs for skinned characters (fed back from Arena FC)
+## New in v11.37: LODs for skinned characters (fed back from Arena FC)
 
 `sforge.skinlod` takes any skinned part down by quadric-error half-edge collapses: every vertex left is an
 original one, so UVs, skin weights, normals and flutter weights stay exact. Hems and UV seams are locked,
@@ -65,12 +65,14 @@ flips and slivers are refused. `lod_parts` follows `LOD_PLAN`:
 - coarse garments stand off a hair so their chords don't sink into the body;
 - lashes, brows and the inner hair layer drop out of the far level.
 
-The plan also suggests switch distances per quality tier.
+The plan also suggests switch distances per quality tier. `tailor.replace_parts(clips_from=)` takes the clips
+of another GLB of the same skeleton (matched by node name), so meshes rebuilt on an older copy keep a game's
+newest clips.
 
     lods = SL.lod_parts(parts)       # {"body": [lod1, lod2], ...}
     T.replace_parts(glb, out, {"v0_": {"body_lod1": lods["body"][0], ...}})
 
-## New in v11.35: cloth flutter weights and keeper garments (fed back from Arena FC)
+## New in v11.36: cloth flutter weights and keeper garments (fed back from Arena FC)
 
 - `tailor` writes a flutter weight per garment vertex as `TEXCOORD_1` (amplitude in metres, phase round its
   hem): sleeve and shorts-leg hems move, the collar and the waistband are held. A game's kit shader ripples
@@ -82,7 +84,7 @@ The plan also suggests switch distances per quality tier.
 
     out = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments())
 
-## New in v11.34: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
+## New in v11.35: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
 
 Arena FC shipped five of the nine squad identities, and its faces read as plastic up close: a 1-2k MakeHuman
 atlas holds colour, not skin. **`sforge/skinshade.py`** writes a tileable skin-detail normal map (pores, fine
@@ -94,6 +96,24 @@ or losing its clips.
 
 Test: `python tools/test_skinshade.py`.
 
+## New in v11.34: FBX mocap packs, and SoccerTrack v2 on real files
+
+**`tools/fbx_to_moves.py OUT a.fbx ...`** converts FBX motion capture into library moves, for any FBX that
+Godot 4.3+ can read:
+- `tools/fbx_dump.gd` samples named joints in world space. It knows the Rokoko, Mixamo, UE5 and iClone bone names.
+- The same mocap IK as every other source (`sforge.jointtrack`) then fits them onto the shared skeleton.
+- Leading T-pose frames are dropped.
+
+The first pack through it was Anderson Rohr's free soccer pack: 21 takes, mostly fitting within 1–3°.
+
+**SoccerTrack v2 on the released files (v1.3):**
+- Events carry their own `frame` within each half's video.
+- Player ids are GSR's numeric ids.
+- GSR `bbox_image` is a fixed 58 × 43 box around a projected pitch position, 25–50 px off the real body, not a body box.
+
+So `process_events(hint_boxes=True)` treats those boxes as hints. For each one, `refine_box` runs the
+person detector on a magnified crop around the hint and takes the nearest person, holding them frame
+to frame. The MOT files do have real boxes, but only for each match's first 4 minutes.
 ## New in v11.33: turf for field sports - markings, mowing patterns, wear (fed back from Arena FC)
 
 Arena FC drew one stripe pattern with soccer lines hard-coded in a shader. **`sforge/pitch.py`** writes a turf
