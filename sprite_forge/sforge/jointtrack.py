@@ -91,7 +91,19 @@ def _ankle(P, side):
 
 def fit_tracks(frames, fps=25.0, joint_names=SKILLCORNER, up="z", face_frame=None, smooth=None):
     """named 3D joint tracks -> (keys, report).  keys are (t in 0..1, pose) like mocap."""
-    P = landmarks(frames, joint_names, up)
+    return fit_landmarks(landmarks(frames, joint_names, up), fps, face_frame, smooth)
+
+
+def fit_landmarks(P, fps=25.0, face_frame=None, smooth=None):
+    """(N, 33, 3) MediaPipe-slot landmarks in rig axes (NaN = missing) -> (keys, report).
+    Used directly by video capture (sforge.matchcapture), which already has slots."""
+    P = np.array(P, dtype=float)
+    for slot, src in FALLBACK.items():
+        miss = np.isnan(P[:, slot, 0])
+        P[miss, slot] = P[miss, src]
+    for i in range(len(P)):
+        if np.isnan(P[i, list(REQUIRED), 0]).any():
+            P[i] = np.nan
     ok = ~np.isnan(P[:, 0, 0])
     if ok.sum() < max(4, int(.6 * len(P))):
         raise ValueError("too few complete frames (%d of %d)" % (int(ok.sum()), len(P)))
