@@ -88,6 +88,8 @@ public partial class Stadium
 
     private static Texture2D? LoadPng(string path)
     {
+        // imported resource first (works in exported builds); the raw file in the editor / headless tools
+        if (ResourceLoader.Exists(path) && GD.Load<Texture2D>(path) is Texture2D tex) return tex;
         var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(path));
         if (img == null || img.IsEmpty()) img = Image.LoadFromFile(path);
         if (img == null || img.IsEmpty()) return null;
@@ -113,7 +115,7 @@ public partial class Stadium
             if (!mast && k++ % 2 == 1) continue;            // roof strips: every other cluster is a light source
             var spot = new SpotLight3D
             {
-                Name = "Floodlight", LightColor = new Color(1f, .96f, .88f), LightEnergy = mast ? .9f : .45f,
+                Name = "Floodlight", LightColor = new Color(1f, .96f, .88f), LightEnergy = (mast ? .9f : .45f) * FloodMul,
                 SpotRange = 220f, SpotAngle = mast ? 38f : 46f, SpotAttenuation = .6f, ShadowEnabled = false,
             };
             AddChild(spot);
@@ -274,5 +276,62 @@ void fragment() {
         }
         _goalFlash = MathF.Max(0f, _goalFlash - dt * .35f);
         _ledMat?.SetShaderParameter("flash", _goalFlash > 0f ? Math.Min(1f, _goalFlash) * (.6f + .4f * MathF.Sin(Time.GetTicksMsec() / 80f)) : 0f);
+    }
+}
+
+public partial class Stadium
+{
+    /// <summary>"day", "dusk" or "night" (MatchOptions.Lighting; set before Build).</summary>
+    public string Lighting = "day";
+    private ShaderMaterial? _turfMat;
+    public static readonly string[] MowPatterns = { "stripes", "checker", "diagonal", "rings", "wide_stripes" };
+
+    /// <summary>Floodlight strength: they're on all match, but they carry a night game.</summary>
+    private float FloodMul => Lighting == "night" ? 2.6f : Lighting == "dusk" ? 1.6f : 1f;
+
+    /// <summary>Turf from Sprite Forge sforge.pitch (v11.33): each ground has its groundsman's mowing pattern.</summary>
+    private MeshInstance3D? BuildTurf(int stadiumIndex)
+    {
+        string mow = MowPatterns[Math.Abs(stadiumIndex) % MowPatterns.Length];
+        string path = $"res://Data/pitch/pitch_soccer_{mow}.png";
+        if (!Godot.FileAccess.FileExists(path)) return null;
+        var meta = ReadJson($"res://Data/pitch/pitch_soccer_{mow}.json");
+        var ext = new Vector2(56.5f, 38f);
+        if (meta is JsonElement m && m.TryGetProperty("extent", out var e)) ext = new Vector2(e[0].GetSingle(), e[1].GetSingle());
+        _turfMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://Shaders/turf.gdshader") };
+        _turfMat.SetShaderParameter("turf", LoadPng(path));
+        _turfMat.SetShaderParameter("extent", ext);
+        return new MeshInstance3D
+        {
+            Name = "Pitch", Mesh = new PlaneMesh { Size = ext * 2f }, MaterialOverride = _turfMat,
+            Position = new Vector3(0, LineY, 0),
+        };
+    }
+
+    private void ApplyLighting(Godot.Environment env, ProceduralSkyMaterial sky)
+    {
+        if (Lighting == "dusk")
+        {
+            sky.SkyTopColor = new Color(.09f, .14f, .32f);
+            sky.SkyHorizonColor = new Color(.80f, .55f, .40f);
+            sky.GroundHorizonColor = new Color(.30f, .24f, .22f);
+            env.AmbientLightEnergy = .5f;
+            env.FogLightColor = new Color(.42f, .38f, .40f);
+        }
+        else if (Lighting == "night")
+        {
+            sky.SkyTopColor = new Color(.008f, .015f, .04f);
+            sky.SkyHorizonColor = new Color(.05f, .08f, .15f);
+            sky.GroundHorizonColor = new Color(.03f, .04f, .06f);
+            sky.GroundBottomColor = new Color(.01f, .01f, .02f);
+            // under floodlights the bowl is evenly lit: a neutral fill instead of the black night sky
+            env.AmbientLightSource = Godot.Environment.AmbientSource.Color;
+            env.AmbientLightColor = new Color(.62f, .65f, .72f);
+            env.AmbientLightEnergy = .55f;
+            env.FogLightColor = new Color(.08f, .1f, .16f);
+            env.GlowEnabled = true;
+            env.GlowIntensity = .5f;
+            env.GlowBloom = .12f;
+        }
     }
 }

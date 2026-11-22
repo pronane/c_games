@@ -26,7 +26,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 | A6 | Five head identities for every squad; FC/eFootball have scanned faces for thousands of players and many generic heads. | P2 | ⬜ more identities from Sprite Forge `look` / `capture_face` (original faces only), hair colour and style per player |
 | A7 | One body for everyone (scaled). | P2 | ⬜ build / height morphs from Sprite Forge's MakeHuman targets, baked per identity |
 | A8 | Cloth doesn't move (shirt flutter, sleeves, shorts). | P2 | ⬜ vertex-shader flutter driven by speed + wind; Sprite Forge flutter-weight mask |
-| A9 | Kit doesn't get wet or dirty. FC 25 does both. | P2 | 🔧 shader has `wet` / `dirt`; wire to weather, slides and time played |
+| A9 | Kit doesn't get wet or dirty. FC 25 does both. | P2 | ✅ kits soak in the rain and pick up grass stains with time played and every slide, tackle, dive or fall |
 | A10 | Accessories: captain's armband, tape, undershirts, snoods, keeper caps. | P3 | ⬜ |
 | A11 | No LODs: 22 full-detail players. | P3 | ⬜ Sprite Forge `lod` for player GLB (two levels + far impostor) |
 
@@ -51,8 +51,8 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 ## D. Pitch, light and atmosphere
 | # | Gap | P | Status |
 |---|---|---|---|
-| D1 | Turf has one stripe pattern; no checkerboard / diagonal mowing, wear in the goalmouths, divots, wet sheen. | P1 | ⬜ |
-| D2 | One lighting setup: day / sunset / night presets with floodlight look, sky with clouds. | P1 | ⬜ |
+| D1 | Turf has one stripe pattern; no checkerboard / diagonal mowing, wear in the goalmouths, divots, wet sheen. | P1 | ✅ Sprite Forge v11.33 `sforge.pitch`: five mowing patterns (one per ground), bands shaded by view direction, worn goalmouths / spots / assistants' channels, wet gloss in rain · ⬜ divots that appear during the match |
+| D2 | One lighting setup: day / sunset / night presets with floodlight look, sky with clouds. | P1 | ✅ `MatchOptions.Lighting` day / dusk / night (`--light`): floodlit nights with a white key light casting players' shadows, glow on the lamps · ⬜ clouds, choosing kick-off time in the menus |
 | D3 | Broadcast colour grade, contact shadows on the Compatibility renderer, lens flare from floodlights. | P2 | ⬜ |
 
 ## E. Broadcast presentation
@@ -76,6 +76,6 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 1. A1–A4 kits, boots, numbers, keepers — **done in the first pair of PRs**.
 2. B1–B2 officials on the pitch, with their own kit and clips — **done**.
 3. C1, C2, C4 stadium bowl, crowd and boards on desktop — **done**.
-4. D1–D2 turf and lighting presets; A9 wet / dirty kits.
+4. D1–D2 turf and lighting presets; A9 wet / dirty kits — **done**.
 5. A5 away kits on a clash; C3 benches and touchline life.
 6. E presentation, then A6–A8 and the rest.
