@@ -56,9 +56,19 @@ def model_path(models_dir, rid):
 
 
 # ------------------------------------------------------------------ detection
+
+def _ort():
+    """onnxruntime, with the pip CUDA / cuDNN libraries (from torch or nvidia-* wheels) loaded first,
+    so the GPU build finds them without LD_LIBRARY_PATH."""
+    import onnxruntime as ort
+    if hasattr(ort, "preload_dlls") and "CUDAExecutionProvider" in ort.get_available_providers():
+        try: ort.preload_dlls()
+        except Exception: pass
+    return ort
+
 class Detector:
     def __init__(self, models_dir, kind="yolox", conf=.35):
-        import onnxruntime as ort
+        ort = _ort()
         rid, self.size, mean, std = DETECTORS[kind]
         path, self.entry = model_path(models_dir, rid)
         prov = [p for p in ("CUDAExecutionProvider", "CPUExecutionProvider") if p in ort.get_available_providers()]
@@ -164,7 +174,7 @@ class Pose2D:
     (MediaPipe's own person finder sees nothing on 60-120 px Veo players)."""
 
     def __init__(self, models_dir, rid="rtmpose_l_halpe26"):
-        import onnxruntime as ort
+        ort = _ort()
         path, self.entry = model_path(models_dir, rid)
         prov = [p for p in ("CUDAExecutionProvider", "CPUExecutionProvider") if p in ort.get_available_providers()]
         self.sess = ort.InferenceSession(path, providers=prov)
@@ -203,7 +213,7 @@ class Lifter:
     3D pose from SkillCorner open data, MIT)."""
 
     def __init__(self, models_dir, rid="lifter_v1"):
-        import onnxruntime as ort
+        ort = _ort()
         path, self.entry = model_path(models_dir, rid)
         meta = json.load(open(os.path.splitext(path)[0] + ".json"))
         self.idx = meta["halpe_index"]; self.win = meta["window"]; self.J = len(self.idx)
