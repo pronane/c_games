@@ -169,11 +169,15 @@ def main() -> int:
     import check_motion as CM
 
     all_takes = []
+    reasons = collections.Counter()
+    raw = 0
     for d in args.merged:
         with open(os.path.join(d, "_import.json")) as f:
-            all_takes += [dict(t, _dir=d) for t in json.load(f)["takes"]]
+            idx = json.load(f)
+        all_takes += [dict(t, _dir=d) for t in idx["takes"]]
+        reasons.update(idx.get("rejected", {}))        # a staged folder carries the GPU box's rejections
+        raw += len(idx["takes"]) + sum(idx.get("rejected", {}).values())
     index = dict(takes=all_takes)
-    reasons = collections.Counter()
     cands = []
     for t in index["takes"]:
         path = os.path.join(t["_dir"], t["name"] + ".json")
@@ -258,9 +262,9 @@ def main() -> int:
               ("  foot %s" % imp.get("foot")) if kind == "strike" else "  %.1f m/s" % vz))
     with open(os.path.join(OUT, "_import.json"), "w") as f:
         json.dump(dict(source="Arena FC own match recordings (Veo) via sforge.matchcapture", licence=LICENCE,
-                       candidates=len(index["takes"]), rejected=dict(reasons), takes=takes), f, indent=1)
+                       candidates=raw, rejected=dict(reasons), takes=takes), f, indent=1)
     update_manifest(takes)
-    print("kept %d of %d (%s); rejected: %s" % (len(takes), len(index["takes"]),
+    print("kept %d of %d (%s); rejected: %s" % (len(takes), raw,
           ", ".join("%s %d" % kv for kv in count.items()), dict(reasons)))
     return 0
 
