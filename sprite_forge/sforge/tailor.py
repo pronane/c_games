@@ -87,6 +87,10 @@ class Garment:
     skip_lip_below: float = -1.0     # no lip on openings lower than this (a tucked-in shirt tail)
     extend: float = 0.0              # push every opening this much further (covers a body hole's ragged edge)
     tuck_into: str = ""              # cut the tail off where it is inside this garment (shirt -> shorts)
+    hem_falloff: int = 5             # rings behind each hem that follow its snap (no folded last row)
+    hem_band: int = 4                # rings next to each opening relaxed after easing (no teeth at the hem)
+    body_clearance: float = .004     # the cloth stays at least this far outside the skin (0 = off)
+    weight_smooth: int = 6           # passes that even out the skin weights (cloth follows the body, no spikes)
     flare_above: float = -1.0        # only openings higher than this flare (a tucked shirt stays inside the shorts)
 
 
@@ -97,7 +101,7 @@ def soccer_garments():
                 skip_lip_below=1.0, extend=.006, tuck_into="shorts"),
         Garment("shorts", "shorts", ease=.013, flare=.010, flare_len=.10, smooth=12),
         Garment("socks", "socks", ease=.0065, smooth=5, lip=.004, extend=.018),
-        Garment("boots", "boots", ease=.004, smooth=400, lip=.004, flat_sole=True),
+        Garment("boots", "boots", ease=.004, smooth=400, lip=.004, flat_sole=True, body_clearance=0),
     ]
 
 
@@ -303,9 +307,10 @@ def hem_plane(P, centre):
     return c + n * d, n
 
 
-def cut_garment(src, g, tuck_y=None):
+def cut_garment(src, g, tuck_y=None, body=None):
     """-> Part (welded, hemmed, smoothed, eased, lipped) from a skin-tight source garment.
-    `tuck_y`: faces wholly below this height are dropped (the tail tucked inside the shorts)."""
+    `tuck_y`: faces wholly below this height are dropped (the tail tucked inside the shorts).
+    `body`: the skin Part underneath - the cloth is pushed clear of it (`clear_body`)."""
     if tuck_y is not None:
         keep = src.V[src.F][:, :, 1].mean(1) > tuck_y
         src = Part(src.name, src.V, src.N, src.UV, src.J, src.W, src.F[keep], src.material)
@@ -324,6 +329,7 @@ def cut_garment(src, g, tuck_y=None):
         onb[lp] = True
     centre = V.mean(0)
     planes = []
+    Vsrc = V.copy()
     for lp in loops:
         o, n = hem_plane(V[lp], centre)
         o = o + n * g.extend
@@ -340,6 +346,10 @@ def cut_garment(src, g, tuck_y=None):
         r1 = np.linalg.norm(V[lp] - c1, axis=1).mean()
         V[lp] = c1 + (V[lp] - c1) * (r0 / max(r1, 1e-9))
         planes.append((o, n, float(V[lp, 1].mean())))
+    if g.hem_falloff > 0 and loops:
+        # carry each hem's move into the rows behind it (a harmonic blend out to `hem_falloff` rings):
+        # moving the hem alone stretches the last row of a staircase edge and folds triangles over
+        V = _carry(Vsrc, V - Vsrc, nb, onb, g.hem_falloff)
     # the reference the cloth rests on: the source with its small features (nipples, navel, toe knuckles)
     # smoothed out first, so only real high points - chest, shoulder blades, calves - hold the cloth up
     V0 = taubin(V, nb, onb, 6)
@@ -354,15 +364,15 @@ def cut_garment(src, g, tuck_y=None):
     A = _avg_matrix(nb)
     for _ in range(4):
         h = .5 * h + .5 * (A @ h)
-    V = V + N * h[:, None]
+    V = V + smooth_normals(N, nb, 8) * h[:, None]
     N = vertex_normals(V, F)
     fpl = [(o, n) for o, n, y in planes if y > g.flare_above]
     if g.flare > 0 and fpl:
         dist = np.min(np.stack([np.abs((V - o) @ n) for o, n in fpl], 1), 1)
         fl = np.clip(1 - dist / g.flare_len, 0, 1) ** 1.6
-        V = V + N * (g.ease + g.flare * fl)[:, None]
+        V = V + smooth_normals(N, nb, 8) * (g.ease + g.flare * fl)[:, None]
     else:
-        V = V + N * g.ease
+        V = V + smooth_normals(N, nb, 8) * g.ease
     if g.flat_sole:
         low = V[:, 1] < .010
         V[:, 1] = np.maximum(V[:, 1], 0.0)
@@ -370,10 +380,109 @@ def cut_garment(src, g, tuck_y=None):
         V = taubin(V, nb, onb | low, 6)
         V[low, 1] = 0.0
     N = vertex_normals(V, F)
+    if body is not None and g.body_clearance > 0:
+        V = clear_body(V, N, nb, body, g.body_clearance, J=J, W=W)
+        N = vertex_normals(V, F)
+    if g.hem_band > 0:
+        # the last rows before an opening are a few long, thin source triangles: easing them out along
+        # noisy normals leaves teeth round the collar.  Relax that band with the hem itself held.
+        band = onb.copy()
+        for _ in range(g.hem_band):
+            band = band | (_avg_matrix(nb) @ band.astype(float) > 0)
+        V = taubin(V, nb, ~band | onb, 12)
+        N = vertex_normals(V, F)
+        if body is not None and g.body_clearance > 0:
+            V = clear_body(V, N, nb, body, g.body_clearance * .75, J=J, W=W)
+            # easing and clearing moved each hem a little unevenly: lay it flat again, the rows behind following
+    Vb = V.copy()
+    for lp in loops:
+        o, n = hem_plane(V[lp], V.mean(0))
+        V[lp] -= ((V[lp] - o) @ n)[:, None] * n
+    V = _carry(Vb, V - Vb, nb, onb, g.hem_falloff)
+    N = vertex_normals(V, F)
+    J, W = smooth_weights(J, W, nb, g.weight_smooth)
     lip_loops = [lp for lp in loops if V[lp, 1].mean() > g.skip_lip_below]
     V, N, F, J, W, lipsrc = _add_lips(V, N, F, J, W, lip_loops, g.ease + g.lip)
     return Part(g.name, V, N, np.zeros((len(V), 2)), J, W, F, material=g.name,
                 extras={"lip_src": lipsrc, "n_core": len(used)})
+
+
+def _carry(V, D, nb, fixed, rings):
+    """V + D, with the moves D of the `fixed` vertices blended harmonically into the `rings` rows
+    around them (moves elsewhere in that band are recomputed, beyond it they are zero)."""
+    if rings <= 0:
+        return V + D
+    A = _avg_matrix(nb)
+    ring, band = fixed.copy(), fixed.copy()
+    for _ in range(rings):
+        ring = (A @ ring.astype(float) > 0) & ~band
+        band |= ring
+    D = D.copy()
+    D[~band] = 0
+    free = band & ~fixed
+    for _ in range(12 * rings):
+        D[free] = (A @ D)[free]
+    return V + D
+
+
+def smooth_normals(N, nb, iters):
+    """Vertex normals averaged over their neighbours: offsetting a surface along its raw normals folds it
+    wherever it curves tighter than the offset (the hollow at the base of the neck)."""
+    A = _avg_matrix(nb)
+    for _ in range(iters):
+        N = .5 * N + .5 * (A @ N)
+    return N / np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+
+
+def clear_body(V, N, nb, body, clearance, reach=.03, J=None, W=None):
+    """Push cloth vertices out along their normal until the skin underneath is `clearance` behind them.
+    Smoothing takes the muscles out of the cloth, but the body keeps them: where the trapezius or the
+    neck base stands proud of the smoothed sheet the skin pokes through as teeth round the collar.
+    The push is spread to the neighbours so the cloth bulges over the high point instead of tenting."""
+    # only skin on the bones the garment itself follows: a hand hanging by the shorts, or a forearm by
+    # the shirt, is outside the cloth and must not push it
+    dom = body.J[np.arange(len(body.J)), body.W.argmax(1)]
+    keep = np.isin(dom, np.unique(J[W > .25])) if J is not None else np.ones(len(body.V), bool)
+    BV = body.V[keep]
+    BN = body.N[keep] / np.maximum(np.linalg.norm(body.N[keep], axis=1, keepdims=True), 1e-9)
+    push = np.zeros(len(V))
+    for a in range(0, len(V), 512):
+        P = V[a:a + 512]
+        d2 = ((P[:, None, :] - BV[None, :, :]) ** 2).sum(-1)
+        # only skin facing the same way counts: the inside of an arm hanging by the torso is near the
+        # shirt's flank but faces it, and must not inflate it
+        d2[(N[a:a + 512] @ BN.T) < .5] = np.inf
+        k = d2.argmin(1)
+        near = d2[np.arange(len(P)), k] < reach * reach
+        s = ((P - BV[k]) * BN[k]).sum(1)                       # how far the cloth is outside the skin
+        push[a:a + 512] = np.where(near, np.maximum(clearance - s, 0), 0)
+    need = push.copy()
+    idx = [np.array(x, int) for x in nb]
+    for _ in range(2):
+        push = np.array([max(push[q], push[i].max()) if len(i) else push[q] for q, i in enumerate(idx)])
+    A = _avg_matrix(nb)
+    for _ in range(3):
+        push = .5 * push + .5 * (A @ push)
+    push = np.maximum(push, need)
+    return V + smooth_normals(N, nb, 8) * push[:, None]
+
+
+def smooth_weights(J, W, nb, iters):
+    """Average each vertex's skin weights with its neighbours': a skin-tight source garment carries the
+    body's sharp weight boundaries (collar vertices following the neck while the next row follows the chest),
+    which pull a looser shell into spikes when the head turns.  Keeps the top four influences."""
+    if iters <= 0:
+        return J, W
+    nb_bones = int(J.max()) + 1
+    D = np.zeros((len(J), nb_bones))
+    np.add.at(D, (np.repeat(np.arange(len(J)), 4), J.reshape(-1)), W.reshape(-1))
+    A = _avg_matrix(nb)
+    for _ in range(iters):
+        D = .5 * D + .5 * (A @ D)
+    top = np.argsort(-D, axis=1)[:, :4]
+    Wn = np.take_along_axis(D, top, 1)
+    Wn /= np.maximum(Wn.sum(1, keepdims=True), 1e-9)
+    return top.astype(J.dtype), Wn
 
 
 def _add_lips(V, N, F, J, W, loops, depth):
@@ -502,7 +611,7 @@ def tailor(parts, bones, garments=None, log=print, joint_names=None):
         tuck = None
         if g.tuck_into and g.tuck_into in parts:
             tuck = float(np.percentile(parts[g.tuck_into].V[:, 1], 99)) - .022
-        p = cut_garment(parts[g.source], g, tuck)
+        p = cut_garment(parts[g.source], g, tuck, parts.get("body"))
         out[g.name] = unwrap(p, bones, joint_names)
         log("  tailor %-7s %5d -> %5d verts, %5d tris" % (g.name, len(parts[g.source].V), len(out[g.name].V), len(out[g.name].F)))
     return out
@@ -527,11 +636,12 @@ def qa(out, bones):
 
 
 # ---------------------------------------------------------------- write back into a GLB
-def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, images=None):
+def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, images=None, image_filter=None):
     """Swap mesh nodes in a skinned GLB.  `by_prefix` = {"v0_": {"jersey": Part, "body": Part, ...}}:
     each named part replaces prefix+name (or is added).  Nodes, skin, animations, images and other
     meshes are kept; buffers are rebuilt so dropped geometry is not carried.  New garment parts get
-    the material named like the part (created plain white if missing)."""
+    the material named like the part (created plain white if missing).  `image_filter(index, image, bytes)`
+    may return new PNG bytes for any image the GLB already holds (e.g. skinshade.grade_iris on eye maps)."""
     j, buf = read_glb(glb_in)
     out = _Out()
     acc_map = {}
@@ -622,7 +732,13 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, image
         if "bufferView" in im:
             bv = j["bufferViews"][im["bufferView"]]
             o = bv.get("byteOffset", 0)
-            im2["bufferView"] = out.view(bytes(buf[o:o + bv["byteLength"]]))
+            raw = bytes(buf[o:o + bv["byteLength"]])
+            if image_filter is not None:
+                new_raw = image_filter(len(imgs), im, raw)
+                if new_raw is not None and new_raw is not raw:
+                    raw = new_raw
+                    im2["mimeType"] = "image/png"
+            im2["bufferView"] = out.view(raw)
         imgs.append(im2)
     for im, raw in new_imgs:
         imgs.append(dict(im, bufferView=out.view(raw)))

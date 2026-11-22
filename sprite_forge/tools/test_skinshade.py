@@ -7,7 +7,8 @@
   2 pores read as pits: the detail height has small dark spots over a smooth field
   3 presets cover skin, hair, eyes, lashes and beards with the keys a game needs
   4 export writes both maps and the presets
-  5 replace_parts adds a part with a new textured material: the image, texture and material land in the GLB"""
+  5 replace_parts adds a part with a new textured material: the image, texture and material land in the GLB
+  6 grade_iris pulls a red-brown iris to brown and leaves the sclera and a blue iris alone"""
 from __future__ import annotations
 
 import json
@@ -63,6 +64,18 @@ def main():
         rec("replace_parts adds a textured material for a new identity",
             tex_ok and j1["images"][img]["name"] == "skin_test_img" and len(j1["images"]) == len(j0["images"]) + 1
             and any(nd.get("name") == "vx_body" for nd in j1["nodes"]))
+    import io
+    eye = np.zeros((64, 64, 3), np.uint8)
+    eye[:] = (225, 220, 215)                                  # sclera
+    eye[16:32, 16:32] = (160, 55, 30)                         # red-brown iris
+    eye[40:56, 40:56] = (60, 110, 190)                        # blue iris
+    b = io.BytesIO()
+    Image.fromarray(eye).save(b, "PNG")
+    g = np.asarray(Image.open(io.BytesIO(SS.grade_iris(b.getvalue()))).convert("RGB")).astype(int)
+    ir = g[24, 24]
+    rec("grade_iris: red-brown iris -> brown, sclera and blue untouched",
+        ir[0] < 140 and ir[1] / max(ir[0], 1) > .45 and np.abs(g[2, 2] - eye[2, 2]).max() <= 1
+        and np.abs(g[48, 48] - eye[48, 48]).max() <= 1, "iris %s" % list(ir))
     fails = [x for x in R if not x[1]]
     print("\n%d checks, %d failed" % (len(R), len(fails)))
     return 1 if fails else 0

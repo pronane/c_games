@@ -9,6 +9,7 @@ material presets a game applies to Sprite Forge characters:
     SS.export("out_dir")        # skin_detail_normal.png (tileable), skin_detail_rough.png, materials.json
 
     SS.PRESETS["skin"]          # roughness, specular, subsurface, detail repeat ...
+    SS.grade_iris(png_bytes)    # MakeHuman's red-brown irises -> a believable brown (blue / green untouched)
 """
 from __future__ import annotations
 
@@ -69,6 +70,44 @@ def height_to_normal(h, strength=2.5):
     nrm = np.stack([-gx, -gy, np.ones_like(h)], -1)
     nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
     return nrm
+
+
+def grade_iris(raw, hue=24.0, sat=.62, value=.72):
+    """PNG/JPEG bytes of an eye texture -> PNG bytes with red-orange irises pulled to a natural brown.
+    MakeHuman's "brown" eyes are a saturated red-brown that a broadcast grade turns red; the sclera, its
+    veins and blue / green / grey irises are left alone (only saturated pixels with a red-orange hue move)."""
+    import colorsys  # noqa: F401  (documentation: HSV as colorsys defines it)
+    import io
+    im = Image.open(io.BytesIO(raw))
+    mode = im.mode
+    a = np.asarray(im.convert("RGBA")).astype(float) / 255
+    rgb = a[..., :3]
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    s = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-9), 0)
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    d = np.maximum(mx - mn, 1e-9)
+    h = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60
+    redish = (h < 38) | (h > 340)
+    w = np.clip((s - .32) / .2, 0, 1) * redish                 # how much of a pixel is red-brown iris
+    nh = (1 - w) * h + w * hue
+    ns = s * (1 - w + w * sat)
+    nv = mx * (1 - w + w * value)
+    c = nv * ns
+    x = c * (1 - np.abs((nh / 60) % 2 - 1))
+    m = nv - c
+    k = (nh // 60).astype(int) % 6
+    out = np.zeros_like(rgb)
+    for i, (rr, gg, bb) in enumerate(((c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x))):
+        sel = k == i
+        for ch, v in enumerate((rr, gg, bb)):
+            out[..., ch][sel] = (v[sel] if isinstance(v, np.ndarray) else v) + m[sel]
+    a[..., :3] = np.where(w[..., None] > 0, out, rgb)
+    res = Image.fromarray((np.clip(a, 0, 1) * 255).round().astype(np.uint8), "RGBA")
+    if mode in ("RGB", "P", "L"):
+        res = res.convert("RGB")
+    buf = io.BytesIO()
+    res.save(buf, "PNG")
+    return buf.getvalue()
 
 
 def export(out_dir, n=512):
