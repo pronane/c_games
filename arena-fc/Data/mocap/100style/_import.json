@@ -1,0 +1,329 @@
+{
+ "source": "100STYLE (Mason, Starke, Komura 2022) via sforge.motionlib",
+ "licence": {
+  "spdx": "CC-BY-4.0",
+  "custom_text": "Creative Commons Attribution 4.0 International",
+  "author": "Ian Mason, Sebastian Starke, Taku Komura (100STYLE)",
+  "source_url": "https://www.ianxmason.com/100style/",
+  "redistribution": "yes",
+  "attribution": "The 100STYLE Dataset - Ian Mason",
+  "notes": "Retargeted onto the Arena FC skeleton; loops cut from the dataset's Frame_Cuts spans."
+ },
+ "takes": [
+  {
+   "name": "ss_run_neutral",
+   "take": "Neutral run",
+   "style": "Neutral",
+   "gait": "FR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.8,
+   "root_velocity": [
+    -0.077,
+    1.869
+   ],
+   "retarget_err_deg": 0.2142,
+   "loop_seam": 0.658
+  },
+  {
+   "name": "ss_walk_neutral",
+   "take": "Neutral walk",
+   "style": "Neutral",
+   "gait": "FW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.3333,
+   "root_velocity": [
+    -0.013,
+    0.951
+   ],
+   "retarget_err_deg": 0.1536,
+   "loop_seam": 0.577
+  },
+  {
+   "name": "ss_backrun_neutral",
+   "take": "Neutral backrun",
+   "style": "Neutral",
+   "gait": "BR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.6667,
+   "root_velocity": [
+    0.557,
+    -1.161
+   ],
+   "retarget_err_deg": 0.2614,
+   "loop_seam": 0.631
+  },
+  {
+   "name": "ss_backwalk_neutral",
+   "take": "Neutral backwalk",
+   "style": "Neutral",
+   "gait": "BW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.2667,
+   "root_velocity": [
+    0.235,
+    -0.721
+   ],
+   "retarget_err_deg": 0.2214,
+   "loop_seam": 0.573
+  },
+  {
+   "name": "ss_siderun_neutral",
+   "take": "Neutral siderun",
+   "style": "Neutral",
+   "gait": "SR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.6333,
+   "root_velocity": [
+    -1.415,
+    -0.02
+   ],
+   "retarget_err_deg": 0.1889,
+   "loop_seam": 0.632
+  },
+  {
+   "name": "ss_sidewalk_neutral",
+   "take": "Neutral sidewalk",
+   "style": "Neutral",
+   "gait": "SW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.1667,
+   "root_velocity": [
+    -0.587,
+    0.171
+   ],
+   "retarget_err_deg": 0.1037,
+   "loop_seam": 0.476
+  },
+  {
+   "name": "ss_walk_rushed",
+   "take": "Rushed walk",
+   "style": "Rushed",
+   "gait": "FW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7333,
+   "root_velocity": [
+    0.028,
+    2.212
+   ],
+   "retarget_err_deg": 0.1891,
+   "loop_seam": 0.59
+  },
+  {
+   "name": "ss_siderun_rushed",
+   "take": "Rushed siderun",
+   "style": "Rushed",
+   "gait": "SR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7667,
+   "root_velocity": [
+    -1.401,
+    0.343
+   ],
+   "retarget_err_deg": 0.4551,
+   "loop_seam": 0.654
+  },
+  {
+   "name": "ss_walk_bigsteps",
+   "take": "BigSteps walk",
+   "style": "BigSteps",
+   "gait": "FW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.5,
+   "root_velocity": [
+    0.036,
+    1.411
+   ],
+   "retarget_err_deg": 0.3131,
+   "loop_seam": 0.608
+  },
+  {
+   "name": "ss_run_proud",
+   "take": "Proud run",
+   "style": "Proud",
+   "gait": "FR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.8333,
+   "root_velocity": [
+    -0.078,
+    1.716
+   ],
+   "retarget_err_deg": 0.2323,
+   "loop_seam": 0.616
+  },
+  {
+   "name": "ss_walk_proud",
+   "take": "Proud walk",
+   "style": "Proud",
+   "gait": "FW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.2333,
+   "root_velocity": [
+    0.014,
+    1.16
+   ],
+   "retarget_err_deg": 0.1967,
+   "loop_seam": 0.545
+  },
+  {
+   "name": "ss_backrun_proud",
+   "take": "Proud backrun",
+   "style": "Proud",
+   "gait": "BR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.7333,
+   "root_velocity": [
+    -0.206,
+    -1.341
+   ],
+   "retarget_err_deg": 0.2798,
+   "loop_seam": 0.636
+  },
+  {
+   "name": "ss_run_heavyset",
+   "take": "Heavyset run",
+   "style": "Heavyset",
+   "gait": "FR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.9667,
+   "root_velocity": [
+    -0.031,
+    1.482
+   ],
+   "retarget_err_deg": 0.3278,
+   "loop_seam": 0.618
+  },
+  {
+   "name": "ss_walk_heavyset",
+   "take": "Heavyset walk",
+   "style": "Heavyset",
+   "gait": "FW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.2667,
+   "root_velocity": [
+    -0.045,
+    0.987
+   ],
+   "retarget_err_deg": 0.3123,
+   "loop_seam": 0.584
+  },
+  {
+   "name": "ss_siderun_bentknees",
+   "take": "BentKnees siderun",
+   "style": "BentKnees",
+   "gait": "SR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.5667,
+   "root_velocity": [
+    -1.238,
+    -0.15
+   ],
+   "retarget_err_deg": 0.5369,
+   "loop_seam": 0.643
+  },
+  {
+   "name": "ss_sidewalk_bentknees",
+   "take": "BentKnees sidewalk",
+   "style": "BentKnees",
+   "gait": "SW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.3333,
+   "root_velocity": [
+    -0.432,
+    -0.006
+   ],
+   "retarget_err_deg": 0.4932,
+   "loop_seam": 0.498
+  },
+  {
+   "name": "ss_backrun_bentknees",
+   "take": "BentKnees backrun",
+   "style": "BentKnees",
+   "gait": "BR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.8667,
+   "root_velocity": [
+    0.031,
+    -1.088
+   ],
+   "retarget_err_deg": 0.4107,
+   "loop_seam": 0.568
+  },
+  {
+   "name": "ss_backwalk_bentknees",
+   "take": "BentKnees backwalk",
+   "style": "BentKnees",
+   "gait": "BW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.3,
+   "root_velocity": [
+    0.096,
+    -0.547
+   ],
+   "retarget_err_deg": 0.4467,
+   "loop_seam": 0.554
+  },
+  {
+   "name": "ss_siderun_crouched",
+   "take": "Crouched siderun",
+   "style": "Crouched",
+   "gait": "SR",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 0.6667,
+   "root_velocity": [
+    1.267,
+    0.304
+   ],
+   "retarget_err_deg": 0.4829,
+   "loop_seam": 0.645
+  },
+  {
+   "name": "ss_sidewalk_crouched",
+   "take": "Crouched sidewalk",
+   "style": "Crouched",
+   "gait": "SW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.1667,
+   "root_velocity": [
+    -0.589,
+    0.041
+   ],
+   "retarget_err_deg": 0.4571,
+   "loop_seam": 0.501
+  },
+  {
+   "name": "ss_backwalk_crouched",
+   "take": "Crouched backwalk",
+   "style": "Crouched",
+   "gait": "BW",
+   "loop": true,
+   "category": "Locomotion",
+   "duration": 1.3333,
+   "root_velocity": [
+    -0.042,
+    -0.518
+   ],
+   "retarget_err_deg": 0.4652,
+   "loop_seam": 0.56
+  }
+ ]
+}
