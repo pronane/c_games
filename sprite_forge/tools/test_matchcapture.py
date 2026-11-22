@@ -132,5 +132,31 @@ reg = M.registry()["models"]
 check("every model has a licence and a file", all(m.get("licence") and m.get("file") for m in reg.values()))
 check("our own lifter is committed and registered", os.path.isfile(os.path.join(models, reg["lifter_v1"]["file"])))
 
+print("6 labelled events (SoccerTrack v2 adapter)")
+sys.path.insert(0, HERE)
+import soccertrack_capture as ST  # noqa: E402
+with tempfile.TemporaryDirectory() as d:
+    bas = {"actions": [
+        {"gameTime": "1 - 00:10", "position": "10000", "label": "PASS", "team": "left", "player_id": "117093_L_9", "visibility": "visible"},
+        {"gameTime": "2 - 45:04", "position": str(45 * 60000 + 4000), "label": "Shot", "team": "right", "player_id": 170959},
+        {"gameTime": "1 - 00:20", "position": "20000", "label": "HEADER", "team": "left", "player_id": None, "visibility": "not shown"}]}
+    json.dump(bas, open(os.path.join(d, "b.json"), "w"))
+    ev = ST.parse_bas(os.path.join(d, "b.json"))
+    check("labels case-folded, 'not shown' dropped, half-2 time made in-half",
+          [(e["half"], e["frame"], e["label"]) for e in ev] == [(1, 250, "pass"), (2, 100, "shot")], str(ev))
+    check("player ids: jersey form and numeric form", ST.player_key("117093_L_9", "left") == ("jersey", "left", "9")
+          and ST.player_key(170959, "right") == ("pid", 170959))
+    gsr = {"info": {}, "images": [{"image_id": "3000001"}, {"image_id": "3000002"}],
+           "annotations": [{"image_id": "3000002", "supercategory": "object", "attributes": {"team": "left", "jersey": "9", "player_id": 5},
+                            "bbox_image": {"x": 10, "y": 20, "w": 30, "h": 70}},
+                           {"image_id": "3000002", "supercategory": "pitch"}]}
+    json.dump(gsr, open(os.path.join(d, "g.json"), "w"))
+    bx = ST.boxes_for(os.path.join(d, "g.json"), {("jersey", "left", "9"): {1}})
+    check("GSR streamed: box found by team + jersey at frame = image_id - first", bx.get(("jersey", "left", "9")) == {1: (10.0, 20.0, 40.0, 90.0)}, str(dict(bx)))
+K = np.array(seq)
+cf, ft = M.contact_frame(K, 13)
+check("labelled contact refined onto the kicking foot within the swing", ft == "R" and 10 <= cf <= 17, "%d %s" % (cf, ft))
+check("every label maps to a kind with a window", all(len(v) == 4 and v[2] + v[3] > 1 for v in M.EVENT_KINDS.values()))
+
 print("RESULT: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

@@ -364,6 +364,155 @@ def process(video, out_dir, models_dir, detector="yolox", fps=15.0, min_height=8
     return clip_id, takes
 
 
+# ------------------------------------------------------------------ labelled events (v11.29)
+# Footage with event labels (who kicked, headed or tackled, and when) and player boxes - e.g.
+# SoccerTrack v2 (CC BY 4.0) - needs no detector, tracker or kick guessing: each labelled event
+# is cut at its own moment on its own player.  Label -> (kind, sub-kind, seconds before, after).
+EVENT_KINDS = {
+    "pass": ("kick", "pass", 1.0, .6), "high pass": ("kick", "lofted", 1.0, .7), "cross": ("kick", "cross", 1.0, .7),
+    "shot": ("kick", "shot", 1.0, .7), "free kick": ("kick", "free_kick", 1.2, .7),
+    "header": ("header", "header", .9, .6), "player successful tackle": ("tackle", "tackle", .9, .7),
+    "ball player block": ("block", "block", .8, .6), "throw in": ("throw_in", "throw_in", 1.2, .6),
+    "drive": ("carry", "carry", 0.0, 2.4),
+}
+
+
+def contact_frame(K, c, side=None, span=6):
+    """refine a labelled contact frame (+-1-2 frames of label slop) to the ankle-speed peak
+    near it; returns (frame, foot)."""
+    best = (-1.0, c, side or "R")
+    for f in range(max(1, c - span), min(len(K), c + span + 1)):
+        for sd, j in (("L", 15), ("R", 16)):
+            if side and sd != side:
+                continue
+            v = float(np.linalg.norm(K[f, j, :2] - K[f - 1, j, :2]))
+            if v > best[0]:
+                best = (v, f, sd)
+    return best[1], best[2]
+
+
+def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print, pose_model="rtmpose_l_halpe26"):
+    """One pass over `video`; for every labelled event cut its player's motion.
+
+    events  [dict(label, frame (contact frame in this video), boxes={frame: (x0, y0, x1, y1)})]
+            - boxes only need to cover the event's window; gaps take the previous box.
+    -> takes (as process(): kind, keys, rep, contact, foot, vis, loop, sub)
+    """
+    import cv2
+    from . import jointtrack as JT
+    t0 = time.time()
+    pose = Pose2D(models_dir, pose_model)
+    lifter = Lifter(models_dir)
+    jobs = []
+    for e in events:
+        spec = EVENT_KINDS.get(str(e["label"]).casefold())
+        if spec is None:
+            continue
+        kind, sub, pre, post = spec
+        lo, hi = int(e["frame"] - round(pre * fps)), int(e["frame"] + round(post * fps))
+        hs = [b[3] - b[1] for b in e["boxes"].values()]
+        if lo < 0 or not hs or np.median(hs) < min_height:
+            continue
+        if sum(1 for f in range(lo, hi + 1) if f in e["boxes"]) < .7 * (hi - lo + 1):
+            continue
+        jobs.append(dict(e, kind=kind, sub=sub, lo=lo, hi=hi, K=np.zeros((hi - lo + 1, HALPE_N, 3)), last=None))
+    jobs.sort(key=lambda j: j["lo"])
+    stats = dict(events=len(events), cut=len(jobs), kept=0, rejected=0)
+    if not jobs:
+        return [], stats
+    cap = cv2.VideoCapture(video)
+    f, ji, active, takes = 0, 0, [], []
+    end = max(j["hi"] for j in jobs)
+    while f <= end:
+        while ji < len(jobs) and jobs[ji]["lo"] <= f:
+            active.append(jobs[ji]); ji += 1
+        if not active:                                   # skip to the next window without decoding pixels
+            nxt = jobs[ji]["lo"] if ji < len(jobs) else end + 1
+            while f < nxt and cap.grab():
+                f += 1
+            if f < nxt:
+                break
+            continue
+        ok, fr = cap.read()
+        if not ok:
+            break
+        for j in active:
+            box = j["boxes"].get(f, j["last"]); j["last"] = box
+            if box is not None:
+                j["K"][f - j["lo"]] = pose(fr, box)
+        done = [j for j in active if j["hi"] <= f]
+        active = [j for j in active if j["hi"] > f]
+        for j in done:
+            tk = _event_take(j, lifter, fps, JT)
+            if tk is None:
+                stats["rejected"] += 1
+            else:
+                stats["kept"] += 1; takes.append(tk)
+            j["K"] = None
+        f += 1
+    cap.release()
+    log("  %s: %d events, %d cut, %d kept, %d rejected (%.0fs)" % (
+        os.path.basename(video), stats["events"], stats["cut"], stats["kept"], stats["rejected"], time.time() - t0))
+    return takes, stats
+
+
+def _event_take(j, lifter, fps, JT):
+    K = j["K"]
+    legs = K[:, list(LEG_H), 2].mean(1)
+    if legs.mean() < .45:
+        return None
+    Y = lifter(K)
+    P = np.full((len(Y), 33, 3), np.nan); P[:, LIFT_SLOTS] = Y
+    c = int(j["frame"] - j["lo"])
+    foot = ""
+    if j["kind"] == "kick":
+        c, foot = contact_frame(K, c)
+    try:
+        keys, rep = JT.fit_landmarks(P, fps=fps, face_frame=min(max(c, 0), len(P) - 1))
+    except ValueError:
+        return None
+    if rep["mean_bone_err_deg"] > 6.0:
+        return None
+    if j["kind"] == "carry":
+        lk = best_loop_keys(keys, int(.45 * fps), int(1.0 * fps))
+        if lk is None:
+            return None
+        k2, L = lk
+        return dict(kind="carry", sub="carry", keys=k2, rep=dict(rep, duration=round(L / fps, 4)), loop=True,
+                    vis=round(float(legs.mean()), 3))
+    return dict(kind=j["kind"], sub=j["sub"], keys=keys, rep=rep, contact=round(c / max(1, len(P) - 1), 4), foot=foot,
+                vis=round(float(legs.mean()), 3))
+
+
+def write_takes(out, takes, clip_id, lic, prefix="mc", footage="match video"):
+    """append takes as library moves + _import.json rows (shared by process / process_events)."""
+    from . import jointtrack as JT
+    os.makedirs(out, exist_ok=True)
+    index_path = os.path.join(out, "_import.json")
+    index = json.load(open(index_path)) if os.path.isfile(index_path) else dict(source="sforge.matchcapture", takes=[])
+    n_by = {}
+    for t in index["takes"]:
+        n_by[t["kind"]] = max(n_by.get(t["kind"], 0), int(t["name"].rsplit("_", 1)[-1]))
+    cat = {"strike": "Kick", "kick": "Kick", "run": "Locomotion", "carry": "Dribble", "header": "Kick",
+           "tackle": "Tackle", "block": "Tackle", "throw_in": "Pass"}
+    for tk in takes:
+        n_by[tk["kind"]] = n_by.get(tk["kind"], 0) + 1
+        name = "%s_%s_%03d" % (prefix, tk["kind"], n_by[tk["kind"]])
+        rec = JT.keys_record(name, tk["keys"], tk["rep"], lic, category=cat.get(tk["kind"], "Mocap"),
+                             loop=tk.get("loop", False), source="matchcapture:%s" % clip_id,
+                             desc="%s from %s (anonymous)" % (tk.get("sub", tk["kind"]).replace("_", " "), footage))
+        rec["import"].update(reader="matchcapture", contact=tk.get("contact", -1.0), foot=tk.get("foot", ""),
+                             leg_visibility=tk["vis"], peak_speed=tk.get("peak_speed"), sub=tk.get("sub", tk["kind"]))
+        with open(os.path.join(out, name + ".json"), "w") as f:
+            json.dump(rec, f, indent=0)
+        index["takes"].append(dict(name=name, kind=tk["kind"], sub=tk.get("sub", tk["kind"]), clip=clip_id,
+                                   loop=tk.get("loop", False), duration=tk["rep"]["duration"], contact=tk.get("contact", -1.0),
+                                   foot=tk.get("foot", ""), fit_err_deg=tk["rep"]["mean_bone_err_deg"], leg_visibility=tk["vis"]))
+    with open(index_path, "w") as f:
+        json.dump(index, f, indent=1)
+    return index
+
+
 def best_loop_keys(keys, lo, hi, max_seam=7.0):
     from . import mocap as MC
     X = np.array([[np.ravel(p.get(k, 0.0)).tolist()[c] if isinstance(p.get(k, 0.0), (list, tuple)) else float(p.get(k, 0.0))

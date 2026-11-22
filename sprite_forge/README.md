@@ -54,6 +54,44 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.29: labelled match events to moves - SoccerTrack v2 (fed back from Arena FC)
+
+`sforge.matchcapture.process_events(video, events, models)` handles footage that already says *who*
+did *what* and *when*. Each event carries a label, a contact frame, and that player's box in every frame.
+
+**What it does:**
+1. Makes one pass over the video. Frames outside the events' windows are skipped without decoding.
+2. Poses only the labelled player.
+3. Refines the labelled contact frame to the kicking ankle's speed peak.
+4. Lifts the pose to 3D and fits it to the shared skeleton, as v11.26 does.
+
+There is no detector, no tracker and no guessing which motion was a kick.
+
+**Labels it uses:**
+
+| Label | Becomes |
+|---|---|
+| pass, lofted pass, cross, shot, free kick | a kick, with its sub-kind kept |
+| header | a header |
+| tackle, block | a tackle or block |
+| throw-in | a throw-in |
+| drive | a dribble loop |
+
+**SoccerTrack v2 adapter:** `tools/soccertrack_capture.py ROOT OUT` reads
+[SoccerTrack v2](https://huggingface.co/datasets/atomscott/soccertrack-v2). The dataset is
+CC BY 4.0: 10 university matches as 4K panoramas at 25 fps, with ball-action labels and per-frame player boxes.
+
+- It streams the 2.7 GB-per-half box files with `ijson`.
+- It handles the files' known quirks:
+  - events are listed under `actions`;
+  - labels may be upper case;
+  - half-2 times are counted from the start of the match;
+  - frame numbers carry an offset.
+- `tools/runpod_soccertrack.sh` runs the whole job on a GPU pod: download (token needed), capture, merge, and stage.
+- `write_takes` is now shared by both capture paths.
+
+Test: `python tools/test_matchcapture.py`. The tests cover label parsing, half-2 timing, player ids, streamed boxes and contact refinement.
+
 ## New in v11.28: textured multi-part GLBs - realistic players on a game skeleton (fed back from Arena FC)
 
 `rigrec.write_glb_parts(rig, path, parts, materials, images, clips)` writes one skinned GLB with

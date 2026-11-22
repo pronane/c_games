@@ -452,7 +452,8 @@ string[] gait = { "soccer_backpedal", "soccer_dribble", "soccer_jockey", "soccer
 // our own match video - are gaits too.)
 bool IsGait(string id) => gait.Contains(id) || id.StartsWith("soccer_mocap_run") || id.StartsWith("soccer_mocap_jog")
                           || (id.StartsWith("soccer_sc_carry_") && manifestClips.First(c => c.Id == id).Loop)
-                          || (id.StartsWith("soccer_vo_run_") && manifestClips.First(c => c.Id == id).Loop);
+                          || (id.StartsWith("soccer_vo_run_") && manifestClips.First(c => c.Id == id).Loop)
+                          || (id.StartsWith("soccer_st_carry_") && manifestClips.First(c => c.Id == id).Loop);
 var locoIds = manifestClips.Where(c => c.Category == ClipCategory.Locomotion).Select(c => c.Id).OrderBy(x => x).ToArray();
 Check("clip manifest: Locomotion holds only gait cycles", locoIds.All(IsGait) && gait.All(g => locoIds.Contains(g)),
       string.Join(",", locoIds.Where(x => !IsGait(x))));
