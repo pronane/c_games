@@ -340,7 +340,9 @@ def cut_garment(src, g, tuck_y=None):
         r1 = np.linalg.norm(V[lp] - c1, axis=1).mean()
         V[lp] = c1 + (V[lp] - c1) * (r0 / max(r1, 1e-9))
         planes.append((o, n, float(V[lp, 1].mean())))
-    V0 = V.copy()
+    # the reference the cloth rests on: the source with its small features (nipples, navel, toe knuckles)
+    # smoothed out first, so only real high points - chest, shoulder blades, calves - hold the cloth up
+    V0 = taubin(V, nb, onb, 6)
     V = taubin(V, nb, onb, g.smooth)
     N = vertex_normals(V, F)
     # cloth rests on the high points (pecs, shoulder blades, calves) and spans the hollows between
