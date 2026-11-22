@@ -15,12 +15,14 @@ def _lic_args(p):
     g.add_argument("--author"); g.add_argument("--source-url", dest="source_url")
     g.add_argument("--redistribution", choices=list(L.REDIST), help="may this asset be shared in a pack? yes / no / unknown")
     g.add_argument("--attribution", help="credit line required by the licence")
+    g.add_argument("--ml-training", dest="ml_training", choices=list(L.ML_TRAINING),
+                   help="may machine-learning models be trained on it? yes / no / unknown (v11.40; Mixamo: no)")
     g.add_argument("--notes")
 
 
 def _lic_from(a, base=None):
     lic = dict(base or L.blank_licence())
-    for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes"):
+    for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes", "ml_training"):
         v = getattr(a, k, None)
         if v is not None:
             lic[k] = v
@@ -134,7 +136,7 @@ def _run(a, lib, p):
         k, n = lib.remove(a.name); print("removed %s/%s (your original source file is untouched)" % (k, n)); return 0
     if a.act in ("licence", "license"):
         lic = lib.licence(a.name)
-        if any(getattr(a, k) is not None for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes")):
+        if any(getattr(a, k) is not None for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes", "ml_training")):
             lic = _lic_from(a, lic); lib.set_licence(a.name, lic); lib.scan(import_inbox=False)
         print(L.licence_text(lic, a.name))
         probs = L.validate_licence(lic)

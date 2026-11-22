@@ -135,8 +135,10 @@ def fit_landmarks(P, fps=25.0, face_frame=None, smooth=None):
 
 
 def keys_record(name, keys, rep, licence, category="Mocap", loop=False, source="", desc=""):
-    """a motion-library record (same schema as motionlib.import_file writes)."""
-    return {
+    """a motion-library record (same schema as motionlib.import_file writes).  v11.40: tagged and, if the
+    category is a catch-all ("Mocap"), filed into a real action category (sforge.motiontags)."""
+    from . import motiontags as MT
+    return MT.retag({
         "name": name, "category": category, "desc": desc or "3D joint track fitted onto the shared skeleton",
         "loop": bool(loop), "source": source, "origin": "import", "licence": licence,
         "duration": rep["duration"],
@@ -144,4 +146,4 @@ def keys_record(name, keys, rep, licence, category="Mocap", loop=False, source="
         "import": dict(reader="jointtrack", fps=rep["fps"], frames=rep["frames"],
                        mean_bone_err_deg=rep["mean_bone_err_deg"], heading_deg=rep["heading_deg"],
                        note="Fitted with the mocap IK (bone directions -> joint angles); root in place."),
-    }
+    })

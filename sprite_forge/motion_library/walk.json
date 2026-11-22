@@ -13,7 +13,8 @@
   "source_url": "",
   "redistribution": "yes",
   "attribution": "",
-  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips.",
+  "ml_training": "yes"
  },
  "duration": 1.0,
  "keys": [
@@ -486,5 +487,10 @@
    }
   ]
  ],
- "cleanup": null
+ "cleanup": null,
+ "tags": {
+  "action": "walk",
+  "gait": "walk",
+  "capture": "procedural"
+ }
 }

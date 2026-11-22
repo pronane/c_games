@@ -40,21 +40,25 @@ MESHY_ANIM_WHY = ("Meshy animation-library clips are Meshy 'Service Assets', lic
 LICENCE_PRESETS = {
     "meshy-free": dict(spdx="CC-BY-4.0", custom_text="", author="Meshy (free plan output, licensed CC BY 4.0)",
                        source_url="https://www.meshy.ai", redistribution="yes",
-                       attribution="Model created with Meshy \u2013 CC BY 4.0 License",
+                       attribution="Model created with Meshy \u2013 CC BY 4.0 License", ml_training="yes",
                        notes="Meshy free plan: Meshy owns the output and licenses it under CC BY 4.0 (commercial use OK with "
                              "credit). Terms: https://www.meshy.ai/terms-of-use 3.2; help.meshy.ai ownership article."),
     "meshy-paid": dict(spdx="LicenseRef-Proprietary", custom_text="Meshy paid-plan output: privately owned by the user who generated it "
                        "(Meshy Terms of Use 3.2), provided the inputs did not infringe anyone's copyright.", author="",
-                       source_url="https://www.meshy.ai", redistribution="no", attribution="",
+                       source_url="https://www.meshy.ai", redistribution="no", attribution="", ml_training="yes",
                        notes="Default redistribution NO: it is your private asset - flip to yes if you want to share it "
                              "(library licence NAME --redistribution yes). Meshy asks paid users who want to keep ownership not to "
                              "publish the model to the Meshy Community."),
     "makehuman": dict(spdx="CC0-1.0", custom_text="", author="MakeHuman base assets (CC0) + your parameters",
-                      source_url="http://www.makehumancommunity.org", redistribution="yes", attribution="",
+                      source_url="http://www.makehumancommunity.org", redistribution="yes", attribution="", ml_training="yes",
                       notes="MakeHuman assets (base mesh, targets, default skeleton + weights) are CC0 1.0; exports are the "
                             "user's own data. MakeHuman program code is AGPL-3.0 and is NOT included or used here."),
 }
 REDIST = ("yes", "no", "unknown")
+# v11.40: may machine-learning models (learned motion matching, motion generators) be trained on the asset?
+# Separate from redistribution: Mixamo may ship inside a game but Adobe forbids training on it; a free pack
+# whose terms are silent is "unknown", and training leaves unknown out (see sforge.motiontags.training_allowed).
+ML_TRAINING = ("yes", "no", "unknown")
 SPDX_COMMON = ["CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "MIT", "Apache-2.0", "LicenseRef-Proprietary",
                "LicenseRef-Mixamo-Terms", "LicenseRef-Store-EULA", "custom"]
 OVERRIDE_STATEMENT = "I own the rights to this asset (or have permission) and may redistribute it in a pack."
@@ -83,8 +87,9 @@ def slug(s):
 
 
 # ----------------------------------------------------------------- licences
-def blank_licence(redistribution="unknown"):
-    return dict(spdx="", custom_text="", author="", source_url="", redistribution=redistribution, attribution="", notes="")
+def blank_licence(redistribution="unknown", ml_training="unknown"):
+    return dict(spdx="", custom_text="", author="", source_url="", redistribution=redistribution, attribution="", notes="",
+                ml_training=ml_training)
 
 
 def validate_licence(lic):
@@ -101,6 +106,8 @@ def validate_licence(lic):
         p.append("spdx 'custom' needs custom_text")
     if lic.get("redistribution") not in REDIST:
         p.append("redistribution must be yes / no / unknown")
+    if "ml_training" in lic and lic["ml_training"] not in ML_TRAINING:  # v11.40 (older records may omit it)
+        p.append("ml_training must be yes / no / unknown")
     if not lic.get("author"):
         p.append("author is empty")
     return p
@@ -129,6 +136,8 @@ def licence_text(lic, name=""):
     if lic.get("source_url"):
         out.append("  source       : %s" % lic["source_url"])
     out.append("  redistribute : %s" % lic.get("redistribution", "unknown"))
+    from .motiontags import training_allowed
+    out.append("  ML training  : %s%s" % (training_allowed(lic), "" if "ml_training" in lic else " (read from the licence)"))
     if lic.get("attribution"):
         out.append("  attribution  : %s" % lic["attribution"])
     ov = lic.get("rights_override")

@@ -54,6 +54,31 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.40: real categories, sub-type tags and training rights for imported moves
+
+Imported moves used to be filed under catch-alls ("Mocap", "Imported", "Recorded", "Library"). They are now
+filed into the library's own action categories (Kicking, Ball, Ball handling, Defence, Goalkeeper,
+Locomotion...). Each move also gets structured tags (`sforge/motiontags.py`):
+
+| tag | values |
+|---|---|
+| `action` | pass, lofted, cross, shot, free_kick, penalty, clearance, header, first_touch, dribble, tackle, block, save, run, walk, backpedal, sidestep, cut, stop... |
+| `gait` / `direction` | walk / jog / run / sprint; forward / back / side (moving loops, from the root speed) |
+| `style` | e.g. neutral, proud, heavyset, crouched, when the source names one |
+| `source` / `capture` | cmu, skillcorner, soccertrack, 100style, veo, rohr, mixamo...; studio / match_video / procedural |
+
+* `jointtrack.keys_record`, `motion import` and `motion record` tag every new move. They re-file only
+  catch-all categories, so a game's own clip names (Arena FC's "Kick", "FirstTouch") are kept.
+* The old category is kept in `import.category_was`. A move whose action cannot be told stays where it was
+  and is tagged `needs_category`.
+* Licence records have a new field, **`ml_training: yes / no / unknown`**. It says whether models (learned
+  motion matching, motion generators, the pose lifter) may be trained on the asset. Mixamo is `no`; packs whose
+  terms are silent are `unknown`, and training leaves them out. See LIBRARY_LICENSING.md.
+* `python3 tools/retag_motions.py FOLDER [--write] [--keep-category] [--ml-training FOLDER=yes]` re-files and
+  tags a folder of moves and reports the training-eligible set per category and source.
+* The built-in `motion_library` is tagged, with `ml_training = yes` (all CC0 procedural moves).
+* Tests: `python3 tools/test_motiontags.py` (in CI).
+
 ## New in v11.35: classic BVH bone names - 100STYLE locomotion (fed back from Arena FC)
 
 `bonemap` now recognises the classic BVH mocap naming used by 100STYLE and many studio and academic
