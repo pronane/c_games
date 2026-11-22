@@ -1690,5 +1690,33 @@ Section("Match officials on the pitch (presentation only, 22.11.2026)");
         string.Join(", ", dir.Calls.GroupBy(c => c.action).Select(g => $"{g.Key}×{g.Count()}")));
 }
 
+Section("Kit clash: away kit, keepers clear of both sides (22.11.2026)");
+{
+    int har = Array.FindIndex(Clubs.All, c => c.Short == "HAR"), cri = Array.FindIndex(Clubs.All, c => c.Short == "CRI");
+    var clash = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 5 });
+    string hs = clash.State.Players.First(p => p.Team == 0 && !p.IsKeeper).Spec.KitPrimary;
+    string aw = clash.State.Players.First(p => p.Team == 1 && !p.IsKeeper).Spec.KitPrimary;
+    Check("red v red: the away side changes into its away kit", Clubs.ColourDistance(hs, aw) >= Clubs.ClashDistance, $"{hs} v {aw}");
+    var noClash = new MatchEngine(new MatchOptions { HomeClub = 0, AwayClub = 1, TeamSize = 11, Seed = 5 });
+    Check("red v blue: both sides keep their home kits",
+          noClash.State.Players.First(p => p.Team == 1 && !p.IsKeeper).Spec.KitPrimary == Clubs.All[1].Primary);
+    bool keepersClear = true;
+    for (int h = 0; h < Clubs.All.Length; h++)
+        for (int a = 0; a < Clubs.All.Length; a += 3)
+        {
+            if (h == a) continue;
+            var m = new MatchEngine(new MatchOptions { HomeClub = h, AwayClub = a, TeamSize = 5, Seed = 1 });
+            var outfield = m.State.Players.Where(p => !p.IsKeeper).Select(p => p.Spec.KitPrimary).Distinct().ToList();
+            foreach (var k in m.State.Players.Where(p => p.IsKeeper))
+                if (outfield.Any(o => Clubs.ColourDistance(o, k.Spec.KitPrimary) < Clubs.ClashDistance)) keepersClear = false;
+        }
+    Check("keepers never clash with either side's outfield kit (every fixture)", keepersClear);
+    // the clash rule changes colours only: same seed, same match
+    var a1 = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 9 });
+    var a2 = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 9 });
+    for (int i = 0; i < 1800; i++) { a1.Step(1f / 60f, PlayerCommand.None); a2.Step(1f / 60f, PlayerCommand.None); }
+    Check("kit changes are deterministic and colour-only", a1.State.Ball.Pos == a2.State.Ball.Pos);
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

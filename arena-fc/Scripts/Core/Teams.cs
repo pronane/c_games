@@ -94,6 +94,48 @@ public static class Clubs
         return KeeperKits[clubIndex % KeeperKits.Length];
     }
 
+    /// <summary>Shirt colours too close to tell apart on a broadcast (RGB distance, 0..1).</summary>
+    public const float ClashDistance = .28f;
+
+    /// <summary>Away team into its away kit when its shirts clash with the home team's; either keeper
+    /// into another keeper kit when it clashes with an outfield kit of either side.  Returns the (copied)
+    /// away roster; the home roster is only touched for its keeper.</summary>
+    public static List<CharacterSpec> ResolveKitClash(List<CharacterSpec> home, List<CharacterSpec> away, int awayClub)
+    {
+        var club = All[Math.Clamp(awayClub, 0, All.Length - 1)];
+        string homeShirt = home.FirstOrDefault(p => !p.IsKeeper)?.KitPrimary ?? "#d7263d";
+        string awayShirt = away.FirstOrDefault(p => !p.IsKeeper)?.KitPrimary ?? club.Primary;
+        var outAway = away.Select(p => p.Clone()).ToList();
+        if (ColourDistance(homeShirt, awayShirt) < ClashDistance && club.AwayPrimary != "")
+        {
+            foreach (var p in outAway)
+            {
+                if (p.IsKeeper) continue;
+                p.KitPrimary = club.AwayPrimary;
+                p.KitSecondary = club.AwaySecondary != "" ? club.AwaySecondary : club.Primary;
+                p.ShortsColor = club.AwayPrimary;
+                p.SocksColor = club.AwayPrimary;
+                p.KitTrim = p.KitSecondary;
+            }
+            awayShirt = club.AwayPrimary;
+        }
+        // keepers: clear of both outfield kits (and of each other)
+        string[] shirts = { homeShirt, awayShirt };
+        foreach (var roster in new[] { home, outAway })
+            foreach (var p in roster.Where(p => p.IsKeeper))
+            {
+                if (shirts.All(sh => ColourDistance(p.KitPrimary, sh) >= ClashDistance)) continue;
+                foreach (var kit in KeeperKits)
+                    if (shirts.All(sh => ColourDistance(kit.shirt, sh) >= ClashDistance))
+                    {
+                        p.KitPrimary = kit.shirt; p.KitSecondary = kit.shorts; p.ShortsColor = kit.shorts;
+                        p.SocksColor = kit.socks; p.GlovesColor = kit.gloves; p.KitPattern = kit.pattern; p.KitTrim = kit.shorts;
+                        break;
+                    }
+            }
+        return outAway;
+    }
+
     public static float ColourDistance(string a, string b)
     {
         Mx.HexToRgb(a, out float ar, out float ag, out float ab);
