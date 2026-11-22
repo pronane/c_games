@@ -22,6 +22,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from sforge import motiontags as MT  # noqa: E402
 
 
+def layout(f):
+    """-> (indent, trailing newline, ensure_ascii) of a JSON file, so a rewrite only shows the added fields"""
+    raw = open(f, encoding="utf-8").read()
+    lines = raw.split("\n", 2)
+    indent = None if len(lines) < 2 else len(lines[1]) - len(lines[1].lstrip(" "))
+    return indent, raw.endswith("\n"), all(ord(c) < 128 for c in raw)
+
+
 def records(paths):
     for d in paths:
         files = sorted(glob.glob(os.path.join(d, "*.json"))) if os.path.isdir(d) else [d]
@@ -72,9 +80,11 @@ def main(argv=None):
         if json.dumps(r, sort_keys=True) != before:
             changed += 1
             if a.write:
+                indent, nl, ascii_ = layout(f)
                 with open(f, "w", encoding="utf-8") as fh:
-                    json.dump(r, fh, indent=1, ensure_ascii=False)
-                    fh.write("\n")
+                    json.dump(r, fh, indent=indent, ensure_ascii=ascii_)
+                    if nl:
+                        fh.write("\n")
     print("%d moves %s%s" % (sum(cats.values()), "updated" if a.write else "would change", ": %d" % changed))
     for (c, s), n in sorted(cats.items(), key=lambda x: (str(x[0][0]), str(x[0][1]))):
         print("  %-14s %-12s %4d" % (c, s, n))
