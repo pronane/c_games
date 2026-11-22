@@ -44,7 +44,16 @@
   "skin_v6",
   "eyes_brownlight",
   "eyebrows_eyebrow009",
-  "hair_afro01"
+  "hair_afro01",
+  "sleeves",
+  "gloves",
+  "skin_v3",
+  "hair_ponytail01",
+  "skin_v4",
+  "eyes_blue",
+  "skin_v7",
+  "eyes_grey",
+  "skin_v8"
  ],
  "look": "realistic",
  "variants": [
@@ -6069,6 +6078,409 @@
    }
   },
   {
+   "name": "soccer_ss_run_neutral",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_run_neutral",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     18
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_walk_neutral",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_walk_neutral",
+   "frames": 41,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     18,
+     24,
+     38
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_backrun_neutral",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_backrun_neutral",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     7,
+     9,
+     17
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_backwalk_neutral",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_backwalk_neutral",
+   "frames": 39,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     13,
+     20,
+     32
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_siderun_neutral",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_siderun_neutral",
+   "frames": 20,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     6,
+     13,
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_sidewalk_neutral",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_sidewalk_neutral",
+   "frames": 36,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     17,
+     25
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_walk_rushed",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_walk_rushed",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     9,
+     19
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_siderun_rushed",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_siderun_rushed",
+   "frames": 24,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     9,
+     16,
+     21,
+     22
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_walk_bigsteps",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_walk_bigsteps",
+   "frames": 46,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     27,
+     39
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_run_proud",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_run_proud",
+   "frames": 26,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     3,
+     9,
+     16,
+     21
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_walk_proud",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_walk_proud",
+   "frames": 38,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     13,
+     18,
+     31
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_backrun_proud",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_backrun_proud",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_run_heavyset",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_run_heavyset",
+   "frames": 30,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     16,
+     23
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_walk_heavyset",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_walk_heavyset",
+   "frames": 39,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     9,
+     28,
+     35
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_siderun_bentknees",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_siderun_bentknees",
+   "frames": 18,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     7,
+     10,
+     12,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_sidewalk_bentknees",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_sidewalk_bentknees",
+   "frames": 41,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     16,
+     19,
+     25,
+     35
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_backrun_bentknees",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_backrun_bentknees",
+   "frames": 27,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_backwalk_bentknees",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_backwalk_bentknees",
+   "frames": 40,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     19
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_siderun_crouched",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_siderun_crouched",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     11,
+     12,
+     15,
+     18
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_sidewalk_crouched",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_sidewalk_crouched",
+   "frames": 36,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     9,
+     14,
+     21,
+     28
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_ss_backwalk_crouched",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "mocap:ss_backwalk_crouched",
+   "frames": 41,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     9,
+     31
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
    "name": "ref_whistle",
    "loop": false,
    "category": "Official",
@@ -6388,7 +6800,7 @@
    0.2116
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 26.2
+  "seconds": 26.6
  },
  "officials": {
   "pack": "sforge.officials v11.31",

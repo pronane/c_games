@@ -62,7 +62,7 @@ def main():
     try:
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
-        check("312 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner + 25 own match video + 126 SoccerTrack)", len(SM.ALL_CLIPS) == 312, str(len(SM.ALL_CLIPS)))
+        check("333 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner + 25 own match video + 126 SoccerTrack + 21 100STYLE)", len(SM.ALL_CLIPS) == 333, str(len(SM.ALL_CLIPS)))
         check("98 action aliases", len(SM.ACTION_ALIASES) == 98, str(len(SM.ACTION_ALIASES)))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
@@ -116,7 +116,7 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 324 clips (312 soccer + 12 officials signals)", len(anims) == 324, str(len(anims)))
+        check("GLB carries 345 clips (333 soccer + 12 officials signals)", len(anims) == 345, str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
@@ -138,7 +138,10 @@ def main():
         check("mesh stands on the ground (min y ~ 0)", abs(gmin[1]) < 0.02, str(gmin))
         check("mesh height ~1.75 m", 1.6 < gmax[1] < 1.95, str(gmax))
         check("GLB mesh is full-body (x spans both sides)", gmin[0] < -0.2 and gmax[0] > 0.2, "%s..%s" % (gmin[0], gmax[0]))
-        tris = sum(j["accessors"][prim_of(nm)["indices"]]["count"] for nm in mesh_nodes if nm.startswith(ids[0])) // 3
+        # the base meshes only: LOD levels and optional layers (keeper / staff garments) ride along hidden
+        base = [nm for nm in mesh_nodes if nm.startswith(ids[0]) and "_lod" not in nm
+                and not any(x in nm for x in ("_sleeves", "_gloves", "_trousers"))]
+        tris = sum(j["accessors"][prim_of(nm)["indices"]]["count"] for nm in base) // 3
         check("an identity is a real-detail mesh (20k-60k tris)", 20000 <= tris <= 60000, str(tris))
         jersey_acc = pos[ids[0] + "jersey"]
         check("jersey layer sits on the torso", jersey_acc["min"][1] > 0.5 and jersey_acc["max"][1] < 1.65,
@@ -183,7 +186,7 @@ def main():
         check("rig JSON bakes the clip keyframes", "clips" in d)
         if "clips" in d:
             clips = d["clips"]
-            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 312)
+            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 333)
             loco = ("soccer_idle", "soccer_walk", "soccer_jog", "soccer_run",
                     "soccer_sprint", "soccer_dribble", "soccer_run_ball")
             check("baked locomotion clips loop",
@@ -213,7 +216,10 @@ def main():
     check("manifest exists", os.path.isfile(man_path))
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
-        check("manifest lists 324 clips (312 soccer + 12 officials)", len(man["clips"]) == 324)
+        glb_clips = [a["name"] for a in j.get("animations", [])] if "j" in dir() else []
+        check("manifest lists every GLB clip (at least 345: 333 soccer + 12 officials)",
+              len(man["clips"]) >= 345 and (not glb_clips or sorted(c["name"] for c in man["clips"]) == sorted(glb_clips)),
+              str(len(man["clips"])))
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
