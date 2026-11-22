@@ -521,7 +521,7 @@ def qa(out, bones):
 
 
 # ---------------------------------------------------------------- write back into a GLB
-def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None):
+def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, images=None):
     """Swap mesh nodes in a skinned GLB.  `by_prefix` = {"v0_": {"jersey": Part, "body": Part, ...}}:
     each named part replaces prefix+name (or is added).  Nodes, skin, animations, images and other
     meshes are kept; buffers are rebuilt so dropped geometry is not carried.  New garment parts get
@@ -536,10 +536,33 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None):
         return acc_map[i]
     mats = [dict(m) for m in j.get("materials", [])]
     mat_ix = {m["name"]: k for k, m in enumerate(mats)}
-    for nm in (materials or {}):
-        if nm not in mat_ix:
-            mats.append(dict(materials[nm], name=nm))
-            mat_ix[nm] = len(mats) - 1
+    texs = [dict(t) for t in j.get("textures", [])]
+    new_imgs = []                 # (image dict, bytes) appended after the GLB's own images
+    img_ix = {im.get("name"): k for k, im in enumerate(j.get("images", []))}
+    for key, data in (images or {}).items():
+        if key in img_ix:
+            continue
+        raw, mime = data if isinstance(data, tuple) else (data, "image/png")
+        img_ix[key] = len(j.get("images", [])) + len(new_imgs)
+        new_imgs.append(({"mimeType": mime, "name": key}, raw))
+    tex_for = {}
+    for nm, m in (materials or {}).items():
+        if nm in mat_ix:
+            continue
+        md = {"name": nm, "pbrMetallicRoughness": {"baseColorFactor": list(m.get("color", [1, 1, 1]))[:3] + [1.0],
+                                                    "metallicFactor": 0.0, "roughnessFactor": float(m.get("roughness", .8))}}
+        key = m.get("image")
+        if key in img_ix:
+            if key not in tex_for:
+                texs.append({"source": img_ix[key], "sampler": 0})
+                tex_for[key] = len(texs) - 1
+            md["pbrMetallicRoughness"]["baseColorTexture"] = {"index": tex_for[key]}
+        if m.get("alpha") == "MASK":
+            md["alphaMode"] = "MASK"; md["alphaCutoff"] = float(m.get("cutoff", .5))
+        if m.get("double"):
+            md["doubleSided"] = True
+        mats.append(md)
+        mat_ix[nm] = len(mats) - 1
     meshes, nodes = [], [dict(n) for n in j["nodes"]]
     scene = dict(j["scenes"][j.get("scene", 0)])
     scene["nodes"] = list(scene["nodes"])
@@ -595,7 +618,12 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None):
             o = bv.get("byteOffset", 0)
             im2["bufferView"] = out.view(bytes(buf[o:o + bv["byteLength"]]))
         imgs.append(im2)
+    for im, raw in new_imgs:
+        imgs.append(dict(im, bufferView=out.view(raw)))
     gl = dict(j)
+    if texs:
+        gl["textures"] = texs
+        gl.setdefault("samplers", [{"magFilter": 9729, "minFilter": 9987}])
     gl.update({"scenes": [scene], "scene": 0, "nodes": nodes, "meshes": meshes, "materials": mats,
                "skins": [sk] + j["skins"][1:], "animations": anims, "images": imgs,
                "accessors": out.acc, "bufferViews": out.views, "buffers": [{"byteLength": 0}]})
