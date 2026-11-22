@@ -12,7 +12,12 @@ On the Gaelic squad GLB (MakeHuman game skeleton, skin-tight clothes, boots that
   5 the shirt tail tucked in the shorts is cut away (nothing of the shirt below the shorts' waist)
   6 UVs land inside their LAYOUT panels; the back print area is on the back of the torso
   7 replace_parts keeps every node, the skin and every animation; the new GLB reads back
-  8 kitdesign: every style's mask, the detail and glyph atlases, the layout contract, a painted kit"""
+  8 kitdesign: every style's mask, the detail and glyph atlases, the layout contract, a painted kit
+  9 flutter (v11.37): free hems (sleeves, shorts legs) carry the flutter weight; the collar, the chest and the
+    waistband none; it is written as TEXCOORD_1 and reads back
+ 10 keeper garments (v11.37): a base layer covering the arms from inside the short sleeve to the wrist,
+    gloves covering the whole hand and overlapping the sleeve at the cuff
+ 11 clips_from (v11.38): replace_parts takes the clips of another GLB of the same skeleton"""
 from __future__ import annotations
 
 import json
@@ -120,6 +125,30 @@ def main():
     zc = je.V[je.F][inb].mean(1)[:, 2]
     rec("back number area is on the back (faces -forward)", inb.sum() > 20 and (zc < .02).mean() > .9,
         "%d faces, %.0f%% behind" % (inb.sum(), 100 * (zc < .02).mean() if inb.sum() else 0))
+    # flutter: the collar and the waistband are held, the sleeve and leg hems move
+    je, sh = out["jersey"], out["shorts"]
+    top = je.V[:, 1] > je.V[:, 1].max() - .01
+    wst = sh.V[:, 1] > sh.V[:, 1].max() - .01
+    leg = sh.V[:, 1] < sh.V[:, 1].min() + .01
+    g = {x.name: x for x in T.soccer_garments()}
+    rec("flutter: collar and waistband held, free hems move",
+        np.abs(je.UV2[top, 0]).max() < 1e-6 and np.abs(sh.UV2[wst, 0]).max() < 1e-6 and np.abs(sh.UV2[leg, 0]).min() > g["shorts"].flutter * .5
+        and je.UV2[:, 0].max() > g["jersey"].flutter * .95, "shorts leg %.4f" % np.abs(sh.UV2[leg, 0]).min())
+    chest = (np.abs(je.V[:, 0]) < .08) & (je.V[:, 1] < je.V[:, 1].max() - .08) & (je.V[:, 1] > je.V[:, 1].max() - .25)
+    rec("flutter stays off the chest and back", np.abs(je.UV2[chest, 0]).max() < 1e-6 and chest.sum() > 20)
+    kp = T.tailor(parts, bones, garments=T.keeper_garments(), joint_names=jn, log=lambda *a: None)
+    near, _t = T.dominant_bone(parts["body"], bones, jn)
+    hand = np.char.endswith(near.astype(str), "Hand")
+    hv = parts["body"].V[hand]
+    gl, sl = kp.get("gloves"), kp.get("sleeves")
+    ok = gl is not None and sl is not None and len(gl.F) > 500 and len(sl.F) > 300
+    if ok:
+        lo, hi = gl.V.min(0), gl.V.max(0)
+        cover = ((hv >= lo - .002) & (hv <= hi + .002)).all(1).mean()
+        # the base layer runs from inside the short sleeve down under the glove cuff
+        overlap = sl.V[:, 1].min() < gl.V[:, 1].max() and sl.V[:, 1].max() > je.V[np.abs(je.V[:, 0]) > .2, 1].min()
+        ok = cover > .99 and overlap
+    rec("keeper base layer and gloves cover the arms and hands", ok)
     with tempfile.TemporaryDirectory() as td:
         dst = os.path.join(td, "t.glb")
         T.replace_parts(SRC, dst, out_all, extras={"kit_atlas": T.layout_json()})
@@ -130,6 +159,14 @@ def main():
             and len(j1.get("animations", [])) == len(j0.get("animations", [])))
         p2 = T.read_parts(dst, "v0_")
         rec("tailored garments read back", len(p2["jersey"].F) == len(out["jersey"].F) and "kit_atlas" in j1["asset"]["extras"])
+        dst2 = os.path.join(td, "c.glb")
+        T.replace_parts(dst, dst2, {}, clips_from=SRC)
+        j2, _ = read_glb(dst2)
+        rec("clips_from: the clips of another GLB move over by node name",
+            [a["name"] for a in j2.get("animations", [])] == [a["name"] for a in j0.get("animations", [])]
+            and len(j2["nodes"]) == len(j1["nodes"]))
+        rec("flutter weights read back (TEXCOORD_1)", p2["jersey"].UV2 is not None
+            and np.allclose(p2["jersey"].UV2, out["jersey"].UV2, atol=1e-6))
         lay = KD.export(os.path.join(td, "kit"))
         files = os.listdir(os.path.join(td, "kit"))
         rec("kitdesign export", all("kit_pattern_%s.png" % s in files for s in KD.STYLES)
