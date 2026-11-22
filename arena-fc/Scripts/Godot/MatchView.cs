@@ -254,6 +254,7 @@ public partial class MatchView : Node3D
         PressureName = TrackerLabel("PressureName", new Color(.55f, .8f, 1f), "OPP");
         AddChild(ControlName); AddChild(OwnerName); AddChild(BallName); AddChild(PressureName);
 
+        RenderProfile.ApplyViewport(GetViewport());
         Cam = new BroadcastCamera { Name = "BroadcastCamera", Fov = 55, Far = 600f };
         AddChild(Cam);
         Cam.MakeCurrent();

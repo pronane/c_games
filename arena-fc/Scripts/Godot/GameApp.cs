@@ -415,6 +415,7 @@ public partial class GameApp : Node3D
             CustomHome = CustomHome?.Select(x => x.Clone()).ToList(),
             Preset = Options.Preset,
             Quality = Options.Quality,
+            Lighting = isTraining ? "day" : Options.Lighting,
             // Practice Arena runs on the training ground (free practice); it used to
             // be a normal match with fouls switched off.
             Mode = Mode == GameMode.PracticeArena ? (int)GameMode.Training : (int)Mode,
@@ -614,6 +615,20 @@ public partial class GameApp : Node3D
     public void ShowSettings()
     {
         var v = Ui.VBox(10);
+        v.AddChild(Ui.Lbl("GRAPHICS", 15, Ui.Sub));
+        var gfxInfo = Ui.Lbl(RenderProfile.Describe(), 13, Ui.Sub);
+        v.AddChild(Ui.Combo(new[] { "Auto (tuned for this device)", "Ultra", "High", "Performance (older / integrated GPUs)" },
+            Math.Max(0, Array.IndexOf(RenderProfile.Choices, RenderProfile.Choice)), i =>
+            {
+                // Ultra / High run on Forward+, Performance on the GL renderer: switching between them restarts
+                if (RenderProfile.SetChoice(RenderProfile.Choices[i])) RenderProfile.RestartForChoice();
+                else gfxInfo.Text = "Applies from the next match · " + RenderProfile.Describe();
+            }));
+        v.AddChild(gfxInfo);
+        v.AddChild(Ui.Lbl("KICK-OFF", 15, Ui.Sub));
+        v.AddChild(Ui.Combo(new[] { "Afternoon", "Evening (sunset)", "Night (floodlit)" },
+            Math.Max(0, Array.IndexOf(new[] { "day", "dusk", "night" }, Options.Lighting)),
+            i => Options.Lighting = new[] { "day", "dusk", "night" }[i]));
         v.AddChild(Ui.Lbl("TEAM SIZE", 15, Ui.Sub));
         v.AddChild(Ui.Combo(new[] { "5-a-side", "7-a-side", "11v11" }, Options.TeamSize == 5 ? 0 : Options.TeamSize == 7 ? 1 : 2,
             i => Options.TeamSize = i == 0 ? 5 : i == 1 ? 7 : 11));
