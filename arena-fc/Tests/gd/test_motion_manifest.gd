@@ -14,7 +14,7 @@ func _init() -> void:
 func _run() -> void:
 	var loaded := ClipManifest.load_manifest()
 	var by_id: Dictionary = loaded.get("by_id", {})
-	ok(by_id.size() == 312 and by_id.has("soccer_run"), "shared manifest loads all clips")
+	ok(by_id.size() == 333 and by_id.has("soccer_run"), "shared manifest loads all clips")
 	if by_id.has("soccer_run"):
 		var run: Dictionary = by_id["soccer_run"]
 		ok(run.get("footPlantFrames", []).size() == 2

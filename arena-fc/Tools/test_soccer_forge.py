@@ -62,7 +62,7 @@ def main():
     try:
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
-        check("312 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner + 25 own match video + 126 SoccerTrack)", len(SM.ALL_CLIPS) == 312, str(len(SM.ALL_CLIPS)))
+        check("333 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner + 25 own match video + 126 SoccerTrack + 21 100STYLE)", len(SM.ALL_CLIPS) == 333, str(len(SM.ALL_CLIPS)))
         check("98 action aliases", len(SM.ACTION_ALIASES) == 98, str(len(SM.ACTION_ALIASES)))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
@@ -116,7 +116,7 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 324 clips (312 soccer + 12 officials signals)", len(anims) == 324, str(len(anims)))
+        check("GLB carries 345 clips (333 soccer + 12 officials signals)", len(anims) == 345, str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
@@ -183,7 +183,7 @@ def main():
         check("rig JSON bakes the clip keyframes", "clips" in d)
         if "clips" in d:
             clips = d["clips"]
-            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 312)
+            check("baked clips cover the manifest", set(clips) == set(man["clips"]) if "man" in dir() else len(clips) == 333)
             loco = ("soccer_idle", "soccer_walk", "soccer_jog", "soccer_run",
                     "soccer_sprint", "soccer_dribble", "soccer_run_ball")
             check("baked locomotion clips loop",
@@ -213,7 +213,7 @@ def main():
     check("manifest exists", os.path.isfile(man_path))
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
-        check("manifest lists 324 clips (312 soccer + 12 officials)", len(man["clips"]) == 324)
+        check("manifest lists 345 clips (333 soccer + 12 officials)", len(man["clips"]) == 345)
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
