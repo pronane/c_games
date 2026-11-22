@@ -54,6 +54,24 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.34: FBX mocap packs, and SoccerTrack v2 on real files
+
+**`tools/fbx_to_moves.py OUT a.fbx ...`** converts FBX motion capture into library moves, for any FBX that
+Godot 4.3+ can read:
+- `tools/fbx_dump.gd` samples named joints in world space. It knows the Rokoko, Mixamo, UE5 and iClone bone names.
+- The same mocap IK as every other source (`sforge.jointtrack`) then fits them onto the shared skeleton.
+- Leading T-pose frames are dropped.
+
+The first pack through it was Anderson Rohr's free soccer pack: 21 takes, mostly fitting within 1–3°.
+
+**SoccerTrack v2 on the released files (v1.3):**
+- Events carry their own `frame` within each half's video.
+- Player ids are GSR's numeric ids.
+- GSR `bbox_image` is a fixed 58 × 43 box around a projected pitch position, 25–50 px off the real body, not a body box.
+
+So `process_events(hint_boxes=True)` treats those boxes as hints. For each one, `refine_box` runs the
+person detector on a magnified crop around the hint and takes the nearest person, holding them frame
+to frame. The MOT files do have real boxes, but only for each match's first 4 minutes.
 ## New in v11.33: turf for field sports - markings, mowing patterns, wear (fed back from Arena FC)
 
 Arena FC drew one stripe pattern with soccer lines hard-coded in a shader. **`sforge/pitch.py`** writes a turf
