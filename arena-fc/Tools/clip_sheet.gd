@@ -32,6 +32,8 @@ func _run() -> void:
 	var cam := Camera3D.new(); cam.fov = 34; root.add_child(cam); cam.make_current()
 	cam.position = Vector3(0, 1.1, 9.0)
 	cam.look_at(Vector3(0, 0.8, 0))
+	if a.size() > 3 and a[3] == "close":
+		cam.position = Vector3(0, 1.3, 4.6); cam.look_at(Vector3(0, 1.0, 0))
 
 	var doc := GLTFDocument.new()
 	var players: Array = []
@@ -43,6 +45,29 @@ func _run() -> void:
 		scene.position = Vector3((k - 1) * 2.4, 0, 0)
 		scene.rotation.y = yaw                 # default side-on; pass 0 for front-on
 		root.add_child(scene)
+		# a realistic GLB carries several identities (v0_..., v1_...): show one per figure
+		var prefixes := []
+		for mi in scene.find_children("*", "MeshInstance3D", true, false):
+			var nm0: String = mi.name
+			if nm0.length() > 3 and nm0[0] == "v" and nm0[2] == "_" and not prefixes.has(nm0.substr(0, 3)): prefixes.append(nm0.substr(0, 3))
+		prefixes.sort()
+		var pick: String = prefixes[(k * 2) % prefixes.size()] if prefixes.size() > 0 else ""
+		if a.size() > 3 and a[3] == "close": scene.position = Vector3((k - 1) * 1.0, 0, 0)
+		for mi in scene.find_children("*", "MeshInstance3D", true, false):
+			var nm: String = mi.name
+			if nm.length() > 3 and nm[0] == "v" and nm[2] == "_":
+				mi.visible = nm.begins_with(pick)
+			# a club kit, as the game tints it (flat kit slots; hair family by hair colour)
+			var tint := {"jersey": Color("#c8102e"), "shorts": Color("#ffffff"), "socks": Color("#c8102e"), "boots": Color("#111111")}
+			for si in mi.mesh.get_surface_count():
+				var m = mi.mesh.surface_get_material(si)
+				if m == null: continue
+				var key: String = m.resource_name
+				var col = tint.get(key)
+				if col == null and (key.begins_with("hair_") or key.begins_with("eyebrows_") or key.begins_with("eyelashes_") or key in ["beard_shell", "facial_hair"]):
+					col = [Color("#3b2a1a"), Color("#1a1410"), Color("#0e0c0a")][k]
+				if col != null:
+					var d: StandardMaterial3D = m.duplicate(); d.albedo_color = col; mi.set_surface_override_material(si, d)
 		var ap: AnimationPlayer = scene.find_children("*", "AnimationPlayer", true, false)[0]
 		players.append(ap)
 	var names: PackedStringArray = players[0].get_animation_list()

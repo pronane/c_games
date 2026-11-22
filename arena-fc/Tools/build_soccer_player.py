@@ -133,6 +133,118 @@ def conform_to_bind(V, N, J18, W18, tpl_joint, rig_json: dict, log=print):
     return V2.astype(V.dtype), N2.astype(N.dtype)
 
 
+# ---------------------------------------------------------------------------
+# Realistic look (ported from #133): the MakeHuman-derived squad that ships in
+# Gaelic_Football_3d - real anatomy, smooth normals, baked skin / eye / hair /
+# beard atlases, nine identities - skinned onto Arena's 18-bone skeleton the same
+# way the sculpt is (weights collapsed 52 -> 18, mesh conformed to the bind pose),
+# so every clip, the motion-matching table and the game code stay as they are.
+# ---------------------------------------------------------------------------
+REALISTIC_SRC = os.path.abspath(os.path.join(ARENA, "..", "Gaelic_Football_3d", "assets", "models", "gaelic_player.glb"))
+# five of the nine: short hair, two bearded, a darker skin tone with a beard, an afro (all nine is a 24 MB file)
+REALISTIC_VARIANTS = ("v0", "v1", "v2", "v5", "v6")
+KIT_PARTS = ("jersey", "shorts", "socks", "boots")
+KIT_COLOR = {"jersey": [1, 1, 1], "shorts": [1, 1, 1], "socks": [1, 1, 1], "boots": [1, 1, 1]}
+
+
+def realistic_parts(rig_json, arena_heads, variants=REALISTIC_VARIANTS, log=print):
+    """-> (parts, materials, images, height): every mesh part of each identity, skinned to Arena's bones."""
+    import io
+    from PIL import Image
+    from sforge.glbpack import read_glb, _acc_bytes
+    from sforge.bindconform import conform_to_bind as _conform
+    j, buf = read_glb(REALISTIC_SRC)
+    sk = FB.Skeleton.from_glb(REALISTIC_SRC)
+    skin_names = [j["nodes"][i]["name"] for i in j["skins"][0]["joints"]]
+    to_sk = np.array([sk.names.index(n) for n in skin_names], int)
+    flip_z = float(sk.p("ball_l")[2] - sk.p("foot_l")[2]) < 0
+    bones = rig_json["bones"]
+    names = [b["n"] for b in bones]
+    tgt_heads = np.array([b["h"] for b in bones], float)
+
+    def acc(a, dt, k):
+        return np.frombuffer(_acc_bytes(j, buf, a), dt).reshape(-1, k)
+
+    parts, used_mats = [], {}
+    for v in variants:
+        nodes = [n for n in j["nodes"] if "mesh" in n and n.get("name", "").startswith(v + "_")]
+        ground = None
+        for n in nodes:
+            if n["name"] == v + "_body":
+                pr = j["meshes"][n["mesh"]]["primitives"][0]
+                ground = float(acc(pr["attributes"]["POSITION"], np.float32, 3)[:, 1].min())
+        ground = ground or 0.0
+
+        def tpl_joint(nm):
+            q = np.array(sk.p(nm), float)
+            if flip_z: q[2] *= -1
+            q[1] -= ground
+            return q
+        src_heads = np.array([tpl_joint(ARENA_TO_TEMPLATE[nm]) for nm in names], float)
+        for n in nodes:
+            pr = j["meshes"][n["mesh"]]["primitives"][0]
+            at = pr["attributes"]
+            V = acc(at["POSITION"], np.float32, 3).astype(np.float64).copy()
+            N = acc(at["NORMAL"], np.float32, 3).astype(np.float64).copy()
+            UV = acc(at["TEXCOORD_0"], np.float32, 2).astype(np.float64)
+            jt = {5121: np.uint8, 5123: np.uint16}[j["accessors"][at["JOINTS_0"]]["componentType"]]
+            J = to_sk[acc(at["JOINTS_0"], jt, 4).astype(int)]
+            W = acc(at["WEIGHTS_0"], np.float32, 4).astype(np.float64)
+            it = np.uint32 if j["accessors"][pr["indices"]]["componentType"] == 5125 else np.uint16
+            F = acc(pr["indices"], it, 3).astype(np.int64)
+            if flip_z:
+                V[:, 2] *= -1; N[:, 2] *= -1; F = F[:, ::-1].copy()
+            V[:, 1] -= ground
+            J18, W18, _ = collapse_weights(J, W, sk, arena_heads)
+            V, N, _rep = _conform(V, N, J18, W18, src_heads, tgt_heads, [b["p"] for b in bones], names)
+            part = n["name"][len(v) + 1:]
+            src_mat = j["materials"][pr["material"]]
+            mat = part if part in KIT_PARTS else src_mat["name"]
+            used_mats[mat] = src_mat
+            parts.append(dict(name=n["name"], V=V, N=N, UV=UV, J=J18, W=W18, F=F, material=mat))
+    images, materials = {}, []
+    for mname, src in used_mats.items():
+        if mname in KIT_PARTS:
+            materials.append(dict(name=mname, color=KIT_COLOR[mname], roughness=.7 if mname != "boots" else .35))
+            continue
+        pb = src.get("pbrMetallicRoughness", {})
+        key = None
+        if "baseColorTexture" in pb:
+            im = j["images"][j["textures"][pb["baseColorTexture"]["index"]]["source"]]
+            bv = j["bufferViews"][im["bufferView"]]
+            raw = bytes(buf[bv.get("byteOffset", 0):bv.get("byteOffset", 0) + bv["byteLength"]])
+            key = im.get("name", mname)
+            if key not in images:
+                pil = Image.open(io.BytesIO(raw))
+                opaque = pil.mode != "RGBA" or int(np.asarray(pil)[..., 3].min()) == 255
+                if mname.startswith("skin_") and opaque:   # opaque skin atlases: JPEG is a fifth of the size
+                    bio = io.BytesIO(); pil.convert("RGB").save(bio, "JPEG", quality=88)
+                    images[key] = (bio.getvalue(), "image/jpeg")
+                else:
+                    images[key] = raw
+        materials.append(dict(name=mname, image=key, color=list(pb.get("baseColorFactor", [1, 1, 1, 1]))[:3],
+                              alpha=src.get("alphaMode"), double=bool(src.get("doubleSided")),
+                              roughness=.55 if mname.startswith("skin_") else .8))
+    # The jersey runs on under the shorts and pokes through them in motion (red patches on
+    # white shorts): cut it off just below the shorts' waistband.
+    for v in variants:
+        sh = next((p for p in parts if p["name"] == v + "_shorts"), None)
+        je = next((p for p in parts if p["name"] == v + "_jersey"), None)
+        if sh is None or je is None:
+            continue
+        waist = float(np.percentile(sh["V"][:, 1], 98)) - 0.035
+        keep = je["V"][je["F"]][:, :, 1].max(axis=1) > waist
+        used = np.unique(je["F"][keep])
+        remap = -np.ones(len(je["V"]), int); remap[used] = np.arange(len(used))
+        for k in ("V", "N", "UV", "J", "W"):
+            je[k] = je[k][used]
+        je["F"] = remap[je["F"][keep]]
+    height = max(float(p["V"][:, 1].max()) for p in parts if p["name"].endswith("_body"))
+    log("  realistic: %d identities, %d parts, %d tris, %d textures" % (
+        len(variants), len(parts), sum(len(p["F"]) for p in parts), len(images)))
+    return parts, materials, images, height
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tris", type=int, default=16000)
@@ -140,6 +252,8 @@ def main() -> int:
     ap.add_argument("--out-dir", default=os.path.join(ARENA, "Data"))
     ap.add_argument("--skip-glb", action="store_true")
     ap.add_argument("--skip-json", action="store_true")
+    ap.add_argument("--look", default="realistic", choices=["realistic", "sculpt"],
+                    help="desktop GLB body: the realistic MakeHuman squad (nine identities) or the sculpted mannequin")
     a = ap.parse_args()
 
     t0 = time.time()
@@ -213,7 +327,15 @@ def main() -> int:
     # ---- 3. GLB (desktop) ---------------------------------------------------
     os.makedirs(os.path.join(a.out_dir, "models"), exist_ok=True)
     glb_path = os.path.join(a.out_dir, "models", "soccer_player.glb")
-    if not a.skip_glb:
+    realistic = None
+    if not a.skip_glb and a.look == "realistic":
+        parts, rmats, rimgs, rheight = realistic_parts(rig_json, arena_heads)
+        RR.write_glb_parts(tgt, glb_path, parts, rmats, rimgs, clips=list(tgt.clips), root_motion="inplace",
+                           extras={"arena_fc": {"look": "realistic", "variants": list(REALISTIC_VARIANTS)}})
+        realistic = dict(materials=[m["name"] for m in rmats], variants=list(REALISTIC_VARIANTS), height=rheight,
+                         tris=int(sum(len(p["F"]) for p in parts)) // len(REALISTIC_VARIANTS))
+        print("  wrote %s (%.1f MB, realistic)" % (glb_path, os.path.getsize(glb_path) / 1e6))
+    elif not a.skip_glb:
         tgt.V = lo.V
         tgt.F = lo.F
         tgt.J = J18
@@ -311,7 +433,11 @@ def main() -> int:
         "sprite_forge": "v11.13 (main 891facd)",
         "skeleton": "arena-18",
         "bones": tgt.bones,
-        "materials": LAYER_ORDER,
+        "materials": realistic["materials"] if realistic else LAYER_ORDER,
+        "look": "realistic" if realistic else "sculpt",
+        "variants": realistic["variants"] if realistic else [],
+        "variant_prefixes": ["%s_" % v for v in realistic["variants"]] if realistic else [],
+        "browser_look": "sculpt",
         "layer_slots": LAYER_SLOT,
         "clips": [
             {"name": n, "loop": bool(SM.LOOP_CLIPS.__contains__(n)), "category": SM.CLIP_CATEGORIES[n],
@@ -322,7 +448,7 @@ def main() -> int:
         "action_aliases": SM.ACTION_ALIASES,
         "stats": {
             "tris": int(len(lo.F)), "verts": int(len(lo.V)),
-            "height_m": round(float(lo.V[:, 1].max()), 4),
+            "height_m": round(realistic["height"] if realistic else float(lo.V[:, 1].max()), 4),
             "bounds_min": [round(float(x), 4) for x in lo.V.min(0)],
             "bounds_max": [round(float(x), 4) for x in lo.V.max(0)],
             "mean_dir_err_deg": round(mean_err, 3),

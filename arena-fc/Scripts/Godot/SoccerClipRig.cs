@@ -33,6 +33,10 @@ public sealed partial class SoccerClipRig : Node3D
     public AnimationPlayer? Player;
     public Skeleton3D? Skel;
     public MeshInstance3D? Mesh;
+    // Realistic GLB: one mesh node per body part per identity ("v0_body", "v5_hair" ...).
+    private readonly List<MeshInstance3D> _meshes = new();
+    private static GltfDocument? _gltfDoc;
+    private static GltfState? _gltfState;
 
     private readonly Dictionary<string, string> _aliases = new();
     private readonly HashSet<string> _loops = new();
@@ -125,15 +129,21 @@ public sealed partial class SoccerClipRig : Node3D
     {
         LoadManifest();
         GD.Print($"[SoccerClipRig] Loading GLB from {GlbPath}, exists={Godot.FileAccess.FileExists(GlbPath)}");
-        var doc = new GltfDocument();
-        var state = new GltfState();
-        var err = doc.AppendFromFile(GlbPath, state);
-        if (err != Error.Ok)
+        // The GLB (several realistic identities, ~15 MB) is parsed once and every player's
+        // scene generated from the same state.
+        if (_gltfState == null)
         {
-            GD.PrintErr($"[SoccerClipRig] AppendFromFile failed: {err}");
-            return false;
+            _gltfDoc = new GltfDocument();
+            var st = new GltfState();
+            var err = _gltfDoc.AppendFromFile(GlbPath, st);
+            if (err != Error.Ok)
+            {
+                GD.PrintErr($"[SoccerClipRig] AppendFromFile failed: {err}");
+                return false;
+            }
+            _gltfState = st;
         }
-        var scene = doc.GenerateScene(state) as Node3D;
+        var scene = _gltfDoc!.GenerateScene(_gltfState) as Node3D;
         if (scene == null)
         {
             GD.PrintErr("[SoccerClipRig] GenerateScene returned null");
@@ -147,7 +157,10 @@ public sealed partial class SoccerClipRig : Node3D
         _styleLean = 0.8f + (Math.Abs(h / 7) % 100) / 100f * 0.4f;
         Player = FindFirst<AnimationPlayer>(scene);
         Skel = FindFirst<Skeleton3D>(scene);
-        Mesh = FindFirst<MeshInstance3D>(scene);
+        _meshes.Clear();
+        foreach (var n in scene.FindChildren("*", "MeshInstance3D", true, false))
+            if (n is MeshInstance3D mi) _meshes.Add(mi);
+        Mesh = _meshes.Count > 0 ? _meshes[0] : null;
         if (Player == null || Skel == null || Mesh == null)
         {
             GD.PrintErr($"[SoccerClipRig] Missing nodes: Player={Player != null}, Skel={Skel != null}, Mesh={Mesh != null}");
@@ -161,6 +174,7 @@ public sealed partial class SoccerClipRig : Node3D
                 anim.LoopMode = _loops.Contains(name)
                     ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
         }
+        ApplyVariant(spec);
         Tint(spec);
         SetArchetype(spec.Archetype);
         float s = _height > 0.01f ? spec.Height / _height : 1f;
@@ -204,34 +218,79 @@ public sealed partial class SoccerClipRig : Node3D
         catch (Exception) { /* fallback aliases above still cover the core actions */ }
     }
 
-    /// <summary>Retint the GLB kit materials from the character spec (per club).</summary>
+    /// <summary>Which identity prefix ("v0_") a player shows: stable per character Id,
+    /// so the same player always has the same face.</summary>
+    public static string VariantFor(CharacterSpec spec, IReadOnlyList<string> prefixes)
+    {
+        if (prefixes.Count == 0) return "";
+        int h = 7;
+        foreach (char c in spec.Id ?? spec.Name ?? "") h = unchecked(h * 31 + c);
+        return prefixes[(int)((uint)h % (uint)prefixes.Count)];
+    }
+
+    /// <summary>Realistic GLB: show one identity per player (all ship in the file; hidden ones cost nothing).</summary>
+    private void ApplyVariant(CharacterSpec spec)
+    {
+        var prefixes = new List<string>();
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (n.Length > 3 && n[0] == 'v' && char.IsDigit(n[1]) && n[2] == '_' && !prefixes.Contains(n[..3])) prefixes.Add(n[..3]);
+        }
+        prefixes.Sort(StringComparer.Ordinal);
+        string pick = VariantFor(spec, prefixes);
+        if (pick == "") return;
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (n.Length > 3 && n[0] == 'v' && n[2] == '_') mi.Visible = n.StartsWith(pick);
+        }
+        foreach (var mi in _meshes) if (mi.Visible) { Mesh = mi; break; }
+    }
+
+    /// <summary>Club / character colour for a material name, or null to keep it as authored:
+    /// kit slots take the club colours, the hair family the player's hair colour, a flat
+    /// sculpt "skin" the skin tone; realistic skin and eye atlases stay natural.</summary>
+    public static string? TintHexFor(string layer, CharacterSpec spec)
+    {
+        switch (layer)
+        {
+            case "jersey": return spec.KitPrimary;
+            case "shorts": return spec.ShortsColor;
+            case "socks": return spec.SocksColor;
+            case "boots": return spec.BootsColor;
+            case "hair": case "beard_shell": case "facial_hair": return spec.HairColor;
+            case "skin": return spec.SkinHex;
+        }
+        if (layer.StartsWith("hair_") || layer.StartsWith("eyebrows_") || layer.StartsWith("eyelashes_")) return spec.HairColor;
+        return null;
+    }
+
+    /// <summary>Retint the GLB materials from the character spec (per club), by material name.</summary>
     public void Tint(CharacterSpec spec)
     {
-        if (Mesh?.Mesh == null) return;
-        for (int i = 0; i < Mesh.Mesh.GetSurfaceCount(); i++)
+        foreach (var mi in _meshes)
         {
-            string layer = i < _materialOrder.Count ? _materialOrder[i] : "";
-            string hex = layer switch
+            if (mi.Mesh == null) continue;
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
             {
-                "skin" => spec.SkinHex,
-                "jersey" => spec.KitPrimary,
-                "shorts" => spec.ShortsColor,
-                "socks" => spec.SocksColor,
-                "boots" => spec.BootsColor,
-                "hair" => spec.HairColor,
-                _ => "#888888",
-            };
-            var src = Mesh.GetSurfaceOverrideMaterial(i) ?? Mesh.Mesh.SurfaceGetMaterial(i);
-            if (src is not StandardMaterial3D std) continue;
-            var mat = (StandardMaterial3D)std.Duplicate();
-            mat.AlbedoColor = CharacterRig.C(hex);
-            mat.Roughness = layer is "boots" or "hair" ? .34f : .68f;
-            mat.MetallicSpecular = .38f;
-            mat.RimEnabled = layer is "skin" or "jersey" or "shorts" or "socks";
-            mat.Rim = .22f;
-            mat.RimTint = .30f;
-            mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-            Mesh.SetSurfaceOverrideMaterial(i, mat);
+                var src = mi.GetSurfaceOverrideMaterial(i) ?? mi.Mesh.SurfaceGetMaterial(i);
+                if (src is not StandardMaterial3D std) continue;
+                string layer = std.ResourceName ?? "";
+                if (layer == "" && _materialOrder.Count > i) layer = _materialOrder[i];   // older sculpt GLBs
+                string? hex = TintHexFor(layer, spec);
+                if (hex == null) continue;
+                var mat = (StandardMaterial3D)std.Duplicate();
+                mat.AlbedoColor = CharacterRig.C(hex);
+                bool kit = layer is "jersey" or "shorts" or "socks";
+                mat.Roughness = layer is "boots" ? .34f : kit ? .68f : mat.Roughness;
+                mat.MetallicSpecular = .38f;
+                mat.RimEnabled = kit || layer == "skin";
+                mat.Rim = .22f;
+                mat.RimTint = .30f;
+                if (kit || layer is "skin" or "boots") mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                mi.SetSurfaceOverrideMaterial(i, mat);
+            }
         }
     }
 

@@ -54,6 +54,25 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.28: textured multi-part GLBs - realistic players on a game skeleton (fed back from Arena FC)
+
+`rigrec.write_glb_parts(rig, path, parts, materials, images, clips)` writes one skinned GLB with
+several textured mesh parts on one skeleton, each part its own node.
+
+- **Use:** a game can ship several player identities in one file, show one per player and hide the rest.
+- **Kept per part:** smooth per-vertex normals and UVs.
+- **Materials:** hair, lashes and beard shells can be alpha-masked and double-sided.
+- **Textures:** mip-mapped with linear filtering. Images may be JPEG, which keeps opaque skin atlases small.
+
+Arena FC uses it to put the realistic MakeHuman squad (real skin, eye, hair and beard atlases) onto its
+18-bone animation skeleton. The steps are the same as for the sculpt:
+1. Collapse the weights from 52 bones to 18.
+2. Conform the mesh to the bind pose with `sforge.bindconform`.
+
+Every retargeted clip then plays on the realistic body.
+
+Test: `python tools/test_glb_parts.py`.
+
 ## New in v11.27: hurling, Aussie rules and rugby; the hurley and helmet; rugby and guernsey kits
 
 ### Three new game packs
