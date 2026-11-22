@@ -44,22 +44,37 @@
   "skin_v6",
   "eyes_brownlight",
   "eyebrows_eyebrow009",
-  "hair_afro01"
+  "hair_afro01",
+  "skin_v3",
+  "hair_ponytail01",
+  "skin_v4",
+  "eyes_blue",
+  "skin_v7",
+  "eyes_grey",
+  "skin_v8"
  ],
  "look": "realistic",
  "variants": [
   "v0",
   "v1",
   "v2",
+  "v3",
+  "v4",
   "v5",
-  "v6"
+  "v6",
+  "v7",
+  "v8"
  ],
  "variant_prefixes": [
   "v0_",
   "v1_",
   "v2_",
+  "v3_",
+  "v4_",
   "v5_",
-  "v6_"
+  "v6_",
+  "v7_",
+  "v8_"
  ],
  "browser_look": "sculpt",
  "layer_slots": {
@@ -6840,5 +6855,6 @@
    "assistant": "one per touchline, each owning one half: level with the second-last defender of the side defending his half (or the ball if it is nearer the goal line), on the line, facing the pitch; sidesteps, sprints when play breaks.",
    "fourth": "between the technical areas at the halfway line; holds up the board for substitutions and added time."
   }
- }
+ },
+ "skin_shading": "textures/skin/materials.json"
 }
