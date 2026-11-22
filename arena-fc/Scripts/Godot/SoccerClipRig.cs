@@ -255,6 +255,27 @@ public sealed partial class SoccerClipRig : Node3D
             }
             if (root.TryGetProperty("stats", out var stats) && stats.TryGetProperty("height_m", out var h))
                 _height = h.GetSingle();
+            if (_lodParts == null && root.TryGetProperty("lod", out var lod))
+            {
+                var parts = new Dictionary<string, int[]>();
+                if (lod.TryGetProperty("parts", out var lp))
+                    foreach (var q in lp.EnumerateObject())
+                    {
+                        var row = new List<int>();
+                        foreach (var x in q.Value.EnumerateArray()) row.Add(x.GetInt32());
+                        parts[q.Name] = row.ToArray();
+                    }
+                var dist = new Dictionary<string, float[]>();
+                if (lod.TryGetProperty("distances_m", out var dm))
+                    foreach (var q in dm.EnumerateObject())
+                    {
+                        var d = new List<float>();
+                        foreach (var x in q.Value.EnumerateArray()) d.Add(x.GetSingle());
+                        dist[q.Name] = d.ToArray();
+                    }
+                _lodDistances = dist;
+                _lodParts = parts;
+            }
         }
         catch (Exception) { /* fallback aliases above still cover the core actions */ }
     }
@@ -331,10 +352,51 @@ public sealed partial class SoccerClipRig : Node3D
                 mi.Visible = n.StartsWith(pick) && (spec.IsKeeper || !IsKeeperOnly(n));
         }
         foreach (var mi in _meshes) if (mi.Visible) { Mesh = mi; break; }
+        ApplyLods(pick);
     }
 
+    // ---- Levels of detail (Sprite Forge skinlod v11.38, Tools/add_lods.py) ----
+    private static Dictionary<string, int[]>? _lodParts;
+    private static Dictionary<string, float[]>? _lodDistances;
+
+    /// <summary>Switch distances (m) for the current quality tier: full detail up close and in replays,
+    /// then about 45% and 20% of the triangles.</summary>
+    public static float[] LodDistances()
+    {
+        string tier = RenderProfile.Tier switch { RenderTier.Ultra => "ultra", RenderTier.High => "high", _ => "performance" };
+        if (_lodDistances != null && _lodDistances.TryGetValue(tier, out var d) && d.Length >= 2) return d;
+        return new[] { 16f, 36f };
+    }
+
+    /// <summary>Visibility ranges on the identity's meshes: each part's base mesh, its _lod1 and _lod2 nodes
+    /// hand over at the tier's distances (a part dropped from a level just ends there).</summary>
+    private void ApplyLods(string pick)
+    {
+        if (_lodParts == null || pick == "") return;
+        var dist = LodDistances();
+        float At(int level) => level <= 0 ? 0f : level - 1 < dist.Length ? dist[level - 1] : float.MaxValue;
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (!n.StartsWith(pick)) continue;
+            string rest = n[pick.Length..];
+            int level = 0;
+            int at = rest.LastIndexOf("_lod", StringComparison.Ordinal);
+            if (at > 0 && int.TryParse(rest[(at + 4)..], out int k)) { level = k; rest = rest[..at]; }
+            if (!_lodParts.TryGetValue(rest, out var row)) continue;
+            int next = -1;
+            for (int m = level + 1; m <= row.Length; m++) if (row[m - 1] != 0) { next = m; break; }
+            mi.VisibilityRangeBegin = At(level);
+            mi.VisibilityRangeBeginMargin = level > 0 ? 1.5f : 0f;
+            mi.VisibilityRangeEnd = next > 0 ? At(next) : 0f;          // 0 = no end
+            mi.VisibilityRangeEndMargin = next > 0 ? 1.5f : 0f;
+        }
+        if (!_lodLogged) { _lodLogged = true; GD.Print($"ARENA_FC_LOD tier={RenderProfile.Tier} switch={dist[0]}m/{dist[1]}m parts={_lodParts.Count}"); }
+    }
+    private static bool _lodLogged;
+
     /// <summary>Goalkeeper-only garments (Sprite Forge tailor.keeper_garments): long-sleeved base layer, gloves.</summary>
-    private static bool IsKeeperOnly(string node) => node.EndsWith("_sleeves") || node.EndsWith("_gloves");
+    private static bool IsKeeperOnly(string node) => node.Contains("_sleeves") || node.Contains("_gloves");
 
     /// <summary>Club / character colour for a material name, or null to keep it as authored:
     /// kit slots take the club colours, the hair family the player's hair colour, a flat
