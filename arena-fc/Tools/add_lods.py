@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Bake two levels of detail for every squad identity into Data/models/soccer_player.glb (Sprite Forge
-skinlod v11.37).  Each part gets `<part>_lod1` / `<part>_lod2` nodes on the same skin and material; the
+skinlod v11.38).  Each part gets `<part>_lod1` / `<part>_lod2` nodes on the same skin and material; the
 manifest records which levels exist per part and the switch distances per quality tier, and SoccerClipRig
 sets the visibility ranges.
 
@@ -49,7 +49,7 @@ def main() -> int:
         print("  %s %d -> %s tris (%.0fs)" % (pre, tri0, " / ".join(map(str, tri)), time.time() - t0))
     n = T.replace_parts(GLB, GLB, by_prefix)
     print("wrote %s (%.1f MB)" % (GLB, n / 1e6))
-    man["lod"] = {"sprite_forge": "v11.37 sforge.skinlod", "parts": table,
+    man["lod"] = {"sprite_forge": "v11.38 sforge.skinlod", "parts": table,
                   "distances_m": {k: list(v) for k, v in SL.LOD_PLAN["distances_m"].items()}}
     with open(MANIFEST, "w") as f:
         json.dump(man, f, indent=1)

@@ -355,7 +355,7 @@ public sealed partial class SoccerClipRig : Node3D
         ApplyLods(pick);
     }
 
-    // ---- Levels of detail (Sprite Forge skinlod v11.37, Tools/add_lods.py) ----
+    // ---- Levels of detail (Sprite Forge skinlod v11.38, Tools/add_lods.py) ----
     private static Dictionary<string, int[]>? _lodParts;
     private static Dictionary<string, float[]>? _lodDistances;
 
@@ -575,7 +575,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.35) ----------------------------------------
+    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.36) ----------------------------------------
     private static Texture2D? _skinDetailN, _skinDetailR;
     private static readonly Dictionary<string, StandardMaterial3D> _shaded = new();
 

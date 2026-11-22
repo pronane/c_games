@@ -6448,9 +6448,9 @@
  },
  "skin_shading": "textures/skin/materials.json",
  "kit_atlas": "textures/kit/kit_layout.json",
- "sprite_forge_tailor": "v11.36 sforge.tailor (flutter, keeper garments) + sforge.kitdesign",
+ "sprite_forge_tailor": "v11.37 sforge.tailor (flutter, keeper garments) + sforge.kitdesign",
  "lod": {
-  "sprite_forge": "v11.37 sforge.skinlod",
+  "sprite_forge": "v11.38 sforge.skinlod",
   "parts": {
    "body": [
     1,
