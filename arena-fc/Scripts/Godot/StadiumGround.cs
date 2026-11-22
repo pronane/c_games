@@ -32,9 +32,9 @@ public partial class Stadium
     /// <summary>Spectators drawn for a quality tier (the seat map holds 6-19k seats).</summary>
     public static int CrowdBudget(QualityPreset q) => q switch
     {
-        QualityPreset.Low => 1800,
-        QualityPreset.Medium => 4500,
-        _ => 9000,
+        QualityPreset.Low => 1500,
+        QualityPreset.Medium => 3500,
+        _ => 6000,         // ~690k triangles at 114 each
     };
 
     private bool BuildSpriteForgeGround(StadiumInfo info, QualityPreset q, bool fullCrowd)
