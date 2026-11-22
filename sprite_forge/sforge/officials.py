@@ -319,15 +319,22 @@ def _write(gl, b, path):
 
 # ------------------------------------------------------------------ append clips to an existing GLB
 def append_clips(glb_in, glb_out, rig, clips, root_motion="inplace", replace=True):
-    """Add baked clips (rigrec.Clip on `rig`, whose bone i is node i of the GLB - the layout every
-    Sprite Forge GLB is written in) to a skinned GLB, keeping every mesh, material, image and the
-    animations already in it.  A clip with a name that is already there replaces it (replace=True)."""
+    """Add baked clips (rigrec.Clip on `rig`) to a skinned GLB, keeping every mesh, material,
+    image and the animations already in it.  A clip with a name that is already there replaces it
+    (replace=True).  Channels are bound to the GLB node whose name matches the rig bone, so GLBs
+    whose node order differs from skin-joint order (e.g. an extra container node up front) work
+    unchanged; the old bone-index == node-index requirement no longer applies."""
     from .glbpack import _Out, read_glb
     from .rigrec import strip_root_motion
     j, buf = read_glb(glb_in)
-    for i, b in enumerate(rig.bones):
-        if j["nodes"][i].get("name") != b:
-            raise ValueError("GLB node %d is %r, rig bone is %r" % (i, j["nodes"][i].get("name"), b))
+    node_names = [nd.get("name") for nd in j["nodes"]]
+    dst_index = {}
+    for i, n in enumerate(node_names):
+        if n not in dst_index:
+            dst_index[n] = i
+    missing = [b for b in rig.bones if b not in dst_index]
+    if missing:
+        raise ValueError("GLB nodes do not cover rig bones: %s" % missing[:8])
     out = _Out()
     amap = {}
 
@@ -367,11 +374,12 @@ def append_clips(glb_in, glb_out, rig, clips, root_motion="inplace", replace=Tru
         T = strip_root_motion(rig, c) if root_motion == "inplace" else c.T
         ch, sm = [], []
         for i in range(rig.nb):
+            node = dst_index[rig.bones[i]]
             sm.append({"input": ta, "output": out.add(c.R[:, i].astype(np.float32), 5126, "VEC4"), "interpolation": "LINEAR"})
-            ch.append({"sampler": len(sm) - 1, "target": {"node": i, "path": "rotation"}})
+            ch.append({"sampler": len(sm) - 1, "target": {"node": node, "path": "rotation"}})
             if i == hips or rig.parent[i] < 0:
                 sm.append({"input": ta, "output": out.add(T[:, i].astype(np.float32), 5126, "VEC3"), "interpolation": "LINEAR"})
-                ch.append({"sampler": len(sm) - 1, "target": {"node": i, "path": "translation"}})
+                ch.append({"sampler": len(sm) - 1, "target": {"node": node, "path": "translation"}})
         anims.append({"name": cn, "channels": ch, "samplers": sm})
     imgs = []
     for im in j.get("images", []):
