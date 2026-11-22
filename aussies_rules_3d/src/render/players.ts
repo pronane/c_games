@@ -27,6 +27,8 @@ export interface PlayerView {
   flashRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   /** Always-on overhead marker for the controlled player — visible in a scrum. */
   chevron: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
+  /** Ground-hugging blob shadow (fades with jump height; counter-set in sync). */
+  shadow: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 }
 
 export interface Teams {
@@ -66,6 +68,25 @@ function luminance(hex: string): number {
   const n = parseInt(hex.replace('#', ''), 16);
   const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+let shadowTex: THREE.CanvasTexture | null = null;
+
+/** Soft radial blob used for contact shadows (one texture, shared by everyone). */
+function getShadowTexture(): THREE.CanvasTexture {
+  if (shadowTex) return shadowTex;
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(0.62, 'rgba(0,0,0,0.28)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  shadowTex = new THREE.CanvasTexture(c);
+  return shadowTex;
 }
 
 function numberTexture(number: number, primary: string): THREE.CanvasTexture {
@@ -229,6 +250,21 @@ export function createPlayerViews(
     chevron.visible = false;
     root.add(chevron);
 
+    // blob contact shadow — cheap, grounds the player at broadcast distance
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1.32, 20),
+      new THREE.MeshBasicMaterial({
+        map: getShadowTexture(),
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+      })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.02;
+    shadow.renderOrder = 1;
+    root.add(shadow);
+
     views.set(p.id, {
       root,
       mixer,
@@ -242,6 +278,7 @@ export function createPlayerViews(
       targetRing,
       flashRing,
       chevron,
+      shadow,
     });
   }
   return views;
@@ -383,6 +420,11 @@ export function syncPlayerViews(
     }
 
     view.root.position.set(p.x, p.y, p.z);
+    // shadow stays on the turf and fades as the player leaves it
+    const jump = Math.max(0, p.y);
+    view.shadow.position.y = 0.02 - p.y;
+    view.shadow.material.opacity = Math.max(0.09, 0.42 - jump * 0.24);
+    view.shadow.scale.setScalar(1 + jump * 0.35);
     // the model faces -Z in glTF; sim facing is radians where 0 = +x
     view.root.rotation.y = -p.facing - Math.PI / 2;
     view.mixer.update(dt);

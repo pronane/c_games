@@ -12,7 +12,7 @@ import type { PlayerState } from './rules/types';
 import { RulesEngine } from './rules/engine';
 import { AFL_SETTINGS, MatchEvent, MatchSettings, scoreString } from './rules/types';
 import { BroadcastCamera } from './render/camera';
-import { createWorld, drawScoreboard, World } from './render/scene';
+import { createWorld, drawScoreboard, updateLedScorebug, World } from './render/scene';
 import {
   createPlayerViews,
   syncPlayerViews,
@@ -57,6 +57,7 @@ class Game {
   sim: MatchSim | null = null;
   views = new Map<number, PlayerView>();
   ballMesh!: THREE.Group;
+  ballShadow!: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   broadcast!: BroadcastCamera;
   input = new InputManager($('game'));
   audio = new MatchAudio();
@@ -110,6 +111,26 @@ class Game {
     // AFL Sherrin is ~27 cm long — the raw GLB is modelled ~1.45 m, scale it down.
     this.ballMesh.scale.setScalar(0.19);
     this.world.scene.add(this.ballMesh);
+    // soft blob under the ball — reads at broadcast distance, survives flight
+    const cnv = document.createElement('canvas');
+    cnv.width = 64;
+    cnv.height = 64;
+    const g2d = cnv.getContext('2d')!;
+    const grad = g2d.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(0,0,0,0.6)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.25)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g2d.fillStyle = grad;
+    g2d.fillRect(0, 0, 64, 64);
+    const ballShadowTex = new THREE.CanvasTexture(cnv);
+    this.ballShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.42, 16),
+      new THREE.MeshBasicMaterial({ map: ballShadowTex, transparent: true, depthWrite: false })
+    );
+    this.ballShadow.rotation.x = -Math.PI / 2;
+    this.ballShadow.position.y = 0.022;
+    this.ballShadow.renderOrder = 1;
+    this.world.scene.add(this.ballShadow);
 
     this.menus.setLoading(0.95, 'Ready.');
     this.setupMenus();
@@ -271,6 +292,10 @@ class Game {
     const b = sim.state.ball;
     syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true);
     this.ballMesh.position.set(b.x, b.y, b.z);
+    this.ballShadow.position.set(b.x, 0.022, b.z);
+    const air = Math.max(0, b.y - 0.11);
+    this.ballShadow.material.opacity = Math.max(0.06, 0.5 - air * 0.045);
+    this.ballShadow.scale.setScalar(1 + air * 0.08);
     this.broadcast.update(dt, sim.state, b.x, b.z);
     this.world.update(dt, b);
     this.scoreboardTimer -= dt;
@@ -298,6 +323,15 @@ class Game {
         `${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
       );
     }
+    updateLedScorebug(
+      this.world.led,
+      teams.home.name,
+      teams.away.name,
+      scoreString(s.scores[0]),
+      scoreString(s.scores[1]),
+      s.clock.quarter,
+      `Q${s.clock.quarter} ${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
+    );
   }
 
   /** White ring that shrinks around whichever player control just moved to. */
@@ -541,6 +575,10 @@ class Game {
     // ball mesh
     const b = sim.state.ball;
     this.ballMesh.position.set(b.x, b.y, b.z);
+    this.ballShadow.position.set(b.x, 0.022, b.z);
+    const air = Math.max(0, b.y - 0.11);
+    this.ballShadow.material.opacity = Math.max(0.06, 0.5 - air * 0.045);
+    this.ballShadow.scale.setScalar(1 + air * 0.08);
     if (b.mode === 'loose') {
       this.ballMesh.rotation.x += b.vy * dt * 1.2;
       this.ballMesh.rotation.z += b.vx * dt * 0.8;

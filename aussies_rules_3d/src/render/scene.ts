@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FIELD } from '../rules/types';
 
 export interface World {
@@ -13,7 +14,24 @@ export interface World {
   sun: THREE.DirectionalLight;
   stadium: THREE.Group;
   screens: { mesh: THREE.Mesh; texture: THREE.CanvasTexture; canvas: HTMLCanvasElement }[];
+  led: LedBoards;
   update(dt: number, ball: { x: number; y: number; z: number }): void;
+}
+
+export interface LedBoards {
+  mesh: THREE.Group;
+  canvas: HTMLCanvasElement;
+  texture: THREE.CanvasTexture;
+  /** Seconds accumulated since the last sponsor rotation. */
+  time: number;
+  sponsor: number;
+  /** Latest scorebug values, so sponsor rotations can redraw the whole ribbon. */
+  home: string;
+  away: string;
+  homeScore: string;
+  awayScore: string;
+  quarter: number;
+  clock: string;
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
@@ -280,11 +298,126 @@ function makeScreens(stadium: THREE.Group): World['screens'] {
   return screens;
 }
 
+
+// -------------------------------------------------------------- led boards
+
+/** Fictional sponsors only — nothing real, nothing trademarked. */
+const LED_SPONSORS = [
+  'SOUTHERN CROSS TOURS',
+  'YARRA POWER',
+  'KOOKABURRA SAFE',
+  'PUNT & RUN',
+  'MELBOURNE MOTORS',
+  'BIG W CHICKEN',
+  'LAUNCESTON LEADLIGHT',
+  'AUSSIE RULES FM',
+];
+const LED_ROTATE_SECONDS = 3.75;
+
+export function drawLedBoard(boards: LedBoards): void {
+  const g = boards.canvas.getContext('2d')!;
+  const { width: W, height: H } = boards.canvas;
+  // Ribbon background: deep navy with a subtle diagonal sweep so it reads as an
+  // LED panel, not a flat sign.
+  g.fillStyle = '#060b16';
+  g.fillRect(0, 0, W, H);
+  const grad = g.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, 'rgba(46,80,140,0.28)');
+  grad.addColorStop(0.5, 'rgba(10,18,34,0)');
+  grad.addColorStop(1, 'rgba(46,80,140,0.28)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, W, H);
+
+  // Thin amber rails, top and bottom.
+  g.fillStyle = '#ffb43a';
+  g.fillRect(0, 6, W, 4);
+  g.fillRect(0, H - 10, W, 4);
+
+  // Sponsor, left of centre.
+  g.fillStyle = '#ffffff';
+  g.font = 'bold 58px system-ui, sans-serif';
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillText(LED_SPONSORS[boards.sponsor % LED_SPONSORS.length], 34, H / 2 + 2);
+
+  // Live scorebug, right of centre.
+  const bug = `${boards.home.toUpperCase()} ${boards.homeScore}   ·   ${boards.away.toUpperCase()} ${boards.awayScore}`;
+  g.textAlign = 'right';
+  g.font = 'bold 46px system-ui, sans-serif';
+  g.fillStyle = '#ffd23f';
+  g.fillText(bug, W - 34, H / 2 + 2);
+
+  boards.texture.needsUpdate = true;
+}
+
+function makeLedBoards(scene: THREE.Scene): LedBoards {
+  const SEGS = 72;
+  const OFFSET = 4.6;         // metres beyond the boundary superellipse
+  const HEIGHT = 1.04;        // board height
+  const Y = HEIGHT / 2 + 0.06;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 128;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+
+  const boards: LedBoards = {
+    mesh: new THREE.Group(),
+    canvas,
+    texture,
+    time: 0,
+    sponsor: 0,
+    home: 'HOME',
+    away: 'AWAY',
+    homeScore: '0.0.0',
+    awayScore: '0.0.0',
+    quarter: 1,
+    clock: '20:00',
+  };
+  drawLedBoard(boards);
+
+  const mat = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+  const group = boards.mesh;
+  for (let i = 0; i < SEGS; i++) {
+    const t0 = (i / SEGS) * Math.PI * 2;
+    const t1 = ((i + 1) / SEGS) * Math.PI * 2;
+    const pt = (t: number) => {
+      const c = Math.cos(t);
+      const s = Math.sin(t);
+      return new THREE.Vector3(
+        Math.sign(c) * Math.pow(Math.abs(c), 2 / FIELD.shapeN) * (FIELD.boundaryA + OFFSET),
+        Y,
+        Math.sign(s) * Math.pow(Math.abs(s), 2 / FIELD.shapeN) * (FIELD.boundaryB + OFFSET)
+      );
+    };
+    const a = pt(t0);
+    const b = pt(t1);
+    const chord = a.distanceTo(b);
+    const seg = new THREE.Mesh(new THREE.PlaneGeometry(chord * 1.06, HEIGHT), mat);
+    seg.position.copy(a).add(b).multiplyScalar(0.5);
+    seg.lookAt(0, Y, 0);
+    group.add(seg);
+  }
+  scene.add(group);
+  return boards;
+}
+
 // -------------------------------------------------------------------- world
 
 export async function createWorld(canvas: HTMLCanvasElement): Promise<World> {
   const renderer = createRenderer(canvas);
+  // Image-based lighting from a generated room environment: gives the PBR
+  // materials (skin, boots, kit sheen, screens) something to reflect. The
+  // PMREM is generated once at startup — no runtime cost, no HDR asset.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+
   const scene = new THREE.Scene();
+  scene.environment = envMap;
+  scene.environmentIntensity = 0.45;
   const camera = new THREE.PerspectiveCamera(
     46,
     window.innerWidth / window.innerHeight,
@@ -333,6 +466,7 @@ export async function createWorld(canvas: HTMLCanvasElement): Promise<World> {
 
   makeCrowd(scene);
   const screens = makeScreens(stadium);
+  const led = makeLedBoards(scene);
 
   const world: World = {
     renderer,
@@ -341,14 +475,40 @@ export async function createWorld(canvas: HTMLCanvasElement): Promise<World> {
     sun,
     stadium,
     screens,
+    led,
     update(dt: number, ball: { x: number; y: number; z: number }) {
       // keep the shadow frustum around the action
       sun.target.position.set(ball.x, 0, ball.z);
       sun.position.set(ball.x + 120, 150, ball.z - 110);
-      void dt;
+      // rotate the LED ribbon sponsor on a fixed cadence
+      led.time += dt;
+      if (led.time >= LED_ROTATE_SECONDS) {
+        led.time = 0;
+        led.sponsor = (led.sponsor + 1) % LED_SPONSORS.length;
+        drawLedBoard(led);
+      }
     },
   };
   return world;
+}
+
+/** Refresh the LED ribbon's live scorebug (call wherever the scoreboard redraws). */
+export function updateLedScorebug(
+  boards: LedBoards,
+  home: string,
+  away: string,
+  homeScore: string,
+  awayScore: string,
+  quarter: number,
+  clock: string
+): void {
+  boards.home = home;
+  boards.away = away;
+  boards.homeScore = homeScore;
+  boards.awayScore = awayScore;
+  boards.quarter = quarter;
+  boards.clock = clock;
+  drawLedBoard(boards);
 }
 
 export function drawScoreboard(

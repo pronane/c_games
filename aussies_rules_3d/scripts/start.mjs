@@ -9,6 +9,8 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, createReadStream, statSync } from 'node:fs';
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -67,6 +69,28 @@ if (DEV) {
     '.mp3': 'audio/mpeg',
   };
 
+  // Brotli/gzip for the big text + GLB payloads. Purely a transport concern —
+  // bytes on the wire differ, content does not. Compressed once per file and
+  // cached in memory (the dist folder is small; the GLB is the only big file).
+  const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.webmanifest', '.svg', '.glb']);
+  const encCache = new Map();
+  const compressedFor = (file, acceptEncoding) => {
+    const cached = encCache.get(file);
+    if (cached !== undefined) return cached;
+    const raw = readFileSync(file);
+    let out = null;
+    if (acceptEncoding.includes('br')) {
+      out = {
+        buf: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } }),
+        enc: 'br',
+      };
+    } else if (acceptEncoding.includes('gzip')) {
+      out = { buf: zlib.gzipSync(raw, { level: 6 }), enc: 'gzip' };
+    }
+    encCache.set(file, out);
+    return out;
+  };
+
   const server = http.createServer((req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -81,9 +105,22 @@ if (DEV) {
         return;
       }
       const ext = path.extname(file).toLowerCase();
+      const acceptEncoding = String(req.headers['accept-encoding'] ?? '');
+      const hit = ext.length && COMPRESSIBLE.has(ext) && acceptEncoding ? compressedFor(file, acceptEncoding) : null;
+      if (hit && hit.buf.length < statSync(file).size) {
+        res.writeHead(200, {
+          'Content-Type': MIME[ext] ?? 'application/octet-stream',
+          'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+          'Content-Encoding': hit.enc,
+          'Vary': 'Accept-Encoding',
+        });
+        res.end(hit.buf);
+        return;
+      }
       res.writeHead(200, {
         'Content-Type': MIME[ext] ?? 'application/octet-stream',
         'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+        'Vary': 'Accept-Encoding',
       });
       createReadStream(file).pipe(res);
     } catch (err) {
