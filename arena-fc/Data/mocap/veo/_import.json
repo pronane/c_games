@@ -1,0 +1,476 @@
+{
+ "source": "Arena FC own match recordings (Veo) via sforge.matchcapture",
+ "licence": {
+  "spdx": "LicenseRef-owner-footage",
+  "custom_text": "Motion taken from the Arena FC team's own Veo match recordings; the team owns the footage and allows its use in Arena FC and Sprite Forge.",
+  "author": "Arena FC (own match recordings)",
+  "source_url": "",
+  "redistribution": "yes",
+  "attribution": "Real match motion from our own recordings.",
+  "notes": ""
+ },
+ "candidates": 6956,
+ "rejected": {
+  "neither kick nor run": 3033,
+  "not running": 2172,
+  "fit error": 293,
+  "legs hidden": 781,
+  "checks: turning": 59,
+  "shaky": 294,
+  "checks: loop": 17,
+  "small swing": 8,
+  "checks: loop,turning": 6
+ },
+ "takes": [
+  {
+   "name": "vo_strike_01",
+   "take": "match video strike",
+   "loop": false,
+   "category": "Kick",
+   "game_category": "Kick",
+   "ball_state": "Possessed",
+   "duration": 1.2346,
+   "keys": 38,
+   "contact": 0.6216,
+   "foot": "R",
+   "root_velocity": [
+    0.0,
+    0.0
+   ],
+   "fit_err_deg": 1.44,
+   "leg_visibility": 0.712
+  },
+  {
+   "name": "vo_run_01",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.6673,
+   "keys": 21,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.606
+   ],
+   "fit_err_deg": 1.38,
+   "leg_visibility": 0.724
+  },
+  {
+   "name": "vo_run_02",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7341,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.633
+   ],
+   "fit_err_deg": 1.36,
+   "leg_visibility": 0.708
+  },
+  {
+   "name": "vo_run_03",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7007,
+   "keys": 22,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.559
+   ],
+   "fit_err_deg": 1.29,
+   "leg_visibility": 0.693
+  },
+  {
+   "name": "vo_run_04",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7674,
+   "keys": 24,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.39
+   ],
+   "fit_err_deg": 1.55,
+   "leg_visibility": 0.676
+  },
+  {
+   "name": "vo_run_05",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7007,
+   "keys": 22,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.175
+   ],
+   "fit_err_deg": 1.68,
+   "leg_visibility": 0.7
+  },
+  {
+   "name": "vo_run_06",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7674,
+   "keys": 24,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.894
+   ],
+   "fit_err_deg": 1.32,
+   "leg_visibility": 0.649
+  },
+  {
+   "name": "vo_run_07",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7674,
+   "keys": 24,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.894
+   ],
+   "fit_err_deg": 1.32,
+   "leg_visibility": 0.649
+  },
+  {
+   "name": "vo_run_08",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7341,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.86
+   ],
+   "fit_err_deg": 1.26,
+   "leg_visibility": 0.666
+  },
+  {
+   "name": "vo_run_09",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7341,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.86
+   ],
+   "fit_err_deg": 1.26,
+   "leg_visibility": 0.666
+  },
+  {
+   "name": "vo_run_10",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.6673,
+   "keys": 21,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.434
+   ],
+   "fit_err_deg": 1.35,
+   "leg_visibility": 0.687
+  },
+  {
+   "name": "vo_run_11",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7674,
+   "keys": 24,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.526
+   ],
+   "fit_err_deg": 1.63,
+   "leg_visibility": 0.704
+  },
+  {
+   "name": "vo_run_12",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7007,
+   "keys": 22,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.762
+   ],
+   "fit_err_deg": 1.39,
+   "leg_visibility": 0.689
+  },
+  {
+   "name": "vo_run_13",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.9676,
+   "keys": 30,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    1.909
+   ],
+   "fit_err_deg": 1.76,
+   "leg_visibility": 0.661
+  },
+  {
+   "name": "vo_run_14",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7341,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.339
+   ],
+   "fit_err_deg": 1.62,
+   "leg_visibility": 0.685
+  },
+  {
+   "name": "vo_run_15",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.6673,
+   "keys": 21,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.761
+   ],
+   "fit_err_deg": 1.72,
+   "leg_visibility": 0.716
+  },
+  {
+   "name": "vo_run_16",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.634,
+   "keys": 20,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.714
+   ],
+   "fit_err_deg": 1.69,
+   "leg_visibility": 0.652
+  },
+  {
+   "name": "vo_run_17",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.634,
+   "keys": 20,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    3.346
+   ],
+   "fit_err_deg": 1.38,
+   "leg_visibility": 0.637
+  },
+  {
+   "name": "vo_run_18",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.634,
+   "keys": 20,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.984
+   ],
+   "fit_err_deg": 1.78,
+   "leg_visibility": 0.706
+  },
+  {
+   "name": "vo_run_19",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7007,
+   "keys": 22,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.99
+   ],
+   "fit_err_deg": 1.79,
+   "leg_visibility": 0.715
+  },
+  {
+   "name": "vo_run_20",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.634,
+   "keys": 20,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.737
+   ],
+   "fit_err_deg": 1.53,
+   "leg_visibility": 0.666
+  },
+  {
+   "name": "vo_run_21",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7341,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.663
+   ],
+   "fit_err_deg": 1.68,
+   "leg_visibility": 0.667
+  },
+  {
+   "name": "vo_run_22",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.6006,
+   "keys": 19,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    4.183
+   ],
+   "fit_err_deg": 2.2,
+   "leg_visibility": 0.651
+  },
+  {
+   "name": "vo_run_23",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7007,
+   "keys": 22,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.932
+   ],
+   "fit_err_deg": 1.95,
+   "leg_visibility": 0.68
+  },
+  {
+   "name": "vo_run_24",
+   "take": "match video run",
+   "loop": true,
+   "category": "Locomotion",
+   "game_category": "Locomotion",
+   "ball_state": "None",
+   "duration": 0.7341,
+   "keys": 23,
+   "contact": -1.0,
+   "foot": "",
+   "root_velocity": [
+    0.0,
+    2.718
+   ],
+   "fit_err_deg": 1.46,
+   "leg_visibility": 0.658
+  }
+ ]
+}
