@@ -336,7 +336,7 @@ public sealed partial class SoccerClipRig : Node3D
         var edge = Lum(fill) > .5f ? trim.Darkened(.35f) : new Color(1, 1, 1);
         m.SetShaderParameter("print_fill", fill);
         m.SetShaderParameter("print_edge", edge);
-        m.SetShaderParameter("number", Math.Clamp(spec.Number, 1, 99));
+        m.SetShaderParameter("number", Math.Clamp(spec.Number, 0, 99));   // 0: officials, no number
         var glyphs = ShirtGlyphs(spec.DisplayName, out int len);
         m.SetShaderParameter("name_chars", glyphs);
         m.SetShaderParameter("name_len", len);

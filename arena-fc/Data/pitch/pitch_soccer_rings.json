@@ -1,0 +1,19 @@
+{
+ "half": [
+  52.5,
+  34.0
+ ],
+ "margin": 4.0,
+ "size_px": [
+  2712,
+  1824
+ ],
+ "extent": [
+  56.5,
+  38.0
+ ],
+ "sport": "soccer",
+ "mow": "rings",
+ "channels": "R markings, G mowing band, B wear",
+ "version": "11.33"
+}
