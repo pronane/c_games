@@ -800,6 +800,96 @@ def write_glb(rig, path, clips=None, kit=None, extras=None, root_motion="keep", 
     return dict(bones=rig.nb, tris=int(len(rig.F)), clips=len(anims), materials=len(materials), textures=len(textures))
 
 
+def write_glb_parts(rig, path, parts, materials, images, clips=None, root_motion="inplace", extras=None):
+    """v11.28: a skinned GLB with several textured mesh parts on one skeleton (fed back from Arena FC's
+    realistic player).  write_glb writes one flat-shaded mesh; this keeps each part as its own node (so a game
+    can show one identity of several and hide the rest), smooth per-vertex normals, UVs, alpha-masked /
+    double-sided materials (hair, lashes, beard shells) and linear mip-mapped textures.
+
+      parts      [dict(name, V (n,3), N (n,3), UV (n,2), J (n,4) bone indices, W (n,4), F (m,3), material)]
+      materials  [dict(name, image=key or None, color=[r,g,b], alpha="MASK"/None, double=bool, roughness)]
+      images     {key: PNG bytes, or (bytes, mime) - e.g. JPEG skin atlases to keep the file small}
+    """
+    import struct
+    buf = _GBuf()
+    nodes = []
+    L0 = rig.rest_local()
+    for i, b in enumerate(rig.bones):
+        q = quat_from_mats(polar(L0[i, :3, :3]))
+        nodes.append(dict(name=b, translation=[float(x) for x in L0[i, :3, 3]], rotation=[float(x) for x in q]))
+    for i in range(rig.nb):
+        ch = rig.children(i)
+        if ch:
+            nodes[i]["children"] = ch
+    roots = [i for i in range(rig.nb) if rig.parent[i] < 0]
+    scene_nodes = list(roots)
+    imgs, texs, img_index = [], [], {}
+    for key, png in images.items():
+        data, mime = png if isinstance(png, tuple) else (png, "image/png")
+        imgs.append(dict(bufferView=buf.add_raw(data), mimeType=mime, name=key))
+        texs.append(dict(source=len(imgs) - 1, sampler=0)); img_index[key] = len(texs) - 1
+    mats, mat_index = [], {}
+    for m in materials:
+        md = dict(name=m["name"], pbrMetallicRoughness=dict(baseColorFactor=list(m.get("color", [1, 1, 1]))[:3] + [1.0],
+                                                             metallicFactor=0.0, roughnessFactor=float(m.get("roughness", .8))))
+        if m.get("image") in img_index:
+            md["pbrMetallicRoughness"]["baseColorTexture"] = dict(index=img_index[m["image"]])
+        if m.get("alpha") == "MASK":
+            md["alphaMode"] = "MASK"; md["alphaCutoff"] = float(m.get("cutoff", .5))
+        if m.get("double"):
+            md["doubleSided"] = True
+        mats.append(md); mat_index[m["name"]] = len(mats) - 1
+    meshes = []
+    for p in parts:
+        V = np.asarray(p["V"], np.float32); N = np.asarray(p["N"], np.float64)
+        ln = np.linalg.norm(N, axis=1, keepdims=True); N = np.where(ln > 1e-9, N / np.maximum(ln, 1e-9), [0, 1, 0])
+        att = dict(POSITION=buf.add(V, 5126, "VEC3", 34962, minmax=True), NORMAL=buf.add(N.astype(np.float32), 5126, "VEC3", 34962),
+                   JOINTS_0=buf.add(np.asarray(p["J"]).astype(np.uint16), 5123, "VEC4", 34962),
+                   WEIGHTS_0=buf.add(np.asarray(p["W"], np.float32), 5126, "VEC4", 34962))
+        if p.get("UV") is not None:
+            att["TEXCOORD_0"] = buf.add(np.asarray(p["UV"], np.float32), 5126, "VEC2", 34962)
+        F = np.asarray(p["F"])
+        it, ic = (np.uint16, 5123) if len(V) < 65535 else (np.uint32, 5125)
+        ind = buf.add(F.astype(it).reshape(-1), ic, "SCALAR", 34963)
+        meshes.append(dict(name=p["name"], primitives=[dict(attributes=att, indices=ind, material=mat_index[p["material"]], mode=4)]))
+        nodes.append(dict(name=p["name"], mesh=len(meshes) - 1, skin=0))
+        scene_nodes.append(len(nodes) - 1)
+    ibm = inv_rigid(rig.bind)
+    skins = [dict(joints=list(range(rig.nb)), skeleton=roots[0],
+                  inverseBindMatrices=buf.add(np.ascontiguousarray(np.transpose(ibm, (0, 2, 1))).reshape(-1, 16).astype(np.float32), 5126, "MAT4"))]
+    anims = []
+    hips = rig.meta.get("hips_index", 0)
+    clipd = clips if isinstance(clips, dict) else {cn: rig.clips[cn] for cn in (clips if clips is not None else list(rig.clips))}
+    for cn, c in clipd.items():
+        t = (np.arange(c.frames) / c.fps).astype(np.float32)
+        ta = buf.add(t, 5126, "SCALAR", minmax=True)
+        ch, sm = [], []
+        T = strip_root_motion(rig, c) if root_motion == "inplace" else c.T
+        for i in range(rig.nb):
+            sm.append(dict(input=ta, output=buf.add(c.R[:, i].astype(np.float32), 5126, "VEC4"), interpolation="LINEAR"))
+            ch.append(dict(sampler=len(sm) - 1, target=dict(node=i, path="rotation")))
+            if np.ptp(T[:, i], axis=0).max() > 1e-6 or i == hips or rig.parent[i] < 0:
+                sm.append(dict(input=ta, output=buf.add(T[:, i].astype(np.float32), 5126, "VEC3"), interpolation="LINEAR"))
+                ch.append(dict(sampler=len(sm) - 1, target=dict(node=i, path="translation")))
+        anims.append(dict(name=cn, channels=ch, samplers=sm))
+    gl = dict(asset=dict(version="2.0", generator="Sprite Forge Studio write_glb_parts"), scene=0,
+              scenes=[dict(nodes=scene_nodes)], nodes=nodes, meshes=meshes, materials=mats, skins=skins, animations=anims)
+    if imgs:
+        gl.update(images=imgs, textures=texs, samplers=[dict(magFilter=9729, minFilter=9987)])
+    if extras:
+        gl["asset"]["extras"] = extras
+    buf.finish(gl)
+    js = json.dumps(gl, separators=(",", ":")).encode()
+    js += b" " * ((4 - len(js) % 4) % 4)
+    bin_ = bytes(buf.data); bin_ += b"\0" * ((4 - len(bin_) % 4) % 4)
+    with open(path, "wb") as f:
+        f.write(struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(bin_)))
+        f.write(struct.pack("<II", len(js), 0x4E4F534A)); f.write(js)
+        f.write(struct.pack("<II", len(bin_), 0x004E4942)); f.write(bin_)
+    return dict(bones=rig.nb, parts=len(parts), tris=int(sum(len(p["F"]) for p in parts)), clips=len(anims),
+                materials=len(mats), textures=len(texs))
+
+
 def strip_root_motion(rig, c):
     """translations with the hips' horizontal travel removed (in-place loop)."""
     hips = rig.meta.get("hips_index", 0)

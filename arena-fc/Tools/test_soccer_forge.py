@@ -120,31 +120,33 @@ def main():
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))
-        check("GLB has 6 flat kit materials",
-              [m.get("name") for m in j.get("materials", [])] == ["skin", "jersey", "shorts", "socks", "boots", "hair"],
-              str([m.get("name") for m in j.get("materials", [])]))
-        check("GLB mesh has 6 primitives (one per layer)",
-              len(j["meshes"][0]["primitives"]) == 6)
-        prims = j["meshes"][0]["primitives"]
-        prim = prims[0]
-        pos_accs = [j["accessors"][p["attributes"]["POSITION"]] for p in prims]
-        gmin = [min(a["min"][k] for a in pos_accs) for k in range(3)]
-        gmax = [max(a["max"][k] for a in pos_accs) for k in range(3)]
-        check("mesh stands on the ground (min y ~ 0)", abs(gmin[1]) < 0.01, str(gmin))
-        check("mesh height ~1.77 m", 1.6 < gmax[1] < 1.95, str(gmax))
-        # Regression: fmat was once fed per-vertex layers, truncating the GLB
-        # to a half-body mesh with scrambled materials.  Guard the full body,
-        # the tri budget, and regional kit layers.
-        check("GLB mesh is full-body (x spans both sides)",
-              gmin[0] < -0.2 and gmax[0] > 0.2, "%s..%s" % (gmin[0], gmax[0]))
-        glb_tris = sum(a["count"] for a in pos_accs) // 3
-        check("GLB carries the full tri budget", 14000 <= glb_tris <= 18000, str(glb_tris))
-        jersey_acc = pos_accs[1]
-        check("jersey layer sits on the torso",
-              jersey_acc["min"][1] > 0.5 and jersey_acc["max"][1] < 1.65,
+        # Realistic look (ported from #133): the MakeHuman squad's identities, one mesh node per
+        # part ("v0_body", "v0_jersey" ...), on Arena's 18 bones; kit slots flat (tinted per club),
+        # skin / eye / hair atlases embedded.
+        mats = [m.get("name") for m in j.get("materials", [])]
+        check("GLB has the four flat kit materials and textured skin", all(k in mats for k in ("jersey", "shorts", "socks", "boots"))
+              and any(m.startswith("skin_") for m in mats) and len(j.get("images", [])) >= 5, str(mats))
+        mesh_nodes = {n["name"]: n for n in j["nodes"] if "mesh" in n}
+        ids = sorted({nm[:3] for nm in mesh_nodes if nm[:1] == "v" and nm[2:3] == "_"})
+        check("GLB carries several identities, each with body and kit", len(ids) >= 3 and all(
+              (v + p) in mesh_nodes for v in ids for p in ("body", "jersey", "shorts", "socks", "boots")), str(ids))
+        def prim_of(nm):
+            return j["meshes"][mesh_nodes[nm]["mesh"]]["primitives"][0]
+        pos = {nm: j["accessors"][prim_of(nm)["attributes"]["POSITION"]] for nm in mesh_nodes}
+        body = pos[ids[0] + "body"]
+        gmin, gmax = body["min"], body["max"]
+        check("mesh stands on the ground (min y ~ 0)", abs(gmin[1]) < 0.02, str(gmin))
+        check("mesh height ~1.75 m", 1.6 < gmax[1] < 1.95, str(gmax))
+        check("GLB mesh is full-body (x spans both sides)", gmin[0] < -0.2 and gmax[0] > 0.2, "%s..%s" % (gmin[0], gmax[0]))
+        tris = sum(j["accessors"][prim_of(nm)["indices"]]["count"] for nm in mesh_nodes if nm.startswith(ids[0])) // 3
+        check("an identity is a real-detail mesh (20k-60k tris)", 20000 <= tris <= 60000, str(tris))
+        jersey_acc = pos[ids[0] + "jersey"]
+        check("jersey layer sits on the torso", jersey_acc["min"][1] > 0.5 and jersey_acc["max"][1] < 1.65,
               "%s..%s" % (jersey_acc["min"][1], jersey_acc["max"][1]))
-        boots_acc = pos_accs[4]
-        check("boots layer sits at the feet", boots_acc["max"][1] < 0.3, str(boots_acc["max"][1]))
+        check("boots layer sits at the feet", pos[ids[0] + "boots"]["max"][1] < 0.3, str(pos[ids[0] + "boots"]["max"][1]))
+        check("realistic body conformed to Arena's bind pose (arms within 45 cm of the centre line)",
+              body["min"][1] < 0.05 and max(abs(gmin[0]), abs(gmax[0])) < 0.45, "x %s..%s" % (gmin[0], gmax[0]))
+        prim = prim_of(ids[0] + "body")
         wraw, wn, _ = acc_bytes(j, buf, prim["attributes"]["WEIGHTS_0"])
         import array
         w = array.array("f")
@@ -215,8 +217,10 @@ def main():
         check("manifest aliases cover match actions",
               all(a in man["action_aliases"] for a in
                   ("idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate")))
-        check("manifest material order matches GLB",
-              man["materials"] == ["skin", "jersey", "shorts", "socks", "boots", "hair"])
+        glb_mats = [m.get("name") for m in j.get("materials", [])] if "j" in dir() else man["materials"]
+        check("manifest material list matches the GLB", man["materials"] == glb_mats, str(man["materials"]))
+        check("manifest names the look and the identity prefixes",
+              man.get("look") == "realistic" and man.get("variant_prefixes") and all(p.endswith("_") for p in man["variant_prefixes"]))
         check("manifest clips carry event frames",
               all("events" in c and "ball_contact_frac" in c["events"] for c in man["clips"]))
         check("manifest aliases include Phase 0 actions",

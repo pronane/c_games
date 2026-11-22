@@ -23,13 +23,45 @@
   "RFoot"
  ],
  "materials": [
-  "skin",
+  "skin_v0",
   "jersey",
   "shorts",
   "socks",
   "boots",
-  "hair"
+  "eyes_brown",
+  "eyelashes_eyelashes02",
+  "eyebrows_eyebrow003",
+  "hair_short02",
+  "skin_v1",
+  "eyes_green",
+  "beard_shell",
+  "facial_hair",
+  "hair_short04",
+  "skin_v2",
+  "eyes_bluegreen",
+  "hair_short01",
+  "skin_v5",
+  "skin_v6",
+  "eyes_brownlight",
+  "eyebrows_eyebrow009",
+  "hair_afro01"
  ],
+ "look": "realistic",
+ "variants": [
+  "v0",
+  "v1",
+  "v2",
+  "v5",
+  "v6"
+ ],
+ "variant_prefixes": [
+  "v0_",
+  "v1_",
+  "v2_",
+  "v5_",
+  "v6_"
+ ],
+ "browser_look": "sculpt",
  "layer_slots": {
   "skin": 0,
   "jersey": 1,
@@ -3506,7 +3538,7 @@
  "stats": {
   "tris": 16000,
   "verts": 8002,
-  "height_m": 1.7724,
+  "height_m": 1.7512,
   "bounds_min": [
    -0.2701,
    -0.0031,
@@ -3518,6 +3550,6 @@
    0.2116
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 11.6
+  "seconds": 12.7
  }
 }
