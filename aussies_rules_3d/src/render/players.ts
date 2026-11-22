@@ -1,8 +1,9 @@
 /**
  * Players — the rigged, skinned, animated footballers from Gaelic_Football_3d
- * (`assets/gaelic_player.glb`, Sprite Forge squad, 3 appearance variants),
- * trimmed to the outfield body meshes, cloned per player with AFL club kit
- * colours and squad numbers, driven by an animation state machine.
+ * (`assets/gaelic_player.glb`, Sprite Forge squad, all nine appearance
+ * variants), trimmed of the painted GAA kit (AFL club colours are flat
+ * tints applied at runtime), cloned per player with squad numbers, driven
+ * by an animation state machine.
  */
 import * as THREE from 'three';
 import { GLTF } from 'three/addons/loaders/GLTFLoader.js';
@@ -37,8 +38,8 @@ export type PlayerAnim =
   | 'idle' | 'walk' | 'run' | 'sprint' | 'run_ball' | 'kick' | 'handball'
   | 'tackle' | 'mark_jump' | 'celebrate' | 'hit_deck';
 
-/** Appearance variants kept in the trimmed GLB (v0 short-hair, v2 beard, v6 afro). */
-const VARIANT_PREFIXES = ['v0_', 'v2_', 'v6_'];
+/** All nine Sprite Forge appearances (v0..v8) — squad variety over download size. */
+const VARIANT_PREFIXES = ['v0_', 'v1_', 'v2_', 'v3_', 'v4_', 'v5_', 'v6_', 'v7_', 'v8_'];
 
 /** Game-facing anim name → Gaelic_Football_3d clip. */
 const CLIP_ALIASES: Record<string, string> = {
