@@ -21,11 +21,11 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 | A1 | Kit was body paint: muscles showed through the shirt, every hem a staircase of triangles, the shirt tail poked through the shorts. FC/eFootball kits are separate cloth with clean hems. | P1 | ✅ Sprite Forge v11.30 `sforge.tailor` (#222) + Arena integration |
 | A2 | "Boots" were bare feet with toes, tinted a colour. | P1 | ✅ tailored boots: no toes, flat sole, sole plate / flash / heel detail |
 | A3 | No names, numbers, crest or shirt designs: flat colour only. A floating "A. PLAYER 10" label hung behind the GLB players. | P1 | ✅ `sforge.kitdesign` masks + glyph atlas; `Shaders/kit.gdshader` prints name, back / front / shorts numbers and an original crest; ten designs; club designs set per club |
-| A4 | Goalkeepers wore the outfield kit. | P1 | ✅ keeper kits that clash with neither club (`Clubs.KeeperKit`) · ✅ padded gloves and a long-sleeved base layer cut from each identity's own hands and arms (Sprite Forge `tailor.keeper_garments` v11.35), shown on keepers, tinted shirt / glove colour |
+| A4 | Goalkeepers wore the outfield kit. | P1 | ✅ keeper kits that clash with neither club (`Clubs.KeeperKit`) · ✅ padded gloves and a long-sleeved base layer cut from each identity's own hands and arms (Sprite Forge `tailor.keeper_garments` v11.36), shown on keepers, tinted shirt / glove colour |
 | A5 | No away-kit choice on a colour clash. | P1 | ✅ `Clubs.ResolveKitClash`: away side into its away kit on a clash, keepers clear of both sides in every fixture (tested), away end of the crowd follows |
-| A6 | Five head identities for every squad; FC/eFootball have scanned faces for thousands of players and many generic heads. | P2 | 🟡 nine identities (v3/v4/v7/v8 added, tailored, `Tools/add_identities.py`), picked per player from Name#Number among the three closest to his skin tone; close-up shading from Sprite Forge `skinshade` v11.34: pore detail normal, SSS on Forward+, alpha-to-coverage anisotropic hair, wet clearcoat eyes, irises graded off MakeHuman's red-brown. Still open: scanned-style faces beyond nine (`look` / `capture_face`) |
+| A6 | Five head identities for every squad; FC/eFootball have scanned faces for thousands of players and many generic heads. | P2 | 🟡 nine identities (v3/v4/v7/v8 added, tailored, `Tools/add_identities.py`), picked per player from Name#Number among the three closest to his skin tone; close-up shading from Sprite Forge `skinshade` v11.35: pore detail normal, SSS on Forward+, alpha-to-coverage anisotropic hair, wet clearcoat eyes, irises graded off MakeHuman's red-brown. Still open: scanned-style faces beyond nine (`look` / `capture_face`) |
 | A7 | One body for everyone (scaled). | P2 | 🟡 `SoccerClipRig.ApplyBuild`: chest / shoulder / arm bulk from the spec (bone pose scale, neck and forearms counter-scaled) on top of height. Still open: baked MakeHuman build morphs |
-| A8 | Cloth doesn't move (shirt flutter, sleeves, shorts). | P2 | ✅ Sprite Forge tailor v11.35 writes a flutter weight + hem phase (TEXCOORD_1): sleeve and shorts-leg hems ripple in `kit.gdshader` with the player's speed and the match wind, collar / waistband / chest held, per-player phase. Not a cloth sim: no folds from contact |
+| A8 | Cloth doesn't move (shirt flutter, sleeves, shorts). | P2 | ✅ Sprite Forge tailor v11.36 writes a flutter weight + hem phase (TEXCOORD_1): sleeve and shorts-leg hems ripple in `kit.gdshader` with the player's speed and the match wind, collar / waistband / chest held, per-player phase. Not a cloth sim: no folds from contact |
 | A9 | Kit doesn't get wet or dirty. FC 25 does both. | P2 | ✅ kits soak in the rain and pick up grass stains with time played and every slide, tackle, dive or fall |
 | A10 | Accessories: captain's armband, tape, undershirts, snoods, keeper caps. | P3 | ⬜ |
 | A11 | No LODs: 22 full-detail players. | P3 | ⬜ Sprite Forge `lod` for player GLB (two levels + far impostor) |
@@ -81,7 +81,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 5. A5 away kits on a clash; C3 benches and touchline life.
 6. E presentation, then A6–A8 and the rest.
 
-### Kit fit (Sprite Forge tailor, v11.34 follow-up)
+### Kit fit (Sprite Forge tailor v11.35)
 Close-ups showed skin poking through the shirt as teeth round the collar and folded triangles at the hem.
 `tailor` now pushes the cloth 4 mm clear of the skin on the garment's own bones, carries each hem's snap
 into the five rows behind it, offsets along smoothed normals and smooths the skin weights. Bind-pose
