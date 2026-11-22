@@ -12,7 +12,8 @@
   "source_url": "http://mocap.cs.cmu.edu/",
   "redistribution": "yes",
   "attribution": "The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217.",
-  "notes": "BVH conversion by B. Hahne (cgspeed), mirrored at github.com/meshula/cmu-mocap."
+  "notes": "BVH conversion by B. Hahne (cgspeed), mirrored at github.com/meshula/cmu-mocap.",
+  "ml_training": "yes"
  },
  "duration": 0.5667,
  "keys": [
@@ -1118,5 +1119,11 @@
   "projection_max_m": 0.0341,
   "common_bones": 17,
   "note": "Projected onto the mannequin's semantic joints. Fingers, twist bones and facial tracks are not kept."
+ },
+ "tags": {
+  "action": "run",
+  "gait": "run",
+  "source": "cmu",
+  "capture": "studio"
  }
 }

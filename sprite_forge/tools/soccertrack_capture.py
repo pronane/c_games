@@ -39,7 +39,7 @@ sys.path.insert(0, ROOT_SF)
 HALF_MS = 45 * 60 * 1000
 FPS = 25.0
 LICENCE = dict(spdx="CC-BY-4.0", author="Atom Scott, Ikuma Uchida, Kento Kuroda, Yufi Kim, Keisuke Fujii (SoccerTrack v2)",
-               url="https://huggingface.co/datasets/atomscott/soccertrack-v2", redistribution="yes",
+               url="https://huggingface.co/datasets/atomscott/soccertrack-v2", redistribution="yes", ml_training="yes",
                attribution="Motion derived from SoccerTrack v2 (Scott et al., CC BY 4.0); changed: 3D pose estimated "
                            "and fitted to a game skeleton.",
                text="")

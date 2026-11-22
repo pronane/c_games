@@ -35,7 +35,7 @@ LICENCE = dict(
                  "commercially-sold products; the data may not be resold directly, even in converted form."),
     author="Carnegie Mellon University Graphics Lab",
     source_url="http://mocap.cs.cmu.edu/",
-    redistribution="yes",
+    redistribution="yes", ml_training="yes",  # v11.40: CMU: free for all uses
     attribution=("The data used in this project was obtained from mocap.cs.cmu.edu. "
                  "The database was created with funding from NSF EIA-0196217."),
     notes="BVH conversion by B. Hahne (cgspeed), mirrored at github.com/meshula/cmu-mocap.",
