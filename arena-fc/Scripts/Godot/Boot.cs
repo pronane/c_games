@@ -120,7 +120,8 @@ public partial class Boot : Node3D
             int size = ArgInt("--size", 5); if (size != 7 && size != 11) size = 5;
             // --weather rain|windy|snow|fog for QA of the weather visuals/physics.
             var (wx, wind) = Presentation.WeatherFor(System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Value("--weather") ?? "clear"));
-            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f, Weather = wx, WindSpeed = wind }, null, () => GetTree().Quit());
+            view.Init(new MatchOptions { TeamSize = size, Seed = ArgInt("--seed", 2026), TimeSpeed = 15f, Weather = wx, WindSpeed = wind,
+                Lighting = (Value("--light") ?? "day").ToLowerInvariant() }, null, () => GetTree().Quit());
             AddChild(view);
             _view = view;
             // --officials-shot K: a QA camera that follows official K (0 ref, 1/2 assistants, 3 fourth)

@@ -31,6 +31,8 @@ public sealed class MatchOptions
     public bool Fouls = true;
     public int HomeClub = 0;
     public int AwayClub = 1;
+    /// <summary>Kick-off light (presentation only): "day", "dusk" or "night" (floodlit).</summary>
+    public string Lighting = "day";
     public string HomeFormation = "4-4-2";
     public string AwayFormation = "4-3-3";
     /// <summary>Optional short labels ("ENG", "BRA"). Clubs fall back to Clubs.All.</summary>
