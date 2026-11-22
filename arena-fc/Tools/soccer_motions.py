@@ -380,14 +380,16 @@ MOCAP_SC_DIR = os.path.join(MOCAP_ROOT, "skillcorner")
 MOCAP_VEO_DIR = os.path.join(MOCAP_ROOT, "veo")
 # Studio mocap packs (FBX via Sprite Forge's fbx_to_moves and Tools/import_fbx_pack.py).
 MOCAP_ROHR_DIR = os.path.join(MOCAP_ROOT, "rohr")
+# SoccerTrack v2 (CC BY 4.0): labelled match events via sforge.matchcapture.process_events.
+MOCAP_ST_DIR = os.path.join(MOCAP_ROOT, "soccertrack")
 _MOCAP_CATEGORY = {"Kick": "Ball", "Locomotion": "Locomotion", "Cut": "Locomotion", "Recovery": "Locomotion",
                    "Pass": "Ball", "FirstTouch": "Ball", "Dribble": "Ball", "Tackle": "Defence"}
-_MOCAP_SOURCE = {MOCAP_DIR: "CMU take", MOCAP_SC_DIR: "SkillCorner match event", MOCAP_VEO_DIR: "own", MOCAP_ROHR_DIR: "studio"}
+_MOCAP_SOURCE = {MOCAP_DIR: "CMU take", MOCAP_SC_DIR: "SkillCorner match event", MOCAP_VEO_DIR: "own", MOCAP_ROHR_DIR: "studio", MOCAP_ST_DIR: "SoccerTrack match event"}
 
 
 def _mocap_takes():
     takes = []
-    for d in (MOCAP_DIR, MOCAP_SC_DIR, MOCAP_VEO_DIR, MOCAP_ROHR_DIR):
+    for d in (MOCAP_DIR, MOCAP_SC_DIR, MOCAP_VEO_DIR, MOCAP_ROHR_DIR, MOCAP_ST_DIR):
         path = os.path.join(d, "_import.json")
         if not os.path.isfile(path):
             continue
