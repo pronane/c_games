@@ -327,10 +327,14 @@ public sealed partial class SoccerClipRig : Node3D
         foreach (var mi in _meshes)
         {
             string n = mi.Name.ToString();
-            if (n.Length > 3 && n[0] == 'v' && n[2] == '_') mi.Visible = n.StartsWith(pick);
+            if (n.Length > 3 && n[0] == 'v' && n[2] == '_')
+                mi.Visible = n.StartsWith(pick) && (spec.IsKeeper || !IsKeeperOnly(n));
         }
         foreach (var mi in _meshes) if (mi.Visible) { Mesh = mi; break; }
     }
+
+    /// <summary>Goalkeeper-only garments (Sprite Forge tailor.keeper_garments): long-sleeved base layer, gloves.</summary>
+    private static bool IsKeeperOnly(string node) => node.EndsWith("_sleeves") || node.EndsWith("_gloves");
 
     /// <summary>Club / character colour for a material name, or null to keep it as authored:
     /// kit slots take the club colours, the hair family the player's hair colour, a flat
@@ -345,6 +349,8 @@ public sealed partial class SoccerClipRig : Node3D
             case "boots": return spec.BootsColor;
             case "hair": case "beard_shell": case "facial_hair": return spec.HairColor;
             case "skin": return spec.SkinHex;
+            case "sleeves": return spec.KitPrimary;      // keeper base layer in the shirt colour
+            case "gloves": return spec.GlovesColor;
         }
         if (layer.StartsWith("hair_") || layer.StartsWith("eyebrows_") || layer.StartsWith("eyelashes_")) return spec.HairColor;
         return null;
@@ -425,6 +431,9 @@ public sealed partial class SoccerClipRig : Node3D
         m.SetShaderParameter("name_chars", glyphs);
         m.SetShaderParameter("name_len", len);
         m.SetShaderParameter("wet", wet);
+        uint seed = (uint)spec.Number * 31u;
+        foreach (char ch in spec.DisplayName ?? "") seed = seed * 131u + ch;
+        m.SetShaderParameter("flutter_seed", seed % 1000u / 1000f);
         return m;
     }
 
@@ -453,6 +462,17 @@ public sealed partial class SoccerClipRig : Node3D
     private static float Lum(Color c) => .2126f * c.R + .7152f * c.G + .0722f * c.B;
 
     private ShaderMaterial? _kit;
+    private float _flutter, _flutterSent = -1f;
+
+    /// <summary>Sleeve and shorts hems ripple with the player's speed (kit.gdshader, tailor flutter weights).</summary>
+    private void UpdateFlutter(float speed, float dt)
+    {
+        if (_kit == null) return;
+        _flutter += (Math.Clamp(speed / 8f, 0f, 1f) - _flutter) * Math.Min(1f, dt * 3f);
+        if (Math.Abs(_flutter - _flutterSent) < .03f) return;
+        _flutterSent = _flutter;
+        _kit.SetShaderParameter("flutter_speed", _flutter);
+    }
     /// <summary>The live kit material (weather / dirt are set on it during a match).</summary>
     public ShaderMaterial? KitShader => _kit;
 
@@ -702,6 +722,7 @@ public sealed partial class SoccerClipRig : Node3D
         else _phase = (_phase + dt * Player.SpeedScale / clipLen) % 1f;
 
         UpdateLean(p, dt, speed);
+        UpdateFlutter(speed, dt);
         UpdateLookAt(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateReach(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateFootIk(worldPos, yaw);

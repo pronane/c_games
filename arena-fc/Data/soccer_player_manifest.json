@@ -45,6 +45,8 @@
   "eyes_brownlight",
   "eyebrows_eyebrow009",
   "hair_afro01",
+  "sleeves",
+  "gloves",
   "skin_v3",
   "hair_ponytail01",
   "skin_v4",
@@ -6856,5 +6858,7 @@
    "fourth": "between the technical areas at the halfway line; holds up the board for substitutions and added time."
   }
  },
- "skin_shading": "textures/skin/materials.json"
+ "skin_shading": "textures/skin/materials.json",
+ "kit_atlas": "textures/kit/kit_layout.json",
+ "sprite_forge_tailor": "v11.37 sforge.tailor (flutter, keeper garments) + sforge.kitdesign"
 }
