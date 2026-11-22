@@ -1,4 +1,4 @@
-"""Pitch-side people for field sports: substitutes, managers, ball kids, photographers (v11.38, fed back from Arena FC).
+"""Pitch-side people for field sports: substitutes, managers, ball kids, photographers (v11.39, fed back from Arena FC).
 
 Arena FC played in front of a full crowd with empty dugouts, no managers in the technical areas and nobody
 round the boards.  This pack gives a game what it needs to fill the touchline with the same skinned squad
@@ -285,7 +285,7 @@ def _write_props(path, nodes):
         ind = add(F.astype(np.uint32).reshape(-1), 5125, "SCALAR", 34963)
         meshes.append({"name": name, "primitives": [{"attributes": at, "indices": ind, "material": 0}]})
         gnodes.append({"name": name, "mesh": len(meshes) - 1})
-    gl = {"asset": {"version": "2.0", "generator": "Sprite Forge pitchside v11.38"}, "scene": 0,
+    gl = {"asset": {"version": "2.0", "generator": "Sprite Forge pitchside v11.39"}, "scene": 0,
           "scenes": [{"nodes": list(range(len(gnodes)))}], "nodes": gnodes, "meshes": meshes,
           "materials": [{"name": "prop", "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": .45}}],
           "accessors": accs, "bufferViews": views, "buffers": [{"byteLength": len(buf)}]}

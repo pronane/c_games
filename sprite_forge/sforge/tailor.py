@@ -1,6 +1,6 @@
 """Garment shells for a skinned body: shirts, shorts, socks and boots with clean hems (v11.30).
 
-v11.36: flutter weights for the free hems (TEXCOORD_1) and `keeper_garments` (long-sleeved base layer,
+v11.37: flutter weights for the free hems (TEXCOORD_1) and `keeper_garments` (long-sleeved base layer,
 padded gloves) cut from the body's own arms and hands.
 
 Fed back from Arena FC.  Its squad wore its kit as body paint: the MakeHuman clothes hug every
@@ -129,7 +129,7 @@ def keeper_garments():
 
 
 def staff_garments():
-    """Long trousers (v11.38): cut from the body's own legs like the base layer, for managers, coaches,
+    """Long trousers (v11.39): cut from the body's own legs like the base layer, for managers, coaches,
     ball kids and photographers (a tracksuit or a suit with `keeper_garments`' sleeves).  Own material
     `trousers`; it stands just outside the socks so it covers them."""
     legs = tuple(sd + b for sd in SIDES for b in ("Thigh", "Shin"))
@@ -752,7 +752,7 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, image
     the material named like the part (created plain white if missing).  `image_filter(index, image, bytes)`
     may return new PNG bytes for any image the GLB already holds (e.g. skinshade.grade_iris on eye maps).
     `clips_from`: another GLB of the same skeleton whose animations replace this one's (matched to nodes by
-    name) - how a game keeps its newest clips when the meshes were rebuilt on an older copy (v11.37)."""
+    name) - how a game keeps its newest clips when the meshes were rebuilt on an older copy (v11.38)."""
     j, buf = read_glb(glb_in)
     out = _Out()
     acc_map = {}

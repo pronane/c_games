@@ -1,4 +1,4 @@
-"""Goals with real nets, and corner flags, for field sports (v11.38, fed back from Arena FC).
+"""Goals with real nets, and corner flags, for field sports (v11.39, fed back from Arena FC).
 
 Arena FC's nets were four flat quads: no depth to the roof, no sag, nothing for the ball to bulge.  This
 builds the goal a broadcast shows: posts and crossbar, a net that runs back flat from the bar and then
@@ -223,7 +223,7 @@ def _write(path, meshes, extras=None):
         mat = 1 if name == "net" else 2 if name == "flag_cloth" else 0
         gm.append({"name": name, "primitives": [{"attributes": at, "indices": ind, "material": mat}]})
         gn.append({"name": name, "mesh": len(gm) - 1})
-    gl = {"asset": {"version": "2.0", "generator": "Sprite Forge goalnet v11.38", "extras": extras or {}},
+    gl = {"asset": {"version": "2.0", "generator": "Sprite Forge goalnet v11.39", "extras": extras or {}},
           "scene": 0, "scenes": [{"nodes": list(range(len(gn)))}], "nodes": gn, "meshes": gm, "materials": mats,
           "accessors": accs, "bufferViews": views, "buffers": [{"byteLength": 0}]}
     while len(buf) % 4:

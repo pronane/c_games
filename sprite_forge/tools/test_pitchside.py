@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pitch-side people, goals with real nets, corner flags (v11.38, fed back from Arena FC).
+"""Pitch-side people, goals with real nets, corner flags (v11.39, fed back from Arena FC).
 
     python tools/test_pitchside.py
 

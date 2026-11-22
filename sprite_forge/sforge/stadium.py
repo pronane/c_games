@@ -1,5 +1,5 @@
 """Stadiums for field sports: the bowl, roof, floodlights, dugouts, tunnel, screens and seat map (v11.32;
-v11.38: dugout seats at chair height, listed in the json as `bench`).
+v11.39: dugout seats at chair height, listed in the json as `bench`).
 
 Fed back from Arena FC.  Its desktop ground was stacked boxes with a flat roof ring (the browser edition had
 a better curved bowl, built at run time in GDScript and nowhere else).  This builds a whole ground from a

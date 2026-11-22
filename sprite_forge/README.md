@@ -54,7 +54,7 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
-## New in v11.38: the touchline - benches, managers, ball kids, photographers, real goal nets, corner flags (fed back from Arena FC)
+## New in v11.39: the touchline - benches, managers, ball kids, photographers, real goal nets, corner flags (fed back from Arena FC)
 
 - **`sforge.pitchside`:** clips for everyone round the pitch, authored in the pose channels and QA'd.
   - The clips: subs sitting or leaning on the bench and jumping up for a goal; managers watching or shouting; staff standing; ball kids at the ready; photographers kneeling or standing with the camera to the eye.
@@ -71,7 +71,7 @@ fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real pers
     PS.placements(json.load(open("stadium_bowl.json")), 52.5, 34.0)
     G.export("goal_soccer.glb", "soccer")
 
-## New in v11.37: LODs for skinned characters (fed back from Arena FC)
+## New in v11.38: LODs for skinned characters (fed back from Arena FC)
 
 `sforge.skinlod` takes any skinned part down by quadric-error half-edge collapses: every vertex left is an
 original one, so UVs, skin weights, normals and flutter weights stay exact. Hems and UV seams are locked,
@@ -89,7 +89,7 @@ newest clips.
     lods = SL.lod_parts(parts)       # {"body": [lod1, lod2], ...}
     T.replace_parts(glb, out, {"v0_": {"body_lod1": lods["body"][0], ...}})
 
-## New in v11.36: cloth flutter weights and keeper garments (fed back from Arena FC)
+## New in v11.37: cloth flutter weights and keeper garments (fed back from Arena FC)
 
 - `tailor` writes a flutter weight per garment vertex as `TEXCOORD_1` (amplitude in metres, phase round its
   hem): sleeve and shorts-leg hems move, the collar and the waistband are held. A game's kit shader ripples
@@ -101,7 +101,7 @@ newest clips.
 
     out = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments())
 
-## New in v11.35: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
+## New in v11.36: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
 
 Arena FC shipped five of the nine squad identities, and its faces read as plastic up close: a 1-2k MakeHuman
 atlas holds colour, not skin. **`sforge/skinshade.py`** writes a tileable skin-detail normal map (pores, fine
