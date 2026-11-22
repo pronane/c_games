@@ -462,7 +462,14 @@ def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print
         if not ok:
             break
         for j in active:
+            if j.get("dead"):
+                continue
             if hint_boxes:
+                hs = j.get("heights") or []
+                if len(hs) >= 6 and np.median(hs) < min_height:      # too small to pose well: stop early
+                    j["dead"] = True; continue
+                if j.get("miss", 0) > .3 * len(j["K"]):               # lost the player
+                    j["dead"] = True; continue
                 hint = j["boxes"].get(f)
                 box = refine_box(det, fr, hint, j["last"]) if hint is not None else None
                 if box is None and j["last"] is not None and hint is not None and j.get("hint_prev") is not None:
@@ -481,7 +488,7 @@ def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print
         done = [j for j in active if j["hi"] <= f]
         active = [j for j in active if j["hi"] > f]
         for j in done:
-            if hint_boxes and (np.median(j.get("heights") or [0]) < min_height or j.get("miss", 0) > .3 * len(j["K"])):
+            if j.get("dead") or (hint_boxes and (np.median(j.get("heights") or [0]) < min_height or j.get("miss", 0) > .3 * len(j["K"]))):
                 stats["rejected"] += 1; stats["small_or_lost"] = stats.get("small_or_lost", 0) + 1
                 j["K"] = None
                 continue
