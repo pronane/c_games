@@ -54,6 +54,31 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.32: stadiums, crowds and pitch-side boards for field sports (fed back from Arena FC)
+
+Arena FC's desktop ground was stacked boxes, its crowd coloured boxes, and its boards read "GODOT 4.7".
+Three new modules build the match-day setting any field-sport game needs:
+
+- **`sforge/stadium.py`** builds a whole ground from a `StadiumSpec`: a stand ring round the pitch (curved
+  corners, or four stands with open corners), any number of tiers with an aisle and vomitories between them,
+  aisle stairs, front and back walls, a roof with a lit fascia and columns, floodlight masts or roof-edge lamps,
+  a continuous LED advertising ring (kept clear of the technical area), big screens, dugouts with benches and a
+  glass front, the tunnel and the concourse - and a **seat map** (`.seats`: x, y, z, yaw, tier, end) for the crowd.
+  The pitch comes from the sport (`PITCH`: soccer, Gaelic / hurling, rugby, Aussie rules), so the same presets
+  build a GAA ground round 145 x 90 m. The ends are baked as a grey level marked in vertex alpha, so a game tints
+  them with whichever clubs are playing. Presets: `bowl` (two tiers, masts), `classic` (open corners, roof
+  lights), `ground` (one tier, partial roof). `export()` writes the GLB, the seat map and a JSON with the
+  lights, screens, dugouts and tunnel.
+- **`sforge/crowd.py`**: low-poly spectators (114 triangles seated, 102 standing), a waving flag and a scarf,
+  with part and arm channels baked in `TEXCOORD_1` so a game instances thousands and animates them in a vertex
+  shader (arms up about the shoulder, out of the seat, bounce, Mexican wave).
+- **`sforge/adboards.py`**: an atlas of original, fictional sponsor panels (and a fair-play message) for an LED
+  shader to scroll and cut between.
+
+Arena FC builds them with `arena-fc/Tools/build_stadiums.py` and picks the preset from the home club's ground.
+
+Test: `python tools/test_stadium.py`.
+
 ## New in v11.31: match officials - signals, kits and props (fed back from Arena FC)
 
 Arena FC refereed every match invisibly: fouls, cards, offsides and VAR were given with nobody on the pitch.
