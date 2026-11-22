@@ -23,6 +23,7 @@ and writes them to Data/mocap/veo/ (vo_strike_NN, vo_run_NN) with the footage li
 plus clip-manifest rows.  Tools/soccer_motions.py bakes them into the player GLB.
 
     python3 Tools/import_matchcapture.py MERGED_DIR [MERGED_DIR ...] [--strikes 24] [--runs 12]
+    python3 Tools/import_matchcapture.py --source soccertrack MOVES_DIR [--quota kick=40,header=10]
 """
 from __future__ import annotations
 
@@ -41,7 +42,7 @@ sys.path.insert(0, os.path.join(SF, "tools"))
 
 OUT = os.path.join(ARENA, "Data", "mocap", "veo")
 MANIFEST = os.path.join(ARENA, "Data", "clips", "clip_manifest.json")
-PREFIX = "vo_"
+PREFIX, TAG = "vo_", "veo"       # set per --source in main()
 
 LICENCE = dict(
     spdx="LicenseRef-owner-footage",
@@ -53,6 +54,22 @@ LICENCE = dict(
     attribution="Real match motion from our own recordings.",
     notes="",
 )
+# Where each source's moves go and how they are named.  Labelled sources (SoccerTrack v2:
+# every pass / shot / header / tackle tagged with its player and moment) keep their own kind
+# and licence; unlabelled ones (our Veo footage) are classified from the 3D legs.
+SOURCES = {
+    "veo": dict(dir="veo", prefix="vo_", tag="veo", licence=LICENCE, footage="our own match video",
+                source="veo:own-footage", title="Arena FC own match recordings (Veo) via sforge.matchcapture"),
+    "soccertrack": dict(dir="soccertrack", prefix="st_", tag="soccertrack", licence=None, footage="SoccerTrack v2 match video",
+                        source="soccertrack-v2", title="SoccerTrack v2 (CC BY 4.0) via sforge.matchcapture events"),
+}
+# labelled kind / sub-kind -> (game category, ball state)
+GAME_CATEGORY = {"pass": ("Pass", "Possessed"), "lofted": ("Pass", "Possessed"), "cross": ("Pass", "Possessed"),
+                 "shot": ("Kick", "Possessed"), "free_kick": ("Kick", "Possessed"), "header": ("FirstTouch", "Approaching"),
+                 "tackle": ("Tackle", "None"), "block": ("Tackle", "None"), "carry": ("Locomotion", "Possessed"),
+                 "strike": ("Kick", "Possessed"), "run": ("Locomotion", "None")}
+LABELLED_QUOTA = dict(kick=40, header=10, tackle=10, block=6, carry=12)
+LABELLED_CAP = dict(kick=6, header=2, tackle=2, block=2, carry=2)          # per match half
 LEG = 0.9          # hip to ankle on the rig, metres
 FLIGHT = 1.25      # running strides are longer than the leg sweep (both feet off the ground)
 
@@ -165,8 +182,20 @@ def main() -> int:
     ap.add_argument("--max-jitter", type=float, default=4.5, help="reject shakier tracking (deg/frame^2)")
     ap.add_argument("--stage", default="", help="only copy the takes that pass the checks (raw, with an index) to this "
                     "folder - run on the GPU box to bring back a small folder instead of every take")
+    ap.add_argument("--source", default="veo", choices=sorted(SOURCES))
+    ap.add_argument("--quota", default="", help="labelled sources: kind=n,... (default %s)" %
+                    ",".join("%s=%d" % kv for kv in LABELLED_QUOTA.items()))
+    ap.add_argument("--label-kick-swing", type=float, default=40.0,
+                    help="a labelled kick's thigh must still swing this much (deg) - else the pose missed it")
     args = ap.parse_args()
     import check_motion as CM
+    global OUT, PREFIX, TAG
+    src_cfg = SOURCES[args.source]
+    OUT = os.path.join(ARENA, "Data", "mocap", src_cfg["dir"])
+    PREFIX, TAG = src_cfg["prefix"], src_cfg["tag"]
+    lquota = dict(LABELLED_QUOTA)
+    for kv in filter(None, args.quota.split(",")):
+        k, v = kv.split("="); lquota[k] = int(v)
 
     all_takes = []
     reasons = collections.Counter()
@@ -191,22 +220,34 @@ def main() -> int:
             reasons["fit error"] += 1; continue
         if vis < args.min_vis:
             reasons["legs hidden"] += 1; continue
-        kind, rec = classify(rec, float(imp.get("fps", 15.0)))
-        if kind is None:
-            reasons["neither kick nor run"] += 1; continue
-        t = dict(t, kind="strike" if kind == "kick" else "run")
-        swing, knee, jit = shape(rec)
-        if jit > args.max_jitter:
-            reasons["shaky"] += 1; continue
-        if t["kind"] == "strike" and (swing < args.kick_swing or knee < args.kick_knee):
-            reasons["small swing"] += 1; continue
-        if t["kind"] == "run" and swing < args.run_swing:
-            reasons["not running"] += 1; continue
+        labelled = bool(imp.get("sub"))
+        if labelled:                                   # the footage says what it is
+            if t["kind"] not in lquota:
+                reasons["kind not imported: " + t["kind"]] += 1; continue
+            swing, knee, jit = shape(rec)
+            if jit > args.max_jitter:
+                reasons["shaky"] += 1; continue
+            if t["kind"] == "kick" and swing < args.label_kick_swing:
+                reasons["kick swing not seen"] += 1; continue
+            if t["kind"] == "carry" and swing < args.run_swing:
+                reasons["not running"] += 1; continue
+        else:
+            kind, rec = classify(rec, float(imp.get("fps", 15.0)))
+            if kind is None:
+                reasons["neither kick nor run"] += 1; continue
+            t = dict(t, kind="strike" if kind == "kick" else "run")
+            swing, knee, jit = shape(rec)
+            if jit > args.max_jitter:
+                reasons["shaky"] += 1; continue
+            if t["kind"] == "strike" and (swing < args.kick_swing or knee < args.kick_knee):
+                reasons["small swing"] += 1; continue
+            if t["kind"] == "run" and swing < args.run_swing:
+                reasons["not running"] += 1; continue
         bad = [c for c, ok, _ in CM.check_clip(rec, t["name"]) if ok is False]
         if bad:
             reasons["checks: " + ",".join(bad)] += 1; continue
         score = err / 4.0 + (1.0 - vis) * 2.0 + jit / 4.0 - min(swing, 100.0) / 100.0
-        if t["kind"] == "strike":
+        if t["kind"] in ("strike", "kick"):
             sp = float(imp.get("peak_speed") or 0)
             score -= min(sp, 14.0) / 28.0                 # a harder strike shows the swing better
         cands.append((score, t, rec))
@@ -228,8 +269,8 @@ def main() -> int:
     for f in os.listdir(OUT):                      # replace the moves, keep the README
         if f.endswith(".json"):
             os.remove(os.path.join(OUT, f))
-    quota = dict(strike=args.strikes, run=args.runs)
-    per_clip_cap = dict(strike=2, run=1)
+    quota = dict(strike=args.strikes, run=args.runs, **lquota)
+    per_clip_cap = dict(strike=2, run=1, **LABELLED_CAP)
     count = collections.Counter(); per_clip = collections.Counter()
     takes = []
     for score, t, rec in cands:
@@ -240,32 +281,36 @@ def main() -> int:
         if per_clip[(kind, clip)] >= per_clip_cap[kind]:
             continue
         count[kind] += 1; per_clip[(kind, clip)] += 1
-        name = "%s%s_%02d" % (PREFIX, kind, count[kind])
         imp = rec["import"]
+        sub = imp.get("sub") or kind
+        count["name:" + sub] += 1
+        name = "%s%s_%02d" % (PREFIX, sub, count["name:" + sub])
         dur = float(rec.get("duration") or 1.0)
         loop = bool(rec.get("loop"))
         vz = stride_speed(rec["keys"], dur) if loop else 0.0
-        lic = dict(LICENCE, notes=(rec.get("licence") or {}).get("notes", ""))
-        cat = "Kick" if kind == "strike" else "Locomotion"
+        lic = dict(src_cfg["licence"], notes=(rec.get("licence") or {}).get("notes", "")) if src_cfg["licence"] else rec.get("licence")
+        gcat, ball = GAME_CATEGORY.get(sub, GAME_CATEGORY.get(kind, ("Kick", "Possessed")))
+        cat = rec.get("category") if labelled else ("Kick" if kind == "strike" else "Locomotion")
         rec = smooth(rec)
-        out = dict(rec, name=name, category=cat, licence=lic, source="veo:own-footage",
-                   desc=("kick" if kind == "strike" else "run loop") + " from our own match video (anonymous)")
+        what = {"strike": "kick", "run": "run loop", "carry": "dribble loop"}.get(sub, sub.replace("_", " "))
+        out = dict(rec, name=name, category=cat, licence=lic, source=src_cfg["source"],
+                   desc="%s from %s (anonymous)" % (what, src_cfg["footage"]))
         out["import"] = dict(imp, root_velocity=[0.0, vz])
         with open(os.path.join(OUT, name + ".json"), "w") as f:
             json.dump(out, f, indent=0)
-        takes.append(dict(name=name, take="match video %s" % (kind), loop=loop, category=cat,
-                          game_category=cat, ball_state="Possessed" if kind == "strike" else "None",
+        takes.append(dict(name=name, take="match video %s" % sub, loop=loop, category=cat,
+                          game_category=gcat, ball_state=ball,
                           duration=round(dur, 4), keys=len(rec["keys"]), contact=float(imp.get("contact", -1.0)),
                           foot=imp.get("foot", ""), root_velocity=[0.0, vz], fit_err_deg=float(imp["mean_bone_err_deg"]),
                           leg_visibility=float(imp["leg_visibility"])))
         print("  %-12s %4.2fs  fit %.1f deg  legs %.2f%s" % (name, dur, imp["mean_bone_err_deg"], imp["leg_visibility"],
-              ("  foot %s" % imp.get("foot")) if kind == "strike" else "  %.1f m/s" % vz))
+              ("  foot %s" % imp.get("foot")) if imp.get("foot") else "  %.1f m/s" % vz))
     with open(os.path.join(OUT, "_import.json"), "w") as f:
-        json.dump(dict(source="Arena FC own match recordings (Veo) via sforge.matchcapture", licence=LICENCE,
+        json.dump(dict(source=src_cfg["title"], licence=src_cfg["licence"] or (takes and out.get("licence")),
                        candidates=raw, rejected=dict(reasons), takes=takes), f, indent=1)
     update_manifest(takes)
     print("kept %d of %d (%s); rejected: %s" % (len(takes), raw,
-          ", ".join("%s %d" % kv for kv in count.items()), dict(reasons)))
+          ", ".join("%s %d" % kv for kv in count.items() if not kv[0].startswith("name:")), dict(reasons)))
     return 0
 
 
@@ -275,7 +320,7 @@ def update_manifest(takes):
     man["clips"] = [c for c in man["clips"] if not c["id"].startswith("soccer_" + PREFIX)]
     for t in takes:
         vx, vz = t["root_velocity"]
-        tags = ["mocap", "veo", "real_match"]
+        tags = ["mocap", TAG, "real_match"]
         if t["ball_state"] == "Possessed":
             tags.append("ball_possessed")
         if t["contact"] >= 0:
