@@ -54,6 +54,43 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.30: tailored kits and boots, and a kit atlas (fed back from Arena FC)
+
+Arena FC's squad wore its kit as body paint. The MakeHuman clothes hugged every muscle (pecs and abs through the
+shirt), every hem was a staircase of whole triangles, and the "boots" were the bare feet, toes and all.
+**`sforge/tailor.py`** rebuilds each garment from its skin-tight source:
+
+- every opening (shirt hem, sleeves, collar, shorts legs, sock tops, boot collars) is snapped onto one plane, pushed
+  out to the furthest point of the old edge so nothing shortens over a body that has no skin underneath;
+- the muscles are smoothed away (Taubin, no shrinkage) and the cloth is lifted back onto the body's high points, so it
+  drapes over the chest and shoulder blades and spans the hollows; it then stands off the skin by an `ease` that
+  grows towards the hem (`flare`);
+- a lip is turned in at each opening, so a sleeve or a shirt tail has thickness;
+- the shirt tail tucked inside the shorts is cut away (it poked through the shorts in motion);
+- boots lose their toes (400 smoothing passes on the foot) and get a flat sole on the ground;
+- all four garments are laid out on one **kit atlas** (`tailor.LAYOUT`: torso front / back, sleeves, shorts, socks,
+  boots), with print areas for the name, numbers and crest (`tailor.PRINT`); the front reads the right way round from
+  the front and the back from behind;
+- `replace_parts(glb_in, glb_out, {"v0_": parts, ...})` swaps the garments into a skinned GLB and keeps every node,
+  the skin and every animation; `skeleton_from_glb()` maps a MakeHuman game skeleton to the garment rules.
+
+Rules are data (`Garment`: source, ease, flare, smoothing, lip, extend, tuck), so long sleeves, a guernsey or rugby
+shorts are a new list, not new code.
+
+**`sforge/kitdesign.py`** ships the kit as masks a game tints at run time (any club, the character editor): a
+pattern mask per style (`plain stripes hoops sash halves pinstripes chevron fade quarters band`), a detail map (trim:
+collar V, cuffs, shorts stripe and hem, sock bands; boot sole plate, flash and heel; a knitted weave and side seams), a
+lettering atlas (Big Shoulders Bold, SIL OFL 1.1, in `sforge/data/fonts`) with fill and outline, and
+`kit_layout.json`, the contract the game's shader reads. `paint()` renders the same maths to a picture for previews.
+Designs are original: no real club's crest, sponsor or template.
+
+Arena FC runs both from `arena-fc/Tools/tailor_soccer_player.py` (and on every `build_soccer_player.py` build), and
+its `Shaders/kit.gdshader` prints each player's name and number on the shirt, his number on the front and the shorts,
+and an original crest.
+
+Test: `python tools/test_tailor.py` (on the Gaelic squad GLB: straight hems, stand-off, no toes, the tuck, UV panels,
+the back print on the back, the GLB round trip, every kit style).
+
 ## New in v11.29: labelled match events to moves - SoccerTrack v2 (fed back from Arena FC)
 
 `sforge.matchcapture.process_events(video, events, models)` handles footage that already says *who*
