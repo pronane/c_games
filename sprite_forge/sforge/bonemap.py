@@ -4,7 +4,8 @@ Canonical names (= the built-in mannequin's names, plus optional extras):
   root hips spine chest upperchest neck head
   shoulder_L upperarm_L forearm_L hand_L     (and _R)
   thigh_L shin_L foot_L toe_L                (and _R)
-Detected conventions: mixamo (also Meshy), unity (humanoid avatar names), rigify (DEF-/ORG-/metarig), unreal (UE4/UE5), makehuman (v7), sforge, generic
+Detected conventions: mixamo (also Meshy), unity (humanoid avatar names), rigify (DEF-/ORG-/metarig), unreal (UE4/UE5), makehuman (v7),
+bvh_classic (v11.35: Collar/Shoulder/Elbow/Wrist, Hip/Knee/Ankle - 100STYLE and many mocap exports), sforge, generic
 (keywords + left/right tokens + a structural fallback).  Stored per rig as editable bonemap.json:
   {"convention": "mixamo", "map": {"hips": "mixamorig:Hips", ...}, "unmapped": [...], "missing": [...], "edited": false}
 """
@@ -96,6 +97,14 @@ CONVENTIONS = {
         ("head", ["head"]), ("shoulder_%s", ["clavicle\\.{S}"]), ("upperarm_%s", ["upperarm01\\.{S}"]),
         ("forearm_%s", ["lowerarm01\\.{S}"]), ("hand_%s", ["wrist\\.{S}"]), ("thigh_%s", ["upperleg01\\.{S}"]),
         ("shin_%s", ["lowerleg01\\.{S}"]), ("foot_%s", ["foot\\.{S}"]), ("toe_%s", ["toe3-1\\.{S}", "toe1-1\\.{S}"])]),
+    # v11.35: classic BVH mocap naming (100STYLE, many studio / academic exports): the joint is named
+    # after where the bone STARTS - {S}Collar = clavicle, {S}Shoulder = upper arm, {S}Elbow = forearm,
+    # {S}Wrist = hand, {S}Hip = thigh, {S}Knee = shin, {S}Ankle = foot - with a Chest, Chest2... spine
+    "bvh_classic": _side_table("Left", "Right", [
+        ("hips", ["hips"]), ("spine", ["chest"]), ("chest", ["chest2"]), ("upperchest", ["chest4", "chest3"]),
+        ("neck", ["neck"]), ("head", ["head"]), ("shoulder_%s", ["{S}collar"]), ("upperarm_%s", ["{S}shoulder"]),
+        ("forearm_%s", ["{S}elbow"]), ("hand_%s", ["{S}wrist"]), ("thigh_%s", ["{S}hip"]), ("shin_%s", ["{S}knee"]),
+        ("foot_%s", ["{S}ankle"]), ("toe_%s", ["{S}toe"])]),
     "sforge": {c: [re.escape(c.lower())] for c in CANON},
 }
 SKIP = re.compile(r"(twist|roll|_ik|ik_|\bik\b|pole|target|helper|_end$|end$|nub|mch|ctrl|wgt|tweak|_jnt_end|hairbone|breast|jaw|eye|finger|thumb|index|middle|ring|pinky|cheek|lip|brow|tongue|tooth|teeth|ear|pinkie|wing|tail|prop|weapon)", re.I)
@@ -119,6 +128,8 @@ def detect_convention(bones):
             bonus = 5
         if conv == "rigify" and not any(re.search(r"[._][lr]$", s) for s in stripped):
             bonus = -10
+        if conv == "bvh_classic" and not any(re.search(r"(left|right)(collar|hip|knee|elbow|wrist)$", s) for s in stripped):
+            bonus = -10                       # only for skeletons that really use joint-named bones
         scores[conv] = (len(m) + bonus, m)
     best = max(scores, key=lambda k: scores[k][0])
     return best, scores[best][1], {k: v[0] for k, v in scores.items()}
