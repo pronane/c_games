@@ -654,14 +654,14 @@ public partial class GameApp : Node3D
             "KEYBOARD", "WASD / Arrows — move", "SHIFT — sprint (clearly faster)",
             "E — short pass", "Q — through ball", "R — long ball / cross",
             "SPACE (hold then release) — charged shot",
-            "F — standing tackle / press", "SHIFT+F — slide tackle (longer reach, more foul risk)",
+            "F — standing tackle / press", "SPACE (without the ball) or SHIFT+F — slide tackle",
             "X (hold) — close-control dribble + shield: use strength between challenger and ball",
             "TAB / middle mouse — switch player (auto-select also keeps you near the ball)",
             "C — cycle camera (Broadcast · Ball follow · Shoulder · Sideline · Tactical)",
             "ESC — pause", "",
             "GAMEPAD (mapped / XInput)", "Left stick / D-pad — move",
             "A — short pass · X — shoot (hold) · Y — through ball",
-            "B — standing tackle · RB+B — slide tackle",
+            "B — standing tackle · X (without the ball) or RB+B — slide tackle",
             "RB / RT — sprint · LB — switch player",
             "Back / Select — long ball / cross · LT or L3 — close-control dribble + shield",
             "Start — pause · R3 — camera", "",
@@ -700,6 +700,13 @@ public partial class GameApp : Node3D
         v.AddChild(Ui.Btn("REMAP PAD 1 (press each button when asked)", () => BeginRemap(0, info)));
         v.AddChild(Ui.Btn("REMAP PAD 2", () => BeginRemap(1, info)));
         v.AddChild(Ui.Btn("RESET PADS TO DEFAULT", () => { InputHub.ResetBindings(); info.Text = InputHub.DescribePads(); }));
+        // Live button test: press each button and check the game reads the right action.
+        v.AddChild(Ui.Lbl("BUTTON TEST - press any button:", 15, Ui.Accent));
+        var live = Ui.Lbl(InputHub.DescribeLive(), 14, Ui.Text);
+        v.AddChild(live);
+        var tick = new Godot.Timer { WaitTime = .05, Autostart = true };
+        tick.Timeout += () => { if (GodotObject.IsInstanceValid(live)) live.Text = InputHub.DescribeLive(); };
+        live.AddChild(tick);
         v.AddChild(Ui.Lbl("Plug in a USB / EasySMX pad and press a button once so the OS exposes it. " +
                           "Unmapped pads are read with the EasySMX D-input layout; remapping is saved per pad name.", 13, Ui.Sub));
         Overlay("CONTROLLER SETUP", v, () => { _remapDevice = -1; _remapStep = -1; _remapLabel = null; });
