@@ -53,7 +53,8 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 |---|---|---|---|
 | D1 | Turf has one stripe pattern; no checkerboard / diagonal mowing, wear in the goalmouths, divots, wet sheen. | P1 | ✅ Sprite Forge v11.33 `sforge.pitch`: five mowing patterns (one per ground), bands shaded by view direction, worn goalmouths / spots / assistants' channels, wet gloss in rain · ⬜ divots that appear during the match |
 | D2 | One lighting setup: day / sunset / night presets with floodlight look, sky with clouds. | P1 | ✅ `MatchOptions.Lighting` day / dusk / night (`--light`): floodlit nights with a white key light casting players' shadows, glow on the lamps · ⬜ clouds, choosing kick-off time in the menus |
-| D3 | Broadcast colour grade, contact shadows on the Compatibility renderer, lens flare from floodlights. | P2 | ⬜ |
+| D3 | Broadcast colour grade, contact shadows on the Compatibility renderer, lens flare from floodlights. | P2 | ✅ broadcast grade on every tier; AgX tone mapping, SSAO contact shadows on Forward+ · ⬜ lens flare |
+| D4 | Every build ran Godot's Compatibility (web / low-end) renderer: no SSAO, bounce light, reflections, TAA or soft shadows. | P1 | ✅ `RenderProfile`: desktop on Forward+ with Ultra (SSAO + SSIL + SSR, TAA, 4K soft shadows, floodlight beams and four-shadow floodlights at night) / High tiers; first-launch benchmark falls back to Performance (GL) on machines that can't carry it, and later launches start there directly; Settings > Graphics overrides |
 
 ## E. Broadcast presentation
 | # | Gap | P | Status |

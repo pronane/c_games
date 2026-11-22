@@ -8,6 +8,7 @@ config/version="2.0.0"
 run/main_scene="res://Scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility", "C#", "Forward Plus")
 config/icon="res://icon.svg"
+config/project_settings_override="user://render_override.cfg"
 boot_splash/show_image=false
 
 [autoload]
@@ -27,7 +28,8 @@ window/handheld/orientation=1
 project/assembly_name="ArenaFC"
 
 [rendering]
-renderer/rendering_method="gl_compatibility"
+renderer/rendering_method="forward_plus"
+rendering_device/fallback_to_opengl3=true
 renderer/rendering_method.mobile="gl_compatibility"
 renderer/rendering_method.web="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true

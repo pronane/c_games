@@ -157,6 +157,7 @@ public partial class Stadium : Node3D
             ShadowNormalBias = 1f,
             DirectionalShadowMaxDistance = 160f,
         };
+        RenderProfile.ApplyEnvironment(env, Lighting, sun);
         if (Lighting == "dusk") { sun.LightColor = new Color(1f, .72f, .48f); sun.LightEnergy = 1.05f; sun.RotationDegrees = new Vector3(-13f, -62f, 0); }
         // night: the "sun" becomes the floodlights' combined key - high, white, casting the players' shadows
         else if (Lighting == "night") { sun.LightColor = new Color(1f, .97f, .92f); sun.LightEnergy = .95f; sun.RotationDegrees = new Vector3(-64f, -38f, 0); }
