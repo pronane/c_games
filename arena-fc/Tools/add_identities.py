@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Add the squad identities Arena FC was not shipping (v3, v4, v7, v8 of the Sprite Forge squad) to
-Data/models/soccer_player.glb, tailored like the rest, plus the close-up shading maps (Sprite Forge v11.35).
+Data/models/soccer_player.glb, tailored like the rest, plus the close-up shading maps (Sprite Forge v11.36).
 
 The squad GLB carried five of the nine MakeHuman identities, so every match was the same five faces.  This
 conforms the other four onto Arena's skeleton (build_soccer_player.realistic_parts), tailors their kit

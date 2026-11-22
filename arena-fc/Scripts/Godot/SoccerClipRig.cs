@@ -493,7 +493,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.35) ----------------------------------------
+    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.36) ----------------------------------------
     private static Texture2D? _skinDetailN, _skinDetailR;
     private static readonly Dictionary<string, StandardMaterial3D> _shaded = new();
 
