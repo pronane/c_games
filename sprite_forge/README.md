@@ -54,6 +54,22 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.36: LODs for skinned characters (fed back from Arena FC)
+
+`sforge.skinlod` takes any skinned part down by quadric-error half-edge collapses: every vertex left is an
+original one, so UVs, skin weights, normals and flutter weights stay exact. Hems and UV seams are locked,
+flips and slivers are refused. `lod_parts` follows `LOD_PLAN`:
+- faces hidden under the kit are cut first;
+- skin just inside an opening keeps full detail;
+- the shirt and shorts keep more of their shape;
+- coarse garments stand off a hair so their chords don't sink into the body;
+- lashes, brows and the inner hair layer drop out of the far level.
+
+The plan also suggests switch distances per quality tier.
+
+    lods = SL.lod_parts(parts)       # {"body": [lod1, lod2], ...}
+    T.replace_parts(glb, out, {"v0_": {"body_lod1": lods["body"][0], ...}})
+
 ## New in v11.35: cloth flutter weights and keeper garments (fed back from Arena FC)
 
 - `tailor` writes a flutter weight per garment vertex as `TEXCOORD_1` (amplitude in metres, phase round its
