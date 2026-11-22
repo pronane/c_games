@@ -156,7 +156,8 @@ def flutter_weights(V, loops, free, amp, length):
         _, _, vt = np.linalg.svd(V[lp] - c)
         n, e1 = vt[2], vt[0]
         e2 = np.cross(n, e1)
-        d = np.abs((V - c) @ n)
+        # distance to the hem itself (its plane would also catch the chest beside a sleeve)
+        d = np.sqrt(((V[:, None, :] - V[lp][None, :, :]) ** 2).sum(-1).min(1))
         closer = d < best
         best[closer] = d[closer]
         r = V - c

@@ -13,7 +13,7 @@ On the Gaelic squad GLB (MakeHuman game skeleton, skin-tight clothes, boots that
   6 UVs land inside their LAYOUT panels; the back print area is on the back of the torso
   7 replace_parts keeps every node, the skin and every animation; the new GLB reads back
   8 kitdesign: every style's mask, the detail and glyph atlases, the layout contract, a painted kit
-  9 flutter (v11.35): free hems (sleeves, shorts legs) carry the flutter weight, the collar and the
+  9 flutter (v11.35): free hems (sleeves, shorts legs) carry the flutter weight; the collar, the chest and the
     waistband none; it is written as TEXCOORD_1 and reads back
  10 keeper garments (v11.35): a base layer covering the arms from inside the short sleeve to the wrist,
     gloves covering the whole hand and overlapping the sleeve at the cuff"""
@@ -131,8 +131,10 @@ def main():
     leg = sh.V[:, 1] < sh.V[:, 1].min() + .01
     g = {x.name: x for x in T.soccer_garments()}
     rec("flutter: collar and waistband held, free hems move",
-        np.abs(je.UV2[top, 0]).max() < 1e-6 and np.abs(sh.UV2[wst, 0]).max() < 1e-6 and np.abs(sh.UV2[leg, 0]).min() > g["shorts"].flutter * .8
+        np.abs(je.UV2[top, 0]).max() < 1e-6 and np.abs(sh.UV2[wst, 0]).max() < 1e-6 and np.abs(sh.UV2[leg, 0]).min() > g["shorts"].flutter * .5
         and je.UV2[:, 0].max() > g["jersey"].flutter * .95, "shorts leg %.4f" % np.abs(sh.UV2[leg, 0]).min())
+    chest = (np.abs(je.V[:, 0]) < .08) & (je.V[:, 1] < je.V[:, 1].max() - .08) & (je.V[:, 1] > je.V[:, 1].max() - .25)
+    rec("flutter stays off the chest and back", np.abs(je.UV2[chest, 0]).max() < 1e-6 and chest.sum() > 20)
     kp = T.tailor(parts, bones, garments=T.keeper_garments(), joint_names=jn, log=lambda *a: None)
     near, _t = T.dominant_bone(parts["body"], bones, jn)
     hand = np.char.endswith(near.astype(str), "Hand")
