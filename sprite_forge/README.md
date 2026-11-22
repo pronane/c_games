@@ -54,6 +54,18 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.35: cloth flutter weights and keeper garments (fed back from Arena FC)
+
+- `tailor` writes a flutter weight per garment vertex as `TEXCOORD_1` (amplitude in metres, phase round its
+  hem): sleeve and shorts-leg hems move, the collar and the waistband are held. A game's kit shader ripples
+  the cloth by it with the player's speed and the wind (Arena FC: `Shaders/kit.gdshader`).
+- `tailor.keeper_garments()`: a long-sleeved base layer and padded goalkeeper gloves, cut from each identity's
+  own arms and hands (`Garment.region` / `region_t`), on materials of their own (`sleeves`, `gloves`).
+- Kit fit: cloth pushed clear of the skin, hem snaps carried into the rows behind, offsets along smoothed
+  normals (no skin teeth at the collar, no folded hems); `skinshade.grade_iris` for MakeHuman's red-brown eyes.
+
+    out = T.tailor(parts, bones, garments=T.soccer_garments() + T.keeper_garments())
+
 ## New in v11.34: close-up shading and textured identities in a squad GLB (fed back from Arena FC)
 
 Arena FC shipped five of the nine squad identities, and its faces read as plastic up close: a 1-2k MakeHuman
