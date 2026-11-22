@@ -3443,6 +3443,2632 @@
    }
   },
   {
+   "name": "soccer_st_pass_01",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_01",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 23,
+    "ball_contact_frac": 0.475,
+    "footsteps": [
+     1,
+     13,
+     26,
+     40,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_02",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_02",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     12,
+     22,
+     30,
+     32,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_01",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_01",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.562,
+    "footsteps": [
+     2,
+     11,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_03",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_03",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.575,
+    "footsteps": [
+     6,
+     11,
+     19,
+     26,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_01",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_01",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 36,
+    "ball_contact_frac": 0.698,
+    "footsteps": [
+     4,
+     15,
+     17,
+     27,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_04",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_04",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.6,
+    "footsteps": [
+     4,
+     7,
+     20,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_05",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_05",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     6,
+     23,
+     35,
+     47
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_06",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_06",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.65,
+    "footsteps": [
+     6,
+     6,
+     20,
+     36
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_07",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_07",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     5,
+     16,
+     32,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_08",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_08",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.7,
+    "footsteps": [
+     2,
+     8,
+     16,
+     25,
+     43
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_09",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_09",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     6,
+     12,
+     20,
+     30,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_02",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_02",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.651,
+    "footsteps": [
+     1,
+     10,
+     15,
+     27,
+     36,
+     37,
+     42,
+     45
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_10",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_10",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.775,
+    "footsteps": [
+     11,
+     22,
+     30,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_11",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_11",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 32,
+    "ball_contact_frac": 0.675,
+    "footsteps": [
+     11,
+     24,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_12",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_12",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.7,
+    "footsteps": [
+     7,
+     13,
+     20,
+     26,
+     36,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_13",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_13",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.65,
+    "footsteps": [
+     1,
+     13,
+     24,
+     34,
+     43
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_14",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_14",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.6,
+    "footsteps": [
+     6,
+     10,
+     18,
+     23,
+     26,
+     43
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_15",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_15",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.775,
+    "footsteps": [
+     12,
+     23,
+     37
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_16",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_16",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     8,
+     12,
+     19,
+     31,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_17",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_17",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     11,
+     20,
+     26,
+     34,
+     41,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_18",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_18",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.775,
+    "footsteps": [
+     8,
+     14,
+     28,
+     32,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_19",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_19",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.6,
+    "footsteps": [
+     14,
+     19,
+     36
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_20",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_20",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.775,
+    "footsteps": [
+     8,
+     22,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_21",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_21",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.6,
+    "footsteps": [
+     8,
+     13,
+     22,
+     32,
+     38
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_03",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_03",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.558,
+    "footsteps": [
+     2,
+     15,
+     21,
+     28,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_22",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_22",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     7,
+     18,
+     28,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_23",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_23",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     8,
+     25,
+     36
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_04",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_04",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.651,
+    "footsteps": [
+     8,
+     18,
+     28,
+     37,
+     45
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_24",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_24",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.7,
+    "footsteps": [
+     1,
+     16,
+     26,
+     30,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_25",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_25",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.6,
+    "footsteps": [
+     1,
+     18,
+     26,
+     37,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_05",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_05",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.628,
+    "footsteps": [
+     10,
+     21,
+     27,
+     34,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_26",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_26",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     7,
+     16,
+     20,
+     29,
+     34,
+     37,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_27",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_27",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     8,
+     19,
+     29,
+     35,
+     36,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_28",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_28",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.7,
+    "footsteps": [
+     18,
+     25,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_29",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_29",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 32,
+    "ball_contact_frac": 0.675,
+    "footsteps": [
+     5,
+     23,
+     30,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_30",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_30",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     8,
+     17,
+     25,
+     25,
+     34
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_31",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_31",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     7,
+     14,
+     18,
+     19,
+     34,
+     43
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_32",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_32",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.5,
+    "footsteps": [
+     8,
+     14,
+     20,
+     25,
+     25,
+     37,
+     37
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_33",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_33",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.775,
+    "footsteps": [
+     4,
+     13,
+     22,
+     32,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_34",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_34",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.65,
+    "footsteps": [
+     10,
+     19,
+     28,
+     38
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_35",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_35",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.7,
+    "footsteps": [
+     6,
+     14,
+     24,
+     30,
+     34,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_36",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_36",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     7,
+     8,
+     14,
+     20,
+     23,
+     34,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_37",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_37",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.65,
+    "footsteps": [
+     11,
+     23,
+     34,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_38",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_38",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.725,
+    "footsteps": [
+     17,
+     19,
+     30,
+     36,
+     43
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_39",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_39",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.7,
+    "footsteps": [
+     10,
+     19,
+     28,
+     38,
+     47
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_40",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_40",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     17,
+     18,
+     24,
+     32,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_41",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_41",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.775,
+    "footsteps": [
+     12,
+     22,
+     25,
+     31,
+     41,
+     47
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_06",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_06",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 36,
+    "ball_contact_frac": 0.698,
+    "footsteps": [
+     4,
+     10,
+     11,
+     27,
+     30,
+     39,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_07",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_07",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.605,
+    "footsteps": [
+     2,
+     12,
+     18,
+     25,
+     35,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_42",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_42",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 23,
+    "ball_contact_frac": 0.475,
+    "footsteps": [
+     6,
+     23,
+     25,
+     32,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_43",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_43",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     17,
+     17,
+     25,
+     31,
+     35,
+     36
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_44",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_44",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 25,
+    "ball_contact_frac": 0.525,
+    "footsteps": [
+     10,
+     16,
+     22,
+     30,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_pass_45",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_pass_45",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.625,
+    "footsteps": [
+     10,
+     10,
+     18,
+     23,
+     30
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_08",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_08",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 25,
+    "ball_contact_frac": 0.488,
+    "footsteps": [
+     10,
+     19,
+     29,
+     40,
+     51
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_09",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_09",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.628,
+    "footsteps": [
+     6,
+     15,
+     23,
+     33,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_10",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_10",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.581,
+    "footsteps": [
+     4,
+     10,
+     17,
+     24,
+     33,
+     39,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_11",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_11",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 23,
+    "ball_contact_frac": 0.442,
+    "footsteps": [
+     4,
+     15,
+     21,
+     39,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_12",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_12",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.628,
+    "footsteps": [
+     6,
+     16,
+     27,
+     35,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_01",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_01",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_13",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_13",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.558,
+    "footsteps": [
+     7,
+     15,
+     23,
+     34,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_14",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_14",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.605,
+    "footsteps": [
+     4,
+     6,
+     16,
+     25,
+     33,
+     37,
+     45,
+     50
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_15",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_15",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 25,
+    "ball_contact_frac": 0.488,
+    "footsteps": [
+     2,
+     8,
+     24,
+     29,
+     29,
+     39,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_02",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_02",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 41,
+    "ball_contact_frac": 0.708,
+    "footsteps": [
+     14,
+     29,
+     45,
+     53
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_02",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_02",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_16",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_16",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.674,
+    "footsteps": [
+     10,
+     21,
+     31,
+     37
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_03",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_03",
+   "frames": 27,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     12,
+     24
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_17",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_17",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.651,
+    "footsteps": [
+     2,
+     7,
+     12,
+     21,
+     28,
+     37,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_18",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_18",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.628,
+    "footsteps": [
+     10,
+     18,
+     28,
+     29,
+     34,
+     39
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_03",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_03",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 40,
+    "ball_contact_frac": 0.688,
+    "footsteps": [
+     7,
+     24,
+     30,
+     36,
+     45,
+     51,
+     56
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_19",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_19",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.558,
+    "footsteps": [
+     2,
+     12,
+     22,
+     29,
+     30,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_01",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_01",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     8,
+     19,
+     30,
+     31,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_lofted_20",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_lofted_20",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.651,
+    "footsteps": [
+     4,
+     16,
+     25,
+     36
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_04",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_04",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 37,
+    "ball_contact_frac": 0.646,
+    "footsteps": [
+     1,
+     16,
+     24,
+     33,
+     41,
+     45
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_04",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_04",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_01",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_01",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     4,
+     8,
+     23,
+     36
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_02",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_02",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     8,
+     16,
+     23,
+     24,
+     29,
+     38,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_cross_01",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_cross_01",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 27,
+    "ball_contact_frac": 0.512,
+    "footsteps": [
+     7,
+     16,
+     23,
+     31,
+     39,
+     50
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_03",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_03",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     11,
+     19,
+     29,
+     40,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_05",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_05",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     11
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_02",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_02",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     7,
+     8,
+     13,
+     17,
+     35,
+     37
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_06",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_06",
+   "frames": 19,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     10
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_03",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_03",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     5,
+     26,
+     31
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_04",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_04",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     7,
+     8,
+     16,
+     23,
+     24,
+     31,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_05",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_05",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 39,
+    "ball_contact_frac": 0.667,
+    "footsteps": [
+     4,
+     14,
+     22,
+     31,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_04",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_04",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     5,
+     8,
+     19,
+     23,
+     37,
+     38
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_07",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_07",
+   "frames": 19,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     11
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_08",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_08",
+   "frames": 18,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     10
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_05",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_05",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     6,
+     12,
+     20,
+     24,
+     35,
+     38,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_09",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_09",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     14
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_06",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_06",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.583,
+    "footsteps": [
+     10,
+     18,
+     29,
+     36,
+     52
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_10",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_10",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     7,
+     18
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_11",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_11",
+   "frames": 20,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_12",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_12",
+   "frames": 27,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     4,
+     9,
+     17
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_05",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_05",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     2,
+     10,
+     18,
+     20,
+     29,
+     35
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_06",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_06",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     6,
+     13,
+     19,
+     24,
+     26,
+     31,
+     40
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_13",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_13",
+   "frames": 20,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     11
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_06",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_06",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     6,
+     13,
+     20,
+     25,
+     35,
+     35
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_14",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_14",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_07",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_07",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 44,
+    "ball_contact_frac": 0.75,
+    "footsteps": [
+     7,
+     14,
+     21,
+     25,
+     37,
+     39,
+     52
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_15",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_15",
+   "frames": 24,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     18
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_16",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_16",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     7,
+     20
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_08",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_08",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 39,
+    "ball_contact_frac": 0.667,
+    "footsteps": [
+     7,
+     13,
+     21,
+     22,
+     36,
+     44,
+     52
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_17",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_17",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     4,
+     13
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_07",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_07",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     2,
+     10,
+     16,
+     23,
+     26,
+     32
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_cross_02",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_cross_02",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.581,
+    "footsteps": [
+     10,
+     18,
+     24,
+     36,
+     45
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_18",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_18",
+   "frames": 20,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_block_08",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_block_08",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.571,
+    "footsteps": [
+     5,
+     14,
+     18,
+     32,
+     32
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_19",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_19",
+   "frames": 20,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     7,
+     10
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_20",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_20",
+   "frames": 18,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     1,
+     8
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_07",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_07",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     1,
+     10,
+     16,
+     28,
+     34,
+     40,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_08",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_08",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     4,
+     6,
+     13,
+     18,
+     22,
+     26,
+     26,
+     32,
+     42,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_09",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_09",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     6,
+     14,
+     20,
+     25,
+     31,
+     46
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_cross_03",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_cross_03",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.581,
+    "footsteps": [
+     11,
+     17,
+     25,
+     36,
+     37,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_09",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_09",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 44,
+    "ball_contact_frac": 0.75,
+    "footsteps": [
+     28,
+     33,
+     44,
+     47,
+     52
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_21",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_21",
+   "frames": 17,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     14
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_22",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_22",
+   "frames": 27,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     11,
+     21
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_10",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_10",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     4,
+     11,
+     18,
+     24,
+     31,
+     37,
+     42
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_23",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_23",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     11
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_carry_24",
+   "loop": true,
+   "category": "Ball",
+   "source": "mocap:st_carry_24",
+   "frames": 15,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     2,
+     8
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_11",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_11",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     8,
+     13,
+     20,
+     30,
+     31,
+     37,
+     43
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_tackle_12",
+   "loop": false,
+   "category": "Defence",
+   "source": "mocap:st_tackle_12",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.55,
+    "footsteps": [
+     14,
+     18,
+     25,
+     31,
+     36,
+     41
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_cross_04",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_cross_04",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 27,
+    "ball_contact_frac": 0.512,
+    "footsteps": [
+     12,
+     21,
+     28,
+     31,
+     37,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_free_kick_10",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_free_kick_10",
+   "frames": 59,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.562,
+    "footsteps": [
+     2,
+     10,
+     16,
+     24,
+     30,
+     34,
+     45
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_cross_05",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_cross_05",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.674,
+    "footsteps": [
+     2,
+     12,
+     19,
+     25,
+     33,
+     34,
+     39,
+     44,
+     48
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_shot_01",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_shot_01",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.535,
+    "footsteps": [
+     11,
+     15,
+     18,
+     22,
+     24,
+     34,
+     37,
+     47
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
+   "name": "soccer_st_cross_06",
+   "loop": false,
+   "category": "Ball",
+   "source": "mocap:st_cross_06",
+   "frames": 53,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.535,
+    "footsteps": [
+     4,
+     10,
+     15,
+     22,
+     24,
+     34,
+     37,
+     42,
+     46,
+     51
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   }
+  },
+  {
    "name": "ref_whistle",
    "loop": false,
    "category": "Official",
@@ -3762,10 +6388,8 @@
    0.2116
   ],
   "mean_dir_err_deg": 0.0,
-  "seconds": 12.7
+  "seconds": 26.2
  },
- "kit_atlas": "textures/kit/kit_layout.json",
- "sprite_forge_tailor": "v11.30 sforge.tailor + sforge.kitdesign",
  "officials": {
   "pack": "sforge.officials v11.31",
   "props": "models/officials_props.glb",
