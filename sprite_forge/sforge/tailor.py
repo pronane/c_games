@@ -735,12 +735,15 @@ def qa(out, bones):
 
 
 # ---------------------------------------------------------------- write back into a GLB
-def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, images=None, image_filter=None):
+def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, images=None, image_filter=None,
+                  clips_from=None):
     """Swap mesh nodes in a skinned GLB.  `by_prefix` = {"v0_": {"jersey": Part, "body": Part, ...}}:
     each named part replaces prefix+name (or is added).  Nodes, skin, animations, images and other
     meshes are kept; buffers are rebuilt so dropped geometry is not carried.  New garment parts get
     the material named like the part (created plain white if missing).  `image_filter(index, image, bytes)`
-    may return new PNG bytes for any image the GLB already holds (e.g. skinshade.grade_iris on eye maps)."""
+    may return new PNG bytes for any image the GLB already holds (e.g. skinshade.grade_iris on eye maps).
+    `clips_from`: another GLB of the same skeleton whose animations replace this one's (matched to nodes by
+    name) - how a game keeps its newest clips when the meshes were rebuilt on an older copy (v11.36)."""
     j, buf = read_glb(glb_in)
     out = _Out()
     acc_map = {}
@@ -821,10 +824,33 @@ def replace_parts(glb_in, glb_out, by_prefix, materials=None, extras=None, image
     sk = dict(j["skins"][0])
     sk["inverseBindMatrices"] = keep_acc(sk["inverseBindMatrices"])
     anims = []
-    for an in j.get("animations", []):
-        sm = [{"input": keep_acc(s["input"]), "output": keep_acc(s["output"]),
-               "interpolation": s.get("interpolation", "LINEAR")} for s in an["samplers"]]
-        anims.append({"name": an.get("name", "anim"), "channels": an["channels"], "samplers": sm})
+    if clips_from is not None:
+        jc, bc = read_glb(clips_from)
+        by_name = {nd.get("name"): k for k, nd in enumerate(nodes)}
+        missing = set()
+        for an in jc.get("animations", []):
+            ch, used = [], {}
+            for c in an["channels"]:
+                nm = jc["nodes"][c["target"]["node"]].get("name")
+                if nm not in by_name:
+                    missing.add(nm)
+                    continue
+                used.setdefault(c["sampler"], len(used))
+                ch.append({"sampler": used[c["sampler"]], "target": dict(c["target"], node=by_name[nm])})
+            sm = [None] * len(used)
+            for si, k in used.items():
+                s0 = an["samplers"][si]
+                sm[k] = {"input": out.copy_acc(jc, bc, s0["input"]), "output": out.copy_acc(jc, bc, s0["output"]),
+                         "interpolation": s0.get("interpolation", "LINEAR")}
+            if ch:
+                anims.append({"name": an.get("name", "anim"), "channels": ch, "samplers": sm})
+        if missing:
+            raise ValueError("clips_from targets nodes this GLB lacks: %s" % sorted(missing)[:8])
+    else:
+        for an in j.get("animations", []):
+            sm = [{"input": keep_acc(s["input"]), "output": keep_acc(s["output"]),
+                   "interpolation": s.get("interpolation", "LINEAR")} for s in an["samplers"]]
+            anims.append({"name": an.get("name", "anim"), "channels": an["channels"], "samplers": sm})
     imgs = []
     for im in j.get("images", []):
         im2 = dict(im)

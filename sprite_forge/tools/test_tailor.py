@@ -15,6 +15,7 @@ On the Gaelic squad GLB (MakeHuman game skeleton, skin-tight clothes, boots that
   8 kitdesign: every style's mask, the detail and glyph atlases, the layout contract, a painted kit
   9 flutter (v11.35): free hems (sleeves, shorts legs) carry the flutter weight; the collar, the chest and the
     waistband none; it is written as TEXCOORD_1 and reads back
+ 11 clips_from (v11.36): replace_parts takes the clips of another GLB of the same skeleton
  10 keeper garments (v11.35): a base layer covering the arms from inside the short sleeve to the wrist,
     gloves covering the whole hand and overlapping the sleeve at the cuff"""
 from __future__ import annotations
@@ -158,6 +159,12 @@ def main():
             and len(j1.get("animations", [])) == len(j0.get("animations", [])))
         p2 = T.read_parts(dst, "v0_")
         rec("tailored garments read back", len(p2["jersey"].F) == len(out["jersey"].F) and "kit_atlas" in j1["asset"]["extras"])
+        dst2 = os.path.join(td, "c.glb")
+        T.replace_parts(dst, dst2, {}, clips_from=SRC)
+        j2, _ = read_glb(dst2)
+        rec("clips_from: the clips of another GLB move over by node name",
+            [a["name"] for a in j2.get("animations", [])] == [a["name"] for a in j0.get("animations", [])]
+            and len(j2["nodes"]) == len(j1["nodes"]))
         rec("flutter weights read back (TEXCOORD_1)", p2["jersey"].UV2 is not None
             and np.allclose(p2["jersey"].UV2, out["jersey"].UV2, atol=1e-6))
         lay = KD.export(os.path.join(td, "kit"))
