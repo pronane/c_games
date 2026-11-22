@@ -24,6 +24,7 @@ public partial class Stadium : Node3D
     /// <summary>Update weather visuals (rain, snow, fog). Call per frame.</summary>
     public void UpdateWeather()
     {
+        _turfMat?.SetShaderParameter("wetness", ArenaFC.Core.Weather.Raining ? .8f : 0f);
         if (_rain != null)
             _rain.Emitting = ArenaFC.Core.Weather.Raining;
         if (_snow != null)
@@ -141,6 +142,7 @@ public partial class Stadium : Node3D
             AdjustmentContrast = 1.05f,
             AdjustmentSaturation = 1.0f,
         };
+        ApplyLighting(env, skyMat);
         var world = new WorldEnvironment { Name = "WorldEnvironment", Environment = env };
         AddChild(world);
 
@@ -155,6 +157,9 @@ public partial class Stadium : Node3D
             ShadowNormalBias = 1f,
             DirectionalShadowMaxDistance = 160f,
         };
+        if (Lighting == "dusk") { sun.LightColor = new Color(1f, .72f, .48f); sun.LightEnergy = 1.05f; sun.RotationDegrees = new Vector3(-13f, -62f, 0); }
+        // night: the "sun" becomes the floodlights' combined key - high, white, casting the players' shadows
+        else if (Lighting == "night") { sun.LightColor = new Color(1f, .97f, .92f); sun.LightEnergy = .95f; sun.RotationDegrees = new Vector3(-64f, -38f, 0); }
         AddChild(sun);
 
         // --- Pitch + outer apron ---
@@ -162,13 +167,11 @@ public partial class Stadium : Node3D
             Mat(new Color(.055f, .16f, .085f)), new Vector3(0, -.18f, 0), "Apron");
         AddChild(apron);
 
-        var pitchShader = GD.Load<Shader>("res://Shaders/pitch.gdshader");
-        var pitchMat = new ShaderMaterial { Shader = pitchShader };
-        var pitch = new MeshInstance3D
+        var pitch = BuildTurf(stadiumIndex) ?? new MeshInstance3D
         {
             Name = "Pitch",
             Mesh = new PlaneMesh { Size = new Vector2(Mx.PitchLength, Mx.PitchWidth) },
-            MaterialOverride = pitchMat,
+            MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://Shaders/pitch.gdshader") },
             Position = new Vector3(0, LineY, 0),
         };
         AddChild(pitch);

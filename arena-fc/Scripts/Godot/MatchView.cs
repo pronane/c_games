@@ -156,6 +156,7 @@ public partial class MatchView : Node3D
         // ends, crowd and flags in the two clubs' colours (Sprite Forge ground, v11.32)
         stadium.HomeColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.HomeClub, 0, Clubs.All.Length - 1)].Primary);
         stadium.AwayColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.AwayClub, 0, Clubs.All.Length - 1)].Primary);
+        stadium.Lighting = _opts.Lighting;
         _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
         // Empty grounds still get the stadium, just not the crowd.
         stadium.Build(_crowd.GetCrowdCount() > 0, _opts.Quality, StadiumIndexFor(_opts.HomeClub));
@@ -372,6 +373,7 @@ public partial class MatchView : Node3D
         var stadium = GetNodeOrNull<Stadium>("Stadium");
         stadium?.UpdateCrowd(dt);
         stadium?.UpdateWeather();
+        UpdateKitWeathering(dt);
         Hud.Update(Engine, dt, Input.Charge, Cam.ModeName);
         _modeOverlay?.UpdateOverlay(Engine, _coach);
         AutoplayReport();
@@ -543,6 +545,30 @@ public partial class MatchView : Node3D
         }
         _lastSoundEvent = newest;
     }
+
+    private float _kitTimer;
+    /// <summary>Kits soak in the rain and pick up grass stains as the match goes on (kit.gdshader wet / dirt).
+    /// Players who go to ground (slides, tackles, dives, falls) get dirtier.  Presentation only.</summary>
+    private void UpdateKitWeathering(float dt)
+    {
+        _kitTimer -= dt;
+        if (_kitTimer > 0f) return;
+        _kitTimer = .5f;
+        float wet = ArenaFC.Core.Weather.Raining ? .85f : 0f;
+        float played = Math.Clamp(Engine.State.Clock / (Math.Max(1f, _opts.HalfMinutes) * 120f), 0f, 1f);
+        for (int i = 0; i < Rigs.Length; i++)
+        {
+            var kit = Rigs[i].Soccer?.KitShader;
+            if (kit == null) continue;
+            var p = Engine.State.Players[i];
+            if (p.Action is "slide" or "tackle" or "dive" or "fall" or "foul" || p.Action.StartsWith("keeper_dive"))
+                _grime[i] = Math.Min(1f, _grime[i] + .12f);
+            float dirt = Math.Clamp(played * .35f + _grime[i] * .55f + wet * .2f, 0f, .9f);
+            kit.SetShaderParameter("wet", wet);
+            kit.SetShaderParameter("dirt", dirt);
+        }
+    }
+    private float[] _grime = new float[64];
 
     private void Sync(float dt)
     {
