@@ -188,7 +188,7 @@ M("sidestep", "Locomotion", "evasive move", keys=K(
     (0.35, P(READY, hips=(10, 0, 14), leg_L=(30, 32, 0), leg_R=(25, -6, 0), knee_L=30, knee_R=60, chest=(4, 0, -12),
              arm_L=(15, 40, 0), arm_R=(30, 20, 0), pos=(0.15, 0))),
     (0.7, P(READY, hips=(10, 0, -6), leg_L=(30, 10, 0), leg_R=(25, 20, 0), pos=(0.30, 0))),
-    (1, P(READY, pos=(0.34, 0)))))     # v11.26: the cut keeps its ground (it used to slide back to where it began)
+    (1, P(READY, pos=(0.34, 0)))))     # v11.27: the cut keeps its ground (it used to slide back to where it began)
 M("juke_feint", "Locomotion", "fake move", keys=K(
     (0, P(READY, HOLD)),
     (0.3, P(READY, HOLD, hips=(14, -30, -14), chest=(8, -20, -8), leg_R=(40, -20, 0), knee_R=70, leg_L=(10, 10, 0), knee_L=25)),
@@ -332,7 +332,7 @@ M("ko", "Contact", "knocked out", keys=K(
     (0, P(FIGHT)), (0.35, P(FIGHT, hips=(-35, 0, 0), neck=(30, 0, 0), arm_L=(60, 70, 0), arm_R=(60, 70, 0), lift=0.1, pos=(0, -0.3))),
     (0.7, P(LIE_BACK, pos=(0, -0.7))), (1, P(LIE_BACK, pos=(0, -0.7)))))
 
-# --- v11.26 hurling, rugby and Aussie rules (CC0, made here). The hurley is a prop on the right hand (equip),
+# --- v11.27 hurling, rugby and Aussie rules (CC0, made here). The hurley is a prop on the right hand (equip),
 #     so the strikes swing the right hand through the ball's plane with the left hand on the handle above it.
 HURL_READY = P(READY, arm_L=(40, -18, 0), elbow_L=45, arm_R=(32, 8, 0), elbow_R=55, wrist_R=-10)
 

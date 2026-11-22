@@ -440,7 +440,7 @@ var manifestClips = ClipManifestLoader.Parse(File.ReadAllText("Data/clips/clip_m
 var manifestEngine = new MotionEngine();
 manifestEngine.LoadClips(manifestClips);
 Check("shared Sprite Forge clip manifest loads all 18-bone clips",
-      manifestEngine.ClipCount == 161 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
+      manifestEngine.ClipCount == 186 && manifestEngine.TryGetClip("soccer_run", out var runMeta)
       && runMeta.BoneCount == 18 && runMeta.Loop && runMeta.FootPlantFrames.Length == 2
       && runMeta.FootPlantSides.Length == 2 && runMeta.FootPlantSides[1] == FootSide.Right,
       $"clips={manifestEngine.ClipCount}");
@@ -448,9 +448,11 @@ Check("shared Sprite Forge clip manifest loads all 18-bone clips",
 // stances filed there at speed 0 made standing players hold arms-up poses.
 string[] gait = { "soccer_backpedal", "soccer_dribble", "soccer_jockey", "soccer_jog", "soccer_run",
     "soccer_run_ball", "soccer_sidestep", "soccer_sprint", "soccer_strafe_l", "soccer_strafe_r", "soccer_walk" };
-// (Motion-captured gait cycles - CMU runs and jogs, SkillCorner match dribble loops - are gaits too.)
+// (Motion-captured gait cycles - CMU runs and jogs, SkillCorner match dribble loops, run loops from
+// our own match video - are gaits too.)
 bool IsGait(string id) => gait.Contains(id) || id.StartsWith("soccer_mocap_run") || id.StartsWith("soccer_mocap_jog")
-                          || (id.StartsWith("soccer_sc_carry_") && manifestClips.First(c => c.Id == id).Loop);
+                          || (id.StartsWith("soccer_sc_carry_") && manifestClips.First(c => c.Id == id).Loop)
+                          || (id.StartsWith("soccer_vo_run_") && manifestClips.First(c => c.Id == id).Loop);
 var locoIds = manifestClips.Where(c => c.Category == ClipCategory.Locomotion).Select(c => c.Id).OrderBy(x => x).ToArray();
 Check("clip manifest: Locomotion holds only gait cycles", locoIds.All(IsGait) && gait.All(g => locoIds.Contains(g)),
       string.Join(",", locoIds.Where(x => !IsGait(x))));
@@ -659,6 +661,15 @@ Check("event-driven one-shots never enter motion database search",
                 }
     Check("real-match motion (SkillCorner) is picked for shots and passes",
           realHits.Any(h => h.StartsWith("Shoot")) && realHits.Any(h => h.StartsWith("Pass")), string.Join(",", realHits));
+    // Our own match video (Veo, Sprite Forge match capture): its run loops are gait
+    // candidates at jogging-to-running speeds.
+    var ownRuns = new HashSet<string>();
+    foreach (float v in new[] { 1.5f, 2f, 2.5f, 3f, 3.5f, 4f })
+    {
+        string g = Gait(v);
+        if (g.StartsWith("soccer_vo_run_")) ownRuns.Add(g);
+    }
+    Check("run loops from our own match video are picked when jogging", ownRuns.Count > 0, string.Join(",", ownRuns));
 }
 var dribbleA = new DribbleState { TouchTimer = 0f };
 var dribbleB = new DribbleState { TouchTimer = 0f };

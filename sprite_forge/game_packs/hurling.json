@@ -18,7 +18,7 @@
   "sport_hurley@hand_r",
   "sport_hurl_helmet@head"
  ],
- "notes": "v11.26. \"equip\" puts library/props/sport_hurley in the right hand and sport_hurl_helmet on the head (CC0 props made by tools/make_sport_props.py); --attach replaces them and --no-equip leaves them off. A mannequin build draws the mannequin as a library rig so the props can be attached. ball_contact is the frame the bas meets the sliotar.",
+ "notes": "v11.27. \"equip\" puts library/props/sport_hurley in the right hand and sport_hurl_helmet on the head (CC0 props made by tools/make_sport_props.py); --attach replaces them and --no-equip leaves them off. A mannequin build draws the mannequin as a library rig so the props can be attached. ball_contact is the frame the bas meets the sliotar.",
  "moves": [
   {
    "name": "idle",

@@ -762,7 +762,7 @@ v9:
     v115 = b.add_argument_group("v11.5 game packs, motion sets, game_character.json")
     v115.add_argument("--game", help="game-type pack: soccer, boxing, fighting, gaelic, ... (forge.py game list) or a path to your own JSON")
     v115.add_argument("--no-equip", dest="no_equip", action="store_true",
-                      help="v11.26: leave off the props a game pack equips (the hurling pack's hurley and helmet)")
+                      help="v11.27: leave off the props a game pack equips (the hurling pack's hurley and helmet)")
     v115.add_argument("--motion-set", dest="motion_set",
                       help="named recorded set to read first (forge.py motion sets). 'off' ignores the saved default. Missing moves fall back to the starter, then the procedural motion.")
     v9x.add_argument("--framedata", action="store_true", help="hit / hurt boxes + startup / active / recovery -> framedata.json + framedata.cfg")

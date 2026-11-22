@@ -40,7 +40,9 @@ jobs:
       - run: python tools/test_roster_look.py
       # v11.25: per-pixel textures and smooth light in sprites, HD frames on every pack, the sports idle
       - run: python tools/test_render_quality.py
-      # v11.26: hurling, Aussie rules and rugby packs, the hurley and helmet, rugby / guernsey kit cuts
+      # v11.26: match capture (tracker, 2D kick detector, the committed lifter round trip, merge)
+      - run: pip install onnxruntime && python tools/test_matchcapture.py
+      # v11.27: hurling, Aussie rules and rugby packs, the hurley and helmet, rugby / guernsey kit cuts
       - run: python tools/test_new_sports.py
       - uses: actions/upload-artifact@v4
         if: always()

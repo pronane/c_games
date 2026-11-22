@@ -235,7 +235,7 @@ def load_lib(path):
 def pack_clips(pack, library):
     """(move, clip path or "procedural:<motion>", record) for each move of a game pack: the clip the build would pick
     (its prefer list, then its own motion, then its library name, from your library, then the starter), or the
-    procedural motion the build falls back to when there is no clip. v11.26: asks the build's own resolver
+    procedural motion the build falls back to when there is no clip. v11.27: asks the build's own resolver
     (sforge.motionset), so a pack's "own" motion (hurl_strike, rugby_try) is what is checked and shown."""
     from sforge import gamepack as GP, motionlib as ML, motionset as MS
     from sforge.build import BuildConfig
