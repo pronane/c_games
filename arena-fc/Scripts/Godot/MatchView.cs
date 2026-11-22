@@ -153,6 +153,9 @@ public partial class MatchView : Node3D
         // Named so the per-frame weather/crowd hooks find it (they looked for a
         // sibling "../Stadium", so rain never showed and the crowd never celebrated).
         var stadium = new Stadium { Name = "Stadium" };
+        // ends, crowd and flags in the two clubs' colours (Sprite Forge ground, v11.32)
+        stadium.HomeColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.HomeClub, 0, Clubs.All.Length - 1)].Primary);
+        stadium.AwayColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.AwayClub, 0, Clubs.All.Length - 1)].Primary);
         _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
         // Empty grounds still get the stadium, just not the crowd.
         stadium.Build(_crowd.GetCrowdCount() > 0, _opts.Quality, StadiumIndexFor(_opts.HomeClub));

@@ -205,100 +205,105 @@ public partial class Stadium : Node3D
             goal.AddChild(top);
         }
 
-        // --- Stands + crowd ---
+        // --- Ground, crowd and boards: Sprite Forge sforge.stadium (v11.32) when built, else the old stands ---
+        bool sfGround = BuildSpriteForgeGround(stadiumInfo, q, fullCrowd);
         var concrete = Mat(new Color(.15f, .17f, .20f));
-        var seats = new Material[]
+        if (!sfGround)
         {
-            Mat(new Color(.09f, .12f, .17f)),
-            Mat(new Color(.10f, .14f, .16f)),
-            Mat(new Color(.13f, .11f, .16f)),
-        };
-        int rows = 9;
-        for (int side = 0; side < 4; side++)
-        {
-            bool alongX = side < 2;
-            float s = side % 2 == 0 ? -1f : 1f;
-            for (int r = 0; r < rows; r++)
+            // --- Stands + crowd ---
+            var seats = new Material[]
             {
-                float dist = (alongX ? Mx.HalfWidth + 8f : Mx.HalfLength + 8f) + r * 2.1f;
-                float height = .8f + r * 1.25f;
-                Vector3 pos = alongX ? new Vector3(0, height * .5f - .35f, s * dist)
-                                     : new Vector3(s * dist, height * .5f - .35f, 0);
-                Vector3 size = alongX ? new Vector3(Mx.PitchLength + 42f + r * 3f, height, 2.1f)
-                                      : new Vector3(2.1f, height, Mx.PitchWidth + 42f + r * 3f);
-                Material rowMaterial = r % 2 == 0 ? concrete : seats[(r + side) % seats.Length];
-                AddChild(Mesh(new BoxMesh { Size = size }, rowMaterial, pos, $"Stand{side}_{r}"));
-            }
-        }
-        if (fullCrowd) AddChild(BuildCrowd(2400));
-
-        // --- Roof ring (P4) — thin boxes above the top row of stands ---
-        var roofMat = Mat(new Color(.22f, .24f, .28f), .6f);
-        float roofY = .8f + 9 * 1.25f + 2f; // Above top stand row
-        float roofDistX = Mx.HalfWidth + 8f + 8 * 2.1f + 2f;
-        float roofDistZ = Mx.HalfLength + 8f + 8 * 2.1f + 2f;
-        // North/South roof (along X)
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
-            new Vector3(0, roofY, -roofDistX), "RoofNorth"));
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
-            new Vector3(0, roofY, roofDistX), "RoofSouth"));
-        // East/West roof (along Z)
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
-            new Vector3(-roofDistZ, roofY, 0), "RoofWest"));
-        AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
-            new Vector3(roofDistZ, roofY, 0), "RoofEast"));
-
-        // --- LED boards (P4) — animated scrolling panels around pitch ---
-        var ledShader = GD.Load<Shader>("res://Shaders/led_board.gdshader");
-        for (int i = 0; i < 12; i++)
-        {
-            bool alongX = i < 6;
-            float t = (i % 6) / 5f;
-            var ledMat = new ShaderMaterial { Shader = ledShader };
-            // Alternate colors for variety
-            ledMat.SetShaderParameter("color_a", i % 2 == 0
-                ? new Color(.1f, .6f, 1f) : new Color(1f, .3f, .1f));
-            var led = new MeshInstance3D
-            {
-                Name = $"LED_{i}",
-                Mesh = new PlaneMesh { Size = alongX
-                    ? new Vector2(12f, 1f) : new Vector2(1f, 12f) },
-                MaterialOverride = ledMat,
+                Mat(new Color(.09f, .12f, .17f)),
+                Mat(new Color(.10f, .14f, .16f)),
+                Mat(new Color(.13f, .11f, .16f)),
             };
-            if (alongX)
+            int rows = 9;
+            for (int side = 0; side < 4; side++)
             {
-                led.Position = new Vector3(Mx.Lerp(-Mx.HalfLength + 6f, Mx.HalfLength - 6f, t), .5f, -Mx.HalfWidth - .8f);
+                bool alongX = side < 2;
+                float s = side % 2 == 0 ? -1f : 1f;
+                for (int r = 0; r < rows; r++)
+                {
+                    float dist = (alongX ? Mx.HalfWidth + 8f : Mx.HalfLength + 8f) + r * 2.1f;
+                    float height = .8f + r * 1.25f;
+                    Vector3 pos = alongX ? new Vector3(0, height * .5f - .35f, s * dist)
+                                         : new Vector3(s * dist, height * .5f - .35f, 0);
+                    Vector3 size = alongX ? new Vector3(Mx.PitchLength + 42f + r * 3f, height, 2.1f)
+                                          : new Vector3(2.1f, height, Mx.PitchWidth + 42f + r * 3f);
+                    Material rowMaterial = r % 2 == 0 ? concrete : seats[(r + side) % seats.Length];
+                    AddChild(Mesh(new BoxMesh { Size = size }, rowMaterial, pos, $"Stand{side}_{r}"));
+                }
             }
-            else
-            {
-                led.Position = new Vector3(-Mx.HalfLength - .8f, .5f, Mx.Lerp(-Mx.HalfWidth + 6f, Mx.HalfWidth - 6f, t));
-                led.RotationDegrees = new Vector3(0, 90, 0);
-            }
-            AddChild(led);
-        }
+            if (fullCrowd) AddChild(BuildCrowd(2400));
 
-        // --- Advertising boards ---
-        string[] boards = { "ARENA FC", "FAIR PLAY", "GODOT 4.7", "ANY DEVICE", "EST. 2026", "MATCH DAY", "GLB EXPORT", "OPEN RIGS" };
-        for (int i = 0; i < 8; i++)
-        {
-            bool alongX = true;
-            float t = i / 7f;
-            var label = new Label3D
+            // --- Roof ring (P4) — thin boxes above the top row of stands ---
+            var roofMat = Mat(new Color(.22f, .24f, .28f), .6f);
+            float roofY = .8f + 9 * 1.25f + 2f; // Above top stand row
+            float roofDistX = Mx.HalfWidth + 8f + 8 * 2.1f + 2f;
+            float roofDistZ = Mx.HalfLength + 8f + 8 * 2.1f + 2f;
+            // North/South roof (along X)
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
+                new Vector3(0, roofY, -roofDistX), "RoofNorth"));
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(Mx.PitchLength + 50f, .4f, 6f) }, roofMat,
+                new Vector3(0, roofY, roofDistX), "RoofSouth"));
+            // East/West roof (along Z)
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
+                new Vector3(-roofDistZ, roofY, 0), "RoofWest"));
+            AddChild(Mesh(new BoxMesh { Size = new Vector3(6f, .4f, Mx.PitchWidth + 50f) }, roofMat,
+                new Vector3(roofDistZ, roofY, 0), "RoofEast"));
+
+            // --- LED boards (P4) — animated scrolling panels around pitch ---
+            var ledShader = GD.Load<Shader>("res://Shaders/led_board.gdshader");
+            for (int i = 0; i < 12; i++)
             {
-                Text = boards[i % boards.Length],
-                FontSize = 56,
-                PixelSize = .016f,
-                Modulate = new Color(.95f, .95f, .95f),
-                OutlineSize = 0,
-                DoubleSided = true,
-            };
-            if (alongX) { label.Position = new Vector3(Mx.Lerp(-Mx.HalfLength, Mx.HalfLength, t), .9f, -Mx.HalfWidth - 1.1f); }
-            else
-            {
-                label.Position = new Vector3(Mx.HalfLength + 1.1f, .9f, Mx.Lerp(-Mx.HalfWidth, Mx.HalfWidth, t));
-                label.RotationDegrees = new Vector3(0, -90, 0);
+                bool alongX = i < 6;
+                float t = (i % 6) / 5f;
+                var ledMat = new ShaderMaterial { Shader = ledShader };
+                // Alternate colors for variety
+                ledMat.SetShaderParameter("color_a", i % 2 == 0
+                    ? new Color(.1f, .6f, 1f) : new Color(1f, .3f, .1f));
+                var led = new MeshInstance3D
+                {
+                    Name = $"LED_{i}",
+                    Mesh = new PlaneMesh { Size = alongX
+                        ? new Vector2(12f, 1f) : new Vector2(1f, 12f) },
+                    MaterialOverride = ledMat,
+                };
+                if (alongX)
+                {
+                    led.Position = new Vector3(Mx.Lerp(-Mx.HalfLength + 6f, Mx.HalfLength - 6f, t), .5f, -Mx.HalfWidth - .8f);
+                }
+                else
+                {
+                    led.Position = new Vector3(-Mx.HalfLength - .8f, .5f, Mx.Lerp(-Mx.HalfWidth + 6f, Mx.HalfWidth - 6f, t));
+                    led.RotationDegrees = new Vector3(0, 90, 0);
+                }
+                AddChild(led);
             }
-            AddChild(label);
+
+            // --- Advertising boards ---
+            string[] boards = { "ARENA FC", "FAIR PLAY", "GODOT 4.7", "ANY DEVICE", "EST. 2026", "MATCH DAY", "GLB EXPORT", "OPEN RIGS" };
+            for (int i = 0; i < 8; i++)
+            {
+                bool alongX = true;
+                float t = i / 7f;
+                var label = new Label3D
+                {
+                    Text = boards[i % boards.Length],
+                    FontSize = 56,
+                    PixelSize = .016f,
+                    Modulate = new Color(.95f, .95f, .95f),
+                    OutlineSize = 0,
+                    DoubleSided = true,
+                };
+                if (alongX) { label.Position = new Vector3(Mx.Lerp(-Mx.HalfLength, Mx.HalfLength, t), .9f, -Mx.HalfWidth - 1.1f); }
+                else
+                {
+                    label.Position = new Vector3(Mx.HalfLength + 1.1f, .9f, Mx.Lerp(-Mx.HalfWidth, Mx.HalfWidth, t));
+                    label.RotationDegrees = new Vector3(0, -90, 0);
+                }
+                AddChild(label);
+            }
         }
 
         // --- Rain particles (P5) — visible when Weather.Raining ---
@@ -392,26 +397,39 @@ public partial class Stadium : Node3D
         };
         AddChild(_jumbotronLabel);
 
-        // --- Floodlights ---
-        for (int i = 0; i < 4; i++)
+        if (!sfGround)
         {
-            float x = (i < 2 ? -1 : 1) * (Mx.HalfLength + 18f);
-            float z = (i % 2 == 0 ? -1 : 1) * (Mx.HalfWidth + 14f);
-            AddChild(Mesh(new CylinderMesh { TopRadius = .35f, BottomRadius = .6f, Height = 32f, RadialSegments = 8 },
-                concrete, new Vector3(x, 16f, z), "FloodPole"));
-            var panel = Mesh(new BoxMesh { Size = new Vector3(6f, 3f, .5f) },
-                Mat(new Color(1f, .97f, .85f), .4f, 0f, new Color(1.6f, 1.5f, 1.2f)),
-                new Vector3(x, 33f, z), "FloodPanel");
-            panel.RotationDegrees = new Vector3(0, x > 0 ? -90 : 90, 0);
-            AddChild(panel);
-            var lamp = new OmniLight3D
+            // --- Floodlights ---
+            for (int i = 0; i < 4; i++)
             {
-                LightColor = new Color(1f, .95f, .86f),
-                LightEnergy = 2.2f,
-                OmniRange = 95f,
-                Position = new Vector3(x, 31f, z),
-            };
-            AddChild(lamp);
+                float x = (i < 2 ? -1 : 1) * (Mx.HalfLength + 18f);
+                float z = (i % 2 == 0 ? -1 : 1) * (Mx.HalfWidth + 14f);
+                AddChild(Mesh(new CylinderMesh { TopRadius = .35f, BottomRadius = .6f, Height = 32f, RadialSegments = 8 },
+                    concrete, new Vector3(x, 16f, z), "FloodPole"));
+                var panel = Mesh(new BoxMesh { Size = new Vector3(6f, 3f, .5f) },
+                    Mat(new Color(1f, .97f, .85f), .4f, 0f, new Color(1.6f, 1.5f, 1.2f)),
+                    new Vector3(x, 33f, z), "FloodPanel");
+                panel.RotationDegrees = new Vector3(0, x > 0 ? -90 : 90, 0);
+                AddChild(panel);
+                var lamp = new OmniLight3D
+                {
+                    LightColor = new Color(1f, .95f, .86f),
+                    LightEnergy = 2.2f,
+                    OmniRange = 95f,
+                    Position = new Vector3(x, 31f, z),
+                };
+                AddChild(lamp);
+            }
+    
+        }
+        if (_jumbotronAnchor is Vector3 ja && _jumbotron != null && _jumbotronLabel != null)
+        {
+            // the scoreline goes up on the ground's own big screen
+            _jumbotron.Visible = false;
+            _jumbotronLabel.Position = ja;
+            _jumbotronLabel.RotationDegrees = new Vector3(0, _jumbotronYaw, 0);
+            _jumbotronLabel.PixelSize = .03f;
+            _jumbotronLabel.Modulate = new Color(1f, .98f, .9f);
         }
     }
 
@@ -456,12 +474,16 @@ public partial class Stadium : Node3D
     public void CelebrateCrowd(float seconds = 4f)
     {
         _celebrateTimer = seconds;
+        _goalFlash = 3f;
         if (_crowdMaterial != null)
             _crowdMaterial.SetShaderParameter("celebrate", 1.0f);
     }
 
+    private float _excite = .12f;
     public void UpdateCrowd(float dt)
     {
+        _excite = Mathf.Lerp(_excite, _celebrateTimer > 0f ? 1f : .12f, Math.Min(1f, dt * (_celebrateTimer > 0f ? 4f : .6f)));
+        UpdateFigureCrowd(dt, _excite);
         if (_celebrateTimer > 0f)
         {
             _celebrateTimer -= dt;

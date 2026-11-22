@@ -40,11 +40,11 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 ## C. Stadium and crowd
 | # | Gap | P | Status |
 |---|---|---|---|
-| C1 | Desktop stadium is stacked boxes and a flat roof ring. The browser edition already has a better curved two-tier bowl (`StadiumKit.gd`); desktop doesn't use it. | P1 | ⬜ |
-| C2 | Crowd is coloured boxes (desktop) or box-and-ball figures (web). FC/eFootball: 3D animated fans in club colours, flags, scarves, tifos; eFootball 2026 adds custom choreography. | P1 | ⬜ Sprite Forge spectator meshes (seated / standing / arms-up) + flags; animated in a shader |
-| C3 | No dugouts, technical areas, benches, substitutes warming up, managers, ball kids, photographers, stewards, TV cameras. | P2 | ⬜ |
-| C4 | Ad boards read "GODOT 4.7", "GLB EXPORT"; plain LED stripes. | P1 | ⬜ original fictional sponsor art on animated LED boards |
-| C5 | Every club's ground is the same building (capacity / roof flags ignored). | P2 | ⬜ |
+| C1 | Desktop stadium is stacked boxes and a flat roof ring. The browser edition already has a better curved two-tier bowl (`StadiumKit.gd`); desktop doesn't use it. | P1 | ✅ Sprite Forge v11.32 `sforge.stadium`: bowl / classic / ground presets (tiers, aisles, vomitories, roof + fascia, masts or roof lamps, screens), ends tinted with the clubs' colours · ⬜ port the browser edition to the same GLBs |
+| C2 | Crowd is coloured boxes (desktop) or box-and-ball figures (web). FC/eFootball: 3D animated fans in club colours, flags, scarves, tifos; eFootball 2026 adds custom choreography. | P1 | ✅ `sforge.crowd` figures instanced on the stadium seat map (9k High / 4.5k Medium / 1.8k Low): ends in club colours, flags waving, arms up and out of their seats on a goal, ends chanting · ⬜ tifos, scarves held up, standing sections |
+| C3 | No dugouts, technical areas, benches, substitutes warming up, managers, ball kids, photographers, stewards, TV cameras. | P2 | 🔧 dugouts, benches and tunnel in the ground · ⬜ people in them (subs, managers, ball kids, photographers) |
+| C4 | Ad boards read "GODOT 4.7", "GLB EXPORT"; plain LED stripes. | P1 | ✅ `sforge.adboards` original fictional sponsors on a continuous LED ring (`led_ads.gdshader`: boards cut between sets, scroll, flash the scorers' colours after a goal) |
+| C5 | Every club's ground is the same building (capacity / roof flags ignored). | P2 | 🔧 three grounds chosen by the club's capacity and roof · ⬜ per-club seat colours, more presets |
 | C6 | Goal nets are flat quads: no sag, no ripple when the ball goes in. | P2 | ⬜ |
 | C7 | Corner flags are static quads; no tunnel, no stadium exterior or skyline. | P3 | ⬜ |
 
@@ -75,7 +75,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 ## Order of work
 1. A1–A4 kits, boots, numbers, keepers — **done in the first pair of PRs**.
 2. B1–B2 officials on the pitch, with their own kit and clips — **done**.
-3. C1, C2, C4 stadium bowl, crowd and boards on desktop.
+3. C1, C2, C4 stadium bowl, crowd and boards on desktop — **done**.
 4. D1–D2 turf and lighting presets; A9 wet / dirty kits.
 5. A5 away kits on a clash; C3 benches and touchline life.
 6. E presentation, then A6–A8 and the rest.
