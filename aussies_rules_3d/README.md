@@ -7,7 +7,7 @@ tablet, TV, or installed as an app.
 
 | Play anywhere | Real 3D | Real footy |
 |---|---|---|
-| Keyboard · gamepad · touch · PWA install | Skinned rigs + 11 baked animations, PBR arena, broadcast cam | 18-a-side, marks, handballs, tackles, holding the ball, 50 m penalties, last-disposal OOB |
+| Keyboard · gamepad · touch · PWA install | Skinned Sprite Forge squad rig (52 joints, 32 clips, +11 authored pending swap) driven by the Arena Motion Engine, PBR arena, broadcast cam | 18-a-side, marks, handballs, tackles, holding the ball, 50 m penalties, last-disposal OOB |
 
 **[▶ Play it](#quick-start)** · [Install](INSTALL.md) · [Controls](CONTROLS.md) ·
 [Rules](RULES.md) · [Deploy](DEPLOY.md) · [3D pipeline](tools/blender/README.md) ·
@@ -40,10 +40,16 @@ For development with hot reload: `npm run dev`.
   **live scoreboard**, padded goal/behind posts, behind flags, interchange
   benches on the wing, ~10,000-strong crowd, mown grass with painted lines,
   50 m arcs and goal squares.
-- **Real 3D players** — a 19-bone skinned humanoid rig (made in Blender,
-  exported as glTF) with 11 baked animation clips: idle, walk, run, sprint,
-  run-with-ball, drop-punt kick, handball, tackle, mark jump, celebration and
-  hit-the-deck. Kit colours and squad numbers are applied per team.
+- **Real 3D players** — the Sprite Forge Gaelic_Football_3d squad (all nine
+  appearance variants) as glTF: a 52-joint skinned rig with 32 shipped
+  animation clips, plus an 11-clip AFL library (mark-contest leap, pack-mark
+  spoil, fend-off, ruck ball-up tap, running snap, throw-in, bounce-to-pickup,
+  Siren and set-shot celebrations, the bounce-in-stride and the 50 m walk)
+  built by `tools/build_afl_motion_clips.py` (candidate — see the motion
+  review). Every player is driven by the Arena Motion Engine (schema-v2
+  feature matching: pose, trajectory and wind-up timing) with a deterministic
+  legacy fallback when the baked assets are missing. Kit colours and squad
+  numbers are applied per team.
 - **Broadcast presentation** — elevated wing camera that follows the play,
   behind-the-kick set-shot cam, goal celebration orbit, ACES tone mapping,
   soft shadows, sky and crowd, synthesized crowd noise, whistles, kick thuds
@@ -90,9 +96,10 @@ build and the glTF assets.
 All models are authored programmatically with **Blender** (`bpy`, Blender as a
 Python module) in [`tools/blender/`](tools/blender/README.md):
 
-1. `gen_player.py` — builds the humanoid body, the 19-bone armature, proximity
-   Sprite Forge squad from Gaelic_Football_3d (all nine appearance variants,
+1. Sprite Forge squad from Gaelic_Football_3d (all nine appearance variants,
    flat AFL club tints at runtime) → `public/assets/gaelic_player.glb`
+   (52 joints, 32 clips). The Blender `gen_player.py` 19-bone rig is the
+   legacy fallback and is not used by the current build.
 2. `gen_ball.py` — the Sherrin-style oval ball with laces → `public/assets/ball.glb`
 3. `gen_stadium.py` — the Melbourne arena bowl, roof, towers, screens and
    posts → `public/assets/stadium.glb`
