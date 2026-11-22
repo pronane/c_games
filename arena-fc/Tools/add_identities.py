@@ -77,6 +77,7 @@ def main() -> int:
     man["variants"] = sorted(have | set(todo))
     man["variant_prefixes"] = [v + "_" for v in man["variants"]]
     man["skin_shading"] = "textures/skin/materials.json"
+    man["materials"] = [m.get("name") for m in read_glb(GLB)[0].get("materials", [])]   # the new skins and eyes
     with open(MANIFEST, "w") as f:
         json.dump(man, f, indent=1)
     return 0
