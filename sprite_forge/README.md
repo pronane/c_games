@@ -54,6 +54,18 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.33: turf for field sports - markings, mowing patterns, wear (fed back from Arena FC)
+
+Arena FC drew one stripe pattern with soccer lines hard-coded in a shader. **`sforge/pitch.py`** writes a turf
+texture a game's grass shader reads: R the line markings for the sport (soccer; Gaelic / hurling with the 13 /
+20 / 45 (65) m lines, both rectangles and the 13 m arc; rugby with the 22, the dashed 10 m, 5 m and 15 m lines),
+G the mowing pattern (`stripes`, `checker`, `diagonal`, `rings` round the centre spot, `wide_stripes`) as two
+directions a shader shades by viewing angle like real cut grass, and B the wear (goalmouths, the spots, the edge
+of the box, the assistants' channels, the centre spot, broken up with noise). `export()` adds the layout JSON so
+a shader maps world x / z to the texture.
+
+Test: `python tools/test_pitch.py`.
+
 ## New in v11.32: stadiums, crowds and pitch-side boards for field sports (fed back from Arena FC)
 
 Arena FC's desktop ground was stacked boxes, its crowd coloured boxes, and its boards read "GODOT 4.7".
