@@ -54,6 +54,29 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.31: match officials - signals, kits and props (fed back from Arena FC)
+
+Arena FC refereed every match invisibly: fouls, cards, offsides and VAR were given with nobody on the pitch.
+**`sforge/officials.py`** is what a game needs to put a referee, two assistants and a fourth official on the field:
+
+- **clips** (right-handed, semantic pose channels, registered in the motion library): `ref_whistle`, `ref_card`
+  (from the back pocket, held high), `ref_advantage`, `ref_penalty`, `ref_direct`, `ref_indirect`, `ref_goal`,
+  `ar_flag_up`, `ar_offside` (flag up, then held level across the pitch), `ar_flag_corner`, `ar_flag_throw`,
+  `fourth_board`, each with a `signal` event fraction; `qa()` checks the signal is reached and held and the clip
+  starts and ends neutral;
+- **kits**: five original official colourways on the v11.30 kit atlas (no number, no name), and `kit_for(home,
+  away)` to pick one that clashes with neither team;
+- **props**: `props_glb()` writes the assistant's two-tone flag, the yellow and red cards, the whistle and the
+  fourth official's board, grips at the origin, ready to hang off a hand bone;
+- **`append_clips(glb_in, glb_out, rig, clips)`** adds baked clips to an existing skinned GLB and keeps its meshes
+  and every clip already in it - for a squad GLB whose motion-capture sources are not at hand;
+- **`ROLES`** writes down where officials stand (the diagonal system; an assistant level with the second-last
+  defender of his half), so games place them the same way.
+
+Arena FC adds them with `arena-fc/Tools/add_official_clips.py`.
+
+Test: `python tools/test_officials.py`.
+
 ## New in v11.30: tailored kits and boots, and a kit atlas (fed back from Arena FC)
 
 Arena FC's squad wore its kit as body paint. The MakeHuman clothes hugged every muscle (pecs and abs through the
