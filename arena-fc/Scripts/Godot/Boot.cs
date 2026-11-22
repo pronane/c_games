@@ -83,11 +83,31 @@ public partial class Boot : Node3D
                 var squad = Clubs.CreateRoster(ArgInt("--rigshot-club", 0), 11);
                 spec = squad[Math.Clamp(ArgInt("--rigshot-player", 9), 0, squad.Count - 1)];
             }
+            if (Has("--rigshot-lineup"))
+            {
+                // six of the squad in a row: faces, skin tones, builds (identity QA)
+                var squad = Clubs.CreateRoster(ArgInt("--rigshot-club", 0), 11);
+                for (int k = 0; k < 6; k++)
+                {
+                    var r = RigFactory.Create(squad[1 + k]);
+                    r.Position = new Vector3(-2.5f + k * 1.0f, 0, 0);
+                    AddChild(r);
+                }
+                var lc = new Camera3D { Fov = 40, Position = new Vector3(0, 1.45f, 5.2f) };
+                lc.LookAtFromPosition(lc.Position, new Vector3(0, 1.0f, 0), Vector3.Up);
+                AddChild(lc);
+                lc.MakeCurrent();
+                _shot = true;
+                return;
+            }
             AddChild(RigFactory.Create(spec));
             bool back = Has("--rigshot-back"), far = Has("--rigshot-far");
-            float d = far ? 4.2f : 2.3f;
+            float d = far ? 4.2f : Has("--rigshot-face") ? .75f : 2.3f;
             var c = new Camera3D { Position = new Vector3(back ? -.9f : .9f, 1.25f, back ? -d : d), Fov = 45 };
-            c.LookAtFromPosition(c.Position, new Vector3(0, .95f, 0), Vector3.Up);
+            // the GLB player is scaled to the spec's height: the face sits at ~93% of it
+            float faceY = spec.Height * .925f;
+            if (Has("--rigshot-face")) c.Position = new Vector3(back ? -.25f : .25f, faceY + .03f, back ? -d : d);
+            c.LookAtFromPosition(c.Position, new Vector3(0, Has("--rigshot-face") ? faceY : .95f, 0), Vector3.Up);
             AddChild(c);
             c.MakeCurrent();
             _shot = true;
