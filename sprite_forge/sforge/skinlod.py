@@ -1,4 +1,4 @@
-"""Level-of-detail meshes for skinned game characters (v11.37, fed back from Arena FC).
+"""Level-of-detail meshes for skinned game characters (v11.38, fed back from Arena FC).
 
 A football match draws 22 players, 3 officials and the benches; at broadcast distance a 45k-triangle player
 is mostly wasted.  `simplify` takes a skinned part (tailor.Part) down to a share of its triangles by

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Level-of-detail meshes for skinned characters (v11.37, fed back from Arena FC).
+"""Level-of-detail meshes for skinned characters (v11.38, fed back from Arena FC).
 
     python tools/test_skinlod.py
 

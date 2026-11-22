@@ -13,11 +13,11 @@ On the Gaelic squad GLB (MakeHuman game skeleton, skin-tight clothes, boots that
   6 UVs land inside their LAYOUT panels; the back print area is on the back of the torso
   7 replace_parts keeps every node, the skin and every animation; the new GLB reads back
   8 kitdesign: every style's mask, the detail and glyph atlases, the layout contract, a painted kit
-  9 flutter (v11.36): free hems (sleeves, shorts legs) carry the flutter weight; the collar, the chest and the
+  9 flutter (v11.37): free hems (sleeves, shorts legs) carry the flutter weight; the collar, the chest and the
     waistband none; it is written as TEXCOORD_1 and reads back
- 10 keeper garments (v11.36): a base layer covering the arms from inside the short sleeve to the wrist,
+ 10 keeper garments (v11.37): a base layer covering the arms from inside the short sleeve to the wrist,
     gloves covering the whole hand and overlapping the sleeve at the cuff
- 11 clips_from (v11.37): replace_parts takes the clips of another GLB of the same skeleton"""
+ 11 clips_from (v11.38): replace_parts takes the clips of another GLB of the same skeleton"""
 from __future__ import annotations
 
 import json

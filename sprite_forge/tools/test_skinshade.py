@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Close-up shading maps and textured identities in a squad GLB (v11.35, fed back from Arena FC).
+"""Close-up shading maps and textured identities in a squad GLB (v11.36, fed back from Arena FC).
 
     python tools/test_skinshade.py
 
