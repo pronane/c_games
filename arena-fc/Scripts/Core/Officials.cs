@@ -31,6 +31,8 @@ public sealed class OfficialsDirector
     // Real officials' pace: a referee covers ~11 km a match, sprinting ~7 m/s at most.
     private const float RefMaxSpeed = 6.8f, AssistantMaxSpeed = 6.4f, Accel = 4.5f;
     private const float TouchlineOffset = 1.2f;
+    /// <summary>Between the technical areas, in front of the dugouts (sforge.stadium puts them 3.2 m back).</summary>
+    private const float FourthOffset = 2.3f;
 
     public OfficialsDirector(string kitPrimary, string kitTrim, string kitShorts, string kitPattern)
     {
@@ -55,7 +57,7 @@ public sealed class OfficialsDirector
         r.Pos = new Vector3(-6f, 0, -10f);
         Officials[(int)OfficialRole.AssistantA].Pos = new Vector3(Mx.HalfLength * .5f, 0, Mx.HalfWidth + TouchlineOffset);
         Officials[(int)OfficialRole.AssistantB].Pos = new Vector3(-Mx.HalfLength * .5f, 0, -Mx.HalfWidth - TouchlineOffset);
-        Officials[(int)OfficialRole.Fourth].Pos = new Vector3(0, 0, -Mx.HalfWidth - 4.5f);
+        Officials[(int)OfficialRole.Fourth].Pos = new Vector3(0, 0, -Mx.HalfWidth - FourthOffset);
         Prop[(int)OfficialRole.AssistantA] = Prop[(int)OfficialRole.AssistantB] = "flag";
     }
 
@@ -93,7 +95,7 @@ public sealed class OfficialsDirector
             var face = new Vector3(0, 0, -MathF.Sign(z));
             Steer(ar, new Vector3(x, 0, z), Officials[(int)ar].Pos + face, AssistantMaxSpeed, dt);
         }
-        Steer(OfficialRole.Fourth, new Vector3(0, 0, -Mx.HalfWidth - 4.5f), new Vector3(0, 0, 0), 2f, dt);
+        Steer(OfficialRole.Fourth, new Vector3(0, 0, -Mx.HalfWidth - FourthOffset), new Vector3(0, 0, 0), 2f, dt);
         for (int i = 0; i < Count; i++) Advance(i, dt);
     }
 
