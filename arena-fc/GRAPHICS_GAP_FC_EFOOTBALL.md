@@ -22,7 +22,7 @@ Legend: ✅ done · 🔧 in progress · ⬜ to do. Priority: **P1** visible in e
 | A2 | "Boots" were bare feet with toes, tinted a colour. | P1 | ✅ tailored boots: no toes, flat sole, sole plate / flash / heel detail |
 | A3 | No names, numbers, crest or shirt designs: flat colour only. A floating "A. PLAYER 10" label hung behind the GLB players. | P1 | ✅ `sforge.kitdesign` masks + glyph atlas; `Shaders/kit.gdshader` prints name, back / front / shorts numbers and an original crest; ten designs; club designs set per club |
 | A4 | Goalkeepers wore the outfield kit. | P1 | ✅ keeper kits that clash with neither club (`Clubs.KeeperKit`) · ⬜ gloves and long sleeves as tailored garments (`Garment` rules for hands / forearms) |
-| A5 | No away-kit choice on a colour clash. | P1 | ⬜ |
+| A5 | No away-kit choice on a colour clash. | P1 | ✅ `Clubs.ResolveKitClash`: away side into its away kit on a clash, keepers clear of both sides in every fixture (tested), away end of the crowd follows |
 | A6 | Five head identities for every squad; FC/eFootball have scanned faces for thousands of players and many generic heads. | P2 | ⬜ more identities from Sprite Forge `look` / `capture_face` (original faces only), hair colour and style per player |
 | A7 | One body for everyone (scaled). | P2 | ⬜ build / height morphs from Sprite Forge's MakeHuman targets, baked per identity |
 | A8 | Cloth doesn't move (shirt flutter, sleeves, shorts). | P2 | ⬜ vertex-shader flutter driven by speed + wind; Sprite Forge flutter-weight mask |

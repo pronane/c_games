@@ -265,6 +265,9 @@ public sealed partial class MatchEngine
         _slots = Clubs.Slots(Options.TeamSize == 5 ? "1-2-1 (5s)" : Options.TeamSize == 7 ? "2-3-1 (7s)" : Options.HomeFormation, Options.TeamSize);
         var home = Options.CustomHome ?? Clubs.CreateRoster(Options.HomeClub, Options.TeamSize, Options.Seed);
         var away = Clubs.CreateRoster(Options.AwayClub, Options.TeamSize, Options.Seed + 313);
+        // Kit clash (presentation only): the away side changes into its away kit, keepers into one that
+        // stands out from both teams.  Colours never feed the simulation.
+        away = Clubs.ResolveKitClash(home, away, Options.AwayClub);
         State.Players = new PlayerState[Options.TeamSize * 2];
         for (int s = 0; s < 2; s++)
         {

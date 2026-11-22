@@ -155,7 +155,11 @@ public partial class MatchView : Node3D
         var stadium = new Stadium { Name = "Stadium" };
         // ends, crowd and flags in the two clubs' colours (Sprite Forge ground, v11.32)
         stadium.HomeColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.HomeClub, 0, Clubs.All.Length - 1)].Primary);
-        stadium.AwayColour = CharacterRig.C(Clubs.All[Math.Clamp(_opts.AwayClub, 0, Clubs.All.Length - 1)].Primary);
+        var awayClub = Clubs.All[Math.Clamp(_opts.AwayClub, 0, Clubs.All.Length - 1)];
+        var homeClub = Clubs.All[Math.Clamp(_opts.HomeClub, 0, Clubs.All.Length - 1)];
+        // the away end wears what its team wears today (away kit on a clash - Clubs.ResolveKitClash)
+        bool clash = Clubs.ColourDistance(homeClub.Primary, awayClub.Primary) < Clubs.ClashDistance && awayClub.AwayPrimary != "";
+        stadium.AwayColour = CharacterRig.C(clash ? awayClub.AwayPrimary : awayClub.Primary);
         stadium.Lighting = _opts.Lighting;
         _crowd.SetFromMatchType(_opts.Mode == 0 ? "Kickoff" : "Tournament");
         // Empty grounds still get the stadium, just not the crowd.
