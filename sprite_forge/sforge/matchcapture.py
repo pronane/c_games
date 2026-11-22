@@ -391,11 +391,35 @@ def contact_frame(K, c, side=None, span=6):
     return best[1], best[2]
 
 
-def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print, pose_model="rtmpose_l_halpe26"):
+def refine_box(det, frame, hint, prev):
+    """find the real player near an approximate box (`hint`, e.g. a pitch position projected into the
+    image): detect people in a magnified crop around it and take the one nearest the previous box
+    (or the hint).  -> (x0, y0, x1, y1) or None."""
+    H, W = frame.shape[:2]
+    cx, cy = (hint[0] + hint[2]) / 2, (hint[1] + hint[3]) / 2
+    side = int(max(224, 4.0 * (prev[3] - prev[1] if prev else hint[3] - hint[1])))
+    x0, y0 = int(max(0, min(W - side, cx - side / 2))), int(max(0, min(H - side, cy - side / 2)))
+    crop = frame[y0:y0 + side, x0:x0 + side]
+    cands = [(b[0] + x0, b[1] + y0, b[2] + x0, b[3] + y0, b[4]) for b in det._run(crop)]
+    if not cands:
+        return None
+    ax, ay = ((prev[0] + prev[2]) / 2, (prev[1] + prev[3]) / 2) if prev else (cx, cy)
+    reach = max(40.0, 1.2 * ((prev[3] - prev[1]) if prev else (hint[3] - hint[1])))
+    best = min(cands, key=lambda b: np.hypot((b[0] + b[2]) / 2 - ax, (b[1] + b[3]) / 2 - ay))
+    if np.hypot((best[0] + best[2]) / 2 - ax, (best[1] + best[3]) / 2 - ay) > reach:
+        return None
+    return tuple(float(v) for v in best[:4])
+
+
+def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print, pose_model="rtmpose_l_halpe26",
+                   hint_boxes=False, detector="yolox"):
     """One pass over `video`; for every labelled event cut its player's motion.
 
     events  [dict(label, frame (contact frame in this video), boxes={frame: (x0, y0, x1, y1)})]
             - boxes only need to cover the event's window; gaps take the previous box.
+    hint_boxes  the boxes are only approximate positions (SoccerTrack's GSR projects pitch positions
+            into the image, 25-50 px off): each frame the real player is found near them with the
+            person detector on a magnified crop (refine_box), and min_height applies to what it finds.
     -> takes (as process(): kind, keys, rep, contact, foot, vis, loop, sub)
     """
     import cv2
@@ -403,6 +427,7 @@ def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print
     t0 = time.time()
     pose = Pose2D(models_dir, pose_model)
     lifter = Lifter(models_dir)
+    det = Detector(models_dir, detector) if hint_boxes else None
     jobs = []
     for e in events:
         spec = EVENT_KINDS.get(str(e["label"]).casefold())
@@ -411,7 +436,7 @@ def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print
         kind, sub, pre, post = spec
         lo, hi = int(e["frame"] - round(pre * fps)), int(e["frame"] + round(post * fps))
         hs = [b[3] - b[1] for b in e["boxes"].values()]
-        if lo < 0 or not hs or np.median(hs) < min_height:
+        if lo < 0 or not hs or (not hint_boxes and np.median(hs) < min_height):
             continue
         if sum(1 for f in range(lo, hi + 1) if f in e["boxes"]) < .7 * (hi - lo + 1):
             continue
@@ -437,12 +462,29 @@ def process_events(video, events, models_dir, fps=25.0, min_height=60, log=print
         if not ok:
             break
         for j in active:
-            box = j["boxes"].get(f, j["last"]); j["last"] = box
+            if hint_boxes:
+                hint = j["boxes"].get(f)
+                box = refine_box(det, fr, hint, j["last"]) if hint is not None else None
+                if box is None and j["last"] is not None and hint is not None and j.get("hint_prev") is not None:
+                    dx = (hint[0] + hint[2] - j["hint_prev"][0] - j["hint_prev"][2]) / 2       # carry the last box with the hint
+                    dy = (hint[1] + hint[3] - j["hint_prev"][1] - j["hint_prev"][3]) / 2
+                    box = (j["last"][0] + dx, j["last"][1] + dy, j["last"][2] + dx, j["last"][3] + dy)
+                    j["miss"] = j.get("miss", 0) + 1
+                j["hint_prev"] = hint
+                if box is not None:
+                    j.setdefault("heights", []).append(box[3] - box[1])
+            else:
+                box = j["boxes"].get(f, j["last"])
+            j["last"] = box
             if box is not None:
                 j["K"][f - j["lo"]] = pose(fr, box)
         done = [j for j in active if j["hi"] <= f]
         active = [j for j in active if j["hi"] > f]
         for j in done:
+            if hint_boxes and (np.median(j.get("heights") or [0]) < min_height or j.get("miss", 0) > .3 * len(j["K"])):
+                stats["rejected"] += 1; stats["small_or_lost"] = stats.get("small_or_lost", 0) + 1
+                j["K"] = None
+                continue
             tk = _event_take(j, lifter, fps, JT)
             if tk is None:
                 stats["rejected"] += 1

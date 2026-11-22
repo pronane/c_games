@@ -15,9 +15,12 @@ the batch merges them into OUT/moves (prefix "st").  Only joint angles are writt
 
 Data quirks handled (see the dataset's src/data_utils/soccertrack_v2.py):
   * BAS events live under "actions" (docs say "annotations"); labels may be UPPER CASE
-  * BAS `position` is ms from the start of the MATCH, so half 2 subtracts a nominal 45 min
+  * BAS (v1.3 files) carries each event's `frame` in its half's video; use it directly
   * GSR files are ~2.7 GB per half: streamed with ijson, keeping only the boxes needed
-  * GSR image_id is offset (e.g. 3000001 for frame 0): frame = image_id - first image_id
+  * GSR image_id is offset (e.g. 3903000001 for frame 0): frame = image_id - first image_id
+  * GSR bbox_image is a fixed-size box around a projected pitch position, not the body: it is
+    used as a hint and the player found with the detector (matchcapture.refine_box); the
+    MOT files have real boxes but only for each match's first 4 minutes
 """
 from __future__ import annotations
 
@@ -43,21 +46,26 @@ LICENCE = dict(spdx="CC-BY-4.0", author="Atom Scott, Ikuma Uchida, Kento Kuroda,
 
 
 def parse_bas(path):
-    """-> [dict(half, frame, label, team, player)] for visible events of halves 1-2."""
+    """-> [dict(half, frame, label, team, player)] for visible events of halves 1-2.
+
+    The released files (v1.3) give each event's `frame` in its half's video, and `position` in ms
+    from that video's first frame (the file's "clock" says so) - not from the start of the match
+    as the dataset paper and older loader assume.  Older files without `frame`: position / 40."""
     d = json.load(open(path))
     rows = next((d[k] for k in ("actions", "annotations") if k in d), [])
+    fps = float(d.get("fps", FPS))
     out = []
     for a in rows:
         if str(a.get("visibility", "visible")).lower().startswith("not"):
             continue
-        pos = int(a["position"])
         gt = str(a.get("gameTime", ""))
-        half = int(gt.split(" - ", 1)[0]) if " - " in gt else pos // HALF_MS + 1
+        if " - " not in gt:
+            continue                                   # a third period with no half prefix
+        half = int(gt.split(" - ", 1)[0])
         if half not in (1, 2):
             continue
-        t_in_half = pos - (half - 1) * HALF_MS
-        out.append(dict(half=half, frame=int(round(t_in_half * FPS / 1000.0)), label=str(a["label"]).casefold(),
-                        team=a.get("team"), player=a.get("player_id")))
+        frame = int(a["frame"]) if a.get("frame") is not None else int(round(int(a["position"]) * fps / 1000.0))
+        out.append(dict(half=half, frame=frame, label=str(a["label"]).casefold(), team=a.get("team"), player=a.get("player_id")))
     return out
 
 
@@ -125,7 +133,9 @@ def run_half(args):
     t0 = time.time()
     boxes = boxes_for(gsr, wanted)
     evs = [dict(label=e["label"], frame=e["frame"], boxes=boxes.get(e["key"], {})) for e in events if "key" in e]
-    takes, stats = M.process_events(video, evs, models, fps=FPS, min_height=min_height,
+    # GSR boxes are pitch positions projected into the image (fixed 58 x 43, 25-50 px off the body):
+    # use them as hints and find the real player with the detector around each one.
+    takes, stats = M.process_events(video, evs, models, fps=FPS, min_height=min_height, hint_boxes=True,
                                     log=lambda s: print("  %s %s:%s" % (match, suffix, s), flush=True))
     lic = M.licence_record(["rtmpose_l_halpe26", "lifter_v1"], LICENCE)
     d = os.path.join(out, "%s_%s" % (match, suffix))
