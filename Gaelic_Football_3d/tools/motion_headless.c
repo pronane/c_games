@@ -204,6 +204,93 @@ static int compare_entry_poses(int action)
     return worse == 0;
 }
 
+/* Check real clip poses after the same presentation-only leg adjustments used
+ * by the renderer. This detects a backwards model-space knee and segment-length
+ * violations, not whether the skinned mesh looks natural on screen. */
+static int validate_leg_ik(void)
+{
+    const int clips[] = {C_JOG, C_RUN, C_RUN_BALL};
+    boneThighL = findBone("thigh_l"); boneThighR = findBone("thigh_r");
+    boneCalfL = findBone("calf_l"); boneCalfR = findBone("calf_r");
+    boneToeL = findBone("ball_l"); boneToeR = findBone("ball_r");
+    if (boneThighL < 0 || boneThighR < 0 || boneCalfL < 0 || boneCalfR < 0) return 0;
+    game_init(&game); game.players[0][9].action = GAME_ACT_NONE;
+    for (int c = 0; c < 3; ++c) {
+        ModelAnimation *a = animFor(clips[c]); AnimState *s = &as[9];
+        int n = ANIM_FRAMES(*a)-1, backward = 0, bad_length = 0, count = 0;
+        memset(s, 0, sizeof *s); s->speed = 5; s->strideScale = 2.35f;
+        for (int f = 0; f < 2*n; ++f) {
+            float lengths[2][2];
+            memcpy(s->pose, ANIM_POSES(*a)[f % n], model.boneCount * sizeof(Transform));
+            s->lastX += .06f;
+            for (int side = 0; side < 2; ++side) {
+                int h = side ? boneThighR : boneThighL, k = side ? boneCalfR : boneCalfL, b = side ? boneFootR : boneFootL;
+                lengths[side][0] = Vector3Distance(s->pose[h].translation, s->pose[k].translation);
+                lengths[side][1] = Vector3Distance(s->pose[k].translation, s->pose[b].translation);
+            }
+            lengthenStride(s); plantFeet(s);
+            for (int side = 0; side < 2; ++side) {
+                int h = side ? boneThighR : boneThighL, k = side ? boneCalfR : boneCalfL, b = side ? boneFootR : boneFootL;
+                Vector3 hip = s->pose[h].translation, knee = s->pose[k].translation, foot = s->pose[b].translation;
+                Vector3 d = Vector3Normalize(Vector3Subtract(foot, hip));
+                Vector3 v = Vector3Subtract(knee, hip);
+                Vector3 pole = Vector3Subtract(v, Vector3Scale(d, Vector3DotProduct(v, d)));
+                if (!finite3(knee) || !finite3(foot) || pole.z < -0.005f) backward++;
+                if (fabsf(Vector3Distance(hip, knee)-lengths[side][0]) > .002f ||
+                    fabsf(Vector3Distance(knee, foot)-lengths[side][1]) > .002f) bad_length++;
+                count++;
+            }
+        }
+        printf("leg_ik clip=%s samples=%d backward=%d bad_length=%d\n", CLIP_NAMES[clips[c]], count, backward, bad_length);
+        if (backward || bad_length) return 0;
+    }
+    return 1;
+}
+
+static int validate_torso_and_grip(void)
+{
+    const int clips[] = {C_IDLE, C_JOG, C_RUN, C_RUN_BALL};
+    AnimState *s = &as[9]; int changed = 0;
+    boneSpine = findBone("spine_03"); boneSpine1 = findBone("spine_01");
+    boneArmUL = findBone("upperarm_l"); boneArmUR = findBone("upperarm_r");
+    boneArmLL = findBone("lowerarm_l"); boneArmLR = findBone("lowerarm_r");
+    boneMidL = findBone("middle_01_l"); boneMidR = findBone("middle_01_r");
+    if (boneSpine < 0 || boneSpine1 < 0 || boneArmUL < 0 || boneArmUR < 0 || boneArmLL < 0 || boneArmLR < 0) return 0;
+    /* The loader does not expose mesh bind poses headlessly; a valid rotation
+     * suffices to test positions, not actual hand mesh collision. */
+    model.bindPose = ANIM_POSES(anims[0])[0];
+    game_init(&game); game.ball_team = 0; game.ball_player = 9;
+    game.players[0][9].action = GAME_ACT_NONE;
+    for (int c = 0; c < 4; ++c) {
+        ModelAnimation *a = animFor(clips[c]); int n = ANIM_FRAMES(*a)-1;
+        for (int f = 0; f < n; f += 3) {
+            float before, after; Vector3 hip, head, ball;
+            memset(s, 0, sizeof *s); s->speed = clips[c] == C_IDLE ? 0 : clips[c] == C_JOG ? 3 : 7;
+            memcpy(s->pose, ANIM_POSES(*a)[f], model.boneCount*sizeof(Transform));
+            hip = s->pose[bonePelvis].translation; head = s->pose[boneHead].translation;
+            before = head.z - hip.z; balanceTorso(s, clips[c]);
+            after = s->pose[boneHead].translation.z - s->pose[bonePelvis].translation.z;
+            if (!finite3(s->pose[boneHead].translation) || after > before + 1e-5f ||
+                Vector3Distance(hip, s->pose[bonePelvis].translation) > 1e-6f) return 0;
+            if (after < before - .001f) changed++;
+            cradleBall(s, clips[c]);
+            if (!s->cradleValid) return 0;
+            s->poseValid = 1; s->yawInit = 1;
+            ball = carriedBall(0, 9);
+            ball = Vector3Subtract(ball, W(game.players[0][9].x, 0, game.players[0][9].z));
+            if (Vector3Distance(ball, s->cradleCenter) > 1e-5f) return 0;
+            for (int side = 0; side < 2; ++side) {
+                int wrist = side ? boneHandR : boneHandL;
+                if (s->speed < 5.9f || side) {
+                    if (!finite3(s->pose[wrist].translation) || Vector3Distance(s->pose[wrist].translation, ball) < BALL_R - .001f) return 0;
+                }
+            }
+        }
+    }
+    printf("torso_and_grip corrected=%d centre_consistent=1 (bone_proxy_only)\n", changed);
+    return changed > 0;
+}
+
 /* Worst-case microbenchmark: all 30 players perform an action-entry search AND
  * a gait-entry search each iteration. It does not include game/renderer work. */
 static int benchmark_search(void)
@@ -252,7 +339,7 @@ int main(int argc, char **argv)
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
-        !validate_interruption() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
+        !validate_interruption() || !validate_leg_ik() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
         !compare_entry_poses(GAME_ACT_SOLO) || !benchmark_search()) {
         fprintf(stderr, "Action integration check failed\n"); return 1;
     }

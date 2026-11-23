@@ -106,3 +106,24 @@ frame timing can still cause visible discrepancies: these need graphics testing.
 - Add authored/captured trajectory data and more licensed Gaelic actions before
   extending the matcher beyond these clips. The shipped GLB has no moving bounce
   clip; Mixamo metadata in the source bounce FBX is not evidence of a licence.
+
+### Player presentation follow-up
+
+A supplied 37-second matching-on motion recording showed ball/hand overlap,
+forward-leaning poses and close-ups that can crop the character. The recording
+is a scripted scrub, not a normal match. The sampled source jog, run and carry
+clips had forward-bending knees, while the stride and foot-plant IK could bend
+some knees backwards. Leg IK now retains the authored pole where possible and
+uses a model-forward fallback when a new target would reverse it; the two-bone
+solver also clamps both too-near and too-far targets. A small, bounded upper
+body correction reduces excessive forward lean in locomotion without changing
+rules positions. The carried ball now uses the same centre as the full-weight
+procedural grip, and the wrist targets are outside the ball.
+
+`test-motion-model` exercises the shipped locomotion clips through the leg IK,
+checking finite positions, knee direction and segment lengths, and checks torso
+and grip bone-position proxies. These are numerical checks only: they do not
+prove that the skinned hand mesh clears the ball or that motion looks natural.
+The corrected rendering, foot-plant smoothness and real gameplay actions still
+need visual A/B review. Trajectory matching, expanded actions, full 30-player
+hardware profiling and the broader graphics work remain outstanding.
