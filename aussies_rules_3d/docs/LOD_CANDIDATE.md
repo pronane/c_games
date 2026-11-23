@@ -68,3 +68,27 @@ at both levels, all nine looks); with the bump the worst sock is ≈36 mm.
    carries no `_lodN` nodes, so every tier renders full detail.
 5. LOD2 drop-outs (`lashes` / `brows` / `hairinner`) and openings should get a
    human look — expected invisible at broadcast distance, unverified.
+
+## CI: Aussies Rules Motion A/B
+
+`.github/workflows/aussies-rules-motion-ab.yml` (`.github/workflows/…`) — manual
+(`workflow_dispatch`) plus push/PR when `aussies_rules_3d/**` changes.
+
+- **ab-metrics** (authoritative): `npm ci` → `check.mjs` → re-bakes the LOD candidate
+  from the shipped asset (`tools/build_afl_lods.py`) → Khronos validator on both GLBs →
+  squad-contract A/B table (`tools/ab_report.py`: sizes, joints, clips, clip parity,
+  per-look triangles, LOD node count, material parity). Fails red on contract breaks;
+  the report lands in the job summary; LOD GLB + JSON/MD reports upload as artifacts.
+- **visual-ab** (experimental, `continue-on-error`): builds the web bundle, then under
+  xvfb + SwiftShader (`LIBGL_ALWAYS_SOFTWARE=1`) loads the attract demo in Electron twice —
+  shipped asset vs LOD asset swapped in — captures 24 frames each (`tools/ci_capture.cjs`)
+  with `?ab=1` (fixed attract seed so both legs simulate the identical match, `.screen`
+  overlays hidden, `AB_STATS` fps/triangle/draw-call line logged every ~2 s;
+  `?lod=ultra|high|performance` forces the graphics tier). Assembles MP4s with ffmpeg,
+  uploads frames/mp4s/console logs as the `aussies-rules-motion-ab-visual` artifact, and a
+  `frame_ab.py` step flags near-uniform (dead) frames and reports the mean abs pixel delta +
+  %changed between aligned original/LOD frames — objective signal even when nobody downloads
+  the pixels. `AB_STATS` tails are dumped into the job summary; a sticky PR comment step
+  exists but no-ops when the repo GITHUB_TOKEN can't write issues. Software WebGL is
+  plausible but unverified end-to-end; treat this leg's output as diagnostic, and keep the
+  shipped asset untouched either way.

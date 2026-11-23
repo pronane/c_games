@@ -1,0 +1,196 @@
+name: Aussies Rules Motion A/B
+# A/B comparison for the squad LOD candidate (tools/out/gaelic_player.lod.glb,
+# built from the shipped asset — public/assets/gaelic_player.glb is never
+# modified, not even in CI). Two legs:
+#
+#   ab-metrics  — deterministic, locally reproducible: rebuild the candidate,
+#                 gate the squad contract (52 joints / 32 clips / nine looks /
+#                 materials) and print the GLB comparison table to the job
+#                 summary. This leg must be green.
+#   visual-ab   — software-WebGL screenshots of the attract demo, original vs
+#                 LOD asset, assembled into MP4s + PNG frames (same approach as
+#                 gaelic-motion-visual.yml, adapted for the web build). This leg
+#                 runs with hardware acceleration off; it is marked experimental
+#                 and must not block merges.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'aussies_rules_3d/**'
+      - '.github/workflows/aussies-rules-motion-ab.yml'
+  pull_request:
+    paths:
+      - 'aussies_rules_3d/**'
+      - '.github/workflows/aussies-rules-motion-ab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ab-metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: aussies_rules_3d/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install bake dependencies
+        run: pip install numpy pillow
+      - name: Install JS dependencies
+        working-directory: aussies_rules_3d
+        env: { ELECTRON_SKIP_BINARY_DOWNLOAD: '1' }
+        run: npm ci
+      - name: Game health gate (tsc, tests, build, squad contract)
+        working-directory: aussies_rules_3d
+        run: node scripts/check.mjs
+      - name: Bake the LOD candidate from the shipped asset
+        working-directory: aussies_rules_3d
+        run: python tools/build_afl_lods.py
+      - name: Khronos validator — both GLBs
+        working-directory: aussies_rules_3d
+        run: |
+          npm i --no-save gltf-validator@2.0.0-dev.3.10 >/dev/null
+          {
+            echo '## Khronos glTF validator'
+            echo
+            echo '| file | errors | warnings | infos |'
+            echo '|---|---|---|---|'
+            node tools/validate-glb.mjs public/assets/gaelic_player.glb tools/out/gaelic_player.lod.glb
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Model-vs-model A/B report
+        working-directory: aussies_rules_3d
+        run: |
+          python tools/ab_report.py | tee tools/out/ab_report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload A/B artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aussies-rules-motion-ab-metrics
+          path: |
+            aussies_rules_3d/tools/out/gaelic_player.lod.glb
+            aussies_rules_3d/tools/out/ab_report.json
+            aussies_rules_3d/tools/out/ab_report.md
+            aussies_rules_3d/tools/out/lod_report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  visual-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true   # experimental: SwiftShader WebGL on a GPU-less runner
+    permissions:
+      contents: read
+      issues: write           # PR comments are issue comments — needs issues: write, not pull-requests
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: aussies_rules_3d/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install software-render + electron dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth ffmpeg libgtk-3-0 libnss3 libasound2t64 libgbm1 libxss1
+      - name: Install JS dependencies (Electron binary downloads from GitHub releases)
+        working-directory: aussies_rules_3d
+        env: { ELECTRON_DISABLE_SANDBOX: '1' }
+        run: npm ci
+      - name: Bake the LOD candidate (kept in tools/out, not installed)
+        working-directory: aussies_rules_3d
+        run: |
+          pip install numpy pillow
+          python tools/build_afl_lods.py
+      - name: Build the production bundle
+        working-directory: aussies_rules_3d
+        run: npm run build
+      - name: Preflight electron under xvfb
+        working-directory: aussies_rules_3d
+        run: |
+          mkdir -p build/motion-ab/original build/motion-ab/lod
+          timeout 60 xvfb-run -a node_modules/.bin/electron --version 2>&1 | tee build/motion-ab/electron-version.log
+      - name: Capture attract demo — shipped asset (original)
+        working-directory: aussies_rules_3d
+        env: { ELECTRON_DISABLE_SANDBOX: '1' }
+        run: |
+          timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
+            node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/original \
+            --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
+            > build/motion-ab/original/electron.log 2>&1
+          echo "electron exit: $?"
+      - name: Capture attract demo — LOD candidate
+        working-directory: aussies_rules_3d
+        env: { ELECTRON_DISABLE_SANDBOX: '1' }
+        run: |
+          cp tools/out/gaelic_player.lod.glb public/assets/gaelic_player.glb
+          npm run build
+          timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
+            node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/lod \
+            --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
+            > build/motion-ab/lod/electron.log 2>&1
+          echo "electron exit: $?"
+      - name: Assemble MP4s
+        working-directory: aussies_rules_3d
+        run: |
+          set -e
+          for leg in original lod; do
+            if ls build/motion-ab/$leg/frame-*.png 1>/dev/null 2>&1; then
+              ffmpeg -hide_banner -loglevel error -y -framerate 2 \
+                -i build/motion-ab/$leg/frame-%03d.png -vf "scale=1280:-2" -pix_fmt yuv420p \
+                build/motion-ab/$leg/$leg.mp4
+            fi
+          done
+      - name: Compare frames between legs
+        if: always()
+        working-directory: aussies_rules_3d
+        run: |
+          python tools/frame_ab.py build/motion-ab/original build/motion-ab/lod | tee build/motion-ab/frame-ab.md >> "$GITHUB_STEP_SUMMARY" || echo "frame comparison flagged dead frames (non-blocking)"
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo '## Visual A/B capture (experimental)'
+            echo
+            for leg in original lod; do
+              if [ -f build/motion-ab/$leg/summary.json ]; then
+                echo "- \`$leg\`: $(cat build/motion-ab/$leg/summary.json | tr -d '\n')"
+              else
+                echo "- \`$leg\`: capture failed (see logs)"
+              fi
+            done
+            echo
+            echo 'Artifacts `aussies-rules-motion-ab-visual` hold the frames + mp4s + console logs.'
+            echo
+            echo '### AB_STATS (renderer info, ~2 s cadence)'
+            for leg in original lod; do
+              echo "**$leg**"
+              echo '```'
+              grep -E 'AB_STATS|capturePage failed' build/motion-ab/$leg/electron.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Sticky PR comment with capture stats
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/ci_ab_comment.sh "${{ github.event.pull_request.number }}" || echo "sticky comment skipped"
+      - name: Upload visual A/B artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aussies-rules-motion-ab-visual
+          path: aussies_rules_3d/build/motion-ab/
+          if-no-files-found: warn
+          retention-days: 14
