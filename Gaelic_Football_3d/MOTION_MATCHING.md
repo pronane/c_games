@@ -170,3 +170,10 @@ invalidates older extracted features. The shipped model triggers reversal.
 Headless checks establish pose/feature alignment, not visual realism or shorts
 mesh deformation. In particular, the shorts' skinned geometry and weights still
 need rendered investigation; bone-length checks cannot validate their hem.
+
+Locomotion cross-fades advance the outgoing cycle instead of holding the last
+pose, using the same speed-dependent cadence as clip selection. This applies
+only between locomotion clips; action and bounce timing remain unchanged. The
+headless report includes low-foot velocity and pelvis-relative hand ranges for
+candidate comparisons. These are raw clip-pose measurements, not a measurement
+of final skinned vertices, ball carrying, ground slip or rendered appearance.

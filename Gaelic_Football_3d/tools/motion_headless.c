@@ -374,6 +374,61 @@ static int validate_jog_playback(void)
     return ok;
 }
 
+static int validate_locomotion_transition(void)
+{
+    AnimState a = {0}, b = {0}, action = {0}, bounce = {0};
+    a.prevClip = b.prevClip = C_JOG; a.speed = b.speed = 3; a.prevT = b.prevT = .1f;
+    a.blend = b.blend = .5f;
+    for (int i = 0; i < 6; ++i) advancePreviousLocomotion(&a, C_RUN, 1.f/30);
+    for (int i = 0; i < 12; ++i) advancePreviousLocomotion(&b, C_RUN, 1.f/60);
+    action = bounce = a; action.prevT = bounce.prevT = .1f; bounce.useBounce = 1;
+    advancePreviousLocomotion(&action, C_KICK_PLACE, 1.f/30);
+    advancePreviousLocomotion(&bounce, C_RUN, 1.f/30);
+    printf("locomotion_transition outgoing_30=%.4f outgoing_60=%.4f action_unchanged=%d bounce_unchanged=%d\n",
+           a.prevT, b.prevT, action.prevT == .1f, bounce.prevT == .1f);
+    return fabsf(a.prevT - b.prevT) < .0001f && fabsf(a.prevT - .1f) > .01f &&
+           action.prevT == .1f && bounce.prevT == .1f;
+}
+
+/* Pose-space diagnostics, not a substitute for rendered mesh or gameplay
+ * validation. Pelvis-relative measurements remove vertical body bob. */
+static int report_jog_motion(void)
+{
+    int n = ANIM_FRAMES(*animFor(C_JOG)) - 1, count = 0;
+    double handMin[2] = {1e9, 1e9}, handMax[2] = {-1e9, -1e9};
+    double low[2] = {1e9, 1e9}, sum = 0, products = 0, aa = 0, bb = 0;
+    double hand[2][2048], foot[2][2048], height[2][2048], mean[2] = {0, 0};
+    Transform pose[MAX_BONES];
+    if (n < 8 || n > 2048) return 0;
+    for (int i = 0; i < n; ++i) {
+        sampleClip(C_JOG, i / ANIM_FPS, pose);
+        for (int side = 0; side < 2; ++side) {
+            int f = side ? boneFootR : boneFootL, h = side ? boneHandR : boneHandL;
+            foot[side][i] = pose[f].translation.z - pose[bonePelvis].translation.z;
+            height[side][i] = pose[f].translation.y;
+            hand[side][i] = pose[h].translation.z - pose[bonePelvis].translation.z;
+            if (!isfinite(foot[side][i]) || !isfinite(height[side][i]) || !isfinite(hand[side][i])) return 0;
+            low[side] = fmin(low[side], height[side][i]);
+            handMin[side] = fmin(handMin[side], hand[side][i]);
+            handMax[side] = fmax(handMax[side], hand[side][i]);
+            mean[side] += hand[side][i] / n;
+        }
+    }
+    for (int i = 0; i < n; ++i) {
+        int j = (i + 1) % n;
+        double x = hand[0][i]-mean[0], y = hand[1][i]-mean[1];
+        products += x*y; aa += x*x; bb += y*y;
+        for (int side = 0; side < 2; ++side)
+            if (height[side][i] <= low[side]+.06 && height[side][j] <= low[side]+.06) {
+                sum += (foot[side][j]-foot[side][i])*ANIM_FPS; ++count;
+            }
+    }
+    printf("jog_pose_metrics low_foot_velocity_mps=%.3f low_samples=%d hand_range_m=%.3f,%.3f hand_correlation=%.3f (clip_pose_only)\n",
+           count ? sum/count : 0, count, handMax[0]-handMin[0], handMax[1]-handMin[1],
+           aa > 1e-10 && bb > 1e-10 ? products/sqrt(aa*bb) : 0);
+    return count > 0;
+}
+
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
@@ -398,7 +453,7 @@ int main(int argc, char **argv)
         !same_rows(&actionDb, &referenceActions)) { fprintf(stderr, "Cache round trip failed\n"); return 1; }
     printf("model=%s bones=%d clips=%d gait_rows=%d action_rows=%d cache_roundtrip=ok\n",
            asset, model.boneCount, animCount, motionDb.count, actionDb.count);
-    if (!validate_jog_playback() || !validate_old_cache_fallback(cache) || !validate_late_observation() ||
+    if (!validate_jog_playback() || !validate_locomotion_transition() || !report_jog_motion() || !validate_old_cache_fallback(cache) || !validate_late_observation() ||
         !validate_offscreen_release(1.f/60.f, 0) || !validate_offscreen_release(1.f/30.f, 0) ||
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||

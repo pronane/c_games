@@ -516,6 +516,27 @@ static float strideLimit(float speed)
     return 1.0f + (GA_LEG_MAX_STRIDE_SCALE - 1.0f) * Clamp((speed - 1.0f) / 6.0f, 0.0f, 1.0f);
 }
 
+/* Shared cadence for the active locomotion clip and the outgoing clip during
+ * a cross-fade. Continuing the outgoing cycle avoids freezing its arms and
+ * legs for up to 0.4 seconds whenever movement state changes. */
+static float locomotionRate(const AnimState *s, int clip)
+{
+    float prefer;
+    int turning;
+    if (clip == C_IDLE) return .35f;
+    turning = s->turnRate > 2.0f && s->speed > .9f && s->speed < 6.2f;
+    prefer = Clamp(.90f + .13f * s->speed, .90f, 2.15f);
+    if (s->accel > 2.2f) prefer = fminf(prefer * 1.08f, 2.3f);
+    if (s->accel < -2.2f) prefer *= .84f;
+    if (turning) prefer = fminf(prefer * 1.06f, 2.3f);
+    return Clamp(prefer * clipLen(clip), .70f, 1.70f);
+}
+static void advancePreviousLocomotion(AnimState *s, int clip, float dt)
+{
+    if (s->blend < 1.0f && !s->useBounce && motionLocomotion(s->prevClip) && motionLocomotion(clip))
+        s->prevT = am_loop_advance(s->prevT, dt, locomotionRate(s, s->prevClip), clipLen(s->prevClip));
+}
+
 /* ---- choose clip for a player from the game state ---------------------- */
 static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, float dt, int *clip, float *t)
 {
@@ -580,7 +601,7 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         /* Avoid forcing the short source cycle into a rigid split at speed.
          * Some high-speed ground sliding is preferable to locked knees. */
         s->strideScale = Clamp(stride / authored, 1.0f, strideLimit(s->speed));
-        rate = Clamp(prefer * clipLen(*clip), 0.70f, 1.70f);
+        rate = locomotionRate(s, *clip);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
         return;
@@ -1174,6 +1195,8 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     if (clip != s->clip) {
         s->prevClip = s->clip; s->prevT = s->t; s->blend = 0.0f;
         s->clip = clip;
+    } else {
+        advancePreviousLocomotion(s, clip, dt);
     }
     s->t = t;
     if (poseFar) s->blend = 1.0f;

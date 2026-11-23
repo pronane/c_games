@@ -51,6 +51,8 @@ int am_action_time(float elapsed, float deadline, float entry, float contact,
  * Return -1 for ambiguous/invalid, 0 for forward time, 1 for reverse time.
  * Use only on a clip known to represent forward locomotion. */
 int am_gait_reverse(const float *left, const float *right, int frames);
+/* Advance a looping animation clock in seconds. Invalid inputs leave it unchanged. */
+float am_loop_advance(float time, float dt, float rate, float length);
 /* Frame-rate-independent exponential approach. dt and response are seconds;
  * invalid inputs, negative dt or nonpositive response leave current unchanged. */
 float am_smooth(float current, float target, float dt, float response);

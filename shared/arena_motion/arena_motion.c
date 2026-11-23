@@ -148,3 +148,13 @@ int am_gait_reverse(const float *left, const float *right, int frames)
     if (count < 6 || fabs(sum / count) < .005) return -1;
     return sum > 0 ? 1 : 0;
 }
+
+float am_loop_advance(float time, float dt, float rate, float length)
+{
+    double t;
+    if (!isfinite(time) || !isfinite(dt) || !isfinite(rate) || !isfinite(length) ||
+        dt < 0 || rate < 0 || length <= 0) return time;
+    t = fmod((double)time + (double)dt * rate, (double)length);
+    if (t < 0) t += length;
+    return (float)t;
+}
