@@ -83,7 +83,10 @@ at both levels, all nine looks); with the bump the worst sock is ≈36 mm.
   xvfb + SwiftShader (`LIBGL_ALWAYS_SOFTWARE=1`) loads the title/attract demo in
   Electron twice — shipped asset vs LOD asset swapped in — captures 24 frames each
   (`tools/ci_capture.cjs`), assembles MP4s with ffmpeg, uploads frames/mp4s/console
-  logs as the `aussies-rules-motion-ab-visual` artifact. Software WebGL is plausible
+  logs as the `aussies-rules-motion-ab-visual` artifact. A `frame_ab.py` step then
+  flags near-uniform (dead) frames and reports the mean abs pixel delta + %changed
+  between aligned original/LOD frames — so the leg reports objective signal even
+  when nobody downloads the pixels. Software WebGL is plausible
   but unverified end-to-end; treat this leg's output as diagnostic, and keep the
   shipped asset untouched either way. A companion PR adds the `?ab=1` capture
   mode (`src/main.ts`): fixed attract seed so both legs simulate the identical

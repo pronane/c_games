@@ -153,6 +153,11 @@ jobs:
                 build/motion-ab/$leg/$leg.mp4
             fi
           done
+      - name: Compare frames between legs
+        if: always()
+        working-directory: aussies_rules_3d
+        run: |
+          python tools/frame_ab.py build/motion-ab/original build/motion-ab/lod | tee build/motion-ab/frame-ab.md >> "$GITHUB_STEP_SUMMARY" || echo "frame comparison flagged dead frames (non-blocking)"
       - name: Job summary
         if: always()
         run: |
