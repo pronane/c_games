@@ -262,7 +262,8 @@ typedef struct GameState {
     int solo_rhythm;
     /* CPU defender closing from behind: 0 not chosen, 1 dive in, 2 get in front. */
     int cpu_tackle_plan;
-    void (*on_release)(struct GameState *game, int team, int player, int action, void *user);
+    /* Notification only; ball flight is already authoritative in game state. */
+    void (*on_release)(const struct GameState *game, int team, int player, int action, void *user);
     void *user;
 } GameState;
 

@@ -39,7 +39,7 @@ The Gaelic adapter uses only the first eight foot features and hard-filters the
 existing selected gait. Its in-place GLB does not contain real root trajectories;
 no fabricated trajectory is passed off as captured motion. The 24-dimensional query,
 category/action filters and contact-deadline helper have unit tests but are **not
-live Gaelic trajectory or action matching yet**. A versioned offline bake and
-asset validation, Gaelic contact metadata, safe integration with the existing
-release callback, additional licensed clips, and visual/performance validation
-remain future work. See `Gaelic_Football_3d/MOTION_MATCHING.md`.
+live Gaelic trajectory or action matching yet**. Gaelic now has an optional versioned gait cache and a notification-only release
+callback. Offline action/trajectory metadata, live action matching and contact
+alignment, additional licensed clips, and visual/performance validation remain
+future work. See `Gaelic_Football_3d/MOTION_MATCHING.md`.
