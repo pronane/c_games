@@ -109,7 +109,14 @@ class Game {
 
     this.menus.setLoading(0.45, 'Rigging the players…');
     const loader = new GLTFLoader();
-    this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
+    try {
+      // Built by tools/build_afl_player.py on a networked machine — preferred when present
+      this.playerGltf = await loader.loadAsync('./assets/afl_player.glb');
+      console.info('AFL player asset loaded (afl_player.glb)');
+    } catch {
+      this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
+      console.info('afl_player.glb not built yet — using gaelic_player.glb');
+    }
     this.motionAssets = await loadMotionAssets();
     this.menus.setLoading(0.75, 'Inflating the Sherrin…');
     const ballGltf = await loader.loadAsync('./assets/ball.glb');
