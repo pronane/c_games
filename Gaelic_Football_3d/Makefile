@@ -28,6 +28,15 @@ test:
 	$(CC) -std=c99 -Wall -Wextra -Isrc tests/release_visual_tests.c src/release_visual.c -lm -o release_visual_tests && ./release_visual_tests
 	$(CC) -std=c99 -Wall -Wextra ../shared/arena_motion/tests/arena_motion_tests.c ../shared/arena_motion/arena_motion.c -lm -o arena_motion_tests && ./arena_motion_tests
 
+# Headless raylib 5.5 animation-only tool: GNU ld discards all draw code.
+# Uses the vendored raylib source, not an installed renderer; no display needed.
+RAYLIB55_SRC := ../TurboTumble64/deps/raylib-5.5/src
+motion_headless: tools/motion_headless.c tools/raylib_headless_support.c src/main.c src/game.c src/motion_match.c src/motion_cache.c src/action_motion.c src/release_visual.c $(wildcard src/*.h) src/stadium.c src/sfx.c src/pad.c $(RAYLIB55_SRC)/rmodels.c $(RAYLIB55_SRC)/raylib.h $(RAYLIB55_SRC)/raymath.h ../shared/arena_motion/arena_motion.c ../shared/arena_motion/arena_motion.h
+	$(CC) -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -DEXTERNAL_CONFIG_FLAGS -DSUPPORT_MODULE_RMODELS -DSUPPORT_FILEFORMAT_GLTF -ffunction-sections -fdata-sections -I$(RAYLIB55_SRC) -Isrc tools/motion_headless.c tools/raylib_headless_support.c $(RAYLIB55_SRC)/rmodels.c src/game.c src/motion_match.c src/motion_cache.c src/action_motion.c src/release_visual.c ../shared/arena_motion/arena_motion.c -Wl,--gc-sections -lm -o $@
+
+test-motion-model: motion_headless
+	python3 tests/run_motion_model_tests.py ./motion_headless assets/models/gaelic_player.glb
+
 run: $(TARGET)
 	./$(TARGET)
 
@@ -35,6 +44,6 @@ shots: $(TARGET)
 	./$(TARGET) --screenshots
 
 clean:
-	rm -f gaelic_football gaelic_football.exe core_tests core_tests.exe motion_tests motion_tests.exe arena_motion_tests arena_motion_tests.exe motion_cache_tests motion_cache_tests.exe action_motion_tests action_motion_tests.exe release_visual_tests release_visual_tests.exe v2_*.png
+	rm -f gaelic_football gaelic_football.exe core_tests core_tests.exe motion_tests motion_tests.exe arena_motion_tests arena_motion_tests.exe motion_cache_tests motion_cache_tests.exe action_motion_tests action_motion_tests.exe release_visual_tests release_visual_tests.exe motion_headless motion_headless.exe v2_*.png
 
-.PHONY: run shots test clean
+.PHONY: run shots test test-motion-model clean

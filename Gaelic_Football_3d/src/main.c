@@ -449,10 +449,11 @@ static void matchAction(AnimState *s, const GamePlayer *p, int carrying, int *cl
     if (fresh) memset(&s->matchedAction, 0, sizeof s->matchedAction);
     if (fresh && actionReady && carrying && (act == GAME_ACT_HANDPASS || act == GAME_ACT_SOLO) &&
         (act != GAME_ACT_HANDPASS || !p->action_released)) {
-        float feet[8];
-        if (motionFeatures(s->clip, (int)(s->t * ANIM_FPS), feet))
+        float feet[8], fallback[8];
+        if (motionFeatures(s->clip, (int)(s->t * ANIM_FPS), feet) &&
+            motionFeatures(*clip, (int)(*time * ANIM_FPS), fallback))
             ga_action_begin(&s->matchedAction, &actionDb, &actionMeta[act], p->action_time,
-                            game_action_contact(act), feet);
+                            game_action_contact(act), feet, fallback);
     }
     /* If possession is lost before contact, discard the presentation plan.
      * A handpass after release keeps its already-selected follow-through. */

@@ -81,7 +81,8 @@ A missing or invalid cache falls back to runtime sampling; if sampling also fail
 the original selector is used. This is an
 initial pose-matching slice, not the full Arena FC motion engine: trajectory matching,
 more action clips and visual validation remain outstanding. See
-`MOTION_MATCHING.md` for the boundaries and follow-up work.
+`MOTION_MATCHING.md` for the boundaries and follow-up work. On Linux,
+`make test-motion-model` also bakes and checks the shipped model without a display.
 
 ## Start-up
 The game opens with a **20-second AI-vs-AI attract demo**. It uses broadcast cameras (aerial
