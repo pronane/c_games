@@ -80,16 +80,15 @@ at both levels, all nine looks); with the bump the worst sock is ≈36 mm.
   per-look triangles, LOD node count, material parity). Fails red on contract breaks;
   the report lands in the job summary; LOD GLB + JSON/MD reports upload as artifacts.
 - **visual-ab** (experimental, `continue-on-error`): builds the web bundle, then under
-  xvfb + SwiftShader (`LIBGL_ALWAYS_SOFTWARE=1`) loads the title/attract demo in
-  Electron twice — shipped asset vs LOD asset swapped in — captures 24 frames each
-  (`tools/ci_capture.cjs`), assembles MP4s with ffmpeg, uploads frames/mp4s/console
-  logs as the `aussies-rules-motion-ab-visual` artifact. A `frame_ab.py` step then
-  flags near-uniform (dead) frames and reports the mean abs pixel delta + %changed
-  between aligned original/LOD frames — so the leg reports objective signal even
-  when nobody downloads the pixels. Software WebGL is plausible
-  but unverified end-to-end; treat this leg's output as diagnostic, and keep the
-  shipped asset untouched either way. A companion PR adds the `?ab=1` capture
-  mode (`src/main.ts`): fixed attract seed so both legs simulate the identical
-  match, menu overlays hidden, and `AB_STATS` renderer counters logged every
-  ~2 s; with `--query ab=1` in `ci_capture.cjs` the captures become
-  frame-comparable between the two legs.
+  xvfb + SwiftShader (`LIBGL_ALWAYS_SOFTWARE=1`) loads the attract demo in Electron twice —
+  shipped asset vs LOD asset swapped in — captures 24 frames each (`tools/ci_capture.cjs`)
+  with `?ab=1` (fixed attract seed so both legs simulate the identical match, `.screen`
+  overlays hidden, `AB_STATS` fps/triangle/draw-call line logged every ~2 s;
+  `?lod=ultra|high|performance` forces the graphics tier). Assembles MP4s with ffmpeg,
+  uploads frames/mp4s/console logs as the `aussies-rules-motion-ab-visual` artifact, and a
+  `frame_ab.py` step flags near-uniform (dead) frames and reports the mean abs pixel delta +
+  %changed between aligned original/LOD frames — objective signal even when nobody downloads
+  the pixels. `AB_STATS` tails are dumped into the job summary; a sticky PR comment step
+  exists but no-ops when the repo GITHUB_TOKEN can't write issues. Software WebGL is
+  plausible but unverified end-to-end; treat this leg's output as diagnostic, and keep the
+  shipped asset untouched either way.

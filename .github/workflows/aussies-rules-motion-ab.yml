@@ -7,12 +7,11 @@ name: Aussies Rules Motion A/B
 #                 gate the squad contract (52 joints / 32 clips / nine looks /
 #                 materials) and print the GLB comparison table to the job
 #                 summary. This leg must be green.
-#   visual-ab   — software-WebGL captures of the title/attract demo, original vs
+#   visual-ab   — software-WebGL screenshots of the attract demo, original vs
 #                 LOD asset, assembled into MP4s + PNG frames (same approach as
 #                 gaelic-motion-visual.yml, adapted for the web build). This leg
 #                 runs with hardware acceleration off; it is marked experimental
-#                 and must not block merges. (A companion PR adds the ?ab=1
-#                 fixed-seed, menu-free capture mode used with --query.)
+#                 and must not block merges.
 on:
   workflow_dispatch:
   push:
@@ -128,7 +127,7 @@ jobs:
         run: |
           timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
             node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/original \
-            --frames 24 --interval-ms 500 --settle-ms 15000 \
+            --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
             > build/motion-ab/original/electron.log 2>&1
           echo "electron exit: $?"
       - name: Capture attract demo — LOD candidate
@@ -139,7 +138,7 @@ jobs:
           npm run build
           timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
             node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/lod \
-            --frames 24 --interval-ms 500 --settle-ms 15000 \
+            --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
             > build/motion-ab/lod/electron.log 2>&1
           echo "electron exit: $?"
       - name: Assemble MP4s
@@ -173,6 +172,14 @@ jobs:
             done
             echo
             echo 'Artifacts `aussies-rules-motion-ab-visual` hold the frames + mp4s + console logs.'
+            echo
+            echo '### AB_STATS (renderer info, ~2 s cadence)'
+            for leg in original lod; do
+              echo "**$leg**"
+              echo '```'
+              grep -E 'AB_STATS|capturePage failed' build/motion-ab/$leg/electron.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
+              echo '```'
+            done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Sticky PR comment with capture stats
         if: always() && github.event_name == 'pull_request'

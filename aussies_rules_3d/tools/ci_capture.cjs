@@ -24,6 +24,12 @@ const take = (flag, fallback) => {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
 const OUT = path.resolve(take('--out', 'build/motion-ab'));
+const QUERY_RAW = take('--query', '');
+const QUERY = {};
+for (const pair of QUERY_RAW.split('&').filter(Boolean)) {
+  const i = pair.indexOf('=');
+  if (i > 0) QUERY[pair.slice(0, i)] = decodeURIComponent(pair.slice(i + 1));
+}
 const FRAMES = Number(take('--frames', '30'));
 const INTERVAL_MS = Number(take('--interval-ms', '600'));
 const SETTLE_MS = Number(take('--settle-ms', '15000'));
@@ -47,7 +53,12 @@ function main() {
     finish(1);
   });
 
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  const target = path.join(__dirname, '..', 'dist', 'index.html');
+  if (Object.keys(QUERY).length) {
+    win.loadFile(target, { query: QUERY });
+  } else {
+    win.loadFile(target);
+  }
 
   win.webContents.once('did-finish-load', () => {
     setTimeout(() => capture(win, 0), SETTLE_MS);
