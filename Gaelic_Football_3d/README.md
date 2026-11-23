@@ -62,7 +62,8 @@ A turn eases the stick and lets the chest lead the hips. Standing or jogging, th
 both hands; sprinting, it is in the right hand and the other arm keeps the clip's swing.
 A solo puts it on the toe and a bounce on the ground. Kicks and handpasses release on
 the rules engine's contact clock from its authoritative ball position; the pose no longer
-changes the simulated flight origin, so a small visual gap may be visible at release.
+changes the simulated flight origin. Handpasses use a short presentation-only
+correction when a recent hand pose is available.
 `Gaelic_football_bounce.fbx` names Mixamo in its metadata. That is not a licence, so
 no merged copy of it is in this tree. A moving bounce still uses the carry cycle. The GPU
 skin shader reads bone indices and weights from the same attribute locations as the mesh
@@ -72,14 +73,14 @@ See `sprite_forge/tools/GAELIC_CLIP_MERGE.md`. The rest of the list is `ROADMAP.
 ## Experimental Gaelic motion matching
 
 The game samples foot poses from the loaded GLB at startup, or loads an optional
-prebaked gait cache, and uses a deterministic
+prebaked gait and action cache, and uses a deterministic
 C matcher to choose an entry frame when changing between idle, jog, run, sidestep
-and carry gaits. Existing clip selection, cross-fades, foot planting, ball handling
-and rules remain in control. Use `--no-motion-match` to compare with the old path.
+and carry gaits, as well as handpass and solo action entries. Existing cross-fades,
+foot planting and rules remain in control. Use `--no-motion-match` to compare with the old path.
 A missing or invalid cache falls back to runtime sampling; if sampling also fails,
 the original selector is used. This is an
-initial pose-matching slice, not the full Arena FC motion engine: trajectory and
-action/contact matching still need to be built and validated. See
+initial pose-matching slice, not the full Arena FC motion engine: trajectory matching,
+more action clips and visual validation remain outstanding. See
 `MOTION_MATCHING.md` for the boundaries and follow-up work.
 
 ## Start-up
@@ -90,8 +91,8 @@ Press **Enter**, or **Start / A** on the pad, to skip it. The title menu offers 
 goes back to the menu.
 
 Launch options:
-- `--no-motion-match` uses the original gait-transition selector (for A/B comparisons).
-- `--bake-motion FILE` samples the loaded model and writes a versioned gait cache, then exits (requires a graphics environment).
+- `--no-motion-match` uses the original gait and action selectors (for A/B comparisons).
+- `--bake-motion FILE` samples the loaded model and writes a versioned gait and action cache, then exits (requires a graphics environment).
 - `--motion-cache FILE` loads that cache if it matches the model and raylib version; otherwise it samples the model at startup.
 - `--no-intro`
 - `--demo` (the CPU plays your team)

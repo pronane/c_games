@@ -1,72 +1,77 @@
 # Gaelic motion matching
 
-This implementation is independent of `arena-fc`. The reusable C99 matcher is in
-`../shared/arena_motion/`; `src/motion_match.c` adapts it to Gaelic's existing gait
-path. Matching searches the already-selected idle, jog, run, sidestep or carry
-clip for a suitable entry frame using left/right foot XZ positions and velocities.
-Existing cross-fades, foot planting and stride logic remain in control. The shared
-core's trajectory queries, action filters and contact-deadline helper are tested
-but are **not yet used by Gaelic gameplay**.
+`../shared/arena_motion/` is the reusable C99 matching core. Gaelic's adapters
+use it without changing `arena-fc`. The live gait path picks an entry frame of
+the already-selected idle, jog, run, sidestep or carry clip. The action path
+also matches entries for **handpass and solo**, using the existing dedicated
+clips only. It does not select between alternative actions or create new motion.
 
-## Offline gait bake
+For each action, startup detects the contact time and limb as before, and bakes
+pre-contact entry frames with foot positions and velocities, action, carried-ball
+and detected limb tags, and remaining clip time to contact. A search runs when
+an action is first observed while in possession. It hard-filters action, clip,
+ball state and limb, and accepts only entries whose wind-up can reach the same
+authoritative deadline at 0.5–1.8 times the authored speed. If fewer than 0.13 s
+remain, metadata is missing, or no compatible row exists, the original action
+animation is used. Playback aligns the selected contact frame to the existing
+rules-engine clock; interruption or a new action clears the plan. Solo's rules
+counter is reset immediately when the action starts; its detected contact time
+is used for visual toe contact, **not** as a new gameplay event.
 
-With a built game, raylib and a working graphics environment, run from the game
-folder (the game changes its working directory to the executable's directory):
+The source GLB's horizontal root motion is stripped. The library's trajectory
+query is therefore not enabled in Gaelic, and no trajectories are fabricated.
+Only the current two action clips are supported; bounce, pickup, kicks, catches,
+keeper actions and paired interactions still use the original selector.
+
+## Offline bake
+
+With a built game, raylib and a graphics environment, run from the game folder:
 
 ```sh
 ./gaelic_football --bake-motion assets/models/gaelic_player.gfmotion
 ./gaelic_football --motion-cache assets/models/gaelic_player.gfmotion
 ```
 
-On Windows use `gaelic_football.exe`. The first command samples the loaded GLB
-using the same raylib animation poses and the same bake code as runtime, writes
-the cache and exits. It is an offline precomputation, but **currently opens a
-window and is not a headless baker**. Use `--model PATH` with both commands to
-bake/use a different model. The cache is optional: with no `--motion-cache`, the
-game samples at startup; if a cache is missing, malformed or incompatible, it
-logs a warning and samples instead. `--no-motion-match` disables matching entirely.
+On Windows use `gaelic_football.exe`. Baking loads and samples the GLB through
+raylib, writes the cache and exits. It is an offline precomputation but currently
+**opens a window and is not headless**. Use `--model PATH` with both commands for
+another model. Without a cache, or if it is invalid, the game samples at startup.
+`--no-motion-match` disables gait and action matching. A failed action bake or
+search falls back to the original clip/time selection.
 
-The v1 little-endian binary cache contains the five gait clip IDs and sample times
-and eight model-space foot features every third frame. It stores a schema version,
-raylib version, a full-model FNV-1a fingerprint, dimension and row count, and a
-payload checksum. Loading verifies those, finite values, bounded sizes, and the
-expected clip/time layout against the loaded animations before rebuilding the
-normalization. FNV is for accidental mismatch/corruption detection, not security.
-Bump the cache version if the clip IDs, feature semantics or extraction algorithm
-change. Generated caches are local build artifacts, not new motion assets.
+The v2 little-endian binary cache stores the five gait clips and pre-contact
+handpass/solo entries, including action/ball/limb tags and time to contact. The
+model fingerprint, raylib version, schema, payload checksum, row counts and
+finite values are checked. The game also validates the expected clip, sample
+and action/contact layout against its loaded clips and detected metadata before
+using the cache. Old v1 caches are rejected and rebuilt at startup; rebake them
+with `--bake-motion`. The fingerprints detect accidental mismatches, not hostile
+files. Bump the cache version whenever the IDs or extraction semantics change.
+Caches are local build artifacts; no new animation assets are added.
 
-This first bake does **not** include action contact/plant annotations or trajectory
-features. The current GLB's horizontal root motion was stripped; an honest
-trajectory database needs authored or captured data rather than guessed motion.
-It is not a full Arena FC motion database, and it does not select a different clip
-or perform periodic rematching. No new or unlicensed motion clips were added.
+## Release safety and visual alignment
 
-## Release safety
+`game.c` remains authoritative for action timing, possession and ball flight.
+Its release notification is read-only. For a handpass, when a recent rendered
+hand pose exists near the launch, the renderer applies a short bounded visual
+correction from the hand toward the simulated flight position. This correction
+never writes back to the ball state and clears on a new release or possession.
+A missing/stale pose or an excessive offset skips the correction. Solo's visible
+ball is at the detected toe at its visual contact time. Cross-fades, foot IK and
+frame timing can still cause visible discrepancies: these need graphics testing.
 
-`game.c` retains authority over possession, contact timing and ball flight.
-The release notification now takes a `const GameState *`, and the raylib callback
-only triggers presentation effects. Previously it overwrote the simulated ball's
-position from the last rendered bone, which might be stale, off screen or blended.
-The flight now starts at the rules engine's existing position instead. This is an
-intentional change from the old rendered-bone origin: a visible gap may occur at
-release until a presentation-only contact alignment is built and validated. The
-existing `detectContacts()` still sets action timing from the loaded clips at
-startup; action matching must not modify that authoritative deadline at runtime.
+## Validation and remaining work
 
-## Validation and next stages
-
-- `make test` covers rules including single-release and interrupted actions,
-  cache round trips/mismatches/corruption, the gait adapter and portable core.
-- On a machine with raylib and a display, compare `--shots-motion` and repeated
-  `--bench 600` runs with matching on and off. Bake and load a cache using the
-  same GLB and compare transitions and performance. Check release contact in
-  particular; these graphical checks have not been run in the current sandbox.
-- Add versioned action-specific contact-limb, ball-state and plant metadata,
-  followed by solo and handpass matching against the authoritative deadline.
-  Test the visible ball/limb alignment, interruptions and one release per action
-  without letting rendering move the simulation ball.
-- Add real or deliberately authored root/trajectory data, then connect the
-  portable query and hard ball/action filters. Profile before adding an index.
-- The shipped GLB has no moving bounce clip. Obtain appropriately licensed Gaelic
-  motion before claiming realistic bounce or aerial contests; Mixamo metadata in
-  the source bounce FBX is not evidence of a licence.
+- `make test` covers the rules, release interruptions, cache round trips and
+  corruption, action tags, feasible entry selection, deadline alignment,
+  presentation-only correction, gait adapter and portable core.
+- On a machine with raylib and a display, bake and reload the actual model;
+  compare `--shots-motion` and `--bench 600` with matching on and with
+  `--no-motion-match`. Inspect hand/ball and toe/ball contact, skipped frames,
+  off-screen releases, clipping and 30-player performance. The existing
+  `--shots-motion` scrub marks actions as already released, so also exercise
+  real handpasses and solos in training; the scrub alone does not validate a
+  normal handpass match. These graphical checks have not been run here.
+- Add authored/captured trajectory data and more licensed Gaelic actions before
+  extending the matcher beyond these clips. The shipped GLB has no moving bounce
+  clip; Mixamo metadata in the source bounce FBX is not evidence of a licence.

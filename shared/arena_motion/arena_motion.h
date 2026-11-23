@@ -31,6 +31,10 @@ int am_finalize(AMDatabase *db);
 /* Returns an index or -1; equal costs resolve in insertion order. All specified
  * filters are hard constraints. No game simulation or renderer state is touched. */
 int am_search(const AMDatabase *db, const AMQuery *query);
+/* Optional pure predicate for additional candidate constraints, e.g. an
+ * action whose remaining wind-up fits an authoritative deadline. */
+typedef int (*AMRowPredicate)(const AMRow *row, void *context);
+int am_search_if(const AMDatabase *db, const AMQuery *query, AMRowPredicate predicate, void *context);
 void am_query_init(AMQuery *query);
 /* Foot positions/velocities in the first 8 values; root velocity, yaw rate,
  * damped-pursuit future positions/facings, then time to contact. */

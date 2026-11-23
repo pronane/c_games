@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #endif
 
-#define CACHE_VERSION 1u
+#define CACHE_VERSION 2u
 #define FNV_OFFSET UINT64_C(14695981039346656037)
 #define FNV_PRIME UINT64_C(1099511628211)
 static const unsigned char magic[8] = {'G','F','M','O','T','I','O','N'};
@@ -54,6 +54,7 @@ static int supported(void) { return sizeof(float) == 4 && FLT_RADIX == 2 && FLT_
 
 #define HEADER_SIZE 40
 #define ROW_SIZE (8 + 4*MM_DIMS)
+#define ACTION_ROW_SIZE (20 + 4*MM_DIMS + 4)
 static int encode_row(const AMRow *r, unsigned char out[ROW_SIZE])
 {
     int i;
@@ -67,40 +68,64 @@ static int encode_row(const AMRow *r, unsigned char out[ROW_SIZE])
     return 1;
 }
 
-int mm_cache_save(const char *path, const char *model_path, unsigned version, const MMDatabase *db)
+static int encode_action(const AMRow *r, unsigned char out[ACTION_ROW_SIZE])
 {
-    unsigned char header[HEADER_SIZE] = {0}, row[ROW_SIZE]; uint64_t model, payload = FNV_OFFSET;
+    int i;
+    if (r->clip < 0 || r->action <= 0 || r->category < GA_LIMB_FOOT_L ||
+        r->category > GA_LIMB_HAND_R || r->ball != GA_BALL_CARRIED ||
+        !isfinite(r->time) || r->time < 0 || !isfinite(r->feature[23]) || r->feature[23] <= 0) return 0;
+    put32(out, (uint32_t)r->clip); put32(out+4, (uint32_t)r->category);
+    put32(out+8, (uint32_t)r->ball); put32(out+12, (uint32_t)r->action); put_float(out+16, r->time);
+    for (i = 0; i < MM_DIMS; ++i) {
+        if (!isfinite(r->feature[i])) return 0;
+        put_float(out+20+4*i, r->feature[i]);
+    }
+    for (i = 8; i < 23; ++i) if (r->feature[i] != 0) return 0;
+    put_float(out+20+4*MM_DIMS, r->feature[23]);
+    return 1;
+}
+
+int mm_cache_save(const char *path, const char *model_path, unsigned version, const MMDatabase *db, const AMDatabase *actions)
+{
+    unsigned char header[HEADER_SIZE] = {0}, row[ROW_SIZE], actionRow[ACTION_ROW_SIZE]; uint64_t model, payload = FNV_OFFSET;
     FILE *f; int i, ok = 1;
     if (!supported() || !path || !model_path || same_file(path, model_path) || !db || !db->ready ||
-        db->count <= 0 || db->count > MM_MAX_ROWS || !model_hash(model_path, &model)) return 0;
+        db->count <= 0 || db->count > MM_MAX_ROWS || !actions || actions->count < 0 ||
+        actions->count > AM_MAX_ROWS || (actions->count && !actions->ready) || !model_hash(model_path, &model)) return 0;
     for (i = 0; i < db->count; ++i) {
         if (!encode_row(&db->rows[i], row)) return 0;
         payload = hash_bytes(payload, row, sizeof row);
     }
+    for (i = 0; i < actions->count; ++i) {
+        if (!encode_action(&actions->rows[i], actionRow)) return 0;
+        payload = hash_bytes(payload, actionRow, sizeof actionRow);
+    }
     memcpy(header, magic, 8); put32(header+8, CACHE_VERSION); put32(header+12, version);
-    put64(header+16, model); put32(header+24, (uint32_t)db->count); put32(header+28, MM_DIMS);
+    put64(header+16, model); put32(header+24, (uint32_t)db->count); put32(header+28, (uint32_t)actions->count);
     put64(header+32, payload);
     if (!(f = fopen(path, "wb"))) return 0;
     if (fwrite(header, 1, sizeof header, f) != sizeof header) ok = 0;
     for (i = 0; ok && i < db->count; ++i) {
         if (!encode_row(&db->rows[i], row) || fwrite(row, 1, sizeof row, f) != sizeof row) ok = 0;
     }
+    for (i = 0; ok && i < actions->count; ++i) {
+        if (!encode_action(&actions->rows[i], actionRow) || fwrite(actionRow, 1, sizeof actionRow, f) != sizeof actionRow) ok = 0;
+    }
     if (fclose(f) != 0) ok = 0;
     return ok;
 }
 
-int mm_cache_load(const char *path, const char *model_path, unsigned version, MMDatabase *db)
+int mm_cache_load(const char *path, const char *model_path, unsigned version, MMDatabase *db, AMDatabase *actions)
 {
-    unsigned char header[HEADER_SIZE], row[ROW_SIZE]; uint64_t model, payload = FNV_OFFSET;
-    uint32_t count; int i, j, ok = 0; FILE *f;
-    if (!db) return 0;
-    mm_init(db);
+    unsigned char header[HEADER_SIZE], row[ROW_SIZE], actionRow[ACTION_ROW_SIZE]; uint64_t model, payload = FNV_OFFSET;
+    uint32_t count, actionCount; int i, j, ok = 0; FILE *f;
+    if (!db || !actions) return 0;
+    mm_init(db); ga_action_db_init(actions);
     if (!supported() || !path || !model_hash(model_path, &model) || !(f = fopen(path, "rb"))) return 0;
     if (fread(header, 1, sizeof header, f) != sizeof header || memcmp(header, magic, 8) ||
-        get32(header+8) != CACHE_VERSION || get32(header+12) != version || get64(header+16) != model ||
-        get32(header+28) != MM_DIMS) goto done;
-    count = get32(header+24);
-    if (!count || count > MM_MAX_ROWS) goto done;
+        get32(header+8) != CACHE_VERSION || get32(header+12) != version || get64(header+16) != model) goto done;
+    count = get32(header+24); actionCount = get32(header+28);
+    if (!count || count > MM_MAX_ROWS || actionCount > AM_MAX_ROWS) goto done;
     for (i = 0; i < (int)count; ++i) {
         float feature[MM_DIMS], time; uint32_t clip;
         if (fread(row, 1, sizeof row, f) != sizeof row) goto done;
@@ -109,10 +134,23 @@ int mm_cache_load(const char *path, const char *model_path, unsigned version, MM
         for (j = 0; j < MM_DIMS; ++j) feature[j] = get_float(row+8+4*j);
         if (!mm_add(db, (int)clip, time, feature)) goto done;
     }
-    if (payload != get64(header+32) || fgetc(f) != EOF || ferror(f) || !mm_finalize(db)) goto done;
+    for (i = 0; i < (int)actionCount; ++i) {
+        AMRow r; uint32_t clip, limb, ball, action;
+        if (fread(actionRow, 1, sizeof actionRow, f) != sizeof actionRow) goto done;
+        payload = hash_bytes(payload, actionRow, sizeof actionRow);
+        clip = get32(actionRow); limb = get32(actionRow+4); ball = get32(actionRow+8); action = get32(actionRow+12);
+        if (clip > INT32_MAX || limb > INT32_MAX || ball > INT32_MAX || action > INT32_MAX) goto done;
+        memset(&r, 0, sizeof r); r.clip = (int)clip; r.category = (int)limb;
+        r.ball = (int)ball; r.action = (int)action; r.time = get_float(actionRow+16);
+        for (j = 0; j < MM_DIMS; ++j) r.feature[j] = get_float(actionRow+20+4*j);
+        r.feature[23] = get_float(actionRow+20+4*MM_DIMS);
+        if (!encode_action(&r, actionRow) || !am_add(actions, &r)) goto done;
+    }
+    if (payload != get64(header+32) || fgetc(f) != EOF || ferror(f) || !mm_finalize(db) ||
+        (actionCount && !am_finalize(actions))) goto done;
     ok = 1;
 done:
     if (fclose(f) != 0) ok = 0;
-    if (!ok) mm_init(db);
+    if (!ok) { mm_init(db); ga_action_db_init(actions); }
     return ok;
 }
