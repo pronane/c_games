@@ -10,6 +10,8 @@
 #include "game.h"
 #include "motion_match.h"
 #include "motion_cache.h"
+#include "action_motion.h"
+#include "release_visual.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,6 +92,10 @@ static ActionClip ACTION_CLIPS[GAME_ACT_COUNT] = {
 };
 
 static MMDatabase motionDb;
+static AMDatabase actionDb;
+static GAActionMeta actionMeta[GAME_ACT_COUNT];
+static int actionReady, actionCacheLoaded;
+static const int motionActions[] = { GAME_ACT_HANDPASS, GAME_ACT_SOLO };
 static int motionMatching = 1, motionReady = 0;
 
 static Model model;
@@ -129,6 +135,10 @@ typedef struct {
     float plantX[2], plantZ[2];
     int plantOn[2];
     int lastAction;
+    float lastActionTime;
+    GAActionState matchedAction;
+    double poseTime;
+    int poseValid, poseClip;
     int useBounce;
 } AnimState;
 
@@ -260,10 +270,17 @@ static int motionFeatures(int clip, int frame, float out[MM_DIMS])
     ModelAnimation *a;
     Transform *p, *before, *after;
     int n, prev, next, bones[2] = { boneFootL, boneFootR };
-    if (!motionLocomotion(clip) || clipIdx[clip] < 0 || boneFootL < 0 || boneFootR < 0) return 0;
+    if (clip < 0 || clip >= C_COUNT || clipIdx[clip] < 0 || boneFootL < 0 || boneFootR < 0) return 0;
     a = animFor(clip); n = ANIM_FRAMES(*a) - 1;
     if (n < 3) return 0;
-    frame = ((frame % n) + n) % n; prev = (frame + n - 1) % n; next = (frame + 1) % n;
+    if (motionLocomotion(clip)) {
+        frame = ((frame % n) + n) % n; prev = (frame + n - 1) % n; next = (frame + 1) % n;
+    } else {
+        if (frame < 0) frame = 0;
+        if (frame > n) frame = n;
+        prev = frame > 0 ? frame - 1 : frame;
+        next = frame < n ? frame + 1 : frame;
+    }
     p = ANIM_POSES(*a)[frame]; before = ANIM_POSES(*a)[prev]; after = ANIM_POSES(*a)[next];
     if (!p || !before || !after) return 0;
     for (int side = 0; side < 2; ++side) {
@@ -291,15 +308,30 @@ static int motionCacheMatchesModel(void)
             ++row;
         }
     }
-    return row == motionDb.count;
+    if (row != motionDb.count) return 0;
+    row = 0;
+    for (unsigned i = 0; i < sizeof(motionActions)/sizeof(motionActions[0]); ++i) {
+        GAActionMeta *m = &actionMeta[motionActions[i]];
+        if (!m->action) continue;
+        for (int frame = (int)ceilf(m->start * ANIM_FPS); frame / ANIM_FPS < m->contact; frame += 3) {
+            const AMRow *r;
+            float time = frame / ANIM_FPS;
+            if (row >= actionDb.count) return 0;
+            r = &actionDb.rows[row++];
+            if (r->clip != m->clip || r->action != m->action || r->category != m->limb ||
+                r->ball != GA_BALL_CARRIED || fabsf(r->time-time) > 1e-5f ||
+                fabsf(r->feature[23] - (m->contact-time)) > 1e-5f) return 0;
+        }
+    }
+    return row == actionDb.count;
 }
 
 static void buildMotionDatabase(const char *cachePath)
 {
-    mm_init(&motionDb); motionReady = 0;
+    mm_init(&motionDb); ga_action_db_init(&actionDb); motionReady = 0; actionReady = 0; actionCacheLoaded = 0;
     if (!motionMatching || boneFootL < 0 || boneFootR < 0) return;
-    if (cachePath && mm_cache_load(cachePath, playerGlb, MOTION_RAYLIB_VERSION, &motionDb) && motionCacheMatchesModel()) {
-        motionReady = 1;
+    if (cachePath && mm_cache_load(cachePath, playerGlb, MOTION_RAYLIB_VERSION, &motionDb, &actionDb) && motionCacheMatchesModel()) {
+        motionReady = 1; actionReady = actionDb.ready; actionCacheLoaded = 1;
         TraceLog(LOG_INFO, "GAME: loaded motion cache (%d frames)", motionDb.count);
         return;
     }
@@ -370,6 +402,65 @@ static void detectContacts(void)
         ActionClip *ac = &ACTION_CLIPS[a];
         if (!ac->contactBy) game_set_action_timing(a, 0.0f, (ac->end - ac->start) / ac->rate);
     }
+}
+
+/* Build action-only entry rows. Contact detection above remains the sole source
+ * of the simulation deadline and limb; these tags only constrain presentation. */
+static void initActionMetadata(void)
+{
+    memset(actionMeta, 0, sizeof actionMeta);
+    for (unsigned i = 0; i < sizeof(motionActions)/sizeof(motionActions[0]); ++i) {
+        int a = motionActions[i], bone = actionFoot[a]; ActionClip *ac = &ACTION_CLIPS[a];
+        GAActionMeta *m = &actionMeta[a];
+        int limb = bone == boneFootL ? GA_LIMB_FOOT_L : bone == boneFootR ? GA_LIMB_FOOT_R :
+                   bone == boneHandL ? GA_LIMB_HAND_L : bone == boneHandR ? GA_LIMB_HAND_R : 0;
+        if (!limb || bone < 0 || (a == GAME_ACT_SOLO && limb > GA_LIMB_FOOT_R) ||
+            (a == GAME_ACT_HANDPASS && limb < GA_LIMB_HAND_L)) continue;
+        m->action = a; m->clip = ac->clip; m->limb = limb;
+        m->start = ac->start; m->end = fminf(ac->end, clipLen(ac->clip));
+        m->contact = actionContactClip[a]; m->rate = ac->rate;
+        if (m->contact <= m->start || m->contact > m->end) memset(m, 0, sizeof *m);
+    }
+}
+
+static void buildActionDatabase(void)
+{
+    ga_action_db_init(&actionDb); actionReady = 0;
+    if (!motionMatching || boneFootL < 0 || boneFootR < 0) return;
+    for (unsigned i = 0; i < sizeof(motionActions)/sizeof(motionActions[0]); ++i) {
+        GAActionMeta *m = &actionMeta[motionActions[i]];
+        if (!m->action) continue;
+        for (int frame = (int)ceilf(m->start * ANIM_FPS); frame / ANIM_FPS < m->contact; frame += 3) {
+            float f[8];
+            if (!motionFeatures(m->clip, frame, f) || !ga_action_add(&actionDb, m, frame / ANIM_FPS, f)) {
+                TraceLog(LOG_WARNING, "GAME: invalid action poses; action matching disabled");
+                ga_action_db_init(&actionDb); return;
+            }
+        }
+    }
+    actionReady = am_finalize(&actionDb);
+    if (actionReady) TraceLog(LOG_INFO, "GAME: action matching ready (%d entries)", actionDb.count);
+}
+
+static void matchAction(AnimState *s, const GamePlayer *p, int carrying, int *clip, float *time)
+{
+    int act = p->action;
+    int fresh = act != s->lastAction || p->action_time + .0001f < s->lastActionTime;
+    if (fresh) memset(&s->matchedAction, 0, sizeof s->matchedAction);
+    if (fresh && actionReady && carrying && (act == GAME_ACT_HANDPASS || act == GAME_ACT_SOLO) &&
+        (act != GAME_ACT_HANDPASS || !p->action_released)) {
+        float feet[8];
+        if (motionFeatures(s->clip, (int)(s->t * ANIM_FPS), feet))
+            ga_action_begin(&s->matchedAction, &actionDb, &actionMeta[act], p->action_time,
+                            game_action_contact(act), feet);
+    }
+    /* If possession is lost before contact, discard the presentation plan.
+     * A handpass after release keeps its already-selected follow-through. */
+    if (s->matchedAction.active && !carrying && p->action_time < s->matchedAction.deadline)
+        memset(&s->matchedAction, 0, sizeof s->matchedAction);
+    if (s->matchedAction.active && s->matchedAction.action == act &&
+        ga_action_time(&s->matchedAction, p->action_time, time)) *clip = s->matchedAction.clip;
+    s->lastAction = act; s->lastActionTime = p->action_time;
 }
 
 /* ---- choose clip for a player from the game state ---------------------- */
@@ -1012,6 +1103,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     coordinateTurn(s);
     uploadPose(s, &lm);
     if ((int)(s - as) == 9) measureCarrierFoot();
+    s->poseTime = GetTime(); s->poseValid = 1; s->poseClip = clip;
     poseOverride = -1;
     tSkin += GetTime() - t0;
     skinnedThisFrame++;
@@ -1145,6 +1237,7 @@ static void drawCharacter(AnimState *s, float x, float z, float yaw, int kit, fl
 
 /* ---- ball ---------------------------------------------------------------- */
 static Vector3 ballDrawPos;
+static GAReleaseVisual releaseVisual;
 
 static float poseYaw(const AnimState *s, const GamePlayer *p)
 {
@@ -1176,6 +1269,11 @@ static Vector3 carriedBall(int team, int idx)
         Vector3 at = boneWorld(s, toe >= 0 ? toe : fb, p->x, p->z, yaw);
         at = Vector3Add(at, Vector3Scale(f, 0.04f));
         at.y = fmaxf(at.y + 0.025f, BALL_R);
+        float contact = game_action_contact(GAME_ACT_SOLO);
+        if (contact > .01f && contact < d - .01f) {
+            if (p->action_time <= contact) return Vector3Lerp(hands, at, Clamp(p->action_time / contact, 0, 1));
+            return Vector3Lerp(at, hands, Clamp((p->action_time - contact) / (d - contact), 0, 1));
+        }
         u = p->action_time / d;
         if (u < 0.30f) return Vector3Lerp(hands, at, u / 0.30f);
         if (u < 0.68f) return at;
@@ -1227,6 +1325,19 @@ static void onRelease(const GameState *g, int team, int idx, int action, void *u
     /* Notification only. The rules engine already created the authoritative
      * flight. A stale/off-screen/blended renderer pose must never move it. */
     (void)user;
+    ga_visual_reset(&releaseVisual);
+    if (action == GAME_ACT_HANDPASS && haveModel && team >= 0 && team < 2 && idx >= 0 && idx < GAME_TEAM_SIZE) {
+        const GamePlayer *p = &g->players[team][idx];
+        const AnimState *s = &as[team * GAME_TEAM_SIZE + idx];
+        int h = actionFoot[action];
+        if (h >= 0 && s->poseValid && s->poseClip == C_HAND_PASS && GetTime() - s->poseTime <= .12) {
+            float yaw = poseYaw(s, p);
+            Vector3 hand = Vector3Add(boneWorld(s, h, p->x, p->z, yaw), (Vector3){ sinf(yaw)*.06f, 0, cosf(yaw)*.06f });
+            float launch[3] = {g->ball.x - HL, g->ball.height, g->ball.z - HW};
+            float contact[3] = {hand.x, hand.y, hand.z};
+            ga_visual_start(&releaseVisual, launch, contact, .15f, 1.5f);
+        }
+    }
     releaseFlash = 0;
     lastReleaseAction = action;
     sfxPlay(action == GAME_ACT_HANDPASS ? SND_HANDPASS : SND_KICK, action == GAME_ACT_HANDPASS ? 0.5f : 0.8f);
@@ -2384,6 +2495,7 @@ static void drawWorld(float dt)
             float yaw = s->bodyYaw;
             int clip; float t;
             desiredClip(team, i, p, s, dt, &clip, &t);
+            matchAction(s, p, game.ball_team == team && game.ball_player == i, &clip, &t);
             if (p->action == GAME_ACT_NONE && p->jump_time <= 0.0f &&
                 !(game.mark_play_on && game.restart_pending && game.ball_team == team && game.ball_player == i))
                 matchGaitTransition(s, clip, &t);
@@ -2399,8 +2511,13 @@ static void drawWorld(float dt)
     /* ball: in the carrier's hands / on the foot, otherwise physics position */
     if (game.ball_team >= 0 && game.ball_player >= 0 && haveModel)
         ballDrawPos = carriedBall(game.ball_team, game.ball_player);
-    else
-        ballDrawPos = W(game.ball.x, fmaxf(game.ball.height, BALL_R), game.ball.z);
+    else {
+        float simulated[3] = {game.ball.x - HL, fmaxf(game.ball.height, BALL_R), game.ball.z - HW};
+        float visual[3];
+        ga_visual_position(&releaseVisual, simulated, dt, game.ball.in_flight && game.ball_team < 0, visual);
+        ballDrawPos = (Vector3){visual[0], fmaxf(visual[1], BALL_R), visual[2]};
+    }
+    if (game.ball_team >= 0) ga_visual_reset(&releaseVisual);
     drawBallLit(ballDrawPos);
 }
 
@@ -2498,6 +2615,7 @@ static void scenarioCarry(int team, int idx, float x, float z)
 
 static void newMatch(void)
 {
+    ga_visual_reset(&releaseVisual);
     game_init(&game);
     game.enforce_three_v_three = 1;
     training = 0;
@@ -2507,7 +2625,7 @@ static void newMatch(void)
     game.dissent_chance = 0.05f;
     game_start_half(&game, 1);
     clockT = 0; fullTime = 0; celebT = 0;
-    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; }
+    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; as[i].lastAction = GAME_ACT_NONE; as[i].lastActionTime = 0; as[i].poseValid = 0; memset(&as[i].matchedAction, 0, sizeof as[i].matchedAction); }
 }
 
 /* ---- training: you, two team-mates to pass to, and their keeper ---------- */
@@ -2523,6 +2641,7 @@ static void trainingPlace(void)
 }
 static void newTraining(void)
 {
+    ga_visual_reset(&releaseVisual);
     newMatch();
     training = 1;
     game.enforce_three_v_three = 0;
@@ -2536,7 +2655,7 @@ static void newTraining(void)
             p->x = GAME_PITCH_LENGTH * 0.5f + (t == 0 ? -1.0f : 1.0f) * (7.0f + (float)i * 0.9f);
             p->z = -6.5f;
         }
-    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; }
+    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; as[i].lastAction = GAME_ACT_NONE; as[i].lastActionTime = 0; as[i].poseValid = 0; memset(&as[i].matchedAction, 0, sizeof as[i].matchedAction); }
     trainingPlace();
     camMode = 2;
 }
@@ -3291,15 +3410,17 @@ int main(int argc, char **argv)
         scratch.frameCount = 1; scratch.framePoses = scratchPosePtr;
 #endif
         detectContacts();
+        initActionMetadata();
         buildMotionDatabase(motionBake ? NULL : motionCache);
+        if (!actionCacheLoaded) buildActionDatabase();
         pickFootProbe();
         attachBoneAttributes();
         if (haveLit) for (int m = 0; m < model.materialCount; m++) model.materials[m].shader = gpuSkin ? skinShader : litShader;
         TraceLog(LOG_INFO, "GAME: %d clips loaded, %d bones", C_COUNT, MODEL_BONECOUNT(model));
     }
     if (motionBake) {
-        int ok = haveModel && motionReady && mm_cache_save(motionBake, playerGlb, MOTION_RAYLIB_VERSION, &motionDb);
-        if (ok) printf("Baked %d motion rows to %s\n", motionDb.count, motionBake);
+        int ok = haveModel && motionReady && mm_cache_save(motionBake, playerGlb, MOTION_RAYLIB_VERSION, &motionDb, &actionDb);
+        if (ok) printf("Baked %d gait rows and %d action rows to %s\n", motionDb.count, actionDb.count, motionBake);
         else fprintf(stderr, "Could not bake motion cache: %s\n", motionBake);
         CloseWindow();
         return ok ? 0 : 1;

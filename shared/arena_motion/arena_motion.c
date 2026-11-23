@@ -52,7 +52,7 @@ void am_query_init(AMQuery *query)
     query->clip = query->category = query->ball = query->action = AM_ANY;
 }
 
-int am_search(const AMDatabase *db, const AMQuery *q)
+int am_search_if(const AMDatabase *db, const AMQuery *q, AMRowPredicate predicate, void *context)
 {
     int i, j, best = -1; double best_cost = DBL_MAX;
     if (!db || !q || !db->ready || db->count <= 0 || db->count > AM_MAX_ROWS) return -1;
@@ -64,7 +64,8 @@ int am_search(const AMDatabase *db, const AMQuery *q)
         if ((q->clip != AM_ANY && q->clip != r->clip) ||
             (q->category != AM_ANY && q->category != r->category) ||
             (q->ball != AM_ANY && q->ball != r->ball) ||
-            (q->action != AM_ANY && q->action != r->action)) continue;
+            (q->action != AM_ANY && q->action != r->action) ||
+            (predicate && !predicate(r, context))) continue;
         for (j = 0; j < AM_DIMENSIONS; ++j) {
             double d = ((double)q->feature[j] - r->feature[j]) / db->scale[j];
             cost += db->weight[j] * d * d;
@@ -72,6 +73,11 @@ int am_search(const AMDatabase *db, const AMQuery *q)
         if (cost < best_cost) { best_cost = cost; best = i; }
     }
     return best;
+}
+
+int am_search(const AMDatabase *db, const AMQuery *q)
+{
+    return am_search_if(db, q, NULL, NULL);
 }
 
 int am_build_features(float out[AM_DIMENSIONS], const float foot[8],

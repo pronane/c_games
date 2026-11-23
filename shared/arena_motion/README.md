@@ -35,11 +35,12 @@ Run the portable and Gaelic adapter tests with `make -C Gaelic_Football_3d test`
 
 ## Current integration limits
 
-The Gaelic adapter uses only the first eight foot features and hard-filters the
-existing selected gait. Its in-place GLB does not contain real root trajectories;
-no fabricated trajectory is passed off as captured motion. The 24-dimensional query,
-category/action filters and contact-deadline helper have unit tests but are **not
-live Gaelic trajectory or action matching yet**. Gaelic now has an optional versioned gait cache and a notification-only release
-callback. Offline action/trajectory metadata, live action matching and contact
-alignment, additional licensed clips, and visual/performance validation remain
-future work. See `Gaelic_Football_3d/MOTION_MATCHING.md`.
+The Gaelic adapter uses foot features to hard-filter the selected gait. For
+handpass and solo it also uses the contact-time feature and action/ball/limb
+filters, with a predicate to reject entries that cannot reach the deadline. Its
+in-place GLB does not contain real root trajectories; no fabricated trajectory
+is passed off as captured motion. The 24-dimensional trajectory query has unit
+tests but is **not live in Gaelic**. The optional v2 cache includes handpass
+and solo entry metadata. More action and trajectory metadata, additional licensed
+clips, and visual/performance validation remain future work. See
+`Gaelic_Football_3d/MOTION_MATCHING.md`.
