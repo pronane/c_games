@@ -16,11 +16,12 @@ TARGET := gaelic_football
 LIBS := -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 endif
 
-$(TARGET): src/main.c src/game.c src/game.h src/stadium.c src/sfx.c src/pad.c
-	$(CC) $(CFLAGS) -Isrc src/main.c src/game.c -o $@ $(LDFLAGS) $(LIBS)
+$(TARGET): src/main.c src/game.c src/motion_match.c src/motion_match.h src/game.h src/stadium.c src/sfx.c src/pad.c
+	$(CC) $(CFLAGS) -Isrc src/main.c src/game.c src/motion_match.c -o $@ $(LDFLAGS) $(LIBS)
 
 test:
 	$(CC) -std=c99 -Isrc tests/core_tests.c src/game.c -lm -o core_tests && ./core_tests
+	$(CC) -std=c99 -Wall -Wextra -Isrc tests/motion_tests.c src/motion_match.c -lm -o motion_tests && ./motion_tests
 
 run: $(TARGET)
 	./$(TARGET)
@@ -29,6 +30,6 @@ shots: $(TARGET)
 	./$(TARGET) --screenshots
 
 clean:
-	rm -f gaelic_football gaelic_football.exe core_tests core_tests.exe v2_*.png
+	rm -f gaelic_football gaelic_football.exe core_tests core_tests.exe motion_tests motion_tests.exe v2_*.png
 
 .PHONY: run shots test clean
