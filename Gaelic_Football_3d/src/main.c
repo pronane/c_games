@@ -47,6 +47,9 @@ static const char *playerGlb = "assets/models/gaelic_player.glb";
 #define ANIM_FPS 60.0f
 #define HALF_SECONDS 300.0f          /* real seconds per half, shown as 35 min */
 #define BALL_R GAME_BALL_REST        /* 0.11 m radius: size-5 ball, ~70 cm round */
+/* Presentation-only procedural leg extension limits. */
+#define GA_LEG_MAX_REACH 0.95f
+#define GA_LEG_MAX_STRIDE_SCALE 1.55f
 #define MAX_BONES 64
 #define BLEND_TIME 0.15f
 #define SIN_BIN_REAL (600.0f * HALF_SECONDS / 2100.0f)   /* 10 match minutes in real seconds */
@@ -527,7 +530,9 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         if (turning) prefer = fminf(prefer * 1.06f, 2.3f);
         stride = s->speed / prefer;
         if (stride > 2.25f) stride = 2.25f;
-        s->strideScale = Clamp(stride / authored, 1.0f, 2.35f);
+        /* Avoid forcing the short source cycle into a rigid split at speed.
+         * Some high-speed ground sliding is preferable to locked knees. */
+        s->strideScale = Clamp(stride / authored, 1.0f, GA_LEG_MAX_STRIDE_SCALE);
         rate = Clamp(prefer * clipLen(*clip), 0.70f, 1.70f);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
@@ -978,7 +983,7 @@ static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int 
     L1 = Vector3Distance(hip, s->pose[calf].translation);
     L2 = Vector3Distance(s->pose[calf].translation, s->pose[foot].translation);
     if (L1 < 0.05f || L2 < 0.05f) return;
-    if (Vector3Distance(hip, model) > (L1 + L2) * 0.97f) { s->plantOn[side] = 0; return; }
+    if (Vector3Distance(hip, model) > (L1 + L2) * GA_LEG_MAX_REACH) { s->plantOn[side] = 0; return; }
     keepT = s->pose[thigh]; keepC = s->pose[calf]; keepF = s->pose[foot];
     keepToe = toe >= 0 ? s->pose[toe] : keepF;
     pole = legPole(hip, s->pose[calf].translation, model);
@@ -999,6 +1004,7 @@ static void stretchLeg(AnimState *s, int thigh, int calf, int foot, int toe, flo
     Vector3 hip, footP, delta, target, old;
     float L1, L2, reach, dist;
     if (thigh < 0 || calf < 0 || foot < 0 || scale < 1.04f) return;
+    scale = fminf(scale, GA_LEG_MAX_STRIDE_SCALE);
     hip = s->pose[thigh].translation;
     footP = s->pose[foot].translation;
     delta = Vector3Subtract(footP, hip);
@@ -1006,7 +1012,7 @@ static void stretchLeg(AnimState *s, int thigh, int calf, int foot, int toe, flo
     target = Vector3Add(hip, delta);
     L1 = Vector3Distance(hip, s->pose[calf].translation);
     L2 = Vector3Distance(s->pose[calf].translation, footP);
-    reach = (L1 + L2) * 0.97f;
+    reach = (L1 + L2) * GA_LEG_MAX_REACH;
     dist = Vector3Distance(hip, target);
     if (L1 < 0.05f || L2 < 0.05f || reach < 0.1f) return;
     if (dist > reach) target = Vector3Add(hip, Vector3Scale(Vector3Subtract(target, hip), reach / dist));

@@ -127,3 +127,12 @@ prove that the skinned hand mesh clears the ball or that motion looks natural.
 The corrected rendering, foot-plant smoothness and real gameplay actions still
 need visual A/B review. Trajectory matching, expanded actions, full 30-player
 hardware profiling and the broader graphics work remain outstanding.
+
+A follow-up visual review found the leg still looked too straight. A model-space
+probe showed the old stride/plant adjustments brought the hip-to-foot reach
+above 94% of the two-bone length in 28 of 41 run samples for each leg (versus
+7 of 41 in the source run clip). The procedural stride and maximum reach are
+now capped more conservatively; the model test checks the cap for both legs.
+This may trade some foot locking for sliding and needs rendered evaluation,
+especially at sprint speed. The motion matcher selects clip entries; these leg
+IK adjustments are separate from the shared matching library.

@@ -217,7 +217,7 @@ static int validate_leg_ik(void)
     game_init(&game); game.players[0][9].action = GAME_ACT_NONE;
     for (int c = 0; c < 3; ++c) {
         ModelAnimation *a = animFor(clips[c]); AnimState *s = &as[9];
-        int n = ANIM_FRAMES(*a)-1, backward = 0, bad_length = 0, count = 0;
+        int n = ANIM_FRAMES(*a)-1, backward = 0, bad_length = 0, straight = 0, count = 0;
         memset(s, 0, sizeof *s); s->speed = 5; s->strideScale = 2.35f;
         for (int f = 0; f < 2*n; ++f) {
             float lengths[2][2];
@@ -236,13 +236,14 @@ static int validate_leg_ik(void)
                 Vector3 v = Vector3Subtract(knee, hip);
                 Vector3 pole = Vector3Subtract(v, Vector3Scale(d, Vector3DotProduct(v, d)));
                 if (!finite3(knee) || !finite3(foot) || pole.z < -0.005f) backward++;
+                if (Vector3Distance(hip, foot) > (lengths[side][0] + lengths[side][1]) * (GA_LEG_MAX_REACH + .001f)) straight++;
                 if (fabsf(Vector3Distance(hip, knee)-lengths[side][0]) > .002f ||
                     fabsf(Vector3Distance(knee, foot)-lengths[side][1]) > .002f) bad_length++;
                 count++;
             }
         }
-        printf("leg_ik clip=%s samples=%d backward=%d bad_length=%d\n", CLIP_NAMES[clips[c]], count, backward, bad_length);
-        if (backward || bad_length) return 0;
+        printf("leg_ik clip=%s samples=%d backward=%d bad_length=%d overextended=%d\n", CLIP_NAMES[clips[c]], count, backward, bad_length, straight);
+        if (backward || bad_length || straight) return 0;
     }
     return 1;
 }
