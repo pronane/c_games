@@ -100,6 +100,7 @@ static GAActionMeta actionMeta[GAME_ACT_COUNT];
 static int actionReady, actionCacheLoaded;
 static const int motionActions[] = { GAME_ACT_HANDPASS, GAME_ACT_SOLO };
 static int motionMatching = 1, motionReady = 0;
+static int reverseJog = 0;
 
 static Model model;
 static ModelAnimation *anims;
@@ -224,6 +225,18 @@ static float clipLen(int clip)
     return (float)(n - 1) / ANIM_FPS;   /* raylib bakes keyframes at ANIM_FPS; the last frame is the clip end */
 }
 
+/* Reverse only an observed backwards forward-jog cycle. Simulation and
+ * matcher clocks still progress forwards; map them to the clip here. */
+static float clipPlaybackTime(int clip, float t)
+{
+    if (clip == C_JOG && reverseJog && poseOverride < 0) {
+        float len = clipLen(clip), p = fmodf(t, len);
+        if (p < 0) p += len;
+        return fmodf(len - p, len);
+    }
+    return t;
+}
+
 #if RAYLIB_VERSION_MAJOR < 6
 /* Pose at a time in seconds, interpolated between baked frames so a sparse cycle does not step.
  * raylib 6 does this inside UpdateModelAnimation (float frame). */
@@ -236,7 +249,7 @@ static void sampleClip(int clip, float t, Transform *out)
     int i0, i1;
     Transform *A, *B;
     if (n <= 0) return;
-    frame = t * ANIM_FPS;
+    frame = clipPlaybackTime(clip, t) * ANIM_FPS;
     if (frame < 0.0f) frame = 0.0f;
     if (frame > (float)(n - 1)) frame = (float)(n - 1);
     i0 = (int)frame;
@@ -257,7 +270,7 @@ static void sampleClip(int clip, float t, Transform *out)
 static float clipFrame(int clip, float t)
 {
     int n = ANIM_FRAMES(*animFor(clip));
-    float f = t * ANIM_FPS;
+    float f = clipPlaybackTime(clip, t) * ANIM_FPS;
     if (f < 0.0f) f = 0.0f;
     if (n > 1 && f > (float)(n - 1) - 0.001f) f = (float)(n - 1) - 0.001f;
     return f;
@@ -271,6 +284,29 @@ static int motionLocomotion(int clip)
     return clip == C_IDLE || clip == C_JOG || clip == C_RUN || clip == C_SIDESTEP || clip == C_RUN_BALL;
 }
 
+/* Detect direction only for the forward-jog slot, not for idle, sidestepping,
+ * actions or arbitrary backwards clips. Ambiguous data is left untouched. */
+static void detectJogDirection(void)
+{
+    ModelAnimation *a; float *left, *right; int n, direction;
+    reverseJog = 0;
+    if (clipIdx[C_JOG] < 0 || boneFootL < 0 || boneFootR < 0) return;
+    a = animFor(C_JOG); n = ANIM_FRAMES(*a) - 1;
+    if (n < 8 || n > 1000000) return;
+    left = malloc((size_t)n * 2 * sizeof(float)); right = malloc((size_t)n * 2 * sizeof(float));
+    if (!left || !right) { free(left); free(right); return; }
+    for (int f = 0; f < n; ++f) {
+        Transform *p = ANIM_POSES(*a)[f];
+        if (!p) { free(left); free(right); return; }
+        left[2*f] = p[boneFootL].translation.y; left[2*f+1] = p[boneFootL].translation.z;
+        right[2*f] = p[boneFootR].translation.y; right[2*f+1] = p[boneFootR].translation.z;
+    }
+    direction = am_gait_reverse(left, right, n);
+    reverseJog = direction == 1;
+    free(left); free(right);
+    TraceLog(LOG_INFO, "GAME: forward jog playback %s", reverseJog ? "reversed" : direction == 0 ? "authored" : "ambiguous, authored");
+}
+
 static int motionFeatures(int clip, int frame, float out[MM_DIMS])
 {
     ModelAnimation *a;
@@ -280,7 +316,10 @@ static int motionFeatures(int clip, int frame, float out[MM_DIMS])
     a = animFor(clip); n = ANIM_FRAMES(*a) - 1;
     if (n < 3) return 0;
     if (motionLocomotion(clip)) {
-        frame = ((frame % n) + n) % n; prev = (frame + n - 1) % n; next = (frame + 1) % n;
+        frame = ((frame % n) + n) % n;
+        if (clip == C_JOG && reverseJog) {
+            frame = (n - frame) % n; prev = (frame + 1) % n; next = (frame + n - 1) % n;
+        } else { prev = (frame + n - 1) % n; next = (frame + 1) % n; }
     } else {
         if (frame < 0) frame = 0;
         if (frame > n) frame = n;
@@ -477,6 +516,27 @@ static float strideLimit(float speed)
     return 1.0f + (GA_LEG_MAX_STRIDE_SCALE - 1.0f) * Clamp((speed - 1.0f) / 6.0f, 0.0f, 1.0f);
 }
 
+/* Shared cadence for the active locomotion clip and the outgoing clip during
+ * a cross-fade. Continuing the outgoing cycle avoids freezing its arms and
+ * legs for up to 0.4 seconds whenever movement state changes. */
+static float locomotionRate(const AnimState *s, int clip)
+{
+    float prefer;
+    int turning;
+    if (clip == C_IDLE) return .35f;
+    turning = s->turnRate > 2.0f && s->speed > .9f && s->speed < 6.2f;
+    prefer = Clamp(.90f + .13f * s->speed, .90f, 2.15f);
+    if (s->accel > 2.2f) prefer = fminf(prefer * 1.08f, 2.3f);
+    if (s->accel < -2.2f) prefer *= .84f;
+    if (turning) prefer = fminf(prefer * 1.06f, 2.3f);
+    return Clamp(prefer * clipLen(clip), .70f, 1.70f);
+}
+static void advancePreviousLocomotion(AnimState *s, int clip, float dt)
+{
+    if (s->blend < 1.0f && !s->useBounce && motionLocomotion(s->prevClip) && motionLocomotion(clip))
+        s->prevT = am_loop_advance(s->prevT, dt, locomotionRate(s, s->prevClip), clipLen(s->prevClip));
+}
+
 /* ---- choose clip for a player from the game state ---------------------- */
 static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, float dt, int *clip, float *t)
 {
@@ -541,7 +601,7 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         /* Avoid forcing the short source cycle into a rigid split at speed.
          * Some high-speed ground sliding is preferable to locked knees. */
         s->strideScale = Clamp(stride / authored, 1.0f, strideLimit(s->speed));
-        rate = Clamp(prefer * clipLen(*clip), 0.70f, 1.70f);
+        rate = locomotionRate(s, *clip);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
         return;
@@ -1135,6 +1195,8 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     if (clip != s->clip) {
         s->prevClip = s->clip; s->prevT = s->t; s->blend = 0.0f;
         s->clip = clip;
+    } else {
+        advancePreviousLocomotion(s, clip, dt);
     }
     s->t = t;
     if (poseFar) s->blend = 1.0f;
@@ -3503,6 +3565,7 @@ int main(int argc, char **argv)
         scratch.frameCount = 1; scratch.framePoses = scratchPosePtr;
 #endif
         detectContacts();
+        detectJogDirection();
         initActionMetadata();
         buildMotionDatabase(motionBake ? NULL : motionCache);
         if (!actionCacheLoaded) buildActionDatabase();
