@@ -103,6 +103,7 @@ class Game {
   private hintTimer = 0;
   private fpsEma = 1 / 60;
   private abLastLog = 0;
+  private abFrameTimes: number[] = [];
   // attract mode — AI vs AI behind the title menu
   private demoSim: MatchSim | null = null;
   private demoViews = new Map<number, PlayerView>();
@@ -545,11 +546,16 @@ class Game {
     this.world.renderer.render(this.world.scene, this.world.camera);
     if (AB_MODE) {
       this.fpsEma += ((1 / Math.max(dt, 1e-4)) - this.fpsEma) * 0.05;
-      if (now - this.abLastLog > 2000) {
+      this.abFrameTimes.push(dt);
+      if (this.abFrameTimes.length > 240) this.abFrameTimes.shift();
+      if (now - this.abLastLog > 2000 && this.abFrameTimes.length >= 20) {
         const info = this.world.renderer.info;
+        const sorted = [...this.abFrameTimes].sort((a, b) => a - b);
+        const pct = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] * 1000;
         console.log(
-          `AB_STATS fps=${this.fpsEma.toFixed(1)} tris=${info.render.triangles} calls=${info.render.calls} textures=${info.memory.textures} geometries=${info.memory.geometries} lod=${this.lodQuality}`
+          `AB_STATS fps=${this.fpsEma.toFixed(1)} p50_ms=${pct(0.5).toFixed(1)} p95_ms=${pct(0.95).toFixed(1)} tris=${info.render.triangles} calls=${info.render.calls} textures=${info.memory.textures} geometries=${info.memory.geometries} lod=${this.lodQuality}`
         );
+        this.abFrameTimes.length = 0;
         this.abLastLog = now;
       }
     }
