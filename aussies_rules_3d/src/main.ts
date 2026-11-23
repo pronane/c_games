@@ -26,6 +26,16 @@ import { InputManager } from './input/input';
 import { InputFrame } from './input/mappings';
 import { MatchAudio } from './audio/audio';
 import { LOD_DISTANCES, pickLodQuality, type LodQuality } from './render/lod';
+
+/**
+ * A/B capture mode for the CI visual workflow (?ab=1, optional ?lod=ultra|high|performance):
+ * fixed attract seed so two runs are frame-comparable, hides menu overlays so frames
+ * show unobstructed attract play, and logs AB_STATS renderer counters to the console
+ * every couple of seconds (captured by the CI console log). No effect otherwise.
+ */
+const AB_PARAMS = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+const AB_MODE = !!AB_PARAMS?.has('ab');
+const AB_LOD = AB_PARAMS?.get('lod');
 import { Hud, Menus, CLUBS, $, createTouchButtons } from './ui/ui';
 
 type GamePhase = 'menu' | 'playing' | 'paused' | 'ended';
@@ -64,7 +74,7 @@ class Game {
   input = new InputManager($('game'));
   audio = new MatchAudio();
   /** Graphics quality tier — drives the squad LOD switch distances. */
-  lodQuality: LodQuality = 'high';
+  lodQuality: LodQuality = pickLodQuality(AB_LOD ?? 'high');
   hud = new Hud();
   menus = new Menus();
   teams: Teams = {
@@ -91,6 +101,8 @@ class Game {
   private menuBackDown = false;
   private showMarkers = true;
   private hintTimer = 0;
+  private fpsEma = 1 / 60;
+  private abLastLog = 0;
   // attract mode — AI vs AI behind the title menu
   private demoSim: MatchSim | null = null;
   private demoViews = new Map<number, PlayerView>();
@@ -150,6 +162,10 @@ class Game {
     this.setupTouch();
     this.startAttract();
     this.menus.show('title');
+    if (AB_MODE) {
+      // capture the unobstructed attract demo (deterministic — see AB_PARAMS)
+      document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    }
 
     // mouse-wheel zoom on the broadcast cam (auto-recentres after 3 s)
     ($('game') as HTMLCanvasElement).addEventListener(
@@ -268,7 +284,7 @@ class Game {
   private startAttract(): void {
     for (const v of this.demoViews.values()) this.world.scene.remove(v.root);
     this.demoViews.clear();
-    const seed = (Math.random() * 1e9) | 0;
+    const seed = AB_MODE ? 0x5eed5eed : (Math.random() * 1e9) | 0;
     const sim = new MatchSim(
       { ...AFL_SETTINGS, quarterSeconds: 300, difficulty: 'afl', seed },
       'afl',
@@ -527,6 +543,16 @@ class Game {
     }
 
     this.world.renderer.render(this.world.scene, this.world.camera);
+    if (AB_MODE) {
+      this.fpsEma += ((1 / Math.max(dt, 1e-4)) - this.fpsEma) * 0.05;
+      if (now - this.abLastLog > 2000) {
+        const info = this.world.renderer.info;
+        console.log(
+          `AB_STATS fps=${this.fpsEma.toFixed(1)} tris=${info.render.triangles} calls=${info.render.calls} textures=${info.memory.textures} geometries=${info.memory.geometries} lod=${this.lodQuality}`
+        );
+        this.abLastLog = now;
+      }
+    }
     this.audio.settle(dt);
   }
 

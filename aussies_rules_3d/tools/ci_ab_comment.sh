@@ -9,7 +9,7 @@ marker='<!-- aussies-motion-ab-sticky -->'
   echo "$marker"
   echo '### Aussies Rules Motion A/B — attract-demo capture'
   echo
-  echo 'Both legs captured the title/attract demo under software WebGL (see workflow). If the companion AB_MODE PR is merged, captures run with `?ab=1` (fixed seed, menu hidden, `AB_STATS` logged from `renderer.info`).'
+  echo 'Both legs ran with `?ab=1`: fixed attract seed, menu overlays hidden, broadcast cam, `AB_STATS` logged from `renderer.info` every ~2 s.'
   echo
   for leg in original lod; do
     log="build/motion-ab/$leg/electron.log"
