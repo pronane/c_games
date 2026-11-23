@@ -12,6 +12,7 @@ import { MatchState, PlayerState, TeamId } from '../rules/types';
 import { MotionBinding, type MotionAssets } from './motionBinding';
 import { basePartName, collectLodKits, pickLodLevel, setLodLevel, LOD_DISTANCES, type LodKit, type LodLevel } from './lod';
 import { ensureJerseyUvs } from './jerseyUvs';
+import { guernseyTexture } from './guernsey';
 
 export interface PlayerView {
   root: THREE.Group;
@@ -41,8 +42,8 @@ export interface PlayerView {
 }
 
 export interface Teams {
-  home: { primary: string; secondary: string; name: string };
-  away: { primary: string; secondary: string; name: string };
+  home: { primary: string; secondary: string; name: string; pattern?: import('./guernsey').GuernseyPattern };
+  away: { primary: string; secondary: string; name: string; pattern?: import('./guernsey').GuernseyPattern };
 }
 
 export type PlayerAnim =
@@ -73,12 +74,6 @@ const ANIM_TIMESCALE: Record<string, number> = {
   walk: 0.9,
 };
 
-function luminance(hex: string): number {
-  const n = parseInt(hex.replace('#', ''), 16);
-  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-}
-
 let shadowTex: THREE.CanvasTexture | null = null;
 
 /** Soft radial blob used for contact shadows (one texture, shared by everyone). */
@@ -98,24 +93,6 @@ function getShadowTexture(): THREE.CanvasTexture {
   return shadowTex;
 }
 
-function numberTexture(number: number, primary: string): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 128;
-  const g = c.getContext('2d')!;
-  g.fillStyle = primary;
-  g.fillRect(0, 0, 128, 128);
-  const ink = luminance(primary) > 0.6 ? '#101010' : '#f5f5f5';
-  g.fillStyle = ink;
-  g.font = 'bold 92px system-ui, sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(String(number), 64, 68);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: number): void {
   const kit = team === 0 ? teams.home : teams.away;
   root.traverse((obj) => {
@@ -131,7 +108,8 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
         // Kit garments ship without UVs — synthesise the chest/back number
         // projection so the number texture can actually sample.
         ensureJerseyUvs((obj as THREE.Mesh).geometry as THREE.BufferGeometry);
-        mat.map = numberTexture(number, kit.primary);
+        mat.map = guernseyTexture({ primary: kit.primary, secondary: kit.secondary,
+          pattern: kit.pattern ?? 'solid', number });
         mat.color = new THREE.Color(0xffffff);
       } else if (meshName.endsWith('shorts') || meshName.endsWith('socks')) {
         mat.color = new THREE.Color(kit.secondary);

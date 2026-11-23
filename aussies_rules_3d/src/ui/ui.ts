@@ -8,21 +8,22 @@ export interface TeamColors {
   name: string;
   primary: string;
   secondary: string;
+  pattern: import('../render/guernsey').GuernseyPattern;
 }
 
 export const CLUBS: TeamColors[] = [
-  { name: 'Melbourne', primary: '#0b2545', secondary: '#e8eef5' },
-  { name: 'Collingwood', primary: '#111111', secondary: '#f2f2f2' },
-  { name: 'Richmond', primary: '#1a1a1a', secondary: '#ffd23f' },
-  { name: 'Carlton', primary: '#12274e', secondary: '#f2f2f2' },
-  { name: 'Geelong', primary: '#0b3d66', secondary: '#f2f2f2' },
-  { name: 'Hawthorn', primary: '#4d2607', secondary: '#f2c53d' },
-  { name: 'Sydney', primary: '#e03a3e', secondary: '#f2f2f2' },
-  { name: 'West Coast', primary: '#0b3a73', secondary: '#f2c53d' },
-  { name: 'Adelaide', primary: '#c8102e', secondary: '#111111' },
-  { name: 'Brisbane', primary: '#7a1524', secondary: '#f2c53d' },
-  { name: 'Fremantle', primary: '#2a1a4d', secondary: '#f2f2f2' },
-  { name: 'Western Bulldogs', primary: '#12356b', secondary: '#e03a3e' },
+  { name: 'Melbourne', primary: '#0b2545', secondary: '#e8eef5', pattern: 'hstripes' },
+  { name: 'Collingwood', primary: '#111111', secondary: '#f2f2f2', pattern: 'vstripes' },
+  { name: 'Richmond', primary: '#1a1a1a', secondary: '#ffd23f', pattern: 'vstripes' },
+  { name: 'Carlton', primary: '#12274e', secondary: '#f2f2f2', pattern: 'vstripes' },
+  { name: 'Geelong', primary: '#0b3d66', secondary: '#f2f2f2', pattern: 'hstripes' },
+  { name: 'Hawthorn', primary: '#4d2607', secondary: '#f2c53d', pattern: 'vstripes' },
+  { name: 'Sydney', primary: '#e03a3e', secondary: '#f2f2f2', pattern: 'sash' },
+  { name: 'West Coast', primary: '#0b3a73', secondary: '#f2c53d', pattern: 'hstripes' },
+  { name: 'Adelaide', primary: '#c8102e', secondary: '#111111', pattern: 'sash' },
+  { name: 'Brisbane', primary: '#7a1524', secondary: '#f2c53d', pattern: 'hstripes' },
+  { name: 'Fremantle', primary: '#2a1a4d', secondary: '#f2f2f2', pattern: 'vstripes' },
+  { name: 'Western Bulldogs', primary: '#12356b', secondary: '#e03a3e', pattern: 'hstripes' },
 ];
 
 export function $(id: string): HTMLElement {
