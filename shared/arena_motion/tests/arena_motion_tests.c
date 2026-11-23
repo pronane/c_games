@@ -68,4 +68,18 @@ static void timing(void)
     assert(!am_action_time(0, 1, .6f, .5f, 1, 1, &t));
     assert(!am_action_time(0, 1, .1f, .5f, 1, .4f, &t));
 }
-int main(void) { features(); matching(); timing(); puts("arena motion tests passed"); return 0; }
+static void smoothing(void)
+{
+    float x = 0, y = 0;
+    for (int i = 0; i < 30; ++i) x = am_smooth(x, 1, 1.f/30.f, .08f);
+    for (int i = 0; i < 60; ++i) y = am_smooth(y, 1, 1.f/60.f, .08f);
+    assert(near(x, y) && x >= 0 && x <= 1);
+    x = am_smooth(0, 1, .05f, .08f);
+    y = am_smooth(am_smooth(0, 1, .02f, .08f), 1, .03f, .08f);
+    assert(near(x, y));
+    assert(am_smooth(.3f, 1, -1, .1f) == .3f);
+    assert(am_smooth(.3f, 1, 1, 0) == .3f);
+    assert(am_smooth(.3f, NAN, 1, 1) == .3f);
+    assert(isfinite(am_smooth(FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MIN)));
+}
+int main(void) { features(); matching(); timing(); smoothing(); puts("arena motion tests passed"); return 0; }

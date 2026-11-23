@@ -46,4 +46,7 @@ int am_build_features(float out[AM_DIMENSIONS], const float foot[8],
  * deadline. After contact the original rate resumes. Returns 0 for invalid input. */
 int am_action_time(float elapsed, float deadline, float entry, float contact,
                    float rate_after, float clip_end, float *clip_time);
+/* Frame-rate-independent exponential approach. dt and response are seconds;
+ * invalid inputs, negative dt or nonpositive response leave current unchanged. */
+float am_smooth(float current, float target, float dt, float response);
 #endif

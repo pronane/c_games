@@ -45,3 +45,59 @@ jobs:
           name: gaelic-motion-ab
           path: Gaelic_Football_3d/build/motion-ab/
           if-no-files-found: warn
+
+  jog-ab:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 25
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install render dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth ffmpeg libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build experimental mocap candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m pip install numpy scipy pillow
+          mkdir -p build/cmu-jog-report
+          curl --fail --location --silent --show-error -H 'Accept: application/vnd.github.raw+json' -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/meshula/cmu-mocap/contents/data/016/16_35.bvh?ref=09a07f54f3bbb58797325f009282d0b2048a2871 \
+            -o build/cmu-jog-16_35.bvh
+          if ! python Gaelic_Football_3d/tools/build_cmu_jog_candidate.py build/cmu-jog-16_35.bvh build/cmu-jog-local > build/cmu-jog-report/candidate-build.log 2>&1; then
+            cat build/cmu-jog-report/candidate-build.log
+            echo "::error::Candidate build failed; see candidate-build.log in the artifact."
+            exit 1
+          fi
+          cp build/cmu-jog-local/research-provenance.json build/cmu-jog-report/
+      - name: Build and test both models
+        run: |
+          make -C TurboTumble64/deps/raylib-5.5/src PLATFORM=PLATFORM_DESKTOP -j4
+          make -C Gaelic_Football_3d RAYLIB_DIR=../TurboTumble64/deps/raylib-5.5/src
+          make -C Gaelic_Football_3d motion_headless
+          cd Gaelic_Football_3d
+          ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb ../build/cmu-jog-local/candidate.gfmotion > ../build/cmu-jog-report/model-test.log 2>&1
+      # Same scripted input and render settings; GF_QUICK stops after frame 340,
+      # so these videos cover standing, walking, jogging, sprinting and stopping.
+      - name: Record original and experimental jog
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/original.mp4 > ../build/cmu-jog-report/original.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog.mp4 > ../build/cmu-jog-report/cmu-jog.log 2>&1
+          test -s ../build/cmu-jog-report/original.mp4
+          test -s ../build/cmu-jog-report/cmu-jog.mp4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gaelic-cmu-jog-comparison
+          path: build/cmu-jog-report/
+          if-no-files-found: warn

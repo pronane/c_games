@@ -137,6 +137,7 @@ typedef struct {
     float strideScale;             /* >1 lengthens the clip's short stride up to a human maximum */
     float plantX[2], plantZ[2];
     int plantOn[2];
+    float plantWeight[2];
     int lastAction;
     float lastActionTime;
     GAActionState matchedAction;
@@ -469,6 +470,13 @@ static void matchAction(AnimState *s, const GamePlayer *p, int carrying, int *cl
     s->lastAction = act; s->lastActionTime = p->action_time;
 }
 
+/* Keep low-speed jogging close to the captured pose, allowing extra stride
+ * only as speed rises. Gameplay movement is not modified. */
+static float strideLimit(float speed)
+{
+    return 1.0f + (GA_LEG_MAX_STRIDE_SCALE - 1.0f) * Clamp((speed - 1.0f) / 6.0f, 0.0f, 1.0f);
+}
+
 /* ---- choose clip for a player from the game state ---------------------- */
 static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, float dt, int *clip, float *t)
 {
@@ -532,7 +540,7 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         if (stride > 2.25f) stride = 2.25f;
         /* Avoid forcing the short source cycle into a rigid split at speed.
          * Some high-speed ground sliding is preferable to locked knees. */
-        s->strideScale = Clamp(stride / authored, 1.0f, GA_LEG_MAX_STRIDE_SCALE);
+        s->strideScale = Clamp(stride / authored, 1.0f, strideLimit(s->speed));
         rate = Clamp(prefer * clipLen(*clip), 0.70f, 1.70f);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
@@ -772,6 +780,30 @@ static Vector3 outsideBall(Vector3 ball, Vector3 p)
     if (len < BALL_R + ballClear) return Vector3Add(ball, Vector3Scale(d, (BALL_R + ballClear + 0.002f) / len));
     return p;
 }
+/* Knuckle endpoints outside a sphere are not enough: the straight segment
+ * between them can still cut through it. Move this finger chain outward as a
+ * unit until both bone segments clear an expanded ball. Mesh collision still
+ * requires visual/vertex verification. */
+static float gripSegmentDistance(Vector3 ball, Vector3 a, Vector3 b)
+{
+    Vector3 ab = Vector3Subtract(b, a), rel = Vector3Subtract(ball, a);
+    float d = Vector3DotProduct(ab, ab);
+    float t = d > 1e-10f ? Clamp(Vector3DotProduct(rel, ab) / d, 0, 1) : 0;
+    return Vector3Distance(ball, Vector3Add(a, Vector3Scale(ab, t)));
+}
+static void plantFingerClear(Transform *pose, int b1, int b2, int b3,
+                             Vector3 ball, Vector3 p1, Vector3 p2, Vector3 p3)
+{
+    float nearest = fminf(gripSegmentDistance(ball, p1, p2), gripSegmentDistance(ball, p2, p3));
+    float radius = BALL_R + ballClear + .012f;
+    if (nearest > 1e-4f && nearest < radius) {
+        float scale = fminf(radius / nearest, 1.5f);
+        p1 = Vector3Add(ball, Vector3Scale(Vector3Subtract(p1, ball), scale));
+        p2 = Vector3Add(ball, Vector3Scale(Vector3Subtract(p2, ball), scale));
+        p3 = Vector3Add(ball, Vector3Scale(Vector3Subtract(p3, ball), scale));
+    }
+    plantFinger(pose, b1, b2, b3, p1, p2, p3);
+}
 static void wrapHand(Transform *pose, int side, Vector3 ball)
 {
     /* side +1 is the character's left. Knuckles and tips stay outside the leather. */
@@ -782,12 +814,12 @@ static void wrapHand(Transform *pose, int side, Vector3 ball)
     for (i = 0; i < 4; i++) {
         float y = 0.055f - (float)i * 0.030f;
         float x = (float)side;
-        plantFinger(pose, base[i], base[i] + 10, base[i] + 20,
+        plantFingerClear(pose, base[i], base[i] + 10, base[i] + 20, ball,
                     outsideBall(ball, (Vector3){ ball.x + x * 0.10f, ball.y + y, ball.z + 0.02f }),
                     outsideBall(ball, (Vector3){ ball.x + x * 0.06f, ball.y + y + 0.04f, ball.z + 0.09f }),
                     outsideBall(ball, (Vector3){ ball.x + x * 0.02f, ball.y + y * 0.3f, ball.z + 0.11f }));
     }
-    plantFinger(pose, base[4], base[4] + 10, base[4] + 20,
+    plantFingerClear(pose, base[4], base[4] + 10, base[4] + 20, ball,
                 outsideBall(ball, (Vector3){ ball.x + (float)side * 0.09f, ball.y + 0.08f, ball.z - 0.02f }),
                 outsideBall(ball, (Vector3){ ball.x + (float)side * 0.05f, ball.y + 0.11f, ball.z + 0.04f }),
                 outsideBall(ball, (Vector3){ ball.x + (float)side * 0.02f, ball.y + 0.10f, ball.z + 0.09f }));
@@ -958,7 +990,7 @@ static Vector3 legPole(Vector3 hip, Vector3 knee, Vector3 target)
     }
     return pole;
 }
-static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int toe)
+static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int toe, float dt)
 {
     Vector3 hip, oldFoot, model, pole, worldFoot, wp, rel;
     float L1, L2, yaw, lift;
@@ -968,13 +1000,13 @@ static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int 
     yaw = s->bodyYaw;
     worldFoot = Vector3Add(W(s->lastX, 0, s->lastZ),
                            Vector3RotateByAxisAngle(s->pose[foot].translation, (Vector3){ 0, 1, 0 }, yaw));
-    if (lift > 0.20f) { s->plantOn[side] = 0; return; }
-    if (!s->plantOn[side]) {
-        if (lift > 0.11f) return;
+    if (lift > 0.20f) s->plantOn[side] = 0;
+    if (!s->plantOn[side] && s->plantWeight[side] < .02f && lift <= 0.11f) {
         s->plantX[side] = worldFoot.x;
         s->plantZ[side] = worldFoot.z;
         s->plantOn[side] = 1;
     }
+    if (!s->plantOn[side] && s->plantWeight[side] < .001f) { s->plantWeight[side] = 0; return; }
     wp = W(s->lastX, 0, s->lastZ);
     rel = (Vector3){ s->plantX[side] - wp.x, 0.08f, s->plantZ[side] - wp.z };
     model = Vector3RotateByAxisAngle(rel, (Vector3){ 0, 1, 0 }, -yaw);
@@ -982,8 +1014,14 @@ static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int 
     hip = s->pose[thigh].translation;
     L1 = Vector3Distance(hip, s->pose[calf].translation);
     L2 = Vector3Distance(s->pose[calf].translation, s->pose[foot].translation);
-    if (L1 < 0.05f || L2 < 0.05f) return;
-    if (Vector3Distance(hip, model) > (L1 + L2) * GA_LEG_MAX_REACH) { s->plantOn[side] = 0; return; }
+    if (L1 < 0.05f || L2 < 0.05f) { s->plantOn[side] = 0; s->plantWeight[side] = 0; return; }
+    if (Vector3Distance(hip, model) > (L1 + L2) * GA_LEG_MAX_REACH) s->plantOn[side] = 0;
+    s->plantWeight[side] = am_smooth(s->plantWeight[side], s->plantOn[side] ? 1.f : 0.f, dt,
+                                     s->plantOn[side] ? .07f : .09f);
+    oldFoot = s->pose[foot].translation;
+    model = Vector3Lerp(oldFoot, model, s->plantWeight[side]);
+    { float distance = Vector3Distance(hip, model), reach = (L1 + L2) * GA_LEG_MAX_REACH;
+      if (distance > reach) model = Vector3Add(hip, Vector3Scale(Vector3Subtract(model, hip), reach / distance)); }
     keepT = s->pose[thigh]; keepC = s->pose[calf]; keepF = s->pose[foot];
     keepToe = toe >= 0 ? s->pose[toe] : keepF;
     pole = legPole(hip, s->pose[calf].translation, model);
@@ -993,7 +1031,7 @@ static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int 
         Vector3Distance(hip, s->pose[foot].translation) > L1 + L2 + 0.02f) {
         s->pose[thigh] = keepT; s->pose[calf] = keepC; s->pose[foot] = keepF;
         if (toe >= 0) s->pose[toe] = keepToe;
-        s->plantOn[side] = 0;
+        s->plantOn[side] = 0; s->plantWeight[side] = 0;
         return;
     }
     if (toe >= 0)
@@ -1004,7 +1042,8 @@ static void stretchLeg(AnimState *s, int thigh, int calf, int foot, int toe, flo
     Vector3 hip, footP, delta, target, old;
     float L1, L2, reach, dist;
     if (thigh < 0 || calf < 0 || foot < 0 || scale < 1.04f) return;
-    scale = fminf(scale, GA_LEG_MAX_STRIDE_SCALE);
+    scale = fminf(scale, strideLimit(s->speed));
+    if (scale < 1.04f) return;
     hip = s->pose[thigh].translation;
     footP = s->pose[foot].translation;
     delta = Vector3Subtract(footP, hip);
@@ -1028,22 +1067,15 @@ static void lengthenStride(AnimState *s)
     stretchLeg(s, boneThighL, boneCalfL, boneFootL, boneToeL, s->strideScale);
     stretchLeg(s, boneThighR, boneCalfR, boneFootR, boneToeR, s->strideScale);
 }
-static void plantFeet(AnimState *s)
+static void plantFeet(AnimState *s, float dt)
 {
     if (s->speed < 0.45f || legBusy(s) || boneThighL < 0) {
         s->plantOn[0] = s->plantOn[1] = 0;
+        s->plantWeight[0] = s->plantWeight[1] = 0;
         return;
     }
-    plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL);
-    plantOne(s, 1, boneThighR, boneCalfR, boneFootR, boneToeR);
-}
-/* A few centimetres of the pelvis toward the foot that is down. Not a whole-body tilt. */
-static void weightOntoStance(AnimState *s)
-{
-    float shift;
-    if (bonePelvis < 0 || boneFootL < 0 || s->speed < 0.5f || legBusy(s)) return;
-    shift = s->pose[boneFootL].translation.y < s->pose[boneFootR].translation.y ? 0.028f : -0.028f;
-    s->pose[bonePelvis].translation.x += shift;
+    plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL, dt);
+    plantOne(s, 1, boneThighR, boneCalfR, boneFootR, boneToeR, dt);
 }
 /* Chest leads the hips through a turn; the head stays closer to the facing. Small, and only while turning. */
 static void twistBone(Transform *bone, float ang)
@@ -1156,8 +1188,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     balanceTorso(s, clip);
     cradleBall(s, clip);
     lengthenStride(s);
-    plantFeet(s);
-    weightOntoStance(s);
+    plantFeet(s, dt);
     coordinateTurn(s);
     uploadPose(s, &lm);
     if ((int)(s - as) == 9) measureCarrierFoot();

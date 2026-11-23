@@ -117,3 +117,12 @@ int am_action_time(float elapsed, float deadline, float entry, float contact,
     *clip_time = (float)fmin(t, clip_end);
     return isfinite(*clip_time);
 }
+
+float am_smooth(float current, float target, float dt, float response)
+{
+    double result, blend;
+    if (!isfinite(current) || !isfinite(target) || !isfinite(dt) || !isfinite(response) || dt < 0 || response <= 0) return current;
+    blend = -expm1(-(double)dt / response);
+    result = (double)current + ((double)target - current) * blend;
+    return (float)result;
+}
