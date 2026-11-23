@@ -67,6 +67,17 @@ skin shader reads bone indices and weights from the same attribute locations as 
 (7 and 8); without that the body was drawn stuck in the bind pose while the bones moved.
 See `sprite_forge/tools/GAELIC_CLIP_MERGE.md`. The rest of the list is `ROADMAP.md`.
 
+## Experimental Gaelic motion matching
+
+The game samples foot poses from the loaded GLB at startup and uses a deterministic
+C matcher to choose an entry frame when changing between idle, jog, run, sidestep
+and carry gaits. Existing clip selection, cross-fades, foot planting, ball handling
+and rules remain in control. Use `--no-motion-match` to compare with the old path.
+A missing or invalid database falls back to the original selector. This is an
+initial pose-matching slice, not the full Arena FC motion engine: trajectory and
+action/contact matching still need to be built and validated. See
+`MOTION_MATCHING.md` for the boundaries and follow-up work.
+
 ## Start-up
 The game opens with a **20-second AI-vs-AI attract demo**. It uses broadcast cameras (aerial
 bowl sweep, main camera, Hill 16 end, tracking, crane), a title overlay and crowd sound.
@@ -75,6 +86,7 @@ Press **Enter**, or **Start / A** on the pad, to skip it. The title menu offers 
 goes back to the menu.
 
 Launch options:
+- `--no-motion-match` uses the original gait-transition selector (for A/B comparisons).
 - `--no-intro`
 - `--demo` (the CPU plays your team)
 - `--training` (start straight in training)

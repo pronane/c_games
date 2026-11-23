@@ -8,6 +8,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "game.h"
+#include "motion_match.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +87,9 @@ static ActionClip ACTION_CLIPS[GAME_ACT_COUNT] = {
     [GAME_ACT_TRIP]        = { C_TRIP, 0.00f, 0.90f, 1.00f, 0 },
     [GAME_ACT_FALL]        = { C_KNOCKED_DOWN, 0.00f, 1.50f, 1.15f, 0 },
 };
+
+static MMDatabase motionDb;
+static int motionMatching = 1, motionReady = 0;
 
 static Model model;
 static ModelAnimation *anims;
@@ -242,6 +246,65 @@ static float clipFrame(int clip, float t)
     return f;
 }
 #endif
+
+/* Bake from the actual loaded model. Its horizontal root motion is stripped,
+ * so only foot pose and velocity are used; no artificial trajectory is added. */
+static int motionLocomotion(int clip)
+{
+    return clip == C_IDLE || clip == C_JOG || clip == C_RUN || clip == C_SIDESTEP || clip == C_RUN_BALL;
+}
+
+static int motionFeatures(int clip, int frame, float out[MM_DIMS])
+{
+    ModelAnimation *a;
+    Transform *p, *before, *after;
+    int n, prev, next, bones[2] = { boneFootL, boneFootR };
+    if (!motionLocomotion(clip) || clipIdx[clip] < 0 || boneFootL < 0 || boneFootR < 0) return 0;
+    a = animFor(clip); n = ANIM_FRAMES(*a) - 1;
+    if (n < 3) return 0;
+    frame = ((frame % n) + n) % n; prev = (frame + n - 1) % n; next = (frame + 1) % n;
+    p = ANIM_POSES(*a)[frame]; before = ANIM_POSES(*a)[prev]; after = ANIM_POSES(*a)[next];
+    if (!p || !before || !after) return 0;
+    for (int side = 0; side < 2; ++side) {
+        int b = bones[side];
+        out[side * 2] = p[b].translation.x;
+        out[side * 2 + 1] = p[b].translation.z;
+        out[4 + side * 2] = (after[b].translation.x - before[b].translation.x) * ANIM_FPS * 0.5f;
+        out[5 + side * 2] = (after[b].translation.z - before[b].translation.z) * ANIM_FPS * 0.5f;
+    }
+    return 1;
+}
+
+static void buildMotionDatabase(void)
+{
+    const int clips[] = { C_IDLE, C_JOG, C_RUN, C_SIDESTEP, C_RUN_BALL };
+    mm_init(&motionDb); motionReady = 0;
+    if (!motionMatching || boneFootL < 0 || boneFootR < 0) return;
+    for (unsigned i = 0; i < sizeof(clips)/sizeof(clips[0]); ++i) {
+        int clip = clips[i], n = ANIM_FRAMES(*animFor(clip)) - 1;
+        if (n < 3) { TraceLog(LOG_WARNING, "GAME: short motion clip; using original selector"); return; }
+        for (int frame = 0; frame < n; frame += 3) {
+            float f[MM_DIMS];
+            if (!motionFeatures(clip, frame, f) || !mm_add(&motionDb, clip, frame / ANIM_FPS, f)) {
+                TraceLog(LOG_WARNING, "GAME: invalid motion poses; using original selector"); return;
+            }
+        }
+    }
+    motionReady = mm_finalize(&motionDb);
+    if (motionReady) TraceLog(LOG_INFO, "GAME: pose matching ready (%d frames)", motionDb.count);
+}
+
+/* Choose an entry frame of the already-legal gait on transition. */
+static void matchGaitTransition(AnimState *s, int clip, float *time)
+{
+    float f[MM_DIMS]; int row;
+    if (!motionReady || clip == s->clip || !motionLocomotion(clip) || !motionLocomotion(s->clip)) return;
+    if (!motionFeatures(s->clip, (int)(s->t * ANIM_FPS), f)) return;
+    row = mm_search(&motionDb, clip, f);
+    if (row < 0) return;
+    *time = motionDb.rows[row].time;
+    s->runPhase = *time;
+}
 
 /* Find the contact moment inside an action's segment from the bones:
  * kicks - the frame where the kicking foot moves fastest (true contact),
@@ -2309,10 +2372,13 @@ static void drawWorld(float dt)
             float yaw = s->bodyYaw;
             int clip; float t;
             desiredClip(team, i, p, s, dt, &clip, &t);
+            if (p->action == GAME_ACT_NONE && p->jump_time <= 0.0f &&
+                !(game.mark_play_on && game.restart_pending && game.ball_team == team && game.ball_player == i))
+                matchGaitTransition(s, clip, &t);
             int kit = i == 0 ? (team ? KIT_GK_AWAY : KIT_GK_HOME) : (team ? KIT_AWAY : KIT_HOME);
             Vector3 at = W(p->x, 0, p->z);
-            if (Vector3Distance(at, cam.target) > 95.0f && camMode != 4 && !camOverride) { s->clip = clip; continue; }
-            if (!inView(Vector3Add(at, (Vector3){ 0, 1.0f, 0 }), 1.6f)) { s->clip = clip; continue; }   /* off-screen: skip pose + draw */
+            if (Vector3Distance(at, cam.target) > 95.0f && camMode != 4 && !camOverride) { s->clip = clip; s->t = t; continue; }
+            if (!inView(Vector3Add(at, (Vector3){ 0, 1.0f, 0 }), 1.6f)) { s->clip = clip; s->t = t; continue; }   /* off-screen: skip pose + draw */
             drawCharacter(s, p->x, p->z, yaw, kit, dt, clip, t);
         }
     drawOfficials(dt);
@@ -3142,6 +3208,7 @@ int main(int argc, char **argv)
     const char *recordPath = NULL, *recordMotion = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
+        else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
         else if (strcmp(argv[i], "--shots-motion") == 0) shotsMotion = 1, skinBanner = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--record-motion") == 0 && i + 1 < argc) { recordMotion = argv[++i]; shotsMotion = 1; skinBanner = 1; skipIntro = 1; }
@@ -3209,6 +3276,7 @@ int main(int argc, char **argv)
         scratch.frameCount = 1; scratch.framePoses = scratchPosePtr;
 #endif
         detectContacts();
+        buildMotionDatabase();
         pickFootProbe();
         attachBoneAttributes();
         if (haveLit) for (int m = 0; m < model.materialCount; m++) model.materials[m].shader = gpuSkin ? skinShader : litShader;
