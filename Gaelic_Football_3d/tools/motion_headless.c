@@ -130,6 +130,38 @@ static int validate_late_observation(void)
     return !slot.matchedAction.active && clip == C_HAND_PASS && time == .42f;
 }
 
+/* Mirror the draw loop's off-screen branch: choose and match first, but skip
+ * pose generation. Also test an actor not observed at all until after release. */
+static int validate_offscreen_release(float dt, int first_observed_late)
+{
+    GameState g; GameInput input = {0}; AnimState slot = {0};
+    int who, saw_match = 0, saw_followthrough = 0, saw_release = 0;
+    game_init(&g); g.enforce_three_v_three = 0; who = g.ball_player;
+    for (int i = 0; i < GAME_TEAM_SIZE; ++i) { g.players[1][i].x = 130; g.players[1][i].z = 75; }
+    g.on_release = count_release; releaseCount = 0;
+    slot.clip = C_RUN_BALL; slot.t = .2f;
+    for (int step = 0; step < 50; ++step) {
+        int clip; float t; GamePlayer *p;
+        memset(&input, 0, sizeof input); input.handpass = step == 0;
+        game_update(&g, input, dt); p = &g.players[0][who];
+        if (releaseCount) saw_release = 1;
+        if (first_observed_late && !saw_release) continue;
+        clip = p->action == GAME_ACT_HANDPASS ? ACTION_CLIPS[p->action].clip : C_RUN_BALL;
+        t = p->action == GAME_ACT_HANDPASS ? fminf(ACTION_CLIPS[p->action].start + p->action_time * ACTION_CLIPS[p->action].rate, ACTION_CLIPS[p->action].end) : 0;
+        matchAction(&slot, p, g.ball_team == 0 && g.ball_player == who, &clip, &t);
+        if (slot.matchedAction.active) {
+            saw_match = 1;
+            if (saw_release) saw_followthrough = 1;
+            if (first_observed_late) return 0;
+        }
+        /* Culling stores animation clock without updating rendered bone poses. */
+        slot.clip = clip; slot.t = t;
+    }
+    printf("offscreen_handpass dt=%.4f first_observed_late=%d matched=%d followthrough=%d releases=%d\n",
+           dt, first_observed_late, saw_match, saw_followthrough, releaseCount);
+    return releaseCount == 1 && (first_observed_late ? !saw_match : saw_match && saw_followthrough);
+}
+
 /* Exercise the real model through the same old-schema fallback as the game. */
 static int validate_old_cache_fallback(const char *cache)
 {
@@ -216,6 +248,8 @@ int main(int argc, char **argv)
     printf("model=%s bones=%d clips=%d gait_rows=%d action_rows=%d cache_roundtrip=ok\n",
            asset, model.boneCount, animCount, motionDb.count, actionDb.count);
     if (!validate_old_cache_fallback(cache) || !validate_late_observation() ||
+        !validate_offscreen_release(1.f/60.f, 0) || !validate_offscreen_release(1.f/30.f, 0) ||
+        !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
         !validate_interruption() || !compare_entry_poses(GAME_ACT_HANDPASS) ||

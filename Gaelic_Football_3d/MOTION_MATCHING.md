@@ -85,11 +85,11 @@ frame timing can still cause visible discrepancies: these need graphics testing.
   corruption, action tags, feasible entry selection, deadline alignment,
   presentation-only correction, gait adapter and portable core.
 - `make test-motion-model` bakes and reloads the shipped GLB headlessly, checks
-  old-cache fallback and late/off-screen observation, drives real handpass and
-  solo rules inputs at 30 and 60 Hz, checks one release / interruption and
+  old-cache fallback, drives real handpass and solo rules inputs at 30 and
+  60 Hz, checks one release / interruption and exercises a simulated culled
+  handpass and first observation after release (without rendering). It also
   compares ball physics, possession, carry steps and events with and without
-  the presentation matcher. It measures
-  unblended XZ foot position across 16 carry phases. Before the new guard, the
+  the presentation matcher. It measures unblended XZ foot position across 16 carry phases. Before the new guard, the
   solo mean error was 0.4012 m for the original entry versus 0.4558 m matched;
   after the guard it was 0.3937 m, with no worse sample by this proxy. The
   synthetic 30-gait-plus-30-action search probe measures search only, not full
