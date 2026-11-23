@@ -47,6 +47,9 @@ static const char *playerGlb = "assets/models/gaelic_player.glb";
 #define ANIM_FPS 60.0f
 #define HALF_SECONDS 300.0f          /* real seconds per half, shown as 35 min */
 #define BALL_R GAME_BALL_REST        /* 0.11 m radius: size-5 ball, ~70 cm round */
+/* Presentation-only procedural leg extension limits. */
+#define GA_LEG_MAX_REACH 0.95f
+#define GA_LEG_MAX_STRIDE_SCALE 1.55f
 #define MAX_BONES 64
 #define BLEND_TIME 0.15f
 #define SIN_BIN_REAL (600.0f * HALF_SECONDS / 2100.0f)   /* 10 match minutes in real seconds */
@@ -140,6 +143,8 @@ typedef struct {
     double poseTime;
     int poseValid, poseClip;
     int useBounce;
+    Vector3 cradleCenter;           /* model-space ball used to place the hands */
+    int cradleValid;
 } AnimState;
 
 #define N_CHAR (2 * GAME_TEAM_SIZE + 5)   /* players, referee, 4 umpires */
@@ -525,7 +530,9 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         if (turning) prefer = fminf(prefer * 1.06f, 2.3f);
         stride = s->speed / prefer;
         if (stride > 2.25f) stride = 2.25f;
-        s->strideScale = Clamp(stride / authored, 1.0f, 2.35f);
+        /* Avoid forcing the short source cycle into a rigid split at speed.
+         * Some high-speed ground sliding is preferable to locked knees. */
+        s->strideScale = Clamp(stride / authored, 1.0f, GA_LEG_MAX_STRIDE_SCALE);
         rate = Clamp(prefer * clipLen(*clip), 0.70f, 1.70f);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));
@@ -668,13 +675,14 @@ static void solveArm(Transform *pose, int upper, int lower, int hand, int mid,
     Vector3 S = pose[upper].translation, E = pose[lower].translation, H = pose[hand].translation;
     float L1 = Vector3Distance(S, E), L2 = Vector3Distance(E, H);
     Vector3 dir, elbow;
-    float dist, a, h2, h;
+    float dist, rawDist, a, h2, h;
     Quaternion qHand;
     int b, nb;
     if (L1 < 0.04f || L2 < 0.04f) return;
     dir = Vector3Subtract(target, S);
     dist = Vector3Length(dir);
     if (dist < 0.02f) return;
+    rawDist = dist;
     if (dist > L1 + L2 - 0.01f) dist = L1 + L2 - 0.01f;
     if (dist < fabsf(L1 - L2) + 0.01f) dist = fabsf(L1 - L2) + 0.01f;
     dir = Vector3Scale(dir, dist / Vector3Length(Vector3Subtract(target, S)));
@@ -683,12 +691,15 @@ static void solveArm(Transform *pose, int upper, int lower, int hand, int mid,
     h = h2 > 0.0f ? sqrtf(h2) : 0.0f;
     dir = Vector3Normalize(dir);
     pole = Vector3Subtract(pole, Vector3Scale(dir, Vector3DotProduct(pole, dir)));
-    if (Vector3Length(pole) < 1e-4f) pole = (Vector3){ 0, -1, 0 };
+    if (Vector3Length(pole) < 1e-4f) {
+        Vector3 axis = fabsf(dir.y) < 0.9f ? (Vector3){0, 1, 0} : (Vector3){1, 0, 0};
+        pole = Vector3Subtract(axis, Vector3Scale(dir, Vector3DotProduct(axis, dir)));
+    }
     pole = Vector3Normalize(pole);
     elbow = Vector3Add(Vector3Add(S, Vector3Scale(dir, a)), Vector3Scale(pole, h));
     /* wrist lands on the target; if the chain cannot quite reach, put it at the solved distance */
-    if (Vector3Distance(target, S) > L1 + L2 - 0.01f)
-        target = Vector3Add(S, Vector3Scale(Vector3Normalize(Vector3Subtract(target, S)), dist));
+    if (fabsf(rawDist - dist) > 1e-6f)
+        target = Vector3Add(S, Vector3Scale(dir, dist));
     (void)mid;
     (void)curlAt;
     (void)qHand;
@@ -819,6 +830,7 @@ static void cradleBall(AnimState *s, int clip)
     float tuck;
     int nb, i;
     (void)clip;
+    s->cradleValid = 0;
     if (w <= 0.0f || boneArmUL < 0 || boneHandL < 0 || boneSpine < 0) return;
     nb = MODEL_BONECOUNT(model);
     memcpy(saved, s->pose, sizeof(Transform) * (size_t)nb);
@@ -833,15 +845,15 @@ static void cradleBall(AnimState *s, int clip)
         };
         curl = (Vector3){ ball.x, ball.y + 0.05f, ball.z + 0.03f };
         {
-            Vector3 wL = { ball.x + 0.09f, ball.y - 0.01f, ball.z - 0.02f };
-            Vector3 wR = { ball.x - 0.09f, ball.y - 0.01f, ball.z - 0.02f };
+            Vector3 wL = outsideBall(ball, (Vector3){ ball.x + 0.13f, ball.y - 0.01f, ball.z - 0.02f });
+            Vector3 wR = outsideBall(ball, (Vector3){ ball.x - 0.13f, ball.y - 0.01f, ball.z - 0.02f });
             solveArm(s->pose, boneArmUL, boneArmLL, boneHandL, boneMidL, wL,
                      (Vector3){ 1.0f, -0.45f, -0.15f }, curl);
             solveArm(s->pose, boneArmUR, boneArmLR, boneHandR, boneMidR, wR,
                      (Vector3){ -1.0f, -0.45f, -0.15f }, curl);
-            orientHand(s->pose, boneHandL, 1.0f, wL,
+            orientHand(s->pose, boneHandL, 1.0f, s->pose[boneHandL].translation,
                        (Vector3){ -0.25f, 0.45f, 0.86f }, (Vector3){ 1.0f, 0.15f, -0.1f });
-            orientHand(s->pose, boneHandR, -1.0f, wR,
+            orientHand(s->pose, boneHandR, -1.0f, s->pose[boneHandR].translation,
                        (Vector3){ 0.25f, 0.45f, 0.86f }, (Vector3){ -1.0f, 0.15f, -0.1f });
         }
         wrapHand(s->pose, 1, ball);
@@ -850,14 +862,15 @@ static void cradleBall(AnimState *s, int clip)
         ball = (Vector3){ chest.x - 0.10f, chest.y - 0.02f, chest.z + 0.16f };
         curl = (Vector3){ ball.x, ball.y + 0.04f, ball.z + 0.02f };
         {
-            Vector3 wR = { ball.x - 0.02f, ball.y - 0.01f, ball.z - 0.04f };
+            Vector3 wR = outsideBall(ball, (Vector3){ ball.x - 0.02f, ball.y - 0.01f, ball.z - 0.04f });
             solveArm(s->pose, boneArmUR, boneArmLR, boneHandR, boneMidR, wR,
                      (Vector3){ -0.7f, -0.35f, 0.15f }, curl);
-            orientHand(s->pose, boneHandR, -1.0f, wR,
+            orientHand(s->pose, boneHandR, -1.0f, s->pose[boneHandR].translation,
                        (Vector3){ 0.15f, 0.35f, 0.92f }, (Vector3){ -0.9f, 0.2f, 0.0f });
         }
         wrapHand(s->pose, -1, ball);
     }
+    if (w >= 0.999f) { s->cradleCenter = ball; s->cradleValid = 1; }
     if (w < 0.999f) {
         for (i = 0; i < nb; i++) {
             if (!boneUnder(i, boneArmUL) && !boneUnder(i, boneArmUR)) continue;
@@ -928,6 +941,23 @@ static int finite3(Vector3 v)
 {
     return v.x == v.x && v.y == v.y && v.z == v.z && fabsf(v.x) < 80.0f && fabsf(v.y) < 80.0f && fabsf(v.z) < 80.0f;
 }
+/* Preserve the authored knee direction whenever it is forward of the
+ * hip-to-ankle line. If a new IK target would flip it, use model-forward as a
+ * stable pole instead. The imported player's forward axis is +Z. */
+static Vector3 legPole(Vector3 hip, Vector3 knee, Vector3 target)
+{
+    Vector3 d = Vector3Subtract(target, hip), pole = Vector3Subtract(knee, hip);
+    float length = Vector3Length(d);
+    if (length < 1e-4f) return pole;
+    d = Vector3Scale(d, 1.0f / length);
+    pole = Vector3Subtract(pole, Vector3Scale(d, Vector3DotProduct(pole, d)));
+    if (pole.z < 0.0f || Vector3Length(pole) < 1e-4f) {
+        Vector3 forward = {0, 0, 1};
+        Vector3 projected = Vector3Subtract(forward, Vector3Scale(d, d.z));
+        if (Vector3Length(projected) >= 1e-4f) pole = projected;
+    }
+    return pole;
+}
 static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int toe)
 {
     Vector3 hip, oldFoot, model, pole, worldFoot, wp, rel;
@@ -953,11 +983,10 @@ static void plantOne(AnimState *s, int side, int thigh, int calf, int foot, int 
     L1 = Vector3Distance(hip, s->pose[calf].translation);
     L2 = Vector3Distance(s->pose[calf].translation, s->pose[foot].translation);
     if (L1 < 0.05f || L2 < 0.05f) return;
-    if (Vector3Distance(hip, model) > (L1 + L2) * 0.97f) { s->plantOn[side] = 0; return; }
+    if (Vector3Distance(hip, model) > (L1 + L2) * GA_LEG_MAX_REACH) { s->plantOn[side] = 0; return; }
     keepT = s->pose[thigh]; keepC = s->pose[calf]; keepF = s->pose[foot];
     keepToe = toe >= 0 ? s->pose[toe] : keepF;
-    pole = Vector3Subtract(s->pose[calf].translation, hip);
-    if (Vector3Length(pole) < 1e-3f) pole = (Vector3){ side ? -1.0f : 1.0f, 0.2f, 1.0f };
+    pole = legPole(hip, s->pose[calf].translation, model);
     oldFoot = s->pose[foot].translation;
     solveArm(s->pose, thigh, calf, foot, -1, model, pole, model);
     if (!finite3(s->pose[foot].translation) || !finite3(s->pose[calf].translation) ||
@@ -975,6 +1004,7 @@ static void stretchLeg(AnimState *s, int thigh, int calf, int foot, int toe, flo
     Vector3 hip, footP, delta, target, old;
     float L1, L2, reach, dist;
     if (thigh < 0 || calf < 0 || foot < 0 || scale < 1.04f) return;
+    scale = fminf(scale, GA_LEG_MAX_STRIDE_SCALE);
     hip = s->pose[thigh].translation;
     footP = s->pose[foot].translation;
     delta = Vector3Subtract(footP, hip);
@@ -982,13 +1012,13 @@ static void stretchLeg(AnimState *s, int thigh, int calf, int foot, int toe, flo
     target = Vector3Add(hip, delta);
     L1 = Vector3Distance(hip, s->pose[calf].translation);
     L2 = Vector3Distance(s->pose[calf].translation, footP);
-    reach = (L1 + L2) * 0.97f;
+    reach = (L1 + L2) * GA_LEG_MAX_REACH;
     dist = Vector3Distance(hip, target);
     if (L1 < 0.05f || L2 < 0.05f || reach < 0.1f) return;
     if (dist > reach) target = Vector3Add(hip, Vector3Scale(Vector3Subtract(target, hip), reach / dist));
     old = footP;
     solveArm(s->pose, thigh, calf, foot, -1, target,
-             Vector3Subtract(s->pose[calf].translation, hip), target);
+             legPole(hip, s->pose[calf].translation, target), target);
     if (toe >= 0)
         s->pose[toe].translation = Vector3Add(s->pose[toe].translation, Vector3Subtract(s->pose[foot].translation, old));
 }
@@ -1020,6 +1050,32 @@ static void twistBone(Transform *bone, float ang)
 {
     Quaternion q = QuaternionFromAxisAngle((Vector3){ 0, 1, 0 }, ang);
     bone->rotation = QuaternionNormalize(QuaternionMultiply(q, bone->rotation));
+}
+/* Ease excessive forward pitch in the imported standing/running clips while
+ * retaining a modest athletic lean. Rotate only the upper-body subtree about
+ * its spine pivot; do this before placing the carrying arms. */
+static void balanceTorso(AnimState *s, int clip)
+{
+    int idx = (int)(s - as);
+    Vector3 pivot, axis = {1, 0, 0};
+    float excess, height, angle, allowed;
+    Quaternion q;
+    if (idx < 0 || idx >= 2 * GAME_TEAM_SIZE || !motionLocomotion(clip) ||
+        game.players[idx / GAME_TEAM_SIZE][idx % GAME_TEAM_SIZE].action != GAME_ACT_NONE ||
+        boneSpine1 < 0 || boneHead < 0 || bonePelvis < 0) return;
+    pivot = s->pose[boneSpine1].translation;
+    height = s->pose[boneHead].translation.y - pivot.y;
+    if (height < .2f) return;
+    allowed = .10f + .012f * Clamp(s->speed, 0.0f, 8.0f);
+    excess = s->pose[boneHead].translation.z - s->pose[bonePelvis].translation.z - allowed;
+    if (excess <= 0) return;
+    angle = -Clamp(atan2f(excess, height), 0, .14f);
+    q = QuaternionFromAxisAngle(axis, angle);
+    for (int b = 0; b < MODEL_BONECOUNT(model); ++b) {
+        if (!boneUnder(b, boneSpine1)) continue;
+        s->pose[b].translation = Vector3Add(pivot, Vector3RotateByQuaternion(Vector3Subtract(s->pose[b].translation, pivot), q));
+        s->pose[b].rotation = QuaternionNormalize(QuaternionMultiply(q, s->pose[b].rotation));
+    }
 }
 static void coordinateTurn(AnimState *s)
 {
@@ -1097,6 +1153,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     }
     memcpy(s->pose, scratchPose, sizeof(Transform) * (size_t)nb);
 #endif
+    balanceTorso(s, clip);
     cradleBall(s, clip);
     lengthenStride(s);
     plantFeet(s);
@@ -1260,8 +1317,12 @@ static Vector3 carriedBall(int team, int idx)
     float yaw = poseYaw(s, p);
     Vector3 f = { sinf(yaw), 0, cosf(yaw) };
     Vector3 hands = handsMid(s, p);
-    Vector3 hold = hands;   /* both hands: the cradle pose puts a wrist on each side of this point */
+    Vector3 hold = hands;
     float u;
+    /* Use the same centre the procedural grip was built around. Reconstructing
+     * it from the wrists puts the ball inside the hand, especially in sprint. */
+    if (p->action == GAME_ACT_NONE && s->poseValid && s->cradleValid)
+        hold = Vector3Add(W(p->x, 0, p->z), Vector3RotateByAxisAngle(s->cradleCenter, (Vector3){0, 1, 0}, yaw));
     switch (p->action) {
     case GAME_ACT_SOLO: {          /* onto the toe, not the ankle or the thigh */
         float d = game_action_duration(GAME_ACT_SOLO);
