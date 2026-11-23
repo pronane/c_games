@@ -294,7 +294,7 @@ class Game {
     const CYCLE: Array<'broadcast' | 'aerial' | 'wing'> = ['broadcast', 'aerial', 'wing'];
     this.broadcast.view = CYCLE[Math.floor(this.menuCamT / 9) % CYCLE.length];
     const b = sim.state.ball;
-    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true);
+    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true, undefined, undefined, this.world.camera);
     this.ballMesh.position.set(b.x, b.y, b.z);
     this.ballShadow.position.set(b.x, 0.022, b.z);
     const air = Math.max(0, b.y - 0.11);
@@ -572,7 +572,8 @@ class Game {
     syncPlayerViews(
       this.views, sim.state, dt, this.celebrationTimer > 0, sim.controlledId, this.showMarkers,
       { mode: targetMode, handId: sim.handTargetId, kickId: sim.kickTargetId },
-      { id: this.switchFlashT > 0 ? this.switchFlashId : -1, remaining: this.switchFlashT }
+      { id: this.switchFlashT > 0 ? this.switchFlashId : -1, remaining: this.switchFlashT },
+      this.world.camera
     );
     this.updateOffscreenArrow(controlled);
 

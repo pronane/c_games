@@ -11,6 +11,7 @@ import {
   advancePhase,
   computeStartPhase,
 } from '../src/motion';
+import { routeOneShot } from '../src/render/motionBinding';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const assets = join(here, '..', 'public', 'assets');
@@ -23,6 +24,16 @@ function makeEngine(): MotionEngine {
   engine.database = database;
   return engine;
 }
+
+describe('kick routing', () => {
+  it('routes stationary kicks to the set shot and running kicks to kick_run', () => {
+    expect(routeOneShot('kick', 0)).toBe('drop_kick');
+    expect(routeOneShot('kick', 0.5)).toBe('drop_kick');
+    expect(routeOneShot('kick', 3.4)).toBe('kick_run');
+    expect(routeOneShot('handball', 0)).toBe('hand_pass');
+    expect(routeOneShot('nonsense', 9)).toBe('');
+  });
+});
 
 describe('baked AFL motion assets', () => {
   it('ship a valid 32-clip manifest with sane durations', () => {

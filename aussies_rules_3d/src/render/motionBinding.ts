@@ -75,6 +75,13 @@ const ONE_SHOT_ANIMS: Record<string, string> = {
   hit_deck: 'knocked_down',
 };
 
+/** Route the kick one-shot by context: stationary players punt with a set shot,
+ * runners use the on-the-run punt. Pure — exported for tests. */
+export function routeOneShot(anim: string, speed: number): string {
+  if (anim === 'kick') return speed < 0.8 ? 'drop_kick' : 'kick_run';
+  return ONE_SHOT_ANIMS[anim] ?? '';
+}
+
 export class MotionBinding {
   readonly state = initialMotionState(0);
   private readonly actions = new Map<string, THREE.AnimationAction>();
@@ -83,6 +90,7 @@ export class MotionBinding {
   private prevFacing: number;
   private smoothedTurn = 0;
   private forcedClip: string | null = null;
+  private lastSpeed = 0;
 
   constructor(
     mixer: THREE.AnimationMixer,
@@ -108,9 +116,10 @@ export class MotionBinding {
     }
   }
 
-  /** Force a one-shot (kick, tackle, ...). Released automatically when it ends. */
+  /** Force a one-shot (kick, tackle, ...). Released automatically when it ends.
+   * Kicks route by last-frame speed (set shot when standing, on-the-run punt otherwise). */
   forceOneShot(anim: string): void {
-    const clip = ONE_SHOT_ANIMS[anim];
+    const clip = routeOneShot(anim, this.lastSpeed);
     if (clip && this.actions.has(clip)) this.forcedClip = clip;
   }
 
@@ -140,6 +149,7 @@ export class MotionBinding {
     this.smoothedTurn += (rawTurn - this.smoothedTurn) * Math.min(1, dt * 8);
 
     const speed = Math.hypot(p.vx, p.vz);
+    this.lastSpeed = speed;
     const forced = this.forcedClip;
     this.assets.engine.update(
       this.state, speed, -this.smoothedTurn, ballState, intent, dt,
