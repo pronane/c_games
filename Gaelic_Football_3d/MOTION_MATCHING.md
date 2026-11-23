@@ -150,3 +150,11 @@ needs deformation/weight inspection; no cloth or mesh fix is claimed here.
 Research sources and their code/data licence boundaries are in
 `../shared/arena_motion/RESEARCH.md`; no third-party footage or motion data is
 shipped or used to train a model.
+
+The visual workflow also has a CMU experiment: it downloads a pinned BVH take,
+checks its hash, imports and retargets it with Sprite Forge, and compares the
+shipped jog against a temporary in-place candidate under identical quick motion
+scripts. This tests real captured locomotion rather than only adjusting a
+procedural clip. No candidate is installed or added to the repository; it must
+be visually reviewed and is not proof of Gaelic skill or hand-contact quality.
+See `../shared/arena_motion/RESEARCH.md` for source terms and limitations.

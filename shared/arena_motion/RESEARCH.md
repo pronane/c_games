@@ -32,3 +32,29 @@ matching needs clips with usable root motion, rig compatibility, contacts and
 clear rights. Review each individual asset's terms before download, training,
 conversion, sharing or game distribution. Capture original or appropriately
 licensed Gaelic actions where possible.
+
+## CMU locomotion experiment
+
+The [CMU Graphics Lab Motion Capture Database](http://mocap.cs.cmu.edu/) says
+its data may be used in research and commercially sold products, but may not be
+resold directly, including in converted form. It requests acknowledgment of the
+source and NSF funding. CMU also warns that hand/toe joints are noisy and that
+finger and thumb motions were not captured. CMU footage is therefore not a fix
+for ball grip or Gaelic-specific skills.
+
+Four cgspeed-converted BVHs (`16_35`, `16_36`, `09_01`, `09_02`) were retrieved
+from the `meshula/cmu-mocap` mirror at commit
+`09a07f54f3bbb58797325f009282d0b2048a2871` and inspected locally. Sprite Forge
+projected them onto its canonical skeleton and selected tentative cycles; this
+is a retarget approximation, not validation of anatomical fidelity. No BVH,
+retargeted motion, generated player or external model weights are committed.
+
+For a controlled comparison, `Gaelic_Football_3d/tools/build_cmu_jog_candidate.py`
+checks the SHA-256 of `16_35`, imports it, retargets it to the player template,
+strips horizontal root motion, and merges it into a **local copy** replacing
+`jog`. It writes a provenance record; the shipped player is untouched. The
+candidate passed the numerical model tests, but is not validated visually and
+is not a new training dataset or a replacement for Gaelic-specific motion.
+The visual workflow generates the candidate on the runner and records both the
+original and candidate with the same scripted inputs. Check cycle transitions,
+foot sliding, all body parts and rights before deciding whether to ship it.
