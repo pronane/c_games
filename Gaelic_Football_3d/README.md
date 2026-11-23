@@ -7,12 +7,12 @@ brought over from `legacy/` and extended), with a raylib 3D frontend in `src/mai
 ## Build & run on Windows (MSYS2 UCRT64)
 1. In an **MSYS2 UCRT64** shell, once:
    `pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-raylib mingw-w64-ucrt-x86_64-glfw`
-2. Double-click `build_release.bat`. It builds `gaelic_football.exe` from `src\main.c src\game.c`,
+2. Double-click `build_release.bat`. It builds `gaelic_football.exe` from the sources in `src/` and `../shared/arena_motion/`,
    linking `-lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -static-libgcc`. It then copies `glfw3.dll`,
    `libwinpthread-1.dll` and `libraylib.dll` from `%RAYLIB_DIR%\bin` and starts the game.
    Set `MSYS2_ROOT` or `RAYLIB_DIR` if MSYS2 is installed somewhere else.
    You can also build in the UCRT64 shell with `make && ./gaelic_football.exe`.
-3. `make test` builds and runs the rules-engine unit tests (`tests/core_tests.c`).
+3. `make test` builds and runs the rules and motion tests (requires Python 3 for temporary cache fixtures).
 
 Works with raylib 5.5 and 6.x. Run the game from this folder, because `assets/` is loaded
 relative to the exe.
@@ -60,8 +60,10 @@ A walk, jog and sprint play the clip fast enough to follow the ground speed (the
 was a glide at 7 m/s). The stance foot stays where it landed until the leg has to push off.
 A turn eases the stick and lets the chest lead the hips. Standing or jogging, the ball is in
 both hands; sprinting, it is in the right hand and the other arm keeps the clip's swing.
-A solo puts it on the toe, a bounce on the ground, and a kick or a fist lets it go from that
-bone. `Gaelic_football_bounce.fbx` names Mixamo in its metadata. That is not a licence, so
+A solo puts it on the toe and a bounce on the ground. Kicks and handpasses release on
+the rules engine's contact clock from its authoritative ball position; the pose no longer
+changes the simulated flight origin, so a small visual gap may be visible at release.
+`Gaelic_football_bounce.fbx` names Mixamo in its metadata. That is not a licence, so
 no merged copy of it is in this tree. A moving bounce still uses the carry cycle. The GPU
 skin shader reads bone indices and weights from the same attribute locations as the mesh
 (7 and 8); without that the body was drawn stuck in the bind pose while the bones moved.
@@ -69,11 +71,13 @@ See `sprite_forge/tools/GAELIC_CLIP_MERGE.md`. The rest of the list is `ROADMAP.
 
 ## Experimental Gaelic motion matching
 
-The game samples foot poses from the loaded GLB at startup and uses a deterministic
+The game samples foot poses from the loaded GLB at startup, or loads an optional
+prebaked gait cache, and uses a deterministic
 C matcher to choose an entry frame when changing between idle, jog, run, sidestep
 and carry gaits. Existing clip selection, cross-fades, foot planting, ball handling
 and rules remain in control. Use `--no-motion-match` to compare with the old path.
-A missing or invalid database falls back to the original selector. This is an
+A missing or invalid cache falls back to runtime sampling; if sampling also fails,
+the original selector is used. This is an
 initial pose-matching slice, not the full Arena FC motion engine: trajectory and
 action/contact matching still need to be built and validated. See
 `MOTION_MATCHING.md` for the boundaries and follow-up work.
@@ -87,6 +91,8 @@ goes back to the menu.
 
 Launch options:
 - `--no-motion-match` uses the original gait-transition selector (for A/B comparisons).
+- `--bake-motion FILE` samples the loaded model and writes a versioned gait cache, then exits (requires a graphics environment).
+- `--motion-cache FILE` loads that cache if it matches the model and raylib version; otherwise it samples the model at startup.
 - `--no-intro`
 - `--demo` (the CPU plays your team)
 - `--training` (start straight in training)
@@ -267,8 +273,8 @@ alongside the pad.
 * **Carrying**: at most 5 steps, then a solo (toe-tap) or bounce. You can't bounce twice in a
   row. A 6th step (**overcarry**) or a **double bounce** gives a free to the opposition.
 * **Tackle**: a tackle from behind, or over the shoulder, is a free to the ball carrier.
-* **Hand pass** has to be struck (fist action); the ball is released from the hand on the
-  contact frame.
+* **Hand pass** uses a fist action; the rules engine releases the ball on the
+  contact frame from its authoritative flight origin.
 * **Ball on the ground** is lifted with the foot (pick-up action); a hand scoop off the ground is never used.
 * **Kick-out** from the 20 m line by the keeper (distinct kit). The ball must travel beyond
   the 40 m arc, otherwise it's a free to the opposition. The opposition must be 13 m away and
@@ -288,8 +294,8 @@ this build: early-movement offences at the throw-in, and extra time.
 ## Animation
 `assets/models/gaelic_player.glb` holds the skinned player (52 bones) plus 32 clips. The ball
 (size 5, 22 cm) is attached to the hand bones while carrying. In a solo it drops to the foot
-and comes back; in a bounce it goes to the ground ahead. Kicks release it from the kicking foot
-bone on the contact frame, and hand passes from the striking hand. Clips cross-fade over 0.15 s.
+and comes back; in a bounce it goes to the ground ahead. Kicks and handpasses release on the
+contact clock from the rules engine's flight origin. Clips cross-fade over 0.15 s.
 
 | Source file | Clip | Used for |
 |---|---|---|

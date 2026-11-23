@@ -1281,9 +1281,74 @@ static void test_over_shoulder_tackle_is_a_free(void)
     assert(game.ball_team == 1 && game.restart_pending);
 }
 
+typedef struct ReleaseProbe { int count, action, team, player; GameBall ball; } ReleaseProbe;
+static void observe_release(const GameState *g, int team, int player, int action, void *user)
+{
+    ReleaseProbe *probe = (ReleaseProbe *)user;
+    probe->count++; probe->team = team; probe->player = player;
+    probe->action = action; probe->ball = g->ball;
+}
+
+static void test_release_observer_does_not_drive_physics(void)
+{
+    const int actions[] = {GAME_ACT_HANDPASS, GAME_ACT_KICK};
+    for (int a = 0; a < 2; ++a) {
+        GameState observed, plain; GameInput input = {0}; ReleaseProbe probe = {0};
+        float original_contact = game_action_contact(actions[a]);
+        float original_duration = game_action_duration(actions[a]);
+        int who;
+        game_set_action_timing(actions[a], .12f, .6f);
+        game_init(&observed); who = observed.ball_player;
+        observed.enforce_three_v_three = 0;
+        observed.players[0][who].x = 70; observed.players[0][who].z = 42;
+        for (int i = 0; i < GAME_TEAM_SIZE; ++i) {
+            observed.players[1][i].x = 130; observed.players[1][i].z = 75;
+        }
+        observed.players[0][who].action = actions[a];
+        observed.players[0][who].action_time = 0;
+        observed.players[0][who].action_released = 0;
+        observed.players[0][who].release_dx = 1; observed.players[0][who].release_dz = 0;
+        observed.players[0][who].release_speed = 13; observed.players[0][who].release_lift = 2;
+        observed.players[0][who].release_event = GAME_EVENT_HANDPASSED;
+        plain = observed;
+        observed.on_release = observe_release; observed.user = &probe;
+        for (int i = 0; i < 8; ++i) {
+            game_update(&observed, input, .05f); game_update(&plain, input, .05f);
+            assert(probe.count == (i < 2 ? 0 : 1));
+            assert(observed.ball.x == plain.ball.x && observed.ball.z == plain.ball.z);
+            assert(observed.ball.height == plain.ball.height && observed.ball.velocity_x == plain.ball.velocity_x);
+            assert(observed.ball_team == plain.ball_team && observed.event == plain.event);
+        }
+        assert(probe.count == 1 && probe.team == 0 && probe.player == who && probe.action == actions[a]);
+        assert(fabsf(probe.ball.x - (observed.players[0][who].x + .6f)) < .1f);
+        assert(fabsf(probe.ball.height - .6f) < 1e-6f);
+        game_set_action_timing(actions[a], original_contact, original_duration);
+    }
+}
+
+static void test_release_cancelled_when_possession_lost(void)
+{
+    GameState g; GameInput input = {0}; ReleaseProbe probe = {0};
+    float contact = game_action_contact(GAME_ACT_HANDPASS);
+    float duration = game_action_duration(GAME_ACT_HANDPASS);
+    game_set_action_timing(GAME_ACT_HANDPASS, .12f, .6f);
+    game_init(&g);
+    int who = g.ball_player;
+    g.on_release = observe_release; g.user = &probe;
+    g.players[0][who].action = GAME_ACT_HANDPASS;
+    g.players[0][who].action_released = 0;
+    g.players[0][who].action_time = 0;
+    g.ball_team = -1; g.ball_player = -1; g.ball.in_flight = 1;
+    for (int i = 0; i < 5; ++i) game_update(&g, input, .05f);
+    assert(probe.count == 0 && g.players[0][who].action_released);
+    game_set_action_timing(GAME_ACT_HANDPASS, contact, duration);
+}
+
 int main(void)
 {
     test_initial_state();
+    test_release_observer_does_not_drive_physics();
+    test_release_cancelled_when_possession_lost();
     test_point_scoring();
     test_goal_scoring();
     test_four_step_turnover();

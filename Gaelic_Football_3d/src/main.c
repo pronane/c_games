@@ -3,12 +3,13 @@
  *  Gameplay and rules live in game.c / game.h (the original rules engine,
  *  extended for the 2025/26 rules). This file renders that state with the
  *  skinned GLB players, drives the animation state machine (with cross-fades),
- *  attaches the ball to hand/foot bones and releases kicks on contact frames.
+ *  attaches the carried ball to hand/foot bones; the rules engine releases it.
  */
 #include "raylib.h"
 #include "raymath.h"
 #include "game.h"
 #include "motion_match.h"
+#include "motion_cache.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -275,13 +276,37 @@ static int motionFeatures(int clip, int frame, float out[MM_DIMS])
     return 1;
 }
 
-static void buildMotionDatabase(void)
+static const int motionClips[] = { C_IDLE, C_JOG, C_RUN, C_SIDESTEP, C_RUN_BALL };
+#define MOTION_RAYLIB_VERSION ((RAYLIB_VERSION_MAJOR << 16) | (RAYLIB_VERSION_MINOR << 8) | RAYLIB_VERSION_PATCH)
+/* Reject structurally valid but incompatible row layouts before they can be used. */
+static int motionCacheMatchesModel(void)
 {
-    const int clips[] = { C_IDLE, C_JOG, C_RUN, C_SIDESTEP, C_RUN_BALL };
+    int row = 0;
+    for (unsigned i = 0; i < sizeof(motionClips)/sizeof(motionClips[0]); ++i) {
+        int clip = motionClips[i], n = ANIM_FRAMES(*animFor(clip)) - 1;
+        if (n < 3) return 0;
+        for (int frame = 0; frame < n; frame += 3) {
+            if (row >= motionDb.count || motionDb.rows[row].clip != clip ||
+                fabsf(motionDb.rows[row].time - frame / ANIM_FPS) > 1e-5f) return 0;
+            ++row;
+        }
+    }
+    return row == motionDb.count;
+}
+
+static void buildMotionDatabase(const char *cachePath)
+{
     mm_init(&motionDb); motionReady = 0;
     if (!motionMatching || boneFootL < 0 || boneFootR < 0) return;
-    for (unsigned i = 0; i < sizeof(clips)/sizeof(clips[0]); ++i) {
-        int clip = clips[i], n = ANIM_FRAMES(*animFor(clip)) - 1;
+    if (cachePath && mm_cache_load(cachePath, playerGlb, MOTION_RAYLIB_VERSION, &motionDb) && motionCacheMatchesModel()) {
+        motionReady = 1;
+        TraceLog(LOG_INFO, "GAME: loaded motion cache (%d frames)", motionDb.count);
+        return;
+    }
+    if (cachePath) TraceLog(LOG_WARNING, "GAME: motion cache missing or incompatible; sampling model");
+    mm_init(&motionDb);
+    for (unsigned i = 0; i < sizeof(motionClips)/sizeof(motionClips[0]); ++i) {
+        int clip = motionClips[i], n = ANIM_FRAMES(*animFor(clip)) - 1;
         if (n < 3) { TraceLog(LOG_WARNING, "GAME: short motion clip; using original selector"); return; }
         for (int frame = 0; frame < n; frame += 3) {
             float f[MM_DIMS];
@@ -1196,25 +1221,12 @@ static Vector3 carriedBall(int team, int idx)
     }
 }
 
-/* Called by the rules engine on the contact frame: start the flight from the bone. */
-static void onRelease(GameState *g, int team, int idx, int action, void *user)
+/* Called by the rules engine after the authoritative release. */
+static void onRelease(const GameState *g, int team, int idx, int action, void *user)
 {
+    /* Notification only. The rules engine already created the authoritative
+     * flight. A stale/off-screen/blended renderer pose must never move it. */
     (void)user;
-    GamePlayer *p = &g->players[team][idx];
-    AnimState *s = &as[team * GAME_TEAM_SIZE + idx];
-    float yaw = poseYaw(s, p);
-    Vector3 f = { sinf(yaw), 0, cosf(yaw) };
-    Vector3 at;
-    if (!haveModel) return;
-    if (action == GAME_ACT_HANDPASS) {
-        int h = actionFoot[GAME_ACT_HANDPASS];
-        at = boneWorld(s, h >= 0 ? h : boneHandR, p->x, p->z, yaw);
-    }
-    else if (action == GAME_ACT_FREE_KICK || action == GAME_ACT_KICKOUT || action == GAME_ACT_GROUND_KICK) at = carriedBall(team, idx);
-    else at = Vector3Add(boneWorld(s, actionFoot[action] >= 0 ? actionFoot[action] : boneFootR, p->x, p->z, yaw), Vector3Scale(f, 0.15f));
-    g->ball.x = at.x + HL;
-    g->ball.z = at.z + HW;
-    g->ball.height = fmaxf(at.y, BALL_R);
     releaseFlash = 0;
     lastReleaseAction = action;
     sfxPlay(action == GAME_ACT_HANDPASS ? SND_HANDPASS : SND_KICK, action == GAME_ACT_HANDPASS ? 0.5f : 0.8f);
@@ -3205,10 +3217,12 @@ static void checkHold(const char *tag)
 int main(int argc, char **argv)
 {
     int shots = 0, skipIntro = 0, bench = 0, cliQuality = -1, shots31 = 0, shots34 = 0, shotsMotion = 0, startTraining = 0;
-    const char *recordPath = NULL, *recordMotion = NULL;
+    const char *recordPath = NULL, *recordMotion = NULL, *motionCache = NULL, *motionBake = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
         else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
+        else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
+        else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
         else if (strcmp(argv[i], "--shots-motion") == 0) shotsMotion = 1, skinBanner = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--record-motion") == 0 && i + 1 < argc) { recordMotion = argv[++i]; shotsMotion = 1; skinBanner = 1; skipIntro = 1; }
@@ -3224,6 +3238,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--no-intro") == 0) skipIntro = 1;
         else if (strcmp(argv[i], "--record-intro") == 0 && i + 1 < argc) recordPath = argv[++i];
     }
+    if (motionBake && !motionMatching) { fprintf(stderr, "--bake-motion cannot be used with --no-motion-match\n"); return 1; }
     if (recordPath) SetTraceLogLevel(LOG_WARNING);
     ChangeDirectory(GetApplicationDirectory());
     loadSettings();
@@ -3276,11 +3291,18 @@ int main(int argc, char **argv)
         scratch.frameCount = 1; scratch.framePoses = scratchPosePtr;
 #endif
         detectContacts();
-        buildMotionDatabase();
+        buildMotionDatabase(motionBake ? NULL : motionCache);
         pickFootProbe();
         attachBoneAttributes();
         if (haveLit) for (int m = 0; m < model.materialCount; m++) model.materials[m].shader = gpuSkin ? skinShader : litShader;
         TraceLog(LOG_INFO, "GAME: %d clips loaded, %d bones", C_COUNT, MODEL_BONECOUNT(model));
+    }
+    if (motionBake) {
+        int ok = haveModel && motionReady && mm_cache_save(motionBake, playerGlb, MOTION_RAYLIB_VERSION, &motionDb);
+        if (ok) printf("Baked %d motion rows to %s\n", motionDb.count, motionBake);
+        else fprintf(stderr, "Could not bake motion cache: %s\n", motionBake);
+        CloseWindow();
+        return ok ? 0 : 1;
     }
     for (int k = 0; k < KIT_COUNT; k++) {
         kits[k] = LoadTexture(TextFormat("assets/textures/kit_%s.png", KIT_FILES[k]));
