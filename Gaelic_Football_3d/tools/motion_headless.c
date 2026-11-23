@@ -228,7 +228,7 @@ static int validate_leg_ik(void)
                 lengths[side][0] = Vector3Distance(s->pose[h].translation, s->pose[k].translation);
                 lengths[side][1] = Vector3Distance(s->pose[k].translation, s->pose[b].translation);
             }
-            lengthenStride(s); plantFeet(s);
+            lengthenStride(s); plantFeet(s, 1.f/30.f);
             for (int side = 0; side < 2; ++side) {
                 int h = side ? boneThighR : boneThighL, k = side ? boneCalfR : boneCalfL, b = side ? boneFootR : boneFootL;
                 Vector3 hip = s->pose[h].translation, knee = s->pose[k].translation, foot = s->pose[b].translation;
@@ -246,6 +246,41 @@ static int validate_leg_ik(void)
         if (backward || bad_length || straight) return 0;
     }
     return 1;
+}
+
+/* Exercise the plant's attack and release with a fixed real-model pose and
+ * fixed position, so render step size is the only variable. */
+static int validate_plant_envelope(void)
+{
+    ModelAnimation *a = animFor(C_JOG); int f, n = ANIM_FRAMES(*a)-1;
+    float values[2][2];
+    for (f = 0; f < n; ++f) {
+        Transform *p = ANIM_POSES(*a)[f]; Vector3 hip = p[boneThighL].translation, knee = p[boneCalfL].translation;
+        Vector3 target = p[boneFootL].translation; float length = Vector3Distance(hip, knee) + Vector3Distance(knee, target);
+        if (target.y > .11f) continue;
+        target.y = .08f;
+        if (Vector3Distance(hip, target) < length * GA_LEG_MAX_REACH) break;
+    }
+    if (f == n) return 0;
+    for (int rate = 0; rate < 2; ++rate) {
+        AnimState *s = &as[9]; int hz = rate ? 60 : 30;
+        memset(s, 0, sizeof *s); s->speed = 2;
+        for (int step = 0; step < hz/5; ++step) {
+            memcpy(s->pose, ANIM_POSES(*a)[f], model.boneCount*sizeof(Transform));
+            plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL, 1.f/hz);
+        }
+        if (!s->plantOn[0]) return 0;
+        values[rate][0] = s->plantWeight[0];
+        for (int step = 0; step < hz/5; ++step) {
+            memcpy(s->pose, ANIM_POSES(*a)[f], model.boneCount*sizeof(Transform));
+            s->pose[boneFootL].translation.y = .3f;
+            plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL, 1.f/hz);
+        }
+        values[rate][1] = s->plantWeight[0];
+        if (s->plantOn[0] || values[rate][0] <= values[rate][1]) return 0;
+    }
+    printf("plant_envelope attack_30=%.4f attack_60=%.4f release_30=%.4f release_60=%.4f\n", values[0][0], values[1][0], values[0][1], values[1][1]);
+    return fabsf(values[0][0] - values[1][0]) < 1e-5f && fabsf(values[0][1] - values[1][1]) < 1e-5f;
 }
 
 static int validate_torso_and_grip(void)
@@ -281,9 +316,17 @@ static int validate_torso_and_grip(void)
             ball = Vector3Subtract(ball, W(game.players[0][9].x, 0, game.players[0][9].z));
             if (Vector3Distance(ball, s->cradleCenter) > 1e-5f) return 0;
             for (int side = 0; side < 2; ++side) {
+                const int left[] = {22, 23, 25, 24, 26}, right[] = {27, 28, 30, 29, 31};
+                const int *fingers = side ? right : left;
                 int wrist = side ? boneHandR : boneHandL;
                 if (s->speed < 5.9f || side) {
                     if (!finite3(s->pose[wrist].translation) || Vector3Distance(s->pose[wrist].translation, ball) < BALL_R - .001f) return 0;
+                    for (int finger = 0; finger < 5; ++finger) {
+                        int b = fingers[finger];
+                        float d1 = gripSegmentDistance(ball, s->pose[b].translation, s->pose[b+10].translation);
+                        float d2 = gripSegmentDistance(ball, s->pose[b+10].translation, s->pose[b+20].translation);
+                        if (fminf(d1, d2) < BALL_R + ballClear + .011f) return 0;
+                    }
                 }
             }
         }
@@ -340,7 +383,7 @@ int main(int argc, char **argv)
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
-        !validate_interruption() || !validate_leg_ik() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
+        !validate_interruption() || !validate_leg_ik() || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
         !compare_entry_poses(GAME_ACT_SOLO) || !benchmark_search()) {
         fprintf(stderr, "Action integration check failed\n"); return 1;
     }

@@ -136,3 +136,17 @@ now capped more conservatively; the model test checks the cap for both legs.
 This may trade some foot locking for sliding and needs rendered evaluation,
 especially at sprint speed. The motion matcher selects clip entries; these leg
 IK adjustments are separate from the shared matching library.
+
+A later recording showed a stiff jog, finger/ball intersection and apparent
+shorts deformation. The jog now limits procedural stride expansion at lower
+speeds, and fades a planted-foot constraint in and out using the shared
+`am_smooth` helper. Finger bone *segments*, not just endpoints, are kept outside
+an expanded ball in a full-weight procedural grip. The tests cover the fade at
+30/60 Hz and segment distances for the shipped model. Neither bone clearance nor
+these numerical tests establish skin/ball clearance or natural movement; this
+needs fresh rendered A/B review. The shorts are separate skinned meshes. An extra pelvis-only offset has been
+removed because it distorted the hip-to-leg hierarchy, but the mesh still
+needs deformation/weight inspection; no cloth or mesh fix is claimed here.
+Research sources and their code/data licence boundaries are in
+`../shared/arena_motion/RESEARCH.md`; no third-party footage or motion data is
+shipped or used to train a model.

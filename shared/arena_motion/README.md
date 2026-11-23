@@ -44,3 +44,8 @@ tests but is **not live in Gaelic**. The optional v2 cache includes handpass
 and solo entry metadata. More action and trajectory metadata, additional licensed
 clips, and visual/performance validation remain future work. See
 `Gaelic_Football_3d/MOTION_MATCHING.md`.
+
+`am_smooth` is a frame-rate-independent exponential scalar approach suitable
+for presentation weights, such as fading an IK foot lock in and out; it is not
+motion prediction or a learned model. See `RESEARCH.md` for external references
+and the difference between their code and data licences.
