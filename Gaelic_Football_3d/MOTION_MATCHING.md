@@ -158,3 +158,15 @@ scripts. This tests real captured locomotion rather than only adjusting a
 procedural clip. No candidate is installed or added to the repository; it must
 be visually reviewed and is not proof of Gaelic skill or hand-contact quality.
 See `../shared/arena_motion/RESEARCH.md` for source terms and limitations.
+
+### Forward-jog direction
+
+The shared gait helper compares low-foot movement over a cycle. For the
+forward-jog slot only, clearly forward-moving low feet trigger reverse clip
+playback; ambiguous and already-correct cycles retain their authored direction.
+This is a heuristic, not a replacement for validated motion capture. Playback,
+matching features and their velocities use the same mapping; cache version 3
+invalidates older extracted features. The shipped model triggers reversal.
+Headless checks establish pose/feature alignment, not visual realism or shorts
+mesh deformation. In particular, the shorts' skinned geometry and weights still
+need rendered investigation; bone-length checks cannot validate their hem.

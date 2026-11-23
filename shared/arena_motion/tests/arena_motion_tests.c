@@ -82,4 +82,17 @@ static void smoothing(void)
     assert(am_smooth(.3f, NAN, 1, 1) == .3f);
     assert(isfinite(am_smooth(FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MIN)));
 }
-int main(void) { features(); matching(); timing(); smoothing(); puts("arena motion tests passed"); return 0; }
+static void gait_direction(void)
+{
+    /* A low foot travels toward the back in a forward-time gait, then swings
+     * forwards while high; reverse the sequence to make a backwards gait. */
+    float forward[16] = {0, .3f, 0, .2f, 0, .1f, 0, 0, 0, -.1f, .2f, -.2f, .2f, 0, .2f, .2f};
+    float backward[16];
+    for (int i = 0; i < 8; ++i) { backward[2*i] = forward[2*(7-i)]; backward[2*i+1] = forward[2*(7-i)+1]; }
+    assert(am_gait_reverse(forward, forward, 8) == 0);
+    assert(am_gait_reverse(backward, backward, 8) == 1);
+    assert(am_gait_reverse(forward, forward, 7) == -1);
+    assert(am_gait_reverse(NULL, forward, 8) == -1);
+    forward[1] = NAN; assert(am_gait_reverse(forward, forward, 8) == -1);
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); puts("arena motion tests passed"); return 0; }

@@ -46,6 +46,11 @@ int am_build_features(float out[AM_DIMENSIONS], const float foot[8],
  * deadline. After contact the original rate resumes. Returns 0 for invalid input. */
 int am_action_time(float elapsed, float deadline, float entry, float contact,
                    float rate_after, float clip_end, float *clip_time);
+/* Infer which time direction moves low feet backwards relative to a forward
+ * travelling root. Samples are cyclic [height, forward] pairs, in metres.
+ * Return -1 for ambiguous/invalid, 0 for forward time, 1 for reverse time.
+ * Use only on a clip known to represent forward locomotion. */
+int am_gait_reverse(const float *left, const float *right, int frames);
 /* Frame-rate-independent exponential approach. dt and response are seconds;
  * invalid inputs, negative dt or nonpositive response leave current unchanged. */
 float am_smooth(float current, float target, float dt, float response);

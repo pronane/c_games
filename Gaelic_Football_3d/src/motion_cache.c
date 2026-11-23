@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #endif
 
-#define CACHE_VERSION 2u
+#define CACHE_VERSION 3u
 #define FNV_OFFSET UINT64_C(14695981039346656037)
 #define FNV_PRIME UINT64_C(1099511628211)
 static const unsigned char magic[8] = {'G','F','M','O','T','I','O','N'};

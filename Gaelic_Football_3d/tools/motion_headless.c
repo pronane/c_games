@@ -356,6 +356,24 @@ static int benchmark_search(void)
     return gaitHits == ITERATIONS * PLAYERS && selected > 0;
 }
 
+static int validate_jog_playback(void)
+{
+    ModelAnimation *a = animFor(C_JOG); int n = ANIM_FRAMES(*a)-1;
+    Transform *sample = malloc(sizeof(Transform) * (size_t)model.boneCount);
+    float feature[MM_DIMS]; int ok = sample != NULL;
+    if (!ok || n < 8) { free(sample); return 0; }
+    for (int f = 0; f < n && ok; ++f) {
+        int source = reverseJog ? (n-f)%n : f;
+        sampleClip(C_JOG, f/ANIM_FPS, sample);
+        if (!motionFeatures(C_JOG, f, feature) ||
+            fabsf(sample[boneFootL].translation.z - ANIM_POSES(*a)[source][boneFootL].translation.z) > .001f ||
+            fabsf(feature[1] - sample[boneFootL].translation.z) > .001f) ok = 0;
+    }
+    free(sample);
+    printf("jog_playback_feature_alignment=%s\n", ok ? "ok" : "failed");
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
@@ -365,7 +383,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "Only self-contained .glb models are supported.\n"); return 2;
     } }
     if (!load_model_animation(asset)) { fprintf(stderr, "Invalid or unsupported model animations: %s\n", asset); return 1; }
-    detectContacts(); initActionMetadata(); buildMotionDatabase(NULL); buildActionDatabase();
+    detectContacts(); detectJogDirection();
+    printf("jog_playback=%s\n", reverseJog ? "reversed" : "authored");
+    initActionMetadata(); buildMotionDatabase(NULL); buildActionDatabase();
     if (!motionReady || !actionReady || !actionMeta[GAME_ACT_SOLO].action || !actionMeta[GAME_ACT_HANDPASS].action) {
         fprintf(stderr, "Could not bake gait and both action databases\n"); return 1;
     }
@@ -378,7 +398,7 @@ int main(int argc, char **argv)
         !same_rows(&actionDb, &referenceActions)) { fprintf(stderr, "Cache round trip failed\n"); return 1; }
     printf("model=%s bones=%d clips=%d gait_rows=%d action_rows=%d cache_roundtrip=ok\n",
            asset, model.boneCount, animCount, motionDb.count, actionDb.count);
-    if (!validate_old_cache_fallback(cache) || !validate_late_observation() ||
+    if (!validate_jog_playback() || !validate_old_cache_fallback(cache) || !validate_late_observation() ||
         !validate_offscreen_release(1.f/60.f, 0) || !validate_offscreen_release(1.f/30.f, 0) ||
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||

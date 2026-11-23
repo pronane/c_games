@@ -126,3 +126,25 @@ float am_smooth(float current, float target, float dt, float response)
     result = (double)current + ((double)target - current) * blend;
     return (float)result;
 }
+
+int am_gait_reverse(const float *left, const float *right, int frames)
+{
+    float low[2] = {FLT_MAX, FLT_MAX}; double sum = 0; int count = 0;
+    const float *feet[2] = {left, right};
+    if (!left || !right || frames < 8 || frames > 1000000) return -1;
+    for (int s = 0; s < 2; ++s) for (int i = 0; i < frames; ++i) {
+        float y = feet[s][2*i], z = feet[s][2*i+1];
+        if (!isfinite(y) || !isfinite(z)) return -1;
+        if (y < low[s]) low[s] = y;
+    }
+    for (int s = 0; s < 2; ++s) for (int i = 0; i < frames; ++i) {
+        int j = (i+1) % frames;
+        float y0 = feet[s][2*i], y1 = feet[s][2*j];
+        if (y0 <= low[s]+.06f && y1 <= low[s]+.06f) {
+            sum += (double)feet[s][2*j+1] - feet[s][2*i+1];
+            count++;
+        }
+    }
+    if (count < 6 || fabs(sum / count) < .005) return -1;
+    return sum > 0 ? 1 : 0;
+}

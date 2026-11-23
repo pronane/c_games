@@ -100,6 +100,7 @@ static GAActionMeta actionMeta[GAME_ACT_COUNT];
 static int actionReady, actionCacheLoaded;
 static const int motionActions[] = { GAME_ACT_HANDPASS, GAME_ACT_SOLO };
 static int motionMatching = 1, motionReady = 0;
+static int reverseJog = 0;
 
 static Model model;
 static ModelAnimation *anims;
@@ -224,6 +225,18 @@ static float clipLen(int clip)
     return (float)(n - 1) / ANIM_FPS;   /* raylib bakes keyframes at ANIM_FPS; the last frame is the clip end */
 }
 
+/* Reverse only an observed backwards forward-jog cycle. Simulation and
+ * matcher clocks still progress forwards; map them to the clip here. */
+static float clipPlaybackTime(int clip, float t)
+{
+    if (clip == C_JOG && reverseJog && poseOverride < 0) {
+        float len = clipLen(clip), p = fmodf(t, len);
+        if (p < 0) p += len;
+        return fmodf(len - p, len);
+    }
+    return t;
+}
+
 #if RAYLIB_VERSION_MAJOR < 6
 /* Pose at a time in seconds, interpolated between baked frames so a sparse cycle does not step.
  * raylib 6 does this inside UpdateModelAnimation (float frame). */
@@ -236,7 +249,7 @@ static void sampleClip(int clip, float t, Transform *out)
     int i0, i1;
     Transform *A, *B;
     if (n <= 0) return;
-    frame = t * ANIM_FPS;
+    frame = clipPlaybackTime(clip, t) * ANIM_FPS;
     if (frame < 0.0f) frame = 0.0f;
     if (frame > (float)(n - 1)) frame = (float)(n - 1);
     i0 = (int)frame;
@@ -257,7 +270,7 @@ static void sampleClip(int clip, float t, Transform *out)
 static float clipFrame(int clip, float t)
 {
     int n = ANIM_FRAMES(*animFor(clip));
-    float f = t * ANIM_FPS;
+    float f = clipPlaybackTime(clip, t) * ANIM_FPS;
     if (f < 0.0f) f = 0.0f;
     if (n > 1 && f > (float)(n - 1) - 0.001f) f = (float)(n - 1) - 0.001f;
     return f;
@@ -271,6 +284,29 @@ static int motionLocomotion(int clip)
     return clip == C_IDLE || clip == C_JOG || clip == C_RUN || clip == C_SIDESTEP || clip == C_RUN_BALL;
 }
 
+/* Detect direction only for the forward-jog slot, not for idle, sidestepping,
+ * actions or arbitrary backwards clips. Ambiguous data is left untouched. */
+static void detectJogDirection(void)
+{
+    ModelAnimation *a; float *left, *right; int n, direction;
+    reverseJog = 0;
+    if (clipIdx[C_JOG] < 0 || boneFootL < 0 || boneFootR < 0) return;
+    a = animFor(C_JOG); n = ANIM_FRAMES(*a) - 1;
+    if (n < 8 || n > 1000000) return;
+    left = malloc((size_t)n * 2 * sizeof(float)); right = malloc((size_t)n * 2 * sizeof(float));
+    if (!left || !right) { free(left); free(right); return; }
+    for (int f = 0; f < n; ++f) {
+        Transform *p = ANIM_POSES(*a)[f];
+        if (!p) { free(left); free(right); return; }
+        left[2*f] = p[boneFootL].translation.y; left[2*f+1] = p[boneFootL].translation.z;
+        right[2*f] = p[boneFootR].translation.y; right[2*f+1] = p[boneFootR].translation.z;
+    }
+    direction = am_gait_reverse(left, right, n);
+    reverseJog = direction == 1;
+    free(left); free(right);
+    TraceLog(LOG_INFO, "GAME: forward jog playback %s", reverseJog ? "reversed" : direction == 0 ? "authored" : "ambiguous, authored");
+}
+
 static int motionFeatures(int clip, int frame, float out[MM_DIMS])
 {
     ModelAnimation *a;
@@ -280,7 +316,10 @@ static int motionFeatures(int clip, int frame, float out[MM_DIMS])
     a = animFor(clip); n = ANIM_FRAMES(*a) - 1;
     if (n < 3) return 0;
     if (motionLocomotion(clip)) {
-        frame = ((frame % n) + n) % n; prev = (frame + n - 1) % n; next = (frame + 1) % n;
+        frame = ((frame % n) + n) % n;
+        if (clip == C_JOG && reverseJog) {
+            frame = (n - frame) % n; prev = (frame + 1) % n; next = (frame + n - 1) % n;
+        } else { prev = (frame + n - 1) % n; next = (frame + 1) % n; }
     } else {
         if (frame < 0) frame = 0;
         if (frame > n) frame = n;
@@ -3503,6 +3542,7 @@ int main(int argc, char **argv)
         scratch.frameCount = 1; scratch.framePoses = scratchPosePtr;
 #endif
         detectContacts();
+        detectJogDirection();
         initActionMetadata();
         buildMotionDatabase(motionBake ? NULL : motionCache);
         if (!actionCacheLoaded) buildActionDatabase();
