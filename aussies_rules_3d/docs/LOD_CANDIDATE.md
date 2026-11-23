@@ -68,3 +68,25 @@ at both levels, all nine looks); with the bump the worst sock is ≈36 mm.
    carries no `_lodN` nodes, so every tier renders full detail.
 5. LOD2 drop-outs (`lashes` / `brows` / `hairinner`) and openings should get a
    human look — expected invisible at broadcast distance, unverified.
+
+## CI: Aussies Rules Motion A/B
+
+`.github/workflows/aussies-rules-motion-ab.yml` (`.github/workflows/…`) — manual
+(`workflow_dispatch`) plus push/PR when `aussies_rules_3d/**` changes.
+
+- **ab-metrics** (authoritative): `npm ci` → `check.mjs` → re-bakes the LOD candidate
+  from the shipped asset (`tools/build_afl_lods.py`) → Khronos validator on both GLBs →
+  squad-contract A/B table (`tools/ab_report.py`: sizes, joints, clips, clip parity,
+  per-look triangles, LOD node count, material parity). Fails red on contract breaks;
+  the report lands in the job summary; LOD GLB + JSON/MD reports upload as artifacts.
+- **visual-ab** (experimental, `continue-on-error`): builds the web bundle, then under
+  xvfb + SwiftShader (`LIBGL_ALWAYS_SOFTWARE=1`) loads the title/attract demo in
+  Electron twice — shipped asset vs LOD asset swapped in — captures 24 frames each
+  (`tools/ci_capture.cjs`), assembles MP4s with ffmpeg, uploads frames/mp4s/console
+  logs as the `aussies-rules-motion-ab-visual` artifact. Software WebGL is plausible
+  but unverified end-to-end; treat this leg's output as diagnostic, and keep the
+  shipped asset untouched either way. A companion PR adds the `?ab=1` capture
+  mode (`src/main.ts`): fixed attract seed so both legs simulate the identical
+  match, menu overlays hidden, and `AB_STATS` renderer counters logged every
+  ~2 s; with `--query ab=1` in `ci_capture.cjs` the captures become
+  frame-comparable between the two legs.
