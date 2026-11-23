@@ -1,0 +1,47 @@
+name: Gaelic motion visual comparison
+on:
+  workflow_dispatch:
+jobs:
+  visual-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install renderer and recording dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth ffmpeg libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+      - name: Build bundled raylib and Gaelic football
+        run: |
+          make -C TurboTumble64/deps/raylib-5.5/src PLATFORM=PLATFORM_DESKTOP -j4
+          make -C Gaelic_Football_3d RAYLIB_DIR=../TurboTumble64/deps/raylib-5.5/src
+          make -C Gaelic_Football_3d motion_headless
+      - name: Bake and compare headless and graphics caches
+        working-directory: Gaelic_Football_3d
+        run: |
+          mkdir -p build/motion-ab
+          ./motion_headless assets/models/gaelic_player.glb build/motion-ab/headless.gfmotion > build/motion-ab/headless.log 2>&1
+          timeout 300 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --bake-motion build/motion-ab/graphics.gfmotion > build/motion-ab/bake.log 2>&1
+          cmp build/motion-ab/headless.gfmotion build/motion-ab/graphics.gfmotion
+      # The motion scrub does not reproduce a real handpass trigger; inspect its
+      # visual assets and use the headless real-input test alongside it.
+      - name: Capture motion matching on and off
+        working-directory: Gaelic_Football_3d
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --motion-cache build/motion-ab/headless.gfmotion --record-motion build/motion-ab/matching.mp4 > build/motion-ab/matching.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --no-motion-match --record-motion build/motion-ab/original.mp4 > build/motion-ab/original.log 2>&1
+          test -s build/motion-ab/matching.mp4
+          test -s build/motion-ab/original.mp4
+      - name: Capture 30-player bench logs
+        working-directory: Gaelic_Football_3d
+        run: |
+          timeout 300 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --quality 0 --motion-cache build/motion-ab/headless.gfmotion --bench 600 > build/motion-ab/bench-matching.log 2>&1
+          timeout 300 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --quality 0 --no-motion-match --bench 600 > build/motion-ab/bench-original.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gaelic-motion-ab
+          path: Gaelic_Football_3d/build/motion-ab/
+          if-no-files-found: warn

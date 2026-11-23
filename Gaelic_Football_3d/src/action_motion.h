@@ -17,8 +17,10 @@ typedef struct {
 void ga_action_db_init(AMDatabase *db);
 int ga_action_add(AMDatabase *db, const GAActionMeta *meta, float time, const float feet[8]);
 /* Choose once when observed; only compatible action, limb, and ball rows whose
- * playback is within [0.5, 1.8] times authored speed are eligible. */
+ * playback is within [0.5, 1.8] times authored speed are eligible. When
+ * fallback_feet is non-NULL, never pick a row with worse XZ foot position
+ * error than the current selector; return 0 if no acceptable row exists. */
 int ga_action_begin(GAActionState *state, const AMDatabase *db, const GAActionMeta *meta,
-                    float elapsed, float deadline, const float feet[8]);
+                    float elapsed, float deadline, const float feet[8], const float fallback_feet[8]);
 int ga_action_time(const GAActionState *state, float elapsed, float *time);
 #endif

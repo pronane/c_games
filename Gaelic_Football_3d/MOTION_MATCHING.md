@@ -13,8 +13,10 @@ an action is first observed while in possession. It hard-filters action, clip,
 ball state and limb, and accepts only entries whose wind-up can reach the same
 authoritative deadline at 0.5–1.8 times the authored speed. If fewer than 0.13 s
 remain, metadata is missing, or no compatible row exists, the original action
-animation is used. Playback aligns the selected contact frame to the existing
-rules-engine clock; interruption or a new action clears the plan. Solo's rules
+animation is used. The matcher also rejects entries whose unblended XZ foot
+position error is worse than the original selector at that instant. This is a
+conservative proxy, not a guarantee of visual quality or low foot sliding.
+Playback aligns the selected contact frame to the existing rules-engine clock; interruption or a new action clears the plan. Solo's rules
 counter is reset immediately when the action starts; its detected contact time
 is used for visual toe contact, **not** as a new gameplay event.
 
@@ -25,16 +27,33 @@ keeper actions and paired interactions still use the original selector.
 
 ## Offline bake
 
-With a built game, raylib and a graphics environment, run from the game folder:
+The headless raylib 5.5 baker/checker can run on Linux with GCC, GNU ld and
+Python 3, without an installed raylib or a display:
+
+```sh
+make -C Gaelic_Football_3d test-motion-model
+# Or persist a cache from the game folder:
+cd Gaelic_Football_3d
+make motion_headless
+./motion_headless assets/models/gaelic_player.glb assets/models/gaelic_player.gfmotion
+```
+
+It compiles only the vendored raylib 5.5 animation loader and uses the same
+sampling, metadata detection, cache writer and model validation as the game.
+It currently supports self-contained `.glb` models and raylib 5.5 cache files;
+a raylib 6 game will reject the cache and use runtime sampling. The checker also
+runs rules-input and search probes before returning success. The temporary
+cache used by `test-motion-model` is automatically removed.
+
+Alternatively, with the built game, raylib and a graphics environment:
 
 ```sh
 ./gaelic_football --bake-motion assets/models/gaelic_player.gfmotion
 ./gaelic_football --motion-cache assets/models/gaelic_player.gfmotion
 ```
 
-On Windows use `gaelic_football.exe`. Baking loads and samples the GLB through
-raylib, writes the cache and exits. It is an offline precomputation but currently
-**opens a window and is not headless**. Use `--model PATH` with both commands for
+On Windows use `gaelic_football.exe`. The game's baking option opens a window,
+samples the GLB through raylib, writes the cache and exits. Use `--model PATH` with both commands for
 another model. Without a cache, or if it is invalid, the game samples at startup.
 `--no-motion-match` disables gait and action matching. A failed action bake or
 search falls back to the original clip/time selection.
@@ -65,13 +84,25 @@ frame timing can still cause visible discrepancies: these need graphics testing.
 - `make test` covers the rules, release interruptions, cache round trips and
   corruption, action tags, feasible entry selection, deadline alignment,
   presentation-only correction, gait adapter and portable core.
-- On a machine with raylib and a display, bake and reload the actual model;
-  compare `--shots-motion` and `--bench 600` with matching on and with
-  `--no-motion-match`. Inspect hand/ball and toe/ball contact, skipped frames,
+- `make test-motion-model` bakes and reloads the shipped GLB headlessly, checks
+  old-cache fallback and late/off-screen observation, drives real handpass and
+  solo rules inputs at 30 and 60 Hz, checks one release / interruption and
+  compares ball physics, possession, carry steps and events with and without
+  the presentation matcher. It measures
+  unblended XZ foot position across 16 carry phases. Before the new guard, the
+  solo mean error was 0.4012 m for the original entry versus 0.4558 m matched;
+  after the guard it was 0.3937 m, with no worse sample by this proxy. The
+  synthetic 30-gait-plus-30-action search probe measures search only, not full
+  game FPS. CI runs both test commands.
+- On a machine with raylib and a display, compare `--shots-motion` and
+  `--bench 600` with matching on and with `--no-motion-match`. Inspect hand/ball and toe/ball contact, skipped frames,
   off-screen releases, clipping and 30-player performance. The existing
   `--shots-motion` scrub marks actions as already released, so also exercise
   real handpasses and solos in training; the scrub alone does not validate a
-  normal handpass match. These graphical checks have not been run here.
+  normal handpass match. These graphical checks have not been run here. The
+  manually dispatched **Gaelic motion visual comparison** GitHub workflow builds
+  with Xvfb and uploads A/B motion recordings and benchmark logs for inspection;
+  it has not yet been run in this session.
 - Add authored/captured trajectory data and more licensed Gaelic actions before
   extending the matcher beyond these clips. The shipped GLB has no moving bounce
   clip; Mixamo metadata in the source bounce FBX is not evidence of a licence.

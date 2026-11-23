@@ -1,0 +1,23 @@
+name: Gaelic motion validation
+on:
+  push:
+    paths:
+      - 'Gaelic_Football_3d/**'
+      - 'shared/arena_motion/**'
+      - 'TurboTumble64/deps/raylib-5.5/**'
+      - '.github/workflows/gaelic-motion.yml'
+  pull_request:
+    paths:
+      - 'Gaelic_Football_3d/**'
+      - 'shared/arena_motion/**'
+      - 'TurboTumble64/deps/raylib-5.5/**'
+      - '.github/workflows/gaelic-motion.yml'
+jobs:
+  motion-headless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: make -C Gaelic_Football_3d test
+      - name: Actual model bake, reload, actions and search-cost probe
+        run: make -C Gaelic_Football_3d test-motion-model
