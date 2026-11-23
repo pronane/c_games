@@ -49,8 +49,10 @@ at both levels, all nine looks); with the bump the worst sock is ≈36 mm.
 `src/render/lod.ts` + `syncPlayerViews(..., camera)`:
 - `collectLodKits(root)` groups `x` / `x_lod1` / `x_lod2`; empty list with the
   shipped asset → **zero behaviour change**.
-- Selection per player per frame: `pickLodLevel(distance, LOD_DISTANCES.high)`
-  = [16 m, 36 m] (`ultra` [22, 48], `performance` [11, 26] available).
+- Selection per player per frame: `pickLodLevel(distance, LOD_DISTANCES[this.lodQuality])`.
+  Tiers — ultra [22, 48], high [16, 36] (default), performance [11, 26] — chosen in
+  settings → Graphics quality (`sel-graphics`, applied live, mirrors
+  `LOD_PLAN['distances_m']` in Sprite Forge).
 - LODs are hidden until a camera distance demotes; visibility flips only on
   level change. Kit tinting strips the `_lodN` suffix before suffix matching
   so LODs get the same tint + squad number.
@@ -61,7 +63,8 @@ at both levels, all nine looks); with the bump the worst sock is ≈36 mm.
 2. Browser/GPU check: variant switching, tint, LOD swaps at distance, shadows.
    Not done — no browser automation in this environment; unverified.
 3. FPS/GPU-time measurement at broadcast distance (LOD2) and wing distance.
-4. Optional: a graphics-quality setting (ultra/high/performance) in the
-   settings screen; distances are currently a constant (`LOD_DISTANCES.high`).
+4. Graphics-quality setting shipped (settings → Graphics quality). The
+   toggle is inert until the LOD candidate actually ships — the shipped GLB
+   carries no `_lodN` nodes, so every tier renders full detail.
 5. LOD2 drop-outs (`lashes` / `brows` / `hairinner`) and openings should get a
    human look — expected invisible at broadcast distance, unverified.
