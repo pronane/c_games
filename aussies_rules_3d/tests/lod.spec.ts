@@ -12,6 +12,7 @@ import {
   LOD_DISTANCES,
   lodLevelOf,
   pickLodLevel,
+  pickLodQuality,
   setLodLevel,
   type LodKit,
 } from '../src/render/lod';
@@ -105,5 +106,27 @@ describe('setLodLevel', () => {
     const kits = collectLodKits(root);
     setLodLevel(kits, 2);
     expect(parts['v0_eyes'].visible).toBe(true);
+  });
+});
+
+describe('pickLodQuality', () => {
+  it('accepts exactly the three tiers', () => {
+    expect(pickLodQuality('ultra')).toBe('ultra');
+    expect(pickLodQuality('high')).toBe('high');
+    expect(pickLodQuality('performance')).toBe('performance');
+    expect(pickLodQuality('ULTRA')).toBe('high');
+    expect(pickLodQuality('')).toBe('high');
+    expect(pickLodQuality(undefined)).toBe('high');
+    expect(pickLodQuality('potato')).toBe('high');
+  });
+
+  it('every tier has ascending switch distances with ultra > high > performance reach', () => {
+    for (const [name, d] of Object.entries(LOD_DISTANCES)) {
+      expect(d[0]).toBeGreaterThan(0);
+      expect(d[1]).toBeGreaterThan(d[0]);
+      void name;
+    }
+    expect(LOD_DISTANCES.ultra[0]).toBeGreaterThan(LOD_DISTANCES.high[0]);
+    expect(LOD_DISTANCES.high[0]).toBeGreaterThan(LOD_DISTANCES.performance[0]);
   });
 });

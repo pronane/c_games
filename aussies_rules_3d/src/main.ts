@@ -25,6 +25,7 @@ import {
 import { InputManager } from './input/input';
 import { InputFrame } from './input/mappings';
 import { MatchAudio } from './audio/audio';
+import { LOD_DISTANCES, pickLodQuality, type LodQuality } from './render/lod';
 import { Hud, Menus, CLUBS, $, createTouchButtons } from './ui/ui';
 
 type GamePhase = 'menu' | 'playing' | 'paused' | 'ended';
@@ -62,6 +63,8 @@ class Game {
   broadcast!: BroadcastCamera;
   input = new InputManager($('game'));
   audio = new MatchAudio();
+  /** Graphics quality tier — drives the squad LOD switch distances. */
+  lodQuality: LodQuality = 'high';
   hud = new Hud();
   menus = new Menus();
   teams: Teams = {
@@ -190,6 +193,10 @@ class Game {
 
     $('btn-play').addEventListener('click', () => this.startMatch());
     $('btn-settings').addEventListener('click', () => this.menus.show('settings'));
+    // graphics quality applies live — next sync picks up the new distances
+    ($('sel-graphics') as HTMLSelectElement).addEventListener('change', (e) => {
+      this.lodQuality = pickLodQuality((e.target as HTMLSelectElement).value);
+    });
     $('btn-controls').addEventListener('click', () => this.menus.show('controls'));
     $('btn-settings-back').addEventListener('click', () => this.menus.show('title'));
     $('btn-controls-back').addEventListener('click', () => {
@@ -221,6 +228,7 @@ class Game {
     this.settings.difficulty = (($('sel-difficulty') as HTMLSelectElement).value as MatchSettings['difficulty']) ?? 'afl';
     this.settings.quarterSeconds = Number(( $('sel-quarters') as HTMLSelectElement).value) || 300;
     this.settings.seed = (Math.random() * 1e9) | 0;
+    this.lodQuality = pickLodQuality(($('sel-graphics') as HTMLSelectElement | null)?.value);
     this.audio.setEnabled(($('chk-sound') as HTMLInputElement).checked);
     this.audio.init();
     this.audio.resume();
@@ -294,7 +302,7 @@ class Game {
     const CYCLE: Array<'broadcast' | 'aerial' | 'wing'> = ['broadcast', 'aerial', 'wing'];
     this.broadcast.view = CYCLE[Math.floor(this.menuCamT / 9) % CYCLE.length];
     const b = sim.state.ball;
-    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true, undefined, undefined, this.world.camera);
+    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true, undefined, undefined, this.world.camera, LOD_DISTANCES[this.lodQuality]);
     this.ballMesh.position.set(b.x, b.y, b.z);
     this.ballShadow.position.set(b.x, 0.022, b.z);
     const air = Math.max(0, b.y - 0.11);
@@ -573,7 +581,8 @@ class Game {
       this.views, sim.state, dt, this.celebrationTimer > 0, sim.controlledId, this.showMarkers,
       { mode: targetMode, handId: sim.handTargetId, kickId: sim.kickTargetId },
       { id: this.switchFlashT > 0 ? this.switchFlashId : -1, remaining: this.switchFlashT },
-      this.world.camera
+      this.world.camera,
+      LOD_DISTANCES[this.lodQuality]
     );
     this.updateOffscreenArrow(controlled);
 

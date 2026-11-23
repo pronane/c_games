@@ -70,12 +70,19 @@ export function collectLodKits(root: THREE.Object3D): LodKit[] {
   return out;
 }
 
+export type LodQuality = 'ultra' | 'high' | 'performance';
+
 /** Switch distances (metres) per quality tier — mirrors `LOD_PLAN['distances_m']` in Sprite Forge. */
-export const LOD_DISTANCES: Record<string, [number, number]> = {
+export const LOD_DISTANCES: Record<LodQuality, [number, number]> = {
   ultra: [22, 48],
   high: [16, 36],
   performance: [11, 26],
 };
+
+/** Normalise a <select> value to a quality tier (anything unexpected → high). */
+export function pickLodQuality(value: string | undefined): LodQuality {
+  return value === 'ultra' || value === 'performance' ? value : 'high';
+}
 
 /** Level for a camera→player distance. */
 export function pickLodLevel(distance: number, d: [number, number]): LodLevel {
