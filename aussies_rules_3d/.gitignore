@@ -14,3 +14,6 @@ npm-debug.log*
 
 # video renderer venv (not committed)
 tools/video/venv/
+
+# Candidate AFL squad GLB (built by tools/build_afl_motion_clips.py)
+/tools/out/
