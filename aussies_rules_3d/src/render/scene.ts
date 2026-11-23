@@ -117,8 +117,20 @@ export function makeGrassTexture(): THREE.CanvasTexture {
   // base grass with mow stripes along x
   const stripes = 22;
   for (let i = 0; i < stripes; i++) {
-    g.fillStyle = i % 2 === 0 ? '#2e7d32' : '#2a7129';
+    g.fillStyle = i % 2 === 0 ? '#2f8039' : '#27702e';
     g.fillRect((i * W) / stripes, 0, W / stripes + 1, H);
+  }
+  // two-tone mow: perpendicular bands across a centre corridor, alternating
+  // brightness — the checkerboard a freshly cut championship oval shows.
+  const corridorHalf = FIELD.centreSquareHalf + 14;
+  const bands = 8;
+  for (let i = 0; i < bands; i++) {
+    const z0 = -corridorHalf + (i * 2 * corridorHalf) / bands;
+    const z1 = -corridorHalf + ((i + 1) * 2 * corridorHalf) / bands;
+    const yTop = Math.min(my(z0), my(z1));
+    const yBot = Math.max(my(z0), my(z1));
+    g.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+    g.fillRect(mx(-corridorHalf), yTop, mx(corridorHalf) - mx(-corridorHalf), yBot - yTop);
   }
   // subtle noise
   for (let i = 0; i < 4200; i++) {

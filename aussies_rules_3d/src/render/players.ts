@@ -10,6 +10,8 @@ import { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 import { MatchState, PlayerState, TeamId } from '../rules/types';
 import { MotionBinding, type MotionAssets } from './motionBinding';
+import { basePartName, collectLodKits, pickLodLevel, setLodLevel, LOD_DISTANCES, type LodKit, type LodLevel } from './lod';
+import { ensureJerseyUvs } from './jerseyUvs';
 
 export interface PlayerView {
   root: THREE.Group;
@@ -32,6 +34,10 @@ export interface PlayerView {
   shadow: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   /** Arena Motion Engine binding — null when baked assets failed to load (legacy path). */
   motion: MotionBinding | null;
+  /** LOD kits for this clone — empty with the shipped asset (no _lodN nodes). */
+  lodKits: LodKit[];
+  /** Cached level so visibility is only flipped on change (-1 = force apply). */
+  lodLevel: LodLevel | -1;
 }
 
 export interface Teams {
@@ -116,12 +122,15 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
     if (!(obj instanceof THREE.Mesh)) return;
     const wasSingle = !Array.isArray(obj.material);
     const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]) as THREE.MeshStandardMaterial[];
-    const meshName = (obj.name ?? '').toLowerCase();
+    const meshName = basePartName((obj.name ?? '').toLowerCase());
     const cloned = mats.map((m) => {
       const mat = m.clone();
       // The Gaelic GLB ships one shared 'kit' material; AFL club colours are
       // flat tints per kit piece, identified by the vN_* mesh names.
       if (meshName.endsWith('jersey')) {
+        // Kit garments ship without UVs — synthesise the chest/back number
+        // projection so the number texture can actually sample.
+        ensureJerseyUvs((obj as THREE.Mesh).geometry as THREE.BufferGeometry);
         mat.map = numberTexture(number, kit.primary);
         mat.color = new THREE.Color(0xffffff);
       } else if (meshName.endsWith('shorts') || meshName.endsWith('socks')) {
@@ -171,6 +180,8 @@ export function createPlayerViews(
   for (const p of state.players) {
     const template = templates[p.id % templates.length];
     const root = skeletonClone(template) as THREE.Group;
+    const lodKits = collectLodKits(root);
+    if (lodKits.length) setLodLevel(lodKits, 0);
     tintKits(root, p.team, teams, p.number);
     root.scale.setScalar(1.0);
     root.position.set(p.x, 0, p.z);
@@ -287,6 +298,8 @@ export function createPlayerViews(
       chevron,
       shadow,
       motion,
+      lodKits,
+      lodLevel: 0,
     });
   }
   return views;
@@ -367,7 +380,9 @@ export function syncPlayerViews(
   controlledId: number | null = null,
   markersOn = true,
   targets: TargetRings = { mode: 'none', handId: -1, kickId: -1 },
-  flash: SwitchFlash = { id: -1, remaining: 0 }
+  flash: SwitchFlash = { id: -1, remaining: 0 },
+  camera?: THREE.Camera,
+  lodDistances: [number, number] = LOD_DISTANCES.high
 ): void {
   const now = performance.now() / 1000;
   for (const p of state.players) {
@@ -449,6 +464,14 @@ export function syncPlayerViews(
     }
 
     view.root.position.set(p.x, p.y, p.z);
+    if (camera && view.lodKits.length) {
+      const dist = camera.position.distanceTo(view.root.position);
+      const level = pickLodLevel(dist, lodDistances);
+      if (level !== view.lodLevel) {
+        setLodLevel(view.lodKits, level);
+        view.lodLevel = level;
+      }
+    }
     // shadow stays on the turf and fades as the player leaves it
     const jump = Math.max(0, p.y);
     view.shadow.position.y = 0.02 - p.y;
