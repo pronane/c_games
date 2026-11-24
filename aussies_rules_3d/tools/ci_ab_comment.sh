@@ -9,9 +9,10 @@ marker='<!-- aussies-motion-ab-sticky -->'
   echo "$marker"
   echo '### Aussies Rules Motion A/B — attract-demo capture'
   echo
-  echo 'Both legs ran with `?ab=1`: fixed attract seed, menu overlays hidden, broadcast cam, `AB_STATS` logged from `renderer.info` every ~2 s.'
+  echo 'Attract legs ran with `?ab=1`: fixed attract seed, menu overlays hidden, broadcast cam, `AB_STATS` logged from `renderer.info` every ~2 s.'
+  echo 'The match leg uses `?ab=1&scenario=match` with a fixed seed and a live controlled player (LOD candidate). It is a coverage scenario, not a third model comparison.'
   echo
-  for leg in original lod; do
+  for leg in original lod match; do
     log="build/motion-ab/$leg/console.log"
     echo "**$leg**"
     if [ -f "$log" ]; then
@@ -34,7 +35,7 @@ marker='<!-- aussies-motion-ab-sticky -->'
   done
   echo
   if command -v node >/dev/null 2>&1 && [ -f tools/ab_stats.mjs ]; then
-    node tools/ab_stats.mjs build/motion-ab/original build/motion-ab/lod || echo '_ab_stats aggregation failed_'
+    node tools/ab_stats.mjs build/motion-ab/original build/motion-ab/lod build/motion-ab/match || echo '_ab_stats aggregation failed_'
     echo
   fi
   echo 'Full frames + MP4s + logs: workflow artifact `aussies-rules-motion-ab-visual` on this run.'

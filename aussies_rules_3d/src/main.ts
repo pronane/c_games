@@ -36,6 +36,7 @@ import { LOD_DISTANCES, pickLodQuality, type LodQuality } from './render/lod';
 const AB_PARAMS = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 const AB_MODE = !!AB_PARAMS?.has('ab');
 const AB_LOD = AB_PARAMS?.get('lod');
+const AB_MATCH = AB_MODE && AB_PARAMS?.get('scenario') === 'match';
 import { Hud, Menus, CLUBS, $, createTouchButtons } from './ui/ui';
 
 type GamePhase = 'menu' | 'playing' | 'paused' | 'ended';
@@ -171,6 +172,7 @@ class Game {
     this.setupTouch();
     this.startAttract();
     this.menus.show('title');
+    if (AB_MATCH) this.startMatch();
     if (AB_MODE) {
       // capture the unobstructed attract demo (deterministic — see AB_PARAMS)
       document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
@@ -259,7 +261,7 @@ class Game {
     this.teams.away = { ...CLUBS[ai] };
     this.settings.difficulty = (($('sel-difficulty') as HTMLSelectElement).value as MatchSettings['difficulty']) ?? 'afl';
     this.settings.quarterSeconds = Number(( $('sel-quarters') as HTMLSelectElement).value) || 300;
-    this.settings.seed = (Math.random() * 1e9) | 0;
+    this.settings.seed = AB_MODE ? 0x5eed5eed : (Math.random() * 1e9) | 0;
     this.lodQuality = pickLodQuality(($('sel-graphics') as HTMLSelectElement | null)?.value);
     this.audio.setEnabled(($('chk-sound') as HTMLInputElement).checked);
     this.audio.init();
@@ -580,7 +582,7 @@ class Game {
             }
           }
         }
-        if (now - this.abCamLastLog > 2000 && this.abCamFrames >= 30) {
+        if (now - this.abCamLastLog > 2000 && this.abCamFrames > 0) {
           const pct = (n: number, d: number) => ((100 * n) / Math.max(1, d)).toFixed(1);
           console.log(
             `AB_CAMSTAT frames=${this.abCamFrames} ball_in=${pct(this.abCamBallIn, this.abCamFrames)} ` +
