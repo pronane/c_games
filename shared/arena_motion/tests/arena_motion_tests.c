@@ -105,4 +105,11 @@ static void loop_advance(void)
     assert(am_loop_advance(.2f, -1, 1, 1) == .2f);
     assert(am_loop_advance(.2f, 1, 1, 0) == .2f);
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); puts("arena motion tests passed"); return 0; }
+static void correction_ramp(void)
+{
+    assert(am_smoothstep(-1) == 0 && am_smoothstep(2) == 1);
+    assert(am_smoothstep(NAN) == 0);
+    assert(fabsf(am_smoothstep(.5f)-.5f) < .00001f);
+    assert(am_smoothstep(.25f) < am_smoothstep(.75f));
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); puts("arena motion tests passed"); return 0; }

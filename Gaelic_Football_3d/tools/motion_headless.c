@@ -217,16 +217,19 @@ static int validate_leg_ik(void)
     game_init(&game); game.players[0][9].action = GAME_ACT_NONE;
     for (int c = 0; c < 3; ++c) {
         ModelAnimation *a = animFor(clips[c]); AnimState *s = &as[9];
-        int n = ANIM_FRAMES(*a)-1, backward = 0, bad_length = 0, straight = 0, count = 0;
+        int n = ANIM_FRAMES(*a)-1, backward = 0, bad_length = 0, straight = 0, authoredStraight = 0, count = 0;
         memset(s, 0, sizeof *s); s->speed = 5; s->strideScale = 2.35f;
         for (int f = 0; f < 2*n; ++f) {
-            float lengths[2][2];
-            memcpy(s->pose, ANIM_POSES(*a)[f % n], model.boneCount * sizeof(Transform));
+            float lengths[2][2]; int wasStraight[2];
+            sampleClip(clips[c], (f % n) / ANIM_FPS, s->pose);
             s->lastX += .06f;
             for (int side = 0; side < 2; ++side) {
                 int h = side ? boneThighR : boneThighL, k = side ? boneCalfR : boneCalfL, b = side ? boneFootR : boneFootL;
                 lengths[side][0] = Vector3Distance(s->pose[h].translation, s->pose[k].translation);
                 lengths[side][1] = Vector3Distance(s->pose[k].translation, s->pose[b].translation);
+                wasStraight[side] = Vector3Distance(s->pose[h].translation, s->pose[b].translation) >
+                    (lengths[side][0] + lengths[side][1]) * (GA_LEG_MAX_REACH + .001f);
+                authoredStraight += wasStraight[side];
             }
             lengthenStride(s); plantFeet(s, 1.f/30.f);
             for (int side = 0; side < 2; ++side) {
@@ -236,16 +239,82 @@ static int validate_leg_ik(void)
                 Vector3 v = Vector3Subtract(knee, hip);
                 Vector3 pole = Vector3Subtract(v, Vector3Scale(d, Vector3DotProduct(v, d)));
                 if (!finite3(knee) || !finite3(foot) || pole.z < -0.005f) backward++;
-                if (Vector3Distance(hip, foot) > (lengths[side][0] + lengths[side][1]) * (GA_LEG_MAX_REACH + .001f)) straight++;
+                if (!wasStraight[side] && Vector3Distance(hip, foot) >
+                    (lengths[side][0] + lengths[side][1]) * (GA_LEG_MAX_REACH + .001f)) straight++;
                 if (fabsf(Vector3Distance(hip, knee)-lengths[side][0]) > .002f ||
                     fabsf(Vector3Distance(knee, foot)-lengths[side][1]) > .002f) bad_length++;
                 count++;
             }
         }
-        printf("leg_ik clip=%s samples=%d backward=%d bad_length=%d overextended=%d\n", CLIP_NAMES[clips[c]], count, backward, bad_length, straight);
+        printf("leg_ik clip=%s samples=%d backward=%d bad_length=%d newly_overextended=%d authored_overextended=%d\n", CLIP_NAMES[clips[c]], count, backward, bad_length, straight, authoredStraight);
         if (backward || bad_length || straight) return 0;
     }
     return 1;
+}
+
+static int validate_jog_stride_ramp(void)
+{
+    const float speeds[] = {2.0f, 2.2f, 2.2001f, 2.7f, 3.2f, 3.5f};
+    float scale[6]; int clip; float t; AnimState slot = {0};
+    GamePlayer p = {0};
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    for (int i = 0; i < 6; ++i) {
+        slot.speed = speeds[i]; desiredClip(0, 9, &p, &slot, 1.f/60, &clip, &t);
+        if (clip != C_JOG || !isfinite(slot.strideScale)) return 0;
+        scale[i] = slot.strideScale;
+    }
+    printf("jog_stride_ramp %.4f %.4f %.4f %.4f %.4f %.4f\n",
+           scale[0], scale[1], scale[2], scale[3], scale[4], scale[5]);
+    return scale[0] == 1.0f && scale[1] == 1.0f && fabsf(scale[2]-scale[1]) < .0001f &&
+           scale[3] > scale[2] && scale[4] > scale[3] && scale[5] >= scale[4] &&
+           scale[5] <= strideLimit(speeds[5]) + .0001f;
+}
+
+/* Drive the actual presentation gait at constant world velocity. The ankle
+ * proxy measures horizontal world displacement while the unadjusted clip is
+ * low, not sole/mesh contact or proof of rendered foot planting. */
+static int report_jog_ground_proxy(float dt, float speed)
+{
+    AnimState *s = &as[9]; GamePlayer *p; Transform raw[MAX_BONES];
+    double rawDist = 0, scaledDist = 0, adjustedDist = 0, activeDist = 0;
+    float prevRaw[2] = {0}, prevScaled[2] = {0}, prevAdjusted[2] = {0}, prevY[2] = {0};
+    int count = 0, active = 0, clip = -1; float t = 0;
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    p = &game.players[0][9]; p->action = GAME_ACT_NONE; p->jump_time = 0;
+    memset(s, 0, sizeof *s); s->speed = speed;
+    for (int step = 0; step < (int)(5.0f/dt); ++step) {
+        float rawWorld[2], scaledWorld[2], adjustedWorld[2];
+        desiredClip(0, 9, p, s, dt, &clip, &t);
+        if (clip != C_JOG) return 0;
+        s->lastZ += speed * dt;
+        sampleClip(clip, t, raw);
+        memcpy(s->pose, raw, (size_t)model.boneCount * sizeof(Transform));
+        lengthenStride(s);
+        scaledWorld[0] = s->lastZ + s->pose[boneFootL].translation.z;
+        scaledWorld[1] = s->lastZ + s->pose[boneFootR].translation.z;
+        plantFeet(s, dt);
+        for (int side = 0; side < 2; ++side) {
+            int f = side ? boneFootR : boneFootL;
+            rawWorld[side] = s->lastZ + raw[f].translation.z;
+            adjustedWorld[side] = s->lastZ + s->pose[f].translation.z;
+            if (!isfinite(adjustedWorld[side])) return 0;
+            if (step > (int)(1.0f/dt) && raw[f].translation.y <= .11f && prevY[side] <= .11f) {
+                rawDist += fabs(rawWorld[side] - prevRaw[side]);
+                scaledDist += fabs(scaledWorld[side] - prevScaled[side]);
+                adjustedDist += fabs(adjustedWorld[side] - prevAdjusted[side]);
+                count++;
+                if (s->plantOn[side] && s->plantWeight[side] > .5f) {
+                    activeDist += fabs(adjustedWorld[side] - prevAdjusted[side]); active++;
+                }
+            }
+            prevRaw[side] = rawWorld[side]; prevScaled[side] = scaledWorld[side]; prevAdjusted[side] = adjustedWorld[side];
+            prevY[side] = raw[f].translation.y;
+        }
+    }
+    printf("jog_ground_proxy dt=%.4f speed=%.1f samples=%d raw_mps=%.3f scaled_mps=%.3f adjusted_mps=%.3f planted_samples=%d planted_mps=%.3f (ankle_proxy_only)\n",
+           dt, speed, count, count ? rawDist/(count*dt) : 0, count ? scaledDist/(count*dt) : 0, count ? adjustedDist/(count*dt) : 0,
+           active, active ? activeDist/(active*dt) : 0);
+    return count > 0;
 }
 
 /* Exercise the plant's attack and release with a fixed real-model pose and
@@ -458,7 +527,7 @@ int main(int argc, char **argv)
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
-        !validate_interruption() || !validate_leg_ik() || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
+        !validate_interruption() || !validate_leg_ik() || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
         !compare_entry_poses(GAME_ACT_SOLO) || !benchmark_search()) {
         fprintf(stderr, "Action integration check failed\n"); return 1;
     }

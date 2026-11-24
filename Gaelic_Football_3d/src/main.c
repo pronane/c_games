@@ -601,6 +601,13 @@ static void desiredClip(int team, int idx, const GamePlayer *p, AnimState *s, fl
         /* Avoid forcing the short source cycle into a rigid split at speed.
          * Some high-speed ground sliding is preferable to locked knees. */
         s->strideScale = Clamp(stride / authored, 1.0f, strideLimit(s->speed));
+        /* Keep the captured jog at low speeds. Forced leg IK can increase
+         * sliding and make short motion-capture strides look stiff. Ramp in
+         * extra reach smoothly at higher speeds instead of switching it on. */
+        if (*clip == C_JOG) {
+            float amount = am_smoothstep((s->speed - 2.2f) / 1.0f);
+            s->strideScale = 1.0f + (s->strideScale - 1.0f) * amount;
+        }
         rate = locomotionRate(s, *clip);
         s->runPhase += dt * rate;
         *t = fmodf(s->runPhase, clipLen(*clip));

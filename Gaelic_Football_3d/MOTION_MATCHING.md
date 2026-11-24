@@ -177,3 +177,13 @@ only between locomotion clips; action and bounce timing remain unchanged. The
 headless report includes low-foot velocity and pelvis-relative hand ranges for
 candidate comparisons. These are raw clip-pose measurements, not a measurement
 of final skinned vertices, ball carrying, ground slip or rendered appearance.
+
+At lower forward-jog speeds (up to 2.2 m/s) the stride adjustment preserves the
+captured leg pose; its additional reach ramps in through 3.2 m/s using the
+shared cubic easing function. Foot planting remains enabled. This is a
+presentation-only heuristic and does not change the player's world motion.
+The headless model check also reports low-foot horizontal world-ankle motion
+before stride adjustment, after stride adjustment, and after planting, at 30
+and 60 Hz. It uses a constant straight-line speed, samples an ankle rather than
+a sole vertex, and classifies low feet using the unadjusted clip; it does not
+measure rendered slipping, skinned shorts, or general gameplay.

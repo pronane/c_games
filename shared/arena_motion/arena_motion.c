@@ -158,3 +158,10 @@ float am_loop_advance(float time, float dt, float rate, float length)
     if (t < 0) t += length;
     return (float)t;
 }
+
+float am_smoothstep(float x)
+{
+    if (!isfinite(x) || x <= 0.0f) return 0.0f;
+    if (x >= 1.0f) return 1.0f;
+    return x*x*(3.0f - 2.0f*x);
+}
