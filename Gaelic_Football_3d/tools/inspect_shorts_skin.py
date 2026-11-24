@@ -41,7 +41,7 @@ def accessor(doc, blob, index):
     view = doc["bufferViews"][a["bufferView"]]
     if view.get("buffer", 0) != 0:
         raise ValueError("external buffers are not supported")
-    components = {"VEC3": 3, "VEC4": 4}[a["type"]]
+    components = {"SCALAR": 1, "VEC3": 3, "VEC4": 4, "MAT4": 16}[a["type"]]
     code, maximum = {5121: ("B", 255), 5123: ("H", 65535), 5126: ("f", 1)}[a["componentType"]]
     fmt = "<" + code * components
     item_size = struct.calcsize(fmt)

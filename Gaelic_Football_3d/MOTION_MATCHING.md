@@ -202,3 +202,14 @@ shorts mesh. In the current shipped model the two low hems have essentially
 matching bind heights and approximately 97% corresponding-thigh / 3% pelvis
 weights. This is an approximate bind-space band, not an animated hem or visual
 proof; it does not identify the cause of the observed changing shorts length.
+
+`python3 tools/inspect_shorts_motion.py assets/models/gaelic_player.glb`
+evaluates the actual GLB jog transforms and linear-blend skinning on the
+bind-selected hem vertices. It reports mean and maximum individual-vertex
+thigh-local vertical offset ranges, not screen-space or cloth length. For the
+first shipped shorts mesh sampled at 60 phases, the mean hem offset ranges are
+about 1.4 mm and 0.8 mm; individual vertices reach 7.3 mm and 4.8 mm. The
+experimental CMU candidate measured about 2.3 mm mean and 9.9 mm maximum
+individual range on each side. These measurements exclude procedural IK,
+renderer behavior, camera perspective and occlusion. They do not rule out the
+reported visual issue or validate a fix.

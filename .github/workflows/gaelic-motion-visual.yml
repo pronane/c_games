@@ -85,6 +85,8 @@ jobs:
           cd Gaelic_Football_3d
           ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb ../build/cmu-jog-local/candidate.gfmotion > ../build/cmu-jog-report/model-test.log 2>&1
           python3 tools/inspect_shorts_skin.py assets/models/gaelic_player.glb > ../build/cmu-jog-report/shorts-bind-skin.json
+          python3 tools/inspect_shorts_motion.py assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-shorts-motion.json
+          python3 tools/inspect_shorts_motion.py ../build/cmu-jog-local/candidate/gaelic_player.glb > ../build/cmu-jog-report/cmu-shorts-motion.json
       # Same scripted input and render settings; GF_QUICK stops after frame 340,
       # so these videos cover standing, walking, jogging, sprinting and stopping.
       - name: Record original and experimental jog
