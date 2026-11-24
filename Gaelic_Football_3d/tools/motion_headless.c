@@ -498,9 +498,92 @@ static int report_jog_motion(void)
     return count > 0;
 }
 
+/* Export paired global poses for the exact same sample before and after the
+ * gameplay presentation's stride/plant IK. This is a constant-speed straight
+ * path after a one-second warmup, not a recording of a rendered match. */
+static void write_json_string(FILE *f, const char *s)
+{
+    fputc('"', f);
+    for (; *s; ++s) {
+        unsigned char c = (unsigned char)*s;
+        if (c == '"' || c == '\\') { fputc('\\', f); fputc(c, f); }
+        else if (c < 32) fprintf(f, "\\u%04x", c);
+        else fputc(c, f);
+    }
+    fputc('"', f);
+}
+static int write_pose(FILE *f, Transform *pose, int n)
+{
+    fputc('[', f);
+    for (int b = 0; b < n; ++b) {
+        Transform p = pose[b];
+        float v[10] = {p.translation.x, p.translation.y, p.translation.z,
+                       p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w,
+                       p.scale.x, p.scale.y, p.scale.z};
+        if (b) fputc(',', f);
+        fputc('[', f);
+        for (int k = 0; k < 10; ++k) {
+            if (!isfinite(v[k])) return 0;
+            fprintf(f, "%s%.9g", k ? "," : "", v[k]);
+        }
+        fputc(']', f);
+    }
+    fputc(']', f); return !ferror(f);
+}
+static int export_jog_poses(const char *asset, const char *out, float speed, int fps, int apply_ik)
+{
+    FILE *f; AnimState *s = &as[9]; GamePlayer *p; int clip; float t;
+    Transform raw[MAX_BONES];
+    if (!isfinite(speed) || speed < .7f || speed >= 4.6f || (fps != 30 && fps != 60) || !strcmp(asset, out)) return 0;
+    if (!load_model_animation(asset)) return 0;
+    detectJogDirection();
+    boneThighL = findBone("thigh_l"); boneThighR = findBone("thigh_r");
+    boneCalfL = findBone("calf_l"); boneCalfR = findBone("calf_r");
+    boneToeL = findBone("ball_l"); boneToeR = findBone("ball_r");
+    if (boneThighL < 0 || boneThighR < 0 || boneCalfL < 0 || boneCalfR < 0) return 0;
+    f = fopen(out, "wb"); if (!f) return 0;
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    p = &game.players[0][9]; p->action = GAME_ACT_NONE; p->jump_time = 0;
+    memset(s, 0, sizeof *s); s->speed = speed;
+    fprintf(f, "{\"format\":1,\"fps\":%d,\"speed_mps\":%.9g,\"warmup_seconds\":1,\"ik\":%s,\"bones\":[", fps, speed, apply_ik ? "true" : "false");
+    for (int b = 0; b < model.boneCount; ++b) { if (b) fputc(',', f); write_json_string(f, model.bones[b].name); }
+    fputs("],\"frames\":[", f);
+    for (int step = 0; step < fps*4; ++step) {
+        desiredClip(0, 9, p, s, 1.f/fps, &clip, &t);
+        if (clip != C_JOG) { fclose(f); return 0; }
+        s->lastZ += speed/fps;
+        sampleClip(clip, t, raw);
+        memcpy(s->pose, raw, sizeof(Transform)*(size_t)model.boneCount);
+        if (apply_ik) { lengthenStride(s); plantFeet(s, 1.f/fps); }
+        if (step < fps) continue;
+        if (step > fps) fputc(',', f);
+        fprintf(f, "{\"clip_time\":%.9g,\"raw\":", t);
+        if (!write_pose(f, raw, model.boneCount)) { fclose(f); return 0; }
+        fputs(",\"adjusted\":", f);
+        if (!write_pose(f, s->pose, model.boneCount)) { fclose(f); return 0; }
+        fputc('}', f);
+    }
+    fputs("]}\n", f);
+    if (fclose(f)) return 0;
+    UnloadModelAnimations(anims, animCount);
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
+    if (argc == 6 || argc == 7) {
+        if (!strcmp(argv[1], "--export-jog-poses") &&
+            (argc == 6 || !strcmp(argv[6], "--no-ik"))) {
+            char *endSpeed, *endFps;
+            float speed = strtof(argv[4], &endSpeed); long fps = strtol(argv[5], &endFps, 10);
+            if (*endSpeed || *endFps || (fps != 30 && fps != 60) ||
+                !export_jog_poses(argv[2], argv[3], speed, (int)fps, argc == 6)) {
+                fprintf(stderr, "Jog pose export failed\n"); return 1;
+            }
+            return 0;
+        }
+    }
     if (argc != 3) { fprintf(stderr, "Usage: motion_headless MODEL.glb OUTPUT.gfmotion\n"); return 2; }
     asset = argv[1]; cache = argv[2];
     { size_t len = strlen(asset); if (len < 4 || strcmp(asset + len - 4, ".glb")) {
