@@ -29,4 +29,18 @@ for fps in (30, 60):
             largest = max(largest, side['max_abs_vertex_delta_m'])
     assert 1e-7 < largest < .1, largest
     print(f'shorts_runtime fps={fps} max_vertex_delta_m={largest:.6f} (headless, no rendering)')
+for fps in (30, 60):
+    report = compare(model, tool, 3.0, fps, scenario='turn-transition')
+    summary = report['scenario_summary']
+    assert report['samples'] == fps*5
+    assert summary['turn_frames'] >= fps - 1 and summary['crossfade_frames'] > 0
+    for clip in ('jog', 'sidestep', 'run', 'idle'): assert summary['clip_frame_counts'].get(clip, 0) > 0
+    for mesh in report['frame_steps']:
+        for side in mesh['sides'].values():
+            assert all(name in side and side[name]['samples'] > 0 for name in ('turn', 'crossfade', 'steady'))
+    print(f"turn_transition fps={fps} clips={summary['clip_frame_counts']} crossfade={summary['crossfade_frames']} (synthetic, no rendering)")
+control = compare(model, tool, 3.0, 30, no_ik=True, scenario='turn-transition')
+assert not control['ik_applied']
+for mesh in control['paired_ik_delta']:
+    for side in mesh['sides'].values(): assert side['max_abs_vertex_delta_m'] == 0
 print('shorts runtime skinning checks passed')

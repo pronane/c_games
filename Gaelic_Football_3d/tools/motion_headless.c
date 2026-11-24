@@ -443,6 +443,35 @@ static int validate_jog_playback(void)
     return ok;
 }
 
+/* Check the refactored raylib 5.5 blend against its original per-bone
+ * interpolation formula, including both the blend and fully-current paths. */
+static int validate_pose_blend(void)
+{
+    AnimState slot = {0}; Transform a[MAX_BONES], b[MAX_BONES];
+    slot.prevClip = C_IDLE; slot.prevT = .2f;
+    sampleClip(C_JOG, .15f, a); sampleClip(C_IDLE, slot.prevT, b);
+    for (int k = 0; k <= 4; ++k) {
+        float w = k / 4.f;
+        slot.blend = k == 4 ? 1.f : .5f;
+        sampleBlendedPose(&slot, C_JOG, .15f, w);
+        for (int i = 0; i < model.boneCount; ++i) {
+            Transform want = a[i];
+            if (slot.blend < 1) {
+                want.translation = Vector3Lerp(b[i].translation, a[i].translation, w);
+                want.rotation = QuaternionSlerp(b[i].rotation, a[i].rotation, w);
+                want.scale = Vector3Lerp(b[i].scale, a[i].scale, w);
+            }
+            if (Vector3Distance(want.translation, slot.pose[i].translation) > 1e-6f ||
+                Vector3Distance(want.scale, slot.pose[i].scale) > 1e-6f ||
+                fabsf(want.rotation.x-slot.pose[i].rotation.x) > 1e-6f ||
+                fabsf(want.rotation.y-slot.pose[i].rotation.y) > 1e-6f ||
+                fabsf(want.rotation.z-slot.pose[i].rotation.z) > 1e-6f ||
+                fabsf(want.rotation.w-slot.pose[i].rotation.w) > 1e-6f) return 0;
+        }
+    }
+    puts("pose_blend_equivalence=ok"); return 1;
+}
+
 static int validate_locomotion_transition(void)
 {
     AnimState a = {0}, b = {0}, action = {0}, bounce = {0};
@@ -569,9 +598,79 @@ static int export_jog_poses(const char *asset, const char *out, float speed, int
     return 1;
 }
 
+/* Synthetic moving player: one second warm-up then a one-second turn,
+ * straight jog, sprint, jog and stop. Uses the renderer's matching and
+ * raylib 5.5 blend helpers; no draw calls or simulation physics. */
+static int export_turn_poses(const char *asset, const char *out, int fps, int apply_ik)
+{
+    FILE *f; AnimState *s = &as[9]; GamePlayer *p; float dt = 1.f/fps, face = 0;
+    Transform raw[MAX_BONES];
+    if ((fps != 30 && fps != 60) || !strcmp(asset, out) || !load_model_animation(asset)) return 0;
+    detectJogDirection(); buildMotionDatabase(NULL);
+    boneThighL = findBone("thigh_l"); boneThighR = findBone("thigh_r");
+    boneCalfL = findBone("calf_l"); boneCalfR = findBone("calf_r");
+    boneToeL = findBone("ball_l"); boneToeR = findBone("ball_r");
+    boneSpine = findBone("spine_03"); boneSpine1 = findBone("spine_01");
+    if (!motionReady || boneThighL < 0 || boneThighR < 0 || boneCalfL < 0 || boneCalfR < 0) return 0;
+    f = fopen(out, "wb"); if (!f) return 0;
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    p = &game.players[0][9]; p->action = GAME_ACT_NONE; p->jump_time = 0;
+    memset(s, 0, sizeof *s); s->speed = 3.0f; s->clip = C_JOG; s->prevClip = C_JOG;
+    s->blend = 1.0f; s->yawInit = 1; poseFar = 0;
+    fprintf(f, "{\"format\":1,\"fps\":%d,\"warmup_seconds\":1,\"ik\":%s,\"scenario\":\"turn-transition\",\"bones\":[", fps, apply_ik ? "true" : "false");
+    for (int b = 0; b < model.boneCount; ++b) { if (b) fputc(',', f); write_json_string(f, model.bones[b].name); }
+    fputs("],\"frames\":[", f);
+    for (int step = 0; step < fps*6; ++step) {
+        float now = (float)step/fps, targetSpeed, err, maxw, t, w; int clip;
+        targetSpeed = now < 2.5f ? 3.0f : now < 3.5f ? 5.2f : now < 4.5f ? 3.0f : 0.0f;
+        if (now >= 1.0f && now < 2.0f) face += 3.0f*dt;
+        p->x += sinf(face)*targetSpeed*dt; p->z += cosf(face)*targetSpeed*dt;
+        s->prevSpeed = s->speed; s->speed = Lerp(s->speed, targetSpeed, .35f);
+        s->accel = (s->speed - s->prevSpeed)/dt; s->lastX = p->x; s->lastZ = p->z;
+        s->turnRate = fabsf(wrapAngle(face - s->faceYaw))/dt; s->faceYaw = face;
+        err = wrapAngle(face - s->bodyYaw); maxw = (s->turnRate > 2 ? 4.f : 7.5f)*dt;
+        s->bodyYaw += Clamp(err, -maxw, maxw); err = wrapAngle(face - s->bodyYaw);
+        if (err > .45f) s->bodyYaw = face-.45f;
+        if (err < -.45f) s->bodyYaw = face+.45f;
+        desiredClip(0, 9, p, s, dt, &clip, &t);
+        matchGaitTransition(s, clip, &t);
+        w = updatePoseBlend(s, clip, t, dt);
+        sampleBlendedPose(s, clip, t, w);
+        balanceTorso(s, clip);
+        memcpy(raw, s->pose, sizeof(Transform)*(size_t)model.boneCount);
+        if (apply_ik) { lengthenStride(s); plantFeet(s, dt); }
+        coordinateTurn(s);
+        { Transform after[MAX_BONES];
+          memcpy(after, s->pose, sizeof(Transform)*(size_t)model.boneCount);
+          memcpy(s->pose, raw, sizeof(Transform)*(size_t)model.boneCount);
+          coordinateTurn(s);
+          memcpy(raw, s->pose, sizeof(Transform)*(size_t)model.boneCount);
+          memcpy(s->pose, after, sizeof(Transform)*(size_t)model.boneCount);
+        }
+        if (step < fps) continue;
+        if (step > fps) fputc(',', f);
+        fprintf(f, "{\"clip\":"); write_json_string(f, CLIP_NAMES[clip]);
+        fprintf(f, ",\"blend\":%.9g,\"turn_rate\":%.9g,\"raw\":", s->blend, s->turnRate);
+        if (!write_pose(f, raw, model.boneCount)) { fclose(f); return 0; }
+        fputs(",\"adjusted\":", f);
+        if (!write_pose(f, s->pose, model.boneCount)) { fclose(f); return 0; }
+        fputc('}', f);
+    }
+    fputs("]}\n", f); if (fclose(f)) return 0;
+    UnloadModelAnimations(anims, animCount); return 1;
+}
+
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
+    if ((argc == 5 || argc == 6) && !strcmp(argv[1], "--export-turn-poses")) {
+        char *end; long fps = strtol(argv[4], &end, 10);
+        if (*end || (fps != 30 && fps != 60) || (argc == 6 && strcmp(argv[5], "--no-ik")) ||
+            !export_turn_poses(argv[2], argv[3], (int)fps, argc == 5)) {
+            fprintf(stderr, "Turn pose export failed\n"); return 1;
+        }
+        return 0;
+    }
     if (argc == 6 || argc == 7) {
         if (!strcmp(argv[1], "--export-jog-poses") &&
             (argc == 6 || !strcmp(argv[6], "--no-ik"))) {
@@ -605,7 +704,7 @@ int main(int argc, char **argv)
         !same_rows(&actionDb, &referenceActions)) { fprintf(stderr, "Cache round trip failed\n"); return 1; }
     printf("model=%s bones=%d clips=%d gait_rows=%d action_rows=%d cache_roundtrip=ok\n",
            asset, model.boneCount, animCount, motionDb.count, actionDb.count);
-    if (!validate_jog_playback() || !validate_locomotion_transition() || !report_jog_motion() || !validate_old_cache_fallback(cache) || !validate_late_observation() ||
+    if (!validate_jog_playback() || !validate_pose_blend() || !validate_locomotion_transition() || !report_jog_motion() || !validate_old_cache_fallback(cache) || !validate_late_observation() ||
         !validate_offscreen_release(1.f/60.f, 0) || !validate_offscreen_release(1.f/30.f, 0) ||
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
