@@ -229,3 +229,18 @@ meshes, the maximum paired IK change was 1.2 mm at 2 m/s and 2.4 mm at
 3.5 m/s for a sampled vertex; mean-hem changes peaked at 0.34 mm and 0.69 mm
 respectively. This is limited evidence for those scenarios, not a fix or proof
 that the visually reported shorts issue is absent.
+
+The runtime shorts inspector also supports `--scenario turn-transition`.
+It synthesizes a straight jog followed by a turn, sprint, jog and stop; it
+uses the same gait matcher, raylib 5.5 cross-fade sampling and leg IK as the
+frontend. The position, speed and facing inputs are scripted rather than a
+rules-engine match. Its report counts each chosen clip, actual cross-fade and
+turn frames, and thigh-local per-vertex frame-to-frame movement. Turn frames
+are categorized before cross-fade frames when both occur. These steps are not
+on-screen hem movement or evidence of a visible pop. At 60 Hz, the local CMU
+candidate sampled sidestep, jog, run and idle, with 60 turning frames and 79
+cross-fade frames. Across nine shorts meshes the largest single-vertex
+thigh-local step was 1.4 mm during turns, 3.7 mm during non-turn cross-fades,
+and 6.4 mm during non-turn, non-cross-fade frames; the largest paired leg-IK
+change was 4.1 mm. This does not cover actual gameplay, camera perspective,
+raylib 6 or occlusion and does not establish the cause of the reported issue.

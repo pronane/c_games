@@ -1187,18 +1187,12 @@ static void coordinateTurn(AnimState *s)
     if (boneHead >= 0) twistBone(&s->pose[boneHead], -lead * 0.35f);
 }
 
-/* Blend and upload the pose for one character, keeping a copy for bone queries.
- * raylib 6 interpolates float frames and blends two clips in UpdateModelAnimationEx.
- * raylib 5.5 has integer frames, so the same blend is done here and uploaded as one pose. */
-static void measureCarrierFoot(void);
-static void poseCharacter(AnimState *s, int clip, float t, float dt)
+/* Keep blend bookkeeping common to rendering and headless motion diagnostics. */
+static float updatePoseBlend(AnimState *s, int clip, float t, float dt)
 {
-    int nb = MODEL_BONECOUNT(model);
-    poseOverride = (s->useBounce && clipBounce >= 0) ? clipBounce : -1;
     int loco = (clip == C_RUN || clip == C_JOG || clip == C_IDLE || clip == C_RUN_BALL ||
                 clip == C_KEEPER_IDLE || clip == C_KEEPER_READY || clip == C_SIDESTEP);
     float blendTime = loco ? ((s->prevClip == C_IDLE || clip == C_IDLE) ? 0.40f : 0.24f) : 0.12f;
-    float w;
     if (clip != s->clip) {
         s->prevClip = s->clip; s->prevT = s->t; s->blend = 0.0f;
         s->clip = clip;
@@ -1208,7 +1202,33 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     s->t = t;
     if (poseFar) s->blend = 1.0f;
     else if (s->blend < 1.0f) s->blend = fminf(1.0f, s->blend + dt / blendTime);
-    w = s->blend * s->blend * (3.0f - 2.0f * s->blend);
+    return s->blend * s->blend * (3.0f - 2.0f * s->blend);
+}
+#if RAYLIB_VERSION_MAJOR < 6
+static void sampleBlendedPose(AnimState *s, int clip, float t, float w)
+{
+    int nb = MODEL_BONECOUNT(model);
+    sampleClip(clip, t, sampleA);
+    if (s->blend < 1.0f && s->prevClip >= 0) {
+        sampleClip(s->prevClip, s->prevT, sampleB);
+        for (int b = 0; b < nb; b++) {
+            s->pose[b].translation = Vector3Lerp(sampleB[b].translation, sampleA[b].translation, w);
+            s->pose[b].rotation = QuaternionSlerp(sampleB[b].rotation, sampleA[b].rotation, w);
+            s->pose[b].scale = Vector3Lerp(sampleB[b].scale, sampleA[b].scale, w);
+        }
+    } else memcpy(s->pose, sampleA, sizeof(Transform) * (size_t)nb);
+}
+#endif
+
+/* Blend and upload the pose for one character, keeping a copy for bone queries. */
+static void measureCarrierFoot(void);
+static void poseCharacter(AnimState *s, int clip, float t, float dt)
+{
+#if RAYLIB_VERSION_MAJOR >= 6
+    int nb = MODEL_BONECOUNT(model);
+#endif
+    poseOverride = (s->useBounce && clipBounce >= 0) ? clipBounce : -1;
+    float w = updatePoseBlend(s, clip, t, dt);
     double t0 = GetTime();
     Model lm = lookModel(lookOf(s));
 #if RAYLIB_VERSION_MAJOR >= 6
@@ -1241,18 +1261,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
         }
     if (model.currentPose) memcpy(s->pose, model.currentPose, sizeof(Transform) * (size_t)nb);
 #else
-    sampleClip(clip, t, sampleA);
-    if (s->blend < 1.0f && s->prevClip >= 0) {
-        sampleClip(s->prevClip, s->prevT, sampleB);
-        for (int b = 0; b < nb; b++) {
-            scratchPose[b].translation = Vector3Lerp(sampleB[b].translation, sampleA[b].translation, w);
-            scratchPose[b].rotation = QuaternionSlerp(sampleB[b].rotation, sampleA[b].rotation, w);
-            scratchPose[b].scale = Vector3Lerp(sampleB[b].scale, sampleA[b].scale, w);
-        }
-    } else {
-        memcpy(scratchPose, sampleA, sizeof(Transform) * (size_t)nb);
-    }
-    memcpy(s->pose, scratchPose, sizeof(Transform) * (size_t)nb);
+    sampleBlendedPose(s, clip, t, w);
 #endif
     balanceTorso(s, clip);
     cradleBall(s, clip);
