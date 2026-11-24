@@ -3,6 +3,7 @@
  * Exact port of arena-fc Scripts/Core/Animation/MotionEngine.cs, minus the 18-bone
  * gate (the AFL/GAA squad rig has 52 joints) and with AFL intent mapping.
  */
+import { strideLimit } from './legIk';
 import {
   type BallState,
   type ClipMeta,
@@ -384,7 +385,12 @@ function playbackScale(
     return 1;
   }
   if (isLocomotionCategory(clip.category) && clip.preferredSpeed > 0.1) {
-    return clamp(speed / clip.preferredSpeed, 0.45, 2.8);
+    // Stride cap (Gaelic strideLimit port): a clip played faster than its
+    // authored cadence stretches the stride; never beyond what the leg can
+    // honestly reach at this run speed (GA_LEG_MAX_STRIDE_SCALE = 1.55 at
+    // 7 m/s+). Speeds above the clip's reach slide the feet — better than
+    // locked knees.
+    return clamp(speed / clip.preferredSpeed, 0.45, Math.min(2.8, strideLimit(speed)));
   }
   return 1;
 }

@@ -18,6 +18,13 @@ import {
   type ClipMeta,
   type PlayerIntent,
 } from '../motion';
+import {
+  createPlantSide,
+  updatePlantSide,
+  solveTwoBoneIK,
+  MAX_REACH_FACTOR,
+  type PlantSide,
+} from '../motion/legIk';
 
 export interface MotionAssets {
   engine: MotionEngine;
@@ -60,10 +67,88 @@ export function gaitStyle(playerId: number): number {
   return 0.94 + (x - Math.floor(x)) * 0.12;
 }
 
+/**
+ * Planted-foot IK is an opt-in experiment (?plantik=1) ported from the Gaelic
+ * branch. Off by default until it has had a GPU/visual pass — see
+ * docs/MOTION_IK.md. Pure parser so it is unit-testable outside the browser.
+ */
+export function parsePlantIkFlag(search: string): boolean {
+  try {
+    return new URLSearchParams(search).get('plantik') === '1';
+  } catch {
+    return false;
+  }
+}
+export const PLANT_IK_ENABLED =
+  typeof window !== 'undefined' ? parsePlantIkFlag(window.location.search) : false;
+
 function wrapAngle(a: number): number {
   while (a > Math.PI) a -= 2 * Math.PI;
   while (a < -Math.PI) a += 2 * Math.PI;
   return a;
+}
+
+/** Rotate `bone` in world space so its local +segment axis (fromDir) maps to
+ * toDir — three.js equivalent of Gaelic `aimBone` (quatFromTo premultiplied). */
+export function aimBoneWorld(
+  bone: THREE.Object3D,
+  fromDir: THREE.Vector3,
+  toDir: THREE.Vector3,
+): void {
+  const from = fromDir.clone();
+  const to = toDir.clone();
+  if (from.lengthSq() < 1e-10 || to.lengthSq() < 1e-10) return;
+  from.normalize();
+  to.normalize();
+  const delta = new THREE.Quaternion().setFromUnitVectors(from, to);
+  const parentQuat = bone.parent
+    ? bone.parent.getWorldQuaternion(new THREE.Quaternion())
+    : new THREE.Quaternion();
+  const worldQuat = bone.getWorldQuaternion(new THREE.Quaternion());
+  const newWorld = delta.multiply(worldQuat);
+  bone.quaternion.copy(parentQuat.invert().multiply(newWorld));
+}
+
+/**
+ * Re-aim a thigh→calf→foot chain so the foot lands on `target` (world space),
+ * preserving bone segment lengths. `root` is the common ancestor — its world
+ * matrices are refreshed between the four write steps. Exported for tests.
+ * Returns false when the solve degenerated (bones left untouched).
+ */
+export function solveLegChainWorld(
+  thigh: THREE.Object3D,
+  calf: THREE.Object3D,
+  foot: THREE.Object3D,
+  target: THREE.Vector3,
+  forward: THREE.Vector3,
+  root: THREE.Object3D,
+): boolean {
+  root.updateMatrixWorld(true);
+  const hipW = thigh.getWorldPosition(new THREE.Vector3());
+  const kneeW = calf.getWorldPosition(new THREE.Vector3());
+  const footW = foot.getWorldPosition(new THREE.Vector3());
+  const l1 = hipW.distanceTo(kneeW);
+  const l2 = kneeW.distanceTo(footW);
+  if (l1 < 0.05 || l2 < 0.05) return false;
+  const solveKnee = kneeW.clone();
+  const solveFoot = footW.clone();
+  solveTwoBoneIK(hipW, solveKnee, solveFoot, target.clone(), forward);
+  const clampedTarget = solveFoot.clone();
+  // 1) rotate the thigh so hip→knee points along hip→solvedKnee
+  aimBoneWorld(thigh, kneeW.clone().sub(hipW), solveKnee.clone().sub(hipW));
+  root.updateMatrixWorld(true);
+  // 2) place the calf joint at the solved knee position
+  calf.position.copy(thigh.worldToLocal(solveKnee.clone()));
+  root.updateMatrixWorld(true);
+  // 3) rotate the calf so knee→foot (post-thigh rotation) points at the target
+  const knee2 = calf.getWorldPosition(new THREE.Vector3());
+  const foot2 = foot.getWorldPosition(new THREE.Vector3());
+  aimBoneWorld(calf, foot2.clone().sub(knee2), clampedTarget.clone().sub(knee2));
+  root.updateMatrixWorld(true);
+  // 4) place the foot joint at the solved target
+  foot.position.copy(calf.worldToLocal(clampedTarget.clone()));
+  root.updateMatrixWorld(true);
+  return true;
 }
 
 const ONE_SHOT_ANIMS: Record<string, string> = {
@@ -91,6 +176,12 @@ export class MotionBinding {
   private smoothedTurn = 0;
   private forcedClip: string | null = null;
   private lastSpeed = 0;
+  private readonly plants: [PlantSide, PlantSide] = [createPlantSide(), createPlantSide()];
+  private bones: {
+    thigh: [THREE.Object3D, THREE.Object3D];
+    calf: [THREE.Object3D, THREE.Object3D];
+    foot: [THREE.Object3D, THREE.Object3D];
+  } | null = null;
 
   constructor(
     mixer: THREE.AnimationMixer,
@@ -164,6 +255,59 @@ export class MotionBinding {
     }
 
     this.applyPose();
+  }
+
+  /**
+   * Planted-foot IK (Gaelic `plantFeet`/`plantOne` port, flag-gated).
+   * Call AFTER `mixer.update(dt)` and after the root's position/rotation are
+   * set for this frame. Re-solves the leg so a stance foot stays anchored to
+   * the ground point where it landed while the clip blends or the body
+   * translates over it. Authored foot orientation is kept; only the leg chain
+   * is re-aimed. No-op unless ?plantik=1.
+   */
+  plantIk(dt: number, root: THREE.Object3D, forwardX: number, forwardZ: number): void {
+    if (!PLANT_IK_ENABLED) return;
+    if (!this.bones) {
+      const find = (name: string) => root.getObjectByName(name) ?? null;
+      const thighL = find('thigh_l'); const thighR = find('thigh_r');
+      const calfL = find('calf_l'); const calfR = find('calf_r');
+      const footL = find('foot_l'); const footR = find('foot_r');
+      if (!thighL || !thighR || !calfL || !calfR || !footL || !footR) return;
+      this.bones = { thigh: [thighL, thighR], calf: [calfL, calfR], foot: [footL, footR] };
+    }
+    const legs = this.bones;
+    // One-shot leg actions (kick/tackle/…) keep the authored foot — Gaelic `legBusy`.
+    if (this.forcedClip || this.lastSpeed < 0.45) {
+      for (const side of this.plants) { side.on = false; side.weight = 0; }
+      return;
+    }
+    root.updateMatrixWorld(true);
+    const forward = new THREE.Vector3(forwardX, 0, forwardZ);
+    if (forward.lengthSq() < 1e-8) forward.set(0, 0, 1);
+    forward.normalize();
+    const groundY = 0.08; // foot rest height, matches Gaelic `rel.y = 0.08`
+    for (let i = 0; i < 2; i++) {
+      const side = this.plants[i];
+      const thigh = legs.thigh[i]; const calf = legs.calf[i]; const foot = legs.foot[i];
+      const hipW = thigh.getWorldPosition(new THREE.Vector3());
+      const kneeW = calf.getWorldPosition(new THREE.Vector3());
+      const footW = foot.getWorldPosition(new THREE.Vector3());
+      updatePlantSide(side, dt, footW.y, footW);
+      if (side.weight <= 0.001) continue; // nothing planted this side
+      const l1 = hipW.distanceTo(kneeW);
+      const l2 = kneeW.distanceTo(footW);
+      if (l1 < 0.05 || l2 < 0.05) { side.on = false; side.weight = 0; continue; }
+      // World anchor of the stance foot, blended in by the plant weight.
+      const anchor = new THREE.Vector3(side.x, groundY, side.z);
+      if (hipW.distanceTo(anchor) > (l1 + l2) * MAX_REACH_FACTOR) {
+        // Out of reach: release the plant (this is the push-off).
+        side.on = false;
+        side.weight = 0; // spring back to the authored pose next frame
+        continue;
+      }
+      const target = footW.clone().lerp(anchor, side.weight);
+      solveLegChainWorld(thigh, calf, foot, target, forward, root);
+    }
   }
 
   private applyPose(): void {
