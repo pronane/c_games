@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
@@ -84,6 +84,9 @@ jobs:
           make -C Gaelic_Football_3d motion_headless
           cd Gaelic_Football_3d
           ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb ../build/cmu-jog-local/candidate.gfmotion > ../build/cmu-jog-report/model-test.log 2>&1
+          python3 tools/inspect_shorts_skin.py assets/models/gaelic_player.glb > ../build/cmu-jog-report/shorts-bind-skin.json
+          python3 tools/inspect_shorts_motion.py assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-shorts-motion.json
+          python3 tools/inspect_shorts_motion.py ../build/cmu-jog-local/candidate/gaelic_player.glb > ../build/cmu-jog-report/cmu-shorts-motion.json
       # Same scripted input and render settings; GF_QUICK stops after frame 340,
       # so these videos cover standing, walking, jogging, sprinting and stopping.
       - name: Record original and experimental jog
@@ -95,6 +98,21 @@ jobs:
           timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog.mp4 > ../build/cmu-jog-report/cmu-jog.log 2>&1
           test -s ../build/cmu-jog-report/original.mp4
           test -s ../build/cmu-jog-report/cmu-jog.mp4
+      - name: Record fixed-camera jog comparison
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_FIXED_JOG: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/original-fixed.mp4 > ../build/cmu-jog-report/original-fixed.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-fixed.mp4 > ../build/cmu-jog-report/cmu-jog-fixed.log 2>&1
+          test -s ../build/cmu-jog-report/original-fixed.mp4
+          test -s ../build/cmu-jog-report/cmu-jog-fixed.mp4
+          grep -q 'MOTION fixed-camera begin frame 120' ../build/cmu-jog-report/original-fixed.log
+          grep -q 'MOTION fixed-camera end frame 210' ../build/cmu-jog-report/original-fixed.log
+          grep -q 'MOTION fixed-camera begin frame 120' ../build/cmu-jog-report/cmu-jog-fixed.log
+          grep -q 'MOTION fixed-camera end frame 210' ../build/cmu-jog-report/cmu-jog-fixed.log
+          diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-fixed.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-fixed.log)
       - uses: actions/upload-artifact@v4
         if: always()
         with:

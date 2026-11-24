@@ -2018,7 +2018,8 @@ static void applyAssist(GameInput *in)
 
 /* ---- camera ---------------------------------------------------------------- */
 static Vector3 camFocus;
-static int camOverride = 0;       /* 1 wide stadium orbit, 2 referee/card close-up */
+static int camOverride = 0;       /* 1 stadium orbit, 2 referee close-up, 3 fixed motion-test side */
+static Vector3 camMotionFixed;
 static int camHardSnap = 0;       /* motion test: jump the camera instead of flying through the stand */
 static int camSide = 0;            /* motion test: side-on, so the feet can be judged against the lines */
 static float camOverrideT = 0;
@@ -2112,6 +2113,11 @@ static void updateCamera(float dt)
     } else if (camOverride == 1) {
         float a = 0.35f + camOverrideT * 0.12f;
         pos = (Vector3){ sinf(a) * 150.0f, 62.0f, cosf(a) * 120.0f }; tgt = (Vector3){ 0, 4, 0 }; cam.fovy = 50; snap = 1.0f;
+    } else if (camOverride == 3) {
+        /* Fixed world-space camera for the scripted jog comparison only. */
+        tgt = camMotionFixed;
+        pos = Vector3Add(tgt, (Vector3){ 0, 1.4f, 18.0f });
+        cam.fovy = 38; snap = 1.0f;
     } else if (camOverride == 2) {
         Vector3 r = W(game.referee.x, 0, game.referee.z);
         Vector3 ob = r;
@@ -3328,6 +3334,19 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
     else if (frame < 300) { pad.axis[0] = 1.0f; pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 1; camMode = 5; }
     else if (frame < 360) { }
     else if (frame < 440) pad.axis[0] = -0.85f;
+    /* Optional stationary camera during the jog segment. Input, simulation,
+     * and pose selection remain identical to the normal tracking capture. */
+    if (getenv("GF_FIXED_JOG")) {
+        if (frame == 120) {
+            camMotionFixed = W(p->x + 5.0f, .9f, p->z);
+            camSide = 0; camOverride = 3;
+            printf("MOTION fixed-camera begin frame %d target %.2f %.2f %.2f\n",
+                   frame, camMotionFixed.x, camMotionFixed.y, camMotionFixed.z);
+        } else if (frame == 210) {
+            camOverride = 0; camSide = 1;
+            printf("MOTION fixed-camera end frame %d\n", frame);
+        }
+    }
     if (frame == 40 || frame == 100 || frame == 160 || frame == 250 || frame == 340) {
         static float footLo = 99, footHi = -99, bufLo = 99, bufHi = -99;
         head = haveModel && boneHead >= 0 ? s->pose[boneHead].translation.y : 1.7f;
