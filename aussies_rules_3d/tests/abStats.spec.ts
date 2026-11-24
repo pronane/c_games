@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAbStats, summariseLeg } from '../tools/ab_stats.mjs';
+import { parseAbStats, summariseLeg, parseAbCamStats, summariseCamLeg } from '../tools/ab_stats.mjs';
 
 const LOG = `
 noise
@@ -41,5 +41,39 @@ describe('summariseLeg', () => {
     expect(row).toContain('22.7 / 24.8'); // p95 avg / max
     expect(row).toContain('51244'); // last tris, not the mean
     expect(row).toContain('high');
+  });
+});
+
+const CAM_LOG = `
+noise
+AB_CAMSTAT frames=120 ball_in=100.0 player_in=na ball_max_ndc=0.62 player_max_ndc=na
+AB_CAMSTAT frames=140 ball_in=97.9 player_in=100.0 ball_max_ndc=0.74 player_max_ndc=0.55
+`;
+
+describe('parseAbCamStats', () => {
+  it('extracts camstat samples, preserving na as null', () => {
+    const s = parseAbCamStats(CAM_LOG);
+    expect(s).toHaveLength(2);
+    expect(s[0]).toEqual({ frames: 120, ball_in: 100.0, player_in: null, ball_max_ndc: 0.62, player_max_ndc: null });
+    expect(s[1].player_in).toBe(100.0);
+  });
+  it('ignores non-camstat lines and empty input', () => {
+    expect(parseAbCamStats('x')).toEqual([]);
+    expect(parseAbCamStats('')).toEqual([]);
+  });
+});
+
+describe('summariseCamLeg', () => {
+  it('handles empty legs', () => {
+    const row = summariseCamLeg('lod', []);
+    expect(row).toContain('`lod`');
+    expect(row).toContain('no samples');
+  });
+  it('aggregates ball/player visibility', () => {
+    const row = summariseCamLeg('original', parseAbCamStats(CAM_LOG));
+    expect(row).toContain('| `original` | 2 |');
+    expect(row).toContain('99.0 / 97.9'); // ball avg / min
+    expect(row).toContain('100.0 / 100.0'); // player avg / min
+    expect(row).toContain('0.74'); // ball max ndc peak
   });
 });

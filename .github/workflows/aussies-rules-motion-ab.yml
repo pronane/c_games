@@ -157,7 +157,12 @@ jobs:
         working-directory: aussies_rules_3d
         run: |
           python tools/frame_ab.py build/motion-ab/original build/motion-ab/lod | tee build/motion-ab/frame-ab.md >> "$GITHUB_STEP_SUMMARY" || echo "frame comparison flagged dead frames (non-blocking)"
+      - name: Check captured ball framing (experimental)
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/check_framing.mjs build/motion-ab/original/console.log build/motion-ab/lod/console.log
       - name: Job summary
+        working-directory: aussies_rules_3d
         if: always()
         run: |
           {
@@ -177,13 +182,14 @@ jobs:
             for leg in original lod; do
               echo "**$leg**"
               echo '```'
-              grep -E 'AB_STATS|capturePage failed' build/motion-ab/$leg/electron.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
+              grep -E 'AB_STATS|AB_CAMSTAT|capturePage failed' build/motion-ab/$leg/console.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
               echo '```'
             done
             echo
             node tools/ab_stats.mjs build/motion-ab/original build/motion-ab/lod || echo 'ab_stats aggregation failed (non-blocking)'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Sticky PR comment with capture stats
+        working-directory: aussies_rules_3d
         if: always() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

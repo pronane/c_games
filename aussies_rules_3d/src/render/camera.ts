@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { FIELD, MatchState } from '../rules/types';
 import { attackGoalX } from '../rules/field';
+import { enforceFraming, SAFE_MARGIN, type FitSubject } from './framing';
 
 export type CameraMode = 'broadcast' | 'setShot' | 'celebration' | 'menu';
 export type ViewName = 'broadcast' | 'wing' | 'behind' | 'aerial' | 'tactical';
@@ -74,7 +75,17 @@ export class BroadcastCamera {
     this.zoomIdleT = 0;
   }
 
-  update(dt: number, state: MatchState, controlledX: number, controlledZ: number): void {
+  /**
+   * `controlled` — the player on your stick (null while spectating/attract or
+   * when no live controlled player exists). The framing post-step keeps the
+   * ball and (when present) the controlled player inside a safe NDC box.
+   * See framing.ts. Celebration mode is exempt (cinematic orbit).
+   */
+  update(
+    dt: number,
+    state: MatchState,
+    controlled: { x: number; y: number; z: number } | null = null
+  ): void {
     const b = state.ball;
     this.target.set(b.x, Math.max(0, b.y), b.z);
     const ballSpeed = Math.hypot(b.vx ?? 0, b.vz ?? 0);
@@ -185,9 +196,30 @@ export class BroadcastCamera {
     }
 
     const ease = this.mode === 'broadcast' ? 2.6 : 1.6;
-    this.camera.position.lerp(this.desired, Math.min(1, dt * ease));
-    void controlledX;
-    void controlledZ;
+    const eased = this.camera.position.clone().lerp(this.desired, Math.min(1, dt * ease));
+    // --- framing guarantee: ball (+ your man) must stay inside the safe box.
+    const subjects: FitSubject[] = [
+      { x: b.x, y: Math.max(b.y, 0.4), z: b.z, weight: 1.3 },
+    ];
+    if (controlled) {
+      subjects.push({ x: controlled.x, y: controlled.y, z: controlled.z, weight: 1 });
+    }
+    const fix =
+      this.mode === 'celebration'
+        ? null
+        : enforceFraming(
+            eased,
+            this.lookAt,
+            this.camera.fov,
+            this.camera.aspect,
+            subjects,
+            SAFE_MARGIN
+          );
+    if (fix) {
+      eased.copy(fix.position);
+      this.lookAt.copy(fix.lookAt);
+    }
+    this.camera.position.copy(eased);
     this.camera.lookAt(this.lookAt);
   }
 
