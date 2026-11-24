@@ -104,6 +104,14 @@ class Game {
   private fpsEma = 1 / 60;
   private abLastLog = 0;
   private abFrameTimes: number[] = [];
+  // camera subject visibility accounting (AB mode — framing regression tripwire)
+  private abCamFrames = 0;
+  private abCamBallIn = 0;
+  private abCamPlayerIn = 0;
+  private abCamPlayerFrames = 0;
+  private abCamBallMax = 0;
+  private abCamPlayerMax = 0;
+  private abCamLastLog = 0;
   // attract mode — AI vs AI behind the title menu
   private demoSim: MatchSim | null = null;
   private demoViews = new Map<number, PlayerView>();
@@ -332,7 +340,7 @@ class Game {
     const air = Math.max(0, b.y - 0.11);
     this.ballShadow.material.opacity = Math.max(0.06, 0.5 - air * 0.045);
     this.ballShadow.scale.setScalar(1 + air * 0.08);
-    this.broadcast.update(dt, sim.state, b.x, b.z);
+    this.broadcast.update(dt, sim.state, null);
     this.world.update(dt, b);
     this.scoreboardTimer -= dt;
     if (this.scoreboardTimer <= 0) {
@@ -548,6 +556,47 @@ class Game {
       this.fpsEma += ((1 / Math.max(dt, 1e-4)) - this.fpsEma) * 0.05;
       this.abFrameTimes.push(dt);
       if (this.abFrameTimes.length > 240) this.abFrameTimes.shift();
+      // camera visibility: is the ball / your man inside the safe NDC box?
+      {
+        const camSim = this.sim ?? this.demoSim;
+        const camBall = camSim?.state.ball ?? null;
+        if (camBall) {
+          const cam = this.world.camera;
+          const ndcOf = (x: number, y: number, z: number) => {
+            const v = new THREE.Vector3(x, y, z).project(cam);
+            return Number.isFinite(v.x) && Number.isFinite(v.y) && v.z >= -1 && v.z <= 1 ? v : null;
+          };
+          this.abCamFrames++;
+          const bn = ndcOf(camBall.x, Math.max(camBall.y, 0.4), camBall.z);
+          if (bn && Math.abs(bn.x) <= 0.78 && Math.abs(bn.y) <= 0.78) this.abCamBallIn++;
+          if (bn) this.abCamBallMax = Math.max(this.abCamBallMax, Math.abs(bn.x), Math.abs(bn.y));
+          if (this.phase === 'playing' && this.sim) {
+            const cp = this.sim.controlled();
+            if (cp) {
+              const pn = ndcOf(cp.x, 1.0 + (cp.y ?? 0), cp.z);
+              this.abCamPlayerFrames++;
+              if (pn && Math.abs(pn.x) <= 0.78 && Math.abs(pn.y) <= 0.78) this.abCamPlayerIn++;
+              if (pn) this.abCamPlayerMax = Math.max(this.abCamPlayerMax, Math.abs(pn.x), Math.abs(pn.y));
+            }
+          }
+        }
+        if (now - this.abCamLastLog > 2000 && this.abCamFrames >= 30) {
+          const pct = (n: number, d: number) => ((100 * n) / Math.max(1, d)).toFixed(1);
+          console.log(
+            `AB_CAMSTAT frames=${this.abCamFrames} ball_in=${pct(this.abCamBallIn, this.abCamFrames)} ` +
+              `player_in=${this.abCamPlayerFrames > 0 ? pct(this.abCamPlayerIn, this.abCamPlayerFrames) : 'na'} ` +
+              `ball_max_ndc=${this.abCamBallMax.toFixed(2)} ` +
+              `player_max_ndc=${this.abCamPlayerFrames > 0 ? this.abCamPlayerMax.toFixed(2) : 'na'}`
+          );
+          this.abCamFrames = 0;
+          this.abCamBallIn = 0;
+          this.abCamPlayerIn = 0;
+          this.abCamPlayerFrames = 0;
+          this.abCamBallMax = 0;
+          this.abCamPlayerMax = 0;
+          this.abCamLastLog = now;
+        }
+      }
       if (now - this.abLastLog > 2000 && this.abFrameTimes.length >= 20) {
         const info = this.world.renderer.info;
         const sorted = [...this.abFrameTimes].sort((a, b) => a - b);
@@ -640,8 +689,7 @@ class Game {
     this.broadcast.update(
       dt,
       sim.state,
-      controlled?.x ?? 0,
-      controlled?.z ?? 0
+      controlled ? { x: controlled.x, y: 1.0 + (controlled.y ?? 0), z: controlled.z } : null
     );
     this.world.update(dt, b);
 

@@ -10,7 +10,7 @@
  * human step (see docs/GAP_ANALYSIS_PS5.md, P0 "verify gap").
  *
  * Usage: node tools/ab_stats.mjs <logOrDir> [<logOrDir> ...]
- *   Each argument is a leg: a directory containing electron.log, or a log file
+ *   Each argument is a leg: a directory containing console.log, or a log file
  *   directly. Leg label = directory name, or the file basename minus .log.
  * Always exits 0 (diagnostics only) — prints the table to stdout.
  */
@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const LINE = /AB_STATS fps=([\d.]+) p50_ms=([\d.]+) p95_ms=([\d.]+) tris=(\d+) calls=(\d+) textures=(\d+) geometries=(\d+) lod=([a-z]+)/g;
+const CAM_LINE = /AB_CAMSTAT frames=(\d+) ball_in=([\d.]+) player_in=([\d.]+|na) ball_max_ndc=([\d.]+) player_max_ndc=([\d.]+|na)/g;
 
 /** Pure: extract every AB_STATS sample from an electron console log. */
 export function parseAbStats(text) {
@@ -43,6 +44,35 @@ const max = (xs) => (xs.length ? Math.max(...xs) : NaN);
 const min = (xs) => (xs.length ? Math.min(...xs) : NaN);
 const f = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : '—');
 
+/** Pure: extract every AB_CAMSTAT sample from an electron console log. */
+export function parseAbCamStats(text) {
+  const out = [];
+  for (const m of text.matchAll(CAM_LINE)) {
+    out.push({
+      frames: Number(m[1]),
+      ball_in: Number(m[2]),
+      player_in: m[3] === 'na' ? null : Number(m[3]),
+      ball_max_ndc: Number(m[4]),
+      player_max_ndc: m[5] === 'na' ? null : Number(m[5]),
+    });
+  }
+  return out;
+}
+
+/** Pure: one markdown table row for a leg's camera-visibility samples. */
+export function summariseCamLeg(label, samples) {
+  if (!samples || samples.length === 0) {
+    return `| \`${label}\` | 0 | no samples captured | — | — | — | — |`;
+  }
+  const ballIn = samples.map((x) => x.ball_in);
+  const ballMax = samples.map((x) => x.ball_max_ndc);
+  const playerIn = samples.map((x) => x.player_in).filter((x) => x !== null);
+  const playerMax = samples.map((x) => x.player_max_ndc).filter((x) => x !== null);
+  const playerAvg = playerIn.length ? `${f(mean(playerIn))} / ${f(min(playerIn))}` : 'n/a';
+  const playerMaxCell = playerMax.length ? f(max(playerMax), 2) : 'n/a';
+  return `| \`${label}\` | ${samples.length} | ${f(mean(ballIn))} / ${f(min(ballIn))} | ${playerAvg} | ${f(max(ballMax), 2)} | ${playerMaxCell} |`;
+}
+
 /** Pure: one markdown table row for a leg's samples (null when empty). */
 export function summariseLeg(label, samples) {
   if (!samples || samples.length === 0) return `| \`${label}\` | 0 | no samples captured | — | — | — | — | — | — | — |`;
@@ -58,7 +88,7 @@ export function summariseLeg(label, samples) {
 function loadLog(arg) {
   const stat = fs.existsSync(arg) ? fs.statSync(arg) : null;
   if (stat?.isDirectory()) {
-    return { label: path.basename(path.resolve(arg)), file: path.join(arg, 'electron.log') };
+    return { label: path.basename(path.resolve(arg)), file: path.join(arg, 'console.log') };
   }
   const label = path.basename(arg).replace(/\.(log|txt)$/i, '') || arg;
   return { label, file: arg };
@@ -83,6 +113,22 @@ export function main(argv) {
   }
   lines.push('');
   lines.push('_SwiftShader software rendering on a GPU-less runner: relative frame-time trend between legs, never an absolute FPS claim. GPU verification is a human step (GAP_ANALYSIS_PS5.md, P0)._');
+  lines.push('');
+  lines.push('## Camera subject visibility (fixed attract seed — framing regression tripwire)');
+  lines.push('');
+  lines.push('Observed subject centres inside NDC ±0.78 (100% expected). Missing samples are unverified; player n/a means attract capture did not exercise a controlled player. This is not an occlusion or GPU-quality check.');
+  lines.push('');
+  lines.push('| leg | camstat samples | ball in-frame avg / min % | player in-frame avg / min % | ball peak NDC | player peak NDC |');
+  lines.push('|---|---|---|---|---|---|');
+  for (const { label, file } of legs) {
+    let cam = [];
+    try {
+      cam = parseAbCamStats(fs.readFileSync(file, 'utf8'));
+    } catch {
+      cam = [];
+    }
+    lines.push(summariseCamLeg(label, cam));
+  }
   console.log(lines.join('\n'));
 }
 

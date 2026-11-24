@@ -12,7 +12,7 @@ marker='<!-- aussies-motion-ab-sticky -->'
   echo 'Both legs ran with `?ab=1`: fixed attract seed, menu overlays hidden, broadcast cam, `AB_STATS` logged from `renderer.info` every ~2 s.'
   echo
   for leg in original lod; do
-    log="build/motion-ab/$leg/electron.log"
+    log="build/motion-ab/$leg/console.log"
     echo "**$leg**"
     if [ -f "$log" ]; then
       echo '```'
