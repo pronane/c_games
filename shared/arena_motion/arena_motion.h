@@ -53,6 +53,8 @@ int am_action_time(float elapsed, float deadline, float entry, float contact,
 int am_gait_reverse(const float *left, const float *right, int frames);
 /* Advance a looping animation clock in seconds. Invalid inputs leave it unchanged. */
 float am_loop_advance(float time, float dt, float rate, float length);
+/* Clamped cubic easing for smoothly introducing a bounded correction. */
+float am_smoothstep(float x);
 /* Frame-rate-independent exponential approach. dt and response are seconds;
  * invalid inputs, negative dt or nonpositive response leave current unchanged. */
 float am_smooth(float current, float target, float dt, float response);
