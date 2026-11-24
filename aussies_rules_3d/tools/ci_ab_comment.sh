@@ -32,6 +32,11 @@ marker='<!-- aussies-motion-ab-sticky -->'
     fi
     echo
   done
+  echo
+  if command -v node >/dev/null 2>&1 && [ -f tools/ab_stats.mjs ]; then
+    node tools/ab_stats.mjs build/motion-ab/original build/motion-ab/lod || echo '_ab_stats aggregation failed_'
+    echo
+  fi
   echo 'Full frames + MP4s + logs: workflow artifact `aussies-rules-motion-ab-visual` on this run.'
   echo "_Refresh: runs on every PR push to this branch; artifact download requires browser access to the run page._"
 } > /tmp/ab-comment.md

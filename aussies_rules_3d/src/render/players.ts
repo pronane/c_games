@@ -458,6 +458,8 @@ export function syncPlayerViews(
     // the model faces -Z in glTF; sim facing is radians where 0 = +x
     view.root.rotation.y = -p.facing - Math.PI / 2;
     view.mixer.update(dt);
+    // Planted-foot IK (experimental, ?plantik=1) — re-solve legs post-pose.
+    view.motion?.plantIk(dt, view.root, Math.cos(p.facing), Math.sin(p.facing));
   }
 }
 

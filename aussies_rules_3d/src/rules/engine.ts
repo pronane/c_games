@@ -25,17 +25,18 @@ import {
   clampInside,
   defendGoalX,
   isOutOfBounds,
-  scoreAtCrossing,
 } from './field';
 import {
   applyFiftyMetrePenalty,
   applyScore,
+  checkSixSixSix,
   decideMark,
   decideOutOfBounds,
   decideRunTooFar,
   decideTackle,
   isSetShot,
   makeFreeKick,
+  scoreLineOutcome,
   TackleContext,
 } from './laws';
 
@@ -239,9 +240,15 @@ export class RulesEngine {
         const ang = -0.9 + (i / 5) * 1.8;
         slots.push({ x: -dir * (FIELD.goalLineX - 32 + Math.cos(ang) * 12), z: Math.sin(ang) * 34 });
       }
+      // Middle corridor: every slot ≥ 50 m from BOTH goals with slack for the
+      // ±1 m placement jitter (the 50 m arc is the binding constraint —
+      // (20,0) sat 49 m out and illegally counted in the attack arc; the old
+      // (±24,±22) pair sat ~50.1 m out and flipped with jitter, so the old
+      // mid could yield 7–9 in an arc and 3–5 in the middle).
       const mid = [
-        { x: dir * 3, z: 0 }, { x: dir * 12, z: -14 }, { x: dir * 12, z: 14 },
-        { x: dir * 24, z: -22 }, { x: dir * 24, z: 22 }, { x: dir * 20, z: 0 },
+        { x: dir * 2, z: -6 }, { x: dir * 2, z: 6 },
+        { x: dir * 10, z: -12 }, { x: dir * 10, z: 12 },
+        { x: -dir * 8, z: 0 }, { x: dir * 16, z: 0 },
       ];
       slots.push(...mid);
       on.forEach((p, i) => {
@@ -252,6 +259,16 @@ export class RulesEngine {
         p.vz = 0;
         p.y = 0;
       });
+    }
+    // Audit self-check: the placement must satisfy the 6-6-6 law it implements.
+    for (const team of [0, 1] as TeamId[]) {
+      const check = checkSixSixSix(this.state.players, team);
+      if (!check.ok) {
+        console.warn(
+          `[laws] 6-6-6 centre placement violated for team ${team}:`,
+          check,
+        );
+      }
     }
   }
 
@@ -717,64 +734,65 @@ export class RulesEngine {
   ): void {
     const s = this.state;
     const b = s.ball;
-    const at = scoreAtCrossing(crossX, crossZ);
-    if (!at) return;
 
     const scoringTeam: TeamId = crossX > 0 ? 0 : 1;
     const otherTeam: TeamId = scoringTeam === 0 ? 1 : 0;
 
+    // Physics may report a post strike; the pure law function classifies the
+    // crossing either way, and both agree on the scoring outcome (a post hit
+    // is a behind for the attacking side). One source of truth, fully tested.
+    const outcome = scoreLineOutcome(b, crossX, crossZ, null, opts.deliberateRush ?? false);
+
     b.mode = 'dead';
     b.holderId = null;
 
-    if (opts.postHit === 'behindPost') {
-      if (!b.bounced) {
-        // behind post on the full → free kick to the opposition beside the post
-        this.emit({ type: 'outOnTheFull', team: otherTeam, x: crossX, z: crossZ });
-        const taker = this.nearestPlayer(otherTeam, crossX, crossZ, true);
+    switch (outcome.kind) {
+      case 'none':
+        return;
+      case 'behindPostOnFull': {
+        // Behind post on the full → free kick to the opposition beside the post.
+        this.emit({ type: 'outOnTheFull', team: outcome.freeKickTeam, x: crossX, z: crossZ });
+        const taker = this.nearestPlayer(outcome.freeKickTeam, crossX, crossZ, true);
         this.awardFreeKick(
-          makeFreeKick(otherTeam, taker ? taker.id : -1, crossX, crossZ, 'outOnTheFull')
+          makeFreeKick(outcome.freeKickTeam, taker ? taker.id : -1, crossX, crossZ, 'outOnTheFull')
         );
-      } else {
-        this.startBallUp(crossX, crossZ, true);
+        return;
       }
-      return;
+      case 'behindPostBounced': {
+        this.startBallUp(crossX, crossZ, true);
+        return;
+      }
+      case 'goalPost': {
+        applyScore(s.scores, outcome);
+        this.emit({ type: 'behind', team: outcome.behindTeam, points: 1, x: crossX, z: crossZ });
+        this.celebrate(false, otherTeam);
+        return;
+      }
+      case 'goal': {
+        applyScore(s.scores, outcome);
+        this.emit({ type: 'goal', team: outcome.team, points: 6, x: crossX, z: crossZ });
+        this.celebrate(true, otherTeam);
+        return;
+      }
+      case 'behind': {
+        applyScore(s.scores, outcome);
+        this.emit({ type: 'behind', team: outcome.team, points: 1, x: crossX, z: crossZ });
+        if (opts.deliberateRush) {
+          // deliberate rushed behind: free kick to the attacking team, 15 m out
+          // from the goal line they are attacking, directly in front.
+          const gx = attackGoalX(scoringTeam);
+          const spot = clampInside(gx - Math.sign(gx) * 15, 0);
+          this.emit({ type: 'freeKick', team: scoringTeam, text: 'deliberateRushedBehind' });
+          const taker = this.nearestPlayer(scoringTeam, spot.x, spot.z, true);
+          this.awardFreeKick(
+            makeFreeKick(scoringTeam, taker ? taker.id : -1, spot.x, spot.z, 'deliberateRushedBehind')
+          );
+          return;
+        }
+        this.celebrate(false, otherTeam);
+        return;
+      }
     }
-
-    if (opts.postHit === 'goalPost') {
-      applyScore(s.scores, { kind: 'goalPost', behindTeam: scoringTeam });
-      this.emit({ type: 'behind', team: scoringTeam, points: 1, x: crossX, z: crossZ });
-      this.celebrate(false, otherTeam);
-      return;
-    }
-
-    const isGoal =
-      at.kind === 'goal' &&
-      !b.touched &&
-      b.lastDisposal === 'kick';
-
-    if (isGoal) {
-      applyScore(s.scores, { kind: 'goal', team: scoringTeam, points: 6 });
-      this.emit({ type: 'goal', team: scoringTeam, points: 6, x: crossX, z: crossZ });
-      this.celebrate(true, otherTeam);
-      return;
-    }
-
-    // behind
-    applyScore(s.scores, { kind: 'behind', team: scoringTeam, points: 1 });
-    this.emit({ type: 'behind', team: scoringTeam, points: 1, x: crossX, z: crossZ });
-    if (opts.deliberateRush) {
-      // deliberate rushed behind: free kick to the attacking team, 15 m out
-      // from the goal line they are attacking, directly in front.
-      const gx = attackGoalX(scoringTeam);
-      const spot = clampInside(gx - Math.sign(gx) * 15, 0);
-      this.emit({ type: 'freeKick', team: scoringTeam, text: 'deliberateRushedBehind' });
-      const taker = this.nearestPlayer(scoringTeam, spot.x, spot.z, true);
-      this.awardFreeKick(
-        makeFreeKick(scoringTeam, taker ? taker.id : -1, spot.x, spot.z, 'deliberateRushedBehind')
-      );
-      return;
-    }
-    this.celebrate(false, otherTeam);
   }
 
   private celebrate(wasGoal: boolean, defendingTeam: TeamId): void {
