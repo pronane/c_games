@@ -59,7 +59,7 @@ def local_y(m, point):
     return sum(m[i][1]*d[i] for i in range(3))
 
 
-def measure(doc, blob, clip='jog', frames=60, band=.025):
+def measure(doc, blob, clip='jog', frames=60, band=.025, world_frames=None, include_values=False):
     if frames < 2 or frames > 1000 or not 0 < band <= .1: raise ValueError('invalid sampling settings')
     nodes = doc['nodes']; parents = {}
     for i, node in enumerate(nodes):
@@ -108,7 +108,27 @@ def measure(doc, blob, clip='jog', frames=60, band=.025):
             meshes.append((mesh['name'], points, ids, weights, sides))
     if not meshes: raise ValueError('no shorts meshes')
     if len({m[0] for m in meshes}) != len(meshes): raise ValueError('duplicate shorts mesh names')
+    if world_frames is not None:
+        # The raylib 5.5 renderer derives inverse binds from node-world TRS,
+        # rather than reading the GLB inverse-bind accessor. Reject a model if
+        # those two bind conventions do not agree, instead of reporting a
+        # misleading result for runtime poses.
+        bind_cache = {}; bind_active = set()
+        def bind_world(i):
+            if i in bind_cache: return bind_cache[i]
+            if i in bind_active: raise ValueError('cyclic node hierarchy')
+            bind_active.add(i); node = nodes[i]
+            local = trs(node.get('translation',(0,0,0)), node.get('rotation',(0,0,0,1)), node.get('scale',(1,1,1)))
+            bind_cache[i] = mul(bind_world(parents[i]), local) if i in parents else local
+            bind_active.remove(i); return bind_cache[i]
+        for i, joint in enumerate(joints):
+            product = mul(bind_world(joint), ibm[i])
+            if any(abs(product[r][c]-(1 if r==c else 0)) > .001 for r in range(4) for c in range(4)):
+                raise ValueError('GLB inverse binds differ from raylib bind convention')
+        if len(world_frames) != frames or any(len(frame) != len(joints) for frame in world_frames):
+            raise ValueError('runtime poses do not match frame or joint count')
     result = {name: [[], []] for name, *_ in meshes}
+    vertex_values = {name: [[], []] for name, *_ in meshes} if include_values else None
     spans = {name: [[ [float('inf'), float('-inf')] for _ in side] for side in sides]
              for name, _, _, _, sides in meshes}
     for frame in range(frames):
@@ -124,7 +144,14 @@ def measure(doc, blob, clip='jog', frames=60, band=.025):
             local = trs(*args)
             cache[i] = mul(world(parents[i]), local) if i in parents else local
             active.remove(i); return cache[i]
-        world_joints = [world(i) for i in joints]
+        if world_frames is None:
+            world_joints = [world(i) for i in joints]
+        else:
+            world_joints = []
+            for row in world_frames[frame]:
+                if len(row) != 10 or any(not math.isfinite(x) for x in row):
+                    raise ValueError('invalid runtime joint transform')
+                world_joints.append(trs(row[:3], row[3:7], row[7:10]))
         for k in thigh_indices:
             m = world_joints[k]
             if any(abs(sum(m[i][a]*m[i][b] for i in range(3))-(1 if a==b else 0)) > .001 for a in range(3) for b in range(3)):
@@ -132,7 +159,7 @@ def measure(doc, blob, clip='jog', frames=60, band=.025):
         mats = [mul(m, inv) for m,inv in zip(world_joints,ibm)]
         for name, points, ids, weights, sides in meshes:
             for side, selected in enumerate(sides):
-                total = 0
+                total = 0; sample_values = []
                 for index, v in enumerate(selected):
                     pos = [0.0,0.0,0.0]
                     for joint, weight in zip(ids[v], weights[v]):
@@ -142,16 +169,20 @@ def measure(doc, blob, clip='jog', frames=60, band=.025):
                             for axis in range(3): pos[axis] += p[axis]*weight
                     y = local_y(world_joints[thigh_indices[side]], pos)
                     total += y
+                    if include_values: sample_values.append(y)
                     bounds = spans[name][side][index]
                     bounds[0] = min(bounds[0], y); bounds[1] = max(bounds[1], y)
                 result[name][side].append(total/len(selected))
-    return {'clip':clip, 'samples':frames, 'duration_seconds':end, 'band_m':band,
+                if include_values: vertex_values[name][side].append(sample_values)
+    report = {'clip':clip, 'samples':frames, 'duration_seconds':end, 'band_m':band,
             'limitation':'GLB clip and linear skinning only; no runtime IK, renderer or occlusion',
             'shorts':[{'mesh':name, 'sides':{side: {'mean_thigh_local_y_min_m':min(v), 'mean_thigh_local_y_max_m':max(v),
                     'mean_thigh_local_y_range_m':max(v)-min(v),
                     'max_vertex_thigh_local_y_range_m': max(high-low for low, high in spans[name][index])}
                     for index,(side,v) in enumerate(zip(('positive_x','negative_x'),values))}}
                     for name,values in result.items()]}
+    if include_values: report['_vertex_values'] = vertex_values
+    return report
 
 
 def main():

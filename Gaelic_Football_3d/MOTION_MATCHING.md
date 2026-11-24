@@ -213,3 +213,19 @@ experimental CMU candidate measured about 2.3 mm mean and 9.9 mm maximum
 individual range on each side. These measurements exclude procedural IK,
 renderer behavior, camera perspective and occlusion. They do not rule out the
 reported visual issue or validate a fix.
+
+`python3 tools/inspect_shorts_runtime.py MODEL.glb --tool ./motion_headless
+--speed 3.5 --fps 60` extends this comparison: raylib 5.5 samples paired
+poses before and after the same `lengthenStride` and `plantFeet` routines used
+by the game, then the inspector skins the selected hem vertices. It checks
+that GLB inverse binds agree with raylib's node-based bind convention. It
+compares each vertex's thigh-local Y at the *same time* before and after IK;
+this is not a measurement of the hem in world space or on screen. It warms up
+for one second and samples three seconds at constant speed on a straight path.
+The script excludes full rendering, turns, culling, transitions, other actions,
+and any differences in raylib 6. The no-IK control and 30/60 Hz sampling are
+tested. In the local experimental CMU jog at 60 Hz, across all nine shorts
+meshes, the maximum paired IK change was 1.2 mm at 2 m/s and 2.4 mm at
+3.5 m/s for a sampled vertex; mean-hem changes peaked at 0.34 mm and 0.69 mm
+respectively. This is limited evidence for those scenarios, not a fix or proof
+that the visually reported shorts issue is absent.
