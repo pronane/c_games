@@ -43,7 +43,7 @@ function main() {
     height: 810,
     show: false,
     backgroundColor: '#0b1420',
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   });
   win.webContents.on('console-message', (_e, _level, message) => {
     consoleLog.push(message);

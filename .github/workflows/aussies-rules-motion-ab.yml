@@ -141,11 +141,20 @@ jobs:
             --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
             > build/motion-ab/lod/electron.log 2>&1
           echo "electron exit: $?"
+      - name: Capture live match — ball and controlled player (LOD candidate)
+        working-directory: aussies_rules_3d
+        env: { ELECTRON_DISABLE_SANDBOX: '1' }
+        run: |
+          mkdir -p build/motion-ab/match
+          timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
+            node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/match \
+            --frames 24 --interval-ms 500 --settle-ms 15000 --query 'ab=1&scenario=match' \
+            > build/motion-ab/match/electron.log 2>&1
       - name: Assemble MP4s
         working-directory: aussies_rules_3d
         run: |
           set -e
-          for leg in original lod; do
+          for leg in original lod match; do
             if ls build/motion-ab/$leg/frame-*.png 1>/dev/null 2>&1; then
               ffmpeg -hide_banner -loglevel error -y -framerate 2 \
                 -i build/motion-ab/$leg/frame-%03d.png -vf "scale=1280:-2" -pix_fmt yuv420p \
@@ -160,7 +169,11 @@ jobs:
       - name: Check captured ball framing (experimental)
         if: always()
         working-directory: aussies_rules_3d
-        run: node tools/check_framing.mjs build/motion-ab/original/console.log build/motion-ab/lod/console.log
+        run: |
+          status=0
+          node tools/check_framing.mjs build/motion-ab/original/console.log build/motion-ab/lod/console.log || status=1
+          node tools/check_framing.mjs --require-player build/motion-ab/match/console.log || status=1
+          exit "$status"
       - name: Job summary
         working-directory: aussies_rules_3d
         if: always()
@@ -168,7 +181,7 @@ jobs:
           {
             echo '## Visual A/B capture (experimental)'
             echo
-            for leg in original lod; do
+            for leg in original lod match; do
               if [ -f build/motion-ab/$leg/summary.json ]; then
                 echo "- \`$leg\`: $(cat build/motion-ab/$leg/summary.json | tr -d '\n')"
               else
@@ -179,14 +192,14 @@ jobs:
             echo 'Artifacts `aussies-rules-motion-ab-visual` hold the frames + mp4s + console logs.'
             echo
             echo '### AB_STATS (renderer info, ~2 s cadence)'
-            for leg in original lod; do
+            for leg in original lod match; do
               echo "**$leg**"
               echo '```'
               grep -E 'AB_STATS|AB_CAMSTAT|capturePage failed' build/motion-ab/$leg/console.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
               echo '```'
             done
             echo
-            node tools/ab_stats.mjs build/motion-ab/original build/motion-ab/lod || echo 'ab_stats aggregation failed (non-blocking)'
+            node tools/ab_stats.mjs build/motion-ab/original build/motion-ab/lod build/motion-ab/match || echo 'ab_stats aggregation failed (non-blocking)'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Sticky PR comment with capture stats
         working-directory: aussies_rules_3d
