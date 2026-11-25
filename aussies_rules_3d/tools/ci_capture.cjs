@@ -60,23 +60,52 @@ function main() {
     win.loadFile(target);
   }
 
-  win.webContents.once('did-finish-load', () => {
-    setTimeout(() => capture(win, 0), SETTLE_MS);
+  // Never call a successfully loaded HTML page a successfully booted game.
+  const deadline = Date.now() + 120000;
+  const waitForGame = async () => {
+    if (Date.now() > deadline) { consoleLog.push('CAPTURE_NOT_READY: game did not render within 120s'); return finish(1); }
+    try {
+      const ready = await win.webContents.executeJavaScript('window.__captureReady === true');
+      if (ready) {
+        consoleLog.push('CAPTURE_READY: first game frame rendered');
+        return setTimeout(() => capture(win, 0), SETTLE_MS);
+      }
+    } catch (err) { consoleLog.push('readiness probe: ' + err); }
+    setTimeout(waitForGame, 250);
+  };
+  win.webContents.once('did-finish-load', waitForGame);
+  win.webContents.on('did-fail-load', (_event, code, description) => {
+    consoleLog.push(`LOAD_FAILED ${code}: ${description}`); finish(1);
   });
+  // Also covers a renderer IPC readiness probe that never resolves.
+  setTimeout(() => { consoleLog.push('CAPTURE_TIMEOUT'); finish(1); }, 220000);
 }
 
-function capture(win, i) {
+async function capture(win, i) {
   if (i >= FRAMES) return finish(0);
+  if (QUERY.drive === 'manual') {
+    try {
+      const state = await win.webContents.executeJavaScript('window.__advanceCapture ? window.__advanceCapture(30) : null');
+      if (!state) throw new Error('Scripted match did not become ready');
+      fs.writeFileSync(path.join(OUT, `state-${String(i).padStart(3, '0')}.json`), JSON.stringify(state, null, 2));
+    } catch (err) { consoleLog.push('capture scenario failed: ' + err); return finish(1); }
+  }
   win.webContents.capturePage().then((img) => {
     const file = path.join(OUT, `frame-${String(i).padStart(3, '0')}.png`);
     try {
       fs.writeFileSync(file, img.toPNG());
+      // A small set of game-only JPEGs can also travel through check annotations.
+      if (QUERY.drive === 'manual' && i % 6 === 0) {
+        let preview = img.resize({ width: 640 }).toJPEG(40);
+        if (preview.length > 40000) preview = img.resize({ width: 480 }).toJPEG(30);
+        fs.writeFileSync(path.join(OUT, `preview-${String(i).padStart(3, '0')}.jpg`), preview);
+      }
     } catch (err) {
       consoleLog.push('capturePage failed: ' + err);
       return finish(1);
     }
     setTimeout(() => capture(win, i + 1), INTERVAL_MS);
-  });
+  }).catch(err => { consoleLog.push('capturePage failed: ' + err); finish(1); });
 }
 
 function finish(code) {

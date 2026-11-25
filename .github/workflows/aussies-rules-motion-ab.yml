@@ -50,6 +50,9 @@ jobs:
       - name: Game health gate (tsc, tests, build, squad contract)
         working-directory: aussies_rules_3d
         run: node scripts/check.mjs
+      - name: Publish API-readable seeded gameplay audit
+        working-directory: aussies_rules_3d
+        run: node tools/gameplay_audit_report.mjs
       - name: Bake the LOD candidate from the shipped asset
         working-directory: aussies_rules_3d
         run: python tools/build_afl_lods.py
@@ -78,6 +81,7 @@ jobs:
             aussies_rules_3d/tools/out/ab_report.json
             aussies_rules_3d/tools/out/ab_report.md
             aussies_rules_3d/tools/out/lod_report.json
+            aussies_rules_3d/build/gameplay-audit/simulation.json
           if-no-files-found: warn
           retention-days: 14
 
@@ -148,7 +152,7 @@ jobs:
           mkdir -p build/motion-ab/match
           timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
             node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/match \
-            --frames 24 --interval-ms 500 --settle-ms 15000 --query 'ab=1&scenario=match' \
+            --frames 36 --interval-ms 500 --settle-ms 15000 --query 'ab=1&scenario=match&drive=manual' \
             > build/motion-ab/match/electron.log 2>&1
       - name: Assemble MP4s
         working-directory: aussies_rules_3d
@@ -172,8 +176,12 @@ jobs:
         run: |
           status=0
           node tools/check_framing.mjs build/motion-ab/original/console.log build/motion-ab/lod/console.log || status=1
-          node tools/check_framing.mjs --require-player build/motion-ab/match/console.log || status=1
+          node tools/check_framing.mjs --require-player --allow-distant-player build/motion-ab/match/console.log || status=1
           exit "$status"
+      - name: Publish API-readable gameplay diagnostics
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/capture_review.mjs build/motion-ab/match
       - name: Job summary
         working-directory: aussies_rules_3d
         if: always()
@@ -195,7 +203,7 @@ jobs:
             for leg in original lod match; do
               echo "**$leg**"
               echo '```'
-              grep -E 'AB_STATS|AB_CAMSTAT|capturePage failed' build/motion-ab/$leg/console.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
+              grep -E 'AB_STATS|AB_CAMSTAT|AB_PLAY|capturePage failed' build/motion-ab/$leg/console.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
               echo '```'
             done
             echo

@@ -42,6 +42,11 @@ export class BroadcastCamera {
   private celebrationT = 0;
   private chaseDir = new THREE.Vector2(1, 0);
   private openness = 0.12;
+  private heldDistance = 0;
+  private fitHold = 0;
+  private shotKey = '';
+  private renderedAim = new THREE.Vector3(0, 1, 0);
+  readonly diagnostics = { emergencyCorrections: 0, playerExcluded: false };
   private zoomOffset = 0;
   private zoomIdleT = 0;
 
@@ -78,7 +83,7 @@ export class BroadcastCamera {
   /**
    * `controlled` — the player on your stick (null while spectating/attract or
    * when no live controlled player exists). The framing post-step keeps the
-   * ball and (when present) the controlled player inside a safe NDC box.
+   * ball inside a safe NDC box; nearby selection is a secondary planning subject.
    * See framing.ts. Celebration mode is exempt (cinematic orbit).
    */
   update(
@@ -195,32 +200,41 @@ export class BroadcastCamera {
       );
     }
 
-    const ease = this.mode === 'broadcast' ? 2.6 : 1.6;
-    const eased = this.camera.position.clone().lerp(this.desired, Math.min(1, dt * ease));
-    // --- framing guarantee: ball (+ your man) must stay inside the safe box.
-    const subjects: FitSubject[] = [
-      { x: b.x, y: Math.max(b.y, 0.4), z: b.z, weight: 1.3 },
-    ];
-    if (controlled) {
-      subjects.push({ x: controlled.x, y: controlled.y, z: controlled.z, weight: 1 });
+    // Plan a conservative fit BEFORE easing. The live ball has priority;
+    // distant selection is represented by the existing offscreen arrow.
+    const subjects: FitSubject[] = [{ x: b.x, y: Math.max(b.y, 0.15), z: b.z, weight: 1.3 }];
+    const nearby = controlled && Math.hypot(controlled.x - b.x, controlled.z - b.z) < 22;
+    this.diagnostics.playerExcluded = !!controlled && !nearby;
+    if (nearby && controlled) subjects.push(controlled);
+    if (this.mode !== 'celebration') {
+      const plan = enforceFraming(this.desired, this.lookAt, this.camera.fov, this.camera.aspect, subjects, 0.60);
+      if (plan) { this.desired.copy(plan.position); this.lookAt.copy(plan.lookAt); }
     }
-    const fix =
-      this.mode === 'celebration'
-        ? null
-        : enforceFraming(
-            eased,
-            this.lookAt,
-            this.camera.fov,
-            this.camera.aspect,
-            subjects,
-            SAFE_MARGIN
-          );
-    if (fix) {
-      eased.copy(fix.position);
-      this.lookAt.copy(fix.lookAt);
+    const key = `${this.mode}:${this.view}`;
+    if (key !== this.shotKey) { this.heldDistance = 0; this.fitHold = 0; this.shotKey = key; }
+    const ray = this.desired.clone().sub(this.lookAt);
+    const requested = ray.length();
+    if (requested > this.heldDistance) { this.heldDistance = requested; this.fitHold = 0.8; }
+    else {
+      this.fitHold = Math.max(0, this.fitHold - dt);
+      if (!this.fitHold) this.heldDistance += (requested - this.heldDistance) * (1 - Math.exp(-dt * 0.7));
     }
-    this.camera.position.copy(eased);
-    this.camera.lookAt(this.lookAt);
+    if (requested > 0.001) this.desired.copy(this.lookAt).addScaledVector(ray, this.heldDistance / requested);
+    const alpha = 1 - Math.exp(-dt * 3.2);
+    this.camera.position.lerp(this.desired, alpha);
+    this.renderedAim.lerp(this.lookAt, alpha);
+    // Emergency recovery is ball-only, never an unlimited zoom-out to selection.
+    // Ordinary travel uses the wider predictive planning region above.
+    if (this.mode !== 'celebration') {
+      const emergency = enforceFraming(this.camera.position, this.renderedAim,
+        this.camera.fov, this.camera.aspect, subjects.slice(0, 1), SAFE_MARGIN);
+      if (emergency) {
+        this.camera.position.copy(emergency.position);
+        this.renderedAim.copy(emergency.lookAt);
+        this.diagnostics.emergencyCorrections++;
+      }
+    }
+    this.camera.lookAt(this.renderedAim);
   }
 
   /** Slight zoom toward goal for set shots. */

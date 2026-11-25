@@ -114,9 +114,9 @@ export function main(argv) {
   lines.push('');
   lines.push('_SwiftShader software rendering on a GPU-less runner: relative frame-time trend between legs, never an absolute FPS claim. GPU verification is a human step (GAP_ANALYSIS_PS5.md, P0)._');
   lines.push('');
-  lines.push('## Camera subject visibility (fixed attract seed — framing regression tripwire)');
+  lines.push('## Camera subject visibility (framing regression tripwire)');
   lines.push('');
-  lines.push('Observed subject centres inside NDC ±0.78 (100% expected). Missing samples are unverified; player n/a means attract capture did not exercise a controlled player. This is not an occlusion or GPU-quality check.');
+  lines.push('Observed subject centres inside NDC ±0.78 (100% expected for the live ball, excluding celebration). Distant selection may be outside the frame under the ball-first policy; player visibility is observational, not a hard constraint. Missing samples are unverified. Player n/a means no player coverage. This is not an occlusion or GPU-quality check.');
   lines.push('');
   lines.push('| leg | camstat samples | ball in-frame avg / min % | player in-frame avg / min % | ball peak NDC | player peak NDC |');
   lines.push('|---|---|---|---|---|---|');

@@ -12,6 +12,8 @@ import {
   TeamId,
 } from '../rules/types';
 import { attackGoalX, clampInside, defendGoalX, isOutOfBounds } from '../rules/field';
+import { stepLocomotion } from './locomotion';
+import { TeamPlan } from './teamPlan';
 import { RulesEngine } from '../rules/engine';
 import { launchHandball, launchKick, stepBall, predictDrop } from './ball';
 import { AiContext, AiIntent, Difficulty, aiIntentFor, emptyIntent } from './ai';
@@ -41,7 +43,7 @@ export function emptyHumanIntent(): HumanIntent {
 }
 
 const CATCH_RADIUS = 1.45;
-const CPU_TACKLE_RANGE = 2.3;
+const CPU_TACKLE_RANGE = 1.95;
 const CPU_TACKLE_COMMIT_TIME = 0.3;
 const CPU_TACKLE_COOLDOWN = 0.9;
 const HUMAN_TACKLE_RADIUS = 2.15;
@@ -75,6 +77,11 @@ export class MatchSim {
   private rng: () => number;
   private liveTime = 0;
   private cpuTackleTimer = 0;
+  private cpuTacklerId = -1;
+  private cpuCarrierId = -1;
+  private teamPlan = new TeamPlan();
+  readonly diagnostics = { tackles: 0, misses: 0, frees: 0, ballUps: 0, whistles: 0, liveSeconds: 0,
+    freesByReason: {} as Record<string, number>, lastTackles: [] as { tackler: number; carrier: number; phase: string; distance: number; outcome: string }[] };
   private runSinceBounce = 0;
   private eventsOut: MatchEvent[] = [];
   /** Player who last disposed of the ball; can't regather it briefly (smother/protection). */
@@ -253,6 +260,7 @@ export class MatchSim {
     if (this.looseSwitchCooldown > 0) this.looseSwitchCooldown -= dt;
     if (this.walkTimer > 0) this.walkTimer -= dt;
 
+    if (s.phase === 'live') this.diagnostics.liveSeconds += dt;
     const wasPhase = s.phase;
     this.engine.step(dt);
     if (s.phase !== wasPhase) {
@@ -281,6 +289,7 @@ export class MatchSim {
       carrierId: carrier ? carrier.id : null,
       liveTime: this.liveTime,
       rng: this.rng,
+      jobs: this.teamPlan.update(s, dt),
     };
 
     // assisted pass options for the human carrier (drives the rings)
@@ -349,7 +358,7 @@ export class MatchSim {
     }
 
     // ---------------------------------------------------------- tackles
-    if (b.mode === 'held' && carrier) {
+    if (b.mode === 'held' && carrier && b.holderId === carrier.id) {
       this.tryTackles(carrier, dt, human);
     }
 
@@ -364,6 +373,14 @@ export class MatchSim {
     }
 
     const drained = this.engine.drainEvents();
+    for (const event of drained) {
+      if (event.type === 'freeKick') {
+        this.diagnostics.frees++;
+        const reason = event.text ?? 'unknown';
+        this.diagnostics.freesByReason[reason] = (this.diagnostics.freesByReason[reason] ?? 0) + 1;
+      }
+      if (event.type === 'ballUp' || event.type === 'centreBallUp' || event.type === 'throwIn') this.diagnostics.ballUps++;
+    }
     this.eventsOut.push(...drained);
     return this.eventsOut;
   }
@@ -386,16 +403,7 @@ export class MatchSim {
       mx /= mag;
       mz /= mag;
     }
-    const tvx = mx * maxSpeed;
-    const tvz = mz * maxSpeed;
-    // reversals brake harder — plant and turn
-    let accel = mag > 0.05 ? 13 : 11;
-    if (mag > 0.05) {
-      const sp0 = Math.hypot(p.vx, p.vz);
-      if (sp0 > 2.5 && (p.vx * mx + p.vz * mz) / sp0 < -0.35) accel = 17.5;
-    }
-    p.vx += (tvx - p.vx) * Math.min(1, accel * dt);
-    p.vz += (tvz - p.vz) * Math.min(1, accel * dt);
+    stepLocomotion(p, mx, mz, maxSpeed, dt);
     p.x += p.vx * dt;
     p.z += p.vz * dt;
 
@@ -408,17 +416,7 @@ export class MatchSim {
       p.vz *= 0.4;
     }
 
-    // face movement or the ball — turn rate falls with speed
     const speed = Math.hypot(p.vx, p.vz);
-    if (speed > 0.6) {
-      const target = Math.atan2(p.vz, p.vx);
-      let d = target - p.facing;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      const turnRate = 4.6 + 6.6 * (1 - Math.min(1, speed / 9.5));
-      p.facing += d * Math.min(1, turnRate * dt);
-    }
-
     p.distanceRun += speed * dt;
     if (p.tackleCooldown > 0) p.tackleCooldown = Math.max(0, p.tackleCooldown - dt);
     p.stamina = Math.max(0.35, p.stamina - speed * dt * 0.0022);
@@ -492,6 +490,7 @@ export class MatchSim {
   private tryTackles(carrier: PlayerState, dt: number, human: HumanIntent): void {
     const s = this.engine.state;
     const RESTART_PHASES = new Set(['kickIn', 'centreBallUp', 'ballUp', 'throwIn', 'freeKick']);
+    if (RESTART_PHASES.has(s.phase)) { this.cpuTackleTimer = 0; this.cpuTacklerId = -1; return; }
     let nearestAi: PlayerState | null = null;
     let nearestAiDist = Infinity;
 
@@ -500,7 +499,7 @@ export class MatchSim {
       const d = Math.hypot(p.x - carrier.x, p.z - carrier.z);
       // AI opponents get considered out to their commit range; the separation
       // force holds bodies at ~1.7 m, so the old 1.55 m cutoff was unreachable.
-      if (d > CPU_TACKLE_RANGE) continue;
+      if (d > (p.id === this.controlledId ? HUMAN_TACKLE_RADIUS : CPU_TACKLE_RANGE)) continue;
       if (p.tackleCooldown > 0) continue;
 
       if (p.id === this.controlledId) {
@@ -521,34 +520,43 @@ export class MatchSim {
     // CPU tackle: must stay inside the range for a short commit window before
     // the pounce, like Gaelic_Football_3d — not a per-frame dice roll.
     if (nearestAi && nearestAiDist <= CPU_TACKLE_RANGE && !RESTART_PHASES.has(s.phase)) {
+      if (this.cpuTacklerId !== nearestAi.id || this.cpuCarrierId !== carrier.id) this.cpuTackleTimer = 0;
+      this.cpuTacklerId = nearestAi.id;
+      this.cpuCarrierId = carrier.id;
       this.cpuTackleTimer += dt;
       if (this.cpuTackleTimer >= CPU_TACKLE_COMMIT_TIME) {
         this.cpuTackleTimer = 0;
         nearestAi.tackleCooldown = CPU_TACKLE_COOLDOWN;
         // difficulty tunes how clean the attempt is once committed
-        const foulChance = this.difficulty === 'afl' ? 0.12 : this.difficulty === 'club' ? 0.16 : 0.22;
         const missChance = this.difficulty === 'afl' ? 0.30 : this.difficulty === 'club' ? 0.42 : 0.55;
         const roll = this.rng();
-        if (roll < missChance) return; // committed but brought down nothing — the carrier slips clear
-        this.commitTackle(nearestAi, carrier, roll < missChance + foulChance);
+        if (roll < missChance) { this.diagnostics.misses++; return; } // committed but brought down nothing — the carrier slips clear
+        this.commitTackle(nearestAi, carrier);
       }
     } else {
       this.cpuTackleTimer = 0;
     }
   }
 
-  private commitTackle(tackler: PlayerState, carrier: PlayerState, forceFoul = false): void {
-    const behind =
-      (carrier.x - tackler.x) * Math.cos(carrier.facing) + (carrier.z - tackler.z) * Math.sin(carrier.facing) > 0.6;
+  private commitTackle(tackler: PlayerState, carrier: PlayerState): void {
+    const s = this.engine.state;
+    this.diagnostics.tackles++;
+    // This controller performs standing wraps only: being behind is legal and
+    // is not evidence of a push. High/push actions need actual action geometry.
+    // The rules engine retains and tests all illegal-contact decisions.
     const ctx = {
       priorOpportunity: false,
-      highContact: this.rng() < 0.035,
-      backContact: forceFoul || (behind && this.rng() < 0.12),
-      incorrectDisposal: this.rng() < 0.02,
+      highContact: false,
+      backContact: false,
+      incorrectDisposal: false,
       attemptedDisposal: false,
       ballSpilledFree: false,
     };
     this.engine.onTackle(tackler.id, carrier.id, ctx);
+    this.diagnostics.lastTackles.push({ tackler: tackler.id, carrier: carrier.id,
+      phase: s.phase, distance: +Math.hypot(tackler.x - carrier.x, tackler.z - carrier.z).toFixed(2),
+      outcome: s.phase === 'freeKick' ? s.freeKick?.reason ?? 'freeKick' : s.phase });
+    if (this.diagnostics.lastTackles.length > 12) this.diagnostics.lastTackles.shift();
   }
 
   private handleGoalLine(side: 1 | -1, before: { x: number; z: number }): void {

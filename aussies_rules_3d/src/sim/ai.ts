@@ -5,6 +5,7 @@
  * to space, defenders man up, the carrier kicks to the best option and shoots
  * on goal inside 50. Difficulty scales reaction speed, pressure and accuracy.
  */
+import type { TeamJob } from './teamPlan';
 import { FIELD, MatchState, PlayerState, TeamId } from '../rules/types';
 import { attackGoalX, defendGoalX, insideAttackArc } from '../rules/field';
 
@@ -65,6 +66,9 @@ export function homePosition(
   const anchorZ = ballZ * 0.45;
   let x = anchorX + dir * shape.fx * 72;
   let z = anchorZ + shape.fz * 52 * (p.id % 2 === 0 ? 1 : -1);
+  // Distinct slots even when multiple players share a role/parity.
+  x += ((p.number % 3) - 1) * 6;
+  z += ((Math.floor(p.number / 3) % 3) - 1) * 5;
 
   // hold the 6-6-6 shape at centre ball-ups
   if (phase === 'centreBallUp') {
@@ -88,6 +92,7 @@ export function homePosition(
 
 export interface AiContext {
   state: MatchState;
+  jobs?: Map<number, TeamJob>;
   difficulty: Difficulty;
   /** Team currently possessing (or null). */
   possessingTeam: TeamId | null;
@@ -171,7 +176,8 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
   // the distance — otherwise a settled ball just lies there forever
   const restingLoose = loose && ballSpeed < 1.4;
   // limit the pack: only the two nearest players per team may chase the ball
-  const mayChase = teammatesCloserToBall(p, ctx) < 2;
+  const job = ctx.jobs?.get(p.id);
+  const mayChase = job ? job.kind === 'contest' : teammatesCloserToBall(p, ctx) < 2;
   const chaseThis =
     mayChase &&
     ((loose && distBall < 9) ||
@@ -191,49 +197,20 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
     return intent;
   }
 
-  // ------------------------------------------------------ support runs (attack)
-  // When our carrier holds the ball, the two nearest free teammates (not the
-  // designated fullback) peel off: one a short handpass option beside him,
-  // one running ahead into space — Gaelic_Football_3d support logic.
-  if (
-    ctx.possessingTeam === p.team &&
-    ctx.carrierId !== null &&
-    ctx.carrierId !== p.id &&
-    (p.role === 'midfielder' ||
-      p.role === 'ruck' ||
-      p.role === 'halfForward' ||
-      p.role === 'keyForward' ||
-      p.role === 'fullForward')
-  ) {
-    const holder = s.players.find((q) => q.id === ctx.carrierId);
-    if (holder) {
-      let rank = 0;
-      for (const q of s.players) {
-        if (q.team !== p.team || q.id === p.id || q.id === ctx.carrierId || q.onBench) continue;
-        if (q.role === 'fullback') continue;
-        const dq = (q.x - holder.x) ** 2 + (q.z - holder.z) ** 2;
-        const dp = (p.x - holder.x) ** 2 + (p.z - holder.z) ** 2;
-        if (dq < dp) rank++;
-      }
-      if (rank < 2) {
-        const side = holder.z < 0 ? 1 : -1;
-        const tx = rank === 0 ? holder.x + dir * 3.5 : holder.x + dir * 13;
-        const tz = rank === 0 ? holder.z - side * 7 : holder.z + side * 11;
-        const dd = Math.hypot(tx - p.x, tz - p.z);
-        if (dd > 2) {
-          intent.moveX = tx - p.x;
-          intent.moveZ = tz - p.z;
-          intent.sprint = dd > 9;
-          return intent;
-        }
-      }
-    }
+  // Persistent receivers hold distinct lanes instead of re-ranking every tick.
+  if (job && (job.kind === 'short' || job.kind === 'outlet' || job.kind === 'mark')) {
+    const tx = Math.max(-FIELD.boundaryA + 8, Math.min(FIELD.boundaryA - 8, job.x));
+    const tz = Math.max(-FIELD.boundaryB + 8, Math.min(FIELD.boundaryB - 8, job.z));
+    const d = Math.hypot(tx - p.x, tz - p.z);
+    if (d > 1.5) { intent.moveX = tx - p.x; intent.moveZ = tz - p.z; intent.sprint = d > 10; }
+    return intent;
   }
 
   // ------------------------------------------------------ goal-side marking
   // Defending: backs pick up attackers goal-side, nearest first, one attacker
   // each — the ball-relative zone alone let forwards drift free between lines.
   if (
+    !ctx.jobs &&
     ctx.possessingTeam !== null &&
     ctx.possessingTeam !== p.team &&
     (p.role === 'fullback' || p.role === 'keyDefender' || p.role === 'halfBack')
