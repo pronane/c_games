@@ -50,6 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      checks: write
     timeout-minutes: 50
     env:
       LIBGL_ALWAYS_SOFTWARE: '1'
@@ -126,6 +127,17 @@ jobs:
           grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-before.log
           grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-relaxed.log
           grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-relaxed.log
+      # Check-run output is readable through api.github.com even when the
+      # artifact CDN is blocked. These stills are not a substitute for video.
+      - name: Publish sampled hand review frames to GitHub checks
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for label in cmu-hands-before cmu-hands-relaxed; do
+            python3 tools/review_frame_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" > "../build/cmu-jog-local/${label}-check.json"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-check.json" > /dev/null
+          done
       - name: Record fixed-camera jog comparison
         working-directory: Gaelic_Football_3d
         env:

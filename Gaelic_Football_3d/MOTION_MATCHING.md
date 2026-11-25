@@ -287,3 +287,14 @@ self-intersection, perspective or visual quality. The visual workflow records
 `cmu-hands-before.mp4` and `cmu-hands-relaxed.mp4` with a closer tracking view
 from frames 120–209, with arm assist enabled in both. Keep both experiments
 off by default until reviewed.
+
+### API-accessible review stills
+
+The manual visual workflow also publishes two machine-readable GitHub check
+runs with six downscaled stills per hand comparison video. They are bounded to
+60,000 characters per check output and are not committed to the repository.
+To retrieve them where the GitHub API is reachable but the artifact CDN is
+not, run `python3 tools/download_review_frames.py RUN_ID --out build/review`
+from the game directory (with authenticated `gh`). Full videos remain workflow
+artifacts; still frames cannot establish fluid motion, timing, or foot slide.
+This check publishing requires `checks: write` in the manual `jog-ab` job.
