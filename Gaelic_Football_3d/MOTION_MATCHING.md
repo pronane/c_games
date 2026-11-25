@@ -264,3 +264,26 @@ is not a visual quality, hand-mesh, transition or performance guarantee. The
 manual visual workflow records a separate `cmu-jog-arm-assist.mp4` beside the
 unmodified CMU version for review. Do not make it the default based on these
 numbers alone.
+
+### Experimental relaxed jog fingers
+
+The CMU BVH does not capture fingers. In the locally retargeted candidate,
+its hand and finger joint rotations remain almost static and near the target
+bind pose; this is not captured hand motion. The candidate's unblended wrist
+centres average approximately 0.108/0.113 m forward of their corresponding
+shoulders (bone proxy, not a rendered posture measurement). Increasing swing
+alone does not change that mean arm posture reliably.
+
+`--jog-hand-relax` is a separate **opt-in** experiment. For nearly static
+finger joints only, it blends their local rotations toward the game's existing
+idle pose, with a maximum correction of 0.25 radians per joint. It rebuilds
+finger descendants parent-first so segments remain connected. Strongly moving
+source joints retain their local animation, and both experiments are excluded
+from carrying, jumps and actions. The target is a heuristic reference, not
+captured CMU finger data or a claim of anatomically correct hands. Headless
+checks cover local-angle bounds, bone lengths, unrelated bones, transitions,
+and disabled/carry/action/jump guards; they do not check rendered hand mesh,
+self-intersection, perspective or visual quality. The visual workflow records
+`cmu-hands-before.mp4` and `cmu-hands-relaxed.mp4` with a closer tracking view
+from frames 120–209, with arm assist enabled in both. Keep both experiments
+off by default until reviewed.

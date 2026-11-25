@@ -188,3 +188,29 @@ float am_arm_swing_profile(const float *arm, const float *leg, int n, float *cen
     *centre = (float)ml; *radius = fmaxf((lmax-lmin)*.5f, .06f);
     return am_smoothstep((.23f - (amax-amin))/.12f);
 }
+
+float am_rotation_stillness(const float *samples, int n)
+{
+    double reference[4], norm = 0, largest = 0;
+    if (!samples || n < 8 || n > 1000000) return 0;
+    for (int k = 0; k < 4; ++k) { if (!isfinite(samples[k])) return 0; norm += (double)samples[k]*samples[k]; }
+    if (norm < 1e-12) return 0;
+    norm = sqrt(norm); for (int k = 0; k < 4; ++k) reference[k] = samples[k]/norm;
+    for (int i = 0; i < n; ++i) {
+        double d = 0, len = 0;
+        for (int k = 0; k < 4; ++k) {
+            double v = samples[4*i+k]; if (!isfinite(v)) return 0;
+            len += v*v; d += reference[k]*v;
+        }
+        if (len < 1e-12) return 0;
+        d = fmin(1.0, fabs(d/sqrt(len)));
+        { double angle = 2*acos(d); if (angle > largest) largest = angle; }
+    }
+    return am_smoothstep((float)((.08-largest)/.04));
+}
+float am_bounded_rotation_weight(float angle, float limit, float blend)
+{
+    if (!isfinite(angle) || !isfinite(limit) || !isfinite(blend) || angle <= 0 || limit <= 0 || blend <= 0) return 0;
+    if (blend > 1) blend = 1;
+    return blend * fminf(1, limit/angle);
+}

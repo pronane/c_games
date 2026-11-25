@@ -257,7 +257,7 @@ static int validate_leg_ik(void)
  * not rendered hand skin or perceived realism. */
 static int validate_jog_arm_assist(void)
 {
-    AnimState *s = &as[9]; Transform base[MAX_BONES]; float gain[2], beforeMin[2], beforeMax[2], afterMin[2], afterMax[2];
+    AnimState *s = &as[9]; Transform base[MAX_BONES]; float gain[2], beforeMin[2], beforeMax[2], afterMin[2], afterMax[2], beforeMean[2] = {0,0};
     int n = ANIM_FRAMES(*animFor(C_JOG))-1, changed = 0;
     boneArmUL = findBone("upperarm_l"); boneArmUR = findBone("upperarm_r");
     boneArmLL = findBone("lowerarm_l"); boneArmLR = findBone("lowerarm_r");
@@ -274,6 +274,7 @@ static int validate_jog_arm_assist(void)
         for (int side=0; side<2; ++side) {
             float old = base[hands[side]].translation.z-base[arms[side]].translation.z;
             float now = s->pose[hands[side]].translation.z-s->pose[arms[side]].translation.z;
+            beforeMean[side] += old / n;
             beforeMin[side] = fminf(beforeMin[side],old); beforeMax[side] = fmaxf(beforeMax[side],old);
             afterMin[side] = fminf(afterMin[side],now); afterMax[side] = fmaxf(afterMax[side],now);
             if (fabsf(Vector3Distance(base[arms[side]].translation,base[elbows[side]].translation) - Vector3Distance(s->pose[arms[side]].translation,s->pose[elbows[side]].translation)) > .0001f ||
@@ -283,8 +284,8 @@ static int validate_jog_arm_assist(void)
         if (Vector3Distance(base[boneHandL].translation,s->pose[boneHandL].translation) > .00001f ||
             Vector3Distance(base[boneHandR].translation,s->pose[boneHandR].translation) > .00001f) changed++;
     }
-    printf("jog_arm_profile gain=%.3f,%.3f wrist_forward_range_before=%.3f,%.3f after=%.3f,%.3f changed_frames=%d (bone_proxy_only)\n",
-           gain[0],gain[1],beforeMax[0]-beforeMin[0],beforeMax[1]-beforeMin[1],afterMax[0]-afterMin[0],afterMax[1]-afterMin[1],changed);
+    printf("jog_arm_profile gain=%.3f,%.3f wrist_forward_mean=%.3f,%.3f range_before=%.3f,%.3f after=%.3f,%.3f changed_frames=%d (bone_proxy_only)\n",
+           gain[0],gain[1],beforeMean[0],beforeMean[1],beforeMax[0]-beforeMin[0],beforeMax[1]-beforeMin[1],afterMax[0]-afterMin[0],afterMax[1]-afterMin[1],changed);
     if ((gain[0] > .01f || gain[1] > .01f) && !changed) return 0;
     /* Force a nonzero profile so guard coverage also works for strong clips. */
     jogArmGain[0] = jogArmGain[1] = 1; jogLegCentre[0] = jogLegCentre[1] = 0; jogLegRadius[0] = jogLegRadius[1] = .1f;
@@ -300,6 +301,52 @@ static int validate_jog_arm_assist(void)
     if (memcmp(base,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
     jogArmAssist = 0; detectJogArmProfile();
     puts("jog_arm_guards=ok"); return 1;
+}
+
+static int validate_jog_hand_relax(void)
+{
+    AnimState *s = &as[9]; Transform original[MAX_BONES]; int eligible = 0, changed = 0;
+    int n = ANIM_FRAMES(*animFor(C_JOG))-1;
+    detectJogHandProfile();
+    for (int b=0; b<model.boneCount; ++b) if (jogFingerGain[b] > .01f) eligible++;
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    game.players[0][9].action = GAME_ACT_NONE; game.players[0][9].jump_time = 0;
+    memset(s,0,sizeof *s); s->speed=3; s->clip=C_JOG; s->prevClip=C_JOG; s->blend=1;
+    jogHandRelax=1;
+    for (int f=0; f<n; f+=3) {
+        sampleClip(C_JOG, f/ANIM_FPS, s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        relaxJogHands(s,C_JOG);
+        for (int b=0; b<model.boneCount; ++b) {
+            int parent = boneChild(b), isFinger = b != boneHandL && b != boneHandR && (boneUnder(b,boneHandL)||boneUnder(b,boneHandR));
+            if (!isFinger) { if (memcmp(&original[b],&s->pose[b],sizeof(Transform))) return 0; continue; }
+            if (parent < 0) return 0;
+            { Quaternion a=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(original[parent].rotation),original[b].rotation));
+              Quaternion z=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(s->pose[parent].rotation),s->pose[b].rotation));
+              float dot=fabsf(a.x*z.x+a.y*z.y+a.z*z.z+a.w*z.w);
+              float angle=2*acosf(Clamp(dot,0,1));
+              if (!finite3(s->pose[b].translation) || angle > .251f ||
+                  fabsf(Vector3Distance(original[parent].translation,original[b].translation)-Vector3Distance(s->pose[parent].translation,s->pose[b].translation)) > .0001f) return 0;
+              if (angle > .001f) changed++;
+            }
+        }
+    }
+    printf("jog_hand_profile eligible_joints=%d changed_samples=%d (bone_proxy_only)\n",eligible,changed);
+    if (eligible && !changed) return 0;
+    sampleClip(C_JOG,.15f,s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+    jogHandRelax=0; relaxJogHands(s,C_JOG); if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogHandRelax=1; game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=1; relaxJogHands(s,C_RUN);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    s->prevClip=C_JOG; s->blend=1; relaxJogHands(s,C_RUN);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogHandRelax=0; puts("jog_hand_guards=ok"); return 1;
 }
 
 static int validate_jog_stride_ramp(void)
@@ -759,7 +806,7 @@ int main(int argc, char **argv)
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
-        !validate_interruption() || !validate_leg_ik() || !validate_jog_arm_assist() || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
+        !validate_interruption() || !validate_leg_ik() || !validate_jog_arm_assist() || !validate_jog_hand_relax() || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
         !compare_entry_poses(GAME_ACT_SOLO) || !benchmark_search()) {
         fprintf(stderr, "Action integration check failed\n"); return 1;
     }

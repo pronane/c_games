@@ -102,6 +102,9 @@ static const int motionActions[] = { GAME_ACT_HANDPASS, GAME_ACT_SOLO };
 static int motionMatching = 1, motionReady = 0;
 static int reverseJog = 0;
 static int jogArmAssist = 0;    /* experimental opt-in, never simulation authority */
+static int jogHandRelax = 0;
+static float jogFingerGain[MAX_BONES];
+static Quaternion jogFingerTarget[MAX_BONES];
 static float jogArmGain[2], jogLegCentre[2], jogLegRadius[2];
 
 static Model model;
@@ -750,6 +753,36 @@ static int boneUnder(int b, int anc)
     }
     return 0;
 }
+/* Compare local finger rotations over the actual jog and use the existing
+ * idle clip as an experimental relaxed-hand reference. A moving finger is
+ * never overwritten. This is not motion-captured finger data. */
+static void detectJogHandProfile(void)
+{
+    ModelAnimation *jog, *idle; Transform *ref; float *samples; int n, refFrame;
+    memset(jogFingerGain, 0, sizeof jogFingerGain);
+    if (boneHandL < 0 || boneHandR < 0 || clipIdx[C_JOG] < 0 || clipIdx[C_IDLE] < 0) return;
+    jog = animFor(C_JOG); idle = animFor(C_IDLE); n = ANIM_FRAMES(*jog)-1;
+    if (n < 8 || n > 1000000 || ANIM_FRAMES(*idle) < 1) return;
+    refFrame = (int)(.2f*ANIM_FPS); if (refFrame >= ANIM_FRAMES(*idle)) refFrame = ANIM_FRAMES(*idle)-1;
+    ref = ANIM_POSES(*idle)[refFrame]; if (!ref) return;
+    samples = malloc((size_t)n * 4 * sizeof(float)); if (!samples) return;
+    for (int b = 0; b < MODEL_BONECOUNT(model); ++b) {
+        int parent = boneChild(b);
+        Quaternion q;
+        if (parent < 0 || b == boneHandL || b == boneHandR ||
+            (!boneUnder(b, boneHandL) && !boneUnder(b, boneHandR))) continue;
+        for (int f = 0; f < n; ++f) {
+            Transform *p = ANIM_POSES(*jog)[f];
+            if (!p) { free(samples); memset(jogFingerGain, 0, sizeof jogFingerGain); return; }
+            q = QuaternionNormalize(QuaternionMultiply(QuaternionInvert(p[parent].rotation), p[b].rotation));
+            samples[4*f] = q.x; samples[4*f+1] = q.y; samples[4*f+2] = q.z; samples[4*f+3] = q.w;
+        }
+        jogFingerGain[b] = am_rotation_stillness(samples, n);
+        jogFingerTarget[b] = QuaternionNormalize(QuaternionMultiply(QuaternionInvert(ref[parent].rotation), ref[b].rotation));
+    }
+    free(samples);
+}
+
 static Quaternion quatFromTo(Vector3 from, Vector3 to)
 {
     float fl = Vector3Length(from), tl = Vector3Length(to);
@@ -1176,18 +1209,25 @@ static void plantFeet(AnimState *s, float dt)
 /* Small extra swing about each shoulder, phase-linked to the opposite knee.
  * Rotate the whole arm subtree rigidly, retaining elbow/hand/finger shape.
  * Excluded from ball carrying, actions, jumping and ambiguous source clips. */
-static void assistJogArms(AnimState *s, int clip)
+static float jogPresentationWeight(AnimState *s, int clip)
 {
-    int idx = (int)(s - as), arms[2] = {boneArmUL, boneArmUR};
-    int hips[2] = {boneThighR, boneThighL}, knees[2] = {boneCalfR, boneCalfL};
+    int idx = (int)(s - as);
     float weight;
-    if (!jogArmAssist || idx < 0 || idx >= 2*GAME_TEAM_SIZE || s->useBounce ||
+    if (idx < 0 || idx >= 2*GAME_TEAM_SIZE || s->useBounce ||
         game.players[idx/GAME_TEAM_SIZE][idx%GAME_TEAM_SIZE].action != GAME_ACT_NONE ||
         game.players[idx/GAME_TEAM_SIZE][idx%GAME_TEAM_SIZE].jump_time > 0 ||
-        (game.ball_team == idx/GAME_TEAM_SIZE && game.ball_player == idx%GAME_TEAM_SIZE)) return;
+        (game.ball_team == idx/GAME_TEAM_SIZE && game.ball_player == idx%GAME_TEAM_SIZE)) return 0;
     weight = clip == C_JOG ? (s->prevClip == C_JOG ? 1.0f : am_smoothstep(s->blend)) :
              (s->prevClip == C_JOG && s->blend < 1.0f ? 1.0f-am_smoothstep(s->blend) : 0.0f);
-    weight *= am_smoothstep((s->speed-.55f)/.9f);
+    return weight * am_smoothstep((s->speed-.55f)/.9f);
+}
+static void assistJogArms(AnimState *s, int clip)
+{
+    int arms[2] = {boneArmUL, boneArmUR};
+    int hips[2] = {boneThighR, boneThighL}, knees[2] = {boneCalfR, boneCalfL};
+    float weight;
+    if (!jogArmAssist) return;
+    weight = jogPresentationWeight(s, clip);
     if (weight <= 0) return;
     for (int side = 0; side < 2; ++side) {
         float x, angle; Vector3 pivot; Quaternion q;
@@ -1200,6 +1240,35 @@ static void assistJogArms(AnimState *s, int clip)
             s->pose[b].translation = Vector3Add(pivot, Vector3RotateByQuaternion(Vector3Subtract(s->pose[b].translation, pivot), q));
             s->pose[b].rotation = QuaternionNormalize(QuaternionMultiply(q, s->pose[b].rotation));
         }
+    }
+}
+
+/* Rebuild child transforms parent-first so finger joints remain connected.
+ * At most .25 radians per joint, fading with locomotion transitions. */
+static void relaxJogHands(AnimState *s, int clip)
+{
+    Transform before[MAX_BONES]; unsigned char finger[MAX_BONES] = {0}, done[MAX_BONES] = {0};
+    int nb = MODEL_BONECOUNT(model), remaining = 0; float weight;
+    if (!jogHandRelax || boneHandL < 0 || boneHandR < 0) return;
+    weight = jogPresentationWeight(s, clip); if (weight <= 0) return;
+    memcpy(before, s->pose, sizeof(Transform)*(size_t)nb);
+    for (int b = 0; b < nb; ++b) {
+        finger[b] = b != boneHandL && b != boneHandR && (boneUnder(b, boneHandL) || boneUnder(b, boneHandR));
+        if (finger[b]) ++remaining; else done[b] = 1;
+    }
+    for (int pass = 0; pass < nb && remaining; ++pass) for (int b = 0; b < nb; ++b) {
+        int parent = boneChild(b); Quaternion local, target; Vector3 offset; float dot, angle, blend;
+        if (!finger[b] || done[b] || parent < 0 || parent >= nb || !done[parent]) continue;
+        offset = Vector3RotateByQuaternion(Vector3Subtract(before[b].translation, before[parent].translation), QuaternionInvert(before[parent].rotation));
+        local = QuaternionNormalize(QuaternionMultiply(QuaternionInvert(before[parent].rotation), before[b].rotation));
+        target = jogFingerTarget[b];
+        dot = fabsf(local.x*target.x + local.y*target.y + local.z*target.z + local.w*target.w);
+        angle = 2.0f*acosf(Clamp(dot, 0, 1));
+        blend = am_bounded_rotation_weight(angle, .25f, weight*jogFingerGain[b]);
+        if (blend > 0) local = QuaternionSlerp(local, target, blend);
+        s->pose[b].translation = Vector3Add(s->pose[parent].translation, Vector3RotateByQuaternion(offset, s->pose[parent].rotation));
+        s->pose[b].rotation = QuaternionNormalize(QuaternionMultiply(s->pose[parent].rotation, local));
+        done[b] = 1; --remaining;
     }
 }
 
@@ -1324,6 +1393,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
 #endif
     balanceTorso(s, clip);
     assistJogArms(s, clip);
+    relaxJogHands(s, clip);
     cradleBall(s, clip);
     lengthenStride(s);
     plantFeet(s, dt);
@@ -2148,9 +2218,17 @@ static Vector3 smoothDamp3(Vector3 cur, Vector3 tgt, Vector3 *vel, float smoothT
 }
 
 static int camHands;   /* tight shot on the carrier's hands */
+static int camJogCloseup; /* scripted motion test only */
 static void updateCamera(float dt)
 {
     Vector3 b = W(game.ball.x, 0, game.ball.z);
+    if (camJogCloseup) {
+        GamePlayer *p = &game.players[0][game.selected_player];
+        Vector3 target = W(p->x, 1.15f, p->z);
+        cam.position = Vector3Add(target, (Vector3){.35f, .25f, 3.0f});
+        cam.target = target; cam.fovy = 25;
+        return;
+    }
     if (camHands && game.ball_team >= 0 && game.ball_player >= 0) {
         GamePlayer *c = &game.players[game.ball_team][game.ball_player];
         float yaw = yawOf(c->facing_x, c->facing_z);
@@ -3405,6 +3483,10 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
     else if (frame < 440) pad.axis[0] = -0.85f;
     /* Optional stationary camera during the jog segment. Input, simulation,
      * and pose selection remain identical to the normal tracking capture. */
+    if (getenv("GF_JOG_CLOSEUP")) {
+        if (frame == 120) { camJogCloseup = 1; printf("MOTION jog-closeup begin frame 120\n"); }
+        if (frame == 210) { camJogCloseup = 0; printf("MOTION jog-closeup end frame 210\n"); }
+    }
     if (getenv("GF_FIXED_JOG")) {
         if (frame == 120) {
             camMotionFixed = W(p->x + 5.0f, .9f, p->z);
@@ -3591,6 +3673,7 @@ int main(int argc, char **argv)
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
         else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
         else if (strcmp(argv[i], "--jog-arm-assist") == 0) jogArmAssist = 1;
+        else if (strcmp(argv[i], "--jog-hand-relax") == 0) jogHandRelax = 1;
         else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
         else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
@@ -3663,6 +3746,7 @@ int main(int argc, char **argv)
         detectContacts();
         detectJogDirection();
         detectJogArmProfile();
+        detectJogHandProfile();
         initActionMetadata();
         buildMotionDatabase(motionBake ? NULL : motionCache);
         if (!actionCacheLoaded) buildActionDatabase();

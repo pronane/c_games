@@ -126,4 +126,16 @@ static void arm_profile(void)
     assert(am_arm_swing_profile(arm, leg, 12, &centre, &radius) == 0);
     assert(am_arm_swing_profile(NULL, leg, 12, &centre, &radius) == 0);
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); puts("arena motion tests passed"); return 0; }
+static void still_rotation(void)
+{
+    float q[48] = {0};
+    for (int i=0;i<12;i++) q[4*i+3] = (i%2) ? -1.f : 1.f;
+    assert(am_rotation_stillness(q, 12) > .99f);
+    q[4] = sinf(.15f); q[7] = cosf(.15f);
+    assert(am_rotation_stillness(q, 12) == 0);
+    q[0] = NAN; assert(am_rotation_stillness(q, 12) == 0);
+    assert(fabsf(am_bounded_rotation_weight(.5f,.2f,1)-.4f) < 1e-6f);
+    assert(am_bounded_rotation_weight(0,.2f,1) == 0);
+    assert(am_bounded_rotation_weight(.5f,.2f,NAN) == 0);
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); puts("arena motion tests passed"); return 0; }

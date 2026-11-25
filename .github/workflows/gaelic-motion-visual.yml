@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 40
+    timeout-minutes: 50
     env:
       LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
@@ -112,6 +112,20 @@ jobs:
           test -s ../build/cmu-jog-report/cmu-jog.mp4
           timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-arm-assist.mp4 > ../build/cmu-jog-report/cmu-jog-arm-assist.log 2>&1
           test -s ../build/cmu-jog-report/cmu-jog-arm-assist.mp4
+      - name: Record jog hand-pose close-ups
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_JOG_CLOSEUP: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-before.mp4 > ../build/cmu-jog-report/cmu-hands-before.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --jog-hand-relax --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-relaxed.mp4 > ../build/cmu-jog-report/cmu-hands-relaxed.log 2>&1
+          test -s ../build/cmu-jog-report/cmu-hands-before.mp4
+          test -s ../build/cmu-jog-report/cmu-hands-relaxed.mp4
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-before.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-before.log
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-relaxed.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-relaxed.log
       - name: Record fixed-camera jog comparison
         working-directory: Gaelic_Football_3d
         env:

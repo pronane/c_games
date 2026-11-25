@@ -56,6 +56,11 @@ int am_gait_reverse(const float *left, const float *right, int frames);
  * ambiguous, uncoordinated and already-strong motion returns zero. On success
  * writes the leg mean and normalization radius. */
 float am_arm_swing_profile(const float *arm, const float *leg, int n, float *centre, float *radius);
+/* Profile relative local joint quaternions (xyzw, four floats per sample).
+ * Returns 0..1 when motion is nearly static, zero for moving/invalid data. */
+float am_rotation_stillness(const float *samples, int n);
+/* Blend fraction that limits a proposed angular correction in radians. */
+float am_bounded_rotation_weight(float angle, float limit, float blend);
 /* Advance a looping animation clock in seconds. Invalid inputs leave it unchanged. */
 float am_loop_advance(float time, float dt, float rate, float length);
 /* Clamped cubic easing for smoothly introducing a bounded correction. */
