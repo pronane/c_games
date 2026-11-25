@@ -10,7 +10,7 @@ marker='<!-- aussies-motion-ab-sticky -->'
   echo '### Aussies Rules Motion A/B — attract-demo capture'
   echo
   echo 'Attract legs ran with `?ab=1`: fixed attract seed, menu overlays hidden, broadcast cam, `AB_STATS` logged from `renderer.info` every ~2 s.'
-  echo 'The match leg uses `?ab=1&scenario=match` with a fixed seed, scripted tick inputs and a live controlled player (LOD candidate). It is a coverage scenario, not a third model comparison.'
+  echo 'The match leg uses `?ab=1&scenario=match` with a fixed seed, scripted tick inputs and a live controlled player (shipped asset). It is a coverage scenario, not a third model comparison.'
   echo
   for leg in original lod match; do
     log="build/motion-ab/$leg/console.log"

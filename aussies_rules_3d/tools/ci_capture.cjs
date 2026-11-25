@@ -13,6 +13,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { createCaptureServer } = require('./capture_server.cjs');
 
 app.commandLine.appendSwitch('enable-unsafe-swiftshader');
 app.commandLine.appendSwitch('use-angle', 'swiftshader');
@@ -36,6 +37,7 @@ const SETTLE_MS = Number(take('--settle-ms', '15000'));
 
 fs.mkdirSync(OUT, { recursive: true });
 const consoleLog = [];
+let finishing = false;
 
 function main() {
   const win = new BrowserWindow({
@@ -53,12 +55,15 @@ function main() {
     finish(1);
   });
 
-  const target = path.join(__dirname, '..', 'dist', 'index.html');
-  if (Object.keys(QUERY).length) {
-    win.loadFile(target, { query: QUERY });
-  } else {
-    win.loadFile(target);
-  }
+  // Exercise the browser build over HTTP, as users do. file:// fetch support
+  // varies across Electron/Chromium and can strand GLB/JSON loading at startup.
+  const server = createCaptureServer(path.resolve(__dirname, '..', 'dist'));
+  server.on('error', err => { consoleLog.push('CAPTURE_SERVER_FAILED: ' + err); finish(1); });
+  server.listen(0, '127.0.0.1', () => {
+    const query = new URLSearchParams(QUERY).toString();
+    win.loadURL(`http://127.0.0.1:${server.address().port}/index.html?${query}`)
+      .catch(err => { consoleLog.push('LOAD_FAILED: ' + err); finish(1); });
+  });
 
   // Never call a successfully loaded HTML page a successfully booted game.
   const deadline = Date.now() + 120000;
@@ -109,6 +114,8 @@ async function capture(win, i) {
 }
 
 function finish(code) {
+  if (finishing) return;
+  finishing = true;
   try {
     fs.writeFileSync(path.join(OUT, 'console.log'), consoleLog.join('\n'));
     const frames = fs.readdirSync(OUT).filter((f) => f.endsWith('.png'));

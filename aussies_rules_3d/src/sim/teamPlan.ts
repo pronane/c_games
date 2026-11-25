@@ -5,10 +5,17 @@ export interface TeamJob { kind: 'contest' | 'short' | 'outlet' | 'mark' | 'shap
 export class TeamPlan {
   private remaining = 0;
   private holder: number | null = null;
+  private phase = '';
+  private roster = '';
+  readonly diagnostics = { replans: 0, roleChanges: 0 };
   jobs = new Map<number, TeamJob>();
   update(state: MatchState, dt: number): Map<number, TeamJob> {
     this.remaining -= dt;
-    if (this.remaining > 0 && this.holder === state.ball.holderId) return this.jobs;
+    const roster = state.players.filter(p => !p.onBench).map(p => p.id).join(',');
+    if (this.remaining > 0 && this.holder === state.ball.holderId && this.phase === state.phase && this.roster === roster) return this.jobs;
+    this.phase = state.phase; this.roster = roster;
+    this.diagnostics.replans++;
+    const previous = this.jobs;
     this.remaining = 0.8;
     this.holder = state.ball.holderId;
     this.jobs = new Map();
@@ -18,6 +25,8 @@ export class TeamPlan {
       const players = state.players.filter(p => !p.onBench && p.team === team && p.id !== carrier?.id)
         .sort((a, c) => Math.hypot(a.x - b.x, a.z - b.z) - Math.hypot(c.x - b.x, c.z - b.z) || a.id - c.id);
       for (const p of players) this.jobs.set(p.id, { kind: 'shape', x: p.x, z: p.z });
+      // Restarts retain role homes, not inherited contest/receiving pressure.
+      if (state.phase !== 'live') continue;
       const attack = carrier?.team === team;
       const count = attack ? 0 : 2;
       players.slice(0, count).forEach(p => this.jobs.set(p.id, { kind: 'contest', x: b.x, z: b.z }));
@@ -43,6 +52,7 @@ export class TeamPlan {
         }
       }
     }
+    for (const [id, job] of this.jobs) if (previous.get(id)?.kind !== job.kind) this.diagnostics.roleChanges++;
     return this.jobs;
   }
 }

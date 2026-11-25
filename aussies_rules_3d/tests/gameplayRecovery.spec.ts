@@ -49,6 +49,7 @@ describe('gameplay recovery regressions', () => {
   });
   it('holds contest jobs and reserves distinct receiving lanes', () => {
     const sim = new MatchSim({ ...AFL_SETTINGS, seed: 42 }); sim.start();
+    sim.state.phase = 'live';
     const plan = new TeamPlan();
     const jobs = plan.update(sim.state, 1 / 60);
     for (const team of [0, 1]) {

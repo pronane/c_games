@@ -114,6 +114,8 @@ export class MatchSim {
     this.pickControlled(true);
   }
 
+  get teamDiagnostics() { return { ...this.teamPlan.diagnostics }; }
+
   get state() {
     return this.engine.state;
   }
@@ -360,6 +362,8 @@ export class MatchSim {
     // ---------------------------------------------------------- tackles
     if (b.mode === 'held' && carrier && b.holderId === carrier.id) {
       this.tryTackles(carrier, dt, human);
+    } else {
+      this.cpuTackleTimer = 0; this.cpuTacklerId = -1; this.cpuCarrierId = -1;
     }
 
     // ------------------------------------------------- human disposals

@@ -118,6 +118,7 @@ jobs:
           pip install numpy pillow
           python tools/build_afl_lods.py
       - name: Build the production bundle
+        id: capture_build
         working-directory: aussies_rules_3d
         run: npm run build
       - name: Preflight electron under xvfb
@@ -126,6 +127,7 @@ jobs:
           mkdir -p build/motion-ab/original build/motion-ab/lod
           timeout 60 xvfb-run -a node_modules/.bin/electron --version 2>&1 | tee build/motion-ab/electron-version.log
       - name: Capture attract demo — shipped asset (original)
+        if: ${{ !cancelled() && steps.capture_build.outcome == 'success' }}
         working-directory: aussies_rules_3d
         env: { ELECTRON_DISABLE_SANDBOX: '1' }
         run: |
@@ -135,6 +137,7 @@ jobs:
             > build/motion-ab/original/electron.log 2>&1
           echo "electron exit: $?"
       - name: Capture attract demo — LOD candidate
+        if: ${{ !cancelled() && steps.capture_build.outcome == 'success' }}
         working-directory: aussies_rules_3d
         env: { ELECTRON_DISABLE_SANDBOX: '1' }
         run: |
@@ -145,16 +148,20 @@ jobs:
             --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
             > build/motion-ab/lod/electron.log 2>&1
           echo "electron exit: $?"
-      - name: Capture live match — ball and controlled player (LOD candidate)
+      - name: Capture live match — shipped asset, ball and controlled player
+        if: ${{ !cancelled() && steps.capture_build.outcome == 'success' }}
         working-directory: aussies_rules_3d
         env: { ELECTRON_DISABLE_SANDBOX: '1' }
         run: |
           mkdir -p build/motion-ab/match
+          git show HEAD:aussies_rules_3d/public/assets/gaelic_player.glb > public/assets/gaelic_player.glb
+          npm run build
           timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
             node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/match \
             --frames 36 --interval-ms 500 --settle-ms 15000 --query 'ab=1&scenario=match&drive=manual' \
             > build/motion-ab/match/electron.log 2>&1
       - name: Assemble MP4s
+        if: always()
         working-directory: aussies_rules_3d
         run: |
           set -e

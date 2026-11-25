@@ -1,3 +1,4 @@
+import { MotionProbe } from './render/motionProbe';
 import { BallReadability } from './render/ballReadability';
 import { captureIntent } from './sim/captureScenario';
 /**
@@ -75,6 +76,7 @@ class Game {
   ballMesh!: THREE.Group;
   private ballReadability!: BallReadability;
   private captureTick = 0;
+  private motionProbe = new MotionProbe();
   ballShadow!: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   broadcast!: BroadcastCamera;
   input = new InputManager($('game'));
@@ -130,6 +132,7 @@ class Game {
   private switchFlashT = 0;
 
   async boot(): Promise<void> {
+    if (AB_MODE) console.log('AB_BOOT world');
     this.menus.setLoading(0.1, 'Building the Melbourne arena…');
     this.world = await createWorld($('game') as HTMLCanvasElement);
     this.broadcast = new BroadcastCamera(this.world.camera);
@@ -144,7 +147,9 @@ class Game {
       this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
       console.info('afl_player.glb not built yet — using gaelic_player.glb');
     }
+    if (AB_MODE) console.log('AB_BOOT player loaded');
     this.motionAssets = await loadMotionAssets();
+    if (AB_MODE) console.log(`AB_BOOT motion=${!!this.motionAssets}`);
     this.menus.setLoading(0.75, 'Inflating the Sherrin…');
     const ballGltf = await loader.loadAsync('./assets/ball.glb');
     this.ballMesh = ballGltf.scene;
@@ -173,6 +178,7 @@ class Game {
     this.ballShadow.renderOrder = 1;
     this.world.scene.add(this.ballShadow);
 
+    if (AB_MODE) console.log('AB_BOOT assets loaded');
     this.menus.setLoading(0.95, 'Ready.');
     this.setupMenus();
     this.setupTouch();
@@ -223,6 +229,9 @@ class Game {
         const ballNdc = new THREE.Vector3(b.x, b.y, b.z).project(this.world.camera);
         const state = { ballNdc: [ballNdc.x, ballNdc.y, ballNdc.z],
           cameraPosition: this.world.camera.position.toArray(),
+          motion: this.motionProbe.snapshot(), team: this.sim!.teamDiagnostics,
+          motionLoaded: cp ? !!this.views.get(cp.id)?.motion : false,
+          clip: cp ? this.views.get(cp.id)?.motion?.state.currentClipId ?? null : null,
           modelYaw: cp ? this.views.get(cp.id)?.root.rotation.y : null,
           mode: this.broadcast.mode, tick: this.captureTick, seed: this.settings.seed, phase: this.sim!.state.phase,
           ballMinorPixels: this.ballReadability.minorPixels,
@@ -315,6 +324,7 @@ class Game {
     this.phase = 'playing';
     this.accum = 0;
     this.captureTick = 0;
+    this.motionProbe = new MotionProbe();
     this.celebrationTimer = 0;
     this.redrawScoreboards();
   }
@@ -710,6 +720,22 @@ class Game {
       this.world.camera,
       LOD_DISTANCES[this.lodQuality]
     );
+    if (AB_MATCH && controlled) {
+      const view = this.views.get(controlled.id);
+      if (view) {
+        view.root.updateMatrixWorld(true);
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(view.root.getWorldQuaternion(new THREE.Quaternion()));
+        const feet = ['foot_l', 'foot_r'].map((name, i) => {
+          const bone = view.root.getObjectByName(name);
+          if (!bone) return null;
+          const p = bone.getWorldPosition(new THREE.Vector3());
+          const contact = i === 0 ? view.motion?.footPlantedLeft : view.motion?.footPlantedRight;
+          return { x: p.x, y: p.y, z: p.z, contact: !!contact };
+        });
+        this.motionProbe.observe(controlled.id, { x: controlled.vx, z: controlled.vz }, forward,
+          feet.filter((f): f is NonNullable<typeof f> => f !== null), dt);
+      }
+    }
     this.updateOffscreenArrow(controlled);
 
     // ball mesh

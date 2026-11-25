@@ -18,7 +18,7 @@ Cosmetic/post-processing work is paused. This batch addresses the three prioriti
 
 ## 3. Team shape and stoppages
 
-- Contest/receiving/marking jobs persist for 0.8 s, with immediate replanning on holder changes. Two contest slots per team, distinct short/outlet destinations and unique defensive marking assignments replace per-frame ranking in the normal sim path. Role homes have distinct offsets.
+- Contest/receiving/marking jobs persist for 0.8 s, with immediate replanning on holder, phase and active-roster changes. Two contest slots per team, distinct short/outlet destinations and unique defensive marking assignments replace per-frame ranking in the normal sim path. Role homes have distinct offsets.
 - Protected restarts now exclude human as well as CPU tackles. The CPU commit timer belongs to a specific tackler/carrier pair; switching candidates cannot inherit a nearly completed attempt. Stale pre-disposal carriers cannot be tackled after possession changes.
 - CPU wrap range is 1.95 m (human range retained at 2.15 m), above body separation but below the previous 2.3 m reach.
 - Normal tackles are explicitly standing wraps. They no longer randomly invent high contact, a push in the back, or an incorrect disposal. The rules engine and its illegal-contact decisions are unchanged. This is **not** a complete geometry-based illegal-tackle system: high/push/incorrect-disposal actions need explicit action/contact modelling before this controller should generate those flags.
@@ -26,9 +26,9 @@ Cosmetic/post-processing work is paused. This batch addresses the three prioriti
 
 ## Repeatable workflow output, without repeated user uploads
 
-The Motion A/B workflow keeps its experimental SwiftShader status. The match leg:
+The Motion A/B workflow keeps its experimental SwiftShader status. The match leg (now restored to the shipped asset, independent of LOD-capture success):
 
-1. Waits for an explicit first-render readiness flag, rather than assuming HTML load plus 15 seconds means game readiness. Readiness/load/capture failures exit with an error.
+1. Serves the production bundle over local HTTP to Electron on the runner, then waits for an explicit first-render readiness flag, rather than assuming HTML load plus 15 seconds means game readiness. Readiness/load/capture failures exit with an error.
 2. Drives a shared fixed input trace (straight run, cut, reversal, stop/kick, handball, selection/tackle inputs) through the normal match code. Each screenshot advances exactly 30 fixed simulation ticks. 36 frames at 2 fps represent 18 simulation seconds, independent of rendering speed.
 3. Saves per-frame JSON: seed/tick, ball projection/pixel size, camera position/mode/emergency count, selected-player heading/model yaw/velocity, crowd count and tackle/stoppage/audio diagnostics.
 4. Publishes aggregate measurements and **six bounded JPEG previews as check annotations**. These are game-only low-resolution frames, not desktop recordings. This provides an API-accessible visual fallback if the artifact-download host is blocked. Full PNGs, states and MP4 remain in the artifact.
@@ -51,9 +51,9 @@ Run `45417811569` (post-PR #268) passed build/metrics but failed visual-ab. All 
 
 ## Local verification and comparison
 
-`node scripts/check.mjs`: TypeScript, **178 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
+`node scripts/check.mjs`: TypeScript, **184 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
 
-A local numerical comparison used source from branch HEAD `440626d` and this working tree, identical input trace/seeds, 60 simulated seconds per seed. No branch switch or baseline source modification was involved. This is a simulation comparison, not before/after video or human acceptance:
+A local numerical comparison used source from branch HEAD `440626d` and the first candidate `18efb2b`, identical input trace/seeds, 60 simulated seconds per seed. No branch switch or baseline source modification was involved. This is a simulation comparison, not before/after video or human acceptance:
 
 | Seed | Live seconds before → after | Restart events before → after | Free events before → after |
 |---|---:|---:|---:|
@@ -69,3 +69,13 @@ Free events include marks and boundary awards; lower is not inherently better. O
 - Inspect camera continuity, visibility/locator intrusiveness, actual mesh facing and turns in the captured sequence. Tune failures rather than merely raising thresholds.
 - Continuous video and real GPU play remain necessary for motion feel, occlusion/readability and frame pacing. Record wall-clock frame timings separately from scripted simulation time (already kept separate).
 - Broader scenarios, authentic turn/contact assets, movement/contact physics, prior-opportunity fidelity and calibration against real Australian-rules footage remain open. This batch does not claim parity with commercial sports games.
+
+
+## Follow-up batch after PR #272 opened
+
+- Contest jobs now invalidate on phase and roster changes; protected phases assign shape jobs rather than retaining pressure/receiving roles. CPU tackle timers are cleared through loose-ball gaps as well as restart guards.
+- The match capture records actual selected-player rendered-root direction and contact-conditioned world-foot displacement. It reports maximum continuous backwards travel above 3 m/s, AME availability, selected clip, contact-foot speed and team replans. A 0.5-second sustained-backwards limit is an engineering regression guard, not a researched biomechanics threshold. Missing motion observations or AME fallback fail the scripted acceptance check. Contact flags come from clip metadata; foot-speed measurements are not proof of genuine planted-foot contact.
+- Run `45720126542` passed `ab-metrics`; original attract capture completed, LOD capture failed, and the dependent match leg was skipped. No match preview was available, so priorities 1–3 remain visually unaccepted. The follow-up makes capture legs independent after the initial build, restores the shipped model before match capture, and publishes startup/error excerpts even when no state is captured.
+- The capture harness uses an HTTP origin matching the browser build rather than relying on file-protocol fetch behaviour. This is tested with real HTTP requests for HTML, GLB and JSON, but is not claimed as the confirmed cause of the LOD failure.
+- Retrieval was tested against the real run. The installed older `gh` lacks `--slurp`; annotations now use paginated JSON-lines compatible with that client.
+- New seeded audits after phase-aware role handling include seeds with no tackles. Less congestion/fewer foul calls alone is not sufficient acceptance; pressure, tackle frequency and disposal opportunities still require capture review and broader calibration.

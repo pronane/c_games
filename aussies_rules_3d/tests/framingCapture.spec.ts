@@ -58,6 +58,7 @@ it('publishes scripted capture measurements as API-readable annotations and reje
     for (let i = 0; i < 12; i++) writeFileSync(join(dir, `state-${String(i).padStart(3, '0')}.json`), JSON.stringify({
       tick: (i + 1) * 30, mode: 'broadcast', ballNdc: [0, 0, 0.9], ballMinorPixels: 6,
       crowd5: 3, camera: { emergencyCorrections: 0 }, sim: { frees: 1 },
+      motionLoaded: true, motion: { samples: (i + 1) * 30, maxBackwardsSeconds: 0 },
     }));
     writeFileSync(join(dir, 'preview-000.jpg'), Buffer.from([255, 216, 255, 217]));
     const run = () => spawnSync(process.execPath, ['tools/capture_review.mjs', dir], { encoding: 'utf8' });
