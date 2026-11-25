@@ -298,3 +298,15 @@ not, run `python3 tools/download_review_frames.py RUN_ID --out build/review`
 from the game directory (with authenticated `gh`). Full videos remain workflow
 artifacts; still frames cannot establish fluid motion, timing, or foot slide.
 This check publishing requires `checks: write` in the manual `jog-ab` job.
+
+### API-accessible motion previews
+
+The same workflow publishes bounded, three-second, 12 fps compressed MP4
+previews for the two hand close-ups and two fixed-camera jog recordings. Run
+`python3 tools/download_review_videos.py RUN_ID --out build/review` from the
+game directory with authenticated `gh`. Each preview fits within one check
+output, has a SHA-256 integrity check, and may be downscaled further to fit.
+The hand view is cropped around the upper body; the fixed view is uncropped.
+These are useful for inspecting timing, but their reduced resolution and frame
+rate cannot replace the original 30 fps artifact or prove foot contact, mesh
+intersection, or gameplay quality.

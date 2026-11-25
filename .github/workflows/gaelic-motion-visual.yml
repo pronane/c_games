@@ -153,6 +153,17 @@ jobs:
           grep -q 'MOTION fixed-camera begin frame 120' ../build/cmu-jog-report/cmu-jog-fixed.log
           grep -q 'MOTION fixed-camera end frame 210' ../build/cmu-jog-report/cmu-jog-fixed.log
           diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-fixed.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-fixed.log)
+      - name: Publish short motion previews to GitHub checks
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for label in cmu-hands-before cmu-hands-relaxed original-fixed cmu-jog-fixed; do
+            crop=()
+            case "$label" in cmu-hands-*) crop=(--hand-crop);; esac
+            python3 tools/review_video_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" "${crop[@]}" > "../build/cmu-jog-local/${label}-preview.json"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-preview.json" > /dev/null
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
