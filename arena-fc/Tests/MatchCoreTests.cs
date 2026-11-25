@@ -1841,5 +1841,99 @@ Section("Hypermotion data plumbing v2 (manifest curves/contact/velocity)");
     Check("motion engine populates root velocity sample", ms.RootVelocitySampleZ > 0.1f);
 }
 
+Section("Football intelligence Milestone 1 (trajectory/perception/coordinator)");
+{
+    // Ball trajectory determinism and basic physics sanity
+    var t1 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(12f,4f,0), Vector3.Zero, 1.0f);
+    var t2 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(12f,4f,0), Vector3.Zero, 1.0f);
+    bool same = t1.Samples.Count == t2.Samples.Count;
+    for (int i = 0; same && i < t1.Samples.Count; i++) same = (t1.Samples[i].Position - t2.Samples[i].Position).LengthSquared() < 1e-10f;
+    Check("ball trajectory deterministic", same && t1.Samples.Count > 10);
+    var mid = t1.At(0.5f);
+    Check("ball trajectory sample moves forward", mid.Position.X > 1f);
+    Check("ball trajectory gravity applied", t1.At(0.2f).Velocity.Y < 4f);
+
+    // Player reachability
+    float tReach = ArenaFC.Core.Football.PlayerPerception.TimeToReach(Vector3.Zero, Vector3.Zero, new Vector3(10,0,0), 8f, 12f);
+    Check("time to reach positive", tReach > 0.5f && tReach < 3f);
+    float tClose = ArenaFC.Core.Football.PlayerPerception.TimeToReach(Vector3.Zero, Vector3.Zero, new Vector3(1,0,0), 8f, 12f);
+    Check("closer target reached sooner", tClose < tReach);
+
+    // Lane safety
+    Vector3[] oppPos = new[] { new Vector3(5f,0,0.2f) };
+    Vector3[] oppVel = new[] { Vector3.Zero };
+    float safe = ArenaFC.Core.Football.PlayerPerception.LaneSafety(Vector3.Zero, new Vector3(10,0,0), oppPos, oppVel, 18f, 7f, 12f);
+    float clear = ArenaFC.Core.Football.PlayerPerception.LaneSafety(Vector3.Zero, new Vector3(10,0,5), oppPos, oppVel, 18f, 7f, 12f);
+    Check("blocked lane less safe than clear lane", safe < clear);
+
+    // Tactical coordinator determinism / role assignment
+    var eng = new MatchEngine(new MatchOptions { Seed = 123, TeamSize = 11 });
+    for (int i = 0; i < 120; i++) eng.Step(1f/60f, PlayerCommand.None);
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    var a1 = tc.BuildAssignments(eng.State, 0);
+    var a2 = tc.BuildAssignments(eng.State, 0);
+    bool det = a1.Count == a2.Count;
+    for (int i = 0; det && i < a1.Count; i++) det = a1[i].PlayerIndex == a2[i].PlayerIndex && a1[i].Role == a2[i].Role;
+    Check("tactical coordinator deterministic", det && a1.Count > 0);
+    { var seen = new System.Collections.Generic.HashSet<int>(); bool uniq = true; foreach (var a in a1) uniq &= seen.Add(a.PlayerIndex); Check("tactical coordinator assigns unique roles per player", uniq && seen.Count == a1.Count); }
+}
+
+Section("Animation telemetry metrics (contact/transition/plant continuity)");
+{
+    string manifestJson = """
+    {
+      "version": 2,
+      "clips": [
+        {
+          "id":"run","category":"Locomotion","duration":1.0,"contactFraction":-1.0,
+          "footPlantFrames":[0.25,0.75],"footPlantSides":["Left","Right"],
+          "rootVelocityX":0.0,"rootVelocityZ":3.0,"preferredSpeed":3.0,"preferredTurnRate":0.0,
+          "ballState":"None","tags":[],"boneCount":18,"loop":true,
+          "plantCurveLeft":[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+          "contactWindowStart":-1.0,"contactWindowEnd":-1.0,"rootVelocitySamples":[0,3,0,3,0,3,0,3]
+        },
+        {
+          "id":"kick","category":"Kick","duration":0.8,"contactFraction":0.5,
+          "footPlantFrames":[0.2],"footPlantSides":["Left"],
+          "rootVelocityX":0.0,"rootVelocityZ":0.5,"preferredSpeed":1.0,"preferredTurnRate":0.0,
+          "ballState":"Possessed","tags":["dedicated"],"boneCount":18,"loop":false,
+          "plantCurveLeft":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+          "contactWindowStart":0.3,"contactWindowEnd":0.55,"rootVelocitySamples":[0,0.5,0,0.5,0,0.5,0,0.5]
+        }
+      ]
+    }
+    """;
+    var clips = ArenaFC.Core.Animation.ClipManifestLoader.Parse(manifestJson);
+    var eng = new ArenaFC.Core.Animation.MotionEngine();
+    eng.LoadClips(clips);
+    var ms = new ArenaFC.Core.Animation.MotionState();
+    // Run locomotion and measure plant/contact continuity.
+    float maxPhaseJump = 0f; float prevPhase = 0f; bool prevSet = false;
+    for (int i = 0; i < 180; i++)
+    {
+        eng.Update(ms, 3f, 0f, ArenaFC.Core.Animation.BallState.None, ArenaFC.Core.Animation.PlayerIntent.Move, 1f/60f);
+        float p = ms.RenderPhase;
+        if (prevSet)
+        {
+            float dp = p - prevPhase;
+            if (dp < -0.5f) dp += 1f;
+            if (dp > 0.5f) dp -= 1f;
+            maxPhaseJump = MathF.Max(maxPhaseJump, MathF.Abs(dp));
+        }
+        prevPhase = p; prevSet = true;
+    }
+    Check("locomotion phase continuity (no large jumps)", maxPhaseJump < 0.2f, $"maxJump={maxPhaseJump:F3}");
+    Check("plant weights in valid range", ms.PlantWeightLeft >= 0f && ms.PlantWeightLeft <= 1f && ms.PlantWeightRight >= 0f && ms.PlantWeightRight <= 1f);
+
+    // Contact alignment: request kick with TTC and ensure contact window/phase are reasonable.
+    var mk = new ArenaFC.Core.Animation.MotionState();
+    for (int i = 0; i < 30; i++) eng.Update(mk, 2f, 0f, ArenaFC.Core.Animation.BallState.Possessed, ArenaFC.Core.Animation.PlayerIntent.Move, 1f/60f);
+    eng.Update(mk, 1.5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, ArenaFC.Core.Animation.PlayerIntent.Shoot, 1f/60f, 0.35f);
+    Check("kick transition enters contact-timed clip", mk.RenderClipId.Length > 0);
+    Check("contact window signal present for kick clip", clips[1].HasContactWindow && clips[1].HasContact);
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
