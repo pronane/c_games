@@ -17,17 +17,25 @@ cat "$OUT/run.json"
 node --input-type=module - "$OUT" <<'NODE'
 import fs from 'node:fs';
 import path from 'node:path';
+import transport from './tools/preview_transport.cjs';
 const dir = process.argv[2];
-for (const file of fs.readdirSync(dir).filter(f => /^annotations-.*\.jsonl$/.test(f))) {
-  for (const annotation of fs.readFileSync(path.join(dir, file), 'utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line))) {
-    const match = /^GAMEPLAY_PREVIEW_(\d+)$/.exec(annotation.title ?? '');
-    if (match) {
-      const target = path.join(dir, `preview-${match[1]}.jpg`);
-      fs.writeFileSync(target, Buffer.from(annotation.message.trim(), 'base64'));
-      console.log(`Recovered game preview: ${target}`);
-    } else console.log(`${annotation.annotation_level}: ${annotation.title}: ${annotation.message}`);
-  }
+const annotations = fs.readdirSync(dir).filter(f => /^annotations-.*\.jsonl$/.test(f)).flatMap(file =>
+  fs.readFileSync(path.join(dir, file), 'utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line)));
+const { images, errors } = transport.decodePreviews(annotations);
+for (const { id, bytes } of images) {
+  const target = path.join(dir, `preview-${id}.jpg`);
+  fs.writeFileSync(target, bytes);
+  console.log(`Recovered integrity-checked game preview: ${target}`);
 }
+for (const { id, reason } of errors) {
+  const target = path.join(dir, `preview-${id}.jpg`);
+  if (fs.existsSync(target)) fs.unlinkSync(target);
+  console.error(`UNVERIFIED preview ${id}: ${reason}`);
+}
+for (const a of annotations.filter(a => !(a.title ?? '').startsWith('GAMEPLAY_PREVIEW_')))
+  console.log(`${a.annotation_level}: ${a.title}: ${a.message}`);
+if (!images.length) console.error('No verified previews recovered; visual review remains unavailable.');
+
 NODE
 if gh run download "$RUN" --repo "$REPO" --name aussies-rules-motion-ab-visual --dir "$OUT/visual"; then
   echo "Video and capture states downloaded into $OUT/visual — ready for frame review."

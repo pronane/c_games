@@ -9,20 +9,13 @@ for (const leg of ['original', 'lod', 'match']) {
   const log = path.join(parent, leg, 'console.log');
   if (!fs.existsSync(log)) continue;
   const lines = fs.readFileSync(log, 'utf8').split(/\r?\n/)
-    .filter(line => /AB_BOOT|CAPTURE_|LOAD_FAILED|SERVER_FAILED|Error|error|failed|RENDER PROCESS GONE/.test(line)).slice(-8);
+    .filter(line => /AB_BOOT|CAPTURE_READY|CAPTURE_NOT_READY|CAPTURE_TIMEOUT|LOAD_FAILED|SERVER_FAILED|Error|error|failed|RENDER PROCESS GONE/.test(line)).slice(-8);
   if (lines.length) {
     const message = lines.map(s => s.slice(0, 350)).join(' | ').replace(/%/g, '%25');
     console.log(`::notice title=Capture startup ${leg}::${message}`);
   }
 }
 const files = dir && fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /^state-\d+\.json$/.test(f)).sort() : [];
-// Six low-resolution game frames, bounded well below annotation message limits.
-// This is a fallback for artifact-host restrictions, not a replacement for MP4s.
-if (dir && fs.existsSync(dir)) for (const file of fs.readdirSync(dir).filter(f => /^preview-\d+\.jpg$/.test(f)).sort().slice(0, 6)) {
-  const bytes = fs.readFileSync(path.join(dir, file));
-  if (bytes.length <= 40000) console.log(`::notice title=GAMEPLAY_PREVIEW_${file.match(/\d+/)[0]}::${bytes.toString('base64')}`);
-  else console.warn(`::warning::Preview too large for annotation: ${file}`);
-}
 const samples = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
 if (samples.length < 12) {
   console.error(`::error::Scripted gameplay capture missing/too short: ${samples.length} states`);
@@ -43,6 +36,7 @@ if (samples.length < 12) {
   };
   if (report.motionFallbackSamples) console.warn(`::warning::AME unavailable in ${report.motionFallbackSamples} captured samples; legacy animation fallback is not AME validation`);
   const motion = report.motion;
+  if (!(motion?.contactFootSamples > 0)) console.warn('::warning::No contact-foot observations: foot sliding remains unverified (the shipped manifest has no authored plant frames)');
   const motionFailure = !motion || !(motion.samples > 0) || !Number.isFinite(motion.maxBackwardsSeconds) || motion.maxBackwardsSeconds > 0.5 || report.motionFallbackSamples > 0;
   if (motionFailure) console.error(`::error::Runtime motion evidence missing, AME fallback, or sustained backwards travel above 0.5s: ${JSON.stringify(motion)}`);
   const text = JSON.stringify(report);

@@ -101,8 +101,10 @@ async function capture(win, i) {
       fs.writeFileSync(file, img.toPNG());
       // A small set of game-only JPEGs can also travel through check annotations.
       if (QUERY.drive === 'manual' && i % 6 === 0) {
-        let preview = img.resize({ width: 640 }).toJPEG(40);
-        if (preview.length > 40000) preview = img.resize({ width: 480 }).toJPEG(30);
+        let preview = img.resize({ width: 480 }).toJPEG(35);
+        if (preview.length > 10000) preview = img.resize({ width: 400 }).toJPEG(25);
+        if (preview.length > 10000) preview = img.resize({ width: 320 }).toJPEG(15);
+        if (preview.length > 10000) throw new Error('Preview exceeds annotation transport budget');
         fs.writeFileSync(path.join(OUT, `preview-${String(i).padStart(3, '0')}.jpg`), preview);
       }
     } catch (err) {

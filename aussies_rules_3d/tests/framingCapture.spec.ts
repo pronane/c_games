@@ -60,12 +60,10 @@ it('publishes scripted capture measurements as API-readable annotations and reje
       crowd5: 3, camera: { emergencyCorrections: 0 }, sim: { frees: 1 },
       motionLoaded: true, motion: { samples: (i + 1) * 30, maxBackwardsSeconds: 0 },
     }));
-    writeFileSync(join(dir, 'preview-000.jpg'), Buffer.from([255, 216, 255, 217]));
     const run = () => spawnSync(process.execPath, ['tools/capture_review.mjs', dir], { encoding: 'utf8' });
     const result = run();
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('::notice title=Scripted gameplay measurements::');
-    expect(result.stdout).toContain('::notice title=GAMEPLAY_PREVIEW_000::/9j/2Q==');
     writeFileSync(join(dir, 'state-011.json'), JSON.stringify({ tick: 999, mode: 'broadcast', ballNdc: [0, 0, 0.9], ballMinorPixels: 6, crowd5: 3 }));
     expect(run().status).toBe(1);
   } finally { rmSync(dir, { recursive: true, force: true }); }

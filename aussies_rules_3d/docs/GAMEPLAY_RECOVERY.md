@@ -51,7 +51,7 @@ Run `45417811569` (post-PR #268) passed build/metrics but failed visual-ab. All 
 
 ## Local verification and comparison
 
-`node scripts/check.mjs`: TypeScript, **184 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
+`node scripts/check.mjs`: TypeScript, **188 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
 
 A local numerical comparison used source from branch HEAD `440626d` and the first candidate `18efb2b`, identical input trace/seeds, 60 simulated seconds per seed. No branch switch or baseline source modification was involved. This is a simulation comparison, not before/after video or human acceptance:
 
@@ -79,3 +79,16 @@ Free events include marks and boundary awards; lower is not inherently better. O
 - The capture harness uses an HTTP origin matching the browser build rather than relying on file-protocol fetch behaviour. This is tested with real HTTP requests for HTML, GLB and JSON, but is not claimed as the confirmed cause of the LOD failure.
 - Retrieval was tested against the real run. The installed older `gh` lacks `--slurp`; annotations now use paginated JSON-lines compatible with that client.
 - New seeded audits after phase-aware role handling include seeds with no tackles. Less congestion/fewer foul calls alone is not sufficient acceptance; pressure, tackle frequency and disposal opportunities still require capture review and broader calibration.
+
+
+## Capture evidence and preview transport follow-up
+
+Run `45721534269` at `b8d40e6` passed **all jobs**, including visual-ab. All three capture legs completed. The scripted shipped-asset match reported 36 states (ticks 30–1080), zero tick errors, zero ball-centre framing failures, zero emergency corrections, no AME fallback and zero sustained backwards time for the observed selected player. It recorded two whistle triggers, zero free events and zero tackle attempts in this short scenario. These are observed values, not evidence of realistic pressure/tackle frequency.
+
+The run also recorded **zero contact-foot samples**. Inspection confirmed the shipped motion manifest's plant-frame arrays are empty. This is a real metadata/validation gap: foot sliding remains unverified, and no fake contacts were inserted simply to produce a passing number.
+
+The first API preview attempt was truncated: each annotation message was limited to 4096 characters, producing 3072-byte JPEG fragments with grey incomplete image areas. Those fragments are **not rendering evidence**. Preview publication now uses messages below 3 KB, at most five parts per image, one image per workflow step, SHA-256 integrity validation and JPEG start/end validation. Missing/truncated/duplicate/altered parts are rejected rather than displayed. Round-trip tests simulate the observed 4096-character limit. Startup excerpts exclude capture-state records so actual startup failures stay readable.
+
+An optional `workflow_dispatch` input `review_run` downloads an already completed run's artifact **on the GitHub runner**, repacks its original frames and republishes integrity-checked preview annotations. It does not advance or re-verify gameplay. This allows recovering source evidence without repeated full captures or asking users to upload files. The retrieval script rejects the old unverified format.
+
+Priorities 1–3 have implementation and automated regression coverage; visual acceptance remains open until intact previews/video support it. Foot-contact metadata and convincing movement/contact animation remain explicit outstanding gaps, not completed checkboxes.
