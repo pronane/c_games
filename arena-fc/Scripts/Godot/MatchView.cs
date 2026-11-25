@@ -602,7 +602,21 @@ public partial class MatchView : Node3D
             rig.Rotation = new Vector3(0, yaw, 0);
             // MotionDriver owns only render-phase state; simulation PlayerState and BallState
             // remain read-only inputs. Keep the mature procedural selector if metadata is absent.
-            var motion = _motion.UpdatePlayer(i, p, b, owner == i, Engine.CurrentTick);
+            ArenaFC.Core.Football.PlayerActionContract? contract = null;
+            if (b.Owner < 0 && b.PassReceiver == i)
+            {
+                contract = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = i,
+                    Intent = "receive",
+                    TargetPosition = b.Pos,
+                    BallContactPosition = b.Pos,
+                    BallContactTime = MathF.Max(0.05f, MathF.Min(1.2f, Mx.FlatDist(p.Pos, b.Pos) / MathF.Max(1f, Mx.Flat(b.Vel).Length()))),
+                    DesiredSpeed = 7.5f,
+                    RequiresBallContact = true,
+                };
+            }
+            var motion = _motion.UpdatePlayer(i, p, b, owner == i, Engine.CurrentTick, contract);
             if (rig.Soccer != null && motion != null)
                 rig.Soccer.ApplyMotion(motion);
             RigAnimator.Pose(rig, p, dt, _time, b.Pos);

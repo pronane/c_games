@@ -86,7 +86,7 @@ public sealed class MotionDriver
 
     /// <summary>Returns null when the manifest is absent, preserving the existing rig selector.</summary>
     public MotionState? UpdatePlayer(int index, PlayerState player, ArenaFC.Core.BallState ball,
-        bool ownsBall, int currentTick)
+        bool ownsBall, int currentTick, ArenaFC.Core.Football.PlayerActionContract? contract = null)
     {
         if (!IsLoaded || index < 0 || index >= _slots.Length) return null;
         var slot = _slots[index];
@@ -95,6 +95,8 @@ public sealed class MotionDriver
         slot.HasTick = true;
         float dt = elapsedTicks * MatchEngine.Dt;
         float yaw = MathF.Atan2(player.Facing.X, player.Facing.Z);
+        if (contract != null && contract.FacingDirection.LengthSquared() > 1e-6f)
+            yaw = MathF.Atan2(contract.FacingDirection.X, contract.FacingDirection.Z);
         float turnRate = 0f;
         if (slot.HasYaw && dt > 1e-5f) turnRate = Mx.AngleDiff(yaw, slot.LastYaw) / dt;
         slot.LastYaw = yaw;
@@ -134,7 +136,12 @@ public sealed class MotionDriver
             float pendingTtc = Math.Max(0f, player.ActionTimer);
             if (untilContact < 0f || pendingTtc < untilContact) untilContact = pendingTtc;
         }
+        if (contract != null && contract.BallContactTime > 0f)
+        {
+            if (untilContact < 0f || contract.BallContactTime < untilContact) untilContact = contract.BallContactTime;
+        }
         float speed = Mx.Flat(player.Vel).Length();
+        if (contract != null && contract.DesiredSpeed > 0f) speed = MathF.Max(speed, MathF.Min(contract.DesiredSpeed, contract.SpeedLimit));
         // Facing-root XZ (x = right, z = forward), the space the feature table is baked in.
         var fwd = Mx.Norm(Mx.Flat(player.Facing));
         if (fwd.LengthSquared() < 1e-6f) fwd = new System.Numerics.Vector3(0, 0, 1);

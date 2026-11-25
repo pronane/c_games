@@ -1531,11 +1531,12 @@ public sealed partial class MatchEngine
                 // One challenger at a time: only the designated presser commits, and
                 // mostly when the carrier's touch is loose.  Every defender within
                 // 2.2 m used to lunge ~3 times a second (~120 tackles a match).
-                bool presser = p.Index == ClosestToBall(p.Team, 0);
+                var tac = GetTacticalAssignment(p.Index);
+                bool presser = tac != null ? tac.Role == "press" : p.Index == ClosestToBall(p.Team, 0);
                 float looseTouch = Mx.FlatDist(carrier.Pos, ball.Pos) > .45f || carrier.FirstTouchQuality < .5f ? .22f : 0f;
                 float aggression = presser
                     ? .22f + Options.Difficulty * .04f + (p.Spec.Defending - .5f) * .08f + looseTouch
-                    : .01f;
+                    : (tac?.Role == "cover" ? .04f : .01f);
                 if (p.Team != carrier.Team && d < 2.0f && p.TackleLock <= 0 && Rng.Next() < aggression)
                     AttemptTackle(p);
             }
@@ -1655,6 +1656,17 @@ public sealed partial class MatchEngine
         // dominant factor so passes go where the player points.
         bool hasAim = aimDir.LengthSquared() > 0.15f;
         Vector2 aim = hasAim ? Vector2.Normalize(aimDir) : new Vector2(from.Facing.X, from.Facing.Z);
+        float passSpeed = longPass ? 20f : through ? 17f : 13f;
+        int oppCount = 0;
+        foreach (var o in State.Players) if (o.Team != from.Team && !o.SentOff) oppCount++;
+        var oppP = new Vector3[oppCount];
+        var oppV = new Vector3[oppCount];
+        int oi = 0;
+        foreach (var o in State.Players)
+        {
+            if (o.Team == from.Team || o.SentOff) continue;
+            oppP[oi] = o.Pos; oppV[oi] = o.Vel; oi++;
+        }
         foreach (var q in State.Players)
         {
             if (q.Team != from.Team || q.Index == from.Index || q.IsKeeper || q.SentOff) continue;
@@ -1668,12 +1680,15 @@ public sealed partial class MatchEngine
             float aimAlign = d > 0.01f ? Vector2.Dot(Vector2.Normalize(toMate), aim) : 0f;
             float openness = NearestOpponent(q, out float od) is null ? 8f : MathF.Min(od, 8f);
             bool laneBlocked = LaneRisk(from, q, d) > 0f;
+            float laneSafety = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from.Pos, q.Pos, oppP, oppV, passSpeed, 7f, 12f);
             // Aim alignment dominates (weight 8.0) so stick direction controls
             // the pass. AI factors (forward/openness) break ties.
             // An opponent who can step into the lane before the ball passes him
             // turns the pass into an interception (61% of AI passes went past an
             // opponent within 1.5 m of the line; real completion is ~80%).
             float score = aimAlign * 8.0f + forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? (hasAim ? 6f : 14f) : 0f);
+            score += (laneSafety - 0.55f) * 3.5f;
+            if (laneSafety < 0.20f) score -= 5f;
             // A long pass wants a distant, advanced target; a short pass prefers
             // the safe nearby option instead of always hitting the furthest man.
             if (longPass) score += MathF.Min(d, 38f) * .16f + forward * .18f;
@@ -1691,7 +1706,7 @@ public sealed partial class MatchEngine
             if (!hasAim && !laneBlocked && MathF.Abs(q.Pos.Z) > Mx.HalfWidth * .45f
                 && MathF.Abs(GoalPos(from.Team).X - q.Pos.X) < 40f) score += 2.5f;
             score += Rng.Range(-1.2f, 1.2f);
-            if (score > bestScore) { bestScore = score; best = q.Index; bestBlocked = laneBlocked; }
+            if (score > bestScore) { bestScore = score; best = q.Index; bestBlocked = laneBlocked || laneSafety < 0.25f; }
         }
         LastPassTargetBlocked = bestBlocked;
         return best;
@@ -3304,6 +3319,37 @@ public sealed partial class MatchEngine
     // runner.  Built from the naming order so indices are stable for both sides.
     private readonly LinkUpPlays _linkUps = new();
     private readonly List<(float x, float z)> _posScratch = new();
+    // PR C: tactical coordinator cache + hysteresis
+    private readonly ArenaFC.Core.Football.TacticalCoordinator _tactical = new();
+    private int _tacticalTick = -1;
+    private readonly Dictionary<int, ArenaFC.Core.Football.TacticalCoordinator.Assignment> _tacticalByPlayer = new();
+    private readonly Dictionary<int, (string role, int ticks)> _tacticalHysteresis = new();
+
+    private ArenaFC.Core.Football.TacticalCoordinator.Assignment? GetTacticalAssignment(int playerIndex)
+    {
+        if (_tacticalTick != _tick)
+        {
+            _tacticalTick = _tick;
+            _tacticalByPlayer.Clear();
+            var t0 = _tactical.BuildAssignments(State, 0);
+            var t1 = _tactical.BuildAssignments(State, 1);
+            void AddWithHysteresis(ArenaFC.Core.Football.TacticalCoordinator.Assignment a)
+            {
+                if (_tacticalHysteresis.TryGetValue(a.PlayerIndex, out var h) && h.ticks > 0 && h.role != a.Role)
+                {
+                    // Keep stable roles briefly unless urgent press/carrier change.
+                    bool urgent = a.Role == "press" || a.Role == "carrier" || h.role == "carrier";
+                    if (!urgent) { a.Role = h.role; a.Intent = h.role; _tacticalHysteresis[a.PlayerIndex] = (h.role, h.ticks - 1); }
+                    else _tacticalHysteresis[a.PlayerIndex] = (a.Role, 30);
+                }
+                else _tacticalHysteresis[a.PlayerIndex] = (a.Role, 20);
+                _tacticalByPlayer[a.PlayerIndex] = a;
+            }
+            foreach (var a in t0) AddWithHysteresis(a);
+            foreach (var a in t1) AddWithHysteresis(a);
+        }
+        return _tacticalByPlayer.TryGetValue(playerIndex, out var asn) ? asn : null;
+    }
 
     private static int RunTypeFor(string type) => type switch
     {
