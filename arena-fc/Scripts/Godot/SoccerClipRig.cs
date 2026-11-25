@@ -1022,9 +1022,10 @@ public sealed partial class SoccerClipRig : Node3D
                 posVel = (oldTx.Origin - prevTx.Origin) / dt;
                 Quaternion prevRot = prevTx.Basis.GetRotationQuaternion();
                 Quaternion dq = (oldRot * prevRot.Inverse()).Normalized();
-                dq.GetAxisAngle(out Vector3 axis, out float angle);
+                Vector3 axis = dq.GetAxis();
+                float angle = dq.GetAngle();
                 if (angle > Mathf.Pi) angle -= Mathf.Tau;
-                angVel = axis * (angle / dt);
+                if (axis.LengthSquared() > 1e-6f) angVel = axis.Normalized() * (angle / dt);
                 if (angVel.Length() > 12f) angVel = angVel.Normalized() * 12f;
             }
 
@@ -1074,7 +1075,7 @@ public sealed partial class SoccerClipRig : Node3D
         {
             _inertialActive = false;
             foreach (var ib in _inertialBones)
-                Skel.ClearBoneGlobalPoseOverride(ib.bone);
+                Skel.SetBoneGlobalPoseOverride(ib.bone, Transform3D.Identity, 0f, false);
             _inertialBones.Clear();
             _lastInertialEnergy = 0f;
         }
@@ -1337,6 +1338,97 @@ public sealed partial class SoccerClipRig : Node3D
         _hasPrevPelvisPos = true;
     }
 
+
+    private void SolveTwoBone(BoneData b, Vector3 targetWorld, Vector3 rootWorld, float yaw)
+    {
+        var hip = Skel.GetBoneGlobalPose(b.Thigh).Origin;
+        float l1 = Mathf.Max(0.001f, b.ThighRest.Length());
+        float l2 = Mathf.Max(0.001f, b.ShinRest.Length());
+        var toTarget = targetWorld - hip;
+        float targetDist = toTarget.Length();
+        float total = l1 + l2;
+        float minLen = Mathf.Abs(l1 - l2) + 0.002f;
+        float dist = Mathf.Clamp(targetDist, minLen, total * 0.995f);
+        var dir = targetDist > 1e-6f ? toTarget / targetDist : Vector3.Up;
+
+        float cosA = (l1 * l1 + dist * dist - l2 * l2) / (2f * l1 * dist);
+        cosA = Mathf.Clamp(cosA, -1f, 1f);
+        float angA = Mathf.Acos(cosA);
+
+        var fwd = new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw));
+        var axis = dir.Cross(fwd);
+        if (axis.LengthSquared() < 1e-6f) axis = Vector3.Right;
+        axis = axis.Normalized();
+        var kneeDir = dir.Rotated(axis, angA);
+        var knee = hip + kneeDir * l1;
+        var end = hip + dir * dist;
+
+        // Hypermotion-style knee clamp: prevent hyperextension / impossible folds.
+        Vector3 upper = knee - hip;
+        Vector3 lower = end - knee;
+        if (upper.LengthSquared() > 1e-8f && lower.LengthSquared() > 1e-8f)
+        {
+            float cosK = Mathf.Clamp(upper.Normalized().Dot((-lower).Normalized()), -1f, 1f);
+            float kneeDeg = Mathf.RadToDeg(Mathf.Acos(cosK));
+            float clampedDeg = Mathf.Clamp(kneeDeg, 8f, 155f);
+            if (Mathf.Abs(clampedDeg - kneeDeg) > 0.5f)
+            {
+                float targetRad = Mathf.DegToRad(clampedDeg);
+                float proj = (l1 * l1 - l2 * l2 + dist * dist) / (2f * dist);
+                float h = Mathf.Sqrt(Mathf.Max(0.0001f, l1 * l1 - proj * proj));
+                Vector3 bendDir = (knee - (hip + dir * proj));
+                if (bendDir.LengthSquared() < 1e-8f) bendDir = axis;
+                bendDir = bendDir.Normalized();
+                knee = hip + dir * proj + bendDir * h;
+                Vector3 nu = knee - hip;
+                if (nu.LengthSquared() > 1e-8f) knee = hip + nu.Normalized() * l1;
+                Vector3 nl = end - knee;
+                if (nl.LengthSquared() > 1e-8f) end = knee + nl.Normalized() * l2;
+            }
+        }
+
+        var thighQuat = ShortestArc(b.ThighRest.Normalized(), (knee - hip).Normalized());
+        var shinQuat = ShortestArc(b.ShinRest.Normalized(), (end - knee).Normalized());
+        Skel.SetBonePoseRotation(b.Thigh, thighQuat);
+        Skel.SetBonePoseRotation(b.Shin, shinQuat);
+    }
+
+    private static Quaternion ShortestArc(Vector3 from, Vector3 to)
+    {
+        from = from.Normalized(); to = to.Normalized();
+        float dot = Mathf.Clamp(from.Dot(to), -1f, 1f);
+        if (dot > .999999f) return Quaternion.Identity;
+        if (dot < -.999999f)
+        {
+            var axis = from.Cross(Vector3.Up);
+            if (axis.LengthSquared() < 1e-6f) axis = from.Cross(Vector3.Right);
+            return new Quaternion(axis.Normalized(), Mathf.Pi);
+        }
+        var axis2 = from.Cross(to).Normalized();
+        float angle = Mathf.Acos(dot);
+        return new Quaternion(axis2, angle);
+    }
+
+    // ---- Phase 1.5 look-at + reach --------------------------------------
+
+    private void UpdateLookAt(Vector3 worldPos, float yaw, Vector3 ballWorld)
+    {
+        if (ballWorld == Vector3.Zero || Skel == null) { _lookYaw = 0f; _lookPitch = 0f; return; }
+        var toBall = ballWorld - (worldPos + Vector3.Up * 1.6f);
+        float dist = toBall.Length();
+        if (dist < .01f) return;
+        float ballYaw = Mathf.Atan2(-toBall.X, -toBall.Z);
+        float yawDiff = Mathf.AngleDifference(ballYaw, yaw);
+        _lookYaw = Mathf.Clamp(yawDiff, -.9f, .9f);
+        _lookPitch = Mathf.Clamp(Mathf.Atan2(toBall.Y, new Vector2(toBall.X, toBall.Z).Length()), -.5f, .5f);
+    }
+
+    private void UpdateReach(Vector3 worldPos, float yaw, Vector3 ballWorld)
+    {
+        if (ballWorld == Vector3.Zero) { _reach = 0f; return; }
+        float dist = (ballWorld - worldPos).Length();
+        _reach = Mathf.Clamp(1f - (dist - .4f) / 1.2f, 0f, 1f);
+    }
 
     private void ApplyLookAndReach()
     {
