@@ -16,7 +16,7 @@ TIMES = (4.2, 4.7, 5.2, 5.7, 6.2, 6.7)
 MAX_TEXT = 60000  # GitHub's check output text limit is 65535 characters.
 
 
-def build_payload(video, label, sha, run_id, repository, ffmpeg='ffmpeg'):
+def build_payload(video, label, sha, run_id, repository, ffmpeg='ffmpeg', hand_crop=False):
     if not re.fullmatch(r'[a-z0-9-]{1,48}', label):
         raise ValueError('invalid review label')
     if not re.fullmatch(r'[0-9a-f]{40}', sha) or not str(run_id).isdigit():
@@ -26,15 +26,18 @@ def build_payload(video, label, sha, run_id, repository, ffmpeg='ffmpeg'):
     for width, quality in ((400, 12), (320, 15), (256, 20), (192, 25)):
         frames = []
         for second in TIMES:
+            # The scripted hand close-up is rendered at 960x540. Crop the
+            # upper body before downsampling so fingers remain inspectable.
+            filt = (f'crop=500:360:280:70,scale={width}:-2' if hand_crop else f'scale={width}:-2')
             image = subprocess.run([ffmpeg, '-v', 'error', '-ss', str(second), '-i', str(video),
-                                    '-frames:v', '1', '-vf', f'scale={width}:-2', '-q:v', str(quality),
+                                    '-frames:v', '1', '-vf', filt, '-q:v', str(quality),
                                     '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'],
                                    check=True, stdout=subprocess.PIPE).stdout
             if not image.startswith(b'\xff\xd8') or not image.endswith(b'\xff\xd9'):
                 raise ValueError(f'missing or invalid frame at {second}s')
             frames.append({'seconds': second, 'jpeg_base64': base64.b64encode(image).decode('ascii')})
         text = json.dumps({'format': 1, 'run_id': str(run_id), 'label': label,
-                           'width': width, 'frames': frames}, separators=(',', ':'))
+                           'width': width, 'hand_crop': hand_crop, 'frames': frames}, separators=(',', ':'))
         if len(text) <= MAX_TEXT:
             return {'name': f'Motion review frames: {label}', 'head_sha': sha,
                     'external_id': str(run_id), 'status': 'completed', 'conclusion': 'neutral',
@@ -50,8 +53,9 @@ def main():
     parser.add_argument('video', type=Path); parser.add_argument('--label', required=True)
     parser.add_argument('--sha', required=True); parser.add_argument('--run-id', required=True)
     parser.add_argument('--repository', required=True); parser.add_argument('--ffmpeg', default='ffmpeg')
+    parser.add_argument('--hand-crop', action='store_true', help='crop the known 960x540 scripted hand close-up before scaling')
     args = parser.parse_args()
-    print(json.dumps(build_payload(args.video, args.label, args.sha, args.run_id, args.repository, args.ffmpeg)))
+    print(json.dumps(build_payload(args.video, args.label, args.sha, args.run_id, args.repository, args.ffmpeg, args.hand_crop)))
 
 
 if __name__ == '__main__': main()

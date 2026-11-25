@@ -135,7 +135,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           for label in cmu-hands-before cmu-hands-relaxed; do
-            python3 tools/review_frame_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" > "../build/cmu-jog-local/${label}-check.json"
+            python3 tools/review_frame_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --hand-crop > "../build/cmu-jog-local/${label}-check.json"
             gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-check.json" > /dev/null
           done
       - name: Record fixed-camera jog comparison

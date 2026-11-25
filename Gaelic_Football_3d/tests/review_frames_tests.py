@@ -19,6 +19,10 @@ with tempfile.TemporaryDirectory() as tmp:
     with patch.object(pack.subprocess, 'run', return_value=Result()):
         payload = pack.build_payload('sample.mp4', 'hands-before', 'a'*40, '123', 'owner/repo')
     assert payload['external_id'] == '123' and payload['conclusion'] == 'neutral'
+    with patch.object(pack.subprocess, 'run', return_value=Result()) as run:
+        cropped = pack.build_payload('sample.mp4', 'hands-before', 'a'*40, '123', 'owner/repo', hand_crop=True)
+    assert json.loads(cropped['output']['text'])['hand_crop']
+    assert 'crop=500:360:280:70' in run.call_args.args[0][run.call_args.args[0].index('-vf')+1]
     label, count = unpack.save_frames({'output': payload['output']}, '123', Path(tmp))
     assert label == 'hands-before' and count == len(pack.TIMES)
     assert (Path(tmp) / label / 'frame-01.jpg').read_bytes() == Result.stdout
