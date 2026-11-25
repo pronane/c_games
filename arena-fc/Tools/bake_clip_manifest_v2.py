@@ -463,6 +463,17 @@ def main():
     args = [a for a in args if a != "--check"]
     manifest_path = args[0] if len(args) > 0 else "arena-fc/Data/clips/clip_manifest.json"
     glb_path = args[1] if len(args) > 1 else GLB_DEFAULT
+    # Allow running from repo root or from arena-fc/ directory.
+    if not os.path.exists(manifest_path) and os.path.exists(os.path.basename(manifest_path).join(["Data/clips/", ""])):
+        pass
+    if not os.path.exists(manifest_path):
+        alt = manifest_path.replace("arena-fc/", "", 1)
+        if os.path.exists(alt):
+            manifest_path = alt
+    if not os.path.exists(glb_path):
+        alt = glb_path.replace("arena-fc/", "", 1)
+        if os.path.exists(alt):
+            glb_path = alt
 
     glb = None
     if os.path.exists(glb_path):
