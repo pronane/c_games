@@ -110,6 +110,8 @@ jobs:
           timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog.mp4 > ../build/cmu-jog-report/cmu-jog.log 2>&1
           test -s ../build/cmu-jog-report/original.mp4
           test -s ../build/cmu-jog-report/cmu-jog.mp4
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-arm-assist.mp4 > ../build/cmu-jog-report/cmu-jog-arm-assist.log 2>&1
+          test -s ../build/cmu-jog-report/cmu-jog-arm-assist.mp4
       - name: Record fixed-camera jog comparison
         working-directory: Gaelic_Football_3d
         env:

@@ -244,3 +244,23 @@ thigh-local step was 1.4 mm during turns, 3.7 mm during non-turn cross-fades,
 and 6.4 mm during non-turn, non-cross-fade frames; the largest paired leg-IK
 change was 4.1 mm. This does not cover actual gameplay, camera perspective,
 raylib 6 or occlusion and does not establish the cause of the reported issue.
+
+### Experimental jog arm assist
+
+`--jog-arm-assist` is an **opt-in experiment**, not the default. A shared
+helper profiles each hand's forward movement relative to its shoulder and the
+opposite knee's forward movement relative to its hip. It enables a bounded
+additional shoulder swing only where the source arm motion is small but
+already correlates with the opposite leg. Strong, ambiguous and uncorrelated
+source motion is left unchanged. The adjustment is phased by the current
+opposite leg, fades through locomotion cross-fades, and rigidly rotates each arm
+subtree so bone lengths are preserved. It is excluded during ball possession,
+jumps and actions, and does not affect simulation or gait selection.
+
+With the local experimental CMU clip, unblended wrist forward ranges relative
+to the shoulder change from roughly 0.137/0.110 m to 0.191/0.160 m in the
+headless bone proxy; the shipped jog's stronger arm motion is unchanged. This
+is not a visual quality, hand-mesh, transition or performance guarantee. The
+manual visual workflow records a separate `cmu-jog-arm-assist.mp4` beside the
+unmodified CMU version for review. Do not make it the default based on these
+numbers alone.

@@ -165,3 +165,26 @@ float am_smoothstep(float x)
     if (x >= 1.0f) return 1.0f;
     return x*x*(3.0f - 2.0f*x);
 }
+
+float am_arm_swing_profile(const float *arm, const float *leg, int n, float *centre, float *radius)
+{
+    double ma = 0, ml = 0, aa = 0, ll = 0, al = 0;
+    float amin = FLT_MAX, amax = -FLT_MAX, lmin = FLT_MAX, lmax = -FLT_MAX;
+    if (!arm || !leg || !centre || !radius || n < 8 || n > 1000000) return 0;
+    for (int i = 0; i < n; ++i) {
+        if (!isfinite(arm[i]) || !isfinite(leg[i])) return 0;
+        if (arm[i] < amin) amin = arm[i];
+        if (arm[i] > amax) amax = arm[i];
+        if (leg[i] < lmin) lmin = leg[i];
+        if (leg[i] > lmax) lmax = leg[i];
+        ma += arm[i]; ml += leg[i];
+    }
+    ma /= n; ml /= n;
+    for (int i = 0; i < n; ++i) {
+        double a = arm[i]-ma, l = leg[i]-ml;
+        aa += a*a; ll += l*l; al += a*l;
+    }
+    if (amax-amin < .06f || lmax-lmin < .12f || aa < 1e-8 || ll < 1e-8 || al/sqrt(aa*ll) < .5) return 0;
+    *centre = (float)ml; *radius = fmaxf((lmax-lmin)*.5f, .06f);
+    return am_smoothstep((.23f - (amax-amin))/.12f);
+}

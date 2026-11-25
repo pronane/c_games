@@ -51,6 +51,11 @@ int am_action_time(float elapsed, float deadline, float entry, float contact,
  * Return -1 for ambiguous/invalid, 0 for forward time, 1 for reverse time.
  * Use only on a clip known to represent forward locomotion. */
 int am_gait_reverse(const float *left, const float *right, int frames);
+/* Profile a weak but coordinated arm swing relative to the opposite leg.
+ * Input samples are forward offsets in metres. Returns a 0..1 assist gain;
+ * ambiguous, uncoordinated and already-strong motion returns zero. On success
+ * writes the leg mean and normalization radius. */
+float am_arm_swing_profile(const float *arm, const float *leg, int n, float *centre, float *radius);
 /* Advance a looping animation clock in seconds. Invalid inputs leave it unchanged. */
 float am_loop_advance(float time, float dt, float rate, float length);
 /* Clamped cubic easing for smoothly introducing a bounded correction. */

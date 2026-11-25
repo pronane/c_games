@@ -112,4 +112,18 @@ static void correction_ramp(void)
     assert(fabsf(am_smoothstep(.5f)-.5f) < .00001f);
     assert(am_smoothstep(.25f) < am_smoothstep(.75f));
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); puts("arena motion tests passed"); return 0; }
+static void arm_profile(void)
+{
+    float arm[12], leg[12], centre, radius, gain;
+    for (int i = 0; i < 12; ++i) { leg[i] = sinf(i * 6.2831853f/12); arm[i] = .05f*leg[i]; }
+    gain = am_arm_swing_profile(arm, leg, 12, &centre, &radius);
+    assert(gain > .9f && fabsf(centre) < .0001f && radius > .9f);
+    for (int i = 0; i < 12; ++i) arm[i] = .2f*leg[i];
+    assert(am_arm_swing_profile(arm, leg, 12, &centre, &radius) == 0);
+    for (int i = 0; i < 12; ++i) arm[i] = -.05f*leg[i];
+    assert(am_arm_swing_profile(arm, leg, 12, &centre, &radius) == 0);
+    arm[0] = NAN;
+    assert(am_arm_swing_profile(arm, leg, 12, &centre, &radius) == 0);
+    assert(am_arm_swing_profile(NULL, leg, 12, &centre, &radius) == 0);
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); puts("arena motion tests passed"); return 0; }

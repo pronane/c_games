@@ -101,6 +101,8 @@ static int actionReady, actionCacheLoaded;
 static const int motionActions[] = { GAME_ACT_HANDPASS, GAME_ACT_SOLO };
 static int motionMatching = 1, motionReady = 0;
 static int reverseJog = 0;
+static int jogArmAssist = 0;    /* experimental opt-in, never simulation authority */
+static float jogArmGain[2], jogLegCentre[2], jogLegRadius[2];
 
 static Model model;
 static ModelAnimation *anims;
@@ -305,6 +307,33 @@ static void detectJogDirection(void)
     reverseJog = direction == 1;
     free(left); free(right);
     TraceLog(LOG_INFO, "GAME: forward jog playback %s", reverseJog ? "reversed" : direction == 0 ? "authored" : "ambiguous, authored");
+}
+
+/* Profile the clip, not a specific filename: only small, already coordinated
+ * opposite-leg/arm motion is eligible for the optional presentation assist. */
+static void detectJogArmProfile(void)
+{
+    ModelAnimation *a; int n, arms[2] = {boneArmUL, boneArmUR};
+    int hands[2] = {boneHandL, boneHandR}, hips[2] = {boneThighR, boneThighL};
+    int knees[2] = {boneCalfR, boneCalfL}; float *arm, *leg;
+    jogArmGain[0] = jogArmGain[1] = 0;
+    if (clipIdx[C_JOG] < 0 || arms[0] < 0 || arms[1] < 0 || hands[0] < 0 || hands[1] < 0 ||
+        hips[0] < 0 || hips[1] < 0 || knees[0] < 0 || knees[1] < 0) return;
+    a = animFor(C_JOG); n = ANIM_FRAMES(*a)-1;
+    if (n < 8 || n > 1000000) return;
+    arm = malloc((size_t)n * sizeof(float)); leg = malloc((size_t)n * sizeof(float));
+    if (!arm || !leg) { free(arm); free(leg); return; }
+    for (int side = 0; side < 2; ++side) {
+        for (int f = 0; f < n; ++f) {
+            Transform *p = ANIM_POSES(*a)[f];
+            if (!p) { free(arm); free(leg); jogArmGain[0] = jogArmGain[1] = 0; return; }
+            arm[f] = p[hands[side]].translation.z - p[arms[side]].translation.z;
+            leg[f] = p[knees[side]].translation.z - p[hips[side]].translation.z;
+        }
+        jogArmGain[side] = am_arm_swing_profile(arm, leg, n, &jogLegCentre[side], &jogLegRadius[side]);
+    }
+    free(arm); free(leg);
+    TraceLog(LOG_INFO, "GAME: experimental jog arm gains %.3f %.3f", jogArmGain[0], jogArmGain[1]);
 }
 
 static int motionFeatures(int clip, int frame, float out[MM_DIMS])
@@ -1144,6 +1173,36 @@ static void plantFeet(AnimState *s, float dt)
     plantOne(s, 0, boneThighL, boneCalfL, boneFootL, boneToeL, dt);
     plantOne(s, 1, boneThighR, boneCalfR, boneFootR, boneToeR, dt);
 }
+/* Small extra swing about each shoulder, phase-linked to the opposite knee.
+ * Rotate the whole arm subtree rigidly, retaining elbow/hand/finger shape.
+ * Excluded from ball carrying, actions, jumping and ambiguous source clips. */
+static void assistJogArms(AnimState *s, int clip)
+{
+    int idx = (int)(s - as), arms[2] = {boneArmUL, boneArmUR};
+    int hips[2] = {boneThighR, boneThighL}, knees[2] = {boneCalfR, boneCalfL};
+    float weight;
+    if (!jogArmAssist || idx < 0 || idx >= 2*GAME_TEAM_SIZE || s->useBounce ||
+        game.players[idx/GAME_TEAM_SIZE][idx%GAME_TEAM_SIZE].action != GAME_ACT_NONE ||
+        game.players[idx/GAME_TEAM_SIZE][idx%GAME_TEAM_SIZE].jump_time > 0 ||
+        (game.ball_team == idx/GAME_TEAM_SIZE && game.ball_player == idx%GAME_TEAM_SIZE)) return;
+    weight = clip == C_JOG ? (s->prevClip == C_JOG ? 1.0f : am_smoothstep(s->blend)) :
+             (s->prevClip == C_JOG && s->blend < 1.0f ? 1.0f-am_smoothstep(s->blend) : 0.0f);
+    weight *= am_smoothstep((s->speed-.55f)/.9f);
+    if (weight <= 0) return;
+    for (int side = 0; side < 2; ++side) {
+        float x, angle; Vector3 pivot; Quaternion q;
+        if (arms[side] < 0 || hips[side] < 0 || knees[side] < 0 || jogArmGain[side] <= 0 || jogLegRadius[side] <= 0) continue;
+        x = s->pose[knees[side]].translation.z - s->pose[hips[side]].translation.z;
+        angle = -.13f * jogArmGain[side] * weight * Clamp((x-jogLegCentre[side])/jogLegRadius[side], -1, 1);
+        pivot = s->pose[arms[side]].translation;
+        q = QuaternionFromAxisAngle((Vector3){1,0,0}, angle);
+        for (int b = 0; b < MODEL_BONECOUNT(model); ++b) if (boneUnder(b, arms[side])) {
+            s->pose[b].translation = Vector3Add(pivot, Vector3RotateByQuaternion(Vector3Subtract(s->pose[b].translation, pivot), q));
+            s->pose[b].rotation = QuaternionNormalize(QuaternionMultiply(q, s->pose[b].rotation));
+        }
+    }
+}
+
 /* Chest leads the hips through a turn; the head stays closer to the facing. Small, and only while turning. */
 static void twistBone(Transform *bone, float ang)
 {
@@ -1264,6 +1323,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
     sampleBlendedPose(s, clip, t, w);
 #endif
     balanceTorso(s, clip);
+    assistJogArms(s, clip);
     cradleBall(s, clip);
     lengthenStride(s);
     plantFeet(s, dt);
@@ -3530,6 +3590,7 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
         else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
+        else if (strcmp(argv[i], "--jog-arm-assist") == 0) jogArmAssist = 1;
         else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
         else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
@@ -3601,6 +3662,7 @@ int main(int argc, char **argv)
 #endif
         detectContacts();
         detectJogDirection();
+        detectJogArmProfile();
         initActionMetadata();
         buildMotionDatabase(motionBake ? NULL : motionCache);
         if (!actionCacheLoaded) buildActionDatabase();
