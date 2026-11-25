@@ -1,4 +1,5 @@
-import { defendGoalX } from '../rules/field';
+import { predictDrop } from './ball';
+import { clampInside, defendGoalX } from '../rules/field';
 import type { MatchState } from '../rules/types';
 export interface TeamJob { kind: 'contest' | 'short' | 'outlet' | 'mark' | 'shape'; x: number; z: number }
 /** Persistent assignments: no re-ranking every player tick and no RNG consumption. */
@@ -20,23 +21,25 @@ export class TeamPlan {
     this.holder = state.ball.holderId;
     this.jobs = new Map();
     const b = state.ball;
+    const landing = b.mode === 'loose' && b.y > 2 ? predictDrop(b) : b;
+    const anchor = clampInside(landing.x, landing.z, 4);
     const carrier = state.players.find(p => p.id === b.holderId && b.mode === 'held');
     for (const team of [0, 1] as const) {
       const players = state.players.filter(p => !p.onBench && p.team === team && p.id !== carrier?.id)
-        .sort((a, c) => Math.hypot(a.x - b.x, a.z - b.z) - Math.hypot(c.x - b.x, c.z - b.z) || a.id - c.id);
+        .sort((a, c) => Math.hypot(a.x - anchor.x, a.z - anchor.z) - Math.hypot(c.x - anchor.x, c.z - anchor.z) || a.id - c.id);
       for (const p of players) this.jobs.set(p.id, { kind: 'shape', x: p.x, z: p.z });
       // Restarts retain role homes, not inherited contest/receiving pressure.
       if (state.phase !== 'live') continue;
       const attack = carrier?.team === team;
       const count = attack ? 0 : 2;
-      players.slice(0, count).forEach(p => this.jobs.set(p.id, { kind: 'contest', x: b.x, z: b.z }));
+      players.slice(0, count).forEach(p => this.jobs.set(p.id, { kind: 'contest', x: anchor.x, z: anchor.z }));
       const dir = team === 0 ? 1 : -1;
       // Only the possessing team (or loose-ball team) reserves receiving lanes.
       if (!carrier || attack) players.slice(count, count + 2).forEach((p, rank) => {
-        const side = b.z > 0 ? -1 : 1;
+        const side = anchor.z > 0 ? -1 : 1;
         this.jobs.set(p.id, { kind: rank === 0 ? 'short' : 'outlet',
-          x: b.x + dir * (rank === 0 ? 4 : 16),
-          z: b.z + side * (rank === 0 ? 10 : -16) });
+          x: anchor.x + dir * (rank === 0 ? 4 : 16),
+          z: anchor.z + side * (rank === 0 ? 10 : -16) });
       });
       if (carrier && !attack) {
         const goalX = defendGoalX(team);

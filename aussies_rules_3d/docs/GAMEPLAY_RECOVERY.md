@@ -51,7 +51,7 @@ Run `45417811569` (post-PR #268) passed build/metrics but failed visual-ab. All 
 
 ## Local verification and comparison
 
-`node scripts/check.mjs`: TypeScript, **188 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
+`node scripts/check.mjs`: TypeScript, **189 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
 
 A local numerical comparison used source from branch HEAD `440626d` and the first candidate `18efb2b`, identical input trace/seeds, 60 simulated seconds per seed. No branch switch or baseline source modification was involved. This is a simulation comparison, not before/after video or human acceptance:
 
@@ -92,3 +92,17 @@ The first API preview attempt was truncated: each annotation message was limited
 An optional `workflow_dispatch` input `review_run` downloads an already completed run's artifact **on the GitHub runner**, repacks its original frames and republishes integrity-checked preview annotations. It does not advance or re-verify gameplay. This allows recovering source evidence without repeated full captures or asking users to upload files. The retrieval script rejects the old unverified format.
 
 Priorities 1–3 have implementation and automated regression coverage; visual acceptance remains open until intact previews/video support it. Foot-contact metadata and convincing movement/contact animation remain explicit outstanding gaps, not completed checkboxes.
+
+
+## Findings recovered without a user upload
+
+Evidence-only run `45723581795` successfully republished the original frames from gameplay run `45721534269`. All six previews were reconstructed locally with matching SHA-256 hashes and inspected. This repairs the evidence transport; it is **not a fresh gameplay run**.
+
+The intact previews show a remaining composition problem around source frames 018/024: substantial empty pitch/stands despite successful ball-centre framing. Inspection found the camera could pitch toward an elevated ball without retaining ground context. The AI also waited for a moving loose ball to come within 9 m instead of committing authorised aerial contest players to the drop point.
+
+Follow-up implementation:
+- Ball and its ground projection are planned/protected together; desired camera height stays above the live ball, rather than tilting toward stands to centre it. This is covered across all five views and set shots in the projection integration test. Emergency correction counts remain visible; no continuity claim is made from these tests.
+- Contest assignments rank players against the predicted/clamped drop point for high loose balls. Assigned contest players can begin running there before the current ball is nearby. Receiving lanes use the same anchor. A regression fixture places the current ball 75 m behind the suitable receiver and verifies movement toward the future landing point instead.
+- New capture states record ground projection and world ball coordinates. Normal fresh captures now check ground context too. Evidence-only republication explicitly labels legacy source data rather than retroactively demanding a field that old captures did not record.
+
+This change still needs a fresh workflow capture. Ball readability/continuity, natural movement and team/contact behaviour are not all visually signed off. Empty plant metadata, full pivot/contact animation coverage and pressure/tackle-frequency calibration remain outstanding. Nothing in a green numeric gate overrides these limitations.

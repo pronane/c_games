@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 const dir = process.argv[2];
+const sourceEvidence = process.argv.includes('--source-evidence');
 // Publish startup evidence for every leg even when no frame/state was produced.
 const parent = dir ? path.dirname(dir) : '';
 for (const leg of ['original', 'lod', 'match']) {
@@ -23,10 +24,12 @@ if (samples.length < 12) {
 } else {
   const gameplay = samples.filter(s => s.mode !== 'celebration');
   const badBall = gameplay.filter(s => !s.ballNdc || s.ballNdc.some(n => !Number.isFinite(n)) || Math.abs(s.ballNdc[0]) > 0.78 || Math.abs(s.ballNdc[1]) > 0.78 || Math.abs(s.ballNdc[2]) > 1);
+  const badGround = gameplay.filter(s => !s.groundNdc || s.groundNdc.some(n => !Number.isFinite(n)) || Math.abs(s.groundNdc[0]) > 0.78 || Math.abs(s.groundNdc[1]) > 0.78 || Math.abs(s.groundNdc[2]) > 1);
   const tickErrors = samples.filter((s, i) => i > 0 && s.tick - samples[i - 1].tick !== 30).length;
   const last = samples.at(-1);
   const report = {
     samples: samples.length, firstTick: samples[0].tick, lastTick: last.tick,
+    sourceEvidence, groundContextFailures: badGround.length,
     tickErrors, ballOutOfFrameSamples: badBall.length,
     minBallMinorPixels: Math.min(...samples.map(s => s.ballMinorPixels)),
     locator: 'always-on 14px canvas (~9.6px ring); physics size unchanged',
@@ -43,8 +46,8 @@ if (samples.length < 12) {
   console.log(`::notice title=Scripted gameplay measurements::${text}`);
   fs.writeFileSync(path.join(dir, 'gameplay-review.json'), JSON.stringify(report, null, 2));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n## Scripted gameplay measurements\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n\nMeasurements are not visual sign-off. Celebration framing excluded.\n`);
-  if (!gameplay.length || badBall.length || tickErrors || motionFailure) {
-    console.error(`::error::Gameplay capture failed: normal-play samples=${gameplay.length}, ball failures=${badBall.length}, tick errors=${tickErrors}`);
+  if (!gameplay.length || badBall.length || tickErrors || motionFailure || (!sourceEvidence && badGround.length)) {
+    console.error(`::error::Gameplay capture failed: normal-play samples=${gameplay.length}, ball failures=${badBall.length}, ground-context failures=${badGround.length}, tick errors=${tickErrors}`);
     process.exitCode = 1;
   }
 }

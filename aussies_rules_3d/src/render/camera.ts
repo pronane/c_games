@@ -202,7 +202,12 @@ export class BroadcastCamera {
 
     // Plan a conservative fit BEFORE easing. The live ball has priority;
     // distant selection is represented by the existing offscreen arrow.
-    const subjects: FitSubject[] = [{ x: b.x, y: Math.max(b.y, 0.15), z: b.z, weight: 1.3 }];
+    const subjects: FitSubject[] = [
+      { x: b.x, y: Math.max(b.y, 0.15), z: b.z, weight: 1.3 },
+      { x: b.x, y: 0.15, z: b.z, weight: 1 },
+    ];
+    // Do not tilt up into the stands just to centre a high ball.
+    if (this.mode !== 'celebration') this.desired.y = Math.max(this.desired.y, b.y + 12);
     const nearby = controlled && Math.hypot(controlled.x - b.x, controlled.z - b.z) < 22;
     this.diagnostics.playerExcluded = !!controlled && !nearby;
     if (nearby && controlled) subjects.push(controlled);
@@ -223,11 +228,11 @@ export class BroadcastCamera {
     const alpha = 1 - Math.exp(-dt * 3.2);
     this.camera.position.lerp(this.desired, alpha);
     this.renderedAim.lerp(this.lookAt, alpha);
-    // Emergency recovery is ball-only, never an unlimited zoom-out to selection.
+    // Emergency recovery includes ball and ground context, never distant selection.
     // Ordinary travel uses the wider predictive planning region above.
     if (this.mode !== 'celebration') {
       const emergency = enforceFraming(this.camera.position, this.renderedAim,
-        this.camera.fov, this.camera.aspect, subjects.slice(0, 1), SAFE_MARGIN);
+        this.camera.fov, this.camera.aspect, subjects.slice(0, 2), SAFE_MARGIN);
       if (emergency) {
         this.camera.position.copy(emergency.position);
         this.renderedAim.copy(emergency.lookAt);

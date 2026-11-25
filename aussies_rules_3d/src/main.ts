@@ -227,7 +227,9 @@ class Game {
         const b = this.sim!.state.ball;
         const crowd5 = this.sim!.state.players.filter(p => !p.onBench && Math.hypot(p.x - b.x, p.z - b.z) < 5).length;
         const ballNdc = new THREE.Vector3(b.x, b.y, b.z).project(this.world.camera);
-        const state = { ballNdc: [ballNdc.x, ballNdc.y, ballNdc.z],
+        const groundNdc = new THREE.Vector3(b.x, 0.15, b.z).project(this.world.camera);
+        const state = { groundNdc: [groundNdc.x, groundNdc.y, groundNdc.z],
+          worldBall: [b.x, b.y, b.z], ballNdc: [ballNdc.x, ballNdc.y, ballNdc.z],
           cameraPosition: this.world.camera.position.toArray(),
           motion: this.motionProbe.snapshot(), team: this.sim!.teamDiagnostics,
           motionLoaded: cp ? !!this.views.get(cp.id)?.motion : false,

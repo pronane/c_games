@@ -300,7 +300,7 @@ jobs:
           SOURCE_RUN: ${{ inputs.review_run }}
         run: |
           echo "Evidence republished from run $SOURCE_RUN; this is not a new gameplay verification." >> "$GITHUB_STEP_SUMMARY"
-          node tools/capture_review.mjs build/review-source/match
+          node tools/capture_review.mjs build/review-source/match --source-evidence
       - name: Publish source preview 000
         if: always()
         working-directory: aussies_rules_3d

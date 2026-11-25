@@ -56,3 +56,19 @@ describe('team plan restart and roster ownership', () => {
     expect(plan.diagnostics.replans).toBe(2);
   });
 });
+
+import { aiIntentFor } from '../src/sim/ai';
+it('assigns aerial contests at the drop point and runs there before the ball comes within 9m', () => {
+  const sim = new MatchSim({ ...AFL_SETTINGS, seed: 42 }); sim.start();
+  sim.state.phase = 'live';
+  Object.assign(sim.state.ball, { mode: 'loose', holderId: null, x: -50, y: 5, z: 0, vx: 30, vy: 14, vz: 0 });
+  const team = sim.state.players.filter(p => p.team === 0 && !p.onBench);
+  for (const p of team) { p.x = -50; p.z = 0; }
+  team[0].x = 25; team[1].x = 20;
+  const plan = new TeamPlan();
+  const jobs = plan.update(sim.state, 1 / 60);
+  expect(jobs.get(team[0].id)?.kind).toBe('contest');
+  expect(jobs.get(team[0].id)!.x).toBeGreaterThan(25);
+  const intent = aiIntentFor(team[0], { state: sim.state, jobs, difficulty: 'afl', possessingTeam: null, carrierId: null, liveTime: 1, rng: () => 0.5 });
+  expect(intent.moveX).toBeGreaterThan(0); // landing is ahead; current ball is 75m behind
+});

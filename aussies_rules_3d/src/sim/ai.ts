@@ -180,7 +180,7 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
   const mayChase = job ? job.kind === 'contest' : teammatesCloserToBall(p, ctx) < 2;
   const chaseThis =
     mayChase &&
-    ((loose && distBall < 9) ||
+    ((loose && (distBall < 9 || b.y > 2)) ||
       (restingLoose) ||
       (ctx.possessingTeam !== null && ctx.possessingTeam !== p.team && distBall < 6.5) ||
       (ctx.carrierId !== null && isNearestChaser(p, ctx)));
@@ -188,8 +188,9 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
   if (chaseThis) {
     // lead the intercept slightly
     const lead = 0.28 * diff.reaction;
-    intent.moveX = normalize(toBallX + b.vx * lead);
-    intent.moveZ = normalize(toBallZ + b.vz * lead);
+    const aerial = loose && b.y > 2 && job?.kind === 'contest';
+    intent.moveX = normalize(aerial ? job.x - p.x : toBallX + b.vx * lead);
+    intent.moveZ = normalize(aerial ? job.z - p.z : toBallZ + b.vz * lead);
     intent.sprint = distBall > 6;
     if (distBall < 1.6 && ctx.possessingTeam !== null && ctx.possessingTeam !== p.team) {
       intent.wantTackle = true;
