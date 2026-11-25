@@ -36,6 +36,12 @@ public sealed class MotionState
     public bool FootPlantedLeft;
     public bool FootPlantedRight;
 
+    // Hypermotion/ML-Flow-style ball approach (presentation-only, deterministic).
+    public float ApproachWeight;
+    public float DistanceToBall = float.MaxValue;
+    public float TimeToBallContact = -1f;
+    public bool IsApproachingBall;
+
     public string RenderClipId => NextClipId.Length > 0 ? NextClipId : CurrentClipId;
     public float RenderPhase => NextClipId.Length > 0 ? NextPhase : Phase;
 }

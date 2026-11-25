@@ -67,7 +67,18 @@ public sealed class MotionEngine
         motion.LastIntent = intent;
         motion.TimeSinceContact += dt;
 
-        ClipMeta? selected = SelectClip(intent, ball, speed, turnRate, bodyTypeFactor, styleTag);
+        // Hypermotion-style ball approach: ramp a presentation-only weight when
+        // the player is closing on the ball / a timed contact is imminent. This biases
+        // selection toward contact-timed clips and shortens stride on approach.
+        float ttc = secondsUntilContact > 0f ? secondsUntilContact : -1f;
+        bool approaching = (ball == BallState.Approaching || ttc > 0f) && (ttc < 1.5f || ball == BallState.Approaching);
+        float targetApproach = approaching ? 1f : 0f;
+        motion.ApproachWeight = MoveToward(motion.ApproachWeight, targetApproach, 3.5f * dt);
+        motion.IsApproachingBall = motion.ApproachWeight > 0.05f;
+        motion.TimeToBallContact = ttc;
+        motion.DistanceToBall = ttc > 0f ? ttc * Math.Max(0.1f, speed) : (ball == BallState.Approaching ? 3f : float.MaxValue);
+
+        ClipMeta? selected = SelectClip(intent, ball, speed, turnRate, bodyTypeFactor, styleTag, motion.ApproachWeight, ttc);
         if (forcedClipId != null && _clips.TryGetValue(forcedClipId, out var forcedClip)) selected = forcedClip;
         float? matchedPhase = null;
         motion.SinceQuery += dt;
@@ -91,6 +102,13 @@ public sealed class MotionEngine
                 }
             }
         }
+        // ML-Flow-style contact lock: when approaching a timed contact, prefer the
+        // selected clip's contact frame to land near the predicted arrival.
+        if (selected != null && selected.HasContact && ttc > 0f && motion.IsApproachingBall)
+        {
+            float phaseMatched = selected.Loop ? Wrap01(motion.Phase) : 0f;
+            matchedPhase = BallApproach.ContactLockedStartPhase(selected, ttc, phaseMatched, motion.ApproachWeight);
+        }
         if (selected == null)
         {
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
@@ -110,7 +128,7 @@ public sealed class MotionEngine
             // If a transition is interrupted, begin from its visible destination phase.
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
             if (!_clips.TryGetValue(motion.CurrentClipId, out var from)) from = selected;
-            float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent);
+            float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent, motion.ApproachWeight, ttc);
             motion.NextClipId = selected.Id;
             motion.NextPhase = selected.Loop ? Wrap01(start) : Clamp01(start);
             motion.CrossfadeDuration = DefaultCrossfadeSeconds;
@@ -169,7 +187,7 @@ public sealed class MotionEngine
     }
 
     public ClipMeta? SelectClip(PlayerIntent intent, BallState ball, float speed, float turnRate,
-        float bodyTypeFactor = 1f, string? styleTag = null)
+        float bodyTypeFactor = 1f, string? styleTag = null, float approachWeight = 0f, float timeToBallContact = -1f)
     {
         ClipCategory category = SelectCategory(intent, ball);
         // Standing still is idle, not the slowest "locomotion" clip: with blocks,
@@ -177,17 +195,17 @@ public sealed class MotionEngine
         // players stood with their arms in the air at every stoppage.
         if (category == ClipCategory.Locomotion && ball != BallState.Possessed && speed < .35f)
         {
-            ClipMeta? idle = SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, styleTag);
+            ClipMeta? idle = SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, styleTag, 0f, -1f);
             if (idle != null) return idle;
         }
-        ClipMeta? best = SelectBest(category, ball, speed, turnRate, bodyTypeFactor, styleTag);
+        ClipMeta? best = SelectBest(category, ball, speed, turnRate, bodyTypeFactor, styleTag, approachWeight, timeToBallContact);
         if (best != null) return best;
         if (category != ClipCategory.Locomotion)
         {
-            best = SelectBest(ClipCategory.Locomotion, ball, speed, turnRate, bodyTypeFactor, styleTag);
+            best = SelectBest(ClipCategory.Locomotion, ball, speed, turnRate, bodyTypeFactor, styleTag, approachWeight, timeToBallContact);
             if (best != null) return best;
         }
-        return SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, null);
+        return SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, null, 0f, -1f);
     }
 
     public static ClipCategory SelectCategory(PlayerIntent intent, BallState ball) => intent switch
@@ -206,15 +224,30 @@ public sealed class MotionEngine
         _ => ClipCategory.Locomotion,
     };
 
-    public static float ComputeStartPhase(ClipMeta from, ClipMeta to, float currentPhase, PlayerIntent intent)
+    public static float ComputeStartPhase(ClipMeta from, ClipMeta to, float currentPhase, PlayerIntent intent,
+        float approachWeight = 0f, float timeToBallContact = -1f)
     {
         if (!to.Loop || IsOneShot(to.Category) || intent is PlayerIntent.Pass or PlayerIntent.ThroughBall
             or PlayerIntent.Shoot or PlayerIntent.Trap or PlayerIntent.Tackle or PlayerIntent.Dive
             or PlayerIntent.Celebrate)
-            return 0f;
+        {
+            float start = 0f;
+            // ML-Flow-style contact lock: start one-shot so contact lands near arrival.
+            if (to.HasContact && timeToBallContact > 0f && approachWeight > 0.05f)
+                start = BallApproach.ContactLockedStartPhase(to, timeToBallContact, 0f, approachWeight);
+            return start;
+        }
         if (from.Loop && IsLocomotion(from.Category) && IsLocomotion(to.Category))
-            return AlignToNearestFootEvent(from, to, currentPhase);
-        return Clamp01(currentPhase);
+        {
+            float phase = AlignToNearestFootEvent(from, to, currentPhase);
+            if (to.HasContact && timeToBallContact > 0f && approachWeight > 0.05f)
+                phase = BallApproach.ContactLockedStartPhase(to, timeToBallContact, phase, approachWeight);
+            return phase;
+        }
+        float basePhase = Clamp01(currentPhase);
+        if (to.HasContact && timeToBallContact > 0f && approachWeight > 0.05f)
+            basePhase = BallApproach.ContactLockedStartPhase(to, timeToBallContact, basePhase, approachWeight);
+        return basePhase;
     }
 
     /// <summary>Map the nearest source plant to the nearest target plant for that same
@@ -260,7 +293,8 @@ public sealed class MotionEngine
     }
 
     private ClipMeta? SelectBest(ClipCategory category, BallState ball, float speed,
-        float turnRate, float bodyTypeFactor, string? styleTag)
+        float turnRate, float bodyTypeFactor, string? styleTag,
+        float approachWeight = 0f, float timeToBallContact = -1f)
     {
         ClipMeta? best = null;
         float bestScore = float.MaxValue;
@@ -283,6 +317,13 @@ public sealed class MotionEngine
             float tagBonus = styleTag != null && Array.Exists(c.Tags, t =>
                 string.Equals(t, styleTag, StringComparison.OrdinalIgnoreCase)) ? -.1f : 0f;
             float score = speedError + turnError + rootError + tagBonus;
+            // Hypermotion-style ball approach: prefer contact-timed clips and
+            // shorten stride when closing on the ball.
+            if (approachWeight > 0.05f)
+            {
+                score += (BallApproach.ContactTimingCost(c, timeToBallContact) * 1.8f
+                       + BallApproach.StrideShorteningCost(c, speed, approachWeight)) * approachWeight;
+            }
             if (score < bestScore) { bestScore = score; best = c; }
         }
         return best;
@@ -338,6 +379,11 @@ public sealed class MotionEngine
         if (d > .5f) d -= 1f;
         if (d < -.5f) d += 1f;
         return d;
+    }
+    private static float MoveToward(float current, float target, float maxDelta)
+    {
+        if (MathF.Abs(target - current) <= maxDelta) return target;
+        return current + MathF.Sign(target - current) * maxDelta;
     }
     private static float Wrap01(float v) => v - MathF.Floor(v);
     private static float Clamp01(float v) => Math.Clamp(v, 0f, 1f);

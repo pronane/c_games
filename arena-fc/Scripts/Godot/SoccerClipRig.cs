@@ -85,6 +85,14 @@ public sealed partial class SoccerClipRig : Node3D
     // Phase 1.2 foot-planting IK state.
     private readonly Dictionary<string, BoneData> _bones = new();
 
+    // Hypermotion-style inertialization (presentation-only).
+    private readonly Dictionary<int, Transform3D> _prevBonePoses = new();
+    private readonly List<(int bone, Vector3 posOff, Quaternion rotOff, Vector3 posVel, Vector3 angVel, float halfLife)> _inertialBones = new();
+    private bool _inertialActive;
+    private float _inertialTime;
+    private Vector3 _prevPelvisWorld;
+    private bool _hasPrevPelvis;
+
     private sealed class BoneData
     {
         public int Thigh, Shin, Foot, Spine, Neck, Head, UpperArmL, LowerArmL, UpperArmR, LowerArmR;
@@ -792,6 +800,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
         if (clip != _current)
         {
+            CaptureInertialOldPoses();
             // Locomotion clips inherit cycle phase; one-shots must begin at frame zero.
             float startPhase = motionDriven ? _motionState!.RenderPhase : oneShot ? 0f : _phase;
             Player.Play(clip, oneShot ? .08f : .12f);
@@ -799,6 +808,7 @@ public sealed partial class SoccerClipRig : Node3D
             _current = clip;
             _oneShotDone = false;
             _blend = 0f;
+            CaptureInertialTransition();
         }
         _blend = Mathf.Min(_blend + dt / .18f, 1f);
         if (oneShot && !Player.IsPlaying()) _oneShotDone = true;
@@ -847,7 +857,9 @@ public sealed partial class SoccerClipRig : Node3D
         UpdateFlutter(speed, dt);
         UpdateLookAt(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateReach(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
+        UpdateInertialization(dt);
         UpdateFootIk(worldPos, yaw);
+        StoreInertialPrevPoses();
         _prevFacing = Mx.Norm(Mx.Flat(p.Facing));
         if (_prevFacing.LengthSquared() < 0.001f) _prevFacing = new System.Numerics.Vector3(0, 0, 1);
     }
@@ -951,6 +963,90 @@ public sealed partial class SoccerClipRig : Node3D
         _sceneRoot.Rotation = new Vector3(_lean, 0, _roll);
     }
 
+
+    // ---- Hypermotion-style inertialization -------------------------------
+
+    private static readonly string[] InertialBoneNames =
+    {
+        "Hips", "spine_01", "spine_02", "neck_01", "head",
+        "upperarm_L", "lowerarm_L", "upperarm_R", "lowerarm_R"
+    };
+
+    private void CaptureInertialOldPoses()
+    {
+        _prevBonePoses.Clear();
+        if (Skel == null) return;
+        foreach (var name in InertialBoneNames)
+        {
+            int b = FindBoneLoose(Skel, name);
+            if (b >= 0) _prevBonePoses[b] = Skel.GetBoneGlobalPose(b);
+        }
+    }
+
+    private void CaptureInertialTransition()
+    {
+        if (Skel == null || _prevBonePoses.Count == 0) return;
+        _inertialBones.Clear();
+        _inertialActive = true;
+        _inertialTime = 0f;
+        foreach (var kv in _prevBonePoses)
+        {
+            int b = kv.Key;
+            var oldTx = kv.Value;
+            var newTx = Skel.GetBoneGlobalPose(b);
+            Vector3 posOff = oldTx.Origin - newTx.Origin;
+            if (posOff.Length() > .12f) posOff = posOff.Normalized() * .12f;
+            Quaternion oldRot = oldTx.Basis.GetRotationQuaternion();
+            Quaternion newRot = newTx.Basis.GetRotationQuaternion();
+            Quaternion rotOff = (oldRot * newRot.Inverse()).Normalized();
+            _inertialBones.Add((b, posOff, rotOff, Vector3.Zero, Vector3.Zero, 0.18f));
+        }
+    }
+
+    private void UpdateInertialization(float dt)
+    {
+        if (!_inertialActive || Skel == null) return;
+        _inertialTime += dt;
+        bool any = false;
+        for (int i = 0; i < _inertialBones.Count; i++)
+        {
+            var ib = _inertialBones[i];
+            float lambda = 0.69314718056f / Mathf.Max(0.001f, ib.halfLife);
+            float decay = Mathf.Exp(-lambda * dt);
+            ib.posOff *= decay;
+            ib.posVel *= decay;
+            float angLen = ib.angVel.Length();
+            if (angLen > 1e-6f)
+            {
+                Quaternion dq = new Quaternion(ib.angVel / angLen, angLen * dt);
+                ib.rotOff = (dq * ib.rotOff).Normalized();
+            }
+            ib.rotOff = ib.rotOff.Slerp(Quaternion.Identity, 1f - decay).Normalized();
+            ib.angVel *= decay;
+            _inertialBones[i] = ib;
+
+            if (ib.posOff.Length() > 0.0008f || Mathf.Abs(ib.rotOff.W) < 0.9995f)
+            {
+                any = true;
+                var cur = Skel.GetBoneGlobalPose(ib.bone);
+                Quaternion finalRot = (ib.rotOff * cur.Basis.GetRotationQuaternion()).Normalized();
+                Vector3 finalPos = cur.Origin + ib.posOff;
+                Skel.SetBoneGlobalPoseOverride(ib.bone, new Transform3D(new Basis(finalRot), finalPos), 1f, true);
+            }
+        }
+        if (!any || _inertialTime > 0.18f * 7f)
+        {
+            _inertialActive = false;
+            foreach (var ib in _inertialBones)
+                Skel.ClearBoneGlobalPoseOverride(ib.bone);
+            _inertialBones.Clear();
+        }
+    }
+
+    private void StoreInertialPrevPoses()
+    {
+        // Kept for velocity-aware capture if needed later.
+    }
     // ---- Phase 1.2 foot-planting IK -------------------------------------
 
     private void CacheBones()
@@ -1019,22 +1115,53 @@ public sealed partial class SoccerClipRig : Node3D
     private void SolveTwoBone(BoneData b, Vector3 targetWorld, Vector3 rootWorld, float yaw)
     {
         var hip = Skel.GetBoneGlobalPose(b.Thigh).Origin;
-        float l1 = b.ThighRest.Length();
-        float l2 = b.ShinRest.Length();
+        float l1 = Mathf.Max(0.001f, b.ThighRest.Length());
+        float l2 = Mathf.Max(0.001f, b.ShinRest.Length());
         var toTarget = targetWorld - hip;
-        float dist = Mathf.Clamp(toTarget.Length(), .01f, l1 + l2 - .001f);
-        var dir = toTarget.Normalized();
+        float targetDist = toTarget.Length();
+        float total = l1 + l2;
+        float minLen = Mathf.Abs(l1 - l2) + 0.002f;
+        float dist = Mathf.Clamp(targetDist, minLen, total * 0.995f);
+        var dir = targetDist > 1e-6f ? toTarget / targetDist : Vector3.Up;
+
         float cosA = (l1 * l1 + dist * dist - l2 * l2) / (2f * l1 * dist);
-        float angA = Mathf.Acos(Mathf.Clamp(cosA, -1f, 1f));
+        cosA = Mathf.Clamp(cosA, -1f, 1f);
+        float angA = Mathf.Acos(cosA);
+
         var fwd = new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw));
         var axis = dir.Cross(fwd);
-        if (axis.LengthSquared() < 1e-6f) axis = Vector3.Up;
+        if (axis.LengthSquared() < 1e-6f) axis = Vector3.Right;
         axis = axis.Normalized();
         var kneeDir = dir.Rotated(axis, angA);
         var knee = hip + kneeDir * l1;
-        var thighQuat = ShortestArc(b.ThighRest.Normalized(), kneeDir);
-        var shinDir = (targetWorld - knee).Normalized();
-        var shinQuat = ShortestArc(b.ShinRest.Normalized(), shinDir);
+        var end = hip + dir * dist;
+
+        // Hypermotion-style knee clamp: prevent hyperextension / impossible folds.
+        Vector3 upper = knee - hip;
+        Vector3 lower = end - knee;
+        if (upper.LengthSquared() > 1e-8f && lower.LengthSquared() > 1e-8f)
+        {
+            float cosK = Mathf.Clamp(upper.Normalized().Dot((-lower).Normalized()), -1f, 1f);
+            float kneeDeg = Mathf.RadToDeg(Mathf.Acos(cosK));
+            float clampedDeg = Mathf.Clamp(kneeDeg, 8f, 155f);
+            if (Mathf.Abs(clampedDeg - kneeDeg) > 0.5f)
+            {
+                float targetRad = Mathf.DegToRad(clampedDeg);
+                float proj = (l1 * l1 - l2 * l2 + dist * dist) / (2f * dist);
+                float h = Mathf.Sqrt(Mathf.Max(0.0001f, l1 * l1 - proj * proj));
+                Vector3 bendDir = (knee - (hip + dir * proj));
+                if (bendDir.LengthSquared() < 1e-8f) bendDir = axis;
+                bendDir = bendDir.Normalized();
+                knee = hip + dir * proj + bendDir * h;
+                Vector3 nu = knee - hip;
+                if (nu.LengthSquared() > 1e-8f) knee = hip + nu.Normalized() * l1;
+                Vector3 nl = end - knee;
+                if (nl.LengthSquared() > 1e-8f) end = knee + nl.Normalized() * l2;
+            }
+        }
+
+        var thighQuat = ShortestArc(b.ThighRest.Normalized(), (knee - hip).Normalized());
+        var shinQuat = ShortestArc(b.ShinRest.Normalized(), (end - knee).Normalized());
         Skel.SetBonePoseRotation(b.Thigh, thighQuat);
         Skel.SetBonePoseRotation(b.Shin, shinQuat);
     }

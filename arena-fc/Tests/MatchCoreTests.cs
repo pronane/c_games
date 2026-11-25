@@ -1721,5 +1721,60 @@ Section("Kit clash: away kit, keepers clear of both sides (22.11.2026)");
     Check("kit changes are deterministic and colour-only", a1.State.Ball.Pos == a2.State.Ball.Pos);
 }
 
-Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
+Section("Hypermotion / ML-Flow-inspired motion system (TwoBoneIK, BallApproach, Inertialization)");
+{
+    // TwoBoneIK: analytic solve reaches target and knee clamp prevents hyperextension.
+    var root = new Vector3(0f, 1f, 0f);
+    var target = new Vector3(0f, 0f, 0.5f);
+    bool solved = TwoBoneIK.Solve(root, target, 0.5f, 0.5f, Vector3.UnitX, out var joint, out var end);
+    Check("TwoBoneIK solves reachable target", solved && (end - target).Length() < 0.05f,
+        $"solved={solved} end={end}");
+    bool clamped = TwoBoneIK.SolveWithKneeClamp(root, target, 0.5f, 0.5f, Vector3.UnitX, 8f, 155f, out var cj, out var ce);
+    Vector3 upper = cj - root; Vector3 lower = ce - cj;
+    float cosK = Vector3.Dot(Vector3.Normalize(upper), Vector3.Normalize(-lower));
+    float kneeDeg = MathF.Acos(Math.Clamp(cosK, -1f, 1f)) * 180f / MathF.PI;
+    Check("TwoBoneIK knee clamp stays within anatomical range", clamped && kneeDeg >= 7.5f && kneeDeg <= 155.5f,
+        $"deg={kneeDeg:F1}");
+
+    // BallApproach: weight ramps when approaching and contact timing cost prefers matching clip.
+    var approach = BallApproach.Update(
+        new Vector3(0, 0, 0), new Vector3(0, 0, 3f), new Vector3(0, 0, 1f),
+        new Vector3(0, 0, 3f), Vector3.Zero, true, 1f / 60f, 0f);
+    Check("BallApproach ramps weight when closing on ball", approach.IsApproachingBall && approach.ApproachWeight > 0f,
+        $"w={approach.ApproachWeight:F3} dist={approach.DistanceToBall:F2} ttc={approach.TimeToBallContact:F2}");
+    var clipGood = new ClipMeta { Id = "kick", Category = ClipCategory.Kick, Duration = 0.4f, ContactFraction = 0.5f };
+    var clipBad = new ClipMeta { Id = "kick_bad", Category = ClipCategory.Kick, Duration = 0.4f, ContactFraction = 0.1f };
+    float goodCost = BallApproach.ContactTimingCost(clipGood, 0.2f);
+    float badCost = BallApproach.ContactTimingCost(clipBad, 0.2f);
+    Check("BallApproach prefers contact timing near arrival", goodCost < badCost, $"good={goodCost:F2} bad={badCost:F2}");
+    float locked = BallApproach.ContactLockedStartPhase(clipGood, 0.1f, 0f, 1f);
+    Check("BallApproach locks start phase toward contact", locked > 0f && locked <= clipGood.ContactFraction,
+        $"locked={locked:F3}");
+
+    // Inertialization: offsets decay to near-zero.
+    var buf = new InertializationBuffer { DefaultHalfLife = 0.1f };
+    var oldPoses = new Dictionary<int, (Vector3 pos, Quaternion rot)> { [1] = (new Vector3(0, 1, 0), Quaternion.Identity) };
+    var newPoses = new Dictionary<int, (Vector3 pos, Quaternion rot)> { [1] = (new Vector3(0, 1.1f, 0), Quaternion.Identity) };
+    buf.Capture(oldPoses, newPoses);
+    Check("Inertialization captures transition offset", buf.Active && buf.Bones.Count == 1);
+    for (int i = 0; i < 120; i++) buf.Update(1f / 60f);
+    Check("Inertialization decays offset to rest", !buf.Active || buf.Bones[0].PositionOffset.Length() < 0.01f,
+        $"active={buf.Active} len={(buf.Bones.Count>0?buf.Bones[0].PositionOffset.Length():0f):F4}");
+
+    // MotionEngine: approach weight rises and contact-locked one-shot enters near contact.
+    var eng = new MotionEngine();
+    eng.LoadClips(new[]
+    {
+        new ClipMeta { Id = "run", Category = ClipCategory.Locomotion, Duration = 1f, Loop = true, PreferredSpeed = 3f, FootPlantFrames = new[]{0.25f,0.75f} },
+        new ClipMeta { Id = "trap", Category = ClipCategory.FirstTouch, Duration = 0.5f, Loop = false, ContactFraction = 0.5f, BallState = BallState.Approaching },
+    });
+    var ms = new MotionState();
+    for (int i = 0; i < 30; i++)
+        eng.Update(ms, 3f, 0f, BallState.Approaching, PlayerIntent.Trap, 1f / 60f, secondsUntilContact: 0.15f);
+    Check("MotionEngine raises approach weight for timed contact", ms.ApproachWeight > 0.2f, $"w={ms.ApproachWeight:F2}");
+    Check("MotionEngine selects contact-capable clip on approach", ms.RenderClipId == "trap" || ms.CurrentClipId == "trap" || ms.NextClipId == "trap",
+        $"cur={ms.CurrentClipId} next={ms.NextClipId}");
+}
+
+Console.WriteLine($"\\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
