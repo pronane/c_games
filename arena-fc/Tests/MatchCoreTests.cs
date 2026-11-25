@@ -1802,14 +1802,43 @@ Section("Hypermotion data plumbing v2 (manifest curves/contact/velocity)");
           "contactWindowStart": -1.0,
           "contactWindowEnd": -1.0,
           "rootVelocitySamples": [0,3,0,3,0,3,0,3]
+        },
+        {
+          "id": "kick",
+          "category": "Kick",
+          "duration": 0.8,
+          "contactFraction": 0.5,
+          "footPlantFrames": [0.2],
+          "footPlantSides": ["Left"],
+          "rootVelocityX": 0.0,
+          "rootVelocityZ": 0.5,
+          "preferredSpeed": 1.0,
+          "preferredTurnRate": 0.0,
+          "ballState": "Possessed",
+          "tags": ["dedicated"],
+          "boneCount": 18,
+          "loop": false,
+          "plantCurveLeft": [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+          "contactWindowStart": 0.3,
+          "contactWindowEnd": 0.55,
+          "rootVelocitySamples": [0,0.5,0,0.5,0,0.5,0,0.5]
         }
       ]
     }
     """;
     var clips = ClipManifestLoader.Parse(manifestJson);
-    Check("v2 manifest parses", clips.Count == 1 && clips[0].HasPlantCurves);
+    Check("v2 manifest parses", clips.Count == 2 && clips[0].HasPlantCurves);
     Check("plant curve samples weight", clips[0].SamplePlantWeight(true, 0.25f) > 0.9f);
     Check("root velocity samples fallback/interpolate", clips[0].SampleRootVelocity(0.5f).Y > 2.9f);
+    Check("contact window parsed", clips[1].HasContactWindow && clips[1].ContactWindowStart == 0.3f && clips[1].ContactWindowEnd == 0.55f);
+
+    var eng = new ArenaFC.Core.Animation.MotionEngine();
+    eng.LoadClips(clips);
+    var ms = new ArenaFC.Core.Animation.MotionState();
+    eng.Update(ms, 3f, 0f, ArenaFC.Core.Animation.BallState.None, ArenaFC.Core.Animation.PlayerIntent.Move, 1f / 60f);
+    Check("motion engine populates v2 plant weights", ms.PlantWeightLeft >= 0f && ms.PlantWeightLeft <= 1f && ms.PlantWeightRight >= 0f && ms.PlantWeightRight <= 1f);
+    Check("motion engine populates root velocity sample", ms.RootVelocitySampleZ > 0.1f);
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

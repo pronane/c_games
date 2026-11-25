@@ -128,6 +128,12 @@ public sealed class MotionDriver
         float elapsedAction = Math.Max(0f, player.ActionDuration - player.ActionTimer);
         float untilContact = player.ActionContactAt > 0f
             ? Math.Max(0f, player.ActionContactAt - elapsedAction) : -1f;
+        // Tighten TTC/contact wiring from sim pending ball events.
+        if (ball.HasPending && ball.PendingFrom == player.Index)
+        {
+            float pendingTtc = Math.Max(0f, player.ActionTimer);
+            if (untilContact < 0f || pendingTtc < untilContact) untilContact = pendingTtc;
+        }
         float speed = Mx.Flat(player.Vel).Length();
         // Facing-root XZ (x = right, z = forward), the space the feature table is baked in.
         var fwd = Mx.Norm(Mx.Flat(player.Facing));

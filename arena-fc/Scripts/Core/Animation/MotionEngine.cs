@@ -164,6 +164,12 @@ public sealed class MotionEngine
             motion.TimeSinceContact = 0f;
         }
         UpdateFootPlants(motion, visible, visiblePhase);
+        var rv = visible.SampleRootVelocity(visiblePhase);
+        motion.RootVelocitySampleX = rv.X;
+        motion.RootVelocitySampleZ = rv.Y;
+        motion.InContactWindow = visible.HasContactWindow
+            ? (visiblePhase >= visible.ContactWindowStart && visiblePhase <= visible.ContactWindowEnd)
+            : (visible.HasContact && CircularDistance(visiblePhase, visible.ContactFraction) < 0.08f);
         motion.LastPoseClipId = motion.RenderClipId;
         motion.LastPosePhase = motion.RenderPhase;
     }
@@ -358,14 +364,17 @@ public sealed class MotionEngine
     private static void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)
     {
         state.FootPlantedLeft = state.FootPlantedRight = false;
+        state.PlantWeightLeft = 0f;
+        state.PlantWeightRight = 0f;
         if (clip == null) return;
-        if (clip.HasPlantCurves)
+        state.PlantWeightLeft = clip.SamplePlantWeight(true, phase);
+        state.PlantWeightRight = clip.SamplePlantWeight(false, phase);
+        if (clip.HasPlantCurves || clip.FootPlantFrames.Length == 0)
         {
-            state.FootPlantedLeft = clip.SamplePlantWeight(true, phase) >= 0.5f;
-            state.FootPlantedRight = clip.SamplePlantWeight(false, phase) >= 0.5f;
+            state.FootPlantedLeft = state.PlantWeightLeft >= 0.5f;
+            state.FootPlantedRight = state.PlantWeightRight >= 0.5f;
             return;
         }
-        if (clip.FootPlantFrames.Length == 0) return;
         for (int i = 0; i < clip.FootPlantFrames.Length; i++)
         {
             if (!NearPlant(phase, clip.FootPlantFrames[i])) continue;

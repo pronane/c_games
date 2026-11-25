@@ -88,6 +88,13 @@ public sealed partial class SoccerClipRig : Node3D
     private bool _hasPrevFootL, _hasPrevFootR;
     private Vector3 _prevPelvisPos;
     private bool _hasPrevPelvisPos;
+    private Vector3 _groundNormalL = Vector3.Up;
+    private Vector3 _groundNormalR = Vector3.Up;
+    private float _lastIkCorrectionL;
+    private float _lastIkCorrectionR;
+    private float _lastInertialEnergy;
+    private Label? _debugLabel;
+    private bool _debugOverlayEnabled = !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("ARENA_FC_DEBUG_OVERLAY"));
 
     // Hypermotion-style inertialization (presentation-only).
     private readonly Dictionary<int, Transform3D> _prevBonePoses = new();
@@ -1060,12 +1067,16 @@ public sealed partial class SoccerClipRig : Node3D
                 Skel.SetBoneGlobalPoseOverride(ib.bone, new Transform3D(new Basis(finalRot), finalPos), 1f, true);
             }
         }
+        float energy = 0f;
+        for (int i = 0; i < _inertialBones.Count; i++) energy += _inertialBones[i].posOff.LengthSquared() + _inertialBones[i].rotOff.GetAngle() * 0.1f;
+        _lastInertialEnergy = energy;
         if (!any || _inertialTime > 0.18f * 7f)
         {
             _inertialActive = false;
             foreach (var ib in _inertialBones)
                 Skel.ClearBoneGlobalPoseOverride(ib.bone);
             _inertialBones.Clear();
+            _lastInertialEnergy = 0f;
         }
     }
 
@@ -1136,6 +1147,7 @@ public sealed partial class SoccerClipRig : Node3D
         if (Skel == null || _bones.Count == 0) return;
         bool leftPlanted = _motionState?.FootPlantedLeft ?? false;
         bool rightPlanted = _motionState?.FootPlantedRight ?? false;
+        _lastIkCorrectionL = 0f; _lastIkCorrectionR = 0f;
 
         foreach (var side in new[] { "L", "R" })
         {
@@ -1145,30 +1157,142 @@ public sealed partial class SoccerClipRig : Node3D
             float height = footGlobal.Y - worldPos.Y;
             bool planted = (isLeft ? leftPlanted : rightPlanted) || height < .10f;
 
-            // Residual motion cancellation: keep planted foot from sliding horizontally.
-            Vector3 target = new Vector3(footGlobal.X, worldPos.Y + 0.012f, footGlobal.Z);
+            var ground = SampleGround(worldPos, footGlobal);
+            if (isLeft) _groundNormalL = ground.normal; else _groundNormalR = ground.normal;
+            float groundY = ground.hit ? ground.y : worldPos.Y;
+            Vector3 target = new Vector3(footGlobal.X, groundY + 0.012f, footGlobal.Z);
+
             if (planted)
             {
                 ref bool hasPrev = ref (isLeft ? ref _hasPrevFootL : ref _hasPrevFootR);
                 ref Vector3 prev = ref (isLeft ? ref _prevFootWorldL : ref _prevFootWorldR);
                 if (hasPrev)
                 {
-                    Vector3 locked = new Vector3(prev.X, worldPos.Y + 0.012f, prev.Z);
+                    Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
                     float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f);
                     target = target.Lerp(locked, lockW);
                 }
-                if (height < .18f) SolveTwoBone(b, target, worldPos, yaw);
-                prev = target;
+                if (height < .22f)
+                {
+                    Vector3 before = Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    SolveTwoBone(b, target, worldPos, yaw);
+                    Vector3 after = Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    float corr = before.DistanceTo(after);
+                    if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
+                }
+                ApplyFootGroundOrientation(b, ground.normal, yaw);
+                prev = Skel.GetBoneGlobalPose(b.Foot).Origin;
+                prev.Y = groundY + 0.012f;
                 hasPrev = true;
             }
             else
             {
                 if (isLeft) _hasPrevFootL = false; else _hasPrevFootR = false;
-                if (height < .18f) SolveTwoBone(b, target, worldPos, yaw);
+                if (height < .18f)
+                {
+                    Vector3 before = Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    SolveTwoBone(b, target, worldPos, yaw);
+                    Vector3 after = Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    float corr = before.DistanceTo(after);
+                    if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
+                    ApplyFootGroundOrientation(b, ground.normal, yaw);
+                }
             }
         }
         ApplyPelvisStabilization(worldPos, leftPlanted, rightPlanted);
+        UpdateDebugOverlay();
         ApplyLookAndReach();
+    }
+
+    private (bool hit, float y, Vector3 normal) SampleGround(Vector3 worldPos, Vector3 footWorld)
+    {
+        // Default to pitch plane at the player's current base.
+        Vector3 normal = Vector3.Up;
+        float y = worldPos.Y;
+        bool hit = false;
+        try
+        {
+            var space = Skel?.GetWorld3D()?.DirectSpaceState;
+            if (space != null)
+            {
+                var from = new Vector3(footWorld.X, footWorld.Y + 0.6f, footWorld.Z);
+                var to = new Vector3(footWorld.X, footWorld.Y - 0.8f, footWorld.Z);
+                var q = PhysicsRayQueryParameters3D.Create(from, to);
+                q.CollideWithAreas = false;
+                q.CollideWithBodies = true;
+                var res = space.IntersectRay(q);
+                if (res.Count > 0 && res.ContainsKey("position"))
+                {
+                    var pos = (Vector3)res["position"];
+                    var n = res.ContainsKey("normal") ? (Vector3)res["normal"] : Vector3.Up;
+                    if (n.LengthSquared() > 1e-6f) normal = n.Normalized();
+                    y = pos.Y;
+                    hit = true;
+                }
+            }
+        }
+        catch { /* headless / no physics: plane fallback */ }
+        return (hit, y, normal);
+    }
+
+    private void ApplyFootGroundOrientation(BoneData b, Vector3 groundNormal, float yaw)
+    {
+        if (Skel == null) return;
+        if (groundNormal.LengthSquared() < 1e-6f) groundNormal = Vector3.Up;
+        groundNormal = groundNormal.Normalized();
+        // Only apply when ground is reasonably level to avoid extreme ankle poses.
+        if (groundNormal.Dot(Vector3.Up) < 0.65f) return;
+        var footTx = Skel.GetBoneGlobalPose(b.Foot);
+        Vector3 fwd = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+        // Project forward onto ground plane.
+        fwd = (fwd - groundNormal * fwd.Dot(groundNormal));
+        if (fwd.LengthSquared() < 1e-6f) fwd = footTx.Basis.Z;
+        fwd = fwd.Normalized();
+        Vector3 right = fwd.Cross(groundNormal);
+        if (right.LengthSquared() < 1e-6f) return;
+        right = right.Normalized();
+        Vector3 up = right.Cross(fwd).Normalized();
+        var basis = new Basis(right, up, fwd).Orthonormalized();
+        // Blend gently toward ground-aligned orientation.
+        footTx.Basis = footTx.Basis.Slerp(basis, 0.35f).Orthonormalized();
+        Skel.SetBoneGlobalPoseOverride(b.Foot, footTx, 1f, true);
+    }
+
+    private void UpdateDebugOverlay()
+    {
+        if (!_debugOverlayEnabled) return;
+        try
+        {
+            if (_debugLabel == null || !IsInstanceValid(_debugLabel))
+            {
+                var canvas = new CanvasLayer { Name = "HypermotionDebugCanvas", Layer = 100 };
+                AddChild(canvas);
+                _debugLabel = new Label
+                {
+                    Name = "HypermotionDebugLabel",
+                    Position = new Vector2(12, 12),
+                    Modulate = new Color(1, 1, 0.6f, 0.95f),
+                };
+                _debugLabel.AddThemeFontSizeOverride("font_size", 14);
+                canvas.AddChild(_debugLabel);
+            }
+            float approach = _motionState?.ApproachWeight ?? 0f;
+            float ttc = _motionState?.TimeToBallContact ?? -1f;
+            bool lp = _motionState?.FootPlantedLeft ?? false;
+            bool rp = _motionState?.FootPlantedRight ?? false;
+            float pwL = _motionState?.PlantWeightLeft ?? 0f;
+            float pwR = _motionState?.PlantWeightRight ?? 0f;
+            float rvx = _motionState?.RootVelocitySampleX ?? 0f;
+            float rvz = _motionState?.RootVelocitySampleZ ?? 0f;
+            bool cw = _motionState?.InContactWindow ?? false;
+            _debugLabel.Text =
+                $"AME dbg\napproach={approach:F2} ttc={ttc:F2} contactWin={cw}\n" +
+                $"plant L={lp}({pwL:F2}) R={rp}({pwR:F2})\n" +
+                $"rv=({rvx:F2},{rvz:F2})\n" +
+                $"ikCorr L={_lastIkCorrectionL:F3} R={_lastIkCorrectionR:F3}\n" +
+                $"inertial={(_inertialActive ? _inertialTime : 0f):F2} E={_lastInertialEnergy:F3}";
+        }
+        catch { /* debug overlay is non-fatal */ }
     }
 
     private void ApplyPelvisStabilization(Vector3 worldPos, bool leftPlanted, bool rightPlanted)
@@ -1213,96 +1337,6 @@ public sealed partial class SoccerClipRig : Node3D
         _hasPrevPelvisPos = true;
     }
 
-    private void SolveTwoBone(BoneData b, Vector3 targetWorld, Vector3 rootWorld, float yaw)
-    {
-        var hip = Skel.GetBoneGlobalPose(b.Thigh).Origin;
-        float l1 = Mathf.Max(0.001f, b.ThighRest.Length());
-        float l2 = Mathf.Max(0.001f, b.ShinRest.Length());
-        var toTarget = targetWorld - hip;
-        float targetDist = toTarget.Length();
-        float total = l1 + l2;
-        float minLen = Mathf.Abs(l1 - l2) + 0.002f;
-        float dist = Mathf.Clamp(targetDist, minLen, total * 0.995f);
-        var dir = targetDist > 1e-6f ? toTarget / targetDist : Vector3.Up;
-
-        float cosA = (l1 * l1 + dist * dist - l2 * l2) / (2f * l1 * dist);
-        cosA = Mathf.Clamp(cosA, -1f, 1f);
-        float angA = Mathf.Acos(cosA);
-
-        var fwd = new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw));
-        var axis = dir.Cross(fwd);
-        if (axis.LengthSquared() < 1e-6f) axis = Vector3.Right;
-        axis = axis.Normalized();
-        var kneeDir = dir.Rotated(axis, angA);
-        var knee = hip + kneeDir * l1;
-        var end = hip + dir * dist;
-
-        // Hypermotion-style knee clamp: prevent hyperextension / impossible folds.
-        Vector3 upper = knee - hip;
-        Vector3 lower = end - knee;
-        if (upper.LengthSquared() > 1e-8f && lower.LengthSquared() > 1e-8f)
-        {
-            float cosK = Mathf.Clamp(upper.Normalized().Dot((-lower).Normalized()), -1f, 1f);
-            float kneeDeg = Mathf.RadToDeg(Mathf.Acos(cosK));
-            float clampedDeg = Mathf.Clamp(kneeDeg, 8f, 155f);
-            if (Mathf.Abs(clampedDeg - kneeDeg) > 0.5f)
-            {
-                float targetRad = Mathf.DegToRad(clampedDeg);
-                float proj = (l1 * l1 - l2 * l2 + dist * dist) / (2f * dist);
-                float h = Mathf.Sqrt(Mathf.Max(0.0001f, l1 * l1 - proj * proj));
-                Vector3 bendDir = (knee - (hip + dir * proj));
-                if (bendDir.LengthSquared() < 1e-8f) bendDir = axis;
-                bendDir = bendDir.Normalized();
-                knee = hip + dir * proj + bendDir * h;
-                Vector3 nu = knee - hip;
-                if (nu.LengthSquared() > 1e-8f) knee = hip + nu.Normalized() * l1;
-                Vector3 nl = end - knee;
-                if (nl.LengthSquared() > 1e-8f) end = knee + nl.Normalized() * l2;
-            }
-        }
-
-        var thighQuat = ShortestArc(b.ThighRest.Normalized(), (knee - hip).Normalized());
-        var shinQuat = ShortestArc(b.ShinRest.Normalized(), (end - knee).Normalized());
-        Skel.SetBonePoseRotation(b.Thigh, thighQuat);
-        Skel.SetBonePoseRotation(b.Shin, shinQuat);
-    }
-
-    private static Quaternion ShortestArc(Vector3 from, Vector3 to)
-    {
-        from = from.Normalized(); to = to.Normalized();
-        float dot = Mathf.Clamp(from.Dot(to), -1f, 1f);
-        if (dot > .999999f) return Quaternion.Identity;
-        if (dot < -.999999f)
-        {
-            var axis = from.Cross(Vector3.Up);
-            if (axis.LengthSquared() < 1e-6f) axis = from.Cross(Vector3.Right);
-            return new Quaternion(axis.Normalized(), Mathf.Pi);
-        }
-        var axis2 = from.Cross(to).Normalized();
-        float angle = Mathf.Acos(dot);
-        return new Quaternion(axis2, angle);
-    }
-
-    // ---- Phase 1.5 look-at + reach --------------------------------------
-
-    private void UpdateLookAt(Vector3 worldPos, float yaw, Vector3 ballWorld)
-    {
-        if (ballWorld == Vector3.Zero || Skel == null) { _lookYaw = 0f; _lookPitch = 0f; return; }
-        var toBall = ballWorld - (worldPos + Vector3.Up * 1.6f);
-        float dist = toBall.Length();
-        if (dist < .01f) return;
-        float ballYaw = Mathf.Atan2(-toBall.X, -toBall.Z);
-        float yawDiff = Mathf.AngleDifference(ballYaw, yaw);
-        _lookYaw = Mathf.Clamp(yawDiff, -.9f, .9f);
-        _lookPitch = Mathf.Clamp(Mathf.Atan2(toBall.Y, new Vector2(toBall.X, toBall.Z).Length()), -.5f, .5f);
-    }
-
-    private void UpdateReach(Vector3 worldPos, float yaw, Vector3 ballWorld)
-    {
-        if (ballWorld == Vector3.Zero) { _reach = 0f; return; }
-        float dist = (ballWorld - worldPos).Length();
-        _reach = Mathf.Clamp(1f - (dist - .4f) / 1.2f, 0f, 1f);
-    }
 
     private void ApplyLookAndReach()
     {

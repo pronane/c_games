@@ -42,6 +42,13 @@ public sealed class MotionState
     public float TimeToBallContact = -1f;
     public bool IsApproachingBall;
 
+    // v2 data plumbing / debug
+    public float RootVelocitySampleX;
+    public float RootVelocitySampleZ;
+    public float PlantWeightLeft;
+    public float PlantWeightRight;
+    public bool InContactWindow;
+
     public string RenderClipId => NextClipId.Length > 0 ? NextClipId : CurrentClipId;
     public float RenderPhase => NextClipId.Length > 0 ? NextPhase : Phase;
 }
