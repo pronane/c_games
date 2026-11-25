@@ -358,7 +358,14 @@ public sealed class MotionEngine
     private static void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)
     {
         state.FootPlantedLeft = state.FootPlantedRight = false;
-        if (clip == null || clip.FootPlantFrames.Length == 0) return;
+        if (clip == null) return;
+        if (clip.HasPlantCurves)
+        {
+            state.FootPlantedLeft = clip.SamplePlantWeight(true, phase) >= 0.5f;
+            state.FootPlantedRight = clip.SamplePlantWeight(false, phase) >= 0.5f;
+            return;
+        }
+        if (clip.FootPlantFrames.Length == 0) return;
         for (int i = 0; i < clip.FootPlantFrames.Length; i++)
         {
             if (!NearPlant(phase, clip.FootPlantFrames[i])) continue;

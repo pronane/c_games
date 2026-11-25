@@ -1776,5 +1776,41 @@ Section("Hypermotion / ML-Flow-inspired motion system (TwoBoneIK, BallApproach, 
         $"cur={ms.CurrentClipId} next={ms.NextClipId}");
 }
 
-Console.WriteLine($"\\nRESULT: {passed} passed, {failed} failed");
+Section("Hypermotion data plumbing v2 (manifest curves/contact/velocity)");
+{
+    string manifestJson = """
+    {
+      "version": 2,
+      "clips": [
+        {
+          "id": "run",
+          "category": "Locomotion",
+          "duration": 1.0,
+          "contactFraction": -1.0,
+          "footPlantFrames": [0.25, 0.75],
+          "footPlantSides": ["Left","Right"],
+          "rootVelocityX": 0.0,
+          "rootVelocityZ": 3.0,
+          "preferredSpeed": 3.0,
+          "preferredTurnRate": 0.0,
+          "ballState": "None",
+          "tags": [],
+          "boneCount": 18,
+          "loop": true,
+          "plantCurveLeft": [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+          "contactWindowStart": -1.0,
+          "contactWindowEnd": -1.0,
+          "rootVelocitySamples": [0,3,0,3,0,3,0,3]
+        }
+      ]
+    }
+    """;
+    var clips = ClipManifestLoader.Parse(manifestJson);
+    Check("v2 manifest parses", clips.Count == 1 && clips[0].HasPlantCurves);
+    Check("plant curve samples weight", clips[0].SamplePlantWeight(true, 0.25f) > 0.9f);
+    Check("root velocity samples fallback/interpolate", clips[0].SampleRootVelocity(0.5f).Y > 2.9f);
+}
+
+Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

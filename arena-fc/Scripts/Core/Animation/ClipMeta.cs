@@ -46,7 +46,65 @@ public sealed class ClipMeta
     public int BoneCount { get; set; } = 18;
     public bool Loop { get; set; }
 
+    // Hypermotion data plumbing (manifest v2): sampled curves for grounded IK/contact.
+    /// <summary>Uniformly sampled left-plant weight over clip duration (0..1). Empty = use FootPlantFrames.</summary>
+    public float[] PlantCurveLeft { get; set; } = Array.Empty<float>();
+    /// <summary>Uniformly sampled right-plant weight over clip duration (0..1). Empty = use FootPlantFrames.</summary>
+    public float[] PlantCurveRight { get; set; } = Array.Empty<float>();
+    /// <summary>Normalized contact window start (0..1), or -1 when no contact.</summary>
+    public float ContactWindowStart { get; set; } = -1f;
+    /// <summary>Normalized contact window end (0..1), or -1 when no contact.</summary>
+    public float ContactWindowEnd { get; set; } = -1f;
+    /// <summary>Uniformly sampled root velocity in facing-local XZ, interleaved [x0,z0,x1,z1,...] m/s.</summary>
+    public float[] RootVelocitySamples { get; set; } = Array.Empty<float>();
+
     public bool HasContact => ContactFraction >= 0f && ContactFraction <= 1f;
+    public bool HasPlantCurves => PlantCurveLeft.Length > 1 && PlantCurveRight.Length == PlantCurveLeft.Length;
+    public bool HasContactWindow => ContactWindowStart >= 0f && ContactWindowEnd >= ContactWindowStart && ContactWindowEnd <= 1f;
     /// <summary>Authored for one engine action (tag "dedicated"): never picked by category.</summary>
     public bool Dedicated => Array.Exists(Tags, t => string.Equals(t, "dedicated", StringComparison.OrdinalIgnoreCase));
+
+    public float SamplePlantWeight(bool left, float phase01)
+    {
+        var curve = left ? PlantCurveLeft : PlantCurveRight;
+        if (curve.Length < 2)
+        {
+            // Fallback to discrete plant events.
+            if (FootPlantFrames.Length == 0) return 0f;
+            bool planted = false;
+            for (int i = 0; i < FootPlantFrames.Length; i++)
+                if (FootPlantSideAt(i) == (left ? FootSide.Left : FootSide.Right)
+                    && MathF.Abs(CircularDiff(phase01, FootPlantFrames[i])) <= .035f) { planted = true; break; }
+            return planted ? 1f : 0f;
+        }
+        float p = phase01 - MathF.Floor(phase01);
+        float f = p * (curve.Length - 1);
+        int i0 = (int)f;
+        int i1 = Math.Min(i0 + 1, curve.Length - 1);
+        float t = f - i0;
+        return curve[i0] + (curve[i1] - curve[i0]) * t;
+    }
+
+    public Vector2 SampleRootVelocity(float phase01)
+    {
+        if (RootVelocitySamples.Length < 4 || RootVelocitySamples.Length % 2 != 0)
+            return new Vector2(RootVelocityAvg.X, RootVelocityAvg.Z);
+        int count = RootVelocitySamples.Length / 2;
+        float p = phase01 - MathF.Floor(phase01);
+        float f = p * (count - 1);
+        int i0 = (int)f;
+        int i1 = Math.Min(i0 + 1, count - 1);
+        float t = f - i0;
+        float x = RootVelocitySamples[i0 * 2] + (RootVelocitySamples[i1 * 2] - RootVelocitySamples[i0 * 2]) * t;
+        float z = RootVelocitySamples[i0 * 2 + 1] + (RootVelocitySamples[i1 * 2 + 1] - RootVelocitySamples[i0 * 2 + 1]) * t;
+        return new Vector2(x, z);
+    }
+
+    private static float CircularDiff(float a, float b)
+    {
+        float d = (a - b) % 1f;
+        if (d > .5f) d -= 1f;
+        if (d < -.5f) d += 1f;
+        return d;
+    }
 }

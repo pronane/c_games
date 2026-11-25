@@ -84,12 +84,18 @@ public sealed partial class SoccerClipRig : Node3D
 
     // Phase 1.2 foot-planting IK state.
     private readonly Dictionary<string, BoneData> _bones = new();
+    private Vector3 _prevFootWorldL, _prevFootWorldR;
+    private bool _hasPrevFootL, _hasPrevFootR;
+    private Vector3 _prevPelvisPos;
+    private bool _hasPrevPelvisPos;
 
     // Hypermotion-style inertialization (presentation-only).
     private readonly Dictionary<int, Transform3D> _prevBonePoses = new();
+    private readonly Dictionary<int, Transform3D> _inertialPrevFramePoses = new();
     private readonly List<(int bone, Vector3 posOff, Quaternion rotOff, Vector3 posVel, Vector3 angVel, float halfLife)> _inertialBones = new();
     private bool _inertialActive;
     private float _inertialTime;
+    private float _inertialPrevDt = 1f / 60f;
     private Vector3 _prevPelvisWorld;
     private bool _hasPrevPelvis;
 
@@ -859,7 +865,7 @@ public sealed partial class SoccerClipRig : Node3D
         UpdateReach(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateInertialization(dt);
         UpdateFootIk(worldPos, yaw);
-        StoreInertialPrevPoses();
+        StoreInertialPrevPoses(dt);
         _prevFacing = Mx.Norm(Mx.Flat(p.Facing));
         if (_prevFacing.LengthSquared() < 0.001f) _prevFacing = new System.Numerics.Vector3(0, 0, 1);
     }
@@ -964,7 +970,7 @@ public sealed partial class SoccerClipRig : Node3D
     }
 
 
-    // ---- Hypermotion-style inertialization -------------------------------
+    // ---- Hypermotion-style inertialization (velocity-aware) -------------
 
     private static readonly string[] InertialBoneNames =
     {
@@ -989,6 +995,7 @@ public sealed partial class SoccerClipRig : Node3D
         _inertialBones.Clear();
         _inertialActive = true;
         _inertialTime = 0f;
+        float dt = Mathf.Max(0.0001f, _inertialPrevDt);
         foreach (var kv in _prevBonePoses)
         {
             int b = kv.Key;
@@ -999,7 +1006,22 @@ public sealed partial class SoccerClipRig : Node3D
             Quaternion oldRot = oldTx.Basis.GetRotationQuaternion();
             Quaternion newRot = newTx.Basis.GetRotationQuaternion();
             Quaternion rotOff = (oldRot * newRot.Inverse()).Normalized();
-            _inertialBones.Add((b, posOff, rotOff, Vector3.Zero, Vector3.Zero, 0.18f));
+
+            // Velocity-aware capture: estimate old bone velocity from previous frame.
+            Vector3 posVel = Vector3.Zero;
+            Vector3 angVel = Vector3.Zero;
+            if (_inertialPrevFramePoses.TryGetValue(b, out var prevTx))
+            {
+                posVel = (oldTx.Origin - prevTx.Origin) / dt;
+                Quaternion prevRot = prevTx.Basis.GetRotationQuaternion();
+                Quaternion dq = (oldRot * prevRot.Inverse()).Normalized();
+                dq.GetAxisAngle(out Vector3 axis, out float angle);
+                if (angle > Mathf.Pi) angle -= Mathf.Tau;
+                angVel = axis * (angle / dt);
+                if (angVel.Length() > 12f) angVel = angVel.Normalized() * 12f;
+            }
+
+            _inertialBones.Add((b, posOff, rotOff, posVel, angVel, 0.18f));
         }
     }
 
@@ -1013,8 +1035,12 @@ public sealed partial class SoccerClipRig : Node3D
             var ib = _inertialBones[i];
             float lambda = 0.69314718056f / Mathf.Max(0.001f, ib.halfLife);
             float decay = Mathf.Exp(-lambda * dt);
-            ib.posOff *= decay;
+            // Velocity-aware integration then decay (Hypermotion-style continuity).
+            ib.posOff += ib.posVel * dt;
             ib.posVel *= decay;
+            ib.posOff *= decay;
+            if (ib.posOff.Length() > .12f) ib.posOff = ib.posOff.Normalized() * .12f;
+
             float angLen = ib.angVel.Length();
             if (angLen > 1e-6f)
             {
@@ -1025,7 +1051,7 @@ public sealed partial class SoccerClipRig : Node3D
             ib.angVel *= decay;
             _inertialBones[i] = ib;
 
-            if (ib.posOff.Length() > 0.0008f || Mathf.Abs(ib.rotOff.W) < 0.9995f)
+            if (ib.posOff.Length() > 0.0008f || ib.posVel.Length() > 0.001f || ib.angVel.Length() > 0.01f || Mathf.Abs(ib.rotOff.W) < 0.9995f)
             {
                 any = true;
                 var cur = Skel.GetBoneGlobalPose(ib.bone);
@@ -1043,10 +1069,18 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    private void StoreInertialPrevPoses()
+    private void StoreInertialPrevPoses(float dt)
     {
-        // Kept for velocity-aware capture if needed later.
+        if (Skel == null) return;
+        _inertialPrevDt = Mathf.Max(0.0001f, dt);
+        _inertialPrevFramePoses.Clear();
+        foreach (var name in InertialBoneNames)
+        {
+            int b = FindBoneLoose(Skel, name);
+            if (b >= 0) _inertialPrevFramePoses[b] = Skel.GetBoneGlobalPose(b);
+        }
     }
+
     // ---- Phase 1.2 foot-planting IK -------------------------------------
 
     private void CacheBones()
@@ -1100,16 +1134,83 @@ public sealed partial class SoccerClipRig : Node3D
     private void UpdateFootIk(Vector3 worldPos, float yaw)
     {
         if (Skel == null || _bones.Count == 0) return;
+        bool leftPlanted = _motionState?.FootPlantedLeft ?? false;
+        bool rightPlanted = _motionState?.FootPlantedRight ?? false;
+
         foreach (var side in new[] { "L", "R" })
         {
             if (!_bones.TryGetValue(side, out var b)) continue;
+            bool isLeft = side == "L";
             var footGlobal = Skel.GetBoneGlobalPose(b.Foot).Origin;
-            var target = new Vector3(footGlobal.X, worldPos.Y, footGlobal.Z);
             float height = footGlobal.Y - worldPos.Y;
-            if (height < .18f)
-                SolveTwoBone(b, target, worldPos, yaw);
+            bool planted = (isLeft ? leftPlanted : rightPlanted) || height < .10f;
+
+            // Residual motion cancellation: keep planted foot from sliding horizontally.
+            Vector3 target = new Vector3(footGlobal.X, worldPos.Y + 0.012f, footGlobal.Z);
+            if (planted)
+            {
+                ref bool hasPrev = ref (isLeft ? ref _hasPrevFootL : ref _hasPrevFootR);
+                ref Vector3 prev = ref (isLeft ? ref _prevFootWorldL : ref _prevFootWorldR);
+                if (hasPrev)
+                {
+                    Vector3 locked = new Vector3(prev.X, worldPos.Y + 0.012f, prev.Z);
+                    float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f);
+                    target = target.Lerp(locked, lockW);
+                }
+                if (height < .18f) SolveTwoBone(b, target, worldPos, yaw);
+                prev = target;
+                hasPrev = true;
+            }
+            else
+            {
+                if (isLeft) _hasPrevFootL = false; else _hasPrevFootR = false;
+                if (height < .18f) SolveTwoBone(b, target, worldPos, yaw);
+            }
         }
+        ApplyPelvisStabilization(worldPos, leftPlanted, rightPlanted);
         ApplyLookAndReach();
+    }
+
+    private void ApplyPelvisStabilization(Vector3 worldPos, bool leftPlanted, bool rightPlanted)
+    {
+        if (Skel == null) return;
+        int pelvisIdx = Skel.FindBone("Hips");
+        if (pelvisIdx < 0) return;
+        var pelvisTx = Skel.GetBoneGlobalPose(pelvisIdx);
+        Vector3 pelvis = pelvisTx.Origin;
+
+        // Soft midpoint pull when both feet planted.
+        if (leftPlanted && rightPlanted && _hasPrevFootL && _hasPrevFootR)
+        {
+            Vector3 mid = (_prevFootWorldL + _prevFootWorldR) * 0.5f;
+            mid.Y = pelvis.Y;
+            Vector3 err = mid - pelvis; err.Y = 0;
+            if (err.Length() > 0.06f) err = err.Normalized() * 0.06f;
+            pelvis += err * 0.35f;
+        }
+
+        // Lateral weight shift toward the more planted foot.
+        float diff = (leftPlanted ? 1f : 0f) - (rightPlanted ? 1f : 0f);
+        if (Mathf.Abs(diff) > 0.1f && _hasPrevFootL && _hasPrevFootR)
+        {
+            Vector3 lat = _prevFootWorldL - _prevFootWorldR; lat.Y = 0;
+            if (lat.LengthSquared() > 1e-6f)
+            {
+                lat = lat.Normalized();
+                pelvis += lat * (diff * 0.025f);
+            }
+        }
+
+        // Soft vertical clamp to keep pelvis grounded.
+        float avgFootY = ((_hasPrevFootL ? _prevFootWorldL.Y : worldPos.Y) + (_hasPrevFootR ? _prevFootWorldR.Y : worldPos.Y)) * 0.5f;
+        float targetY = avgFootY + _height * 0.52f;
+        float yErr = Mathf.Clamp(targetY - pelvis.Y, -0.04f, 0.04f);
+        pelvis.Y += yErr * 0.25f;
+
+        pelvisTx.Origin = pelvis;
+        Skel.SetBoneGlobalPoseOverride(pelvisIdx, pelvisTx, 1f, true);
+        _prevPelvisPos = pelvis;
+        _hasPrevPelvisPos = true;
     }
 
     private void SolveTwoBone(BoneData b, Vector3 targetWorld, Vector3 rootWorld, float yaw)
