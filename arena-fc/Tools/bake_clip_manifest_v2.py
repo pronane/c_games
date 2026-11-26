@@ -522,11 +522,36 @@ def main():
     for c in data.get("clips", []):
         enrich_clip(c, glb, stats)
     out = json.dumps(data, indent=2) + "\n"
+    # M6 validation: schema/provenance invariants.
+    errors = []
+    for c in data.get("clips", []):
+        cid = c.get("id", "<missing>")
+        rv = c.get("rootVelocitySamples")
+        pl = c.get("plantCurveLeft")
+        pr = c.get("plantCurveRight")
+        if not isinstance(rv, list) or len(rv) != SAMPLES * 2:
+            errors.append(f"{cid}: rootVelocitySamples len={len(rv) if isinstance(rv,list) else 'bad'}")
+        if not isinstance(pl, list) or len(pl) != SAMPLES:
+            errors.append(f"{cid}: plantCurveLeft len={len(pl) if isinstance(pl,list) else 'bad'}")
+        if not isinstance(pr, list) or len(pr) != SAMPLES:
+            errors.append(f"{cid}: plantCurveRight len={len(pr) if isinstance(pr,list) else 'bad'}")
+        if c.get("source") not in ("glb", "heuristic"):
+            errors.append(f"{cid}: missing/invalid source")
+        prov = c.get("provenance")
+        if not isinstance(prov, dict) or "type" not in prov:
+            errors.append(f"{cid}: missing/invalid provenance")
+    if errors:
+        print("FAIL: manifest validation errors:")
+        for e in errors[:30]:
+            print(" -", e)
+        if len(errors) > 30:
+            print(f" ... {len(errors)-30} more")
+        sys.exit(1)
     if check:
         if out != original:
             print(f"FAIL: {manifest_path} is stale; run python3 arena-fc/Tools/bake_clip_manifest_v2.py")
             sys.exit(1)
-        print(f"ok: {manifest_path} is up to date (glb={stats['glb']}, heuristic={stats['heuristic']})")
+        print(f"ok: {manifest_path} is up to date and valid (glb={stats['glb']}, heuristic={stats['heuristic']})")
         return
     with open(manifest_path, "w") as f:
         f.write(out)
