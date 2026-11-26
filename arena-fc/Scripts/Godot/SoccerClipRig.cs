@@ -52,6 +52,7 @@ public sealed partial class SoccerClipRig : Node3D
     /// <summary>Presentation-only motion input; never written back to PlayerState.</summary>
     public void ApplyMotion(MotionState? motion) => _motionState = motion;
     public ArenaFC.Core.Animation.AnimationMetrics? AnimMetrics { get; set; }
+    public bool HasFootIkBones => _bones.ContainsKey("L") && _bones.ContainsKey("R");
 
     // FIFA-style locomotion state.
     private Node3D? _sceneRoot;
@@ -1126,9 +1127,9 @@ public sealed partial class SoccerClipRig : Node3D
         {
             var b = new BoneData
             {
-                Thigh = Skel.FindBone("thigh_" + side),
-                Shin = Skel.FindBone("shin_" + side),
-                Foot = Skel.FindBone("foot_" + side),
+                Thigh = FindBoneLoose(Skel, "thigh_" + side),
+                Shin = FindBoneLoose(Skel, "shin_" + side),
+                Foot = FindBoneLoose(Skel, "foot_" + side),
             };
             if (b.Thigh < 0 || b.Shin < 0 || b.Foot < 0) continue;
             b.ThighRest = Skel.GetBoneRest(b.Thigh).Origin;
@@ -1136,13 +1137,13 @@ public sealed partial class SoccerClipRig : Node3D
             b.FootRest = Skel.GetBoneRest(b.Foot).Origin;
             _bones[side] = b;
         }
-        var spine = Skel.FindBone("spine_02");
-        var neck = Skel.FindBone("neck_01");
-        var head = Skel.FindBone("head");
-        var uaL = Skel.FindBone("upperarm_L");
-        var laL = Skel.FindBone("lowerarm_L");
-        var uaR = Skel.FindBone("upperarm_R");
-        var laR = Skel.FindBone("lowerarm_R");
+        var spine = FindBoneLoose(Skel, "spine_02");
+        var neck = FindBoneLoose(Skel, "neck_01");
+        var head = FindBoneLoose(Skel, "head");
+        var uaL = FindBoneLoose(Skel, "upperarm_L");
+        var laL = FindBoneLoose(Skel, "lowerarm_L");
+        var uaR = FindBoneLoose(Skel, "upperarm_R");
+        var laR = FindBoneLoose(Skel, "lowerarm_R");
         if (spine >= 0 && neck >= 0 && head >= 0)
         {
             var b = _bones.TryGetValue("L", out var bl) ? bl : new BoneData();
@@ -1336,7 +1337,7 @@ public sealed partial class SoccerClipRig : Node3D
     private void ApplyPelvisStabilization(Vector3 worldPos, float plantLeft, float plantRight, Transform3D skelGlobal, Transform3D skelInv)
     {
         if (Skel == null) return;
-        int pelvisIdx = Skel.FindBone("Hips");
+        int pelvisIdx = FindBoneLoose(Skel, "Hips");
         if (pelvisIdx < 0) return;
         var pelvisTx = Skel.GetBoneGlobalPose(pelvisIdx);
         // Work in world space (report P0: avoid skeleton/world mixing).
