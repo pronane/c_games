@@ -17,6 +17,7 @@ Status date: 2026-11-25 (sandbox evidence; visual/runtime Godot checks are limit
 - `b327a06`: intercept contracts, M3 per-player flap test, sandbox validation procedure; CI green (Arena FC tests pass, netplay/determinism pass).
 - `cfba339`: M1 determinism, M2 capability, M3 spacing validation tests; **dotnet-core failed** (M2 LaneSafety test case equal, M3 spacing too strict).
 - `d264dde`: fixed M2/M3 tests and added percentage tracking; CI green (Arena FC tests pass, netplay/determinism pass).
+- `a8708ff`/`dcb42cf`: M2 capability tests + doc; PR dotnet-core failed on bad intercept scenario (canFast/canSlow false). Fix pending.
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 
