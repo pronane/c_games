@@ -2291,6 +2291,21 @@ Section("M4 authoritative action contracts");
     }
     Check("M4 multi-seed contract fields valid", multiOk, multiOk ? "ok" : "invalid");
     Check("M4 multi-seed core intents observed", allIntents.Contains("carry") && (allIntents.Contains("pass") || allIntents.Contains("shoot")), string.Join(",", allIntents));
+
+    // Every active player should have a contract each tick.
+    var ec = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 11, AwayHuman = true });
+    bool allCovered = true; string covDetail = "ok";
+    for (int t = 0; t < 300; t++)
+    {
+        ec.Step(1f / 60f, PlayerCommand.None);
+        foreach (var p in ec.State.Players)
+        {
+            if (p.SentOff) continue;
+            if (!ec.LastActionContracts.ContainsKey(p.Index)) { allCovered = false; covDetail = $"missing p={p.Index} t={t}"; break; }
+        }
+        if (!allCovered) break;
+    }
+    Check("M4 every active player has contract", allCovered, covDetail);
 }
 
 Section("M2 perception uses real capabilities");
@@ -2344,6 +2359,12 @@ Section("M1 BallTrajectory prediction parity scenarios");
         if (dpos > 0.01f || dvel > 0.05f) { allOk = false; detail = $"dpos={dpos:F4} dvel={dvel:F4}"; break; }
     }
     Check("M1 BallTrajectory.Predict matches Step over scenarios", allOk, detail);
+
+    var pred2 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(3,0.11f,-2), new Vector3(-7,3,4), new Vector3(1,0.5f,0), 2.0f, true, 1.2f, -0.8f);
+    Vector3 p2=new Vector3(3,0.11f,-2), v2=new Vector3(-7,3,4), s2=new Vector3(1,0.5f,0);
+    for (int i=0;i<120;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p2, ref v2, ref s2, 1f/60f, true, 1.2f, -0.8f);
+    var samp2 = pred2.At(2.0f);
+    Check("M1 Predict matches Step with wind/spin/rain", (p2-samp2.Position).Length() < 0.02f && (v2-samp2.Velocity).Length() < 0.08f, $"dpos={(p2-samp2.Position).Length():F4}");
 }
 
 Section("M3 support destination spacing");
