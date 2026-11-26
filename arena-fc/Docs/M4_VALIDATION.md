@@ -72,3 +72,14 @@ GD.Print($"AnimMetrics samples={_motion.Metrics.Samples} slide={_motion.Metrics.
 | BallContactPosition | Yes | No | No | Populated; presentation/diagnostic. |
 
 SoccerClipRig currently receives motion state, not raw action contracts. Any new contract-field consumption must remain presentation-only and must not alter authoritative match state.
+
+## Presentation plumbing plan (unconsumed fields)
+
+These fields are populated by sim and available for presentation-only use. Consuming them must not alter `MatchState`, determinism, or replay/online outcomes.
+
+- **`Pressing`**: MotionDriver can bias locomotion urgency/pose selection (e.g. defensive shuffle) when not in an action clip; SoccerClipRig could add upper-body tension cue. No sim effect.
+- **`Role`**: MotionDriver/SoccerClipRig can select style/idle variants (defender hold shape vs forward ready stance) as presentation-only tags. Must not change tactical decisions.
+- **`RequiresFootPlant`**: SoccerClipRig can use as an IK/plant-window hint alongside existing clip contact/plant curves; should only tighten foot lock timing, not ball/sim events.
+- **`RequiresBallContact` / `BallContactPosition`**: Presentation-only debug/overlay and optional hand/foot reach hint; never move authoritative ball.
+
+Validation when implemented: Godot visual capture before/after same seed, confirm no hash/telemetry drift in headless sim tests.

@@ -2062,7 +2062,9 @@ public sealed partial class MatchEngine
     private bool LastPassTargetBlocked;
 
     /// <summary>How far inside an opponent's interception reach the pass lane passes
-    /// (0 = clear).  Reach grows with the time the ball takes to get level with him.</summary>
+    /// (0 = clear).  Reach grows with the time the ball takes to get level with him.
+    /// M2 scope: intentional pass-selector heuristic (fixed ball-speed/reach constants),
+    /// separate from PlayerPerception.LaneSafety; not a duplicate sim eval but a different layer.</summary>
     private float LaneRisk(PlayerState from, PlayerState to, float d)
     {
         float worst = 0f;
