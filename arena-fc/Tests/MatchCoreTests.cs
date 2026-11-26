@@ -2320,12 +2320,16 @@ Section("M4 authoritative action contracts");
                 {
                     if (!c2.RequiresBallContact) { contactIntentOk = false; contactDetail = $"intent={c2.Intent} p={c2.PlayerIndex} seed={seed} t={t}"; }
                 }
+                if (c2.Intent is "pass" or "shoot" or "clear" or "tackle" or "throw_in")
+                {
+                    if (!c2.RequiresFootPlant) { contactIntentOk = false; contactDetail = $"footPlant intent={c2.Intent} p={c2.PlayerIndex} seed={seed} t={t}"; }
+                }
             }
         }
     }
     Check("M4 multi-seed contract fields valid", multiOk, multiOk ? "ok" : "invalid");
     Check("M4 multi-seed core intents observed", allIntents.Contains("carry") && (allIntents.Contains("pass") || allIntents.Contains("shoot")), string.Join(",", allIntents));
-    Check("M4 contact-required action intents flag RequiresBallContact", contactIntentOk, contactDetail);
+    Check("M4 contact/foot-plant action intents flag required fields", contactIntentOk, contactDetail);
     bool actionTurnOk = true; string actionTurnDetail = "ok";
     foreach (var seed in seeds)
     {
