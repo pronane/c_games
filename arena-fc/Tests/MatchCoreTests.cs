@@ -9,6 +9,9 @@
 // repeating, the ball never leaving the centre circle for long).
 //
 // Run: dotnet run --project Tests/MatchCoreTests.csproj -c Release
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
