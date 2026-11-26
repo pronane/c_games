@@ -2144,6 +2144,30 @@ Section("M3 runtime no-conflicting-chasers and stability");
     }
     Check("M3 no conflicting hard pressers", conflictTicks == 0, $"conflicts={conflictTicks}/{checkedTicks}");
     Check("M3 role changes bounded", e.TacticalRoleChanges < 8000, $"roleChanges={e.TacticalRoleChanges}");
+
+    // Stronger engagement invariant: at most one OOP outfielder per team in close pressing state.
+    var e2 = new MatchEngine(new MatchOptions { Seed = 81, TeamSize = 11, AwayHuman = true });
+    int closePressConflicts = 0, closePressChecked = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e2.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = e2.State.Ball.Owner >= 0 && e2.State.Ball.Owner < e2.State.Players.Length ? e2.State.Players[e2.State.Ball.Owner].Team : -1;
+        if (possTeam < 0) continue;
+        for (int team = 0; team < 2; team++)
+        {
+            if (team == possTeam) continue;
+            int closePressers = 0;
+            foreach (var p in e2.State.Players)
+            {
+                if (p.Team != team || p.IsKeeper || p.SentOff) continue;
+                if (p.Index == e2.State.Controlled || p.Index == e2.State.ControlledAway) continue;
+                if (p.Pressing && Mx.FlatDist(p.Pos, e2.State.Players[e2.State.Ball.Owner].Pos) < 5.5f) closePressers++;
+            }
+            if (closePressers > 1) closePressConflicts++;
+            closePressChecked++;
+        }
+    }
+    Check("M3 no conflicting close pressers", closePressConflicts == 0, $"conflicts={closePressConflicts}/{closePressChecked}");
 }
 
 Section("M4 authoritative action contracts");
