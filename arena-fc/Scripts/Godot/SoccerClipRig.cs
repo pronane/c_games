@@ -1004,6 +1004,7 @@ public sealed partial class SoccerClipRig : Node3D
         _inertialActive = true;
         _inertialTime = 0f;
         float dt = Mathf.Max(0.0001f, _inertialPrevDt);
+        float transitionDiscontinuity = 0f;
         foreach (var kv in _prevBonePoses)
         {
             int b = kv.Key;
@@ -1014,6 +1015,10 @@ public sealed partial class SoccerClipRig : Node3D
             Quaternion oldRot = oldTx.Basis.GetRotationQuaternion();
             Quaternion newRot = newTx.Basis.GetRotationQuaternion();
             Quaternion rotOff = (oldRot * newRot.Inverse()).Normalized();
+            // Measure the raw pose discontinuity before inertialization masks it.
+            // Translation is metres; angular error is scaled to a comparable small
+            // displacement so the aggregate is stable across skeleton proportions.
+            transitionDiscontinuity += posOff.Length() + rotOff.GetAngle() * 0.1f;
 
             // Velocity-aware capture: estimate old bone velocity from previous frame.
             Vector3 posVel = Vector3.Zero;
@@ -1032,6 +1037,8 @@ public sealed partial class SoccerClipRig : Node3D
 
             _inertialBones.Add((b, posOff, rotOff, posVel, angVel, 0.18f));
         }
+        if (_inertialBones.Count > 0)
+            AnimMetrics?.RecordSample(0f, transitionDiscontinuity / _inertialBones.Count, true);
     }
 
     private void UpdateInertialization(float dt)
