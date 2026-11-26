@@ -362,9 +362,8 @@ public sealed partial class MatchEngine
         {
             PlayerIndex = p.Index,
             Intent = intent,
-            Action = action,
-            MovementTarget = p.Target,
-            FacingTarget = State.Ball.Pos,
+            TargetPosition = p.Target,
+            FacingDirection = Mx.FlatDir(p.Pos, State.Ball.Pos),
             BallContactTime = duration * Mx.Clamp(contactFrac, 0f, 1f),
             RequiresBallContact = action is "kick" or "volley" or "throw_in" or "slide" or "tackle",
         };
@@ -404,9 +403,9 @@ public sealed partial class MatchEngine
                 float spd = MathF.Max(1f, Mx.Flat(b.Vel).Length());
                 LastActionContracts[recv.Index] = new ArenaFC.Core.Football.PlayerActionContract
                 {
-                    PlayerIndex = recv.Index, Intent = "receive", Action = "receive",
-                    MovementTarget = b.PendingTarget, FacingTarget = b.Pos,
-                    BallContactTime = MathF.Clamp(dist / spd, 0.05f, 2.0f),
+                    PlayerIndex = recv.Index, Intent = "receive",
+                    TargetPosition = b.PendingTarget, FacingDirection = Mx.FlatDir(recv.Pos, b.Pos),
+                    BallContactTime = Mx.Clamp(dist / spd, 0.05f, 2.0f),
                     RequiresBallContact = true, DesiredSpeed = 7.5f,
                 };
             }

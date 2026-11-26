@@ -136,7 +136,7 @@ public sealed class MotionEngine
             float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent, motion.ApproachWeight, ttc);
             if (selected.HasContact && ttc > 0f)
             {
-                float contactPhase = selected.BallContactSec / MathF.Max(0.001f, selected.Duration);
+                float contactPhase = selected.ContactFraction;
                 float predPhase = Wrap01(start + ttc / MathF.Max(0.001f, selected.Duration));
                 Metrics.RecordContact(CircularDistance(predPhase, contactPhase));
             }
