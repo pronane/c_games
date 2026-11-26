@@ -14,6 +14,7 @@ Status date: 2026-11-25 (sandbox evidence; visual/runtime Godot checks are limit
 - `76825fc`: M6 test tolerance fix; CI green (Arena FC tests pass, netplay/determinism pass).
 - `c83e932`: M3 close-presser invariant; CI green (Arena FC tests pass, netplay/determinism pass).
 - `4827746`: BallFocus parity fallback + M3/M6 schema tests; CI green (Arena FC tests pass, netplay/determinism pass).
+- `b327a06`: intercept contracts, M3 per-player flap test, sandbox validation procedure; CI green (Arena FC tests pass, netplay/determinism pass).
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 
