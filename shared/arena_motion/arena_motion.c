@@ -233,3 +233,16 @@ void am_contact_drift_sample(AMContactDrift *drift, float x, float z, float dt, 
     }
     drift->previous_x = x; drift->previous_z = z; drift->previous_contact = !!contact;
 }
+
+int am_direction_angle(const float a[3], const float b[3], float *out)
+{
+    double aa = 0, bb = 0, ab = 0;
+    if (!a || !b || !out) return 0;
+    for (int i = 0; i < 3; ++i) {
+        if (!isfinite(a[i]) || !isfinite(b[i])) return 0;
+        aa += (double)a[i]*a[i]; bb += (double)b[i]*b[i]; ab += (double)a[i]*b[i];
+    }
+    if (aa < 1e-16 || bb < 1e-16) return 0;
+    *out = (float)acos(fmax(-1.0, fmin(1.0, ab/(sqrt(aa)*sqrt(bb)))));
+    return 1;
+}

@@ -57,3 +57,7 @@ accumulated path distance by accumulated seconds to obtain mean speed. It
 excludes intervals across contact gaps or invalid samples. It does not detect
 contact, drive the simulation or correct animation, and results are only as
 meaningful as the caller's positions and contact proxy.
+
+`am_direction_angle` safely measures the angle between caller-supplied 3D
+directions. It is usable for diagnostics such as comparing hand-joint segment
+bends; it does not classify anatomical plausibility or inspect a skinned mesh.

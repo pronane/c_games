@@ -303,10 +303,35 @@ static int validate_jog_arm_assist(void)
     puts("jog_arm_guards=ok"); return 1;
 }
 
+/* Hand-joint geometry proxies use the portable angle primitive. They cannot
+ * measure skin or decide whether a reference is anatomically natural. */
+static int hand_geometry(const Transform *pose, int side, float *bend, float *spread)
+{
+    static const char *names[4] = {"index", "middle", "ring", "pinky"};
+    float dirs[4][3], total = 0;
+    for (int i=0; i<4; ++i) {
+        int ids[3]; char name[32]; float a[3], b[3], angle;
+        for (int j=0; j<3; ++j) {
+            snprintf(name, sizeof name, "%s_%02d_%c", names[i], j+1, side ? 'r' : 'l');
+            ids[j] = findBone(name); if (ids[j] < 0) return 0;
+        }
+        Vector3 x=pose[ids[0]].translation, y=pose[ids[1]].translation, z=pose[ids[2]].translation;
+        a[0]=y.x-x.x; a[1]=y.y-x.y; a[2]=y.z-x.z;
+        b[0]=z.x-y.x; b[1]=z.y-y.y; b[2]=z.z-y.z;
+        for (int k=0;k<3;++k) dirs[i][k]=a[k]+b[k];
+        if (!am_direction_angle(a,b,&angle)) return 0;
+        total += angle;
+    }
+    if (!am_direction_angle(dirs[0],dirs[3],spread)) return 0;
+    *bend=total/4; return 1;
+}
+
 static int validate_jog_hand_relax(void)
 {
     AnimState *s = &as[9]; Transform original[MAX_BONES]; int eligible = 0, changed = 0;
     int n = ANIM_FRAMES(*animFor(C_JOG))-1;
+    double beforeBend[2]={0}, afterBend[2]={0}, beforeSpread[2]={0}, afterSpread[2]={0};
+    int geometrySamples=0;
     detectJogHandProfile();
     for (int b=0; b<model.boneCount; ++b) if (jogFingerGain[b] > .01f) eligible++;
     game_init(&game); game.ball_team = -1; game.ball_player = -1;
@@ -316,6 +341,12 @@ static int validate_jog_hand_relax(void)
     for (int f=0; f<n; f+=3) {
         sampleClip(C_JOG, f/ANIM_FPS, s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
         relaxJogHands(s,C_JOG);
+        for (int side=0;side<2;++side) {
+            float a,b,c,d;
+            if (!hand_geometry(original,side,&a,&b) || !hand_geometry(s->pose,side,&c,&d)) return 0;
+            beforeBend[side]+=a; beforeSpread[side]+=b; afterBend[side]+=c; afterSpread[side]+=d;
+        }
+        ++geometrySamples;
         for (int b=0; b<model.boneCount; ++b) {
             int parent = boneChild(b), isFinger = b != boneHandL && b != boneHandR && (boneUnder(b,boneHandL)||boneUnder(b,boneHandR));
             if (!isFinger) { if (memcmp(&original[b],&s->pose[b],sizeof(Transform))) return 0; continue; }
@@ -331,6 +362,14 @@ static int validate_jog_hand_relax(void)
         }
     }
     printf("jog_hand_profile eligible_joints=%d changed_samples=%d (bone_proxy_only)\n",eligible,changed);
+    for (int side=0;side<2;++side) {
+        float rb, rs; Transform reference[MAX_BONES];
+        sampleClip(C_IDLE,.2f,reference);
+        if (!hand_geometry(reference,side,&rb,&rs)) return 0;
+        printf("jog_hand_geometry side=%c bend_deg=%.1f->%.1f idle_ref=%.1f spread_deg=%.1f->%.1f idle_ref=%.1f (joint_proxy_only)\n",
+               side?'r':'l', beforeBend[side]/geometrySamples*RAD2DEG, afterBend[side]/geometrySamples*RAD2DEG, rb*RAD2DEG,
+               beforeSpread[side]/geometrySamples*RAD2DEG, afterSpread[side]/geometrySamples*RAD2DEG, rs*RAD2DEG);
+    }
     if (eligible && !changed) return 0;
     sampleClip(C_JOG,.15f,s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
     jogHandRelax=0; relaxJogHands(s,C_JOG); if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;

@@ -325,3 +325,21 @@ report now uses it on each adjusted ankle with the existing low raw-ankle height
 proxy; it reports a 2D mean speed in addition to the historical 1D forward
 metric. It does not establish actual sole contact, rendered mesh clearance, or
 correctness in a turning gameplay scenario. No simulation state depends on it.
+
+### Sole detail and hand reference investigation
+
+The visual workflow records matched `original-soles.mp4` and
+`cmu-jog-soles.mp4` with a tighter **stationary** world-space view. The API
+preview covers only 0.8 seconds at 20 fps and may be further downscaled; it is
+not a substitute for the full 30 fps video. The selected-player ring, camera
+perspective and compression can obscure true sole contact.
+
+`tools/inspect_hand_references.py MODEL.glb` compares index-through-pinky bone
+geometry across selected non-possession clips. Its spread and middle-joint bend
+are direction proxies, not anatomical measures; it excludes the thumb, the end
+of each finger and the skinned mesh. The workflow saves reports for both models
+and publishes headless candidate before/after and idle-reference measurements
+through a check. The headless report calls the reusable `am_direction_angle`
+primitive from `shared/arena_motion`. None of these metrics select a reference or
+change poses. No alternative is enabled without rendered review and joint/mesh
+validation; the previous idle-reference experiment remains opt-in.

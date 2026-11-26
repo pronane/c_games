@@ -2264,8 +2264,8 @@ static void updateCamera(float dt)
     } else if (camOverride == 3) {
         /* Fixed world-space camera for the scripted jog comparison only. */
         tgt = camMotionFixed;
-        pos = Vector3Add(tgt, camMotionDetail ? (Vector3){ 0, .5f, 8.0f } : (Vector3){ 0, 1.4f, 18.0f });
-        cam.fovy = camMotionDetail ? 30 : 38; snap = 1.0f;
+        pos = Vector3Add(tgt, camMotionDetail == 2 ? (Vector3){ 0, .20f, 5.0f } : camMotionDetail ? (Vector3){ 0, .5f, 8.0f } : (Vector3){ 0, 1.4f, 18.0f });
+        cam.fovy = camMotionDetail == 2 ? 23 : camMotionDetail ? 30 : 38; snap = 1.0f;
     } else if (camOverride == 2) {
         Vector3 r = W(game.referee.x, 0, game.referee.z);
         Vector3 ob = r;
@@ -3488,10 +3488,10 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
         if (frame == 120) { camJogCloseup = 1; printf("MOTION jog-closeup begin frame 120\n"); }
         if (frame == 210) { camJogCloseup = 0; printf("MOTION jog-closeup end frame 210\n"); }
     }
-    if (getenv("GF_FIXED_JOG") || getenv("GF_FIXED_JOG_DETAIL")) {
+    if (getenv("GF_FIXED_JOG") || getenv("GF_FIXED_JOG_DETAIL") || getenv("GF_FIXED_JOG_SOLES")) {
         if (frame == 120) {
-            camMotionDetail = getenv("GF_FIXED_JOG_DETAIL") != NULL;
-            camMotionFixed = W(p->x + (camMotionDetail ? 4.5f : 5.0f), camMotionDetail ? .8f : .9f, p->z);
+            camMotionDetail = getenv("GF_FIXED_JOG_SOLES") ? 2 : (getenv("GF_FIXED_JOG_DETAIL") != NULL);
+            camMotionFixed = W(p->x + (camMotionDetail ? 4.5f : 5.0f), camMotionDetail == 2 ? .55f : camMotionDetail ? .8f : .9f, p->z);
             camSide = 0; camOverride = 3;
             printf("MOTION fixed-camera begin frame %d target %.2f %.2f %.2f\n",
                    frame, camMotionFixed.x, camMotionFixed.y, camMotionFixed.z);

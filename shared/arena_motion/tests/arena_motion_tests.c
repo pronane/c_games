@@ -158,4 +158,13 @@ static void contact_drift(void)
     am_contact_drift_reset(&a); assert(a.intervals == 0 && a.seconds == 0 && a.distance == 0);
     am_contact_drift_sample(NULL, 0, 0, 1, 1); am_contact_drift_reset(NULL);
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); puts("arena motion tests passed"); return 0; }
+static void direction_angle(void)
+{
+    float x[3] = {1,0,0}, y[3] = {0,1,0}, z[3] = {0,0,0}, angle = 7;
+    assert(am_direction_angle(x,y,&angle) && fabsf(angle-1.5707963f) < 1e-6f);
+    assert(am_direction_angle(x,x,&angle) && angle == 0);
+    assert(!am_direction_angle(x,z,&angle) && angle == 0);
+    y[1] = NAN; assert(!am_direction_angle(x,y,&angle));
+    assert(!am_direction_angle(NULL,x,&angle)); assert(!am_direction_angle(x,x,NULL));
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); puts("arena motion tests passed"); return 0; }

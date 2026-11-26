@@ -61,6 +61,10 @@ float am_arm_swing_profile(const float *arm, const float *leg, int n, float *cen
 float am_rotation_stillness(const float *samples, int n);
 /* Blend fraction that limits a proposed angular correction in radians. */
 float am_bounded_rotation_weight(float angle, float limit, float blend);
+/* Angle in radians between finite 3D directions. Returns 0 for null,
+ * nonfinite or near-zero vectors, leaving out unchanged on failure. Useful
+ * for bone-segment diagnostics; it does not infer anatomy or contact. */
+int am_direction_angle(const float a[3], const float b[3], float *out);
 /* Accumulate horizontal world-space drift while the caller's contact proxy is
  * true in consecutive samples. One independent instance per foot and stream.
  * Distance / seconds is mean path speed, not a sole-contact detector. Invalid

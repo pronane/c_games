@@ -100,6 +100,17 @@ jobs:
               python3 tools/inspect_shorts_runtime.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless --speed "$speed" --fps "$fps" > "../build/cmu-jog-report/cmu-shorts-runtime-${speed}-${fps}.json"
             done
           done
+      - name: Publish hand and gait diagnostics
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/inspect_hand_references.py assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-hand-references.json
+          python3 tools/inspect_hand_references.py ../build/cmu-jog-local/candidate/gaelic_player.glb > ../build/cmu-jog-report/cmu-hand-references.json
+          grep -E '^(jog_hand_profile|jog_hand_geometry|jog_hand_guards|shared_contact_drift)' ../build/cmu-jog-report/model-test.log > ../build/cmu-jog-local/diagnostic-summary.txt
+          test -s ../build/cmu-jog-local/diagnostic-summary.txt
+          python3 -c 'import json,os,pathlib; text=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt").read_text(); assert len(text)<60000; print(json.dumps({"name":"Motion diagnostics: CMU candidate", "head_sha":os.environ["GITHUB_SHA"], "external_id":os.environ["GITHUB_RUN_ID"], "status":"completed", "conclusion":"neutral", "output":{"title":"Headless joint proxy diagnostics", "summary":"Not rendered mesh, contact or anatomical validation.", "text":text}}))' > ../build/cmu-jog-local/diagnostic-check.json
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/diagnostic-check.json > /dev/null
       # Same scripted input and render settings; GF_QUICK stops after frame 340,
       # so these videos cover standing, walking, jogging, sprinting and stopping.
       - name: Record original and experimental jog
@@ -168,14 +179,28 @@ jobs:
             grep -q 'MOTION fixed-camera end frame 210' "../build/cmu-jog-report/${label}.log"
           done
           diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-feet.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-feet.log)
+      - name: Record tighter fixed-world sole comparison
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_FIXED_JOG_SOLES: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/original-soles.mp4 > ../build/cmu-jog-report/original-soles.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-soles.mp4 > ../build/cmu-jog-report/cmu-jog-soles.log 2>&1
+          for label in original-soles cmu-jog-soles; do
+            test -s "../build/cmu-jog-report/${label}.mp4"
+            grep -q 'MOTION fixed-camera begin frame 120' "../build/cmu-jog-report/${label}.log"
+            grep -q 'MOTION fixed-camera end frame 210' "../build/cmu-jog-report/${label}.log"
+          done
+          diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-soles.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-soles.log)
       - name: Publish short motion previews to GitHub checks
         working-directory: Gaelic_Football_3d
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for label in cmu-hands-before cmu-hands-relaxed original-fixed cmu-jog-fixed original-feet cmu-jog-feet; do
+          for label in cmu-hands-before cmu-hands-relaxed original-fixed cmu-jog-fixed original-feet cmu-jog-feet original-soles cmu-jog-soles; do
             crop=()
-            case "$label" in cmu-hands-*) crop=(--hand-crop);; *-feet) crop=(--foot-detail);; esac
+            case "$label" in cmu-hands-*) crop=(--hand-crop);; *-feet) crop=(--foot-detail);; *-soles) crop=(--sole-detail);; esac
             python3 tools/review_video_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" "${crop[@]}" > "../build/cmu-jog-local/${label}-preview.json"
             gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-preview.json" > /dev/null
           done

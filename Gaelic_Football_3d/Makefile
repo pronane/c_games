@@ -31,6 +31,7 @@ test:
 	python3 tests/shorts_motion_tests.py
 	python3 tests/review_frames_tests.py
 	python3 tests/review_video_tests.py
+	python3 tests/hand_reference_tests.py
 
 # Headless raylib 5.5 animation-only tool: GNU ld discards all draw code.
 # Uses the vendored raylib source, not an installed renderer; no display needed.

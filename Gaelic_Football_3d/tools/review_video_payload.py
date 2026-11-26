@@ -12,15 +12,15 @@ from pathlib import Path
 MAX_TEXT = 60000
 
 
-def build_payload(video, label, sha, run_id, repository, ffmpeg='ffmpeg', hand_crop=False, foot_detail=False):
+def build_payload(video, label, sha, run_id, repository, ffmpeg='ffmpeg', hand_crop=False, foot_detail=False, sole_detail=False):
     if not re.fullmatch(r'[a-z0-9-]{1,48}', label): raise ValueError('invalid label')
     if not re.fullmatch(r'[0-9a-f]{40}', sha) or not str(run_id).isdigit(): raise ValueError('invalid workflow identity')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository): raise ValueError('invalid repository')
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / 'preview.mp4'
-        if hand_crop and foot_detail: raise ValueError('crop modes are mutually exclusive')
-        start, duration, fps = (4.2, 1.4, 15) if foot_detail else (4, 3, 12)
-        settings = ((480, 32), (400, 35), (320, 38), (256, 41)) if foot_detail else ((320, 35), (256, 38), (192, 41))
+        if sum(bool(x) for x in (hand_crop, foot_detail, sole_detail)) > 1: raise ValueError('crop modes are mutually exclusive')
+        start, duration, fps = (4.5, .8, 20) if sole_detail else (4.2, 1.4, 15) if foot_detail else (4, 3, 12)
+        settings = ((640, 32), (480, 35), (400, 38), (320, 41)) if sole_detail else ((480, 32), (400, 35), (320, 38), (256, 41)) if foot_detail else ((320, 35), (256, 38), (192, 41))
         for width, crf in settings:
             filt = (f'crop=500:360:280:70,scale={width}:-2,fps={fps}' if hand_crop else f'scale={width}:-2,fps={fps}')
             subprocess.run([ffmpeg, '-v', 'error', '-ss', str(start), '-i', str(video), '-t', str(duration), '-vf', filt,
@@ -48,7 +48,8 @@ def main():
     p.add_argument('--repository', required=True); p.add_argument('--ffmpeg', default='ffmpeg')
     p.add_argument('--hand-crop', action='store_true')
     p.add_argument('--foot-detail', action='store_true', help='shorter, higher-resolution fixed-camera pass')
+    p.add_argument('--sole-detail', action='store_true', help='short high-resolution fixed-camera sole pass')
     a = p.parse_args()
-    print(json.dumps(build_payload(a.video, a.label, a.sha, a.run_id, a.repository, a.ffmpeg, a.hand_crop, a.foot_detail)))
+    print(json.dumps(build_payload(a.video, a.label, a.sha, a.run_id, a.repository, a.ffmpeg, a.hand_crop, a.foot_detail, a.sole_detail)))
 
 if __name__ == '__main__': main()
