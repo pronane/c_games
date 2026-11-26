@@ -91,6 +91,9 @@ public partial class RuntimeEvidenceRunner : Node3D
                 $"Production skeleton is missing grounding bones: {string.Join(", ", missingFootBones)}. " +
                 $"Available bones: {string.Join(", ", actualBones)}");
         }
+        if (!rig.Soccer.HasFootIkBones)
+            throw new InvalidOperationException(
+                "Production skeleton bones were found by validation but were not cached by the runtime foot-IK solver.");
 
         var metrics = new AnimationMetrics();
         rig.Soccer.AnimMetrics = metrics;
