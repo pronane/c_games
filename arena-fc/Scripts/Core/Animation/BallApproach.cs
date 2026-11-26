@@ -75,7 +75,8 @@ public static class BallApproach
     {
         if (clip == null || !clip.HasContact || timeToBallContact <= 0f) return phaseMatchedStart;
         float idealStart = Math.Clamp(clip.ContactFraction - (timeToBallContact / MathF.Max(0.001f, clip.Duration)), 0f, clip.ContactFraction);
-        return Lerp(phaseMatchedStart, idealStart, Math.Clamp(approachWeight, 0f, 1f) * 0.75f);
+        float urgency = timeToBallContact < 0.35f ? 1f : Math.Clamp(approachWeight, 0f, 1f) * 0.75f;
+        return Lerp(phaseMatchedStart, idealStart, Math.Clamp(urgency, 0f, 1f));
     }
 
     private static Vector3 MxFlat(Vector3 v) => new Vector3(v.X, 0f, v.Z);

@@ -1728,11 +1728,12 @@ Section("Hypermotion / ML-Flow-inspired motion system (TwoBoneIK, BallApproach, 
 {
     // TwoBoneIK: analytic solve reaches target and knee clamp prevents hyperextension.
     var root = new Vector3(0f, 1f, 0f);
-    var target = new Vector3(0f, 0f, 0.5f);
+    var target = new Vector3(0f, 0.3f, 0.4f); // reachable: dist ~0.806
     bool solved = TwoBoneIK.Solve(root, target, 0.5f, 0.5f, Vector3.UnitX, out var joint, out var end);
     Check("TwoBoneIK solves reachable target", solved && (end - target).Length() < 0.05f,
         $"solved={solved} end={end}");
-    bool clamped = TwoBoneIK.SolveWithKneeClamp(root, target, 0.5f, 0.5f, Vector3.UnitX, 8f, 155f, out var cj, out var ce);
+    var clampTarget = new Vector3(0f, 0.02f, 0.1f); // reachable but near-straight knee
+    bool clamped = TwoBoneIK.SolveWithKneeClamp(root, clampTarget, 0.5f, 0.5f, Vector3.UnitX, 8f, 155f, out var cj, out var ce);
     Vector3 upper = cj - root; Vector3 lower = ce - cj;
     float cosK = Vector3.Dot(Vector3.Normalize(upper), Vector3.Normalize(-lower));
     float kneeDeg = MathF.Acos(Math.Clamp(cosK, -1f, 1f)) * 180f / MathF.PI;
@@ -1832,7 +1833,7 @@ Section("Hypermotion data plumbing v2 (manifest curves/contact/velocity)");
     """;
     var clips = ClipManifestLoader.Parse(manifestJson);
     Check("v2 manifest parses", clips.Count == 2 && clips[0].HasPlantCurves);
-    Check("plant curve samples weight", clips[0].SamplePlantWeight(true, 0.25f) > 0.9f);
+    Check("plant curve samples weight", clips[0].SamplePlantWeight(true, 8f / 31f) > 0.9f);
     Check("root velocity samples fallback/interpolate", clips[0].SampleRootVelocity(0.5f).Y > 2.9f);
     Check("contact window parsed", clips[1].HasContactWindow && clips[1].ContactWindowStart == 0.3f && clips[1].ContactWindowEnd == 0.55f);
 

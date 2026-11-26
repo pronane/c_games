@@ -41,7 +41,7 @@ public sealed partial class MatchEngine
                 return LandingPoint(b, 1.3f);
             }
             float flatSpeed = Mx.Flat(b.Vel).Length();
-            if (flatSpeed > 8f)
+            if (!IsSkill && flatSpeed > 8f)
             {
                 var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 0.5f, Weather.Raining, Weather.WindX, Weather.WindZ);
                 var s = pred.At(MathF.Min(0.25f, 6f / MathF.Max(1f, flatSpeed)));

@@ -1538,7 +1538,7 @@ public sealed partial class MatchEngine
                     Vector3 focus = BallFocus();
                     Vector3 intercept = focus != ball.Pos ? focus
                         : ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
-                    if (ball.Owner < 0 && !ball.HasPending)
+                    if (ball.Owner < 0 && !ball.HasPending && !IsSkill)
                     {
                         var pred = ArenaFC.Core.Football.BallTrajectory.Predict(ball.Pos, ball.Vel, ball.Spin, 1.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
                         if (pred.TryInterceptXZ(p.Pos, 7.2f, 12f, out var s, 0f))

@@ -103,7 +103,15 @@ public static class TwoBoneIK
         if (dist < 1e-6f) return joint;
         Vector3 dir = toEnd / dist;
 
-        float proj = (upperLength * upperLength - lowerLength * lowerLength + dist * dist) / (2f * dist);
+        // Recompute root-end distance for the clamped knee angle.
+        float desiredDist = MathF.Sqrt(MathF.Max(0f,
+            upperLength * upperLength + lowerLength * lowerLength
+            - 2f * upperLength * lowerLength * MathF.Cos(targetAngleRad)));
+        float minLength = MathF.Abs(upperLength - lowerLength) + 0.002f;
+        float maxLength = (upperLength + lowerLength) * 0.995f;
+        desiredDist = Math.Clamp(desiredDist, minLength, maxLength);
+
+        float proj = (upperLength * upperLength - lowerLength * lowerLength + desiredDist * desiredDist) / (2f * desiredDist);
         float heightSq = upperLength * upperLength - proj * proj;
         float height = MathF.Sqrt(MathF.Max(0.0001f, heightSq));
 
