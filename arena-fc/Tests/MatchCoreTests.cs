@@ -2213,6 +2213,33 @@ Section("M3 runtime no-conflicting-chasers and stability");
     }
     int maxFlap = roleChangesPerPlayer.Count > 0 ? roleChangesPerPlayer.Values.Max() : 0;
     Check("M3 per-player role flap bounded", maxFlap <= 80, $"maxFlap={maxFlap}");
+
+    // Engagement ownership: at most one AI OOP outfielder in primary engage state near carrier.
+    var e5 = new MatchEngine(new MatchOptions { Seed = 93, TeamSize = 11, AwayHuman = true });
+    int engageConflicts = 0, engageChecked = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e5.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = e5.State.Ball.Owner >= 0 && e5.State.Ball.Owner < e5.State.Players.Length ? e5.State.Players[e5.State.Ball.Owner].Team : -1;
+        if (possTeam < 0) continue;
+        var carrier = e5.State.Players[e5.State.Ball.Owner];
+        for (int team = 0; team < 2; team++)
+        {
+            if (team == possTeam) continue;
+            int engagers = 0;
+            foreach (var p in e5.State.Players)
+            {
+                if (p.Team != team || p.IsKeeper || p.SentOff) continue;
+                if (p.Index == e5.State.Controlled || p.Index == e5.State.ControlledAway) continue;
+                bool engaging = (p.Pressing || p.Action == "tackle" || p.Action == "slide")
+                                && Mx.FlatDist(p.Pos, carrier.Pos) < 4.0f;
+                if (engaging) engagers++;
+            }
+            if (engagers > 1) engageConflicts++;
+            engageChecked++;
+        }
+    }
+    Check("M3 single primary engager near carrier", engageConflicts == 0, $"conflicts={engageConflicts}/{engageChecked}");
 }
 
 Section("M4 authoritative action contracts");
