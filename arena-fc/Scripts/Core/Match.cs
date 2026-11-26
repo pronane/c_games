@@ -1696,6 +1696,10 @@ public sealed partial class MatchEngine
             float openness = NearestOpponent(q, out float od) is null ? 8f : MathF.Min(od, 8f);
             bool laneBlocked = LaneRisk(from, q, d) > 0f;
             float laneSafety = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from.Pos, q.Pos, oppP, oppV, passSpeed, 7f, 12f);
+            float tBall = d / MathF.Max(1f, passSpeed);
+            Vector3 recvAim = q.Pos + Mx.Flat(q.Vel) * MathF.Min(tBall, 0.6f) * (through ? 0.8f : 0.45f);
+            float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(q.Pos, q.Vel, recvAim, 7.0f, 12f);
+            float recvReachPenalty = MathF.Max(0f, tRecv - tBall - 0.15f) * 3.0f;
             // Aim alignment dominates (weight 8.0) so stick direction controls
             // the pass. AI factors (forward/openness) break ties.
             // An opponent who can step into the lane before the ball passes him
@@ -1704,6 +1708,7 @@ public sealed partial class MatchEngine
             float score = aimAlign * 8.0f + forward * .22f + openness * .55f - d * .10f + (through ? forward * .28f : 0f) - (laneBlocked ? (hasAim ? 6f : 14f) : 0f);
             score += (laneSafety - 0.55f) * 3.5f;
             if (laneSafety < 0.20f) score -= 5f;
+            score -= recvReachPenalty;
             // A long pass wants a distant, advanced target; a short pass prefers
             // the safe nearby option instead of always hitting the furthest man.
             if (longPass) score += MathF.Min(d, 38f) * .16f + forward * .18f;
