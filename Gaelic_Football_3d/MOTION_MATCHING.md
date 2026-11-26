@@ -599,3 +599,22 @@ large wrist-to-root discrepancy worse, even as the sphere screen improves.
 Because finger origins are deliberately planted independently of the wrist,
 this proxy motivates a coherent wrist/finger adjustment and skin inspection;
 it cannot alone establish the shape or amount of visible deformation.
+
+`--finger-follow 0..1` adds another **headless-only** counterfactual to the
+sprint offset experiment: after the regular cradle, it translates the right
+finger-joint origins by that fraction of the actual solved wrist displacement.
+It does not reorient the hand, rebuild finger targets, run collision response,
+or change the game. Full follow preserves the original wrist-to-finger-root
+spans, including their pre-existing discrepancy from bind.
+
+With an (-80, 0, -80) mm offset, no follow gave 68/66 wider selected-surface
+sphere overlaps in the two shipped sprint samples. Full follow maintained the
+default wrist-to-index and wrist-to-thumb spans (1.47× and 3.09× bind) but gave
+192/472 wider overlaps, all in the selected distal-finger triangles. Half
+follow gave 429/446 wider overlaps. With a smaller (-40, 0, -40) mm offset,
+full follow gave 583/596 wider overlaps, compared with 252/241 without follow.
+Counts can increase as planted fingers move into the ball; they are not an
+area or depth measure. These synthetic tests demonstrate the tradeoff, not a
+viable hand pose: rigidly following the wrist does not re-wrap the fingers,
+restore bind anatomy, or establish rendered/live motion. A coordinated grip
+solver or authored poses should be evaluated before changing the default.

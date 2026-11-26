@@ -22,24 +22,31 @@ for bad in ('nan', '0', '0.061', 'garbage'):
 with tempfile.TemporaryDirectory() as tmp:
     bind=Path(tmp)/'bind'; doc,blob=load_glb(sys.argv[2]); bind.write_text(bind_rotations(doc,blob))
     exports=[]
-    for offset in ((0,0,0),(-.08,0,-.08)):
+    for offset,follow in (((0,0,0),0),((-.08,0,-.08),0),((-.08,0,-.08),1),((0,0,0),1)):
         out=Path(tmp)/'poses.json'
-        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',*(str(v) for v in offset)]
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',*(str(v) for v in offset),str(follow)]
         subprocess.run(cmd,check=True,capture_output=True)
         exports.append(json.loads(out.read_text()))
-    for a,b in zip(*[x['frames'] for x in exports]):
+    for a,b in zip(exports[0]['frames'], exports[1]['frames']):
         if a['state'].startswith('sprint'):
             assert a['raw']!=b['raw']
         else:
             assert a==b
-    base,changed=[joint_spans(doc,x) for x in exports]
+    assert exports[0]['frames']==exports[3]['frames']
+    for a,b in zip(exports[0]['frames'],exports[2]['frames']):
+        if not a['state'].startswith('sprint'): assert a==b
+    base,changed,following=[joint_spans(doc,x) for x in exports[:3]]
     for state in ('sprint-a','sprint-b'):
         for f in ('index','middle','ring','pinky','thumb'):
             assert changed[state]['r']['wrist_to_finger_roots'][f]['length_m'] > base[state]['r']['wrist_to_finger_roots'][f]['length_m']
+            assert abs(following[state]['r']['wrist_to_finger_roots'][f]['length_m']-base[state]['r']['wrist_to_finger_roots'][f]['length_m']) < 1e-5
         for part in ('upper_arm','forearm'):
             assert abs(changed[state]['r'][part]['length_m']-base[state]['r'][part]['length_m']) < 1e-5
     for bad in ('nan','0.201','', 'garbage'):
         cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',bad,'0','0']
+        assert subprocess.run(cmd,capture_output=True).returncode != 0
+    for bad in ('nan','-0.1','1.1','','garbage'):
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08',bad]
         assert subprocess.run(cmd,capture_output=True).returncode != 0
 r=compare(sys.argv[2],sys.argv[1])
 assert 0.012 <= r['clearance_m'] <= 0.06
