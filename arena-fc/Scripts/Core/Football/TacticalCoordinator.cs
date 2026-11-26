@@ -66,9 +66,13 @@ public sealed class TacticalCoordinator
             }
             else
             {
-                if (p.Index == presser) { a.Role = "press"; a.Intent = "press"; a.Pressing = true; a.ShouldSprint = true; a.MovementTarget = ballRef; a.SpeedLimit = 8.5f; }
-                else if (p.Index == cover) { a.Role = "cover"; a.Intent = "cover"; a.MovementTarget = Vector3.Lerp(p.Pos, ballRef, 0.35f); a.SpeedLimit = 7.5f; }
-                else { a.Role = "recover"; a.Intent = "shape"; a.SpeedLimit = 7.0f; }
+                float attackSign = team == 0 ? 1f : -1f;
+                Vector3 bVel = Mx.Flat(s.Ball.Vel);
+                bool transitionThreat = bVel.LengthSquared() > 36f && (bVel.X * -attackSign) > 3f;
+                if (p.Index == presser && !transitionThreat) { a.Role = "press"; a.Intent = "press"; a.Pressing = true; a.ShouldSprint = true; a.MovementTarget = ballRef; a.SpeedLimit = 8.5f; }
+                else if (p.Index == presser && transitionThreat) { a.Role = "recover"; a.Intent = "transition_recover"; a.MovementTarget = Vector3.Lerp(p.Pos, new Vector3(p.Pos.X - attackSign * 8f, 0, p.Pos.Z), 0.6f); a.SpeedLimit = 8.0f; }
+                else if (p.Index == cover) { a.Role = "cover"; a.Intent = transitionThreat ? "transition_cover" : "cover"; a.MovementTarget = Vector3.Lerp(p.Pos, ballRef, transitionThreat ? 0.20f : 0.35f); a.SpeedLimit = 7.5f; }
+                else { a.Role = "recover"; a.Intent = transitionThreat ? "transition_shape" : "shape"; a.MovementTarget = Vector3.Lerp(p.Pos, new Vector3(p.Pos.X - attackSign * (transitionThreat ? 6f : 0f), 0, ballRef.Z * 0.3f), transitionThreat ? 0.45f : 0f); a.SpeedLimit = 7.0f; }
             }
             list.Add(a);
         }

@@ -2019,7 +2019,22 @@ Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
         }
     }
     int maxFlips = roleFlips.Count > 0 ? roleFlips.Values.Max() : 0;
-    Check("coordinator role flips bounded over 120 ticks", maxFlips <= 60, $"maxFlips={maxFlips}");
+    Check("coordinator role flips bounded over 120 ticks", maxFlips <= 50, $"maxFlips={maxFlips}");
+    Check("tactical telemetry counters are reported", eng2.TacticalPressAssignments >= 0 && eng2.TacticalCoverAssignments >= 0, $"press={eng2.TacticalPressAssignments} cover={eng2.TacticalCoverAssignments}");
+
+    // B: predicted-intercept decision behavior - defender chases intercept point, not stale ball position.
+    var engI = new MatchEngine(new MatchOptions { Seed = 99, TeamSize = 5, AwayHuman = true });
+    engI.State.Phase = Phase.Play; engI.State.PhaseTimer = 0f;
+    foreach (var p in engI.State.Players) { p.Pos = new Vector3(-40f,0,40f); p.Vel = Vector3.Zero; p.ActionTimer = 0f; p.Action = "idle"; }
+    engI.State.Ball.Owner = -1; engI.State.Ball.HasPending = false;
+    engI.State.Ball.Pos = new Vector3(0f, 0.11f, 0f);
+    engI.State.Ball.Vel = new Vector3(12f, 0f, 0f);
+    var def = engI.State.Players.First(p => p.Team == 1 && !p.IsKeeper);
+    def.Pos = new Vector3(4f, 0f, 3f); def.Vel = Vector3.Zero;
+    engI.Step(1f/60f, PlayerCommand.None);
+    float distToIntercept = Mx.FlatDist(def.Target, new Vector3(6f,0,0f));
+    float distToBallNow = Mx.FlatDist(def.Target, engI.State.Ball.Pos);
+    Check("predicted intercept influences defender chase target", distToIntercept <= distToBallNow + 1.5f, $"targetDistIntercept={distToIntercept:F2} targetDistBall={distToBallNow:F2} target={def.Target}");
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

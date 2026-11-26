@@ -1511,6 +1511,9 @@ public sealed partial class MatchEngine
                         float sz = nearBox ? 3f : 5f;
                         Vector3 side = new Vector3(0, 0, p.Index == chaser2 ? sz : -sz);
                         p.Target = carrier.Pos + goalDir * lane + side;
+                        var tacCover = GetTacticalAssignment(p.Index);
+                        if (tacCover != null && tacCover.Role == "cover")
+                            p.Target = Mx.Lerp(p.Target, tacCover.MovementTarget, 0.35f);
                         // Contain: stay between carrier and goal.
                         if (Mx.FlatDist(p.Pos, carrier.Pos) < 3f)
                             p.JockeyState = 2; // containing
@@ -1574,6 +1577,12 @@ public sealed partial class MatchEngine
                         Vector3 goalSide = mark.Pos + Mx.FlatDir(mark.Pos, ownGoal) * 1.6f;
                         p.Target = Mx.Lerp(slotPos, goalSide, .65f);
                     }
+                }
+                if (!IsSkill)
+                {
+                    var tacDef = GetTacticalAssignment(p.Index);
+                    if (tacDef != null && (tacDef.Role == "cover" || tacDef.Role == "recover"))
+                        p.Target = Mx.Lerp(p.Target, tacDef.MovementTarget, tacDef.Role == "cover" ? 0.25f : 0.15f);
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
@@ -1709,9 +1718,18 @@ public sealed partial class MatchEngine
 
     private int ClosestToBall(int team, int rank)
     {
+        var b = State.Ball;
         var focus = BallFocus();
+        bool looseMoving = b.Owner < 0 && !b.HasPending && !IsSkill && Mx.Flat(b.Vel).LengthSquared() > 4f;
+        var pred = looseMoving ? ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 1.5f, Weather.Raining, Weather.WindX, Weather.WindZ) : null;
         var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff)
-            .OrderBy(p => Mx.FlatDist2(p.Pos, focus)).ToArray();
+            .Select(p => {
+                float score = Mx.FlatDist2(p.Pos, focus);
+                if (pred != null && pred.TryInterceptXZ(p.Pos, 7.2f, 12f, out var s, 0f))
+                    score = s.Time * s.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(s.Position.X,0,s.Position.Z)) * 0.01f;
+                return (p.Index, score);
+            })
+            .OrderBy(x => x.score).ToArray();
         return rank < list.Length ? list[rank].Index : (list.Length > 0 ? list[0].Index : -1);
     }
 
@@ -3416,6 +3434,8 @@ public sealed partial class MatchEngine
     private int _tacticalTick = -1;
     private readonly Dictionary<int, ArenaFC.Core.Football.TacticalCoordinator.Assignment> _tacticalByPlayer = new();
     public int TacticalRoleChanges;
+    public int TacticalPressAssignments;
+    public int TacticalCoverAssignments;
     public readonly Dictionary<int, ArenaFC.Core.Football.PlayerActionContract> LastActionContracts = new();
 
     private ArenaFC.Core.Football.TacticalCoordinator.Assignment? GetTacticalAssignment(int playerIndex)
@@ -3431,6 +3451,8 @@ public sealed partial class MatchEngine
             void Add(ArenaFC.Core.Football.TacticalCoordinator.Assignment a)
             {
                 if (prev.TryGetValue(a.PlayerIndex, out var oldRole) && oldRole != a.Role) TacticalRoleChanges++;
+                if (a.Role == "press") TacticalPressAssignments++;
+                else if (a.Role == "cover") TacticalCoverAssignments++;
                 _tacticalByPlayer[a.PlayerIndex] = a;
             }
             foreach (var a in t0) Add(a);
@@ -3444,6 +3466,8 @@ public sealed partial class MatchEngine
         _tacticalTick = -1;
         _tacticalByPlayer.Clear();
         TacticalRoleChanges = 0;
+        TacticalPressAssignments = 0;
+        TacticalCoverAssignments = 0;
         LastActionContracts.Clear();
     }
 

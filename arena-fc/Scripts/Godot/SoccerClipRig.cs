@@ -51,6 +51,7 @@ public sealed partial class SoccerClipRig : Node3D
 
     /// <summary>Presentation-only motion input; never written back to PlayerState.</summary>
     public void ApplyMotion(MotionState? motion) => _motionState = motion;
+    public ArenaFC.Core.Animation.AnimationMetrics? AnimMetrics { get; set; }
 
     // FIFA-style locomotion state.
     private Node3D? _sceneRoot;
@@ -1169,6 +1170,8 @@ public sealed partial class SoccerClipRig : Node3D
                 ref Vector3 prev = ref (isLeft ? ref _prevFootWorldL : ref _prevFootWorldR);
                 if (hasPrev)
                 {
+                    float slide = new Vector2(footGlobal.X - prev.X, footGlobal.Z - prev.Z).Length();
+                    if (dt > 1e-4f) AnimMetrics?.RecordSample(slide / dt, 0f, false);
                     Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
                     float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f);
                     target = target.Lerp(locked, lockW);

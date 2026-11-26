@@ -25,6 +25,7 @@ public sealed class MotionDriver
 
     public bool IsLoaded => _engine.ClipCount > 0;
     public bool Matching => _engine.Database != null;
+    public ArenaFC.Core.Animation.AnimationMetrics Metrics => _engine.Metrics;
     private readonly Dictionary<string, string> _dedicated = new(StringComparer.Ordinal);
 
     /// <summary>Turn on pose-level motion matching: the baked feature table, and the
