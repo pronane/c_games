@@ -154,9 +154,9 @@ public sealed partial class MatchEngine
         foreach (var q in S.Players)
         {
             if (q.Team == holder.Team || q.SentOff) continue;
-            // In the area but beyond 10 yards at a goal kick: the referee waves him
-            // out (no caution unless he is also inside 9.15 m).
-            if (areaRule && InArea(q.Pos, areaGx, -.3f) && Mx.FlatDist(q.Pos, b.Pos) >= need - .35f)
+            // At a goal kick / own-area free kick opponents must be outside the
+            // penalty area until the ball is in play, regardless of distance.
+            if (areaRule && InArea(q.Pos, areaGx, 0f))
             {
                 q.Pos = OutsideArea(q.Pos, areaGx); q.Target = q.Pos; q.Vel = Vector3.Zero;
                 continue;
