@@ -177,6 +177,8 @@ public sealed class MotionDriver
             "celebrate" => PlayerIntent.Celebrate,
             "shield" => PlayerIntent.Shield,
             "carry" => fallback == PlayerIntent.Sprint ? PlayerIntent.Sprint : PlayerIntent.Move,
+            "move" or "run" or "jog" => PlayerIntent.Move,
+            "idle" or "stand" => fallback == PlayerIntent.Shield ? PlayerIntent.Shield : PlayerIntent.Move,
             "skill" => PlayerIntent.Cut,
             _ => fallback,
         };

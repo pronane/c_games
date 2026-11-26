@@ -2365,6 +2365,12 @@ Section("M1 BallTrajectory prediction parity scenarios");
     for (int i=0;i<120;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p2, ref v2, ref s2, 1f/60f, true, 1.2f, -0.8f);
     var samp2 = pred2.At(2.0f);
     Check("M1 Predict matches Step with wind/spin/rain", (p2-samp2.Position).Length() < 0.02f && (v2-samp2.Velocity).Length() < 0.08f, $"dpos={(p2-samp2.Position).Length():F4}");
+
+    var pred3 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,2.0f,0), new Vector3(5,-2,3), new Vector3(0,1f,0), 1.5f, false, 0f, 0f);
+    Vector3 p3=new Vector3(0,2.0f,0), v3=new Vector3(5,-2,3), s3=new Vector3(0,1f,0);
+    for (int i=0;i<90;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p3, ref v3, ref s3, 1f/60f, false, 0f, 0f);
+    var samp3 = pred3.At(1.5f);
+    Check("M1 Predict matches Step on bounce trajectory", (p3-samp3.Position).Length() < 0.03f && (v3-samp3.Velocity).Length() < 0.1f, $"dpos={(p3-samp3.Position).Length():F4}");
 }
 
 Section("M3 support destination spacing");
