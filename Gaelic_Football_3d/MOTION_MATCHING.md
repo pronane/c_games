@@ -586,3 +586,16 @@ palm/finger skin, distort the arm or float visibly. It leaves the ball and
 finger targets unchanged and does not prove continuous, full-mesh or rendered
 contact. A useful correction would need to address wrist, orientation and
 finger shape coherently and be reviewed in motion.
+
+The grip report also compares wrist-to-finger-root and arm joint-origin spans
+with the GLB bind pose. These are geometry proxies, **not** skin strain or
+proof of anatomical correctness. On the shipped model's sprint samples, the
+default wrist-to-index-root span is 172 mm versus 117 mm in bind (1.47×), and
+wrist-to-thumb-root is 153 mm versus 49.5 mm (3.09×). With the large
+(-0.08, 0, -0.08) m experimental offset, they increase to 231 mm (1.98×) and
+206 mm (4.15×) respectively. Upper-arm and forearm origin spans stay within
+0.1% of bind in those samples. The wrist-only offset therefore makes an already
+large wrist-to-root discrepancy worse, even as the sphere screen improves.
+Because finger origins are deliberately planted independently of the wrist,
+this proxy motivates a coherent wrist/finger adjustment and skin inspection;
+it cannot alone establish the shape or amount of visible deformation.

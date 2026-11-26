@@ -10,10 +10,13 @@ import json
 import math
 import subprocess
 import tempfile
+import sys
 from pathlib import Path
 from inspect_shorts_skin import load_glb, accessor
 from inspect_shorts_motion import mul, trs
 from inspect_hand_mesh import measure
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'shared/arena_motion'))
+from mesh_diagnostics import joint_span_ratio
 
 
 def qmul(a,b):
@@ -71,6 +74,34 @@ def compare_renderer_bind(expected, actual):
     return maximum
 
 
+def joint_spans(doc,data):
+    """Compare model-space bone-origin spans with GLB bind, not skin strain."""
+    nodes=doc['nodes']; parents={child:i for i,n in enumerate(nodes) for child in n.get('children',[])}
+    joints=doc['skins'][0]['joints']; names={nodes[i].get('name'):i for i in joints}
+    exported={name:i for i,name in enumerate(data['bones'])}; cache={}
+    def world(i):
+        if i not in cache:
+            n=nodes[i]; m=trs(n.get('translation',(0,0,0)),n.get('rotation',(0,0,0,1)),n.get('scale',(1,1,1)))
+            cache[i]=mul(world(parents[i]),m) if i in parents else m
+        return cache[i]
+    def bind(name):
+        m=world(names[name]); return [m[i][3] for i in range(3)]
+    results={}
+    for frame in data['frames']:
+        sides={}
+        for side in ('l','r'):
+            rows=frame['raw']
+            def span(a,b):
+                current,ratio=joint_span_ratio(rows[exported[a]][:3],rows[exported[b]][:3],bind(a),bind(b))
+                return {'length_m':current,'bind_ratio':ratio}
+            wrist=f'hand_{side}'
+            sides[side]={'wrist_to_finger_roots':{f:span(wrist,f'{f}_01_{side}') for f in ('index','middle','ring','pinky','thumb')},
+                         'upper_arm':span(f'upperarm_{side}',f'lowerarm_{side}'),
+                         'forearm':span(f'lowerarm_{side}',wrist)}
+        results[frame['state']]=sides
+    return results
+
+
 def compare(model,tool,clearance=None,sprint_offset=None):
     doc,blob=load_glb(model)
     with tempfile.TemporaryDirectory(prefix='hand-grip-') as tmp:
@@ -86,6 +117,9 @@ def compare(model,tool,clearance=None,sprint_offset=None):
     for f in data['frames']:
         if f['raw']!=f['adjusted']: raise ValueError('guarded correction changed grip')
     report=measure(doc,blob,data,surface=True)
+    spans=joint_spans(doc,data)
+    for state in report['sampled_surface_by_state']:
+        state['joint_spans']=spans[state['state']]
     return {'limitation':'12 synthetic sampled CPU poses, selected finger surfaces, approximate ball sphere; no gameplay, full mesh, rendered or continuous collision validation',
             'samples':report['surface_samples'], 'clearance_m':data['clearance_m'], 'sprint_offset_m':sprint_offset or [0,0,0], 'pose_export':proc.stdout.strip(),
             'triangle_counts':report['selected_surface_triangles'], 'palm_surface_triangles':report['palm_surface_triangles'], 'hand_surface_triangles':report['hand_surface_triangles'], 'states':report['sampled_surface_by_state'],

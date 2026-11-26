@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from inspect_hand_grip import compare, compare_renderer_bind, bind_rotations
+from inspect_hand_grip import compare, compare_renderer_bind, bind_rotations, joint_spans
 from inspect_shorts_skin import load_glb
 
 assert compare_renderer_bind('x 0 0 0 1\n','x 0 0 0 -1\n')==0
@@ -32,6 +32,12 @@ with tempfile.TemporaryDirectory() as tmp:
             assert a['raw']!=b['raw']
         else:
             assert a==b
+    base,changed=[joint_spans(doc,x) for x in exports]
+    for state in ('sprint-a','sprint-b'):
+        for f in ('index','middle','ring','pinky','thumb'):
+            assert changed[state]['r']['wrist_to_finger_roots'][f]['length_m'] > base[state]['r']['wrist_to_finger_roots'][f]['length_m']
+        for part in ('upper_arm','forearm'):
+            assert abs(changed[state]['r'][part]['length_m']-base[state]['r'][part]['length_m']) < 1e-5
     for bad in ('nan','0.201','', 'garbage'):
         cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',bad,'0','0']
         assert subprocess.run(cmd,capture_output=True).returncode != 0

@@ -4,6 +4,8 @@ import math
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'shared/arena_motion'))
+from mesh_diagnostics import joint_span_ratio
 from inspect_hand_mesh import compare, select_tips, select_influenced_triangles, skin_point, sampled_min_distance, centroid, triangles_intersect, triangle_overlap_pairs, point_triangle_distance
 
 try: select_tips([(0,0,0)]*5,[(0,)]*5,[(1,)]*5,0,(0,0,0),(0,0,0))
@@ -18,6 +20,10 @@ ident=[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
 assert skin_point((1,2,3),(0,),(1,),[ident]) == [1,2,3]
 assert centroid([(0,0,0),(2,0,0)]) == [1,0,0]
 assert sampled_min_distance([(0,0,0)],[(0,3,4)]) == 5
+assert joint_span_ratio((0,0,0),(2,0,0),(0,0,0),(1,0,0)) == (2,2)
+try: joint_span_ratio((0,0,0),(2,0,0),(0,0,0),(0,0,0))
+except ValueError: pass
+else: raise AssertionError('degenerate reference span accepted')
 tri=[(0,0,0),(2,0,0),(0,2,0)]
 assert triangles_intersect(tri,[(.2,.2,-1),(.2,.2,1),(.8,.2,0)])
 assert triangles_intersect(tri,[(.2,.2,0),(.3,.2,0),(.2,.3,0)])

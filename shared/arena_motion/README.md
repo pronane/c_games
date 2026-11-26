@@ -98,3 +98,6 @@ supply centers in the same coordinate system.
 `mesh_diagnostics.select_influenced_triangles` selects triangles adjacent to
 vertices with a chosen summed skin-bone weight. It can include seam vertices
 and omit anatomy outside the selection; it is not a complete segmentation.
+`mesh_diagnostics.joint_span_ratio` compares a pair of bone-origin positions
+with a reference span. It is a geometric proxy, not a measure of skin strain
+or a guarantee of anatomical plausibility.

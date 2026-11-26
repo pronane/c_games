@@ -139,3 +139,11 @@ def select_influenced_triangles(indices, ids, weights, bones, threshold=.25):
     if any(i<0 or i>=len(influenced) for i in indices): raise ValueError('invalid triangle index')
     return [tuple(indices[i:i+3]) for i in range(0,len(indices),3)
             if any(influenced[j] for j in indices[i:i+3])]
+
+
+def joint_span_ratio(a, b, reference_a, reference_b):
+    """Distance and ratio against a reference span; not a skin-strain metric."""
+    reference=distance(reference_a,reference_b)
+    if reference < 1e-8: raise ValueError('degenerate reference span')
+    current=distance(a,b)
+    return current, current/reference
