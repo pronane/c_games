@@ -1935,5 +1935,29 @@ Section("Animation telemetry metrics (contact/transition/plant continuity)");
     Check("contact window signal present for kick clip", clips[1].HasContactWindow && clips[1].HasContact);
 }
 
+Section("PR B/C/D regression: trajectory intercept, coordinator roles, action contract");
+{
+    // B: BallTrajectory intercept finds a reachable sample
+    var traj = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,1f,0), new Vector3(8f,-1f,2f), Vector3.Zero, 2.0f);
+    bool hasIntercept = traj.TryInterceptXZ(new Vector3(2f,0,0f), 7f, 12f, out var intercept, 0.05f);
+    Check("trajectory intercept search returns reachable sample", hasIntercept, hasIntercept ? $"t={intercept.Time:F2}" : "none");
+    if (hasIntercept) Check("intercept sample is within horizon", intercept.Time >= 0.05f && intercept.Time <= 2.0f);
+
+    // C: coordinator gives at most one primary presser per team in ordinary setup
+    var eng2 = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11 });
+    for (int i = 0; i < 180; i++) eng2.Step(1f/60f, PlayerCommand.None);
+    var tc2 = new ArenaFC.Core.Football.TacticalCoordinator();
+    var asn = tc2.BuildAssignments(eng2.State, 0);
+    int pressers = 0; foreach (var a in asn) if (a.Role == "press") pressers++;
+    Check("coordinator assigns at most one primary presser", pressers <= 1, $"pressers={pressers}");
+
+    // D: action contract carries contact-timed receive intent
+    var contract = new ArenaFC.Core.Football.PlayerActionContract
+    {
+        PlayerIndex = 3, Intent = "receive", BallContactTime = 0.35f, RequiresBallContact = true, DesiredSpeed = 7f
+    };
+    Check("action contract stores contact timing", contract.RequiresBallContact && contract.BallContactTime > 0.3f && contract.BallContactTime < 0.4f);
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
