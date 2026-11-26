@@ -441,14 +441,36 @@ def enrich_clip(c, glb: Optional[GlbAnimations], stats: Dict[str, int]):
     if sampled is not None:
         c["plantCurveLeft"] = sampled["plantCurveLeft"]
         c["plantCurveRight"] = sampled["plantCurveRight"]
-        c["rootVelocitySamples"] = sampled["rootVelocitySamples"]
+        rv = sampled["rootVelocitySamples"]
+        # In-place GLB clips yield zero hips translation; fall back to
+        # authored/metadata speed so motion-matching features are meaningful.
+        if rv and all(abs(float(x)) < 1e-6 for x in rv):
+            vx = float(c.get("rootVelocityX", 0.0) or 0.0)
+            vz = float(c.get("rootVelocityZ", 0.0) or 0.0)
+            speed = float(c.get("preferredSpeed", 0.0) or 0.0)
+            cat = str(c.get("category", "")).lower()
+            if abs(vx) < 1e-6 and abs(vz) < 1e-6 and speed > 0.1 and cat in ("locomotion", "dribble", "carry", "goalkeeper"):
+                # Facing-local XZ: x=right, z=forward.
+                vx, vz = 0.0, speed
+            if abs(vx) > 1e-6 or abs(vz) > 1e-6:
+                rv = root_velocity_samples_heuristic(vx, vz, len(rv) // 2)
+        c["rootVelocitySamples"] = rv
+        c["source"] = "glb"
+        c["provenance"] = {"type": "glb", "glb": os.path.basename(glb.path) if glb else GLB_DEFAULT}
         stats["glb"] += 1
     else:
         c["plantCurveLeft"] = plant_curve_heuristic(frames, sides, "left")
         c["plantCurveRight"] = plant_curve_heuristic(frames, sides, "right")
-        vx = c.get("rootVelocityX", 0.0) or 0.0
-        vz = c.get("rootVelocityZ", 0.0) or 0.0
+        vx = float(c.get("rootVelocityX", 0.0) or 0.0)
+        vz = float(c.get("rootVelocityZ", 0.0) or 0.0)
+        if abs(vx) < 1e-6 and abs(vz) < 1e-6:
+            speed = float(c.get("preferredSpeed", 0.0) or 0.0)
+            cat = str(c.get("category", "")).lower()
+            if speed > 0.1 and cat in ("locomotion", "dribble", "carry", "goalkeeper"):
+                vx, vz = 0.0, speed
         c["rootVelocitySamples"] = root_velocity_samples_heuristic(vx, vz)
+        c["source"] = "heuristic"
+        c["provenance"] = {"type": "heuristic"}
         stats["heuristic"] += 1
 
     ws, we = contact_window(c.get("contactFraction", -1.0))

@@ -1608,7 +1608,7 @@ public sealed partial class MatchEngine
                         : ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
                     if (ball.Owner < 0 && !ball.HasPending && !IsSkill)
                     {
-                        var pred = _tacticalBallPred ?? ArenaFC.Core.Football.BallTrajectory.Predict(ball.Pos, ball.Vel, ball.Spin, 1.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
+                        var pred = _tacticalBallPred ?? BallPred(1.2f);
                         float maxSpd = p.MaxSpeed;
                         float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
                         if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f))
@@ -1791,7 +1791,7 @@ public sealed partial class MatchEngine
         var b = State.Ball;
         var focus = BallFocus();
         bool looseMoving = b.Owner < 0 && !b.HasPending && !IsSkill && Mx.Flat(b.Vel).LengthSquared() > 4f;
-        var pred = looseMoving ? ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 1.5f, Weather.Raining, Weather.WindX, Weather.WindZ) : null;
+        var pred = looseMoving ? BallPred(1.5f) : null;
         var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff)
             .Select(p => {
                 float score = Mx.FlatDist2(p.Pos, focus);
@@ -1904,7 +1904,7 @@ public sealed partial class MatchEngine
         var b = State.Ball; point = default;
         if (b.Pos.Y < 1.2f && b.Vel.Y <= 0f) return false;
         if (Mx.Flat(b.Vel).Length() < 4f) return false;
-        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 2.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
+        var pred = BallPred(2.2f);
         float t = -1f; Vector3 p = default;
         for (int i = 1; i < pred.Samples.Count; i++)
         {
@@ -1934,7 +1934,7 @@ public sealed partial class MatchEngine
         float planeX = MathF.Abs(k.Pos.X - gx) < 6f ? k.Pos.X : gx - MathF.Sign(gx) * .6f;
         t = (planeX - b.Pos.X) / vx;
         if (t < 0f || t > 1.6f) return false;
-        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, MathF.Min(1.6f, t + 0.1f), Weather.Raining, Weather.WindX, Weather.WindZ);
+        var pred = BallPred(MathF.Min(1.6f, t + 0.1f));
         var s = pred.At(t);
         float z = s.Position.Z;
         float y = s.Position.Y;
@@ -3470,6 +3470,22 @@ public sealed partial class MatchEngine
     public readonly Dictionary<int, ArenaFC.Core.Football.PlayerActionContract> LastActionContracts = new();
 
     private ArenaFC.Core.Football.BallTrajectory? _tacticalBallPred;
+    private ArenaFC.Core.Football.BallTrajectory? _ballPredLong;
+    private int _ballPredLongTick = -1;
+    private float _ballPredLongHorizon;
+
+    private ArenaFC.Core.Football.BallTrajectory BallPred(float horizonSeconds)
+    {
+        float h = Math.Clamp(horizonSeconds, 0.1f, 3.0f);
+        if (_tacticalTick == _tick && _tacticalBallPred != null && h <= 0.8f) return _tacticalBallPred;
+        if (_ballPredLongTick == _tick && _ballPredLong != null && _ballPredLongHorizon >= h - 0.001f)
+            return _ballPredLong;
+        _ballPredLongHorizon = MathF.Max(h, 2.5f);
+        _ballPredLong = ArenaFC.Core.Football.BallTrajectory.Predict(
+            State.Ball.Pos, State.Ball.Vel, State.Ball.Spin, _ballPredLongHorizon, Weather.Raining, Weather.WindX, Weather.WindZ);
+        _ballPredLongTick = _tick;
+        return _ballPredLong;
+    }
 
     private ArenaFC.Core.Football.TacticalCoordinator.Assignment? GetTacticalAssignment(int playerIndex)
     {
@@ -3502,6 +3518,9 @@ public sealed partial class MatchEngine
         _tacticalTick = -1;
         _tacticalByPlayer.Clear();
         _tacticalBallPred = null;
+        _ballPredLong = null;
+        _ballPredLongTick = -1;
+        _ballPredLongHorizon = 0f;
         _tactical.ClearState();
         TacticalRoleChanges = 0;
         TacticalPressAssignments = 0;
