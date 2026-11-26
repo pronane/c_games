@@ -13,7 +13,8 @@ namespace ArenaFC.Core;
 public sealed partial class MatchEngine
 {
     /// <summary>Where a ball in flight comes down to height <paramref name="h"/> (ballistic,
-    /// with a little drag).  Falls back to the ground if it never rises to h.</summary>
+    /// with a little drag).  Falls back to the ground if it never rises to h.
+    /// M1 scope: analytical fallback (fixed 0.93 horizontal drag factor), not BallTrajectory.Step parity.</summary>
     public static Vector3 LandingPoint(BallState b, float h)
     {
         const float g = 9.81f;

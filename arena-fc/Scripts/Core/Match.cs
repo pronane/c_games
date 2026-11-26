@@ -3677,7 +3677,8 @@ public sealed partial class MatchEngine
     }
 
     /// <summary>Shot on target: would the launched ball cross the goal line inside
-    /// the frame (straight line in plan, ballistic in height, ignoring curve/drag)?</summary>
+    /// the frame (straight line in plan, ballistic in height, ignoring curve/drag)?
+    /// M1 scope: simplified ballistic heuristic, not BallTrajectory.Step parity.</summary>
     public static bool IsOnTarget(Vector3 pos, Vector3 vel, Vector3 goal)
     {
         float dx = goal.X - pos.X;
