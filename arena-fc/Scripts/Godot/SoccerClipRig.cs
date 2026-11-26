@@ -86,8 +86,11 @@ public sealed partial class SoccerClipRig : Node3D
 
     // Phase 1.2 foot-planting IK state.
     private readonly Dictionary<string, BoneData> _bones = new();
+    // Latched plant anchors and independent previous corrected poses for velocity measurement.
     private Vector3 _prevFootWorldL, _prevFootWorldR;
+    private Vector3 _lastMeasuredFootWorldL, _lastMeasuredFootWorldR;
     private bool _hasPrevFootL, _hasPrevFootR;
+    private bool _hasLastMeasuredFootL, _hasLastMeasuredFootR;
     private Vector3 _prevPelvisPos;
     private bool _hasPrevPelvisPos;
     private Vector3 _groundNormalL = Vector3.Up;
@@ -1226,15 +1229,28 @@ public sealed partial class SoccerClipRig : Node3D
                 // Measure the corrected foot, not the pre-IK animation pose. Compare
                 // against the latched anchor so residual motion cannot hide as drift.
                 Vector3 correctedWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
-                if (dt > 1e-4f && pw > 0.01f)
+                ref bool hasLastMeasured = ref (isLeft ? ref _hasLastMeasuredFootL : ref _hasLastMeasuredFootR);
+                ref Vector3 lastMeasured = ref (isLeft ? ref _lastMeasuredFootWorldL : ref _lastMeasuredFootWorldR);
+                if (hasLastMeasured && dt > 1e-4f && pw > 0.01f)
                 {
-                    float slide = new Vector2(correctedWorld.X - prev.X, correctedWorld.Z - prev.Z).Length();
+                    float slide = new Vector2(correctedWorld.X - lastMeasured.X, correctedWorld.Z - lastMeasured.Z).Length();
                     AnimMetrics?.RecordSample(slide / dt, 0f, false);
                 }
+                lastMeasured = correctedWorld;
+                hasLastMeasured = pw > 0.01f;
             }
             else
             {
-                if (isLeft) _hasPrevFootL = false; else _hasPrevFootR = false;
+                if (isLeft)
+                {
+                    _hasPrevFootL = false;
+                    _hasLastMeasuredFootL = false;
+                }
+                else
+                {
+                    _hasPrevFootR = false;
+                    _hasLastMeasuredFootR = false;
+                }
                 if (height < .18f)
                 {
                     Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
