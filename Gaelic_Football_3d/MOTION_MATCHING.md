@@ -373,3 +373,13 @@ possession/action/jump and transition guards. The stronger correction is not a
 new reference or a validated natural pose, and should not be promoted based on
 point gaps alone. The workflow produces three matched hand videos, sampled
 stills and mesh proxy reports for comparison.
+
+In workflow run 45854098631, the CMU candidate's mean adjacent fingertip-cap
+centroid gaps (left/right) were 43.1/43.1 mm unmodified, 36.2/41.8 mm with
+mode 1, and 33.5/45.4 mm with mode 2. The stronger setting moved some sampled
+tip vertices by up to 44.5 mm and increased the right-hand gap. The six
+close-up stills still showed splayed fingers, with no persuasive overall visual
+improvement. These are sampled cap metrics, not triangle collisions, and the
+three captures are not proof of frame-perfect comparison. Do not promote the
+stronger setting on this evidence; a more suitable, validated hand reference
+and mesh-level intersection checks remain open.
