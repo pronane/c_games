@@ -236,12 +236,20 @@ public sealed partial class SoccerClipRig : Node3D
     /// another scene (every player shares the parsed GLB).</summary>
     public static int FindBoneLoose(Skeleton3D skel, string name)
     {
-        int b = skel.FindBone(name);
-        if (b >= 0) return b;
+        // GLTF exporters differ in bone-name casing (e.g. thigh_L vs thigh_l).
+        // Resolve exact names case-insensitively before handling Godot's duplicate
+        // suffixes so the grounding/IK path does not silently disable itself.
         for (int i = 0; i < skel.GetBoneCount(); i++)
         {
             string n = skel.GetBoneName(i);
-            if (n.StartsWith(name + "_") && n.Substring(name.Length).Replace("_2", "") == "") return i;
+            if (string.Equals(n, name, StringComparison.OrdinalIgnoreCase)) return i;
+        }
+        string suffix = name + "_";
+        for (int i = 0; i < skel.GetBoneCount(); i++)
+        {
+            string n = skel.GetBoneName(i);
+            if (n.StartsWith(suffix, StringComparison.OrdinalIgnoreCase)
+                && n.Substring(name.Length).Replace("_2", "") == "") return i;
         }
         return -1;
     }
