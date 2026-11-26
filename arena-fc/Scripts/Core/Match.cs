@@ -3371,6 +3371,14 @@ public sealed partial class MatchEngine
         return _tacticalByPlayer.TryGetValue(playerIndex, out var asn) ? asn : null;
     }
 
+    internal void ResetTacticalCache()
+    {
+        _tacticalTick = -1;
+        _tacticalByPlayer.Clear();
+        _tacticalHysteresis.Clear();
+        TacticalRoleChanges = 0;
+    }
+
     private static int RunTypeFor(string type) => type switch
     {
         "overlap" => 1, "underlap" => 2, "decoy" => 3, _ => 4,

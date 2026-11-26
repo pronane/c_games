@@ -89,6 +89,7 @@ public sealed partial class MatchEngine
         _tick = c.Tick;
         Events.Clear();
         Events.AddRange(c.Events.Select(CloneEvent));
+        ResetTacticalCache();
     }
 
     /// <summary>Rewind to an authoritative snapshot state (rollback / reconnect).</summary>
@@ -99,6 +100,7 @@ public sealed partial class MatchEngine
         _globalTime = globalTime;
         _acc = 0f;
         _tick = tick;
+        ResetTacticalCache();
     }
 
     /// <summary>Set only the timing/RNG words (snapshot application on a mirror engine).</summary>
@@ -108,6 +110,7 @@ public sealed partial class MatchEngine
         _globalTime = globalTime;
         _acc = 0f;
         _tick = tick;
+        ResetTacticalCache();
     }
 
     /// <summary>Overlay the networked fields of an authoritative state on a restored
