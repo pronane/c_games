@@ -2080,5 +2080,61 @@ Section("M4 seeded telemetry comparison (headless deterministic)");
     Check("seeded telemetry collected", c.shots >= 0 && c.passes >= 0 && c.roleChanges >= 0, $"telemetry={c}");
 }
 
+Section("M3 coordinator authority invariants");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11, AwayHuman = true });
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    int checks = 0;
+    for (int t = 0; t < 240; t++)
+    {
+        e.Step(1f / 60f, PlayerCommand.None);
+        for (int team = 0; team < 2; team++)
+        {
+            var assignments = tc.BuildAssignments(e.State, team);
+            int press = 0, cover = 0;
+            var seen = new HashSet<int>();
+            bool unique = true;
+            foreach (var a in assignments)
+            {
+                unique &= seen.Add(a.PlayerIndex);
+                if (a.Role == "press") press++;
+                if (a.Role == "cover") cover++;
+            }
+            Check($"M3 unique assignments tick {t} team {team}", unique, unique ? "ok" : "duplicate player");
+            if (!unique) { checks = -1; break; }
+            bool teamInPoss = e.State.Ball.Owner >= 0 && e.State.Ball.Owner < e.State.Players.Length && e.State.Players[e.State.Ball.Owner].Team == team;
+            if (!teamInPoss)
+            {
+                Check($"M3 single press tick {t} team {team}", press <= 1, $"press={press}");
+                Check($"M3 single cover tick {t} team {team}", cover <= 1, $"cover={cover}");
+                if (press > 1 || cover > 1) { checks = -1; break; }
+            }
+            checks++;
+        }
+        if (checks < 0) break;
+    }
+    Check("M3 coordinator invariants exercised", checks > 0, $"checks={checks}");
+}
+
+Section("M4 authoritative action contracts");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 55, TeamSize = 11, AwayHuman = true });
+    bool sawCarrier = false, sawAction = false;
+    for (int t = 0; t < 300; t++)
+    {
+        e.Step(1f / 60f, PlayerCommand.None);
+        foreach (var kv in e.LastActionContracts)
+        {
+            var c = kv.Value;
+            if (c.PlayerIndex != kv.Key) { Check("M4 contract key matches player", false, $"key={kv.Key} player={c.PlayerIndex}"); sawAction = sawCarrier = true; break; }
+            if (c.Intent == "carry" || c.Intent == "shield") sawCarrier = true;
+            if (c.Intent is "kick" or "shoot" or "pass" or "receive" or "tackle" or "dive" or "throw_in" or "skill") sawAction = true;
+        }
+        if (sawCarrier && sawAction) break;
+    }
+    Check("M4 baseline carrier/shield contract observed", sawCarrier, sawCarrier ? "ok" : "missing");
+    Check("M4 action/receive contract observed", sawAction, sawAction ? "ok" : "missing");
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
