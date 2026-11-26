@@ -155,17 +155,20 @@ public partial class RuntimeEvidenceRunner : Node3D
 
         var report = new Dictionary<string, object>
         {
-            ["commit_sha"] = System.Environment.GetEnvironmentVariable("GITHUB_SHA") ?? "local",
+            ["commit_sha"] = System.Environment.GetEnvironmentVariable("ARENA_FC_COMMIT_SHA") ?? "local",
             ["godot_version"] = Engine.GetVersionInfo().ToString(),
             ["renderer"] = ProjectSettings.GetSetting("rendering/renderer/rendering_method").AsString(),
             ["scenario"] = "production_soccer_clip_rig_flat_and_8_percent_slope_translated_rotated",
             ["frames"] = frames,
             ["animation_metric_samples"] = metrics.Samples,
             ["avg_planted_foot_slide_mps"] = metrics.AvgFootSlide,
+            ["foot_slide_metric_scope"] = "world_space_xz_velocity_during_contract_planted_frames",
             ["transition_events"] = metrics.TransitionEvents,
             ["avg_transition_discontinuity"] = metrics.AvgTransitionDiscontinuity,
+            ["transition_metric_scope"] = "mean_raw_pose_offset_on_inertialized_upper_body_bones",
             ["contact_events"] = metrics.ContactEvents,
             ["avg_contact_frame_error"] = metrics.AvgContactFrameError,
+            ["ground_clearance_metric"] = "ankle_bone_origin_to_collision_surface_not_sole_clearance",
             ["ankle_ground_clearance_min_m"] = ankleClearance.Min(),
             ["ankle_ground_clearance_max_m"] = ankleClearance.Max(),
             ["rig_update_avg_ms"] = updateMs.Average(),
