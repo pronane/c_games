@@ -49,3 +49,11 @@ clips, and visual/performance validation remain future work. See
 for presentation weights, such as fading an IK foot lock in and out; it is not
 motion prediction or a learned model. See `RESEARCH.md` for external references
 and the difference between their code and data licences.
+
+`am_contact_drift_sample` is an optional renderer-independent diagnostic for
+horizontal world-space contact-proxy drift. Call it once per sample and per
+foot with positions, elapsed time and a caller-provided contact flag; divide
+accumulated path distance by accumulated seconds to obtain mean speed. It
+excludes intervals across contact gaps or invalid samples. It does not detect
+contact, drive the simulation or correct animation, and results are only as
+meaningful as the caller's positions and contact proxy.

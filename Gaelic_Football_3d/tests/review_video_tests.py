@@ -15,6 +15,12 @@ def fake_run(cmd, check):
 
 with tempfile.TemporaryDirectory() as tmp, patch.object(pack.subprocess, 'run', side_effect=fake_run):
     p = pack.build_payload('test', 'hands-before', 'a'*40, '123', 'owner/repo', hand_crop=True)
+    detail = pack.build_payload('test', 'feet', 'a'*40, '123', 'owner/repo', foot_detail=True)
+    info = json.loads(detail['output']['text'])
+    assert info['start'] == 4.5 and info['duration'] == 1.8 and info['fps'] == 15 and info['width'] == 480
+    try: pack.build_payload('test', 'feet', 'a'*40, '123', 'owner/repo', hand_crop=True, foot_detail=True)
+    except ValueError: pass
+    else: raise AssertionError('accepted conflicting crop modes')
     path = unpack.save_preview({'output': p['output']}, '123', Path(tmp))
     assert path.read_bytes() == raw
     data = json.loads(p['output']['text'])

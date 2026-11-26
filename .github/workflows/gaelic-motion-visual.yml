@@ -153,14 +153,29 @@ jobs:
           grep -q 'MOTION fixed-camera begin frame 120' ../build/cmu-jog-report/cmu-jog-fixed.log
           grep -q 'MOTION fixed-camera end frame 210' ../build/cmu-jog-report/cmu-jog-fixed.log
           diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-fixed.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-fixed.log)
+      # A second, closer stationary pass; both runs use identical simulation input.
+      - name: Record fixed-world foot and shorts detail
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_FIXED_JOG_DETAIL: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/original-feet.mp4 > ../build/cmu-jog-report/original-feet.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-feet.mp4 > ../build/cmu-jog-report/cmu-jog-feet.log 2>&1
+          for label in original-feet cmu-jog-feet; do
+            test -s "../build/cmu-jog-report/${label}.mp4"
+            grep -q 'MOTION fixed-camera begin frame 120' "../build/cmu-jog-report/${label}.log"
+            grep -q 'MOTION fixed-camera end frame 210' "../build/cmu-jog-report/${label}.log"
+          done
+          diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-feet.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-feet.log)
       - name: Publish short motion previews to GitHub checks
         working-directory: Gaelic_Football_3d
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for label in cmu-hands-before cmu-hands-relaxed original-fixed cmu-jog-fixed; do
+          for label in cmu-hands-before cmu-hands-relaxed original-fixed cmu-jog-fixed original-feet cmu-jog-feet; do
             crop=()
-            case "$label" in cmu-hands-*) crop=(--hand-crop);; esac
+            case "$label" in cmu-hands-*) crop=(--hand-crop);; *-feet) crop=(--foot-detail);; esac
             python3 tools/review_video_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" "${crop[@]}" > "../build/cmu-jog-local/${label}-preview.json"
             gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-preview.json" > /dev/null
           done

@@ -2159,6 +2159,7 @@ static void applyAssist(GameInput *in)
 static Vector3 camFocus;
 static int camOverride = 0;       /* 1 stadium orbit, 2 referee close-up, 3 fixed motion-test side */
 static Vector3 camMotionFixed;
+static int camMotionDetail; /* scripted fixed-world close pass only */
 static int camHardSnap = 0;       /* motion test: jump the camera instead of flying through the stand */
 static int camSide = 0;            /* motion test: side-on, so the feet can be judged against the lines */
 static float camOverrideT = 0;
@@ -2263,8 +2264,8 @@ static void updateCamera(float dt)
     } else if (camOverride == 3) {
         /* Fixed world-space camera for the scripted jog comparison only. */
         tgt = camMotionFixed;
-        pos = Vector3Add(tgt, (Vector3){ 0, 1.4f, 18.0f });
-        cam.fovy = 38; snap = 1.0f;
+        pos = Vector3Add(tgt, camMotionDetail ? (Vector3){ 0, .5f, 8.0f } : (Vector3){ 0, 1.4f, 18.0f });
+        cam.fovy = camMotionDetail ? 30 : 38; snap = 1.0f;
     } else if (camOverride == 2) {
         Vector3 r = W(game.referee.x, 0, game.referee.z);
         Vector3 ob = r;
@@ -3487,14 +3488,15 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
         if (frame == 120) { camJogCloseup = 1; printf("MOTION jog-closeup begin frame 120\n"); }
         if (frame == 210) { camJogCloseup = 0; printf("MOTION jog-closeup end frame 210\n"); }
     }
-    if (getenv("GF_FIXED_JOG")) {
+    if (getenv("GF_FIXED_JOG") || getenv("GF_FIXED_JOG_DETAIL")) {
         if (frame == 120) {
-            camMotionFixed = W(p->x + 5.0f, .9f, p->z);
+            camMotionDetail = getenv("GF_FIXED_JOG_DETAIL") != NULL;
+            camMotionFixed = W(p->x + (camMotionDetail ? 3.0f : 5.0f), camMotionDetail ? .8f : .9f, p->z);
             camSide = 0; camOverride = 3;
             printf("MOTION fixed-camera begin frame %d target %.2f %.2f %.2f\n",
                    frame, camMotionFixed.x, camMotionFixed.y, camMotionFixed.z);
         } else if (frame == 210) {
-            camOverride = 0; camSide = 1;
+            camOverride = 0; camSide = 1; camMotionDetail = 0;
             printf("MOTION fixed-camera end frame %d\n", frame);
         }
     }

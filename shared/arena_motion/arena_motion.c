@@ -214,3 +214,22 @@ float am_bounded_rotation_weight(float angle, float limit, float blend)
     if (blend > 1) blend = 1;
     return blend * fminf(1, limit/angle);
 }
+
+void am_contact_drift_reset(AMContactDrift *drift)
+{
+    if (drift) { drift->distance = 0; drift->seconds = 0; drift->intervals = 0;
+        drift->previous_x = drift->previous_z = 0; drift->previous_contact = 0; }
+}
+
+void am_contact_drift_sample(AMContactDrift *drift, float x, float z, float dt, int contact)
+{
+    if (!drift) return;
+    if (!isfinite(x) || !isfinite(z) || !isfinite(dt) || dt <= 0) {
+        drift->previous_contact = 0; return;
+    }
+    if (contact && drift->previous_contact) {
+        double dx = (double)x - drift->previous_x, dz = (double)z - drift->previous_z;
+        drift->distance += hypot(dx, dz); drift->seconds += dt; ++drift->intervals;
+    }
+    drift->previous_x = x; drift->previous_z = z; drift->previous_contact = !!contact;
+}

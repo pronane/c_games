@@ -310,3 +310,18 @@ The hand view is cropped around the upper body; the fixed view is uncropped.
 These are useful for inspecting timing, but their reduced resolution and frame
 rate cannot replace the original 30 fps artifact or prove foot contact, mesh
 intersection, or gameplay quality.
+
+### Fixed-world detail and shared drift diagnostic
+
+The visual workflow also records `original-feet.mp4` and `cmu-jog-feet.mp4`
+with the same scripted motion and a closer stationary world-space camera during
+frames 120–209. A shorter 15 fps preview is published through GitHub checks;
+the player may leave this narrow view, and a compressed preview cannot resolve
+all sole or fabric details. The original 30 fps recordings remain artifacts.
+
+The shared `am_contact_drift_sample` utility accumulates horizontal world-space
+path distance only across consecutive contact-proxy samples. The headless gait
+report now uses it on each adjusted ankle with the existing low raw-ankle height
+proxy; it reports a 2D mean speed in addition to the historical 1D forward
+metric. It does not establish actual sole contact, rendered mesh clearance, or
+correctness in a turning gameplay scenario. No simulation state depends on it.

@@ -138,4 +138,24 @@ static void still_rotation(void)
     assert(am_bounded_rotation_weight(0,.2f,1) == 0);
     assert(am_bounded_rotation_weight(.5f,.2f,NAN) == 0);
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); puts("arena motion tests passed"); return 0; }
+static void contact_drift(void)
+{
+    AMContactDrift a, b;
+    am_contact_drift_reset(&a); am_contact_drift_reset(&b);
+    for (int i = 0; i <= 30; ++i) am_contact_drift_sample(&a, 3.f*i/30, 4.f*i/30, 1.f/30, 1);
+    for (int i = 0; i <= 60; ++i) am_contact_drift_sample(&b, 3.f*i/60, 4.f*i/60, 1.f/60, 1);
+    assert(a.intervals == 30 && b.intervals == 60);
+    assert(fabs(a.distance/a.seconds - 5) < .0001 && fabs(b.distance/b.seconds - 5) < .0001);
+    am_contact_drift_sample(&a, 100, 100, .1f, 0);
+    am_contact_drift_sample(&a, 200, 200, .1f, 1); /* no swing-to-contact interval */
+    assert(a.intervals == 30);
+    am_contact_drift_sample(&a, NAN, 0, .1f, 1);
+    am_contact_drift_sample(&a, 0, 0, .1f, 1); /* invalid sample breaks continuity */
+    assert(a.intervals == 30);
+    am_contact_drift_sample(&a, 0, 0, 0, 1);
+    am_contact_drift_sample(&a, 0, 0, .1f, 1);
+    assert(a.intervals == 30);
+    am_contact_drift_reset(&a); assert(a.intervals == 0 && a.seconds == 0 && a.distance == 0);
+    am_contact_drift_sample(NULL, 0, 0, 1, 1); am_contact_drift_reset(NULL);
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); puts("arena motion tests passed"); return 0; }

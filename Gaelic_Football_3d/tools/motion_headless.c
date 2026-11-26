@@ -376,6 +376,8 @@ static int report_jog_ground_proxy(float dt, float speed)
     double rawDist = 0, scaledDist = 0, adjustedDist = 0, activeDist = 0;
     float prevRaw[2] = {0}, prevScaled[2] = {0}, prevAdjusted[2] = {0}, prevY[2] = {0};
     int count = 0, active = 0, clip = -1; float t = 0;
+    AMContactDrift drift[2];
+    am_contact_drift_reset(&drift[0]); am_contact_drift_reset(&drift[1]);
     game_init(&game); game.ball_team = -1; game.ball_player = -1;
     p = &game.players[0][9]; p->action = GAME_ACT_NONE; p->jump_time = 0;
     memset(s, 0, sizeof *s); s->speed = speed;
@@ -395,6 +397,8 @@ static int report_jog_ground_proxy(float dt, float speed)
             rawWorld[side] = s->lastZ + raw[f].translation.z;
             adjustedWorld[side] = s->lastZ + s->pose[f].translation.z;
             if (!isfinite(adjustedWorld[side])) return 0;
+            am_contact_drift_sample(&drift[side], s->pose[f].translation.x, adjustedWorld[side], dt,
+                                    step > (int)(1.0f/dt) && raw[f].translation.y <= .11f);
             if (step > (int)(1.0f/dt) && raw[f].translation.y <= .11f && prevY[side] <= .11f) {
                 rawDist += fabs(rawWorld[side] - prevRaw[side]);
                 scaledDist += fabs(scaledWorld[side] - prevScaled[side]);
@@ -411,7 +415,11 @@ static int report_jog_ground_proxy(float dt, float speed)
     printf("jog_ground_proxy dt=%.4f speed=%.1f samples=%d raw_mps=%.3f scaled_mps=%.3f adjusted_mps=%.3f planted_samples=%d planted_mps=%.3f (ankle_proxy_only)\n",
            dt, speed, count, count ? rawDist/(count*dt) : 0, count ? scaledDist/(count*dt) : 0, count ? adjustedDist/(count*dt) : 0,
            active, active ? activeDist/(active*dt) : 0);
-    return count > 0;
+    printf("shared_contact_drift dt=%.4f speed=%.1f samples=%lu mean_mps=%.3f (low_ankle_proxy_2d)\n",
+           dt, speed, drift[0].intervals + drift[1].intervals,
+           (drift[0].seconds + drift[1].seconds) > 0 ?
+           (drift[0].distance + drift[1].distance)/(drift[0].seconds + drift[1].seconds) : 0);
+    return count > 0 && drift[0].intervals + drift[1].intervals > 0;
 }
 
 /* Exercise the plant's attack and release with a fixed real-model pose and

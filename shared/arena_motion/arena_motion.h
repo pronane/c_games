@@ -61,6 +61,19 @@ float am_arm_swing_profile(const float *arm, const float *leg, int n, float *cen
 float am_rotation_stillness(const float *samples, int n);
 /* Blend fraction that limits a proposed angular correction in radians. */
 float am_bounded_rotation_weight(float angle, float limit, float blend);
+/* Accumulate horizontal world-space drift while the caller's contact proxy is
+ * true in consecutive samples. One independent instance per foot and stream.
+ * Distance / seconds is mean path speed, not a sole-contact detector. Invalid
+ * samples break continuity. Initialize/reset with am_contact_drift_reset. */
+typedef struct {
+    double distance, seconds;
+    float previous_x, previous_z;
+    unsigned long intervals;
+    int previous_contact;
+} AMContactDrift;
+void am_contact_drift_reset(AMContactDrift *drift);
+void am_contact_drift_sample(AMContactDrift *drift, float x, float z, float dt, int contact);
+
 /* Advance a looping animation clock in seconds. Invalid inputs leave it unchanged. */
 float am_loop_advance(float time, float dt, float rate, float length);
 /* Clamped cubic easing for smoothly introducing a bounded correction. */
