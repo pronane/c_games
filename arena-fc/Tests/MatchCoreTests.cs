@@ -2301,6 +2301,15 @@ Section("M2 perception uses real capabilities");
     float fast = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from, to, oppP, oppV, 13f, new[]{8.5f}, new[]{16f});
     float slow = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from, to, oppP, oppV, 13f, new[]{5.0f}, new[]{8f});
     Check("M2 faster opponent reduces lane safety", fast < slow, $"fast={fast:F3} slow={slow:F3}");
+
+    float tFast = ArenaFC.Core.Football.PlayerPerception.TimeToReach(new Vector3(0,0,0), Vector3.Zero, new Vector3(10,0,0), 8.5f, 16f);
+    float tSlow = ArenaFC.Core.Football.PlayerPerception.TimeToReach(new Vector3(0,0,0), Vector3.Zero, new Vector3(10,0,0), 5.5f, 10f);
+    Check("M2 TimeToReach respects capability", tFast < tSlow, $"fast={tFast:F3} slow={tSlow:F3}");
+
+    var pred = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(10,0,0), Vector3.Zero, 1.5f, false, 0f, 0f);
+    bool canFast = pred.TryInterceptXZ(new Vector3(-2,0,1f), 8.5f, 16f, out var sFast, 0f);
+    bool canSlow = pred.TryInterceptXZ(new Vector3(-2,0,1f), 4.5f, 8f, out var sSlow, 0f);
+    Check("M2 intercept capability differentiation", canFast && (!canSlow || sFast.Time < sSlow.Time), $"canFast={canFast} tFast={(canFast?sFast.Time:-1):F3} canSlow={canSlow} tSlow={(canSlow?sSlow.Time:-1):F3}");
 }
 
 Section("M1 BallPred cache determinism");
