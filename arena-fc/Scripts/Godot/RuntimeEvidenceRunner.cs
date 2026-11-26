@@ -44,7 +44,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         {
             BackgroundMode = Godot.Environment.BGMode.Color,
             BackgroundColor = new Color("#7890a8"),
-            AmbientLightSource = Environment.AmbientSource.Color,
+            AmbientLightSource = Godot.Environment.AmbientSource.Color,
             AmbientLightColor = new Color(.78f, .81f, .88f),
             AmbientLightEnergy = .8f
         };
