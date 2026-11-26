@@ -31,8 +31,14 @@ public sealed partial class MatchEngine
     public Vector3 BallFocus()
     {
         var b = State.Ball;
-        if (b.Owner < 0 && !b.HasPending && !IsSkill)
+        if (b.Owner < 0 && !b.HasPending)
         {
+            if (IsSkill)
+            {
+                if (b.Pos.Y > .7f || b.Vel.Y > 1.5f || Mx.Flat(b.Vel).LengthSquared() > 9f)
+                    return LandingPoint(b, 1.3f);
+                return b.Pos;
+            }
             if (b.Pos.Y > .7f || b.Vel.Y > 1.5f)
             {
                 var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 2.0f, Weather.Raining, Weather.WindX, Weather.WindZ);
