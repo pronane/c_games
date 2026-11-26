@@ -61,11 +61,19 @@ public static class PlayerPerception
     public static float LaneSafety(Vector3 from, Vector3 to, Vector3[] oppPos, Vector3[] oppVel,
         float ballSpeed, float oppMaxSpeed, float oppAccel)
     {
+        var spd = new float[oppPos.Length];
+        var acc = new float[oppPos.Length];
+        for (int i = 0; i < oppPos.Length; i++) { spd[i] = oppMaxSpeed; acc[i] = oppAccel; }
+        return LaneSafety(from, to, oppPos, oppVel, ballSpeed, spd, acc);
+    }
+
+    public static float LaneSafety(Vector3 from, Vector3 to, Vector3[] oppPos, Vector3[] oppVel,
+        float ballSpeed, float[] oppMaxSpeeds, float[] oppAccels)
+    {
         Vector3 dir = to - from; dir.Y = 0f;
         float dist = dir.Length();
         if (dist < 1e-4f) return 0f;
         dir /= dist;
-        float ballT = dist / MathF.Max(1f, ballSpeed);
         float safety = 1f;
         for (int i = 0; i < oppPos.Length; i++)
         {
@@ -76,7 +84,9 @@ public static class PlayerPerception
             Vector3 lateral = oppPos[i] - closest; lateral.Y = 0f;
             float latDist = lateral.Length();
             float tBallAt = along / MathF.Max(1f, ballSpeed);
-            float tOpp = TimeToReach(oppPos[i], oppVel[i], closest, oppMaxSpeed, oppAccel);
+            float ms = i < oppMaxSpeeds.Length ? oppMaxSpeeds[i] : 7f;
+            float ac = i < oppAccels.Length ? oppAccels[i] : 12f;
+            float tOpp = TimeToReach(oppPos[i], oppVel[i], closest, ms, ac);
             if (tOpp <= tBallAt + 0.05f)
             {
                 float sev = Math.Clamp(1f - latDist / 2.0f, 0f, 1f);

@@ -1482,39 +1482,40 @@ public sealed partial class MatchEngine
             if (!IsSkill)
             {
                 var tacOff = GetTacticalAssignment(p.Index);
-                if (tacOff != null && tacOff.Role == "support")
-                    p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.20f);
+                if (tacOff != null && (tacOff.Role == "support" || tacOff.Role == "recycle"))
+                    p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.45f);
             }
             if (p.ActionTimer <= 0f) p.Action = "run";
         }
         else
         {
-            bool isChaser = p.Index == chaser1 || p.Index == chaser2 || p.Index == chaser3;
+            var tacAssign = GetTacticalAssignment(p.Index);
+            bool isPresser = tacAssign?.Role == "press";
+            bool isCoverRole = tacAssign?.Role == "cover";
+            bool isChaser = isPresser || isCoverRole || (tacAssign == null && (p.Index == chaser1 || p.Index == chaser2 || p.Index == chaser3));
             if (isChaser)
             {
                 if (oppOwns)
                 {
                     var carrier = S.Players[ball.Owner];
                     Vector3 goalDir = Mx.FlatDir(carrier.Pos, GoalPos(carrier.Team));
-                    // The second and third defenders stay goal-side and jockey
-                    // separate lanes instead of diving in alongside the challenger.
-                    // Only the first presser (chaser1) commits to the tackle.
-                    if (p.Index != chaser1)
+                    // M3: coordinator is authoritative for primary presser/cover.
+                    bool primaryPresser = isPresser || (tacAssign == null && p.Index == chaser1);
+                    if (!primaryPresser)
                     {
                         p.JockeyState = 1; // jockeying
-                        // Cover, not crowd: real carriers have their nearest opponent
-                        // ~6.5 m away (median) and within 2 m only 6% of the time; ours
-                        // were mobbed at 1.4 m by three players.
-                        // Near our box the cover tightens: there is no room to give.
                         bool nearBox = Mx.FlatDist(carrier.Pos, GoalPos(carrier.Team)) < 30f;
-                        float lane = p.Index == chaser2 ? (nearBox ? -3f : -5.5f) : (nearBox ? -5f : -9f);
-                        float sz = nearBox ? 3f : 5f;
-                        Vector3 side = new Vector3(0, 0, p.Index == chaser2 ? sz : -sz);
-                        p.Target = carrier.Pos + goalDir * lane + side;
-                        var tacCover = GetTacticalAssignment(p.Index);
-                        if (tacCover != null && tacCover.Role == "cover")
-                            p.Target = Mx.Lerp(p.Target, tacCover.MovementTarget, 0.35f);
-                        // Contain: stay between carrier and goal.
+                        if (tacAssign != null && isCoverRole)
+                        {
+                            p.Target = tacAssign.MovementTarget;
+                        }
+                        else
+                        {
+                            float lane = p.Index == chaser2 ? (nearBox ? -3f : -5.5f) : (nearBox ? -5f : -9f);
+                            float sz = nearBox ? 3f : 5f;
+                            Vector3 side = new Vector3(0, 0, p.Index == chaser2 ? sz : -sz);
+                            p.Target = carrier.Pos + goalDir * lane + side;
+                        }
                         if (Mx.FlatDist(p.Pos, carrier.Pos) < 3f)
                             p.JockeyState = 2; // containing
                         p.Pressing = false;
@@ -1522,20 +1523,17 @@ public sealed partial class MatchEngine
                     else
                     {
                         p.JockeyState = 0;
-                        // High pressing closes the carrier down; a low block
-                        // stands off and invites the pass.
-                        // The presser closes to a standoff and jockeys (goal-side); he
-                        // steps in when the tackle logic says so.  High press = tighter.
                         float lane = 2.6f / Mx.Clamp(p.TacticsPressMult, .6f, 1.7f);
                         float gap = Mx.FlatDist(p.Pos, carrier.Pos);
-                        // Step in to challenge: on a heavy touch, near our goal, or in
-                        // short engagement windows (real defenders jockey, then commit).
                         bool heavy = Mx.FlatDist(carrier.Pos, ball.Pos) > 1.1f || carrier.FirstTouchQuality < .4f;
                         bool danger = Mx.FlatDist(carrier.Pos, GoalPos(carrier.Team)) < 28f;
                         float phase = (S.Clock / MathF.Max(1f, Options.TimeSpeed) * .5f + p.Index * .37f) % 1f;
                         if (heavy || danger || phase < .12f) lane = .9f;
-                        p.Target = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f;
-                        p.Pressing = gap > lane + 1.5f;   // sprint to close down, then contain
+                        Vector3 pressTarget = carrier.Pos + goalDir * lane + Mx.Flat(carrier.Vel) * .22f;
+                        if (tacAssign != null && isPresser)
+                            pressTarget = Mx.Lerp(pressTarget, tacAssign.MovementTarget, 0.5f);
+                        p.Target = pressTarget;
+                        p.Pressing = gap > lane + 1.5f;
                         p.JockeyState = gap <= lane + 1.5f ? 2 : 0;
                     }
                 }
@@ -1546,10 +1544,14 @@ public sealed partial class MatchEngine
                         : ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
                     if (ball.Owner < 0 && !ball.HasPending && !IsSkill)
                     {
-                        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(ball.Pos, ball.Vel, ball.Spin, 1.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
-                        if (pred.TryInterceptXZ(p.Pos, 7.2f, 12f, out var s, 0f))
+                        var pred = _tacticalBallPred ?? ArenaFC.Core.Football.BallTrajectory.Predict(ball.Pos, ball.Vel, ball.Spin, 1.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
+                        float maxSpd = p.MaxSpeed;
+                        float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Physicality * 3f, 8f, 18f);
+                        if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f))
                             intercept = new Vector3(s.Position.X, 0f, s.Position.Z);
                     }
+                    if (tacAssign != null && isPresser)
+                        intercept = Mx.Lerp(intercept, tacAssign.MovementTarget, 0.35f);
                     p.Target = intercept;
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
@@ -1580,9 +1582,8 @@ public sealed partial class MatchEngine
                 }
                 if (!IsSkill)
                 {
-                    var tacDef = GetTacticalAssignment(p.Index);
-                    if (tacDef != null && (tacDef.Role == "cover" || tacDef.Role == "recover"))
-                        p.Target = Mx.Lerp(p.Target, tacDef.MovementTarget, tacDef.Role == "cover" ? 0.25f : 0.15f);
+                    if (tacAssign != null && (tacAssign.Role == "cover" || tacAssign.Role == "recover" || tacAssign.Role == "shape" || tacAssign.Role == "transition_shape"))
+                        p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, 0.35f);
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
@@ -1747,11 +1748,16 @@ public sealed partial class MatchEngine
         foreach (var o in State.Players) if (o.Team != from.Team && !o.SentOff) oppCount++;
         var oppP = new Vector3[oppCount];
         var oppV = new Vector3[oppCount];
+        var oppSpd = new float[oppCount];
+        var oppAcc = new float[oppCount];
         int oi = 0;
         foreach (var o in State.Players)
         {
             if (o.Team == from.Team || o.SentOff) continue;
-            oppP[oi] = o.Pos; oppV[oi] = o.Vel; oi++;
+            oppP[oi] = o.Pos; oppV[oi] = o.Vel;
+            oppSpd[oi] = o.MaxSpeed;
+            oppAcc[oi] = Math.Clamp(9f + o.Spec.Pace * 6f + o.Spec.Physicality * 3f, 8f, 18f);
+            oi++;
         }
         foreach (var q in State.Players)
         {
@@ -1766,10 +1772,12 @@ public sealed partial class MatchEngine
             float aimAlign = d > 0.01f ? Vector2.Dot(Vector2.Normalize(toMate), aim) : 0f;
             float openness = NearestOpponent(q, out float od) is null ? 8f : MathF.Min(od, 8f);
             bool laneBlocked = LaneRisk(from, q, d) > 0f;
-            float laneSafety = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from.Pos, q.Pos, oppP, oppV, passSpeed, 7f, 12f);
+            float laneSafety = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from.Pos, q.Pos, oppP, oppV, passSpeed, oppSpd, oppAcc);
             float tBall = d / MathF.Max(1f, passSpeed);
             Vector3 recvAim = q.Pos + Mx.Flat(q.Vel) * MathF.Min(tBall, 0.6f) * (through ? 0.8f : 0.45f);
-            float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(q.Pos, q.Vel, recvAim, 7.0f, 12f);
+            float recvMax = q.MaxSpeed;
+            float recvAcc = Math.Clamp(9f + q.Spec.Pace * 6f + q.Spec.Physicality * 3f, 8f, 18f);
+            float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(q.Pos, q.Vel, recvAim, recvMax, recvAcc);
             float recvReachPenalty = MathF.Max(0f, tRecv - tBall - 0.15f) * 3.0f;
             // Aim alignment dominates (weight 8.0) so stick direction controls
             // the pass. AI factors (forward/openness) break ties.
@@ -1936,7 +1944,9 @@ public sealed partial class MatchEngine
             if (through)
                 recvLead += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * MathF.Min(5f, 2f + tBall * 4f);
             // Only adopt lead if receiver can plausibly reach it around ball arrival.
-            float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(to.Pos, to.Vel, recvLead, 7.2f, 12f);
+            float recvMax = to.MaxSpeed;
+            float recvAcc = Math.Clamp(9f + to.Spec.Pace * 6f + to.Spec.Physicality * 3f, 8f, 18f);
+            float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(to.Pos, to.Vel, recvLead, recvMax, recvAcc);
             if (tRecv <= tBall + 0.30f)
             {
                 aim = Vector3.Lerp(aim, recvLead, through ? 0.70f : 0.35f);
@@ -3390,6 +3400,8 @@ public sealed partial class MatchEngine
     public int TacticalCoverAssignments;
     public readonly Dictionary<int, ArenaFC.Core.Football.PlayerActionContract> LastActionContracts = new();
 
+    private ArenaFC.Core.Football.BallTrajectory? _tacticalBallPred;
+
     private ArenaFC.Core.Football.TacticalCoordinator.Assignment? GetTacticalAssignment(int playerIndex)
     {
         if (_tacticalTick != _tick)
@@ -3398,8 +3410,11 @@ public sealed partial class MatchEngine
             foreach (var kv in _tacticalByPlayer) prev[kv.Key] = kv.Value.Role;
             _tacticalTick = _tick;
             _tacticalByPlayer.Clear();
-            var t0 = _tactical.BuildAssignments(State, 0);
-            var t1 = _tactical.BuildAssignments(State, 1);
+            // M3: coordinator sees predicted ball trajectory (same physics rules).
+            _tacticalBallPred = ArenaFC.Core.Football.BallTrajectory.Predict(
+                State.Ball.Pos, State.Ball.Vel, State.Ball.Spin, 0.8f, Weather.Raining, Weather.WindX, Weather.WindZ);
+            var t0 = _tactical.BuildAssignments(State, 0, _tacticalBallPred);
+            var t1 = _tactical.BuildAssignments(State, 1, _tacticalBallPred);
             void Add(ArenaFC.Core.Football.TacticalCoordinator.Assignment a)
             {
                 if (prev.TryGetValue(a.PlayerIndex, out var oldRole) && oldRole != a.Role) TacticalRoleChanges++;
@@ -3417,6 +3432,8 @@ public sealed partial class MatchEngine
     {
         _tacticalTick = -1;
         _tacticalByPlayer.Clear();
+        _tacticalBallPred = null;
+        _tactical.ClearState();
         TacticalRoleChanges = 0;
         TacticalPressAssignments = 0;
         TacticalCoverAssignments = 0;
