@@ -479,3 +479,10 @@ frames. The ramp multiplies the existing locomotion blend; modes 1–3 and
 simulation state are unchanged. A 30/60 Hz scripted regression checks the
 previously abrupt jump-to-jog correction re-entry. Abrupt **guard onset** still
 exists by design and needs an action-aware solution and rendered validation.
+
+Candidate run 45862807573 reduced the scripted jump-to-jog first-frame
+correction change from 20.08 degrees to 1.49 degrees at 30 Hz and 0.40 degrees
+at 60 Hz. Carry, jump, handpass and solo still remained exact no-ops, while
+entry into those guards continued to remove up to 20.08 degrees in one frame.
+These are local-quaternion correction deltas in a synthetic presentation
+scenario, not proof of visually smooth real gameplay or full mesh clearance.
