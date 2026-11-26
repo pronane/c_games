@@ -232,24 +232,31 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    /// <summary>Bone by name, tolerating the "_2" suffixes Godot adds each time one GltfState generates
-    /// another scene (every player shares the parsed GLB).</summary>
+    /// <summary>Resolve common GLTF bone-name variants, including side-prefix names
+    /// (LThigh) and side-suffix names (thigh_L), plus Godot duplicate suffixes.</summary>
     public static int FindBoneLoose(Skeleton3D skel, string name)
     {
-        // GLTF exporters differ in bone-name casing (e.g. thigh_L vs thigh_l).
-        // Resolve exact names case-insensitively before handling Godot's duplicate
-        // suffixes so the grounding/IK path does not silently disable itself.
-        for (int i = 0; i < skel.GetBoneCount(); i++)
+        static string Normalize(string value)
+            => new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+        static string WithoutGodotDuplicate(string value)
         {
-            string n = skel.GetBoneName(i);
-            if (string.Equals(n, name, StringComparison.OrdinalIgnoreCase)) return i;
+            int split = value.LastIndexOf('_');
+            return split >= 0 && int.TryParse(value[(split + 1)..], out _)
+                ? value[..split] : value;
         }
-        string suffix = name + "_";
+
+        string wanted = Normalize(WithoutGodotDuplicate(name));
+        if (wanted.Length == 0) return -1;
+        char side = wanted[^1];
+        bool hasSideSuffix = side is 'l' or 'r';
+        string sidePrefixEquivalent = hasSideSuffix ? side + wanted[..^1] : wanted;
+
         for (int i = 0; i < skel.GetBoneCount(); i++)
         {
-            string n = skel.GetBoneName(i);
-            if (n.StartsWith(suffix, StringComparison.OrdinalIgnoreCase)
-                && n.Substring(name.Length).Replace("_2", "") == "") return i;
+            string actual = Normalize(WithoutGodotDuplicate(skel.GetBoneName(i)));
+            if (actual == wanted || (hasSideSuffix && actual == sidePrefixEquivalent))
+                return i;
         }
         return -1;
     }
