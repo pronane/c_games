@@ -1,0 +1,153 @@
+name: Arena FC quality gates
+
+on:
+  pull_request:
+    paths:
+      - "arena-fc/**"
+      - ".github/workflows/**"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arena-fc-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  asset-contracts:
+    name: Asset and Python contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python tooling
+        run: python -m compileall -q arena-fc/Tools
+      - name: Validate committed clip manifest and GLB container
+        working-directory: arena-fc
+        run: python Tools/ci_validate_assets.py
+
+  simulation-stress:
+    name: Seeded simulation stress and determinism
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STRESS_SEEDS: ${{ github.event_name == 'schedule' && '12' || '3' }}
+      STRESS_SECONDS: ${{ github.event_name == 'schedule' && '90' || '30' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Run deterministic 5v5, 7v7 and 11v11 stress scenarios
+        working-directory: arena-fc
+        run: |
+          set -o pipefail
+          dotnet run --project Tests/CiStressTests.csproj -c Release -- \
+            --seeds "$STRESS_SEEDS" --seconds "$STRESS_SECONDS" 2>&1 | tee ci-stress.log
+      - name: Upload simulation stress log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-simulation-stress
+          path: arena-fc/ci-stress.log
+          if-no-files-found: warn
+
+  dotnet-coverage:
+    name: .NET core coverage report
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Install cross-platform coverage collector
+        run: |
+          dotnet tool install --global dotnet-coverage --version 17.14.1
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Collect core test coverage
+        working-directory: arena-fc
+        run: |
+          dotnet-coverage collect --output coverage-core.cobertura.xml --output-format cobertura \
+            bash -c 'dotnet run --project Tests/CoreTests.csproj -c Release'
+      - name: Collect match-core test coverage
+        working-directory: arena-fc
+        run: |
+          dotnet-coverage collect --output coverage-match-core.cobertura.xml --output-format cobertura \
+            bash -c 'dotnet run --project Tests/MatchCoreTests.csproj -c Release'
+      - name: Upload Cobertura coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-dotnet-coverage
+          path: |
+            arena-fc/coverage-core.cobertura.xml
+            arena-fc/coverage-match-core.cobertura.xml
+          if-no-files-found: warn
+
+  godot-render-captures:
+    name: Godot rendered rig and gameplay captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Install software rendering and virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+      - name: Download Godot 4.7.2 Mono
+        run: |
+          curl -fsSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x "$RUNNER_TEMP"/godot/*/Godot_v4.7.2-stable_mono_linux.x86_64
+      - name: Build Godot C# assemblies
+        working-directory: arena-fc
+        run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Render procedural rig captures
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/arena-captures/rig"
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy \
+            --script res://Tools/rig_shot.gd -- "$RUNNER_TEMP/arena-captures/rig"
+          test -s "$RUNNER_TEMP/arena-captures/rig/lineup.png"
+          test -s "$RUNNER_TEMP/arena-captures/rig/upper.png"
+      - name: Render browser gameplay smoke captures
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/arena-captures/gameplay"
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy \
+            --script res://Tools/shot.gd -- "$RUNNER_TEMP/arena-captures/gameplay"
+          test -s "$RUNNER_TEMP/arena-captures/gameplay/play_0.png"
+          test -s "$RUNNER_TEMP/arena-captures/gameplay/goal.png"
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-rendered-captures
+          path: ${{ runner.temp }}/arena-captures/
+          if-no-files-found: warn
