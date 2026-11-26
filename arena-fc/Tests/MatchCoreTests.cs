@@ -2326,6 +2326,27 @@ Section("M4 authoritative action contracts");
     Check("M4 multi-seed contract fields valid", multiOk, multiOk ? "ok" : "invalid");
     Check("M4 multi-seed core intents observed", allIntents.Contains("carry") && (allIntents.Contains("pass") || allIntents.Contains("shoot")), string.Join(",", allIntents));
     Check("M4 contact-required action intents flag RequiresBallContact", contactIntentOk, contactDetail);
+    bool actionTurnOk = true; string actionTurnDetail = "ok";
+    foreach (var seed in seeds)
+    {
+        var em2 = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
+        for (int t = 0; t < 600; t++)
+        {
+            em2.Step(1f / 60f, PlayerCommand.None);
+            foreach (var kv in em2.LastActionContracts)
+            {
+                var cc = kv.Value;
+                if (cc.Intent is "carry" or "move" or "idle" or "receive" or "pass" or "shoot" or "clear" or "tackle" or "intercept" or "throw_in")
+                {
+                    if (!float.IsFinite(cc.DesiredTurnRate) || cc.DesiredTurnRate <= 0f)
+                    { actionTurnOk = false; actionTurnDetail = $"intent={cc.Intent} p={cc.PlayerIndex} seed={seed} t={t} turn={cc.DesiredTurnRate}"; break; }
+                }
+            }
+            if (!actionTurnOk) break;
+        }
+        if (!actionTurnOk) break;
+    }
+    Check("M4 action-trace DesiredTurnRate valid for active intents", actionTurnOk, actionTurnDetail);
 
     // Every active player should have a valid contract each tick.
     var ec = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 11, AwayHuman = true });
