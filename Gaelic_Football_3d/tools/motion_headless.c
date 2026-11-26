@@ -871,31 +871,6 @@ static int export_hand_transition(const char *asset, const char *out, int fps)
     UnloadModelAnimations(anims,animCount); return 1;
 }
 
-/* Offline-only counterfactual: translate planted right finger joints by a
- * fraction of the solved wrist displacement. Not used by game rendering. */
-static void diagnosticGrip(AnimState *s, int clip, Vector3 offset, float follow, int replant)
-{
-    Transform original[MAX_BONES]; Vector3 baseWrist, delta;
-    if (follow <= 0) { cradleBallWithSprintOffset(s,clip,offset); return; }
-    memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
-    cradleBallWithSprintOffset(s,clip,(Vector3){0,0,0});
-    baseWrist=s->pose[boneHandR].translation;
-    memcpy(s->pose,original,sizeof(Transform)*(size_t)model.boneCount);
-    cradleBallWithSprintOffset(s,clip,offset);
-    delta=Vector3Scale(Vector3Subtract(s->pose[boneHandR].translation,baseWrist),follow);
-    for (int b=0;b<model.boneCount;++b)
-        if (b!=boneHandR && boneUnder(b,boneHandR))
-            s->pose[b].translation=Vector3Add(s->pose[b].translation,delta);
-    if (replant && s->cradleValid) {
-        const int fingers[]={27,28,30,29,31};
-        for (int i=0;i<5;++i) {
-            int b=fingers[i];
-            plantFingerClear(s->pose,b,b+10,b+20,s->cradleCenter,
-                             s->pose[b].translation,s->pose[b+10].translation,s->pose[b+20].translation);
-        }
-    }
-}
-
 /* Scripted ball-carry/action samples with the frontend's torso and cradle
  * implementation. Bind rotations are supplied by a GLB-verified exporter. */
 static int export_grip_poses(const char *asset, const char *out, const char *bindpath, float clearance, Vector3 sprintOffset, float follow, int replant)

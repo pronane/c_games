@@ -249,6 +249,13 @@ jobs:
           grep -q 'MOTION grip-review frame 620 .*action 0 holder 0/9 cradle 1' ../build/cmu-jog-report/sprint-grip.log
           python3 tools/review_video_payload.py ../build/cmu-jog-report/sprint-grip.mp4 --label sprint-grip --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --grip-detail > ../build/cmu-jog-local/sprint-grip-preview.json
           gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/sprint-grip-preview.json > /dev/null
+          timeout 900 xvfb-run -a -s '-screen 0 1280x720x24' env GF_GRIP_PROBE=1 ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/sprint-grip-probe.mp4 > ../build/cmu-jog-report/sprint-grip-probe.log 2>&1
+          test -s ../build/cmu-jog-report/sprint-grip-probe.mp4
+          grep -q 'MOTION grip-camera begin frame 580 probe 1' ../build/cmu-jog-report/sprint-grip-probe.log
+          grep -q 'MOTION grip-review frame 620 .*action 0 holder 0/9 cradle 1' ../build/cmu-jog-report/sprint-grip-probe.log
+          diff <(grep 'MOTION grip-review frame 620' ../build/cmu-jog-report/sprint-grip.log) <(grep 'MOTION grip-review frame 620' ../build/cmu-jog-report/sprint-grip-probe.log)
+          python3 tools/review_video_payload.py ../build/cmu-jog-report/sprint-grip-probe.mp4 --label sprint-grip-probe --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --grip-detail > ../build/cmu-jog-local/sprint-grip-probe-preview.json
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/sprint-grip-probe-preview.json > /dev/null
       - name: Publish short motion previews to GitHub checks
         working-directory: Gaelic_Football_3d
         env:
