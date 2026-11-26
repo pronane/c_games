@@ -245,6 +245,7 @@ jobs:
         run: |
           timeout 900 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/sprint-grip.mp4 > ../build/cmu-jog-report/sprint-grip.log 2>&1
           test -s ../build/cmu-jog-report/sprint-grip.mp4
+          grep -q 'MOTION grip-camera begin frame 580' ../build/cmu-jog-report/sprint-grip.log
           grep -q 'MOTION grip-review frame 620 .*action 0 holder 0/9 cradle 1' ../build/cmu-jog-report/sprint-grip.log
           python3 tools/review_video_payload.py ../build/cmu-jog-report/sprint-grip.mp4 --label sprint-grip --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --grip-detail > ../build/cmu-jog-local/sprint-grip-preview.json
           gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/sprint-grip-preview.json > /dev/null

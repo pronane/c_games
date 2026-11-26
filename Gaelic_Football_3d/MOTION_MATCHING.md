@@ -632,3 +632,13 @@ These are two synthetic phases with a sphere proxy and overlapping triangle
 selections, not continuous contact or rendered evidence. Segment clearance
 alone cannot solve the palm and finger tradeoffs, and none of these experimental
 poses are used in gameplay.
+
+### Scripted sprint-carry visual review
+
+The manual visual workflow records a baseline sprint-carry close-up from the
+carrier side with `GF_GRIP_REVIEW`; it verifies a full-weight, non-action
+sprint cradle at frame 620 and publishes a bounded 1.2-second, 24 fps API
+preview. This script forces possession and step state for the demo; it is not
+unmodified live gameplay. The preview shows the carrying hand over the ball,
+but compression, occlusion and angle limit inspection of palm/ball intersection
+and deformation. It does not render the offline wrist/finger experiments.
