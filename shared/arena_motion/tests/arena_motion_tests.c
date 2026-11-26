@@ -177,4 +177,13 @@ static void mirrored_rotation(void)
     assert(!am_mirror_rotation_x(zero,a)); q[0]=NAN; assert(!am_mirror_rotation_x(q,a));
     assert(!am_mirror_rotation_x(NULL,a)); assert(!am_mirror_rotation_x(b,NULL));
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); puts("arena motion tests passed"); return 0; }
+static void local_rotation(void)
+{
+    float q[4]={0,0,0,1}, axis[3]={2,0,0}, out[4], zero[3]={0};
+    assert(am_rotation_compose_local(q,axis,1,out));
+    assert(fabsf(out[0]-sinf(.5f))<1e-6f && fabsf(out[3]-cosf(.5f))<1e-6f);
+    assert(am_rotation_compose_local(out,axis,-1,out) && fabsf(out[0])<1e-6f && fabsf(out[3]-1)<1e-6f);
+    assert(!am_rotation_compose_local(q,zero,1,out)); assert(!am_rotation_compose_local(q,axis,NAN,out));
+    assert(!am_rotation_compose_local(NULL,axis,1,out));
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); puts("arena motion tests passed"); return 0; }

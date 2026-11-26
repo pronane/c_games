@@ -1292,13 +1292,34 @@ static void relaxJogHands(AnimState *s, int clip)
         offset = Vector3RotateByQuaternion(Vector3Subtract(before[b].translation, before[parent].translation), QuaternionInvert(before[parent].rotation));
         local = QuaternionNormalize(QuaternionMultiply(QuaternionInvert(before[parent].rotation), before[b].rotation));
         target = jogFingerTarget[b];
-        if (jogHandRelax == 3 && boneUnder(b,boneHandR)) {
+        if ((jogHandRelax == 3 || jogHandRelax == 4) && boneUnder(b,boneHandR)) {
             if (jogFingerMirrorValid[b]) target = jogFingerMirrorTarget[b];
             else target = local; /* still inherit parent movement; no local correction */
         }
+        /* Authored curl is specific to this rig's local X finger axis. Only
+         * paired, near-static fingers with verified source symmetry qualify. */
+        if (jogHandRelax == 4) {
+            const char *name=MODEL_BONES(model)[b].name;
+            int paired=-1, right=boneUnder(b,boneHandR); size_t len=strlen(name);
+            char other[64]; float degrees=0, axis[3]={1,0,0}, in[4],out[4];
+            if (right) paired=b;
+            else if (len>=3 && len<sizeof other && !strcmp(name+len-2,"_l")) {
+                memcpy(other,name,len+1); other[len-1]='r'; paired=findBone(other);
+            }
+            if (paired>=0 && jogFingerMirrorValid[paired] &&
+                (!strncmp(name,"index_",6) || !strncmp(name,"middle_",7) ||
+                 !strncmp(name,"ring_",5) || !strncmp(name,"pinky_",6))) {
+                if (strstr(name,"_01_")) degrees=.20f;
+                else if (strstr(name,"_02_")) degrees=.35f;
+                else if (strstr(name,"_03_")) degrees=.20f;
+                in[0]=target.x; in[1]=target.y; in[2]=target.z; in[3]=target.w;
+                if (degrees>0 && am_rotation_compose_local(in,axis,degrees,out))
+                    target=(Quaternion){out[0],out[1],out[2],out[3]};
+            }
+        }
         dot = fabsf(local.x*target.x + local.y*target.y + local.z*target.z + local.w*target.w);
         angle = 2.0f*acosf(Clamp(dot, 0, 1));
-        blend = am_bounded_rotation_weight(angle, jogHandRelax == 2 ? .5f : .25f, weight*jogFingerGain[b]);
+        blend = am_bounded_rotation_weight(angle, jogHandRelax == 2 ? .5f : jogHandRelax == 4 ? .35f : .25f, weight*jogFingerGain[b]);
         if (blend > 0) local = QuaternionSlerp(local, target, blend);
         s->pose[b].translation = Vector3Add(s->pose[parent].translation, Vector3RotateByQuaternion(offset, s->pose[parent].rotation));
         s->pose[b].rotation = QuaternionNormalize(QuaternionMultiply(s->pose[parent].rotation, local));
@@ -3714,6 +3735,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--jog-hand-relax") == 0) jogHandRelax = 1;
         else if (strcmp(argv[i], "--jog-hand-relax-strong") == 0) jogHandRelax = 2;
         else if (strcmp(argv[i], "--jog-hand-relax-mirrored") == 0) jogHandRelax = 3;
+        else if (strcmp(argv[i], "--jog-hand-relax-curled") == 0) jogHandRelax = 4;
         else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
         else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];

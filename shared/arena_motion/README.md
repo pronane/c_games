@@ -72,3 +72,10 @@ triangles do not intersect, and these helpers do not assess hand anatomy.
 plane and normalizes it. The caller must establish compatible mirrored local
 joint bases; the operation alone cannot establish skeleton symmetry or produce
 an anatomically valid pose.
+
+`am_rotation_compose_local` composes an axis-angle offset in a caller-defined
+joint-local basis. It validates and normalizes inputs, but the caller must
+choose an appropriate axis and angular limits. `mesh_diagnostics.py` also has
+floating-point triangle overlap and broad-phase pair counting for offline
+sampled-surface analysis. These are not exact predicates, swept collision or
+full closed-volume containment tests.

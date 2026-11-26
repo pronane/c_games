@@ -69,6 +69,10 @@ int am_direction_angle(const float a[3], const float b[3], float *out);
  * Caller must establish that the left/right local bases actually mirror.
  * Returns 0 on invalid input, leaving out unchanged; in-place is supported. */
 int am_mirror_rotation_x(const float input[4], float out[4]);
+/* Compose a local axis-angle offset after an xyzw rotation. Normalizes both
+ * inputs, rejects degenerate/nonfinite values, allows in-place output. The
+ * caller owns anatomical axes, limits and collision checks. */
+int am_rotation_compose_local(const float rotation[4], const float axis[3], float radians, float out[4]);
 /* Accumulate horizontal world-space drift while the caller's contact proxy is
  * true in consecutive samples. One independent instance per foot and stream.
  * Distance / seconds is mean path speed, not a sole-contact detector. Invalid

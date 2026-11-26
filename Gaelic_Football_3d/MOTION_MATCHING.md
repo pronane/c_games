@@ -405,3 +405,23 @@ of natural hand shape or a reduction in intersections; the sampled close-ups
 still show open, splayed fingers. Maximum sampled tip displacement in the
 mirrored case was 18.3 mm. Keep it experimental pending better reference and
 surface/visual evaluation.
+
+### Authored curl and sampled finger-surface check
+
+`--jog-hand-relax-curled` is an opt-in, authored procedural reference (mode 4),
+not external motion capture or a claim of a natural pose. Starting from the
+mirrored idle reference, it composes local-X offsets on the four named finger
+chains (not the thumb), for joints with the existing stillness and mirrored
+source guards. Per-joint deviation from the jog is capped at 0.35 radians. The
+local-X axis and offset choices are rig-specific, not general anatomy; moving
+source joints are preserved, and possession/action/jump/transition guards are
+unchanged. Shared `am_rotation_compose_local` supplies only the generic math.
+
+`inspect_hand_mesh.py --surface` also skins selected proximal/distal finger
+triangles from `v0_body` and tests pairwise overlap across five fingers at 12
+sampled clip phases, using the shared floating-point triangle-overlap helper.
+It intentionally excludes weakly finger-weighted and palm triangles, so it can
+miss intersections, containment, self-overlap within a finger or collisions
+between phases. Contact/touch within numerical tolerance counts as overlap.
+This is a screen for selected surfaces, not proof that the mesh is collision
+free or that a pose is anatomically correct. Neither correction is default.

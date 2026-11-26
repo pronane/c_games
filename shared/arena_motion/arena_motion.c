@@ -258,3 +258,21 @@ int am_mirror_rotation_x(const float input[4], float out[4])
     for (int i=0;i<4;++i) out[i]=q[i];
     return 1;
 }
+
+int am_rotation_compose_local(const float rotation[4], const float axis[3], float radians, float out[4])
+{
+    double n=0, an=0, q[4], v[3], t[4], half;
+    if (!rotation || !axis || !out || !isfinite(radians)) return 0;
+    for (int i=0;i<4;i++) { if (!isfinite(rotation[i])) return 0; n+=(double)rotation[i]*rotation[i]; }
+    for (int i=0;i<3;i++) { if (!isfinite(axis[i])) return 0; an+=(double)axis[i]*axis[i]; }
+    if (n<1e-12 || an<1e-12) return 0;
+    n=sqrt(n); an=sqrt(an); half=(double)radians*.5;
+    for (int i=0;i<4;i++) q[i]=rotation[i]/n;
+    for (int i=0;i<3;i++) v[i]=axis[i]/an*sin(half);
+    t[0]=q[3]*v[0]+q[0]*cos(half)+q[1]*v[2]-q[2]*v[1];
+    t[1]=q[3]*v[1]-q[0]*v[2]+q[1]*cos(half)+q[2]*v[0];
+    t[2]=q[3]*v[2]+q[0]*v[1]-q[1]*v[0]+q[2]*cos(half);
+    t[3]=q[3]*cos(half)-q[0]*v[0]-q[1]*v[1]-q[2]*v[2];
+    for (int i=0;i<4;i++) out[i]=(float)t[i];
+    return 1;
+}
