@@ -100,6 +100,8 @@ public sealed class MotionDriver
             yaw = MathF.Atan2(contract.FacingDirection.X, contract.FacingDirection.Z);
         float turnRate = 0f;
         if (slot.HasYaw && dt > 1e-5f) turnRate = Mx.AngleDiff(yaw, slot.LastYaw) / dt;
+        if (contract != null && contract.DesiredTurnRate > 0f)
+            turnRate = Math.Clamp(turnRate, -contract.DesiredTurnRate, contract.DesiredTurnRate);
         slot.LastYaw = yaw;
         slot.HasYaw = true;
 
@@ -116,6 +118,8 @@ public sealed class MotionDriver
             intent = IntentFromContract(contract.Intent, intent);
         bool actionClip = intent is PlayerIntent.Pass or PlayerIntent.ThroughBall or PlayerIntent.Shoot
             or PlayerIntent.Trap or PlayerIntent.Tackle or PlayerIntent.Dive or PlayerIntent.Celebrate or PlayerIntent.Cut;
+        if (!actionClip && contract != null && contract.ShouldSprint && intent == PlayerIntent.Move)
+            intent = PlayerIntent.Sprint;
         if (!actionClip) slot.LastAction = "";
         else if (!string.Equals(slot.LastAction, player.Action, StringComparison.Ordinal))
         {

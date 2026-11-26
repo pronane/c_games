@@ -113,6 +113,7 @@ public sealed class TacticalCoordinator
         Vector3[] oppVelArr = oppVel.ToArray();
         Vector3 ballVel = Mx.Flat(s.Ball.Vel);
         bool transitionThreat = !teamInPoss && ballVel.LengthSquared() > 25f && (ballVel.X * -attackSign) > 2.5f;
+        var claimedSupportTargets = new List<Vector3>();
 
         foreach (var p in s.Players)
         {
@@ -136,7 +137,8 @@ public sealed class TacticalCoordinator
                 else if (p.Index == support)
                 {
                     a.Role = "support"; a.Intent = "support";
-                    a.MovementTarget = SupportTarget(p, s, team, attackSign, ballRef, oppPosArr);
+                    a.MovementTarget = SupportTarget(p, s, team, attackSign, ballRef, oppPosArr, claimedSupportTargets);
+                    claimedSupportTargets.Add(a.MovementTarget);
                     a.FacingTarget = ballNow;
                     a.SpeedLimit = 7.2f;
                 }
@@ -151,7 +153,8 @@ public sealed class TacticalCoordinator
                 {
                     a.Role = space > 0.40f ? "support" : "recycle";
                     a.Intent = a.Role;
-                    a.MovementTarget = SupportTarget(p, s, team, attackSign, ballRef, oppPosArr);
+                    a.MovementTarget = SupportTarget(p, s, team, attackSign, ballRef, oppPosArr, claimedSupportTargets);
+                    claimedSupportTargets.Add(a.MovementTarget);
                     a.SpeedLimit = 6.8f;
                 }
             }
@@ -233,7 +236,7 @@ public sealed class TacticalCoordinator
         return ClampPitch(t);
     }
 
-    private static Vector3 SupportTarget(PlayerState p, MatchState s, int team, int attackSign, Vector3 ballRef, Vector3[] oppPos)
+    private static Vector3 SupportTarget(PlayerState p, MatchState s, int team, int attackSign, Vector3 ballRef, Vector3[] oppPos, List<Vector3>? claimedTargets = null)
     {
         // Find a support spot: ahead/side of ball, in space, onside-safe.
         float best = float.MinValue;
@@ -251,6 +254,14 @@ public sealed class TacticalCoordinator
             float score = space * 3f + Math.Clamp(forward / 20f, -1f, 1f) * 1.5f - dist * 0.04f;
             if (p.Role == Role.Defender) score -= Math.Max(0f, forward - 5f) * 0.08f;
             if (p.Role == Role.Forward) score += Math.Max(0f, forward) * 0.03f;
+            if (claimedTargets != null)
+            {
+                for (int i = 0; i < claimedTargets.Count; i++)
+                {
+                    float cd = Mx.FlatDist(c, claimedTargets[i]);
+                    if (cd < 8f) score -= (8f - cd) * 0.12f;
+                }
+            }
             if (score > best) { best = score; bestPos = c; }
         }
         return bestPos;
