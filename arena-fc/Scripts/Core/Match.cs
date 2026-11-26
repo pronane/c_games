@@ -1547,7 +1547,7 @@ public sealed partial class MatchEngine
             {
                 var tacOff = GetTacticalAssignment(p.Index);
                 if (tacOff != null && (tacOff.Role == "support" || tacOff.Role == "recycle"))
-                    p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.30f);
+                    p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.22f);
             }
             if (p.ActionTimer <= 0f) p.Action = "run";
         }
@@ -1646,8 +1646,13 @@ public sealed partial class MatchEngine
                 }
                 if (!IsSkill)
                 {
-                    if (tacAssign != null && (tacAssign.Role == "cover" || tacAssign.Role == "recover"))
-                        p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, tacAssign.Role == "cover" ? 0.20f : 0.10f);
+                    if (tacAssign != null)
+                    {
+                        if (tacAssign.Role == "cover")
+                            p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, 0.18f);
+                        else if (tacAssign.Role == "recover" && tacAssign.Intent.StartsWith("transition", StringComparison.Ordinal))
+                            p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, 0.12f);
+                    }
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
