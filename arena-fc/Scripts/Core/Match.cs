@@ -1593,7 +1593,22 @@ public sealed partial class MatchEngine
             x = MathF.Max(x, -.80f);
         }
         x = Mx.Clamp(x, -.86f, .80f);
-        return Clubs.SlotToWorld(x, z, attack);
+        Vector3 world = Clubs.SlotToWorld(x, z, attack);
+        // PR C deeper: coordinator shapes cover/recover when out of possession.
+        var tac = GetTacticalAssignment(p.Index);
+        if (tac != null && !p.IsKeeper)
+        {
+            if (!inPossession && (tac.Role == "cover" || tac.Role == "recover"))
+            {
+                float blend = tac.Role == "cover" ? 0.30f : 0.18f;
+                world = Mx.Lerp(world, tac.MovementTarget, blend);
+            }
+            else if (inPossession && tac.Role == "support")
+            {
+                world = Mx.Lerp(world, tac.MovementTarget, 0.15f);
+            }
+        }
+        return world;
     }
 
     /// <summary>The opposition's second-last player (offside line), in
@@ -3324,6 +3339,7 @@ public sealed partial class MatchEngine
     private int _tacticalTick = -1;
     private readonly Dictionary<int, ArenaFC.Core.Football.TacticalCoordinator.Assignment> _tacticalByPlayer = new();
     private readonly Dictionary<int, (string role, int ticks)> _tacticalHysteresis = new();
+    public int TacticalRoleChanges;
 
     private ArenaFC.Core.Football.TacticalCoordinator.Assignment? GetTacticalAssignment(int playerIndex)
     {
@@ -3340,9 +3356,13 @@ public sealed partial class MatchEngine
                     // Keep stable roles briefly unless urgent press/carrier change.
                     bool urgent = a.Role == "press" || a.Role == "carrier" || h.role == "carrier";
                     if (!urgent) { a.Role = h.role; a.Intent = h.role; _tacticalHysteresis[a.PlayerIndex] = (h.role, h.ticks - 1); }
-                    else _tacticalHysteresis[a.PlayerIndex] = (a.Role, 30);
+                    else { TacticalRoleChanges++; _tacticalHysteresis[a.PlayerIndex] = (a.Role, 30); }
                 }
-                else _tacticalHysteresis[a.PlayerIndex] = (a.Role, 20);
+                else
+                {
+                    if (!_tacticalHysteresis.TryGetValue(a.PlayerIndex, out var prev) || prev.role != a.Role) TacticalRoleChanges++;
+                    _tacticalHysteresis[a.PlayerIndex] = (a.Role, 20);
+                }
                 _tacticalByPlayer[a.PlayerIndex] = a;
             }
             foreach (var a in t0) AddWithHysteresis(a);

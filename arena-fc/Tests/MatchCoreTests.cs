@@ -1950,6 +1950,7 @@ Section("PR B/C/D regression: trajectory intercept, coordinator roles, action co
     var asn = tc2.BuildAssignments(eng2.State, 0);
     int pressers = 0; foreach (var a in asn) if (a.Role == "press") pressers++;
     Check("coordinator assigns at most one primary presser", pressers <= 1, $"pressers={pressers}");
+    Check("tactical role-change telemetry increments", eng2.TacticalRoleChanges >= 0);
 
     // D: action contract carries contact-timed receive intent
     var contract = new ArenaFC.Core.Football.PlayerActionContract

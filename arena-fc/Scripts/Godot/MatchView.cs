@@ -605,15 +605,45 @@ public partial class MatchView : Node3D
             ArenaFC.Core.Football.PlayerActionContract? contract = null;
             if (b.Owner < 0 && b.PassReceiver == i)
             {
+                float ttc = MathF.Max(0.05f, MathF.Min(1.2f, Mx.FlatDist(p.Pos, b.Pos) / MathF.Max(1f, Mx.Flat(b.Vel).Length())));
                 contract = new ArenaFC.Core.Football.PlayerActionContract
                 {
                     PlayerIndex = i,
                     Intent = "receive",
-                    TargetPosition = b.Pos,
-                    BallContactPosition = b.Pos,
-                    BallContactTime = MathF.Max(0.05f, MathF.Min(1.2f, Mx.FlatDist(p.Pos, b.Pos) / MathF.Max(1f, Mx.Flat(b.Vel).Length()))),
+                    TargetPosition = b.Pos + Mx.Flat(b.Vel) * ttc,
+                    BallContactPosition = b.Pos + Mx.Flat(b.Vel) * ttc,
+                    BallContactTime = ttc,
                     DesiredSpeed = 7.5f,
                     RequiresBallContact = true,
+                };
+            }
+            else if (p.ActionTimer > 0f && p.ActionContactAt > 0f)
+            {
+                float elapsed = MathF.Max(0f, p.ActionDuration - p.ActionTimer);
+                float ttc = MathF.Max(0f, p.ActionContactAt - elapsed);
+                contract = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = i,
+                    Intent = p.Action,
+                    TargetPosition = p.Target,
+                    FacingDirection = p.Facing,
+                    BallContactPosition = b.Pos,
+                    BallContactTime = ttc,
+                    DesiredSpeed = Mx.Flat(p.Vel).Length(),
+                    SpeedLimit = p.MaxSpeed,
+                    RequiresBallContact = true,
+                };
+            }
+            else if (owner == i)
+            {
+                contract = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = i,
+                    Intent = p.Shielding ? "shield" : "carry",
+                    TargetPosition = p.Target,
+                    FacingDirection = p.Facing,
+                    DesiredSpeed = Mx.Flat(p.Vel).Length(),
+                    SpeedLimit = p.MaxSpeed,
                 };
             }
             var motion = _motion.UpdatePlayer(i, p, b, owner == i, Engine.CurrentTick, contract);
