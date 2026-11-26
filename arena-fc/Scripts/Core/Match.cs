@@ -127,6 +127,9 @@ public sealed class PlayerState
     /// <summary>RestartId at which this player was last cautioned for encroaching.</summary>
     public int EncroachedAt = -1;
     public string Action = "idle";
+    /// <summary>Authoritative action intent for the active one-shot (pass/shoot/clear/tackle...).
+    /// Preserved across ticks while ActionTimer > 0 so animation contracts persist.</summary>
+    public string ActionIntent = "";
     /// <summary>Phase 0 event sync: total duration of the current one-shot and the
     /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
     /// The sim releases/captures the ball at that moment; the animation layer
@@ -360,6 +363,7 @@ public sealed partial class MatchEngine
         };
         bool requiresBallContact = intent is "kick" or "shoot" or "pass" or "clear" or "throw_in" or "tackle" or "skill"
             || action is "kick" or "volley" or "throw_in" or "slide" or "tackle";
+        p.ActionIntent = intent;
         LastActionContracts[p.Index] = new ArenaFC.Core.Football.PlayerActionContract
         {
             PlayerIndex = p.Index,
@@ -386,6 +390,14 @@ public sealed partial class MatchEngine
                 // Preserve active action contracts set by SetAction/FirePending.
                 if (existing.Intent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "skill" or "throw_in" or "intercept" or "dribble" or "catch" or "parry" or "header" or "block")
                     continue;
+            }
+            // Reconstruct persistent one-shot action contract across ticks.
+            if (p.ActionTimer > 0f && !string.IsNullOrWhiteSpace(p.ActionIntent)
+                && p.ActionIntent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "skill" or "throw_in" or "header" or "catch" or "parry" or "block")
+            {
+                float frac = p.ActionDuration > 1e-6f ? p.ActionContactAt / p.ActionDuration : 0.5f;
+                RecordActionContract(p, p.Action, p.ActionDuration, frac, p.ActionIntent);
+                continue;
             }
             if (b.Owner == i)
             {
@@ -463,6 +475,7 @@ public sealed partial class MatchEngine
             {
                 ac.Intent = isPass ? "pass" : "shoot";
                 ac.RequiresBallContact = true;
+                actor.ActionIntent = ac.Intent;
             }
             if (isPass && b.PendingReceiver < State.Players.Length)
             {
@@ -915,6 +928,7 @@ public sealed partial class MatchEngine
             p.TacticsWidthMult = mod.widthMultiplier;
             p.DecisionTimer -= dt;
             p.ActionTimer = MathF.Max(0, p.ActionTimer - dt);
+            if (p.ActionTimer <= 0f) p.ActionIntent = "";
             p.PossessionLock = MathF.Max(0, p.PossessionLock - dt);
             p.TackleLock = MathF.Max(0, p.TackleLock - dt);
             // Was never counted down: one skill move per player per match.
@@ -1625,7 +1639,7 @@ public sealed partial class MatchEngine
                         var pred = _tacticalBallPred ?? BallPred(1.2f);
                         float maxSpd = p.MaxSpeed;
                         float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
-                        if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f))
+                        if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f, p.Vel))
                             intercept = new Vector3(s.Position.X, 0f, s.Position.Z);
                     }
                     if (tacAssign != null && isPresser)
@@ -1862,7 +1876,7 @@ public sealed partial class MatchEngine
                 if (pred != null)
                 {
                     float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
-                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var s, 0f))
+                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var s, 0f, p.Vel))
                         score = s.Time * s.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(s.Position.X,0,s.Position.Z)) * 0.01f;
                 }
                 return (p.Index, score);

@@ -2241,6 +2241,34 @@ Section("M3 runtime no-conflicting-chasers and stability");
     }
     Check("M3 single primary engager near carrier", engageConflicts == 0, $"conflicts={engageConflicts}/{engageChecked}");
 
+    // Coordinator team indexing/hysteresis safety across team sizes.
+    foreach (int ts in new[] { 5, 7, 11 })
+    {
+        var et = new MatchEngine(new MatchOptions { Seed = 71 + ts, TeamSize = ts, AwayHuman = true });
+        var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+        bool teamOk = true; string teamDetail = "ok";
+        for (int t = 0; t < 240; t++)
+        {
+            et.Step(1f / 60f, PlayerCommand.None);
+            for (int team = 0; team < 2; team++)
+            {
+                var asn = tc.BuildAssignments(et.State, team);
+                int pressers = 0;
+                foreach (var a in asn)
+                {
+                    if (a.PlayerIndex < 0 || a.PlayerIndex >= et.State.Players.Length) { teamOk = false; teamDetail = $"bad idx ts={ts}"; break; }
+                    var ap = et.State.Players[a.PlayerIndex];
+                    if (ap.Team != team) { teamOk = false; teamDetail = $"wrong team ts={ts} p={a.PlayerIndex} got={ap.Team} want={team}"; break; }
+                    if (a.Role == "press") pressers++;
+                }
+                if (pressers > 1) { teamOk = false; teamDetail = $"pressers={pressers} ts={ts} team={team}"; }
+                if (!teamOk) break;
+            }
+            if (!teamOk) break;
+        }
+        Check($"M3 coordinator assignments valid for {ts}v{ts}", teamOk, teamDetail);
+    }
+
 }
 
 Section("M4 authoritative action contracts");
@@ -2308,11 +2336,12 @@ Section("M4 authoritative action contracts");
             if (p.SentOff) continue;
             if (!ec.LastActionContracts.TryGetValue(p.Index, out var cc))
             { allCovered = false; covDetail = $"missing p={p.Index} t={t}"; break; }
-            string bad = null;
+            string? bad = null;
             if (string.IsNullOrWhiteSpace(cc.Intent)) bad = "intent";
             else if (!float.IsFinite(cc.DesiredSpeed)) bad = "desiredSpeed";
             else if (!float.IsFinite(cc.SpeedLimit) || cc.SpeedLimit <= 0f) bad = $"speedLimit={cc.SpeedLimit}";
             else if (!float.IsFinite(cc.BallContactTime) || (cc.BallContactTime < 0f && cc.BallContactTime != -1f)) bad = $"ballContactTime={cc.BallContactTime}";
+            else if (cc.RequiresBallContact && cc.BallContactTime < 0f) bad = $"requiredContactTime={cc.BallContactTime}";
             else if (!float.IsFinite(cc.TargetPosition.X) || !float.IsFinite(cc.TargetPosition.Y) || !float.IsFinite(cc.TargetPosition.Z)) bad = "targetPos";
             else if (!float.IsFinite(cc.FacingDirection.X) || !float.IsFinite(cc.FacingDirection.Y) || !float.IsFinite(cc.FacingDirection.Z)) bad = "facingDir";
             else if (!float.IsFinite(cc.BallContactPosition.X) || !float.IsFinite(cc.BallContactPosition.Y) || !float.IsFinite(cc.BallContactPosition.Z)) bad = "ballContactPos";
@@ -2322,6 +2351,38 @@ Section("M4 authoritative action contracts");
     }
     Check("M4 every active player has contract", allCovered, allCovered ? "ok" : covDetail);
     Check("M4 every active player contract has valid shape", allShapeOk, allShapeOk ? "ok" : covDetail);
+
+    // Action contract persistence across ticks (report P1).
+    var ep = new MatchEngine(new MatchOptions { Seed = 65, TeamSize = 11, AwayHuman = true });
+    bool persistenceSaw = false, persistenceOk = true; string persistenceDetail = "none";
+    for (int t = 0; t < 1800; t++)
+    {
+        ep.Step(1f / 60f, PlayerCommand.None);
+        int watch = -1; string watchIntent = "";
+        foreach (var kv in ep.LastActionContracts)
+        {
+            var c = kv.Value;
+            if (c.Intent is "pass" or "shoot" or "clear" or "tackle" or "header" or "catch" or "parry" or "block")
+            {
+                var p = ep.State.Players[c.PlayerIndex];
+                if (p.ActionTimer > 2f / 60f) { watch = c.PlayerIndex; watchIntent = c.Intent; break; }
+            }
+        }
+        if (watch >= 0)
+        {
+            ep.Step(1f / 60f, PlayerCommand.None);
+            t++;
+            persistenceSaw = true;
+            if (ep.LastActionContracts.TryGetValue(watch, out var c2))
+            {
+                if (c2.Intent != watchIntent) { persistenceOk = false; persistenceDetail = $"p={watch} {watchIntent}->{c2.Intent} t={t}"; }
+                else persistenceDetail = $"ok {watchIntent}";
+            }
+            else { persistenceOk = false; persistenceDetail = $"missing p={watch} intent={watchIntent} t={t}"; }
+            if (persistenceSaw) break;
+        }
+    }
+    Check("M4 action contract persists across ticks", persistenceSaw && persistenceOk, persistenceDetail);
 }
 
 Section("M2 perception uses real capabilities");
@@ -2342,6 +2403,14 @@ Section("M2 perception uses real capabilities");
     bool canFast = pred.TryInterceptXZ(new Vector3(5,0,2f), 8.5f, 16f, out var sFast, 0f);
     bool canSlow = pred.TryInterceptXZ(new Vector3(5,0,2f), 4.5f, 8f, out var sSlow, 0f);
     Check("M2 intercept capability differentiation", canFast && (!canSlow || sFast.Time < sSlow.Time), $"canFast={canFast} tFast={(canFast?sFast.Time:-1):F3} canSlow={canSlow} tSlow={(canSlow?sSlow.Time:-1):F3}");
+
+    // Interception should account for player current velocity (report P1).
+    var predVel = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(10,0,0), Vector3.Zero, 1.5f, false, 0f, 0f);
+    bool canToward = predVel.TryInterceptXZ(new Vector3(6,0,3f), 7f, 14f, out var sToward, 0f, new Vector3(0,0,-4f));
+    bool canAway = predVel.TryInterceptXZ(new Vector3(6,0,3f), 7f, 14f, out var sAway, 0f, new Vector3(0,0,4f));
+    bool canAcross = predVel.TryInterceptXZ(new Vector3(6,0,3f), 7f, 14f, out var sAcross, 0f, new Vector3(4f,0,0f));
+    Check("M2 TryInterceptXZ uses current velocity (toward vs away)", canToward && (!canAway || sToward.Time <= sAway.Time + 0.001f),
+        $"toward={canToward}:{(canToward?sToward.Time:-1):F3} away={canAway}:{(canAway?sAway.Time:-1):F3} across={canAcross}:{(canAcross?sAcross.Time:-1):F3}");
 }
 
 Section("M1 BallPred cache determinism");

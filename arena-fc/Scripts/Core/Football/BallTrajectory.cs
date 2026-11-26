@@ -76,7 +76,7 @@ public sealed class BallTrajectory
         return false;
     }
 
-    public bool TryInterceptXZ(Vector3 origin, float maxSpeed, float acceleration, out BallSample sample, float minT = 0f)
+    public bool TryInterceptXZ(Vector3 origin, float maxSpeed, float acceleration, out BallSample sample, float minT = 0f, Vector3 currentVelocity = default)
     {
         sample = default;
         bool found = false;
@@ -85,7 +85,7 @@ public sealed class BallTrajectory
         {
             var s = Samples[i];
             if (s.Time < minT) continue;
-            float tReach = PlayerPerception.TimeToReach(origin, Vector3.Zero, s.Position, maxSpeed, acceleration);
+            float tReach = PlayerPerception.TimeToReach(origin, currentVelocity, s.Position, maxSpeed, acceleration);
             if (tReach <= s.Time + 0.03f && s.Time < bestT)
             {
                 bestT = s.Time;
