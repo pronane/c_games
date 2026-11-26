@@ -3771,8 +3771,13 @@ static void checkHold(const char *tag)
            tag, fminf(dl, dr), dl, dr, head, s->speed, p->action, ballDrawPos.y);
     fflush(stdout);
     if (fminf(dl, dr) > 0.20f) {
-        fprintf(stderr, "ball is %.3f m from the nearer wrist (%s)\n", fminf(dl, dr), tag);
-        exit(2);
+        if (gripReviewProbe && !strcmp(tag, "motion-sprint")) {
+            printf("MOTION grip-probe rejected: nearer wrist %.3f m exceeds 0.20 m\n", fminf(dl, dr));
+            fflush(stdout);
+        } else {
+            fprintf(stderr, "ball is %.3f m from the nearer wrist (%s)\n", fminf(dl, dr), tag);
+            exit(2);
+        }
     }
     if (s->speed < 4.0f && (dl > 0.22f || dr > 0.22f)) {
         fprintf(stderr, "standing carry should use both hands (%s: L %.3f R %.3f)\n", tag, dl, dr);
