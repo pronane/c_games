@@ -59,8 +59,9 @@ public partial class RuntimeEvidenceRunner : Node3D
         camera.LookAt(new Vector3(0, 1.0f, 0));
         camera.MakeCurrent();
 
-        AddGround(-2f, 0f);
-        AddGround(2f, .08f);
+        AddGround(-2f, 0f, .1f);
+        // Raise the ramp's centre so its left edge meets the flat surface at x=0.
+        AddGround(2f, .08f, .26f);
 
         var spec = new CharacterSpec
         {
@@ -106,23 +107,18 @@ public partial class RuntimeEvidenceRunner : Node3D
         // Each run has 3 deterministic clip segments on both a flat and an 8%
         // grade. Non-zero yaw and world translation exercise skeleton/world
         // conversions rather than a rig placed at the origin.
-        foreach (float centerX in new[] { -2f, 2f })
+        rig.Rotation = new Vector3(0f, .55f, 0f);
+        for (int i = 0; i < 360; i++)
         {
-            float slope = centerX < 0f ? 0f : .08f;
-            rig.Position = new Vector3(centerX, .2f, 0f);
-            rig.Rotation = new Vector3(0f, .55f, 0f);
-
-            for (int i = 0; i < 180; i++)
-            {
-                float offset = -.8f + 1.6f * i / 179f;
-                float y = .2f + MathF.Tan(slope) * offset;
-                var worldPosition = new Vector3(centerX + offset, y, 0f);
+                float x = -3.8f + 7.6f * i / 359f;
+                float y = .2f + MathF.Tan(.08f) * MathF.Max(0f, x);
+                var worldPosition = new Vector3(x, y, 0f);
                 rig.Position = worldPosition;
                 player.Pos = new NVector3(worldPosition.X, worldPosition.Y, worldPosition.Z);
-                player.Vel = new NVector3(.54f, 0f, 0f);
+                player.Vel = new NVector3(1.27f, 0f, 0f);
                 player.Facing = new NVector3(0f, 0f, 1f);
 
-                motion.CurrentClipId = i < 60 ? "soccer_run" : i < 120 ? "soccer_sprint" : "soccer_turn";
+                motion.CurrentClipId = i < 120 ? "soccer_run" : i < 240 ? "soccer_sprint" : "soccer_turn";
                 motion.Phase = (motion.Phase + .012f) % 1f;
                 bool left = (i / 20) % 2 == 0;
                 motion.FootPlantedLeft = left;
@@ -147,7 +143,6 @@ public partial class RuntimeEvidenceRunner : Node3D
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_R", ankleClearance);
                 }
                 frames++;
-            }
         }
 
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -191,11 +186,11 @@ public partial class RuntimeEvidenceRunner : Node3D
         GetTree().Quit(0);
     }
 
-    private void AddGround(float centerX, float slope)
+    private void AddGround(float centerX, float slope, float centerY)
     {
         var body = new StaticBody3D
         {
-            Position = new Vector3(centerX, .1f, 0f),
+            Position = new Vector3(centerX, centerY, 0f),
             Rotation = new Vector3(0f, 0f, slope)
         };
         var shape = new BoxShape3D { Size = new Vector3(4.2f, .2f, 8f) };
