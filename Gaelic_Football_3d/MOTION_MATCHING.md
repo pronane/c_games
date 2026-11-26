@@ -618,3 +618,17 @@ area or depth measure. These synthetic tests demonstrate the tradeoff, not a
 viable hand pose: rigidly following the wrist does not re-wrap the fingers,
 restore bind anatomy, or establish rendered/live motion. A coordinated grip
 solver or authored poses should be evaluated before changing the default.
+
+`--finger-replant` is a further headless-only probe, requiring a positive
+`--finger-follow`. It applies the existing segment-based `plantFingerClear`
+step to the translated right finger chains relative to the scripted ball, with
+its existing limited radial scaling. This is not a full finger IK or true mesh
+collision solver. For the large (-80, 0, -80) mm offset and full follow, it
+reduced sampled wider right-hand overlaps from 192/472 to 48/96, while the
+index wrist-to-root span rose from 1.47× to 1.56× bind (thumb remained 3.09×).
+Selected finger self-overlap pairs increased from 211/258 to 260/286. The
+smaller offset produced 198/174 wider ball overlaps; most were palm-influenced.
+These are two synthetic phases with a sphere proxy and overlapping triangle
+selections, not continuous contact or rendered evidence. Segment clearance
+alone cannot solve the palm and finger tradeoffs, and none of these experimental
+poses are used in gameplay.
