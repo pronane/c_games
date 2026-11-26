@@ -31,6 +31,11 @@ for row in r['states']:
         assert side['raw']==side['adjusted']
         h=side['raw']
         assert 0 <= h['triangles_inside_sphere'] <= h['triangles_within_10mm'] <= h['triangle_count']
+        assert 0 <= h['palm_influenced_triangles_inside_sphere'] <= h['palm_influenced_triangle_count'] <= h['triangle_count']
+        assert h['palm_influenced_triangles_inside_sphere'] <= h['triangles_inside_sphere']
+        assert (h['palm_influenced_min_surface_gap_m'] < 0) == (h['palm_influenced_triangles_inside_sphere'] > 0)
+        assert h['palm_influenced_min_surface_gap_m'] >= h['min_surface_gap_m'] - 1e-9
+        assert h['wrist_distance_m'] >= 0
         assert (h['min_surface_gap_m'] < 0) == (h['triangles_inside_sphere'] > 0)
     for key, side in row.get('ball_proximity',{}).items():
         assert (side['raw']['min_surface_gap_m'] < 0) == (row['ball_triangle_overlap'][key]['raw'] > 0)

@@ -95,3 +95,6 @@ point-to-triangle distance for offline proximity checks, such as testing a
 sphere against selected skinned triangles. It does not provide complete or
 continuous collision detection; callers must select all relevant surfaces and
 supply centers in the same coordinate system.
+`mesh_diagnostics.select_influenced_triangles` selects triangles adjacent to
+vertices with a chosen summed skin-bone weight. It can include seam vertices
+and omit anatomy outside the selection; it is not a complete segmentation.

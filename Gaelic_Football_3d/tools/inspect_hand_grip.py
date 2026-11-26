@@ -86,7 +86,7 @@ def compare(model,tool,clearance=None):
     report=measure(doc,blob,data,surface=True)
     return {'limitation':'12 synthetic sampled CPU poses, selected finger surfaces, approximate ball sphere; no gameplay, full mesh, rendered or continuous collision validation',
             'samples':report['surface_samples'], 'clearance_m':data['clearance_m'], 'pose_export':proc.stdout.strip(),
-            'triangle_counts':report['selected_surface_triangles'], 'hand_surface_triangles':report['hand_surface_triangles'], 'states':report['sampled_surface_by_state'],
+            'triangle_counts':report['selected_surface_triangles'], 'palm_surface_triangles':report['palm_surface_triangles'], 'hand_surface_triangles':report['hand_surface_triangles'], 'states':report['sampled_surface_by_state'],
             'ball_available':[f['state'] for f in data['frames'] if f['ball_center'] is not None],
             'cradle_weights':{f['state']:f['cradle_weight'] for f in data['frames']}}
 

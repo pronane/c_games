@@ -13,7 +13,7 @@ import tempfile
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared/arena_motion"))
-from mesh_diagnostics import centroid, distance, sampled_min_distance, skin_point, triangles_intersect, triangle_overlap_pairs, point_triangle_distance
+from mesh_diagnostics import centroid, distance, sampled_min_distance, skin_point, triangles_intersect, triangle_overlap_pairs, point_triangle_distance, select_influenced_triangles
 from inspect_shorts_skin import load_glb, accessor
 from inspect_shorts_motion import mul, trs
 
@@ -32,21 +32,6 @@ def select_tips(points, ids, weights, bone, origin, axis):
     candidates.sort(reverse=True)
     # A small distal cap, not a guessed anatomical fingertip vertex.
     return [i for _,i in candidates[:max(3, math.ceil(len(candidates)*.2))]]
-
-
-def select_influenced_triangles(indices, ids, weights, bones, threshold=.25):
-    """Include a triangle when any vertex has substantial hand influence.
-
-    Includes seams and weakly hand-weighted neighbours, but excludes surfaces
-    controlled only by forearm/other bones; it is not a complete hand mesh.
-    """
-    if not 0 < threshold <= 1 or len(indices)%3 or len(ids)!=len(weights):
-        raise ValueError('invalid surface selection')
-    influenced=[sum(w for j,w in zip(js,ws) if j in bones)>=threshold
-                for js,ws in zip(ids,weights)]
-    if any(i<0 or i>=len(influenced) for i in indices): raise ValueError('invalid triangle index')
-    return [tuple(indices[i:i+3]) for i in range(0,len(indices),3)
-            if any(influenced[j] for j in indices[i:i+3])]
 
 
 def measure(doc, blob, data, surface=False):
@@ -88,7 +73,7 @@ def measure(doc, blob, data, surface=False):
             j2=names.index(f'{finger}_02_{side}'); j3=names.index(f'{finger}_03_{side}')
             a=[bind_world(joints[j2])[k][3] for k in range(3)]; b=[bind_world(joints[j3])[k][3] for k in range(3)]
             tips[(side,finger)]=select_tips(points,ids,weights,j3,b,[b[k]-a[k] for k in range(3)])
-    surfaces = {}; hand_surfaces = {}; surface_samples = 0; surface_by_state = []
+    surfaces = {}; hand_surfaces = {}; palm_surfaces = {}; surface_samples = 0; surface_by_state = []
     surface_stats = {side:{kind:{'overlap_pairs':0,'frames_with_overlap':0} for kind in ('raw','adjusted')} for side in ('l','r')}
     if surface:
         primitive=prims[0]
@@ -100,6 +85,7 @@ def measure(doc, blob, data, surface=False):
             hand_bones.update(names.index(f'{finger}_{j:02}_{side}')
                               for finger in (*FINGERS,'thumb') for j in (1,2,3))
             hand_surfaces[side]=select_influenced_triangles(indices,ids,weights,hand_bones)
+            palm_surfaces[side]=select_influenced_triangles(indices,ids,weights,{names.index(f'hand_{side}')})
             if not hand_surfaces[side]: raise ValueError('hand surface selection empty')
             for finger in (*FINGERS,'thumb'):
                 all_bones={names.index(f'{finger}_{j:02}_{side}') for j in (1,2,3)}
@@ -151,7 +137,13 @@ def measure(doc, blob, data, surface=False):
                             'triangles_within_10mm':sum(d<=radius+.010 for d in distances),
                             'triangle_count':len(distances)}
                         hand_distances=[point_triangle_distance(center,[verts[i] for i in tri]) for tri in hand_surfaces[side]]
+                        palm_distances=[point_triangle_distance(center,[verts[i] for i in tri]) for tri in palm_surfaces[side]]
+                        wrist=rows[exported.index(f'hand_{side}')][:3]
                         state_stats['ball_hand_surface'][side][kind]={
+                            'wrist_distance_m':distance(center,wrist),
+                            'palm_influenced_min_surface_gap_m':min(palm_distances)-radius,
+                            'palm_influenced_triangles_inside_sphere':sum(d<radius for d in palm_distances),
+                            'palm_influenced_triangle_count':len(palm_distances),
                             'min_surface_gap_m':min(hand_distances)-radius,
                             'triangles_inside_sphere':sum(d<radius for d in hand_distances),
                             'triangles_within_10mm':sum(d<=radius+.010 for d in hand_distances),
@@ -176,7 +168,7 @@ def measure(doc, blob, data, surface=False):
                        'max_tip_vertex_displacement_m':d['max_tip_displacement']}
     return {'samples':len(data['frames']), 'mode':data['mode'],
             'tip_vertex_counts':{f'{s}_{f}':len(v) for (s,f),v in tips.items()}, 'sides':summary,
-            'surface_samples':surface_samples, 'hand_surface_triangles':{side:len(tris) for side,tris in hand_surfaces.items()}, 'selected_surface_triangles':{f'{s}_{f}':len(v) for (s,f),v in surfaces.items()},
+            'surface_samples':surface_samples, 'palm_surface_triangles':{side:len(tris) for side,tris in palm_surfaces.items()}, 'hand_surface_triangles':{side:len(tris) for side,tris in hand_surfaces.items()}, 'selected_surface_triangles':{f'{s}_{f}':len(v) for (s,f),v in surfaces.items()},
             'sampled_surface_overlap':surface_stats if surface else None,
             'sampled_surface_by_state':surface_by_state if surface else None,
             'limitation':'v0_body fingertip caps and selected distal finger triangles at sampled phases only; no palm, proximal surface, containment, continuous collision, render or anatomical validation'}

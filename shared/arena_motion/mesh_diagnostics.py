@@ -122,3 +122,20 @@ def point_triangle_distance(point, triangle):
         w=(d4-d3)/((d4-d3)+(d5-d6)); return distance(point,[b[i]+w*(c[i]-b[i]) for i in range(3)])
     v=vb/(va+vb+vc); w=vc/(va+vb+vc)
     return distance(point,[a[i]+v*ab[i]+w*ac[i] for i in range(3)])
+
+
+def select_influenced_triangles(indices, ids, weights, bones, threshold=.25):
+    """Include a triangle when any vertex has substantial hand influence.
+
+    Includes neighbouring vertices and seams; the caller owns bone selection,
+    threshold and completeness. This is not anatomical segmentation.
+    """
+    if not 0 < threshold <= 1 or len(indices)%3 or len(ids)!=len(weights):
+        raise ValueError('invalid surface selection')
+    if not math.isfinite(threshold) or any(len(js)!=len(ws) or any(not math.isfinite(w) or w<0 for w in ws) for js,ws in zip(ids,weights)):
+        raise ValueError('invalid skin influences')
+    influenced=[sum(w for j,w in zip(js,ws) if j in bones)>=threshold
+                for js,ws in zip(ids,weights)]
+    if any(i<0 or i>=len(influenced) for i in indices): raise ValueError('invalid triangle index')
+    return [tuple(indices[i:i+3]) for i in range(0,len(indices),3)
+            if any(influenced[j] for j in indices[i:i+3])]

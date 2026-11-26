@@ -550,3 +550,18 @@ surface to the sphere centre is approximately 14 mm and 41 mm respectively
 for a 110 mm radius sphere. These are synthetic poses and a sphere proxy, not
 rendered proof or reliable penetration depth. They do suggest the sprint grip
 needs separate investigation rather than a global clearance increase.
+
+The broader report further identifies the subset of triangles where at least
+one vertex has 25% hand-bone influence, and records wrist-origin distance to
+the sphere centre. Subsets overlap, so do not add their counts. On the shipped
+GLB this subset contains 684 triangles per side. In the two sprint samples at
+12 mm clearance, the right wrist origin is 124 mm from the centre of the
+110 mm sphere, yet 526/549 palm-influenced triangles overlap it. At 40 mm,
+the wrist is 152 mm out, but 321/319 palm-influenced triangles still overlap.
+For comparison, standing/jogging show 72–91 palm-influenced overlaps at the
+default and zero at 40 mm. The sprint target is behind and close to the ball
+centre, and hand orientation places a substantial amount of palm-influenced
+surface inside the sphere despite the wrist being outside. This is evidence to
+investigate wrist placement and orientation together, not a proof of the best
+correction: these weight-selected triangles may include seams, and rendered
+and continuously animated gripping still need examination.
