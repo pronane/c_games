@@ -227,11 +227,11 @@ public sealed class TacticalCoordinator
 
     private static Vector3 RecoverTarget(PlayerState p, Vector3 ownGoal, Vector3 ballRef, int attackSign, bool transition)
     {
-        float depth = transition ? 0.45f : 0.28f;
+        float depth = transition ? 0.50f : 0.38f;
         Vector3 t = Vector3.Lerp(ballRef, ownGoal, depth);
-        // Preserve team width: keep most of player's lateral position.
-        t.Z = Math.Clamp(p.Pos.Z * 0.75f + ballRef.Z * 0.25f, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f);
-        t.X += -attackSign * (transition ? 1.5f : 0f);
+        // Preserve team width and avoid collapsing shape.
+        t.Z = Math.Clamp(p.Pos.Z * 0.82f + ballRef.Z * 0.18f, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f);
+        t.X += -attackSign * (transition ? 1.0f : 0f);
         return ClampPitch(t);
     }
 

@@ -1647,7 +1647,7 @@ public sealed partial class MatchEngine
                 if (!IsSkill)
                 {
                     if (tacAssign != null && (tacAssign.Role == "cover" || tacAssign.Role == "recover"))
-                        p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, tacAssign.Role == "cover" ? 0.28f : 0.18f);
+                        p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, tacAssign.Role == "cover" ? 0.20f : 0.10f);
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
