@@ -64,10 +64,10 @@ GD.Print($"AnimMetrics samples={_motion.Metrics.Samples} slide={_motion.Metrics.
 | BallContactTime | Yes (remaining s, -1 N/A) | Yes (untilContact) | No | Aligned to MotionDriver remaining-time semantics. |
 | DesiredSpeed / SpeedLimit | Yes | Yes | No | Speed hint clamped by SpeedLimit. |
 | DesiredTurnRate | Yes (heuristic) | Yes (turn clamp) | No | Heuristic; presentation-only clamp. |
-| ShouldSprint | Yes | Yes (Move->Sprint hint) | No | Presentation-only. |
-| Pressing | Yes | No | No | Populated; presentation/diagnostic currently. |
-| Role | Yes | No | No | Populated; presentation/diagnostic currently. |
-| RequiresFootPlant | Yes | No | No | Populated; rig/plant-window integration pending. |
+| ShouldSprint | Yes | Yes (Move->Sprint hint) | No | Presentation-only; also mirrored to MotionState. |
+| Pressing | Yes | MotionState hint only | No | Populated to MotionState.ContractPressing; not used for selection yet. |
+| Role | Yes | MotionState hint only | No | Populated to MotionState.ContractRole; not used for selection yet. |
+| RequiresFootPlant | Yes | MotionState hint only | No | Populated to MotionState.ContractRequiresFootPlant; rig/plant-window integration pending. |
 | RequiresBallContact | Yes | No | No | Populated; test/audit invariant. |
 | BallContactPosition | Yes | No | No | Populated; presentation/diagnostic. |
 

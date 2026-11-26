@@ -49,6 +49,12 @@ public sealed class MotionState
     public float PlantWeightRight;
     public bool InContactWindow;
 
+    // Presentation-only contract hints (M4 plumbing; no sim authority).
+    public bool ContractShouldSprint;
+    public bool ContractPressing;
+    public bool ContractRequiresFootPlant;
+    public string ContractRole = "";
+
     public string RenderClipId => NextClipId.Length > 0 ? NextClipId : CurrentClipId;
     public float RenderPhase => NextClipId.Length > 0 ? NextPhase : Phase;
 }

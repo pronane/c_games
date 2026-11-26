@@ -149,6 +149,10 @@ public sealed class MotionDriver
         }
         float speed = Mx.Flat(player.Vel).Length();
         if (contract != null && contract.DesiredSpeed > 0f) speed = MathF.Max(speed, MathF.Min(contract.DesiredSpeed, contract.SpeedLimit));
+        slot.State.ContractShouldSprint = contract?.ShouldSprint ?? player.Sprinting;
+        slot.State.ContractPressing = contract?.Pressing ?? player.Pressing;
+        slot.State.ContractRequiresFootPlant = contract?.RequiresFootPlant ?? false;
+        slot.State.ContractRole = contract?.Role ?? player.Role.ToString().ToLowerInvariant();
         // Facing-root XZ (x = right, z = forward), the space the feature table is baked in.
         var fwd = Mx.Norm(Mx.Flat(player.Facing));
         if (fwd.LengthSquared() < 1e-6f) fwd = new System.Numerics.Vector3(0, 0, 1);
