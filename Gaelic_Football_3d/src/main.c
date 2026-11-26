@@ -3491,7 +3491,7 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
     if (getenv("GF_FIXED_JOG") || getenv("GF_FIXED_JOG_DETAIL")) {
         if (frame == 120) {
             camMotionDetail = getenv("GF_FIXED_JOG_DETAIL") != NULL;
-            camMotionFixed = W(p->x + (camMotionDetail ? 3.0f : 5.0f), camMotionDetail ? .8f : .9f, p->z);
+            camMotionFixed = W(p->x + (camMotionDetail ? 4.5f : 5.0f), camMotionDetail ? .8f : .9f, p->z);
             camSide = 0; camOverride = 3;
             printf("MOTION fixed-camera begin frame %d target %.2f %.2f %.2f\n",
                    frame, camMotionFixed.x, camMotionFixed.y, camMotionFixed.z);

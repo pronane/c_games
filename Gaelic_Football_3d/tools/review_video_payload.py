@@ -19,7 +19,7 @@ def build_payload(video, label, sha, run_id, repository, ffmpeg='ffmpeg', hand_c
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / 'preview.mp4'
         if hand_crop and foot_detail: raise ValueError('crop modes are mutually exclusive')
-        start, duration, fps = (4.5, 1.8, 15) if foot_detail else (4, 3, 12)
+        start, duration, fps = (4.2, 1.4, 15) if foot_detail else (4, 3, 12)
         settings = ((480, 32), (400, 35), (320, 38), (256, 41)) if foot_detail else ((320, 35), (256, 38), (192, 41))
         for width, crf in settings:
             filt = (f'crop=500:360:280:70,scale={width}:-2,fps={fps}' if hand_crop else f'scale={width}:-2,fps={fps}')
