@@ -205,7 +205,7 @@ public sealed class TacticalCoordinator
     private static float PlayerMaxSpeed(PlayerState p) => p.MaxSpeed;
 
     private static float PlayerAccel(PlayerState p)
-        => Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Physicality * 3f, 8f, 18f);
+        => Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
 
     private static Vector3 PressTarget(PlayerState p, MatchState s, Vector3 ballRef, Vector3 ownGoal)
     {

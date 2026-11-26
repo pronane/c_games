@@ -364,9 +364,63 @@ public sealed partial class MatchEngine
             Intent = intent,
             TargetPosition = p.Target,
             FacingDirection = Mx.FlatDir(p.Pos, State.Ball.Pos),
+            BallContactPosition = State.Ball.Pos,
             BallContactTime = duration * Mx.Clamp(contactFrac, 0f, 1f),
+            DesiredSpeed = Mx.Flat(p.Vel).Length(),
+            SpeedLimit = p.MaxSpeed,
             RequiresBallContact = action is "kick" or "volley" or "throw_in" or "slide" or "tackle",
         };
+    }
+
+    private void PopulateBaselineContracts()
+    {
+        var b = State.Ball;
+        for (int i = 0; i < State.Players.Length; i++)
+        {
+            var p = State.Players[i];
+            if (p.SentOff) continue;
+            if (LastActionContracts.TryGetValue(i, out var existing))
+            {
+                // Preserve active action contracts set by SetAction/FirePending.
+                if (existing.Intent is "kick" or "shoot" or "pass" or "tackle" or "dive" or "skill" or "throw_in")
+                    continue;
+            }
+            if (b.Owner == i)
+            {
+                LastActionContracts[i] = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = i,
+                    Intent = p.Shielding ? "shield" : "carry",
+                    TargetPosition = p.Target,
+                    FacingDirection = p.Facing,
+                    DesiredSpeed = Mx.Flat(p.Vel).Length(),
+                    SpeedLimit = p.MaxSpeed,
+                };
+            }
+            else if (b.Owner < 0 && b.PassReceiver == i)
+            {
+                float dist = Mx.FlatDist(p.Pos, b.Pos);
+                float spd = MathF.Max(1f, Mx.Flat(b.Vel).Length());
+                float ttc = Math.Clamp(dist / spd, 0.05f, 2.0f);
+                Vector3 recvPos = b.Pos + Mx.Flat(b.Vel) * ttc;
+                LastActionContracts[i] = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = i,
+                    Intent = "receive",
+                    TargetPosition = recvPos,
+                    FacingDirection = Mx.FlatDir(p.Pos, b.Pos),
+                    BallContactPosition = recvPos,
+                    BallContactTime = ttc,
+                    DesiredSpeed = 7.5f,
+                    SpeedLimit = p.MaxSpeed,
+                    RequiresBallContact = true,
+                };
+            }
+            else
+            {
+                LastActionContracts.Remove(i);
+            }
+        }
     }
 
     /// <summary>Fire a pending ball release/capture whose contact time has elapsed.</summary>
@@ -584,6 +638,7 @@ public sealed partial class MatchEngine
         _tick++;
         _globalTime += dt;
         LastActionContracts.Clear();
+        PopulateBaselineContracts();
         var S = State;
         if (S.Phase == Phase.FullTime || S.Phase == Phase.Paused) return;
 
@@ -956,6 +1011,7 @@ public sealed partial class MatchEngine
         if (!S.Ball.HasPending) TryPossession(dt);
         EnforceRestartLaws(dt);
         UpdateVar(dt);
+        PopulateBaselineContracts();
         ClampAll();
     }
 
@@ -1546,7 +1602,7 @@ public sealed partial class MatchEngine
                     {
                         var pred = _tacticalBallPred ?? ArenaFC.Core.Football.BallTrajectory.Predict(ball.Pos, ball.Vel, ball.Spin, 1.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
                         float maxSpd = p.MaxSpeed;
-                        float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Physicality * 3f, 8f, 18f);
+                        float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
                         if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f))
                             intercept = new Vector3(s.Position.X, 0f, s.Position.Z);
                     }
@@ -1756,7 +1812,7 @@ public sealed partial class MatchEngine
             if (o.Team == from.Team || o.SentOff) continue;
             oppP[oi] = o.Pos; oppV[oi] = o.Vel;
             oppSpd[oi] = o.MaxSpeed;
-            oppAcc[oi] = Math.Clamp(9f + o.Spec.Pace * 6f + o.Spec.Physicality * 3f, 8f, 18f);
+            oppAcc[oi] = Math.Clamp(9f + o.Spec.Pace * 6f + o.Spec.Defending * 3f, 8f, 18f);
             oi++;
         }
         foreach (var q in State.Players)
@@ -1776,7 +1832,7 @@ public sealed partial class MatchEngine
             float tBall = d / MathF.Max(1f, passSpeed);
             Vector3 recvAim = q.Pos + Mx.Flat(q.Vel) * MathF.Min(tBall, 0.6f) * (through ? 0.8f : 0.45f);
             float recvMax = q.MaxSpeed;
-            float recvAcc = Math.Clamp(9f + q.Spec.Pace * 6f + q.Spec.Physicality * 3f, 8f, 18f);
+            float recvAcc = Math.Clamp(9f + q.Spec.Pace * 6f + q.Spec.Defending * 3f, 8f, 18f);
             float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(q.Pos, q.Vel, recvAim, recvMax, recvAcc);
             float recvReachPenalty = MathF.Max(0f, tRecv - tBall - 0.15f) * 3.0f;
             // Aim alignment dominates (weight 8.0) so stick direction controls
@@ -1945,7 +2001,7 @@ public sealed partial class MatchEngine
                 recvLead += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * MathF.Min(5f, 2f + tBall * 4f);
             // Only adopt lead if receiver can plausibly reach it around ball arrival.
             float recvMax = to.MaxSpeed;
-            float recvAcc = Math.Clamp(9f + to.Spec.Pace * 6f + to.Spec.Physicality * 3f, 8f, 18f);
+            float recvAcc = Math.Clamp(9f + to.Spec.Pace * 6f + to.Spec.Defending * 3f, 8f, 18f);
             float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(to.Pos, to.Vel, recvLead, recvMax, recvAcc);
             if (tRecv <= tBall + 0.30f)
             {

@@ -112,6 +112,8 @@ public sealed class MotionDriver
         PlayerIntent intent = IntentFor(player);
         if (ball.HasPending && ball.PendingFrom == player.Index && ball.PendingReceiver >= 0)
             intent = PlayerIntent.Pass;
+        if (contract != null)
+            intent = IntentFromContract(contract.Intent, intent);
         bool actionClip = intent is PlayerIntent.Pass or PlayerIntent.ThroughBall or PlayerIntent.Shoot
             or PlayerIntent.Trap or PlayerIntent.Tackle or PlayerIntent.Dive or PlayerIntent.Celebrate or PlayerIntent.Cut;
         if (!actionClip) slot.LastAction = "";
@@ -148,7 +150,10 @@ public sealed class MotionDriver
         if (fwd.LengthSquared() < 1e-6f) fwd = new System.Numerics.Vector3(0, 0, 1);
         var right = new System.Numerics.Vector3(-fwd.Z, 0, fwd.X);   // same handedness as SoccerClipRig's strafe test
         var vel = Mx.Flat(player.Vel);
-        var toTarget = Mx.Flat(player.Target - player.Pos);
+        var targetPos = player.Target;
+        if (contract != null && contract.TargetPosition != default)
+            targetPos = contract.TargetPosition;
+        var toTarget = Mx.Flat(targetPos - player.Pos);
         var desired = toTarget.LengthSquared() > .04f ? Mx.Norm(toTarget) * MathF.Max(speed, MathF.Min(toTarget.Length() * 2f, 8f))
                                                        : System.Numerics.Vector3.Zero;
         var localVel = new System.Numerics.Vector2(System.Numerics.Vector3.Dot(vel, right), System.Numerics.Vector3.Dot(vel, fwd));
@@ -158,6 +163,23 @@ public sealed class MotionDriver
             styleTag: player.Spec.Archetype.ToString().ToLowerInvariant(),
             localVelocity: localVel, desiredLocalVelocity: desiredVel, forcedClipId: forced);
         return slot.State;
+    }
+
+    private static PlayerIntent IntentFromContract(string intent, PlayerIntent fallback)
+    {
+        return intent switch
+        {
+            "kick" or "shoot" or "volley" or "chip_shot" or "trivela" or "bicycle" => PlayerIntent.Shoot,
+            "pass" or "short_pass" or "through_ball" or "cross" or "throw_in" => intent is "pass" or "short_pass" ? PlayerIntent.Pass : PlayerIntent.ThroughBall,
+            "receive" or "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
+            "tackle" or "slide" or "shoulder_charge" => PlayerIntent.Tackle,
+            "dive" or "keeper_dive" => PlayerIntent.Dive,
+            "celebrate" => PlayerIntent.Celebrate,
+            "shield" => PlayerIntent.Shield,
+            "carry" => fallback == PlayerIntent.Sprint ? PlayerIntent.Sprint : PlayerIntent.Move,
+            "skill" => PlayerIntent.Cut,
+            _ => fallback,
+        };
     }
 
     private static PlayerIntent IntentFor(PlayerState p)
