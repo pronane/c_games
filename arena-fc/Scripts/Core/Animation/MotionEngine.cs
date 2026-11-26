@@ -102,12 +102,16 @@ public sealed class MotionEngine
                 }
             }
         }
+        bool switchingToSelected = selected != null && !string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal);
         // ML-Flow-style contact lock: when approaching a timed contact, prefer the
         // selected clip's contact frame to land near the predicted arrival.
         if (selected != null && selected.HasContact && ttc > 0f && motion.IsApproachingBall)
         {
-            float phaseMatched = selected.Loop ? Wrap01(motion.Phase) : 0f;
-            matchedPhase = BallApproach.ContactLockedStartPhase(selected, ttc, phaseMatched, motion.ApproachWeight);
+            if (switchingToSelected || motion.CurrentClipId.Length == 0)
+            {
+                float phaseMatched = selected.Loop ? Wrap01(motion.Phase) : 0f;
+                matchedPhase = BallApproach.ContactLockedStartPhase(selected, ttc, phaseMatched, motion.ApproachWeight);
+            }
         }
         if (selected == null)
         {
@@ -123,7 +127,7 @@ public sealed class MotionEngine
             motion.Phase = matchedPhase ?? (selected.Loop ? Wrap01(motion.Phase) : 0f);
             motion.BlendWeight = 1f;
         }
-        else if (!string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal) || matchedPhase != null)
+        else if (switchingToSelected || (matchedPhase != null && switchingToSelected))
         {
             // If a transition is interrupted, begin from its visible destination phase.
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
@@ -134,6 +138,16 @@ public sealed class MotionEngine
             motion.CrossfadeDuration = DefaultCrossfadeSeconds;
             motion.CrossfadeRemaining = motion.CrossfadeDuration;
             motion.BlendWeight = 0f;
+        }
+        else if (matchedPhase != null && string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal))
+        {
+            // Same clip: only nudge phase if far off contact alignment (avoid self-transition jitter).
+            float currentP = motion.RenderPhase;
+            if (CircularDistance(currentP, matchedPhase.Value) > 0.20f)
+            {
+                if (motion.NextClipId.Length > 0) CommitTransition(motion);
+                motion.Phase = selected.Loop ? Wrap01(matchedPhase.Value) : Clamp01(matchedPhase.Value);
+            }
         }
 
         var current = _clips.TryGetValue(motion.CurrentClipId, out var c) ? c : selected;
