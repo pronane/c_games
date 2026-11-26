@@ -1980,10 +1980,11 @@ public sealed partial class MatchEngine
         if (t <= 0f) return false;
         Vector3 own = OwnGoalPos(k.Team);
         if (MathF.Abs(p.X - own.X) > 7f || MathF.Abs(p.Z) > 9f || MathF.Abs(p.X) > Mx.HalfLength) return false;
-        float mine = Mx.FlatDist(k.Pos, p) / 6.5f;
+        float kSpeed = MathF.Max(4.5f, k.MaxSpeed * 0.95f);
+        float mine = Mx.FlatDist(k.Pos, p) / kSpeed;
         if (mine > t + .25f) return false;
         foreach (var q in State.Players)
-            if (q.Team != k.Team && !q.SentOff && Mx.FlatDist(q.Pos, p) / 7f < mine - .35f) return false;
+            if (q.Team != k.Team && !q.SentOff && Mx.FlatDist(q.Pos, p) / MathF.Max(4f, q.MaxSpeed) < mine - .35f) return false;
         point = p;
         return true;
     }
