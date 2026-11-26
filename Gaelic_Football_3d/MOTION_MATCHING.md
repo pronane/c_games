@@ -505,3 +505,12 @@ different, time-dependent ball position there. This is a small synthetic set,
 not real input, complete mesh intersection, live ball physics, animated
 transitions or rendered validation; partial cradle blends can also obscure
 whether an overlap comes from the clip or procedural adjustment.
+
+A diagnostic-only `--clearance METRES` override allows a controlled offline
+sweep; it does not change the game's grip settings. On the shipped model's
+five sampled non-action cradle poses, the default 0.012 m clearance produced
+29 selected ball-triangle overlaps in jog-b (left) and 9/6 in sprint-a/b
+(right); 0.025 m reduced these to 0 and 3/3, and 0.040 m produced none in
+these samples. Triangle counts are not penetration depth, and zero here does
+not establish whole-hand clearance or a natural-looking grip. In particular,
+changing the game default on this evidence alone could make the hands float.

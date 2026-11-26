@@ -873,7 +873,7 @@ static int export_hand_transition(const char *asset, const char *out, int fps)
 
 /* Scripted ball-carry/action samples with the frontend's torso and cradle
  * implementation. Bind rotations are supplied by a GLB-verified exporter. */
-static int export_grip_poses(const char *asset, const char *out, const char *bindpath)
+static int export_grip_poses(const char *asset, const char *out, const char *bindpath, float clearance)
 {
     static Transform bind[MAX_BONES];
     static const struct { const char *name; int clip,action; float speed,phase; } cases[]={
@@ -912,10 +912,12 @@ static int export_grip_poses(const char *asset, const char *out, const char *bin
     boneArmLL=findBone("lowerarm_l"); boneArmLR=findBone("lowerarm_r");
     boneMidL=findBone("middle_01_l"); boneMidR=findBone("middle_01_r");
     if (boneSpine<0 || boneSpine1<0 || boneArmUL<0 || boneArmUR<0 || boneArmLL<0 || boneArmLR<0 || boneMidL<0 || boneMidR<0) return 0;
-    loadGrip(asset); detectJogDirection(); detectJogHandProfile(); game_init(&game);
+    loadGrip(asset);
+    if (clearance>0) { if (!isfinite(clearance) || clearance<.012f || clearance>.06f) return 0; ballClear=clearance; }
+    detectJogDirection(); detectJogHandProfile(); game_init(&game);
     game.ball_team=0; game.ball_player=9; p=&game.players[0][9];
     f=fopen(out,"wb"); if (!f) return 0;
-    fputs("{\"format\":1,\"mode\":4,\"scenario\":\"scripted-grip\",\"bones\":[",f);
+    fprintf(f,"{\"format\":1,\"mode\":4,\"scenario\":\"scripted-grip\",\"clearance_m\":%.9g,\"bones\":[",ballClear);
     for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
     fputs("],\"frames\":[",f);
     for (int k=0;k<(int)(sizeof cases/sizeof cases[0]);++k) {
@@ -1010,8 +1012,10 @@ static int export_turn_poses(const char *asset, const char *out, int fps, int ap
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
-    if (argc==5 && !strcmp(argv[1],"--export-grip-poses")) {
-        if (!export_grip_poses(argv[2],argv[3],argv[4])) { fprintf(stderr,"Grip pose export failed\n"); return 1; }
+    if ((argc==5 || argc==6) && !strcmp(argv[1],"--export-grip-poses")) {
+        float clearance=0; char *end=NULL;
+        if (argc==6) { clearance=strtof(argv[5],&end); if (*end || !isfinite(clearance) || clearance<.012f || clearance>.06f) { fprintf(stderr,"Invalid grip clearance\n"); return 1; } }
+        if (!export_grip_poses(argv[2],argv[3],argv[4],clearance)) { fprintf(stderr,"Grip pose export failed\n"); return 1; }
         return 0;
     }
     if (argc == 5 && !strcmp(argv[1], "--export-hand-transition")) {
