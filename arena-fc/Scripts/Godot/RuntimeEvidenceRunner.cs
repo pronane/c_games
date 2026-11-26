@@ -116,7 +116,7 @@ public partial class RuntimeEvidenceRunner : Node3D
                 rig.Position = worldPosition;
                 player.Pos = new NVector3(worldPosition.X, worldPosition.Y, worldPosition.Z);
                 player.Vel = new NVector3(1.27f, 0f, 0f);
-                player.Facing = new NVector3(0f, 0f, 1f);
+                player.Facing = new NVector3(-MathF.Sin(.55f), 0f, -MathF.Cos(.55f));
 
                 motion.CurrentClipId = i < 120 ? "soccer_run" : i < 240 ? "soccer_sprint" : "soccer_turn";
                 motion.Phase = (motion.Phase + .012f) % 1f;
@@ -160,6 +160,8 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["renderer"] = ProjectSettings.GetSetting("rendering/renderer/rendering_method").AsString(),
             ["scenario"] = "production_soccer_clip_rig_flat_and_8_percent_slope_translated_rotated",
             ["frames"] = frames,
+            ["physics_tick_rate_hz"] = 60,
+            ["frame_budget_ms_at_60hz"] = 1000.0 / 60.0,
             ["animation_metric_samples"] = metrics.Samples,
             ["avg_planted_foot_slide_mps"] = metrics.AvgFootSlide,
             ["foot_slide_metric_scope"] = "world_space_xz_velocity_during_contract_planted_frames",
