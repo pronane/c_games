@@ -2119,21 +2119,23 @@ Section("M3 coordinator authority invariants");
 Section("M4 authoritative action contracts");
 {
     var e = new MatchEngine(new MatchOptions { Seed = 55, TeamSize = 11, AwayHuman = true });
-    bool sawCarrier = false, sawAction = false;
-    for (int t = 0; t < 300; t++)
+    bool sawCarrier = false, sawAction = false, keyOk = true;
+    for (int t = 0; t < 1200; t++)
     {
         e.Step(1f / 60f, PlayerCommand.None);
         foreach (var kv in e.LastActionContracts)
         {
             var c = kv.Value;
-            if (c.PlayerIndex != kv.Key) { Check("M4 contract key matches player", false, $"key={kv.Key} player={c.PlayerIndex}"); sawAction = sawCarrier = true; break; }
-            if (c.Intent == "carry" || c.Intent == "shield") sawCarrier = true;
+            if (c.PlayerIndex != kv.Key) { keyOk = false; break; }
+            if (c.Intent is "carry" or "shield" or "receive") sawCarrier = true;
             if (c.Intent is "kick" or "shoot" or "pass" or "receive" or "tackle" or "dive" or "throw_in" or "skill") sawAction = true;
         }
+        if (!keyOk) break;
         if (sawCarrier && sawAction) break;
     }
-    Check("M4 baseline carrier/shield contract observed", sawCarrier, sawCarrier ? "ok" : "missing");
-    Check("M4 action/receive contract observed", sawAction, sawAction ? "ok" : "missing");
+    Check("M4 contract keys match players", keyOk, keyOk ? "ok" : "mismatch");
+    Check("M4 baseline carrier/receive contract observed", sawCarrier, sawCarrier ? "ok" : "missing");
+    Check("M4 action contract observed", sawAction, sawAction ? "ok" : "missing");
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

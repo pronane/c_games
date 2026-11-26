@@ -1149,6 +1149,8 @@ public sealed partial class SoccerClipRig : Node3D
         if (Skel == null || _bones.Count == 0) return;
         bool leftPlanted = _motionState?.FootPlantedLeft ?? false;
         bool rightPlanted = _motionState?.FootPlantedRight ?? false;
+        float leftPlantW = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
+        float rightPlantW = _motionState?.PlantWeightRight ?? (rightPlanted ? 1f : 0f);
         _lastIkCorrectionL = 0f; _lastIkCorrectionR = 0f;
 
         foreach (var side in new[] { "L", "R" })
@@ -1173,7 +1175,8 @@ public sealed partial class SoccerClipRig : Node3D
                     float slide = new Vector2(footGlobal.X - prev.X, footGlobal.Z - prev.Z).Length();
                     if (dt > 1e-4f) AnimMetrics?.RecordSample(slide / dt, 0f, false);
                     Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
-                    float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f);
+                    float pw = isLeft ? leftPlantW : rightPlantW;
+                    float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f) * Mathf.Clamp(pw, 0f, 1f);
                     target = target.Lerp(locked, lockW);
                 }
                 if (height < .22f)
@@ -1203,7 +1206,9 @@ public sealed partial class SoccerClipRig : Node3D
                 }
             }
         }
-        ApplyPelvisStabilization(worldPos, leftPlanted, rightPlanted);
+        float pwL = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
+        float pwR = _motionState?.PlantWeightRight ?? (rightPlanted ? 1f : 0f);
+        ApplyPelvisStabilization(worldPos, pwL, pwR);
         UpdateDebugOverlay();
         ApplyLookAndReach();
     }
@@ -1299,41 +1304,54 @@ public sealed partial class SoccerClipRig : Node3D
         catch { /* debug overlay is non-fatal */ }
     }
 
-    private void ApplyPelvisStabilization(Vector3 worldPos, bool leftPlanted, bool rightPlanted)
+    private void ApplyPelvisStabilization(Vector3 worldPos, float plantLeft, float plantRight)
     {
         if (Skel == null) return;
         int pelvisIdx = Skel.FindBone("Hips");
         if (pelvisIdx < 0) return;
         var pelvisTx = Skel.GetBoneGlobalPose(pelvisIdx);
         Vector3 pelvis = pelvisTx.Origin;
+        float lW = Mathf.Clamp(plantLeft, 0f, 1f);
+        float rW = Mathf.Clamp(plantRight, 0f, 1f);
 
-        // Soft midpoint pull when both feet planted.
-        if (leftPlanted && rightPlanted && _hasPrevFootL && _hasPrevFootR)
+        // Continuous plant-weighted midpoint pull when feet are planted.
+        float both = Mathf.Min(lW, rW);
+        if (both > 0.01f && _hasPrevFootL && _hasPrevFootR)
         {
-            Vector3 mid = (_prevFootWorldL + _prevFootWorldR) * 0.5f;
+            Vector3 mid = (_prevFootWorldL * lW + _prevFootWorldR * rW) / Mathf.Max(0.001f, lW + rW);
             mid.Y = pelvis.Y;
             Vector3 err = mid - pelvis; err.Y = 0;
             if (err.Length() > 0.06f) err = err.Normalized() * 0.06f;
-            pelvis += err * 0.35f;
+            pelvis += err * (0.20f + 0.25f * both);
         }
 
-        // Lateral weight shift toward the more planted foot.
-        float diff = (leftPlanted ? 1f : 0f) - (rightPlanted ? 1f : 0f);
-        if (Mathf.Abs(diff) > 0.1f && _hasPrevFootL && _hasPrevFootR)
+        // Continuous lateral weight shift toward the more planted foot.
+        float diff = lW - rW;
+        if (Mathf.Abs(diff) > 0.01f && _hasPrevFootL && _hasPrevFootR)
         {
             Vector3 lat = _prevFootWorldL - _prevFootWorldR; lat.Y = 0;
             if (lat.LengthSquared() > 1e-6f)
             {
                 lat = lat.Normalized();
-                pelvis += lat * (diff * 0.025f);
+                pelvis += lat * (diff * 0.03f);
             }
+        }
+
+        // Residual-motion correction: damp sudden pelvis XZ jumps relative to planted feet.
+        if (_hasPrevPelvisPos)
+        {
+            Vector3 vel = pelvis - _prevPelvisPos;
+            vel.Y = 0;
+            float maxStep = 0.035f + 0.02f * (1f - Mathf.Max(lW, rW));
+            if (vel.Length() > maxStep)
+                pelvis -= vel.Normalized() * (vel.Length() - maxStep) * 0.5f;
         }
 
         // Soft vertical clamp to keep pelvis grounded.
         float avgFootY = ((_hasPrevFootL ? _prevFootWorldL.Y : worldPos.Y) + (_hasPrevFootR ? _prevFootWorldR.Y : worldPos.Y)) * 0.5f;
         float targetY = avgFootY + _height * 0.52f;
         float yErr = Mathf.Clamp(targetY - pelvis.Y, -0.04f, 0.04f);
-        pelvis.Y += yErr * 0.25f;
+        pelvis.Y += yErr * (0.20f + 0.15f * Mathf.Max(lW, rW));
 
         pelvisTx.Origin = pelvis;
         Skel.SetBoneGlobalPoseOverride(pelvisIdx, pelvisTx, 1f, true);
