@@ -120,6 +120,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         var processMs = new List<double>();
         var physicsMs = new List<double>();
         var ankleClearance = new List<float>();
+        Image? centeredEvidenceCapture = null;
         int frames = 0;
 
         // Each run has 3 deterministic clip segments on both a flat and an 8%
@@ -159,6 +160,15 @@ public partial class RuntimeEvidenceRunner : Node3D
                 {
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_L", ankleClearance);
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_R", ankleClearance);
+                }
+
+                // Capture near the centre of the deterministic traversal. Capturing
+                // only after frame 359 leaves the translated production rig clipped
+                // at the right edge and makes the evidence image hard to inspect.
+                if (i == 180)
+                {
+                    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                    centeredEvidenceCapture = GetViewport().GetTexture().GetImage();
                 }
                 frames++;
         }
@@ -201,7 +211,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         };
         string json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(Path.Combine(output, "runtime-evidence.json"), json);
-        var image = GetViewport().GetTexture().GetImage();
+        var image = centeredEvidenceCapture ?? GetViewport().GetTexture().GetImage();
         if (image.SavePng(Path.Combine(output, "production-rig-grounding.png")) != Error.Ok)
             throw new InvalidOperationException("Could not save production rig evidence image.");
 
