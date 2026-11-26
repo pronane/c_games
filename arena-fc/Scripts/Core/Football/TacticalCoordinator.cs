@@ -77,7 +77,7 @@ public sealed class TacticalCoordinator
         {
             presser = byReach.Count > 0 ? byReach[0].idx : -1;
             // Hysteresis: keep current presser if close enough to avoid oscillation.
-            if (presser >= 0)
+            if (presser >= 0 && (!_prevRole.TryGetValue(presser, out var prRole) || prRole != "press"))
             {
                 int prevPresser = (team >= 0 && team < _prevPresserByTeam.Length) ? _prevPresserByTeam[team] : -1;
                 if (prevPresser >= 0 && prevPresser != presser && prevPresser < s.Players.Length)
