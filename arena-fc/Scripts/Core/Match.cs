@@ -362,7 +362,8 @@ public sealed partial class MatchEngine
             _ => action,
         };
         bool requiresBallContact = intent is "kick" or "shoot" or "pass" or "clear" or "throw_in" or "tackle" or "skill"
-            || action is "kick" or "volley" or "throw_in" or "slide" or "tackle";
+            or "header" or "catch" or "parry" or "block"
+            || action is "kick" or "volley" or "throw_in" or "slide" or "tackle" or "header" or "catch" or "parry" or "block";
         p.ActionIntent = intent;
         // BallContactTime is seconds remaining until contact (-1 if not applicable).
         float contactAt = duration * Mx.Clamp(contactFrac, 0f, 1f);
@@ -376,7 +377,10 @@ public sealed partial class MatchEngine
             Intent = intent,
             TargetPosition = p.Target,
             HasTarget = true,
-            FacingDirection = Mx.FlatDir(p.Pos, State.Ball.Pos),
+            // Preserve the simulation's action-facing direction. A generic
+            // ball-facing vector is wrong for shots, clearances and directional skills.
+            FacingDirection = Mx.Flat(p.Facing).LengthSquared() > 1e-6f
+                ? Mx.Norm(Mx.Flat(p.Facing)) : Mx.FlatDir(p.Pos, State.Ball.Pos),
             BallContactPosition = State.Ball.Pos,
             BallContactTime = contactRemaining,
             DesiredSpeed = Mx.Flat(p.Vel).Length(),
