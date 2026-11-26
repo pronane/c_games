@@ -1296,8 +1296,15 @@ public sealed partial class SoccerClipRig : Node3D
         Vector3 up = fwd.Cross(right).Normalized();
         var basis = new Basis(right, up, fwd).Orthonormalized();
         if (basis.Determinant() < 0f) return;
-        // Blend gently toward ground-aligned orientation.
-        footTx.Basis = footTx.Basis.Slerp(basis, 0.35f).Orthonormalized();
+        // Animation bone bases may contain scale or small numerical drift.
+        // Convert proper orthonormal frames to unit quaternions explicitly:
+        // Basis.Slerp can throw when either extracted quaternion is not unit.
+        var fromBasis = footTx.Basis.Orthonormalized();
+        if (fromBasis.Determinant() < 0f)
+            fromBasis = new Basis(-fromBasis.X, fromBasis.Y, fromBasis.Z).Orthonormalized();
+        var fromRotation = fromBasis.GetRotationQuaternion().Normalized();
+        var toRotation = basis.GetRotationQuaternion().Normalized();
+        footTx.Basis = new Basis(fromRotation.Slerp(toRotation, 0.35f).Normalized());
         Skel.SetBoneGlobalPoseOverride(b.Foot, footTx, 1f, true);
     }
 
