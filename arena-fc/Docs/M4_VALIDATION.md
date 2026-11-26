@@ -67,7 +67,7 @@ GD.Print($"AnimMetrics samples={_motion.Metrics.Samples} slide={_motion.Metrics.
 | ShouldSprint | Yes | Yes (Move->Sprint hint) | No | Presentation-only; also mirrored to MotionState. |
 | Pressing | Yes | MotionState hint only | No | Populated to MotionState.ContractPressing; not used for selection yet. |
 | Role | Yes | MotionState hint only | No | Populated to MotionState.ContractRole; not used for selection yet. |
-| RequiresFootPlant | Yes | MotionState hint only | No | Populated to MotionState.ContractRequiresFootPlant; rig/plant-window integration pending. |
+| RequiresFootPlant | Yes | MotionState hint only | Mild SoccerClipRig plant-weight floor when planted | Populated to MotionState.ContractRequiresFootPlant; SoccerClipRig applies mild plant-weight floor for planted feet (presentation-only). |
 | RequiresBallContact | Yes | No | No | Populated; test/audit invariant. |
 | BallContactPosition | Yes | No | No | Populated; presentation/diagnostic. |
 

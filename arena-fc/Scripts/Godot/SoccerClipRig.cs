@@ -1155,6 +1155,12 @@ public sealed partial class SoccerClipRig : Node3D
         bool rightPlanted = _motionState?.FootPlantedRight ?? false;
         float leftPlantW = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
         float rightPlantW = _motionState?.PlantWeightRight ?? (rightPlanted ? 1f : 0f);
+        // M4 presentation hint: strengthen plant lock when contract requires foot plant.
+        if (_motionState?.ContractRequiresFootPlant == true)
+        {
+            if (leftPlanted) leftPlantW = MathF.Max(leftPlantW, 0.35f);
+            if (rightPlanted) rightPlantW = MathF.Max(rightPlantW, 0.35f);
+        }
         _lastIkCorrectionL = 0f; _lastIkCorrectionR = 0f;
 
         foreach (var side in new[] { "L", "R" })
@@ -1211,9 +1217,7 @@ public sealed partial class SoccerClipRig : Node3D
                 }
             }
         }
-        float pwL = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
-        float pwR = _motionState?.PlantWeightRight ?? (rightPlanted ? 1f : 0f);
-        ApplyPelvisStabilization(worldPos, pwL, pwR, skelGlobal, skelInv);
+        ApplyPelvisStabilization(worldPos, leftPlantW, rightPlantW, skelGlobal, skelInv);
         UpdateDebugOverlay();
         ApplyLookAndReach();
     }
