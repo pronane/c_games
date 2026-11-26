@@ -219,19 +219,19 @@ public sealed class TacticalCoordinator
 
     private static Vector3 CoverTarget(PlayerState p, Vector3 ownGoal, Vector3 ballRef, int attackSign, float lerp)
     {
-        Vector3 goalSide = Vector3.Lerp(ballRef, ownGoal, 0.45f);
-        goalSide.X += -attackSign * 1.5f;
-        goalSide.Z = Math.Clamp(goalSide.Z + (p.Pos.Z - ballRef.Z) * 0.2f, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f);
-        return ClampPitch(Vector3.Lerp(p.Pos, goalSide, Math.Clamp(lerp + 0.35f, 0f, 1f)));
+        Vector3 goalSide = Vector3.Lerp(ballRef, ownGoal, 0.40f);
+        goalSide.X += -attackSign * 1.0f;
+        goalSide.Z = Math.Clamp(p.Pos.Z * 0.65f + ballRef.Z * 0.35f, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f);
+        return ClampPitch(Vector3.Lerp(p.Pos, goalSide, Math.Clamp(lerp + 0.25f, 0f, 1f)));
     }
 
     private static Vector3 RecoverTarget(PlayerState p, Vector3 ownGoal, Vector3 ballRef, int attackSign, bool transition)
     {
-        float depth = transition ? 0.55f : 0.35f;
+        float depth = transition ? 0.45f : 0.28f;
         Vector3 t = Vector3.Lerp(ballRef, ownGoal, depth);
-        // Keep some lane width by player's current side
-        t.Z = Math.Clamp(t.Z * 0.5f + p.Pos.Z * 0.5f, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f);
-        t.X += -attackSign * (transition ? 2f : 0f);
+        // Preserve team width: keep most of player's lateral position.
+        t.Z = Math.Clamp(p.Pos.Z * 0.75f + ballRef.Z * 0.25f, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f);
+        t.X += -attackSign * (transition ? 1.5f : 0f);
         return ClampPitch(t);
     }
 
@@ -241,12 +241,12 @@ public sealed class TacticalCoordinator
         float best = float.MinValue;
         Vector3 bestPos = p.Pos;
         float baseX = ballRef.X + attackSign * 8f;
-        float[] zOffs = { -12f, -6f, 0f, 6f, 12f };
+        float[] zOffs = { -18f, -12f, -6f, 0f, 6f, 12f, 18f };
         float[] xOffs = { 0f, 6f, 12f, -4f };
         foreach (float xo in xOffs)
         foreach (float zo in zOffs)
         {
-            Vector3 c = ClampPitch(new Vector3(baseX + xo * attackSign, 0, ballRef.Z + zo));
+            Vector3 c = ClampPitch(new Vector3(baseX + xo * attackSign, 0, Math.Clamp(ballRef.Z + zo, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f)));
             float space = PlayerPerception.SpaceScore(c, oppPos, 9f);
             float forward = (c.X - ballRef.X) * attackSign;
             float dist = Mx.FlatDist(p.Pos, c);

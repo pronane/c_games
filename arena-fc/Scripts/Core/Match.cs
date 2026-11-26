@@ -1351,8 +1351,16 @@ public sealed partial class MatchEngine
             var press = NearestOpponent(p, out float pd);
             if (press != null && pd < 4f)
                 dir = Mx.Norm(dir * .75f + Mx.FlatDir(press.Pos, p.Pos) * .55f + new Vector3(0, 0, Mx.Clamp(-press.Pos.Z * .04f, -.5f, .5f)));
-            p.Target = p.Pos + dir * 4f;
-            if (p.ActionTimer <= 0f) p.Action = "run";
+            if (p.MustPlayBall)
+            {
+                p.Target = p.Pos;
+                if (p.ActionTimer <= 0f) p.Action = "idle";
+            }
+            else
+            {
+                p.Target = p.Pos + dir * 4f;
+                if (p.ActionTimer <= 0f) p.Action = "run";
+            }
             if (!human)
             {
                 // Set piece: play it.  A direct free kick in range is a shot; anything
@@ -1539,7 +1547,7 @@ public sealed partial class MatchEngine
             {
                 var tacOff = GetTacticalAssignment(p.Index);
                 if (tacOff != null && (tacOff.Role == "support" || tacOff.Role == "recycle"))
-                    p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.45f);
+                    p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.30f);
             }
             if (p.ActionTimer <= 0f) p.Action = "run";
         }
@@ -1638,8 +1646,8 @@ public sealed partial class MatchEngine
                 }
                 if (!IsSkill)
                 {
-                    if (tacAssign != null && (tacAssign.Role == "cover" || tacAssign.Role == "recover" || tacAssign.Role == "shape" || tacAssign.Role == "transition_shape"))
-                        p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, 0.35f);
+                    if (tacAssign != null && (tacAssign.Role == "cover" || tacAssign.Role == "recover"))
+                        p.Target = Mx.Lerp(p.Target, tacAssign.MovementTarget, tacAssign.Role == "cover" ? 0.28f : 0.18f);
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
             }
