@@ -21,6 +21,9 @@ with tempfile.TemporaryDirectory() as tmp, patch.object(pack.subprocess, 'run', 
     sole = pack.build_payload('test', 'soles', 'a'*40, '123', 'owner/repo', sole_detail=True)
     info = json.loads(sole['output']['text'])
     assert info['start'] == 4.5 and info['duration'] == .8 and info['fps'] == 20 and info['width'] == 640
+    hand = pack.build_payload('test', 'hand-detail', 'a'*40, '123', 'owner/repo', hand_detail=True)
+    info = json.loads(hand['output']['text'])
+    assert info['start'] == 4.5 and info['duration'] == 1.2 and info['fps'] == 24 and info['width'] == 640 and info['hand_detail']
     try: pack.build_payload('test', 'feet', 'a'*40, '123', 'owner/repo', hand_crop=True, foot_detail=True)
     except ValueError: pass
     else: raise AssertionError('accepted conflicting crop modes')

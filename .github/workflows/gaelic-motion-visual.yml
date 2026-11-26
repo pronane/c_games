@@ -92,6 +92,8 @@ jobs:
           python3 tests/shorts_runtime_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
           python3 tests/hand_mesh_tests.py ./motion_headless assets/models/gaelic_player.glb
           python3 tests/hand_mesh_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
+          python3 tests/hand_transition_tests.py ./motion_headless assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-hand-transition.log
+          python3 tests/hand_transition_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb --surface > ../build/cmu-jog-report/cmu-hand-transition.log
           for mode in 0 1 2 3 4; do
             python3 tools/inspect_hand_mesh.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless --mode "$mode" --fps 60 > "../build/cmu-jog-report/hand-mesh-mode-${mode}.json"
           done
@@ -119,6 +121,7 @@ jobs:
           test -s ../build/cmu-jog-local/diagnostic-summary.txt
           python3 -c 'import json,pathlib; p=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt"); f=p.open("a"); [(lambda r: [f.write("hand_mesh mode=%d side=%s %s\n"%(m,s,json.dumps(v,sort_keys=True))) for s,v in r["sides"].items()])(json.loads(pathlib.Path("../build/cmu-jog-report/hand-mesh-mode-%d.json"%m).read_text())) for m in (0,1,2,3,4)]; f.close()'
           python3 -c 'import json,pathlib; p=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt"); f=p.open("a"); [(lambda r: f.write("hand_surface mode=%d samples=%d %s\n"%(m,r["surface_samples"],json.dumps(r["sampled_surface_overlap"],sort_keys=True))))(json.loads(pathlib.Path("../build/cmu-jog-report/hand-surface-mode-%d.json"%m).read_text())) for m in (3,4)]; f.close()'
+          grep -E '^hand_transition( |_)' ../build/cmu-jog-report/cmu-hand-transition.log >> ../build/cmu-jog-local/diagnostic-summary.txt
           python3 -c 'import json,os,pathlib; text=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt").read_text(); assert len(text)<60000; print(json.dumps({"name":"Motion diagnostics: CMU candidate", "head_sha":os.environ["GITHUB_SHA"], "external_id":os.environ["GITHUB_RUN_ID"], "status":"completed", "conclusion":"neutral", "output":{"title":"Headless joint proxy diagnostics", "summary":"Not rendered mesh, contact or anatomical validation.", "text":text}}))' > ../build/cmu-jog-local/diagnostic-check.json
           gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/diagnostic-check.json > /dev/null
       # Same scripted input and render settings; GF_QUICK stops after frame 340,
@@ -170,6 +173,16 @@ jobs:
           for label in cmu-hands-before cmu-hands-relaxed cmu-hands-strong cmu-hands-mirrored cmu-hands-curled; do
             python3 tools/review_frame_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --hand-crop > "../build/cmu-jog-local/${label}-check.json"
             gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-check.json" > /dev/null
+          done
+      - name: Publish higher-detail hand motion previews
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pose in before curled; do
+            label="cmu-hands-detail-${pose}"
+            python3 tools/review_video_payload.py "../build/cmu-jog-report/cmu-hands-${pose}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --hand-detail > "../build/cmu-jog-local/${label}-preview.json"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-preview.json" > /dev/null
           done
       - name: Record fixed-camera jog comparison
         working-directory: Gaelic_Football_3d

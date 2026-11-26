@@ -186,4 +186,13 @@ static void local_rotation(void)
     assert(!am_rotation_compose_local(q,zero,1,out)); assert(!am_rotation_compose_local(q,axis,NAN,out));
     assert(!am_rotation_compose_local(NULL,axis,1,out));
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); puts("arena motion tests passed"); return 0; }
+static void rotation_distance(void)
+{
+    float a[4]={0,0,0,1}, b[4]={0,0,0,-1}, c[4]={sinf(.25f),0,0,cosf(.25f)}, z[4]={0};
+    float angle=7;
+    assert(am_rotation_distance(a,b,&angle) && angle<1e-6f);
+    assert(am_rotation_distance(a,c,&angle) && fabsf(angle-.5f)<1e-6f);
+    assert(!am_rotation_distance(a,z,&angle) && fabsf(angle-.5f)<1e-6f);
+    assert(!am_rotation_distance(NULL,c,&angle)); c[0]=NAN; assert(!am_rotation_distance(a,c,&angle));
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); rotation_distance(); puts("arena motion tests passed"); return 0; }

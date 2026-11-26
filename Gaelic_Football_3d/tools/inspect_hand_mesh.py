@@ -73,7 +73,7 @@ def measure(doc, blob, data, surface=False):
             j2=names.index(f'{finger}_02_{side}'); j3=names.index(f'{finger}_03_{side}')
             a=[bind_world(joints[j2])[k][3] for k in range(3)]; b=[bind_world(joints[j3])[k][3] for k in range(3)]
             tips[(side,finger)]=select_tips(points,ids,weights,j3,b,[b[k]-a[k] for k in range(3)])
-    surfaces = {}; surface_samples = 0
+    surfaces = {}; surface_samples = 0; surface_by_state = []
     surface_stats = {side:{kind:{'overlap_pairs':0,'frames_with_overlap':0} for kind in ('raw','adjusted')} for side in ('l','r')}
     if surface:
         primitive=prims[0]
@@ -93,7 +93,9 @@ def measure(doc, blob, data, surface=False):
     for frame_index,frame in enumerate(data['frames']):
         samples={}
         do_surface = surface and frame_index in {i*len(data['frames'])//12 for i in range(12)}
-        if do_surface: surface_samples += 1
+        if do_surface:
+            surface_samples += 1
+            state_stats={'state':frame.get('state',str(frame_index)), 'sides':{side:{} for side in ('l','r')}}
         for kind in ('raw','adjusted'):
             rows=frame[kind]
             if len(rows)!=len(order): raise ValueError('incomplete pose')
@@ -112,6 +114,8 @@ def measure(doc, blob, data, surface=False):
                     overlap=sum(triangle_overlap_pairs(tris[a],tris[b]) for i,a in enumerate((*FINGERS,'thumb')) for b in (*FINGERS,'thumb')[i+1:])
                     surface_stats[side][kind]['overlap_pairs'] += overlap
                     surface_stats[side][kind]['frames_with_overlap'] += overlap>0
+                    state_stats['sides'][side][kind]=overlap
+        if do_surface: surface_by_state.append(state_stats)
         for side in ('l','r'):
             for finger in FINGERS:
                 key=(side,finger)
@@ -133,6 +137,7 @@ def measure(doc, blob, data, surface=False):
             'tip_vertex_counts':{f'{s}_{f}':len(v) for (s,f),v in tips.items()}, 'sides':summary,
             'surface_samples':surface_samples, 'selected_surface_triangles':{f'{s}_{f}':len(v) for (s,f),v in surfaces.items()},
             'sampled_surface_overlap':surface_stats if surface else None,
+            'sampled_surface_by_state':surface_by_state if surface else None,
             'limitation':'v0_body fingertip caps and selected distal finger triangles at sampled phases only; no palm, proximal surface, containment, continuous collision, render or anatomical validation'}
 
 

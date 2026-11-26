@@ -810,6 +810,67 @@ static int export_hand_poses(const char *asset, const char *out, int mode, int f
     UnloadModelAnimations(anims,animCount); return 1;
 }
 
+/* Deliberately scripted presentation transitions and guard switches. Uses
+ * the same pose blend and correction functions as raylib 5.5 rendering, but
+ * is not a live match or a simulation input test. */
+static int export_hand_transition(const char *asset, const char *out, int fps)
+{
+    static const char *state[] = {"idle","jog-in","run","jog-before-carry","carry","jog-before-jump","jump","jog-before-handpass","handpass","jog-before-solo","solo","jog-return"};
+    static const int clips[] = {C_IDLE,C_JOG,C_RUN,C_JOG,C_RUN_BALL,C_JOG,C_JOG,C_JOG,C_HAND_PASS,C_JOG,C_SOLO,C_JOG};
+    AnimState *s=&as[9]; GamePlayer *p; Transform raw[MAX_BONES]; Quaternion previous[MAX_BONES];
+    float boundary[12]={0}, interior[12]={0}; int tested[12]={0}, noops[12]={0}, have_previous=0;
+    FILE *f;
+    if ((fps!=30 && fps!=60) || !strcmp(asset,out) || !load_model_animation(asset)) return 0;
+    detectJogDirection(); detectJogHandProfile(); game_init(&game); game.ball_team=-1; game.ball_player=-1;
+    p=&game.players[0][9]; memset(s,0,sizeof *s); s->speed=3; s->clip=C_IDLE; s->prevClip=C_IDLE; s->blend=1;
+    jogHandRelax=4; poseFar=0; f=fopen(out,"wb"); if (!f) return 0;
+    fprintf(f,"{\"format\":1,\"mode\":4,\"fps\":%d,\"scenario\":\"scripted-hand-transition\",\"bones\":[",fps);
+    for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
+    fputs("],\"frames\":[",f);
+    for (int step=0;step<12*fps;++step) {
+        int phase=step/fps, clip=clips[phase]; float t=fmodf((float)step/fps,clipLen(clip)), w, maxstep=0;
+        int guarded=(phase==4||phase==6||phase==8||phase==10);
+        game.ball_team=phase==4?0:-1; game.ball_player=phase==4?9:-1;
+        p->jump_time=phase==6?.2f:0;
+        p->action=phase==8?GAME_ACT_HANDPASS:phase==10?GAME_ACT_SOLO:GAME_ACT_NONE;
+        w=updatePoseBlend(s,clip,t,1.f/fps); sampleBlendedPose(s,clip,t,w);
+        memcpy(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        relaxJogHands(s,clip);
+        if (guarded && memcmp(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount)) { fclose(f); return 0; }
+        if (guarded) ++noops[phase];
+        for (int b=0;b<model.boneCount;++b) {
+            int parent=boneChild(b); Quaternion a,z,delta; float now[4],old[4],angle;
+            if (parent<0 || b==boneHandL || b==boneHandR || (!boneUnder(b,boneHandL) && !boneUnder(b,boneHandR))) continue;
+            a=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(raw[parent].rotation),raw[b].rotation));
+            z=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(s->pose[parent].rotation),s->pose[b].rotation));
+            delta=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(a),z));
+            now[0]=delta.x; now[1]=delta.y; now[2]=delta.z; now[3]=delta.w;
+            if (have_previous) {
+                old[0]=previous[b].x; old[1]=previous[b].y; old[2]=previous[b].z; old[3]=previous[b].w;
+                if (!am_rotation_distance(now,old,&angle)) { fclose(f); return 0; }
+                if (angle>maxstep) maxstep=angle;
+            }
+            previous[b]=delta;
+        }
+        have_previous=1; ++tested[phase];
+        if (step%fps==0) boundary[phase]=maxstep; else if (maxstep>interior[phase]) interior[phase]=maxstep;
+        if (step%fps==fps/2) {
+            if (phase) fputc(',',f);
+            fputs("{\"state\":",f); write_json_string(f,state[phase]);
+            fputs(",\"raw\":",f); if (!write_pose(f,raw,model.boneCount)) { fclose(f); return 0; }
+            fputs(",\"adjusted\":",f); if (!write_pose(f,s->pose,model.boneCount)) { fclose(f); return 0; }
+            fputc('}',f);
+        }
+    }
+    fputs("]}\n",f); if (fclose(f)) return 0;
+    for (int phase=0;phase<12;++phase) {
+        printf("hand_transition fps=%d state=%s frames=%d guarded_noops=%d boundary_delta_deg=%.3f max_internal_delta_deg=%.3f (local_correction_only)\n",
+               fps,state[phase],tested[phase],noops[phase],boundary[phase]*RAD2DEG,interior[phase]*RAD2DEG);
+        if (tested[phase]!=fps || ((phase==4||phase==6||phase==8||phase==10) && noops[phase]!=fps)) return 0;
+    }
+    UnloadModelAnimations(anims,animCount); return 1;
+}
+
 /* Synthetic moving player: one second warm-up then a one-second turn,
  * straight jog, sprint, jog and stop. Uses the renderer's matching and
  * raylib 5.5 blend helpers; no draw calls or simulation physics. */
@@ -875,6 +936,13 @@ static int export_turn_poses(const char *asset, const char *out, int fps, int ap
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
+    if (argc == 5 && !strcmp(argv[1], "--export-hand-transition")) {
+        char *end; long fps=strtol(argv[4],&end,10);
+        if (*end || (fps!=30 && fps!=60) || !export_hand_transition(argv[2],argv[3],(int)fps)) {
+            fprintf(stderr,"Hand transition export failed\n"); return 1;
+        }
+        return 0;
+    }
     if (argc == 6 && !strcmp(argv[1], "--export-hand-poses")) {
         char *endMode, *endFps; long mode=strtol(argv[4],&endMode,10), fps=strtol(argv[5],&endFps,10);
         if (*endMode || *endFps || mode < 0 || mode > 4 || (fps != 30 && fps != 60) ||

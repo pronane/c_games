@@ -79,3 +79,8 @@ choose an appropriate axis and angular limits. `mesh_diagnostics.py` also has
 floating-point triangle overlap and broad-phase pair counting for offline
 sampled-surface analysis. These are not exact predicates, swept collision or
 full closed-volume containment tests.
+
+`am_rotation_distance` returns shortest angular separation of normalized
+quaternions, treating opposite signs as the same rotation. It can diagnose
+frame-to-frame correction changes without depending on a renderer; it does not
+on its own establish that a visible pose transition is smooth.

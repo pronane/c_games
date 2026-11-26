@@ -276,3 +276,16 @@ int am_rotation_compose_local(const float rotation[4], const float axis[3], floa
     for (int i=0;i<4;i++) out[i]=(float)t[i];
     return 1;
 }
+
+int am_rotation_distance(const float a[4], const float b[4], float *out)
+{
+    double aa=0,bb=0,dot=0;
+    if (!a || !b || !out) return 0;
+    for (int i=0;i<4;i++) {
+        if (!isfinite(a[i]) || !isfinite(b[i])) return 0;
+        aa+=(double)a[i]*a[i]; bb+=(double)b[i]*b[i]; dot+=(double)a[i]*b[i];
+    }
+    if (aa<1e-12 || bb<1e-12) return 0;
+    *out=(float)(2*acos(fmin(1.0,fabs(dot/(sqrt(aa)*sqrt(bb))))));
+    return 1;
+}

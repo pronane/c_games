@@ -436,3 +436,23 @@ close-up stills show noticeably more curled, less open fingers than before,
 but this is not an anatomical or motion-quality verdict. Keep the experiment
 off by default until it is reviewed in full-resolution motion and broader
 scenarios.
+
+### Curled-hand transition and guard investigation
+
+`tests/hand_transition_tests.py` drives the raylib 5.5 presentation blend and
+hand correction through scripted idle, jog, run, carry, jump, handpass and solo
+states at 30/60 Hz. Guarded states must be exact no-ops. It reports the largest
+per-frame change in the *local correction quaternion*, including state
+boundaries; this isolates the added hand correction, not the rendered pose or
+actual gameplay. At 30 Hz on the shipped model the hard guard switch removed up
+to about 20 degrees of correction in one frame when carrying, jumping or
+starting an action; the same risk exists when an unguarded jog resumes without
+a clip fade. No automatic fade was added: a delayed guard could interfere with
+ball or action posing, and requires a safe design and live validation. The
+curled experiment is therefore not ready to default on.
+
+With `--surface`, the script also checks selected skinned finger triangles at
+one mid-state sample for each scripted state; guarded samples must match the
+uncorrected geometry. This is not complete mesh, live gameplay, continuous
+collision or visual validation. The workflow publishes 1.2-second 24 fps
+closer hand crops through the API; original 30 fps videos remain artifacts.

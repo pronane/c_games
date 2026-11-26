@@ -73,6 +73,9 @@ int am_mirror_rotation_x(const float input[4], float out[4]);
  * inputs, rejects degenerate/nonfinite values, allows in-place output. The
  * caller owns anatomical axes, limits and collision checks. */
 int am_rotation_compose_local(const float rotation[4], const float axis[3], float radians, float out[4]);
+/* Shortest angular separation (radians) of two xyzw rotations. Normalizes
+ * inputs; quaternion signs are equivalent. Returns 0 on invalid input. */
+int am_rotation_distance(const float a[4], const float b[4], float *out);
 /* Accumulate horizontal world-space drift while the caller's contact proxy is
  * true in consecutive samples. One independent instance per foot and stream.
  * Distance / seconds is mean path speed, not a sole-contact detector. Invalid
