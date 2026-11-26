@@ -2273,7 +2273,7 @@ Section("M4 authoritative action contracts");
     // Multi-seed action trace smoke: core intents appear and contract fields stay valid.
     var seeds = new[] { 11, 22, 33 };
     var allIntents = new HashSet<string>();
-    bool multiOk = true;
+    bool multiOk = true, contactIntentOk = true; string contactDetail = "ok";
     foreach (var seed in seeds)
     {
         var em = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
@@ -2286,26 +2286,40 @@ Section("M4 authoritative action contracts");
                 if (c2.PlayerIndex != kv.Key) multiOk = false;
                 if (!float.IsFinite(c2.DesiredSpeed) || c2.SpeedLimit <= 0f) multiOk = false;
                 allIntents.Add(c2.Intent);
+                if (c2.Intent is "pass" or "shoot" or "clear" or "tackle" or "throw_in" or "skill")
+                {
+                    if (!c2.RequiresBallContact) { contactIntentOk = false; contactDetail = $"intent={c2.Intent} p={c2.PlayerIndex} seed={seed} t={t}"; }
+                }
             }
         }
     }
     Check("M4 multi-seed contract fields valid", multiOk, multiOk ? "ok" : "invalid");
     Check("M4 multi-seed core intents observed", allIntents.Contains("carry") && (allIntents.Contains("pass") || allIntents.Contains("shoot")), string.Join(",", allIntents));
+    Check("M4 contact-required action intents flag RequiresBallContact", contactIntentOk, contactDetail);
 
-    // Every active player should have a contract each tick.
+    // Every active player should have a valid contract each tick.
     var ec = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 11, AwayHuman = true });
-    bool allCovered = true; string covDetail = "ok";
+    bool allCovered = true, allShapeOk = true; string covDetail = "ok";
     for (int t = 0; t < 300; t++)
     {
         ec.Step(1f / 60f, PlayerCommand.None);
         foreach (var p in ec.State.Players)
         {
             if (p.SentOff) continue;
-            if (!ec.LastActionContracts.ContainsKey(p.Index)) { allCovered = false; covDetail = $"missing p={p.Index} t={t}"; break; }
+            if (!ec.LastActionContracts.TryGetValue(p.Index, out var cc))
+            { allCovered = false; covDetail = $"missing p={p.Index} t={t}"; break; }
+            if (string.IsNullOrWhiteSpace(cc.Intent)
+                || !float.IsFinite(cc.DesiredSpeed) || !float.IsFinite(cc.SpeedLimit) || cc.SpeedLimit <= 0f
+                || !float.IsFinite(cc.BallContactTime) || cc.BallContactTime < 0f
+                || !float.IsFinite(cc.TargetPosition.X) || !float.IsFinite(cc.TargetPosition.Y) || !float.IsFinite(cc.TargetPosition.Z)
+                || !float.IsFinite(cc.FacingDirection.X) || !float.IsFinite(cc.FacingDirection.Y) || !float.IsFinite(cc.FacingDirection.Z)
+                || !float.IsFinite(cc.BallContactPosition.X) || !float.IsFinite(cc.BallContactPosition.Y) || !float.IsFinite(cc.BallContactPosition.Z))
+            { allShapeOk = false; covDetail = $"bad shape p={p.Index} intent={cc.Intent} t={t}"; break; }
         }
-        if (!allCovered) break;
+        if (!allCovered || !allShapeOk) break;
     }
-    Check("M4 every active player has contract", allCovered, covDetail);
+    Check("M4 every active player has contract", allCovered, allCovered ? "ok" : covDetail);
+    Check("M4 every active player contract has valid shape", allShapeOk, allShapeOk ? "ok" : covDetail);
 }
 
 Section("M2 perception uses real capabilities");
