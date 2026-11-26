@@ -872,7 +872,7 @@ public sealed partial class SoccerClipRig : Node3D
         UpdateLookAt(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateReach(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateInertialization(dt);
-        UpdateFootIk(worldPos, yaw);
+        UpdateFootIk(worldPos, yaw, dt);
         StoreInertialPrevPoses(dt);
         _prevFacing = Mx.Norm(Mx.Flat(p.Facing));
         if (_prevFacing.LengthSquared() < 0.001f) _prevFacing = new System.Numerics.Vector3(0, 0, 1);
@@ -1144,7 +1144,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    private void UpdateFootIk(Vector3 worldPos, float yaw)
+    private void UpdateFootIk(Vector3 worldPos, float yaw, float dt)
     {
         if (Skel == null || _bones.Count == 0) return;
         bool leftPlanted = _motionState?.FootPlantedLeft ?? false;
