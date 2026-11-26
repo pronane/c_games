@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-The Arena AI editing sandbox may not have Godot or .NET installed. The GitHub Actions runners are the independent execution environment: they install .NET 9 and Godot 4.7.2 Mono, build the project, run the existing suites, exercise longer deterministic simulations, collect .NET coverage and render screenshot artifacts.
+The Arena AI editing sandbox may not have Godot or .NET installed. GitHub Actions is the independent execution environment: it installs .NET 9 and Godot 4.7.2 Mono, builds the project, runs existing suites, exercises deterministic simulations, collects .NET coverage and renders screenshot artifacts.
 
 A local agent must never describe a build, runtime test or rendered capture as successful unless the matching workflow ran on the commit being reported.
 
@@ -10,25 +10,25 @@ A local agent must never describe a build, runtime test or rendered capture as s
 
 ### Existing: Arena FC tests
 
-\`.github/workflows/arena-fc-tests.yml\` remains the primary existing build/regression workflow. It covers the Godot C# build, server build, pure-C# suites, Godot headless self-test, GDScript checks and Node/network smoke tests.
+`.github/workflows/arena-fc-tests.yml` remains the primary build/regression workflow. It covers the Godot C# build, server build, pure-C# suites, Godot headless self-test, GDScript checks and Node/network smoke tests.
 
 ### Added: Arena FC quality gates
 
-\`.github/workflows/arena-fc-quality.yml\` adds:
+`.github/workflows/arena-fc-quality.yml` adds:
 
-- **Asset and Python contracts:** Python syntax compilation, strict manifest/curve/provenance checks, GLB header/length checks and deterministic manifest rebake validation.
+- **Asset and Python contracts:** Python syntax compilation, validation against the repository's actual v1 clip manifest schema, normalized foot-plant/contact fields, unique clip and pose keys, finite motion metadata, and GLB header/length checks.
 - **Seeded simulation stress:** paired identical-seed 5v5, 7v7 and 11v11 matches; compares authoritative state each tick and rejects non-finite player/ball state.
-- **.NET coverage reports:** collects Cobertura reports from the existing CoreTests and MatchCoreTests console test runners using Microsoft's cross-platform \`dotnet-coverage\`.
+- **.NET coverage reports:** collects Cobertura reports from the existing CoreTests and MatchCoreTests console test runners using Microsoft's cross-platform `dotnet-coverage`.
 - **Rendered evidence:** uses Xvfb and Mesa software rendering to execute the existing procedural-rig and browser-game screenshot scripts. PNGs are uploaded as workflow artifacts.
 
-Pull-request stress runs use 3 seeds and 30 simulated seconds per team size. The scheduled nightly run uses 12 seeds and 90 simulated seconds per team size. Adjust these budgets only after observing CI duration and stability.
+Pull-request stress runs use 3 seeds and 30 simulated seconds per team size. The scheduled nightly run uses 12 seeds and 90 simulated seconds per team size. The workflow is pull-request triggered (not also push triggered) to avoid duplicate runs for the same PR update.
 
 ## How to use it from the Arena AI sandbox
 
 1. Make changes on the PR branch and add regression tests.
 2. Commit and push the changes.
 3. Wait for both **Arena FC tests** and **Arena FC quality gates** on the exact new head SHA.
-4. Inspect the failed job logs and annotations; do not rely only on the green/red summary.
+4. Inspect failed job logs and annotations; do not rely only on the green/red summary.
 5. Download the stress log, Cobertura files and rendered-capture artifact when relevant.
 6. Fix the underlying defect, push again and repeat.
 
@@ -44,4 +44,4 @@ The rendered-capture job proves that the existing rig and browser gameplay captu
 
 ## Branch protection
 
-Repository administrators should configure a ruleset for \`main\` that requires the existing Arena FC test workflow and the new Arena FC quality-gates workflow. The required check names should be selected from actual completed PR runs. Also require the branch to be up to date and block force pushes. The GitHub Actions files cannot safely grant or change repository branch-protection permissions themselves.
+Repository administrators should configure a ruleset for `main` that requires the existing Arena FC test workflow and the new Arena FC quality-gates workflow. Select required check names from actual completed PR runs. Also require the branch to be up to date and block force pushes. The GitHub Actions files cannot safely grant or change repository branch-protection permissions themselves.
