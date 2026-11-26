@@ -29,7 +29,8 @@ Status date: 2026-11-25 (sandbox evidence; visual/runtime Godot checks are limit
 - `34dbb93`: M1 bounce parity + M4 move/idle mapping; CI green.
 - `ba5684a`: TryClaimPoint real-speed change; dotnet-core/godot-selftest failed (calibration: team length in possession 26.6 < 27). Reverted in `31c46ec`.
 - `31c46ec`: revert TryClaimPoint speed change; CI green (Arena FC tests, netplay/determinism).
-- `bf11f29`: M4 contract shape/contact-intent validation tests; dotnet-core failed (idle contract shape at t=0, pass RequiresBallContact false after FirePending mutation). Fix pending.
+- `bf11f29`: M4 contract shape/contact-intent validation tests; dotnet-core failed (idle contract shape at t=0, pass RequiresBallContact false after FirePending mutation). Fixed in `28c6688`/pending.
+- `28c6688`: FirePending RequiresBallContact fix; dotnet-core failed (M4 shape check rejected BallContactTime=-1 sentinel). Fix pending.
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 

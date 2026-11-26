@@ -2312,7 +2312,7 @@ Section("M4 authoritative action contracts");
             if (string.IsNullOrWhiteSpace(cc.Intent)) bad = "intent";
             else if (!float.IsFinite(cc.DesiredSpeed)) bad = "desiredSpeed";
             else if (!float.IsFinite(cc.SpeedLimit) || cc.SpeedLimit <= 0f) bad = $"speedLimit={cc.SpeedLimit}";
-            else if (!float.IsFinite(cc.BallContactTime) || cc.BallContactTime < 0f) bad = $"ballContactTime={cc.BallContactTime}";
+            else if (!float.IsFinite(cc.BallContactTime) || (cc.BallContactTime < 0f && cc.BallContactTime != -1f)) bad = $"ballContactTime={cc.BallContactTime}";
             else if (!float.IsFinite(cc.TargetPosition.X) || !float.IsFinite(cc.TargetPosition.Y) || !float.IsFinite(cc.TargetPosition.Z)) bad = "targetPos";
             else if (!float.IsFinite(cc.FacingDirection.X) || !float.IsFinite(cc.FacingDirection.Y) || !float.IsFinite(cc.FacingDirection.Z)) bad = "facingDir";
             else if (!float.IsFinite(cc.BallContactPosition.X) || !float.IsFinite(cc.BallContactPosition.Y) || !float.IsFinite(cc.BallContactPosition.Z)) bad = "ballContactPos";
