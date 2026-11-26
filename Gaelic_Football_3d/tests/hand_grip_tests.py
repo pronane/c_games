@@ -22,4 +22,10 @@ assert {'stand','jog-a','jog-b','sprint-a','sprint-b'}==set(r['ball_available'])
 for row in r['states']:
     for side in row['sides'].values(): assert side['raw']==side['adjusted']
     for side in row.get('ball_triangle_overlap',{}).values(): assert side['raw']==side['adjusted']
+    for side in row.get('ball_proximity',{}).values():
+        assert side['raw']==side['adjusted']
+        assert 0 <= side['raw']['triangles_within_10mm'] <= side['raw']['triangle_count']
+        assert side['raw']['min_surface_gap_m'] >= -0.11
+    for key, side in row.get('ball_proximity',{}).items():
+        assert (side['raw']['min_surface_gap_m'] < 0) == (row['ball_triangle_overlap'][key]['raw'] > 0)
 print('scripted grip checks passed (selected surfaces only; no live or rendered validation)')

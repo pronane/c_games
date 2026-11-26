@@ -96,7 +96,9 @@ def measure(doc, blob, data, surface=False):
         if do_surface:
             surface_samples += 1
             state_stats={'state':frame.get('state',str(frame_index)), 'sides':{side:{} for side in ('l','r')}}
-            if frame.get('ball_center') is not None: state_stats['ball_triangle_overlap']={side:{} for side in ('l','r')}
+            if frame.get('ball_center') is not None:
+                state_stats['ball_triangle_overlap']={side:{} for side in ('l','r')}
+                state_stats['ball_proximity']={side:{} for side in ('l','r')}
         for kind in ('raw','adjusted'):
             rows=frame[kind]
             if len(rows)!=len(order): raise ValueError('incomplete pose')
@@ -119,7 +121,14 @@ def measure(doc, blob, data, surface=False):
                     if frame.get('ball_center') is not None:
                         center=frame['ball_center']; radius=frame['ball_radius']
                         if not isinstance(radius,(int,float)) or not math.isfinite(radius) or radius<=0: raise ValueError('invalid ball radius')
-                        state_stats['ball_triangle_overlap'][side][kind]=sum(point_triangle_distance(center,t)<radius for group in tris.values() for t in group)
+                        distances=[point_triangle_distance(center,t) for group in tris.values() for t in group]
+                        state_stats['ball_triangle_overlap'][side][kind]=sum(d<radius for d in distances)
+                        # Closest surface distance and a near-contact count help reveal
+                        # floating hands; triangles are not equal-area samples.
+                        state_stats['ball_proximity'][side][kind]={
+                            'min_surface_gap_m':min(distances)-radius,
+                            'triangles_within_10mm':sum(d<=radius+.010 for d in distances),
+                            'triangle_count':len(distances)}
         if do_surface: surface_by_state.append(state_stats)
         for side in ('l','r'):
             for finger in FINGERS:

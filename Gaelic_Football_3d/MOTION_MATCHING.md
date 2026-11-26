@@ -514,3 +514,16 @@ five sampled non-action cradle poses, the default 0.012 m clearance produced
 these samples. Triangle counts are not penetration depth, and zero here does
 not establish whole-hand clearance or a natural-looking grip. In particular,
 changing the game default on this evidence alone could make the hands float.
+
+The grip report also gives the minimum selected-triangle distance to the ball
+surface (negative means the selected surface enters the sphere), and how many
+selected triangles are within 10 mm. These counts are not area-weighted; the
+minimum is not a maximum penetration-depth or whole-hand contact measure.
+For the shipped-model samples, raising clearance from 12 to 25 mm removed the
+jog-b overlap but put the closest selected triangles of both standing/jogging
+hands 11.5–16.1 mm away, with none within 10 mm; sprint still overlapped.
+At 40 mm the closest standing/jogging selected triangles were 25.3–30.3 mm
+away, again with none within 10 mm. Sprint intentionally cradles with only the
+right hand; the left hand is not expected to contact the ball. This tradeoff
+argues against simply increasing the global clearance; more representative
+surface coverage and rendered review are needed before modifying the grip.
