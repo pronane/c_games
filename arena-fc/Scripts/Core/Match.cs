@@ -384,7 +384,7 @@ public sealed partial class MatchEngine
             if (LastActionContracts.TryGetValue(i, out var existing))
             {
                 // Preserve active action contracts set by SetAction/FirePending.
-                if (existing.Intent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "skill" or "throw_in" or "intercept" or "dribble")
+                if (existing.Intent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "skill" or "throw_in" or "intercept" or "dribble" or "catch" or "parry" or "header" or "block")
                     continue;
             }
             if (b.Owner == i)

@@ -2268,6 +2268,28 @@ Section("M4 authoritative action contracts");
     Check("M4 action contract observed", sawAction, sawAction ? "ok" : "missing");
     Check("M4 pass or shoot intent observed", seenIntents.Contains("pass") || seenIntents.Contains("shoot"), string.Join(",", seenIntents));
     Check("M4 tackle intent observed", seenIntents.Contains("tackle"), string.Join(",", seenIntents));
+
+    // Multi-seed action trace smoke: core intents appear and contract fields stay valid.
+    var seeds = new[] { 11, 22, 33 };
+    var allIntents = new HashSet<string>();
+    bool multiOk = true;
+    foreach (var seed in seeds)
+    {
+        var em = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
+        for (int t = 0; t < 900; t++)
+        {
+            em.Step(1f / 60f, PlayerCommand.None);
+            foreach (var kv in em.LastActionContracts)
+            {
+                var c2 = kv.Value;
+                if (c2.PlayerIndex != kv.Key) multiOk = false;
+                if (!float.IsFinite(c2.DesiredSpeed) || c2.SpeedLimit <= 0f) multiOk = false;
+                allIntents.Add(c2.Intent);
+            }
+        }
+    }
+    Check("M4 multi-seed contract fields valid", multiOk, multiOk ? "ok" : "invalid");
+    Check("M4 multi-seed core intents observed", allIntents.Contains("carry") && (allIntents.Contains("pass") || allIntents.Contains("shoot")), string.Join(",", allIntents));
 }
 
 Section("M2 perception uses real capabilities");
