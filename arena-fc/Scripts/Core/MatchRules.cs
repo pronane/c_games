@@ -161,7 +161,7 @@ public sealed partial class MatchEngine
                 q.Pos = OutsideArea(q.Pos, areaGx); q.Target = q.Pos; q.Vel = Vector3.Zero;
                 continue;
             }
-            if (q.IsKeeper && !IsThrowInHold(holder) && MathF.Abs(b.Pos.X) > Mx.HalfLength - 12f) continue; // keeper on his line at a penalty
+            if (q.IsKeeper && AtPenaltySpot(S.RestartPos) && MathF.Abs(b.Pos.X) > Mx.HalfLength - 12f) continue; // keeper on his line at a penalty
             float d = Mx.FlatDist(q.Pos, b.Pos);
             if (d < need - .35f)
             {
