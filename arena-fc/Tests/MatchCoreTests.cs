@@ -1968,29 +1968,29 @@ Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
     // B: MatchEngine blocked-lane avoidance - FindBestPassTarget should avoid directly blocked lane.
     var eng = new MatchEngine(new MatchOptions { Seed = 123, TeamSize = 5, AwayHuman = true });
     eng.State.Phase = Phase.Play; eng.State.PhaseTimer = 0f;
-    var passer = eng.State.Players[eng.State.Controlled];
-    passer.Pos = new Vector3(-10f, 0f, 0f); passer.Vel = Vector3.Zero; passer.Facing = new Vector3(1,0,0);
-    eng.State.Ball.Owner = passer.Index; eng.State.Ball.Pos = passer.Pos; eng.State.Ball.Vel = Vector3.Zero;
+    var bPasser = eng.State.Players[eng.State.Controlled];
+    bPasser.Pos = new Vector3(-10f, 0f, 0f); bPasser.Vel = Vector3.Zero; bPasser.Facing = new Vector3(1,0,0);
+    eng.State.Ball.Owner = bPasser.Index; eng.State.Ball.Pos = bPasser.Pos; eng.State.Ball.Vel = Vector3.Zero;
     PlayerState? safeMate = null, blockedMate = null;
     foreach (var q in eng.State.Players)
     {
-        if (q.Team != passer.Team || q.Index == passer.Index || q.IsKeeper) continue;
+        if (q.Team != bPasser.Team || q.Index == bPasser.Index || q.IsKeeper) continue;
         if (blockedMate == null) { blockedMate = q; q.Pos = new Vector3(8f,0,0f); q.Vel = Vector3.Zero; }
         else if (safeMate == null) { safeMate = q; q.Pos = new Vector3(8f,0,12f); q.Vel = Vector3.Zero; }
         else { q.Pos = new Vector3(-20f,0,20f + q.Index); }
     }
     foreach (var o in eng.State.Players)
     {
-        if (o.Team == passer.Team) continue;
+        if (o.Team == bPasser.Team) continue;
         o.Pos = new Vector3(40f,0,40f); o.Vel = Vector3.Zero;
     }
     if (blockedMate != null)
     {
-        var blocker = eng.State.Players.First(o => o.Team != passer.Team && !o.IsKeeper);
+        var blocker = eng.State.Players.First(o => o.Team != bPasser.Team && !o.IsKeeper);
         blocker.Pos = new Vector3(0f,0,0f); blocker.Vel = Vector3.Zero;
     }
     var mi = typeof(MatchEngine).GetMethod("FindBestPassTarget", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-    int target = mi != null ? (int)mi.Invoke(eng, new object[] { passer, false, false, new Vector2(1f,0f) })! : -1;
+    int target = mi != null ? (int)mi.Invoke(eng, new object[] { bPasser, false, false, new Vector2(1f,0f) })! : -1;
     if (blockedMate != null && safeMate != null)
         Check("blocked-lane pass avoids directly blocked receiver", target != blockedMate.Index, $"target={target} blocked={blockedMate.Index} safe={safeMate.Index}");
     else
@@ -2006,18 +2006,18 @@ Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
     for (int i = 0; i < 120; i++) eng2.Step(1f/60f, PlayerCommand.None);
     var tc = new ArenaFC.Core.Football.TacticalCoordinator();
     var prevRoles = new Dictionary<int, string>();
-    var flips = new Dictionary<int, int>();
+    var roleFlips = new Dictionary<int, int>();
     for (int t = 0; t < 120; t++)
     {
         eng2.Step(1f/60f, PlayerCommand.None);
         foreach (var a in tc.BuildAssignments(eng2.State, 0))
         {
             if (prevRoles.TryGetValue(a.PlayerIndex, out var pr) && pr != a.Role)
-                flips[a.PlayerIndex] = flips.TryGetValue(a.PlayerIndex, out var f) ? f + 1 : 1;
+                roleFlips[a.PlayerIndex] = roleFlips.TryGetValue(a.PlayerIndex, out var f) ? f + 1 : 1;
             prevRoles[a.PlayerIndex] = a.Role;
         }
     }
-    int maxFlips = flips.Count > 0 ? flips.Values.Max() : 0;
+    int maxFlips = roleFlips.Count > 0 ? roleFlips.Values.Max() : 0;
     Check("coordinator role flips bounded over 120 ticks", maxFlips <= 60, $"maxFlips={maxFlips}");
 }
 
