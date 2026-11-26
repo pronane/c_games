@@ -980,6 +980,7 @@ public sealed partial class SoccerClipRig : Node3D
 
     // ---- Hypermotion-style inertialization (velocity-aware) -------------
 
+    // M5 scope: upper-body only (9 bones). Feet/legs excluded to avoid fighting foot IK/contact.
     private static readonly string[] InertialBoneNames =
     {
         "Hips", "spine_01", "spine_02", "neck_01", "head",

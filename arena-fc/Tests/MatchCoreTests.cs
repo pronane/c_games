@@ -2374,6 +2374,7 @@ Section("M4 authoritative action contracts");
             else if (!float.IsFinite(cc.BallContactPosition.X) || !float.IsFinite(cc.BallContactPosition.Y) || !float.IsFinite(cc.BallContactPosition.Z)) bad = "ballContactPos";
             else if (!cc.HasTarget) bad = "hasTarget";
             else if (cc.Role == null) bad = "role";
+            else if (cc.Role is not ("goalkeeper" or "defender" or "midfielder" or "forward")) bad = $"role={cc.Role}";
             else if (!float.IsFinite(cc.DesiredTurnRate) || cc.DesiredTurnRate <= 0f) bad = $"desiredTurnRate={cc.DesiredTurnRate}";
             if (bad != null) { allShapeOk = false; covDetail = $"bad shape p={p.Index} intent={cc.Intent} t={t} {bad}"; break; }
         }
