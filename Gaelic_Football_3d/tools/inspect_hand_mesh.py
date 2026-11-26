@@ -13,7 +13,7 @@ import tempfile
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared/arena_motion"))
-from mesh_diagnostics import centroid, distance, sampled_min_distance, skin_point, triangles_intersect, triangle_overlap_pairs
+from mesh_diagnostics import centroid, distance, sampled_min_distance, skin_point, triangles_intersect, triangle_overlap_pairs, point_triangle_distance
 from inspect_shorts_skin import load_glb, accessor
 from inspect_shorts_motion import mul, trs
 
@@ -96,6 +96,7 @@ def measure(doc, blob, data, surface=False):
         if do_surface:
             surface_samples += 1
             state_stats={'state':frame.get('state',str(frame_index)), 'sides':{side:{} for side in ('l','r')}}
+            if frame.get('ball_center') is not None: state_stats['ball_triangle_overlap']={side:{} for side in ('l','r')}
         for kind in ('raw','adjusted'):
             rows=frame[kind]
             if len(rows)!=len(order): raise ValueError('incomplete pose')
@@ -115,6 +116,10 @@ def measure(doc, blob, data, surface=False):
                     surface_stats[side][kind]['overlap_pairs'] += overlap
                     surface_stats[side][kind]['frames_with_overlap'] += overlap>0
                     state_stats['sides'][side][kind]=overlap
+                    if frame.get('ball_center') is not None:
+                        center=frame['ball_center']; radius=frame['ball_radius']
+                        if not isinstance(radius,(int,float)) or not math.isfinite(radius) or radius<=0: raise ValueError('invalid ball radius')
+                        state_stats['ball_triangle_overlap'][side][kind]=sum(point_triangle_distance(center,t)<radius for group in tris.values() for t in group)
         if do_surface: surface_by_state.append(state_stats)
         for side in ('l','r'):
             for finger in FINGERS:

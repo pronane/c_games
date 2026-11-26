@@ -44,6 +44,7 @@ test-motion-model: motion_headless
 	python3 tests/shorts_runtime_tests.py ./motion_headless assets/models/gaelic_player.glb
 	python3 tests/hand_mesh_tests.py ./motion_headless assets/models/gaelic_player.glb
 	python3 tests/hand_transition_tests.py ./motion_headless assets/models/gaelic_player.glb
+	python3 tests/hand_grip_tests.py ./motion_headless assets/models/gaelic_player.glb
 
 run: $(TARGET)
 	./$(TARGET)

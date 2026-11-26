@@ -92,6 +92,12 @@ jobs:
           python3 tests/shorts_runtime_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
           python3 tests/hand_mesh_tests.py ./motion_headless assets/models/gaelic_player.glb
           python3 tests/hand_mesh_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
+          python3 tests/hand_grip_tests.py ./motion_headless assets/models/gaelic_player.glb
+          python3 tests/hand_grip_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
+          python3 tools/inspect_hand_grip.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless > ../build/cmu-jog-report/cmu-hand-grip.json
+          timeout 300 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --bake-motion ../build/cmu-jog-local/graphics-bind-check.gfmotion --dump-motion-bind ../build/cmu-jog-local/renderer-bind.txt > ../build/cmu-jog-report/renderer-bind.log 2>&1
+          python3 tools/inspect_hand_grip.py ../build/cmu-jog-local/candidate/gaelic_player.glb --check-renderer-bind ../build/cmu-jog-local/renderer-bind.txt > ../build/cmu-jog-report/renderer-bind-check.log
+
           python3 tests/hand_transition_tests.py ./motion_headless assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-hand-transition.log
           python3 tests/hand_transition_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb --surface > ../build/cmu-jog-report/cmu-hand-transition.log
           for mode in 0 1 2 3 4; do
@@ -122,6 +128,8 @@ jobs:
           python3 -c 'import json,pathlib; p=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt"); f=p.open("a"); [(lambda r: [f.write("hand_mesh mode=%d side=%s %s\n"%(m,s,json.dumps(v,sort_keys=True))) for s,v in r["sides"].items()])(json.loads(pathlib.Path("../build/cmu-jog-report/hand-mesh-mode-%d.json"%m).read_text())) for m in (0,1,2,3,4)]; f.close()'
           python3 -c 'import json,pathlib; p=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt"); f=p.open("a"); [(lambda r: f.write("hand_surface mode=%d samples=%d %s\n"%(m,r["surface_samples"],json.dumps(r["sampled_surface_overlap"],sort_keys=True))))(json.loads(pathlib.Path("../build/cmu-jog-report/hand-surface-mode-%d.json"%m).read_text())) for m in (3,4)]; f.close()'
           grep -E '^hand_transition( |_)' ../build/cmu-jog-report/cmu-hand-transition.log >> ../build/cmu-jog-local/diagnostic-summary.txt
+          cat ../build/cmu-jog-report/renderer-bind-check.log >> ../build/cmu-jog-local/diagnostic-summary.txt
+          python3 -c 'import json,pathlib; r=json.loads(pathlib.Path("../build/cmu-jog-report/cmu-hand-grip.json").read_text()); f=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt").open("a"); f.write("grip_surface "+json.dumps({"ball_available":r["ball_available"],"states":r["states"]},separators=(",",":"))+"\n"); f.close()'
           python3 -c 'import json,os,pathlib; text=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt").read_text(); assert len(text)<60000; print(json.dumps({"name":"Motion diagnostics: CMU candidate", "head_sha":os.environ["GITHUB_SHA"], "external_id":os.environ["GITHUB_RUN_ID"], "status":"completed", "conclusion":"neutral", "output":{"title":"Headless joint proxy diagnostics", "summary":"Not rendered mesh, contact or anatomical validation.", "text":text}}))' > ../build/cmu-jog-local/diagnostic-check.json
           gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/diagnostic-check.json > /dev/null
       # Same scripted input and render settings; GF_QUICK stops after frame 340,

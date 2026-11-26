@@ -871,6 +871,80 @@ static int export_hand_transition(const char *asset, const char *out, int fps)
     UnloadModelAnimations(anims,animCount); return 1;
 }
 
+/* Scripted ball-carry/action samples with the frontend's torso and cradle
+ * implementation. Bind rotations are supplied by a GLB-verified exporter. */
+static int export_grip_poses(const char *asset, const char *out, const char *bindpath)
+{
+    static Transform bind[MAX_BONES];
+    static const struct { const char *name; int clip,action; float speed,phase; } cases[]={
+        {"stand",C_IDLE,GAME_ACT_NONE,0,.25f},{"jog-a",C_RUN_BALL,GAME_ACT_NONE,3,.2f},
+        {"jog-b",C_RUN_BALL,GAME_ACT_NONE,3,.7f},{"sprint-a",C_RUN_BALL,GAME_ACT_NONE,7,.2f},
+        {"sprint-b",C_RUN_BALL,GAME_ACT_NONE,7,.7f},{"solo-hold",C_SOLO,GAME_ACT_SOLO,3,.1f},
+        {"solo-release",C_SOLO,GAME_ACT_SOLO,3,.45f},{"solo-return",C_SOLO,GAME_ACT_SOLO,3,.72f},
+        {"solo-held",C_SOLO,GAME_ACT_SOLO,3,.95f},{"handpass",C_HAND_PASS,GAME_ACT_HANDPASS,3,.3f},
+        {"catch",C_CATCH,GAME_ACT_CATCH,3,.8f},{"pickup",C_PICKUP,GAME_ACT_PICKUP,3,.8f}};
+    static const char *finger_names[]={"index_01_l","middle_01_l","ring_01_l","pinky_01_l","thumb_01_l",
+                                       "index_01_r","middle_01_r","ring_01_r","pinky_01_r","thumb_01_r"};
+    static const int expected[]={22,23,25,24,26,27,28,30,29,31};
+    AnimState *s=&as[9]; GamePlayer *p; FILE *f,*bf; char name[128],extra[8];
+    if (!strcmp(asset,out) || !strcmp(bindpath,out) || !load_model_animation(asset)) return 0;
+    bf=fopen(bindpath,"r"); if (!bf) return 0;
+    for (int b=0;b<model.boneCount;++b) {
+        Quaternion q;
+        if (fscanf(bf,"%127s %f %f %f %f",name,&q.x,&q.y,&q.z,&q.w)!=5 || strcmp(name,model.bones[b].name) ||
+            !isfinite(q.x)||!isfinite(q.y)||!isfinite(q.z)||!isfinite(q.w) || QuaternionLength(q)<.99f || QuaternionLength(q)>1.01f) { fclose(bf); return 0; }
+        bind[b].rotation=QuaternionNormalize(q); bind[b].scale=(Vector3){1,1,1};
+    }
+    if (fscanf(bf,"%7s",extra)==1) { fclose(bf); return 0; } fclose(bf);
+    for (int k=0;k<10;++k) {
+        char joint[32];
+        if (findBone(finger_names[k])!=expected[k]) return 0;
+        for (int j=2;j<=3;++j) {
+            const char *suffix=strstr(finger_names[k],"_01_"); size_t prefix;
+            if (!suffix) return 0;
+            prefix=(size_t)(suffix-finger_names[k]);
+            if (snprintf(joint,sizeof joint,"%.*s_%02d_%c",(int)prefix,finger_names[k],j,finger_names[k][strlen(finger_names[k])-1]) >= (int)sizeof joint ||
+                findBone(joint)!=expected[k]+10*(j-1)) return 0;
+        }
+    }
+    model.bindPose=bind; boneSpine=findBone("spine_03"); boneSpine1=findBone("spine_01");
+    boneArmUL=findBone("upperarm_l"); boneArmUR=findBone("upperarm_r");
+    boneArmLL=findBone("lowerarm_l"); boneArmLR=findBone("lowerarm_r");
+    boneMidL=findBone("middle_01_l"); boneMidR=findBone("middle_01_r");
+    if (boneSpine<0 || boneSpine1<0 || boneArmUL<0 || boneArmUR<0 || boneArmLL<0 || boneArmLR<0 || boneMidL<0 || boneMidR<0) return 0;
+    loadGrip(asset); detectJogDirection(); detectJogHandProfile(); game_init(&game);
+    game.ball_team=0; game.ball_player=9; p=&game.players[0][9];
+    f=fopen(out,"wb"); if (!f) return 0;
+    fputs("{\"format\":1,\"mode\":4,\"scenario\":\"scripted-grip\",\"bones\":[",f);
+    for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
+    fputs("],\"frames\":[",f);
+    for (int k=0;k<(int)(sizeof cases/sizeof cases[0]);++k) {
+        Transform raw[MAX_BONES], input[MAX_BONES]; Vector3 center={0}; int hasCenter, cradleValid; float cw;
+        memset(s,0,sizeof *s); s->speed=cases[k].speed; s->clip=cases[k].clip; s->prevClip=cases[k].clip; s->blend=1; s->handRelaxEnvelope=1;
+        p->action=cases[k].action; p->action_time=cases[k].phase*game_action_duration(p->action); p->jump_time=0;
+        sampleClip(cases[k].clip,clipLen(cases[k].clip)*cases[k].phase,s->pose);
+        balanceTorso(s,cases[k].clip); memcpy(input,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        jogHandRelax=0; relaxJogHands(s,cases[k].clip,1.f/30); cradleBall(s,cases[k].clip);
+        cw=cradleWeight(s); cradleValid=s->cradleValid;
+        hasCenter=cradleValid && cases[k].action==GAME_ACT_NONE; if (hasCenter) center=s->cradleCenter;
+        memcpy(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        memcpy(s->pose,input,sizeof(Transform)*(size_t)model.boneCount); s->handRelaxEnvelope=1; jogHandRelax=4;
+        relaxJogHands(s,cases[k].clip,1.f/30); cradleBall(s,cases[k].clip);
+        if (memcmp(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount) || cradleValid!=s->cradleValid ||
+            (hasCenter && Vector3Distance(center,s->cradleCenter)>1e-6f)) { fclose(f); return 0; }
+        if (k) fputc(',',f);
+        fputs("{\"state\":",f); write_json_string(f,cases[k].name);
+        fprintf(f,",\"cradle_weight\":%.9g,\"ball_radius\":%.9g,\"ball_center\":",cw,(float)BALL_R);
+        if (hasCenter) fprintf(f,"[%.9g,%.9g,%.9g]",center.x,center.y,center.z); else fputs("null",f);
+        fputs(",\"raw\":",f); if (!write_pose(f,raw,model.boneCount)) { fclose(f); return 0; }
+        fputs(",\"adjusted\":",f); if (!write_pose(f,s->pose,model.boneCount)) { fclose(f); return 0; }
+        fputc('}',f);
+    }
+    fputs("]}\n",f); if (fclose(f)) return 0;
+    puts("grip_pose cases=12 exact_guard_noops=12 (scripted_cpu_pose_only)");
+    UnloadModelAnimations(anims,animCount); return 1;
+}
+
 /* Synthetic moving player: one second warm-up then a one-second turn,
  * straight jog, sprint, jog and stop. Uses the renderer's matching and
  * raylib 5.5 blend helpers; no draw calls or simulation physics. */
@@ -936,6 +1010,10 @@ static int export_turn_poses(const char *asset, const char *out, int fps, int ap
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
+    if (argc==5 && !strcmp(argv[1],"--export-grip-poses")) {
+        if (!export_grip_poses(argv[2],argv[3],argv[4])) { fprintf(stderr,"Grip pose export failed\n"); return 1; }
+        return 0;
+    }
     if (argc == 5 && !strcmp(argv[1], "--export-hand-transition")) {
         char *end; long fps=strtol(argv[4],&end,10);
         if (*end || (fps!=30 && fps!=60) || !export_hand_transition(argv[2],argv[3],(int)fps)) {

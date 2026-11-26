@@ -89,3 +89,9 @@ on its own establish that a visible pose transition is smooth.
 forbidden and a bounded linear re-entry over a caller-chosen duration. It is
 presentation-only math: callers must update/reset it across hidden or skipped
 frames and decide which guards take priority over smoothing.
+
+`mesh_diagnostics.point_triangle_distance` supplies floating-point
+point-to-triangle distance for offline proximity checks, such as testing a
+sphere against selected skinned triangles. It does not provide complete or
+continuous collision detection; callers must select all relevant surfaces and
+supply centers in the same coordinate system.

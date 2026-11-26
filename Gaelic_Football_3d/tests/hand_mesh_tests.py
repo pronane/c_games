@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from inspect_hand_mesh import compare, select_tips, skin_point, sampled_min_distance, centroid, triangles_intersect, triangle_overlap_pairs
+from inspect_hand_mesh import compare, select_tips, skin_point, sampled_min_distance, centroid, triangles_intersect, triangle_overlap_pairs, point_triangle_distance
 
 try: select_tips([(0,0,0)]*5,[(0,)]*5,[(1,)]*5,0,(0,0,0),(0,0,0))
 except ValueError: pass
@@ -19,6 +19,12 @@ assert triangles_intersect(tri,[(.2,.2,0),(.3,.2,0),(.2,.3,0)])
 assert not triangles_intersect(tri,[(3,3,0),(4,3,0),(3,4,0)])
 assert not triangles_intersect(tri,[(0,0,1),(2,0,1),(0,2,1)])
 assert triangle_overlap_pairs([tri],[tri]) == 1
+assert abs(point_triangle_distance((.2,.2,1),tri)-1)<1e-9
+assert abs(point_triangle_distance((3,0,0),tri)-1)<1e-9
+assert point_triangle_distance((.2,.2,0),tri)<1e-9
+try: point_triangle_distance((0,0,0),[(0,0,0)]*3)
+except ValueError: pass
+else: raise AssertionError('degenerate ball-proximity triangle accepted')
 try: triangles_intersect(tri,[(0,0,0)]*3)
 except ValueError: pass
 else: raise AssertionError('degenerate triangle accepted')

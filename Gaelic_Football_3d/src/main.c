@@ -3737,7 +3737,7 @@ static void checkHold(const char *tag)
 int main(int argc, char **argv)
 {
     int shots = 0, skipIntro = 0, bench = 0, cliQuality = -1, shots31 = 0, shots34 = 0, shotsMotion = 0, startTraining = 0;
-    const char *recordPath = NULL, *recordMotion = NULL, *motionCache = NULL, *motionBake = NULL;
+    const char *recordPath = NULL, *recordMotion = NULL, *motionCache = NULL, *motionBake = NULL, *bindDump = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
         else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
@@ -3748,6 +3748,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--jog-hand-relax-curled") == 0) jogHandRelax = 4;
         else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
         else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
+        else if (strcmp(argv[i], "--dump-motion-bind") == 0 && i + 1 < argc) bindDump = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];
         else if (strcmp(argv[i], "--shots-motion") == 0) shotsMotion = 1, skinBanner = 1, skipIntro = 1;
         else if (strcmp(argv[i], "--record-motion") == 0 && i + 1 < argc) { recordMotion = argv[++i]; shotsMotion = 1; skinBanner = 1; skipIntro = 1; }
@@ -3826,6 +3827,18 @@ int main(int argc, char **argv)
         attachBoneAttributes();
         if (haveLit) for (int m = 0; m < model.materialCount; m++) model.materials[m].shader = gpuSkin ? skinShader : litShader;
         TraceLog(LOG_INFO, "GAME: %d clips loaded, %d bones", C_COUNT, MODEL_BONECOUNT(model));
+    }
+    if (bindDump) {
+        FILE *out = haveModel ? fopen(bindDump,"wb") : NULL;
+        int ok = out != NULL;
+        if (out) {
+            for (int b=0;b<MODEL_BONECOUNT(model);++b) {
+                Quaternion q=QuaternionNormalize(bindOf(b).rotation);
+                if (fprintf(out,"%s %.9g %.9g %.9g %.9g\n",MODEL_BONES(model)[b].name,q.x,q.y,q.z,q.w)<0) ok=0;
+            }
+            if (fclose(out)) ok=0;
+        }
+        if (!ok) { fprintf(stderr,"Could not dump model bind rotations\n"); CloseWindow(); return 1; }
     }
     if (motionBake) {
         int ok = haveModel && motionReady && mm_cache_save(motionBake, playerGlb, MOTION_RAYLIB_VERSION, &motionDb, &actionDb);

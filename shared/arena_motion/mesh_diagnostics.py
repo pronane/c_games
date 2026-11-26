@@ -90,3 +90,35 @@ def triangle_overlap_pairs(a, b, epsilon=1e-7):
             if any(hi[k]+epsilon<lb[k] or hb[k]+epsilon<lo[k] for k in range(3)): continue
             if triangles_intersect(ta,tb,epsilon): total+=1
     return total
+
+
+def point_triangle_distance(point, triangle):
+    """Shortest distance from a point to a non-degenerate 3D triangle.
+
+    Floating-point diagnostic; caller owns units, surface selection and
+    containment/continuous-collision analysis. Raises on invalid triangles.
+    """
+    if len(point)!=3 or len(triangle)!=3 or any(len(p)!=3 for p in triangle) or any(not math.isfinite(x) for p in (point,*triangle) for x in p):
+        raise ValueError('invalid triangle or point')
+    def sub(a,b): return [a[i]-b[i] for i in range(3)]
+    def dot(a,b): return sum(x*y for x,y in zip(a,b))
+    a,b,c=triangle; ab=sub(b,a); ac=sub(c,a); ap=sub(point,a)
+    d00=dot(ab,ab); d01=dot(ab,ac); d11=dot(ac,ac)
+    if d00*d11-d01*d01<1e-24: raise ValueError('degenerate triangle')
+    d1=dot(ab,ap); d2=dot(ac,ap)
+    if d1<=0 and d2<=0: return distance(point,a)
+    bp=sub(point,b); d3=dot(ab,bp); d4=dot(ac,bp)
+    if d3>=0 and d4<=d3: return distance(point,b)
+    vc=d1*d4-d3*d2
+    if vc<=0 and d1>=0 and d3<=0:
+        v=d1/(d1-d3); return distance(point,[a[i]+v*ab[i] for i in range(3)])
+    cp=sub(point,c); d5=dot(ab,cp); d6=dot(ac,cp)
+    if d6>=0 and d5<=d6: return distance(point,c)
+    vb=d5*d2-d1*d6
+    if vb<=0 and d2>=0 and d6<=0:
+        w=d2/(d2-d6); return distance(point,[a[i]+w*ac[i] for i in range(3)])
+    va=d3*d6-d5*d4
+    if va<=0 and d4-d3>=0 and d5-d6>=0:
+        w=(d4-d3)/((d4-d3)+(d5-d6)); return distance(point,[b[i]+w*(c[i]-b[i]) for i in range(3)])
+    v=vb/(va+vb+vc); w=vc/(va+vb+vc)
+    return distance(point,[a[i]+v*ab[i]+w*ac[i] for i in range(3)])

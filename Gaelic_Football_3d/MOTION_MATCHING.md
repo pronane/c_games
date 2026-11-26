@@ -486,3 +486,22 @@ at 60 Hz. Carry, jump, handpass and solo still remained exact no-ops, while
 entry into those guards continued to remove up to 20.08 degrees in one frame.
 These are local-quaternion correction deltas in a synthetic presentation
 scenario, not proof of visually smooth real gameplay or full mesh clearance.
+
+### Scripted cradled-hand surface screen
+
+`tools/inspect_hand_grip.py MODEL --tool ./motion_headless` generates and
+verifies actual bind rotations from the GLB, runs 12 hand-picked standing,
+carrying, solo, handpass, catch and pickup clip states through the frontend's
+`balanceTorso` and `cradleBall` functions, and skins selected finger surfaces.
+Its paired curled/disabled outputs must be exactly equal while possession or
+action guards apply. The workflow also checks the generated bind rotations
+against raylib 5.5's actual renderer-loaded bind pose.
+
+The surface report covers selected triangles only. Where normal non-action
+carrying gives a valid cradle centre, it also screens the selected triangles
+against a radius-0.11 m sphere using a shared point-to-triangle distance helper.
+It deliberately omits the sphere for action states: `carriedBall` uses a
+different, time-dependent ball position there. This is a small synthetic set,
+not real input, complete mesh intersection, live ball physics, animated
+transitions or rendered validation; partial cradle blends can also obscure
+whether an overlap comes from the clip or procedural adjustment.
