@@ -1766,11 +1766,11 @@ Section("Hypermotion / ML-Flow-inspired motion system (TwoBoneIK, BallApproach, 
     eng.LoadClips(new[]
     {
         new ClipMeta { Id = "run", Category = ClipCategory.Locomotion, Duration = 1f, Loop = true, PreferredSpeed = 3f, FootPlantFrames = new[]{0.25f,0.75f} },
-        new ClipMeta { Id = "trap", Category = ClipCategory.FirstTouch, Duration = 0.5f, Loop = false, ContactFraction = 0.5f, BallState = BallState.Approaching },
+        new ClipMeta { Id = "trap", Category = ClipCategory.FirstTouch, Duration = 0.5f, Loop = false, ContactFraction = 0.5f, BallState = ArenaFC.Core.Animation.BallState.Approaching },
     });
     var ms = new MotionState();
     for (int i = 0; i < 30; i++)
-        eng.Update(ms, 3f, 0f, BallState.Approaching, PlayerIntent.Trap, 1f / 60f, secondsUntilContact: 0.15f);
+        eng.Update(ms, 3f, 0f, ArenaFC.Core.Animation.BallState.Approaching, PlayerIntent.Trap, 1f / 60f, secondsUntilContact: 0.15f);
     Check("MotionEngine raises approach weight for timed contact", ms.ApproachWeight > 0.2f, $"w={ms.ApproachWeight:F2}");
     Check("MotionEngine selects contact-capable clip on approach", ms.RenderClipId == "trap" || ms.CurrentClipId == "trap" || ms.NextClipId == "trap",
         $"cur={ms.CurrentClipId} next={ms.NextClipId}");
