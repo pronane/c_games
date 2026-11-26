@@ -44,7 +44,8 @@ public sealed partial class MatchEngine
                 var pred = BallPred(2.0f);
                 if (pred.TryFirstGroundedBelow(1.35f, out var s))
                     return new Vector3(s.Position.X, 0f, s.Position.Z);
-                return LandingPoint(b, 1.3f);
+                var end = pred.At(2.0f);
+                return new Vector3(end.Position.X, 0f, end.Position.Z);
             }
             float flatSpeed = Mx.Flat(b.Vel).Length();
             if (flatSpeed > 8f)

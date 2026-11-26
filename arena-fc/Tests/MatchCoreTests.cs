@@ -2168,6 +2168,30 @@ Section("M3 runtime no-conflicting-chasers and stability");
         }
     }
     Check("M3 no conflicting close pressers", closePressConflicts == 0, $"conflicts={closePressConflicts}/{closePressChecked}");
+
+    // Support-destination quality: coordinator-assigned movement targets stay sane.
+    var e3 = new MatchEngine(new MatchOptions { Seed = 83, TeamSize = 11, AwayHuman = true });
+    var tc3 = new ArenaFC.Core.Football.TacticalCoordinator();
+    int targetChecks = 0, targetBad = 0;
+    for (int t = 0; t < 240; t++)
+    {
+        e3.Step(1f / 60f, PlayerCommand.None);
+        for (int team = 0; team < 2; team++)
+        {
+            var assignments = tc3.BuildAssignments(e3.State, team);
+            foreach (var a in assignments)
+            {
+                if (a.Role is not ("support" or "cover" or "recover" or "press")) continue;
+                targetChecks++;
+                var mt = a.MovementTarget;
+                bool sane = float.IsFinite(mt.X) && float.IsFinite(mt.Z)
+                    && MathF.Abs(mt.X) < Mx.HalfLength + 15f
+                    && MathF.Abs(mt.Z) < Mx.HalfWidth + 15f;
+                if (!sane) targetBad++;
+            }
+        }
+    }
+    Check("M3 coordinator movement targets sane", targetBad == 0, $"bad={targetBad}/{targetChecks}");
 }
 
 Section("M4 authoritative action contracts");
@@ -2207,18 +2231,22 @@ Section("M6 clip manifest provenance/root velocity");
         using var doc = JsonDocument.Parse(System.IO.File.ReadAllText(manifestPath));
         var root = doc.RootElement;
         Check("M6 manifest version 2", root.TryGetProperty("version", out var ver) && ver.GetInt32() == 2, ver.ToString());
-        int clips = 0, withProv = 0, locoNonZero = 0, locoTotal = 0;
+        int clips = 0, withProv = 0, locoNonZero = 0, locoTotal = 0, schemaBad = 0;
         foreach (var c in root.GetProperty("clips").EnumerateArray())
         {
             clips++;
             bool hasProv = c.TryGetProperty("provenance", out var prov) && prov.ValueKind == JsonValueKind.Object;
             bool hasSrc = c.TryGetProperty("source", out var src) && src.ValueKind == JsonValueKind.String;
             if (hasProv || hasSrc) withProv++;
+            int rvLen = c.TryGetProperty("rootVelocitySamples", out var rv) && rv.ValueKind == JsonValueKind.Array ? rv.GetArrayLength() : 0;
+            int plLen = c.TryGetProperty("plantCurveLeft", out var pl) && pl.ValueKind == JsonValueKind.Array ? pl.GetArrayLength() : 0;
+            int prLen = c.TryGetProperty("plantCurveRight", out var pr) && pr.ValueKind == JsonValueKind.Array ? pr.GetArrayLength() : 0;
+            if (rvLen != 64 || plLen != 32 || prLen != 32) schemaBad++;
             string cat = c.TryGetProperty("category", out var catEl) ? catEl.GetString() ?? "" : "";
             if (cat.Equals("Locomotion", StringComparison.OrdinalIgnoreCase))
             {
                 locoTotal++;
-                if (c.TryGetProperty("rootVelocitySamples", out var rv) && rv.ValueKind == JsonValueKind.Array)
+                if (rvLen == 64)
                 {
                     bool nz = false;
                     foreach (var s in rv.EnumerateArray()) { if (s.TryGetSingle(out float f) && MathF.Abs(f) > 1e-6f) { nz = true; break; } }
@@ -2229,6 +2257,7 @@ Section("M6 clip manifest provenance/root velocity");
         Check("M6 manifest has clips", clips > 0, $"clips={clips}");
         Check("M6 all clips have provenance/source", withProv == clips, $"withProv={withProv}/{clips}");
         Check("M6 locomotion clips mostly have nonzero root velocity", locoNonZero >= locoTotal - 3 && locoTotal > 0, $"nonzero={locoNonZero}/{locoTotal}");
+        Check("M6 rootVelocity/plant curve schema", schemaBad == 0, $"bad={schemaBad}/{clips}");
     }
     else
     {
