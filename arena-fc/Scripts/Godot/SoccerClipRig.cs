@@ -1147,6 +1147,9 @@ public sealed partial class SoccerClipRig : Node3D
     private void UpdateFootIk(Vector3 worldPos, float yaw, float dt)
     {
         if (Skel == null || _bones.Count == 0) return;
+        // P0 fix: GetBoneGlobalPose is skeleton-space; convert to/from world explicitly.
+        var skelGlobal = Skel.GlobalTransform;
+        var skelInv = skelGlobal.AffineInverse();
         bool leftPlanted = _motionState?.FootPlantedLeft ?? false;
         bool rightPlanted = _motionState?.FootPlantedRight ?? false;
         float leftPlantW = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
@@ -1157,14 +1160,15 @@ public sealed partial class SoccerClipRig : Node3D
         {
             if (!_bones.TryGetValue(side, out var b)) continue;
             bool isLeft = side == "L";
-            var footGlobal = Skel.GetBoneGlobalPose(b.Foot).Origin;
-            float height = footGlobal.Y - worldPos.Y;
+            var footSkel = Skel.GetBoneGlobalPose(b.Foot).Origin;
+            var footWorld = skelGlobal * footSkel;
+            float height = footWorld.Y - worldPos.Y;
             bool planted = (isLeft ? leftPlanted : rightPlanted) || height < .10f;
 
-            var ground = SampleGround(worldPos, footGlobal);
+            var ground = SampleGround(worldPos, footWorld);
             if (isLeft) _groundNormalL = ground.normal; else _groundNormalR = ground.normal;
             float groundY = ground.hit ? ground.y : worldPos.Y;
-            Vector3 target = new Vector3(footGlobal.X, groundY + 0.012f, footGlobal.Z);
+            Vector3 targetWorld = new Vector3(footWorld.X, groundY + 0.012f, footWorld.Z);
 
             if (planted)
             {
@@ -1172,23 +1176,23 @@ public sealed partial class SoccerClipRig : Node3D
                 ref Vector3 prev = ref (isLeft ? ref _prevFootWorldL : ref _prevFootWorldR);
                 if (hasPrev)
                 {
-                    float slide = new Vector2(footGlobal.X - prev.X, footGlobal.Z - prev.Z).Length();
+                    float slide = new Vector2(footWorld.X - prev.X, footWorld.Z - prev.Z).Length();
                     if (dt > 1e-4f) AnimMetrics?.RecordSample(slide / dt, 0f, false);
                     Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
                     float pw = isLeft ? leftPlantW : rightPlantW;
                     float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f) * Mathf.Clamp(pw, 0f, 1f);
-                    target = target.Lerp(locked, lockW);
+                    targetWorld = targetWorld.Lerp(locked, lockW);
                 }
                 if (height < .22f)
                 {
-                    Vector3 before = Skel.GetBoneGlobalPose(b.Foot).Origin;
-                    SolveTwoBone(b, target, worldPos, yaw);
-                    Vector3 after = Skel.GetBoneGlobalPose(b.Foot).Origin;
-                    float corr = before.DistanceTo(after);
+                    Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    SolveTwoBone(b, skelInv * targetWorld, yaw);
+                    Vector3 afterWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
                 }
-                ApplyFootGroundOrientation(b, ground.normal, yaw);
-                prev = Skel.GetBoneGlobalPose(b.Foot).Origin;
+                ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
+                prev = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
                 prev.Y = groundY + 0.012f;
                 hasPrev = true;
             }
@@ -1197,18 +1201,18 @@ public sealed partial class SoccerClipRig : Node3D
                 if (isLeft) _hasPrevFootL = false; else _hasPrevFootR = false;
                 if (height < .18f)
                 {
-                    Vector3 before = Skel.GetBoneGlobalPose(b.Foot).Origin;
-                    SolveTwoBone(b, target, worldPos, yaw);
-                    Vector3 after = Skel.GetBoneGlobalPose(b.Foot).Origin;
-                    float corr = before.DistanceTo(after);
+                    Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    SolveTwoBone(b, skelInv * targetWorld, yaw);
+                    Vector3 afterWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
-                    ApplyFootGroundOrientation(b, ground.normal, yaw);
+                    ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
                 }
             }
         }
         float pwL = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
         float pwR = _motionState?.PlantWeightRight ?? (rightPlanted ? 1f : 0f);
-        ApplyPelvisStabilization(worldPos, pwL, pwR);
+        ApplyPelvisStabilization(worldPos, pwL, pwR, skelGlobal, skelInv);
         UpdateDebugOverlay();
         ApplyLookAndReach();
     }
@@ -1244,16 +1248,19 @@ public sealed partial class SoccerClipRig : Node3D
         return (hit, y, normal);
     }
 
-    private void ApplyFootGroundOrientation(BoneData b, Vector3 groundNormal, float yaw)
+    private void ApplyFootGroundOrientation(BoneData b, Vector3 groundNormalWorld, Transform3D skelInv, float yaw)
     {
         if (Skel == null) return;
-        if (groundNormal.LengthSquared() < 1e-6f) groundNormal = Vector3.Up;
-        groundNormal = groundNormal.Normalized();
+        if (groundNormalWorld.LengthSquared() < 1e-6f) groundNormalWorld = Vector3.Up;
+        groundNormalWorld = groundNormalWorld.Normalized();
         // Only apply when ground is reasonably level to avoid extreme ankle poses.
-        if (groundNormal.Dot(Vector3.Up) < 0.65f) return;
+        if (groundNormalWorld.Dot(Vector3.Up) < 0.65f) return;
+        // Convert world-space normal/forward to skeleton space for bone override.
+        Vector3 groundNormal = (skelInv.Basis * groundNormalWorld).Normalized();
         var footTx = Skel.GetBoneGlobalPose(b.Foot);
-        Vector3 fwd = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-        // Project forward onto ground plane.
+        Vector3 fwdWorld = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+        Vector3 fwd = skelInv.Basis * fwdWorld;
+        // Project forward onto ground plane in skeleton space.
         fwd = (fwd - groundNormal * fwd.Dot(groundNormal));
         if (fwd.LengthSquared() < 1e-6f) fwd = footTx.Basis.Z;
         fwd = fwd.Normalized();
@@ -1304,13 +1311,14 @@ public sealed partial class SoccerClipRig : Node3D
         catch { /* debug overlay is non-fatal */ }
     }
 
-    private void ApplyPelvisStabilization(Vector3 worldPos, float plantLeft, float plantRight)
+    private void ApplyPelvisStabilization(Vector3 worldPos, float plantLeft, float plantRight, Transform3D skelGlobal, Transform3D skelInv)
     {
         if (Skel == null) return;
         int pelvisIdx = Skel.FindBone("Hips");
         if (pelvisIdx < 0) return;
         var pelvisTx = Skel.GetBoneGlobalPose(pelvisIdx);
-        Vector3 pelvis = pelvisTx.Origin;
+        // Work in world space (report P0: avoid skeleton/world mixing).
+        Vector3 pelvis = skelGlobal * pelvisTx.Origin;
         float lW = Mathf.Clamp(plantLeft, 0f, 1f);
         float rW = Mathf.Clamp(plantRight, 0f, 1f);
 
@@ -1353,19 +1361,19 @@ public sealed partial class SoccerClipRig : Node3D
         float yErr = Mathf.Clamp(targetY - pelvis.Y, -0.04f, 0.04f);
         pelvis.Y += yErr * (0.20f + 0.15f * Mathf.Max(lW, rW));
 
-        pelvisTx.Origin = pelvis;
+        pelvisTx.Origin = skelInv * pelvis;
         Skel.SetBoneGlobalPoseOverride(pelvisIdx, pelvisTx, 1f, true);
         _prevPelvisPos = pelvis;
         _hasPrevPelvisPos = true;
     }
 
 
-    private void SolveTwoBone(BoneData b, Vector3 targetWorld, Vector3 rootWorld, float yaw)
+    private void SolveTwoBone(BoneData b, Vector3 targetSkel, float yaw)
     {
         var hip = Skel.GetBoneGlobalPose(b.Thigh).Origin;
         float l1 = Mathf.Max(0.001f, b.ThighRest.Length());
         float l2 = Mathf.Max(0.001f, b.ShinRest.Length());
-        var toTarget = targetWorld - hip;
+        var toTarget = targetSkel - hip;
         float targetDist = toTarget.Length();
         float total = l1 + l2;
         float minLen = Mathf.Abs(l1 - l2) + 0.002f;
