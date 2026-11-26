@@ -38,7 +38,8 @@ Status date: 2026-11-26 (sandbox evidence; visual/runtime Godot checks are limit
 - `32399c7`: report P0 foot IK skeleton-space/world-space fix in `SoccerClipRig`; CI green.
 - `4a61a8a`: M4 contract semantics - `BallContactTime` remaining seconds (-1 when N/A), `HasTarget` replaces zero-vector target sentinel; CI green.
 - `c94c8aa`: M4 contract fields/tests populated and tightened; CI green.
-- This batch (pending CI): add Godot headless selftest for skeleton/world-space transform round-trip off-origin and rotated rig (report P0 assumption check).
+- `cbbaec7`: Godot headless selftest for skeleton/world-space round-trip off-origin and rotated rig; CI green.
+- This batch (pending CI): document foot IK manual sloped/uneven-surface runtime validation procedure in master status.
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 
@@ -59,6 +60,13 @@ Percentages are rough, evidence-based estimates (not DoD completion). 100% requi
 ## Sandbox-blocked evidence / manual validation procedure
 
 The sandbox has no `dotnet`/Godot runtime for local execution; visual animation validation, performance profiling, and before/after capture cannot be completed here. CI provides build/test/netplay/sim-compare evidence.
+
+### Foot IK world/skeleton validation (report P0, sandbox-blocked)
+
+1. Open `arena-fc` in Godot 4.7.2 Mono on a machine with display/GPU.
+2. Place a player rig off-origin (e.g. X=20, Z=-15), rotated (Y=35deg), on sloped/uneven ground (pitch edge/ramp or test collider).
+3. Run 10-20 seconds of locomotion/turning and confirm planted feet do not slide in world space; foot raycasts hit ground near the actual foot; ground-normal orientation is applied in skeleton space without twisting.
+4. Capture before/after video and `AnimationMetrics` foot-slide/contact values for the same seed/scenario.
 
 ### Commands (Godot-capable environment)
 
