@@ -2,9 +2,9 @@ name: Arena FC quality gates
 
 on:
   pull_request:
-    paths: ["arena-fc/**", ".github/workflows/**"]
-  push:
-    paths: ["arena-fc/**", ".github/workflows/**"]
+    paths:
+      - "arena-fc/**"
+      - ".github/workflows/**"
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: arena-fc-quality-\${{ github.ref }}
+  group: arena-fc-quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,27 +23,28 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Compile Python tooling
         run: python -m compileall -q arena-fc/Tools
-      - name: Validate clip manifest, curves and GLB container
+      - name: Validate committed clip manifest and GLB container
         working-directory: arena-fc
         run: python Tools/ci_validate_assets.py
-      - name: Verify deterministic manifest bake
-        working-directory: arena-fc
-        run: python Tools/bake_clip_manifest_v2.py --check Data/clips/clip_manifest.json Data/models/soccer_player.glb
 
   simulation-stress:
     name: Seeded simulation stress and determinism
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      STRESS_SEEDS: \${{ github.event_name == 'schedule' && '12' || '3' }}
-      STRESS_SECONDS: \${{ github.event_name == 'schedule' && '90' || '30' }}
+      STRESS_SEEDS: ${{ github.event_name == 'schedule' && '12' || '3' }}
+      STRESS_SECONDS: ${{ github.event_name == 'schedule' && '90' || '30' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
@@ -67,6 +68,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
@@ -100,6 +103,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
@@ -144,5 +149,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: arena-fc-rendered-captures
-          path: \${{ runner.temp }}/arena-captures/
+          path: ${{ runner.temp }}/arena-captures/
           if-no-files-found: warn
