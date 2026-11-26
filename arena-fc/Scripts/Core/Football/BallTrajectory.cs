@@ -28,6 +28,11 @@ public sealed class BallTrajectory
     public const float Dt = 1f / 60f;
     public readonly List<BallSample> Samples = new();
 
+    /// <summary>
+    /// Base-flight prediction using Step() physics only. Excludes post-Step match events:
+    /// post/crossbar/keeper/boundary/goal collisions and knuckleball RNG wobble.
+    /// Use for short-horizon AI/animation decisions; never authoritative.
+    /// </summary>
     public static BallTrajectory Predict(Vector3 pos, Vector3 vel, Vector3 spin,
         float horizonSeconds, bool raining = false, float windX = 0f, float windZ = 0f)
     {

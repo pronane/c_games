@@ -1670,7 +1670,7 @@ public sealed partial class MatchEngine
                         var pred = _tacticalBallPred ?? BallPred(1.2f);
                         float maxSpd = p.MaxSpeed;
                         float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
-                        if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f, Mx.Flat(p.Vel) * 0.3f))
+                        if (pred.TryInterceptXZ(p.Pos, maxSpd, accel, out var s, 0f))
                             intercept = new Vector3(s.Position.X, 0f, s.Position.Z);
                     }
                     if (tacAssign != null && isPresser)
@@ -1907,7 +1907,7 @@ public sealed partial class MatchEngine
                 if (pred != null)
                 {
                     float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
-                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var s, 0f, Mx.Flat(p.Vel) * 0.3f))
+                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var s, 0f))
                         score = s.Time * s.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(s.Position.X,0,s.Position.Z)) * 0.01f;
                 }
                 return (p.Index, score);

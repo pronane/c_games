@@ -87,9 +87,7 @@ public sealed class TacticalCoordinator
                     {
                         float prevT = PlayerPerception.TimeToReach(pp.Pos, pp.Vel, ballRef, PlayerMaxSpeed(pp), PlayerAccel(pp));
                         float newT = byReach[0].t;
-                        int held = _roleHoldTicks.TryGetValue(prevPresser, out int h) ? h : 0;
-                        float margin = held < 6 ? 0.24f : 0.18f; // short-hold target-consistent stability
-                        if (prevT <= newT + margin) presser = prevPresser;
+                        if (prevT <= newT + 0.18f) presser = prevPresser; // stability margin
                     }
                 }
             }
