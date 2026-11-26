@@ -11,8 +11,10 @@ public sealed class PlayerActionContract
     public int PlayerIndex;
     public string Intent = "move";
     public Vector3 TargetPosition;
+    public bool HasTarget;
     public Vector3 FacingDirection;
     public Vector3 BallContactPosition;
+    /// <summary>Seconds remaining until ball contact; -1 when not applicable.</summary>
     public float BallContactTime = -1f;
     public float DesiredSpeed;
     public float DesiredTurnRate;

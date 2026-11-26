@@ -151,7 +151,7 @@ public sealed class MotionDriver
         var right = new System.Numerics.Vector3(-fwd.Z, 0, fwd.X);   // same handedness as SoccerClipRig's strafe test
         var vel = Mx.Flat(player.Vel);
         var targetPos = player.Target;
-        if (contract != null && contract.TargetPosition != default)
+        if (contract != null && contract.HasTarget)
             targetPos = contract.TargetPosition;
         var toTarget = Mx.Flat(targetPos - player.Pos);
         var desired = toTarget.LengthSquared() > .04f ? Mx.Norm(toTarget) * MathF.Max(speed, MathF.Min(toTarget.Length() * 2f, 8f))

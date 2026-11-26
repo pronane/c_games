@@ -364,14 +364,19 @@ public sealed partial class MatchEngine
         bool requiresBallContact = intent is "kick" or "shoot" or "pass" or "clear" or "throw_in" or "tackle" or "skill"
             || action is "kick" or "volley" or "throw_in" or "slide" or "tackle";
         p.ActionIntent = intent;
+        // BallContactTime is seconds remaining until contact (-1 if not applicable).
+        float contactAt = duration * Mx.Clamp(contactFrac, 0f, 1f);
+        float elapsed = (p.ActionTimer > 0f && p.ActionDuration > 1e-6f) ? MathF.Max(0f, p.ActionDuration - p.ActionTimer) : 0f;
+        float contactRemaining = requiresBallContact ? MathF.Max(0f, contactAt - elapsed) : -1f;
         LastActionContracts[p.Index] = new ArenaFC.Core.Football.PlayerActionContract
         {
             PlayerIndex = p.Index,
             Intent = intent,
             TargetPosition = p.Target,
+            HasTarget = true,
             FacingDirection = Mx.FlatDir(p.Pos, State.Ball.Pos),
             BallContactPosition = State.Ball.Pos,
-            BallContactTime = duration * Mx.Clamp(contactFrac, 0f, 1f),
+            BallContactTime = contactRemaining,
             DesiredSpeed = Mx.Flat(p.Vel).Length(),
             SpeedLimit = p.MaxSpeed,
             RequiresBallContact = requiresBallContact,
@@ -406,6 +411,7 @@ public sealed partial class MatchEngine
                     PlayerIndex = i,
                     Intent = p.Shielding ? "shield" : "carry",
                     TargetPosition = p.Target,
+                    HasTarget = true,
                     FacingDirection = p.Facing,
                     DesiredSpeed = Mx.Flat(p.Vel).Length(),
                     SpeedLimit = p.MaxSpeed,
@@ -422,6 +428,7 @@ public sealed partial class MatchEngine
                     PlayerIndex = i,
                     Intent = "receive",
                     TargetPosition = recvPos,
+                    HasTarget = true,
                     FacingDirection = Mx.FlatDir(p.Pos, b.Pos),
                     BallContactPosition = recvPos,
                     BallContactTime = ttc,
@@ -438,6 +445,7 @@ public sealed partial class MatchEngine
                     PlayerIndex = i,
                     Intent = speed > 0.5f ? "move" : "idle",
                     TargetPosition = p.Target,
+                    HasTarget = true,
                     FacingDirection = p.Facing.LengthSquared() > 1e-6f ? p.Facing : Mx.FlatDir(p.Pos, b.Pos),
                     DesiredSpeed = speed,
                     SpeedLimit = p.MaxSpeed,
@@ -485,7 +493,7 @@ public sealed partial class MatchEngine
                 LastActionContracts[recv.Index] = new ArenaFC.Core.Football.PlayerActionContract
                 {
                     PlayerIndex = recv.Index, Intent = "receive",
-                    TargetPosition = b.PendingTarget, FacingDirection = Mx.FlatDir(recv.Pos, b.Pos),
+                    TargetPosition = b.PendingTarget, HasTarget = true, FacingDirection = Mx.FlatDir(recv.Pos, b.Pos),
                     BallContactTime = Mx.Clamp(dist / spd, 0.05f, 2.0f),
                     RequiresBallContact = true, DesiredSpeed = 7.5f,
                 };

@@ -35,7 +35,8 @@ Status date: 2026-11-26 (sandbox evidence; visual/runtime Godot checks are limit
 - `c837c2f`: report-driven P1 fixes (TryInterceptXZ current velocity, coordinator team indexing/hold-counter bookkeeping, action-contract persistence, M4 shape tightening, tests); dotnet-core failed (calibration team length OOP 24.7<25, opposition closes down carrier nearTicks=192). Fix pending (restore presser-hysteresis gate).
 - `262675f`: restored presser-hysteresis gate; dotnet-core failed with same 2 calibration failures (OOP team length 24.7, nearTicks=192). TryInterceptXZ caller-velocity integration suspected.
 - `c7c97c8`: revert TryInterceptXZ `p.Vel` caller integration in Match.cs intercept/chase call sites (kept API+test); CI green.
-- This batch (pending CI): report P0 foot IK skeleton-space/world-space fix in `SoccerClipRig` (raycasts, world-foot locks, metrics, ground-normal orientation, pelvis stabilization use explicit world/skeleton transforms; SolveTwoBone takes skeleton-space target).
+- `32399c7`: report P0 foot IK skeleton-space/world-space fix in `SoccerClipRig`; CI green.
+- This batch (pending CI): M4 contract semantics - `BallContactTime` now remaining seconds (-1 when N/A), aligned with MotionDriver `untilContact`; added `HasTarget` and replaced zero-vector target sentinel in MotionDriver/Match contract producers.
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 
