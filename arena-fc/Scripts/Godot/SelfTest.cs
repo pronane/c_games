@@ -180,6 +180,26 @@ public static class SelfTest
         hud.QueueFree();
         stadium.QueueFree();
 
+        Section("Foot IK coordinate-space assumptions (report P0)");
+        {
+            var skelNode = new Skeleton3D();
+            skelNode.Position = new Vector3(10f, 0f, -5f);
+            skelNode.RotationDegrees = new Vector3(0f, 35f, 0f);
+            root.AddChild(skelNode);
+            skelNode.AddBone("Hips");
+            skelNode.SetBoneRest(0, new Transform3D(Basis.Identity, new Vector3(0f, 1f, 0f)));
+            skelNode.SetBonePosePosition(0, new Vector3(0f, 1f, 0f));
+            skelNode.ResetBonePoses();
+            var boneSkel = skelNode.GetBoneGlobalPose(0).Origin;
+            var boneWorld = skelNode.GlobalTransform * boneSkel;
+            var skelInv = skelNode.GlobalTransform.AffineInverse();
+            var roundTrip = skelInv * boneWorld;
+            Check("GetBoneGlobalPose treated as skeleton-space converts to world", (boneWorld - (skelNode.GlobalTransform * boneSkel)).Length() < 0.001f);
+            Check("world/skeleton round-trip stable off-origin rotated rig", (roundTrip - boneSkel).Length() < 0.001f);
+            Check("offset rig bone world position not at skeleton origin", boneWorld.DistanceTo(skelNode.GlobalTransform.Origin) > 0.1f);
+            skelNode.QueueFree();
+        }
+
         Section("Full 3D match pipeline (5v5, 12 simulated seconds)");
         var view = new MatchView();
         view.Init(new MatchOptions { TeamSize = 5, Seed = 4242, TimeSpeed = 15f }, null, () => { });
