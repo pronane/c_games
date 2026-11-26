@@ -456,3 +456,14 @@ one mid-state sample for each scripted state; guarded samples must match the
 uncorrected geometry. This is not complete mesh, live gameplay, continuous
 collision or visual validation. The workflow publishes 1.2-second 24 fps
 closer hand crops through the API; original 30 fps videos remain artifacts.
+
+In candidate run 45860524131, the synthetic guard switches produced an
+approximately 20.08 degree one-frame local-correction removal at both 30 and
+60 Hz, despite exact no-op behavior during carry, jump, handpass and solo.
+The selected-triangle mid-state scan also reported overlapping triangle pairs
+in the unmodified run, carry and solo clip poses; adjusted and raw counts were
+identical at those samples. These are partial headless clip/blend poses without
+ball IK or a live match, so they are a warning to investigate, not a diagnosis
+of the complete rendered hand. The detail previews were retrieved at 480 pixels
+wide and 24 fps; sampled images show a less-open curled pose, but neither the
+full-resolution video nor transition motion was visually verified here.
