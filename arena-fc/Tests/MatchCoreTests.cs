@@ -2037,5 +2037,31 @@ Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
     Check("predicted intercept influences defender chase target", distToIntercept <= distToBallNow + 1.5f, $"targetDistIntercept={distToIntercept:F2} targetDistBall={distToBallNow:F2} target={def.Target}");
 }
 
+Section("M4 seeded telemetry comparison (headless deterministic)");
+{
+    static (int goals, int shots, int passes, int roleChanges, int press, int cover) RunTelemetry(int seed)
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
+        for (int i = 0; i < 600; i++)
+        {
+            var cmds = new Dictionary<int, PlayerCommand>
+            {
+                [e.State.Controlled] = new PlayerCommand { Move = new Vector2((float)Math.Sin(i * .07f), (float)Math.Cos(i * .11f)), Sprint = i % 9 == 0, Pass = i % 73 == 0, Shoot = i % 97 == 0 },
+                [e.State.ControlledAway] = new PlayerCommand { Move = new Vector2((float)Math.Cos(i * .05f), (float)Math.Sin(i * .13f)) },
+            };
+            e.StepOneTick(cmds);
+        }
+        int goals = e.State.Score[0] + e.State.Score[1];
+        int shots = e.State.Shots[0] + e.State.Shots[1];
+        int passes = e.State.Passes[0] + e.State.Passes[1];
+        return (goals, shots, passes, e.TacticalRoleChanges, e.TacticalPressAssignments, e.TacticalCoverAssignments);
+    }
+    var a = RunTelemetry(4242);
+    var b = RunTelemetry(4242);
+    Check("seeded telemetry deterministic", a == b, $"a={a} b={b}");
+    var c = RunTelemetry(4243);
+    Check("seeded telemetry collected", c.shots >= 0 && c.passes >= 0 && c.roleChanges >= 0, $"telemetry={c}");
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

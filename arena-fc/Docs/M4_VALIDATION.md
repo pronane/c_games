@@ -1,0 +1,55 @@
+# Milestone 4 - Validation & Tuning (Arena FC)
+
+## Environment limitation
+This sandbox does not have Godot/.NET runtime installed, so before/after gameplay
+capture and real-clip metric measurement must be run in a Godot-enabled environment.
+The instrumentation/hooks are in place; this document gives the commands to run.
+
+## Seeded telemetry comparison (headless, deterministic)
+Run CoreTests/MatchCoreTests:
+
+```bash
+cd arena-fc
+dotnet test Tests/MatchCoreTests.csproj -c Release
+dotnet run --project Tests/CoreTests.csproj -c Release
+```
+
+The MatchCoreTests include seeded regression checks for:
+- ball trajectory determinism/intercepts
+- coordinator role stability (bounded flips over N ticks)
+- tactical telemetry counters (`TacticalRoleChanges`, press/cover assignments)
+- action contract contact timing
+- predicted intercept decision behavior
+- blocked-lane avoidance
+
+## Godot runtime capture (before/after)
+Run in a machine with Godot 4.7+ and the project imported:
+
+```bash
+cd arena-fc
+# Enable debug overlay for animation/contact signals
+ARENA_FC_DEBUG_OVERLAY=1 godot --path . --scene res://Scenes/Match.tscn
+```
+
+Capture before/after by recording the same seed/scenario:
+- Use the same `MatchOptions.Seed`, team, formation, and camera.
+- Record video and the debug overlay (approach weight, TTC, contact window).
+- Save screenshots/video to `arena-fc/Docs/captures/<date>/`.
+
+## Real-clip metric measurement
+AnimationMetrics hooks are wired in `MotionEngine` and `SoccerClipRig`:
+- foot sliding: `AnimationMetrics.AvgFootSlide` (m/s while planted foot moves)
+- contact-frame error: `AnimationMetrics.AvgContactFrameError` (normalized phase error at contact-timed transitions)
+- transition discontinuity: `AnimationMetrics.AvgTransitionDiscontinuity` (hook; extend with pose delta in Godot)
+
+To capture in Godot, add a temporary debug print in MatchView/World3D:
+
+```csharp
+GD.Print($"AnimMetrics samples={_motion.Metrics.Samples} slide={_motion.Metrics.AvgFootSlide:F3} contactErr={_motion.Metrics.AvgContactFrameError:F3} trans={_motion.Metrics.AvgTransitionDiscontinuity:F3}");
+```
+
+## Tuning targets
+- Reduce foot sliding during planted phases and sharp direction changes.
+- Keep contact-frame error small for pass/shoot/tackle/receive contracts.
+- Avoid transition discontinuities on clip switches; prefer foot-event-aligned transitions.
+- Preserve sim/online determinism: no visual fix may alter authoritative state.
