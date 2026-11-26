@@ -420,7 +420,16 @@ public sealed partial class MatchEngine
             }
             else
             {
-                LastActionContracts.Remove(i);
+                float speed = Mx.Flat(p.Vel).Length();
+                LastActionContracts[i] = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = i,
+                    Intent = speed > 0.5f ? "move" : "idle",
+                    TargetPosition = p.Target,
+                    FacingDirection = p.Facing.LengthSquared() > 1e-6f ? p.Facing : Mx.FlatDir(p.Pos, b.Pos),
+                    DesiredSpeed = speed,
+                    SpeedLimit = p.MaxSpeed,
+                };
             }
         }
     }
