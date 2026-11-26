@@ -96,23 +96,38 @@ public sealed class BallTrajectory
         return found;
     }
 
-    private static void Step(ref Vector3 pos, ref Vector3 vel, ref Vector3 spin, float dt,
-        bool raining, float windX, float windZ)
+    /// <summary>
+    /// Authoritative core ball integration: gravity, Magnus, optional knuckleball
+    /// wobble, drag, wind, air/ground friction and bounce. Does not apply
+    /// collisions, goals, saves or out-of-bounds — those are sim-only.
+    /// </summary>
+    public static void Step(ref Vector3 pos, ref Vector3 vel, ref Vector3 spin, float dt,
+        bool raining, float windX, float windZ, Func<float>? randomSigned = null)
     {
         Vector3 v = vel;
         v.Y += Mx.Gravity * dt;
+        // Magnus effect from spin (side curve + dip).
         v += Vector3.Cross(spin, v) * (.055f * dt);
+        // Knuckleball wobble for power shots (sim-only; predictor omits RNG).
+        if (randomSigned != null && spin.LengthSquared() < 0.1f && v.Length() > 20f)
+        {
+            v.X += randomSigned() * 0.5f * dt;
+            v.Z += randomSigned() * 0.5f * dt;
+        }
+        // Ball drag: air resistance proportional to velocity squared.
         float speed = v.Length();
         float dragCoeff = 0.0035f;
         if (raining) dragCoeff *= 1.5f;
         v -= v * (dragCoeff * speed * dt);
-        bool airborne = v.Y > 0f || pos.Y > Mx.BallRadius + .05f;
-        if (airborne)
+        // Wind: lateral force on airborne ball (matches MatchEngine.BallPhysics).
+        if (pos.Y > Mx.BallRadius + 0.5f)
         {
             v.X += windX * dt * 0.5f;
             v.Z += windZ * dt * 0.5f;
-            v *= 1f - .045f * dt;
         }
+        // Air drag when airborne; rolling friction when on ground.
+        bool airborne = v.Y > 0f || pos.Y > Mx.BallRadius + .05f;
+        if (airborne) v *= 1f - .045f * dt;
         pos += v * dt;
 
         if (pos.Y < Mx.BallRadius)
@@ -123,7 +138,7 @@ public sealed class BallTrajectory
             if (v.Y == 0f)
             {
                 float flat = MathF.Sqrt(v.X * v.X + v.Z * v.Z);
-                float next = MathF.Max(0f, flat * (1f - 0.30f * dt) - 1.0f * dt);
+                float next = MathF.Max(0f, flat * (1f - Mx.RollDrag * dt) - Mx.RollResistance * dt);
                 float k = flat > 1e-4f ? next / flat : 0f;
                 v.X *= k; v.Z *= k;
             }

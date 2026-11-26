@@ -961,11 +961,10 @@ Section("Goals, keeper and AI shooting");
 Section("Laws of the game at restarts (full matches)");
 {
     int restarts = 0, tooClose = 0, ranWithBall = 0, throwOffLine = 0, penaltyCrowd = 0, goalKicks = 0, gkAreaBreach = 0;
-    string gkDbg = "";
     for (int seed = 31; seed <= 33; seed++)
     {
         var m = new MatchEngine(new MatchOptions { Seed = seed });
-        var S = m.State; Phase prev = S.Phase; int taker = -1; Vector3 start = default; Phase takerPhase = Phase.Play;
+        var S = m.State; Phase prev = S.Phase; int taker = -1; Vector3 start = default;
         while (S.Phase != Phase.FullTime)
         {
             S.Controlled = -1;
@@ -974,7 +973,7 @@ Section("Laws of the game at restarts (full matches)");
             if (wasSet && S.Phase == Phase.Play && S.Ball.Owner >= 0)
             {
                 restarts++;
-                taker = S.Ball.Owner; start = S.Players[taker].Pos; takerPhase = prev;
+                taker = S.Ball.Owner; start = S.Players[taker].Pos;
                 int side = S.Players[taker].Team;
                 float need = prev == Phase.ThrowIn ? 2f : 9.15f;
                 foreach (var q in S.Players)
@@ -991,17 +990,13 @@ Section("Laws of the game at restarts (full matches)");
             }
             if (taker >= 0 && S.Ball.Owner == taker && S.Players[taker].MustPlayBall)
             {
-                // Goal kick: opponents stay out of the area until the ball is played.
+                // Goal kick / own-area free kick: opponents stay out of the
+                // penalty area until the ball is in play (restart spot inside).
                 float gx = m.OwnGoalPos(S.Players[taker].Team).X;
-                if (MathF.Abs(S.Ball.Pos.X - gx) < 16.5f && MathF.Abs(S.Ball.Pos.Z) < 20.16f)
+                bool ownAreaRestart = MathF.Abs(S.RestartPos.X - gx) < 16.5f && MathF.Abs(S.RestartPos.Z) < 20.16f;
+                if (ownAreaRestart)
                     foreach (var q in S.Players)
-                        if (q.Team != S.Players[taker].Team && !q.SentOff && MathF.Abs(q.Pos.X - gx) < 16.2f && MathF.Abs(q.Pos.Z) < 19.9f)
-                        {
-                            gkAreaBreach++;
-                            if (gkAreaBreach <= 3)
-                                gkDbg += $"[seed={seed} phase={takerPhase} q={q.Index} gk={q.IsKeeper} qPos=({q.Pos.X:F2},{q.Pos.Z:F2}) ball=({S.Ball.Pos.X:F2},{S.Ball.Pos.Z:F2}) restart=({S.RestartPos.X:F2},{S.RestartPos.Z:F2}) gx={gx:F1} dBall={Mx.FlatDist(q.Pos,S.Ball.Pos):F2}] ";
-                            break;
-                        }
+                        if (q.Team != S.Players[taker].Team && !q.SentOff && MathF.Abs(q.Pos.X - gx) < 16.2f && MathF.Abs(q.Pos.Z) < 19.9f) { gkAreaBreach++; break; }
             }
             if (taker >= 0)
             {
@@ -1016,7 +1011,7 @@ Section("Laws of the game at restarts (full matches)");
     Check("set-piece takers play the ball, they don't run off with it", ranWithBall == 0, $"ran={ranWithBall}");
     Check("throw-ins are taken from the touchline", throwOffLine == 0, $"off line={throwOffLine}");
     Check("only the taker and keeper are in the area at a penalty", penaltyCrowd == 0, $"crowded={penaltyCrowd}");
-    Check("opponents stay outside the penalty area at a goal kick until it is taken", goalKicks > 0 && gkAreaBreach == 0, $"goal kicks={goalKicks} breach ticks={gkAreaBreach} {gkDbg}");
+    Check("opponents stay outside the penalty area at a goal kick until it is taken", goalKicks > 0 && gkAreaBreach == 0, $"goal kicks={goalKicks} breach ticks={gkAreaBreach}");
 }
 {
     // A keeper's parry never sends the ball towards his own goal.
@@ -1863,6 +1858,21 @@ Section("Football intelligence Milestone 1 (trajectory/perception/coordinator)")
     var mid = t1.At(0.5f);
     Check("ball trajectory sample moves forward", mid.Position.X > 1f);
     Check("ball trajectory gravity applied", t1.At(0.2f).Velocity.Y < 4f);
+    // M1 parity: Predict must match shared authoritative Step integration.
+    {
+        Vector3 pp = new(0, 0.11f, 0), pv = new(12f, 4f, 1f), ps = new(0.2f, 0, -0.3f);
+        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(pp, pv, ps, 1.0f, true, 0.8f, -0.4f);
+        Vector3 mp = pp, mv = pv, msSpin = ps;
+        bool parity = true;
+        for (int i = 0; i < pred.Samples.Count; i++)
+        {
+            var s = pred.Samples[i];
+            if ((s.Position - mp).LengthSquared() > 1e-8f || (s.Velocity - mv).LengthSquared() > 1e-8f) { parity = false; break; }
+            if (i < pred.Samples.Count - 1)
+                ArenaFC.Core.Football.BallTrajectory.Step(ref mp, ref mv, ref msSpin, ArenaFC.Core.Football.BallTrajectory.Dt, true, 0.8f, -0.4f);
+        }
+        Check("ball trajectory prediction matches shared Step integration", parity && pred.Samples.Count > 10);
+    }
 
     // Player reachability
     float tReach = ArenaFC.Core.Football.PlayerPerception.TimeToReach(Vector3.Zero, Vector3.Zero, new Vector3(10,0,0), 8f, 12f);

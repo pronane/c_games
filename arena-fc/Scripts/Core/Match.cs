@@ -2969,58 +2969,10 @@ public sealed partial class MatchEngine
     {
         var b = State.Ball;
         b.FreeTime += dt;
-        Vector3 v = b.Vel;
-        v.Y += Mx.Gravity * dt;
-        // Magnus effect from spin (side curve + dip).
-        v += Vector3.Cross(b.Spin, v) * (.055f * dt);
-        // Gap 5: Knuckleball wobble for power shots.
-        if (b.Spin.LengthSquared() < 0.1f && v.Length() > 20f)
-        {
-            v.X += Rng.Signed() * 0.5f * dt;
-            v.Z += Rng.Signed() * 0.5f * dt;
-        }
-        // Ball drag: air resistance proportional to velocity squared.
-        // Prevents shots from floating; high-speed balls decelerate faster.
-        float speed = v.Length();
-        float dragCoeff = 0.0035f; // tuned for realistic shot trajectories
-        // G6: Weather effects — rain increases drag, wind adds lateral force.
-        if (Weather.Raining) dragCoeff *= 1.5f;
-        v -= v * (dragCoeff * speed * dt);
-        // Wind: lateral force on airborne ball
-        if (b.Pos.Y > Mx.BallRadius + 0.5f)
-        {
-            v.X += Weather.WindX * dt * 0.5f;
-            v.Z += Weather.WindZ * dt * 0.5f;
-        }
-        // Air drag when airborne; rolling friction when on ground (stops gliding).
-        bool airborne = v.Y > 0f || b.Pos.Y > Mx.BallRadius + .05f;
-        // Rolling resistance lives in the ground branch below; only air drag here.
-        if (airborne) v *= 1f - .045f * dt;
-        b.Pos += v * dt;
-
-        if (b.Pos.Y < Mx.BallRadius)
-        {
-            b.Pos.Y = Mx.BallRadius;
-            if (v.Y < 0f) v.Y = -v.Y * .48f;
-            if (MathF.Abs(v.Y) < .45f) v.Y = 0f;
-            if (v.Y == 0f)
-            {
-                // Rolling on grass: light speed-proportional drag plus constant
-                // rolling resistance, so a 15 m/s pass rolls ~30 m (was ~7 m).
-                float flat = MathF.Sqrt(v.X * v.X + v.Z * v.Z);
-                float next = MathF.Max(0f, flat * (1f - RollDrag * dt) - RollResistance * dt);
-                float k = flat > 1e-4f ? next / flat : 0f;
-                v.X *= k; v.Z *= k;
-            }
-            else
-            {
-                // Bouncing: each contact scrubs some pace.
-                v.X *= MathF.Max(0f, 1f - .55f * dt);
-                v.Z *= MathF.Max(0f, 1f - .55f * dt);
-            }
-            b.Spin *= MathF.Max(0f, 1f - 2f * dt);
-        }
-        b.Vel = v;
+        // Shared authoritative core integration (gravity, Magnus, knuckleball,
+        // drag, wind, air/ground friction, bounce). Collisions/outcomes below.
+        ArenaFC.Core.Football.BallTrajectory.Step(ref b.Pos, ref b.Vel, ref b.Spin, dt,
+            Weather.Raining, Weather.WindX, Weather.WindZ, Rng.Signed);
 
         // --- Posts and crossbar ---
         foreach (int side in new[] { -1, 1 })
