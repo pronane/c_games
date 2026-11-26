@@ -1013,7 +1013,8 @@ static float cradleWeight(const AnimState *s)
     if (u < 0.50f) return 0.0f;
     return Clamp((u - 0.50f) / 0.50f, 0.0f, 1.0f);
 }
-static void cradleBall(AnimState *s, int clip)
+/* Offset is used only by offline experiments; gameplay passes zero. */
+static void cradleBallWithSprintOffset(AnimState *s, int clip, Vector3 sprintOffset)
 {
     float w = cradleWeight(s);
     Transform saved[MAX_BONES];
@@ -1054,6 +1055,8 @@ static void cradleBall(AnimState *s, int clip)
         curl = (Vector3){ ball.x, ball.y + 0.04f, ball.z + 0.02f };
         {
             Vector3 wR = outsideBall(ball, (Vector3){ ball.x - 0.02f, ball.y - 0.01f, ball.z - 0.04f });
+            if (sprintOffset.x != 0 || sprintOffset.y != 0 || sprintOffset.z != 0)
+                wR = Vector3Add(wR, sprintOffset);
             solveArm(s->pose, boneArmUR, boneArmLR, boneHandR, boneMidR, wR,
                      (Vector3){ -0.7f, -0.35f, 0.15f }, curl);
             orientHand(s->pose, boneHandR, -1.0f, s->pose[boneHandR].translation,
@@ -1070,6 +1073,11 @@ static void cradleBall(AnimState *s, int clip)
         }
     }
 }
+static void cradleBall(AnimState *s, int clip)
+{
+    cradleBallWithSprintOffset(s, clip, (Vector3){0, 0, 0});
+}
+
 #if RAYLIB_VERSION_MAJOR >= 6
 static Matrix invBind[MAX_BONES];
 static int invBindReady;

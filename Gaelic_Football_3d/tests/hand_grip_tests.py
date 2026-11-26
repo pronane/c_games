@@ -2,9 +2,12 @@
 """Scripted cradle poses with real bind rotations; not live/rendered validation."""
 import sys
 import subprocess
+import json
+import tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from inspect_hand_grip import compare, compare_renderer_bind
+from inspect_hand_grip import compare, compare_renderer_bind, bind_rotations
+from inspect_shorts_skin import load_glb
 
 assert compare_renderer_bind('x 0 0 0 1\n','x 0 0 0 -1\n')==0
 for other in ('x 1 0 0 0\n','y 0 0 0 1\n'):
@@ -15,6 +18,23 @@ if len(sys.argv)!=3: raise SystemExit('usage: hand_grip_tests.py TOOL MODEL')
 for bad in ('nan', '0', '0.061', 'garbage'):
     result=subprocess.run([sys.argv[1], '--export-grip-poses', sys.argv[2], '/dev/null', '/dev/null', bad], capture_output=True)
     assert result.returncode != 0
+# Exercise the optional offline offset without the expensive surface screen.
+with tempfile.TemporaryDirectory() as tmp:
+    bind=Path(tmp)/'bind'; doc,blob=load_glb(sys.argv[2]); bind.write_text(bind_rotations(doc,blob))
+    exports=[]
+    for offset in ((0,0,0),(-.08,0,-.08)):
+        out=Path(tmp)/'poses.json'
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',*(str(v) for v in offset)]
+        subprocess.run(cmd,check=True,capture_output=True)
+        exports.append(json.loads(out.read_text()))
+    for a,b in zip(*[x['frames'] for x in exports]):
+        if a['state'].startswith('sprint'):
+            assert a['raw']!=b['raw']
+        else:
+            assert a==b
+    for bad in ('nan','0.201','', 'garbage'):
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',bad,'0','0']
+        assert subprocess.run(cmd,capture_output=True).returncode != 0
 r=compare(sys.argv[2],sys.argv[1])
 assert 0.012 <= r['clearance_m'] <= 0.06
 assert r['samples']==12 and len(r['states'])==12

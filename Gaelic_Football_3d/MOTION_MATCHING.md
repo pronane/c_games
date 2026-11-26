@@ -565,3 +565,24 @@ surface inside the sphere despite the wrist being outside. This is evidence to
 investigate wrist placement and orientation together, not a proof of the best
 correction: these weight-selected triangles may include seams, and rendered
 and continuously animated gripping still need examination.
+
+#### Offline sprint wrist offset experiment
+
+`inspect_hand_grip.py --clearance 0.012 --sprint-offset X Y Z` applies a
+bounded model-space offset in metres to the sprint wrist target *after* the
+normal ball projection, before the existing arm IK and hand orientation. It
+uses the same cradle implementation; the game always passes zero and gains no
+new gameplay setting. It does not alter the scripted ball centre or finger
+plant targets. Offsets can push the target past arm reach, where IK clamps it.
+
+At the default clearance on the shipped GLB, a deliberately large offset of
+(-0.08, 0, -0.08) m reduced the wider right-hand sphere-overlap counts from
+566/578 to 68/66 in the two sprint samples; 4/6 selected distal triangles
+still overlapped. The wrist moved from 124 mm to 233 mm from the centre. A
+side-only (-0.08, 0, 0) m offset yielded 139/135 overlaps; a backward-only
+(0, 0, -0.08) m offset yielded 302/299. This is only a coarse numerical
+experiment, not a proposed setting: such large displacement could stretch the
+palm/finger skin, distort the arm or float visibly. It leaves the ball and
+finger targets unchanged and does not prove continuous, full-mesh or rendered
+contact. A useful correction would need to address wrist, orientation and
+finger shape coherently and be reviewed in motion.
