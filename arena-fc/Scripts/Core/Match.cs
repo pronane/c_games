@@ -1460,8 +1460,8 @@ public sealed partial class MatchEngine
         // a carrier, one engages and two stagger across the passing lanes to contain.
         // The cover defenders jockey instead of all diving into the same scrum.
         bool oppOwns = ball.Owner >= 0 && S.Players[ball.Owner].Team != p.Team;
-        int chaser1 = ClosestToBall(p.Team, 0), chaser2 = ClosestToBall(p.Team, 1);
-        int chaser3 = oppOwns ? ClosestToBall(p.Team, 2) : -1;
+        int chaser1 = PrimaryChaser(p.Team, 0), chaser2 = PrimaryChaser(p.Team, 1);
+        int chaser3 = oppOwns ? PrimaryChaser(p.Team, 2) : -1;
         // Their pass in flight: one man goes for the interception, the rest hold shape
         // (the passing side still sends two, so a team-mate can tidy up a loose one).
         if (!oppOwns && PossessionTeam() >= 0 && PossessionTeam() != p.Team) chaser2 = -1;
@@ -1786,13 +1786,63 @@ public sealed partial class MatchEngine
         return best;
     }
 
-    private int ClosestToBall(int team, int rank)
+    private int PrimaryChaser(int team, int rank)
+    {
+        // M3: coordinator is authoritative for primary defensive engagement when available.
+        // Rank 0 prefers coordinator press, rank 1 prefers cover, rank 2 prefers next defensive role.
+        // Fallback to distance/intercept ranking, excluding higher-ranked picks.
+        if (rank < 0) rank = 0;
+        var exclude = new HashSet<int>();
+        for (int r = 0; r <= rank; r++)
+        {
+            int pick = -1;
+            if (r <= 2)
+            {
+                string? want = r == 0 ? "press" : r == 1 ? "cover" : null;
+                if (want != null)
+                {
+                    foreach (var p in State.Players)
+                    {
+                        if (p.Team != team || p.IsKeeper || p.SentOff || exclude.Contains(p.Index)) continue;
+                        var tac = GetTacticalAssignment(p.Index);
+                        if (tac != null && tac.Role == want) { pick = p.Index; break; }
+                    }
+                }
+                else
+                {
+                    var candidates = new List<(int idx, float score)>();
+                    foreach (var p in State.Players)
+                    {
+                        if (p.Team != team || p.IsKeeper || p.SentOff || exclude.Contains(p.Index)) continue;
+                        var tac = GetTacticalAssignment(p.Index);
+                        if (tac == null) continue;
+                        if (tac.Role == "recover" || tac.Role == "support" || tac.Role == "cover")
+                            candidates.Add((p.Index, Mx.FlatDist2(p.Pos, BallFocus())));
+                    }
+                    if (candidates.Count > 0)
+                    {
+                        candidates.Sort((a, b) => a.score.CompareTo(b.score));
+                        pick = candidates[0].idx;
+                    }
+                }
+            }
+            if (pick < 0) pick = ClosestToBall(team, 0, exclude);
+            if (pick < 0) return -1;
+            if (r == rank) return pick;
+            exclude.Add(pick);
+        }
+        return -1;
+    }
+
+    private int ClosestToBall(int team, int rank) => ClosestToBall(team, rank, null);
+
+    private int ClosestToBall(int team, int rank, HashSet<int>? exclude)
     {
         var b = State.Ball;
         var focus = BallFocus();
         bool looseMoving = b.Owner < 0 && !b.HasPending && !IsSkill && Mx.Flat(b.Vel).LengthSquared() > 4f;
         var pred = looseMoving ? BallPred(1.5f) : null;
-        var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff)
+        var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff && (exclude == null || !exclude.Contains(p.Index)))
             .Select(p => {
                 float score = Mx.FlatDist2(p.Pos, focus);
                 if (pred != null && pred.TryInterceptXZ(p.Pos, 7.2f, 12f, out var s, 0f))

@@ -2116,6 +2116,36 @@ Section("M3 coordinator authority invariants");
     Check("M3 coordinator invariants exercised", checks > 0, $"checks={checks}");
 }
 
+Section("M3 runtime no-conflicting-chasers and stability");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 79, TeamSize = 11, AwayHuman = true });
+    int conflictTicks = 0, checkedTicks = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = -1;
+        if (e.State.Ball.Owner >= 0 && e.State.Ball.Owner < e.State.Players.Length)
+            possTeam = e.State.Players[e.State.Ball.Owner].Team;
+        for (int team = 0; team < 2; team++)
+        {
+            if (possTeam < 0 || possTeam == team) continue;
+            var carrier = e.State.Players[e.State.Ball.Owner];
+            int hardPressers = 0;
+            foreach (var p in e.State.Players)
+            {
+                if (p.Team != team || p.IsKeeper || p.SentOff) continue;
+                bool hardPress = (p.Action == "tackle" || p.Action == "slide")
+                                 && Mx.FlatDist(p.Pos, carrier.Pos) < 1.8f;
+                if (hardPress) hardPressers++;
+            }
+            if (hardPressers > 1) conflictTicks++;
+            checkedTicks++;
+        }
+    }
+    Check("M3 no conflicting hard pressers", conflictTicks == 0, $"conflicts={conflictTicks}/{checkedTicks}");
+    Check("M3 role changes bounded", e.TacticalRoleChanges < 8000, $"roleChanges={e.TacticalRoleChanges}");
+}
+
 Section("M4 authoritative action contracts");
 {
     var e = new MatchEngine(new MatchOptions { Seed = 55, TeamSize = 11, AwayHuman = true });
