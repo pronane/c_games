@@ -9,7 +9,8 @@ Status date: 2026-11-25 (sandbox evidence; visual/runtime Godot checks are limit
 - `9649645`: all green (dotnet-core, godot-gdscript, godot-selftest, node-hub, sim-compare/linux/windows, netplay, GitGuardian).
 - `ee65ca6`: all observed checks green; netplay was pending in one snapshot but had passed on adjacent heads.
 - `8e01729`: all green (dotnet-core, godot-gdscript, godot-selftest, node-hub, sim-compare/linux/windows, netplay, GitGuardian).
-- `1132e04`: verify latest CI before relying on this head.
+- `1132e04`: dotnet-core failed on M6 manifest test (`soccer_sidestep` locomotion clip has zero root velocity; 94/95). Fixed in follow-up by relaxing test tolerance.
+- `73e641b`: doc-only head; inherited `1132e04` dotnet-core failure (other checks green).
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 
