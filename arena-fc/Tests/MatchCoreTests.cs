@@ -2149,23 +2149,67 @@ Section("M3 runtime no-conflicting-chasers and stability");
 Section("M4 authoritative action contracts");
 {
     var e = new MatchEngine(new MatchOptions { Seed = 55, TeamSize = 11, AwayHuman = true });
-    bool sawCarrier = false, sawAction = false, keyOk = true;
-    for (int t = 0; t < 1200; t++)
+    bool sawCarrier = false, sawAction = false, keyOk = true, fieldsOk = true;
+    var seenIntents = new HashSet<string>();
+    for (int t = 0; t < 1800; t++)
     {
         e.Step(1f / 60f, PlayerCommand.None);
         foreach (var kv in e.LastActionContracts)
         {
             var c = kv.Value;
             if (c.PlayerIndex != kv.Key) { keyOk = false; break; }
+            if (!float.IsFinite(c.DesiredSpeed) || !float.IsFinite(c.SpeedLimit) || c.SpeedLimit <= 0f) fieldsOk = false;
+            if (!float.IsFinite(c.FacingDirection.X) || !float.IsFinite(c.FacingDirection.Z)) fieldsOk = false;
+            seenIntents.Add(c.Intent);
             if (c.Intent is "carry" or "shield" or "receive") sawCarrier = true;
-            if (c.Intent is "kick" or "shoot" or "pass" or "receive" or "tackle" or "dive" or "throw_in" or "skill") sawAction = true;
+            if (c.Intent is "kick" or "shoot" or "pass" or "clear" or "receive" or "tackle" or "dive" or "throw_in" or "skill") sawAction = true;
         }
         if (!keyOk) break;
-        if (sawCarrier && sawAction) break;
     }
     Check("M4 contract keys match players", keyOk, keyOk ? "ok" : "mismatch");
+    Check("M4 contract fields finite/valid", fieldsOk, fieldsOk ? "ok" : "invalid field");
     Check("M4 baseline carrier/receive contract observed", sawCarrier, sawCarrier ? "ok" : "missing");
     Check("M4 action contract observed", sawAction, sawAction ? "ok" : "missing");
+    Check("M4 pass or shoot intent observed", seenIntents.Contains("pass") || seenIntents.Contains("shoot"), string.Join(",", seenIntents));
+    Check("M4 tackle intent observed", seenIntents.Contains("tackle"), string.Join(",", seenIntents));
+}
+
+Section("M6 clip manifest provenance/root velocity");
+{
+    string manifestPath = "Data/clips/clip_manifest.json";
+    if (!System.IO.File.Exists(manifestPath)) manifestPath = "arena-fc/Data/clips/clip_manifest.json";
+    if (System.IO.File.Exists(manifestPath))
+    {
+        using var doc = JsonDocument.Parse(System.IO.File.ReadAllText(manifestPath));
+        var root = doc.RootElement;
+        Check("M6 manifest version 2", root.TryGetProperty("version", out var ver) && ver.GetInt32() == 2, ver.ToString());
+        int clips = 0, withProv = 0, locoNonZero = 0, locoTotal = 0;
+        foreach (var c in root.GetProperty("clips").EnumerateArray())
+        {
+            clips++;
+            bool hasProv = c.TryGetProperty("provenance", out var prov) && prov.ValueKind == JsonValueKind.Object;
+            bool hasSrc = c.TryGetProperty("source", out var src) && src.ValueKind == JsonValueKind.String;
+            if (hasProv || hasSrc) withProv++;
+            string cat = c.TryGetProperty("category", out var catEl) ? catEl.GetString() ?? "" : "";
+            if (cat.Equals("Locomotion", StringComparison.OrdinalIgnoreCase))
+            {
+                locoTotal++;
+                if (c.TryGetProperty("rootVelocitySamples", out var rv) && rv.ValueKind == JsonValueKind.Array)
+                {
+                    bool nz = false;
+                    foreach (var s in rv.EnumerateArray()) { if (s.TryGetSingle(out float f) && MathF.Abs(f) > 1e-6f) { nz = true; break; } }
+                    if (nz) locoNonZero++;
+                }
+            }
+        }
+        Check("M6 manifest has clips", clips > 0, $"clips={clips}");
+        Check("M6 all clips have provenance/source", withProv == clips, $"withProv={withProv}/{clips}");
+        Check("M6 locomotion clips have nonzero root velocity", locoNonZero == locoTotal && locoTotal > 0, $"nonzero={locoNonZero}/{locoTotal}");
+    }
+    else
+    {
+        Check("M6 manifest present for validation", false, "manifest not found; run from arena-fc");
+    }
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

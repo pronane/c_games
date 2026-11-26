@@ -1666,7 +1666,7 @@ public sealed partial class MatchEngine
                 // mostly when the carrier's touch is loose.  Every defender within
                 // 2.2 m used to lunge ~3 times a second (~120 tackles a match).
                 var tac = GetTacticalAssignment(p.Index);
-                bool presser = tac != null ? tac.Role == "press" : p.Index == ClosestToBall(p.Team, 0);
+                bool presser = tac != null ? tac.Role == "press" : p.Index == PrimaryChaser(p.Team, 0);
                 float looseTouch = Mx.FlatDist(carrier.Pos, ball.Pos) > .45f || carrier.FirstTouchQuality < .5f ? .22f : 0f;
                 float aggression = presser
                     ? .22f + Options.Difficulty * .04f + (p.Spec.Defending - .5f) * .08f + looseTouch
