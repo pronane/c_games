@@ -1999,7 +1999,7 @@ Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
     // B: predicted intercept - TryInterceptXZ finds intercept for a moving loose ball.
     var pred = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.2f,0), new Vector3(10f,0,0), Vector3.Zero, 1.5f);
     bool canIntercept = pred.TryInterceptXZ(new Vector3(3f,0,1f), 8f, 14f, out var si, 0f);
-    Check("predicted intercept finds moving-ball interception", canIntercept, canIntercept ? $"t={si.Time:F2}" p=({si.Position.X:F1},{si.Position.Z:F1})" : "none");
+    Check("predicted intercept finds moving-ball interception", canIntercept, canIntercept ? $"t={si.Time:F2} p=({si.Position.X:F1},{si.Position.Z:F1})" : "none");
 
     // C: no-oscillation-over-N-ticks - in a stable phase, role flips should be bounded.
     var eng2 = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11 });
