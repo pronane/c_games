@@ -2011,7 +2011,9 @@ public sealed partial class MatchEngine
     }
 
     /// <summary>6.5: a high ball dropping into his area that he can get to first -
-    /// where it comes down through catching height (2.3 m).</summary>
+    /// where it comes down through catching height (2.3 m).
+    /// M2 scope: uses hardcoded reach constants (keeper 6.5, opponent 7.0 m/s);
+    /// replacing with real capabilities is calibration-sensitive.</summary>
     private bool TryClaimPoint(PlayerState k, out Vector3 point)
     {
         var b = State.Ball; point = default;

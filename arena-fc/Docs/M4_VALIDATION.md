@@ -53,3 +53,22 @@ GD.Print($"AnimMetrics samples={_motion.Metrics.Samples} slide={_motion.Metrics.
 - Keep contact-frame error small for pass/shoot/tackle/receive contracts.
 - Avoid transition discontinuities on clip switches; prefer foot-event-aligned transitions.
 - Preserve sim/online determinism: no visual fix may alter authoritative state.
+
+## Contract field consumption audit (2026-11-26)
+
+| Field | Populated by sim | Consumed by MotionDriver | Consumed by SoccerClipRig | Notes |
+|---|---:|---:|---:|---|
+| Intent | Yes | Yes | No (via motion state) | Core action selection driver. |
+| HasTarget / TargetPosition | Yes | Yes | No | `HasTarget` replaces zero-vector sentinel. |
+| FacingDirection | Yes | Yes | No | Overrides yaw when valid. |
+| BallContactTime | Yes (remaining s, -1 N/A) | Yes (untilContact) | No | Aligned to MotionDriver remaining-time semantics. |
+| DesiredSpeed / SpeedLimit | Yes | Yes | No | Speed hint clamped by SpeedLimit. |
+| DesiredTurnRate | Yes (heuristic) | Yes (turn clamp) | No | Heuristic; presentation-only clamp. |
+| ShouldSprint | Yes | Yes (Move->Sprint hint) | No | Presentation-only. |
+| Pressing | Yes | No | No | Populated; presentation/diagnostic currently. |
+| Role | Yes | No | No | Populated; presentation/diagnostic currently. |
+| RequiresFootPlant | Yes | No | No | Populated; rig/plant-window integration pending. |
+| RequiresBallContact | Yes | No | No | Populated; test/audit invariant. |
+| BallContactPosition | Yes | No | No | Populated; presentation/diagnostic. |
+
+SoccerClipRig currently receives motion state, not raw action contracts. Any new contract-field consumption must remain presentation-only and must not alter authoritative match state.
