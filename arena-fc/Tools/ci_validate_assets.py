@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict, dependency-free validation for Arena FC's committed v1 clip manifest and GLB."""
+"""Strict, dependency-free validation for Arena FC v1/v2 clip manifests and GLB."""
 from __future__ import annotations
 
 import argparse
@@ -23,6 +23,15 @@ def finite_number(value: object, label: str) -> float:
     return number
 
 
+def normalized_curve(value: object, label: str, expected_samples: int) -> None:
+    if not isinstance(value, list) or len(value) != expected_samples:
+        fail(f"{label}: expected exactly {expected_samples} samples")
+    for index, sample in enumerate(value):
+        number = finite_number(sample, f"{label}[{index}]")
+        if not 0.0 <= number <= 1.0:
+            fail(f"{label}[{index}] must be normalized to [0,1]")
+
+
 def validate(root: Path) -> None:
     manifest_path = root / "Data/clips/clip_manifest.json"
     glb_path = root / "Data/models/soccer_player.glb"
@@ -32,8 +41,9 @@ def validate(root: Path) -> None:
         fail(f"missing source GLB: {glb_path}")
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("version") != 1:
-        fail(f"expected committed clip manifest version 1, got {manifest.get('version')!r}")
+    version = manifest.get("version")
+    if version not in (1, 2):
+        fail(f"unsupported clip manifest version {version!r}; expected 1 or 2")
     if not isinstance(manifest.get("skeleton"), str) or not manifest["skeleton"]:
         fail("manifest.skeleton must be a non-empty string")
     if not isinstance(manifest.get("poseSource"), str) or not manifest["poseSource"]:
@@ -103,21 +113,54 @@ def validate(root: Path) -> None:
         if contact >= 0:
             contact_clips += 1
 
+        if version == 2:
+            start = finite_number(clip.get("contactWindowStart"), f"{label}.contactWindowStart")
+            end = finite_number(clip.get("contactWindowEnd"), f"{label}.contactWindowEnd")
+            if (start, end) != (-1, -1):
+                if not (0 <= start <= end <= 1):
+                    fail(f"{label}: contact window must be (-1,-1) or normalized with start <= end")
+            normalized_curve(clip.get("plantCurveLeft"), f"{label}.plantCurveLeft", 32)
+            normalized_curve(clip.get("plantCurveRight"), f"{label}.plantCurveRight", 32)
+
+            samples = clip.get("rootVelocitySamples")
+            if not isinstance(samples, list) or len(samples) != 64:
+                fail(f"{label}.rootVelocitySamples: expected 64 finite X/Z samples")
+            for j, sample in enumerate(samples):
+                finite_number(sample, f"{label}.rootVelocitySamples[{j}]")
+
+            source = clip.get("source")
+            provenance = clip.get("provenance")
+            if not isinstance(source, str) or not source:
+                fail(f"{label}.source must be a non-empty string")
+            if not isinstance(provenance, dict) or not isinstance(provenance.get("type"), str):
+                fail(f"{label}.provenance must be an object with a string type")
+            if provenance["type"] != source:
+                fail(f"{label}.source and provenance.type must agree")
+
+    if version == 2:
+        plumbing = manifest.get("hypermotionDataPlumbing")
+        if not isinstance(plumbing, dict):
+            fail("manifest.hypermotionDataPlumbing must be an object in v2")
+        if plumbing.get("phase") != 1 or plumbing.get("samples") != 32:
+            fail("manifest.hypermotionDataPlumbing must declare phase=1 and samples=32")
+        if not isinstance(plumbing.get("source"), str) or not plumbing["source"]:
+            fail("manifest.hypermotionDataPlumbing.source must be a non-empty string")
+
     raw = glb_path.read_bytes()
     if len(raw) < 12:
         fail("source GLB is shorter than its 12-byte header")
-    magic, version, declared_length = struct.unpack("<4sII", raw[:12])
-    if magic != b"glTF" or version != 2:
-        fail(f"invalid GLB header: magic={magic!r}, version={version}")
+    magic, glb_version, declared_length = struct.unpack("<4sII", raw[:12])
+    if magic != b"glTF" or glb_version != 2:
+        fail(f"invalid GLB header: magic={magic!r}, version={glb_version}")
     if declared_length != len(raw):
         fail(f"GLB declared length {declared_length} does not match file length {len(raw)}")
 
     print(
         "PASS asset contracts: "
-        f"manifest v1, {len(clips)} unique clips/pose keys, "
+        f"manifest v{version}, {len(clips)} unique clips/pose keys, "
         f"{plant_clips} clips with foot plants, {contact_clips} contact clips, "
         f"{moving_clips} clips with non-zero root velocity, "
-        f"GLB v{version} ({len(raw):,} bytes)"
+        f"GLB v{glb_version} ({len(raw):,} bytes)"
     )
 
 
