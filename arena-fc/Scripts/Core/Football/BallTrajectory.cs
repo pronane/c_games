@@ -138,7 +138,7 @@ public sealed class BallTrajectory
             if (v.Y == 0f)
             {
                 float flat = MathF.Sqrt(v.X * v.X + v.Z * v.Z);
-                float next = MathF.Max(0f, flat * (1f - Mx.RollDrag * dt) - Mx.RollResistance * dt);
+                float next = MathF.Max(0f, flat * (1f - MatchEngine.RollDrag * dt) - MatchEngine.RollResistance * dt);
                 float k = flat > 1e-4f ? next / flat : 0f;
                 v.X *= k; v.Z *= k;
             }
