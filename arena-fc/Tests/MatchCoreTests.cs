@@ -2240,6 +2240,31 @@ Section("M3 runtime no-conflicting-chasers and stability");
         }
     }
     Check("M3 single primary engager near carrier", engageConflicts == 0, $"conflicts={engageConflicts}/{engageChecked}");
+
+    // Engagement ownership proof: coordinator press role aligns with close engagement.
+    var e6 = new MatchEngine(new MatchOptions { Seed = 97, TeamSize = 11, AwayHuman = true });
+    var tc6 = new ArenaFC.Core.Football.TacticalCoordinator();
+    int pressChecked = 0, pressAligned = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e6.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = e6.State.Ball.Owner >= 0 && e6.State.Ball.Owner < e6.State.Players.Length ? e6.State.Players[e6.State.Ball.Owner].Team : -1;
+        if (possTeam < 0) continue;
+        var carrier = e6.State.Players[e6.State.Ball.Owner];
+        var focus = e6.State.Ball.Owner < 0 ? e6.State.Ball.Pos : carrier.Pos;
+        for (int team = 0; team < 2; team++)
+        {
+            if (team == possTeam) continue;
+            var assignments = tc6.BuildAssignments(e6.State, team);
+            var press = assignments.FirstOrDefault(a => a.Role == "press");
+            if (press == null) continue;
+            pressChecked++;
+            var p = e6.State.Players[press.PlayerIndex];
+            bool aligned = p.Pressing || p.Action == "tackle" || p.Action == "slide" || Mx.FlatDist(p.Pos, focus) < 8f;
+            if (aligned) pressAligned++;
+        }
+    }
+    Check("M3 coordinator press aligned with engagement", pressChecked > 0 && pressAligned >= pressChecked * 95 / 100, $"aligned={pressAligned}/{pressChecked}");
 }
 
 Section("M4 authoritative action contracts");
