@@ -1244,7 +1244,8 @@ static void assistJogArms(AnimState *s, int clip)
 }
 
 /* Rebuild child transforms parent-first so finger joints remain connected.
- * At most .25 radians per joint, fading with locomotion transitions. */
+ * At most .25 radians per joint (.5 for a separate opt-in experiment),
+ * fading with locomotion transitions. */
 static void relaxJogHands(AnimState *s, int clip)
 {
     Transform before[MAX_BONES]; unsigned char finger[MAX_BONES] = {0}, done[MAX_BONES] = {0};
@@ -1264,7 +1265,7 @@ static void relaxJogHands(AnimState *s, int clip)
         target = jogFingerTarget[b];
         dot = fabsf(local.x*target.x + local.y*target.y + local.z*target.z + local.w*target.w);
         angle = 2.0f*acosf(Clamp(dot, 0, 1));
-        blend = am_bounded_rotation_weight(angle, .25f, weight*jogFingerGain[b]);
+        blend = am_bounded_rotation_weight(angle, jogHandRelax == 2 ? .5f : .25f, weight*jogFingerGain[b]);
         if (blend > 0) local = QuaternionSlerp(local, target, blend);
         s->pose[b].translation = Vector3Add(s->pose[parent].translation, Vector3RotateByQuaternion(offset, s->pose[parent].rotation));
         s->pose[b].rotation = QuaternionNormalize(QuaternionMultiply(s->pose[parent].rotation, local));
@@ -3678,6 +3679,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
         else if (strcmp(argv[i], "--jog-arm-assist") == 0) jogArmAssist = 1;
         else if (strcmp(argv[i], "--jog-hand-relax") == 0) jogHandRelax = 1;
+        else if (strcmp(argv[i], "--jog-hand-relax-strong") == 0) jogHandRelax = 2;
         else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
         else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];

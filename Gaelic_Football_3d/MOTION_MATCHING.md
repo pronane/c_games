@@ -353,3 +353,23 @@ sides before the existing experimental correction and 13.1/21.5 afterward,
 but captured images still look splayed. These are joint proxies, not fingertip
 mesh spread or evidence of an anatomically correct pose. The asymmetry and
 rendered uncertainty argue against automatically promoting another clip.
+
+### Experimental fingertip mesh probes
+
+`tools/inspect_hand_mesh.py MODEL --tool ./motion_headless --mode N` compares
+paired raylib 5.5 jog poses using CPU linear skinning of the model's `v0_body`.
+It selects the distal 20% of vertices strongly weighted to each index, middle,
+ring and pinky tip bone, and reports adjacent fingertip-cap centroid gaps,
+minimum *sampled vertex* distances and maximum paired displacement. It excludes
+the thumb, most finger surfaces, triangles and self-occlusion. The result is
+not collision detection, anatomical validation or a substitute for a render.
+The basic point and skinning operations live in `shared/arena_motion` for reuse.
+
+Mode 0 is an unmodified control; 1 is the existing opt-in 0.25-radian idle
+reference; 2 is an additional opt-in **experiment**, `--jog-hand-relax-strong`,
+which permits at most 0.5 radians per eligible joint using the same shared
+bounded rotation helper. Neither is enabled by default. Both retain the
+possession/action/jump and transition guards. The stronger correction is not a
+new reference or a validated natural pose, and should not be promoted based on
+point gaps alone. The workflow produces three matched hand videos, sampled
+stills and mesh proxy reports for comparison.

@@ -61,3 +61,9 @@ meaningful as the caller's positions and contact proxy.
 `am_direction_angle` safely measures the angle between caller-supplied 3D
 directions. It is usable for diagnostics such as comparing hand-joint segment
 bends; it does not classify anatomical plausibility or inspect a skinned mesh.
+
+`mesh_diagnostics.py` provides dependency-free CPU skinned-point, centroid and
+sampled point-distance primitives for offline tooling in any game or asset
+pipeline. Callers must supply compatible bind/pose matrices and meaningful
+vertex sets. A positive sampled-point distance does **not** establish that mesh
+triangles do not intersect, and these helpers do not assess hand anatomy.
