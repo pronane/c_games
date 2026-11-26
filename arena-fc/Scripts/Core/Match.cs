@@ -368,6 +368,7 @@ public sealed partial class MatchEngine
         float contactAt = duration * Mx.Clamp(contactFrac, 0f, 1f);
         float elapsed = (p.ActionTimer > 0f && p.ActionDuration > 1e-6f) ? MathF.Max(0f, p.ActionDuration - p.ActionTimer) : 0f;
         float contactRemaining = requiresBallContact ? MathF.Max(0f, contactAt - elapsed) : -1f;
+        bool requiresFootPlant = intent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "throw_in" or "header" or "catch" or "parry" or "block";
         LastActionContracts[p.Index] = new ArenaFC.Core.Football.PlayerActionContract
         {
             PlayerIndex = p.Index,
@@ -380,6 +381,10 @@ public sealed partial class MatchEngine
             DesiredSpeed = Mx.Flat(p.Vel).Length(),
             SpeedLimit = p.MaxSpeed,
             RequiresBallContact = requiresBallContact,
+            RequiresFootPlant = requiresFootPlant,
+            ShouldSprint = p.Sprinting,
+            Pressing = p.Pressing,
+            Role = p.Role.ToString().ToLowerInvariant(),
         };
     }
 
@@ -415,6 +420,9 @@ public sealed partial class MatchEngine
                     FacingDirection = p.Facing,
                     DesiredSpeed = Mx.Flat(p.Vel).Length(),
                     SpeedLimit = p.MaxSpeed,
+                    ShouldSprint = p.Sprinting,
+                    Pressing = p.Pressing,
+                    Role = p.Role.ToString().ToLowerInvariant(),
                 };
             }
             else if (b.Owner < 0 && b.PassReceiver == i)
@@ -435,6 +443,9 @@ public sealed partial class MatchEngine
                     DesiredSpeed = 7.5f,
                     SpeedLimit = p.MaxSpeed,
                     RequiresBallContact = true,
+                    ShouldSprint = p.Sprinting,
+                    Pressing = p.Pressing,
+                    Role = p.Role.ToString().ToLowerInvariant(),
                 };
             }
             else
@@ -449,6 +460,9 @@ public sealed partial class MatchEngine
                     FacingDirection = p.Facing.LengthSquared() > 1e-6f ? p.Facing : Mx.FlatDir(p.Pos, b.Pos),
                     DesiredSpeed = speed,
                     SpeedLimit = p.MaxSpeed,
+                    ShouldSprint = p.Sprinting,
+                    Pressing = p.Pressing,
+                    Role = p.Role.ToString().ToLowerInvariant(),
                 };
             }
         }
@@ -496,6 +510,9 @@ public sealed partial class MatchEngine
                     TargetPosition = b.PendingTarget, HasTarget = true, FacingDirection = Mx.FlatDir(recv.Pos, b.Pos),
                     BallContactTime = Mx.Clamp(dist / spd, 0.05f, 2.0f),
                     RequiresBallContact = true, DesiredSpeed = 7.5f,
+                    ShouldSprint = recv.Sprinting,
+                    Pressing = recv.Pressing,
+                    Role = recv.Role.ToString().ToLowerInvariant(),
                 };
             }
         }

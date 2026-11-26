@@ -2345,6 +2345,8 @@ Section("M4 authoritative action contracts");
             else if (!float.IsFinite(cc.TargetPosition.X) || !float.IsFinite(cc.TargetPosition.Y) || !float.IsFinite(cc.TargetPosition.Z)) bad = "targetPos";
             else if (!float.IsFinite(cc.FacingDirection.X) || !float.IsFinite(cc.FacingDirection.Y) || !float.IsFinite(cc.FacingDirection.Z)) bad = "facingDir";
             else if (!float.IsFinite(cc.BallContactPosition.X) || !float.IsFinite(cc.BallContactPosition.Y) || !float.IsFinite(cc.BallContactPosition.Z)) bad = "ballContactPos";
+            else if (!cc.HasTarget) bad = "hasTarget";
+            else if (cc.Role == null) bad = "role";
             if (bad != null) { allShapeOk = false; covDetail = $"bad shape p={p.Index} intent={cc.Intent} t={t} {bad}"; break; }
         }
         if (!allCovered || !allShapeOk) break;
@@ -2354,18 +2356,18 @@ Section("M4 authoritative action contracts");
 
     // Action contract persistence across ticks (report P1).
     var ep = new MatchEngine(new MatchOptions { Seed = 65, TeamSize = 11, AwayHuman = true });
-    bool persistenceSaw = false, persistenceOk = true; string persistenceDetail = "none";
+    bool persistenceSaw = false, persistenceOk = true, contactTimeOk = true; string persistenceDetail = "none";
     for (int t = 0; t < 1800; t++)
     {
         ep.Step(1f / 60f, PlayerCommand.None);
-        int watch = -1; string watchIntent = "";
+        int watch = -1; string watchIntent = ""; float watchContact = -1f;
         foreach (var kv in ep.LastActionContracts)
         {
             var c = kv.Value;
             if (c.Intent is "pass" or "shoot" or "clear" or "tackle" or "header" or "catch" or "parry" or "block")
             {
                 var p = ep.State.Players[c.PlayerIndex];
-                if (p.ActionTimer > 2f / 60f) { watch = c.PlayerIndex; watchIntent = c.Intent; break; }
+                if (p.ActionTimer > 2f / 60f) { watch = c.PlayerIndex; watchIntent = c.Intent; watchContact = c.BallContactTime; break; }
             }
         }
         if (watch >= 0)
@@ -2376,13 +2378,19 @@ Section("M4 authoritative action contracts");
             if (ep.LastActionContracts.TryGetValue(watch, out var c2))
             {
                 if (c2.Intent != watchIntent) { persistenceOk = false; persistenceDetail = $"p={watch} {watchIntent}->{c2.Intent} t={t}"; }
-                else persistenceDetail = $"ok {watchIntent}";
+                else
+                {
+                    if (watchContact >= 0f && c2.BallContactTime >= 0f && c2.BallContactTime > watchContact + 0.001f)
+                    { contactTimeOk = false; persistenceDetail = $"contactTime increased {watchContact:F3}->{c2.BallContactTime:F3}"; }
+                    else persistenceDetail = $"ok {watchIntent}";
+                }
             }
             else { persistenceOk = false; persistenceDetail = $"missing p={watch} intent={watchIntent} t={t}"; }
             if (persistenceSaw) break;
         }
     }
     Check("M4 action contract persists across ticks", persistenceSaw && persistenceOk, persistenceDetail);
+    Check("M4 persistent action BallContactTime does not increase", !persistenceSaw || contactTimeOk, persistenceDetail);
 }
 
 Section("M2 perception uses real capabilities");

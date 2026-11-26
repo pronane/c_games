@@ -36,7 +36,8 @@ Status date: 2026-11-26 (sandbox evidence; visual/runtime Godot checks are limit
 - `262675f`: restored presser-hysteresis gate; dotnet-core failed with same 2 calibration failures (OOP team length 24.7, nearTicks=192). TryInterceptXZ caller-velocity integration suspected.
 - `c7c97c8`: revert TryInterceptXZ `p.Vel` caller integration in Match.cs intercept/chase call sites (kept API+test); CI green.
 - `32399c7`: report P0 foot IK skeleton-space/world-space fix in `SoccerClipRig`; CI green.
-- This batch (pending CI): M4 contract semantics - `BallContactTime` now remaining seconds (-1 when N/A), aligned with MotionDriver `untilContact`; added `HasTarget` and replaced zero-vector target sentinel in MotionDriver/Match contract producers.
+- `4a61a8a`: M4 contract semantics - `BallContactTime` remaining seconds (-1 when N/A), `HasTarget` replaces zero-vector target sentinel; CI green.
+- This batch (pending CI): M4 contract fields/tests - populate `ShouldSprint/Pressing/Role/RequiresFootPlant` on producers; shape checks assert `HasTarget` and non-null `Role`; persistence test asserts BallContactTime does not increase across ticks.
 
 Automated checks in CI include: manifest version sanity, `bake_clip_manifest_v2.py --check`, Godot C# build, server build, full `Tests/CoreTests.csproj` suite, netplay/determinism, sim compare, Godot selftest/GDScript tests.
 
