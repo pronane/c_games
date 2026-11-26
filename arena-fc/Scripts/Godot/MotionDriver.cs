@@ -169,11 +169,11 @@ public sealed class MotionDriver
     {
         return intent switch
         {
-            "kick" or "shoot" or "volley" or "chip_shot" or "trivela" or "bicycle" => PlayerIntent.Shoot,
+            "kick" or "shoot" or "volley" or "chip_shot" or "trivela" or "bicycle" or "clear" => PlayerIntent.Shoot,
             "pass" or "short_pass" or "through_ball" or "cross" or "throw_in" => intent is "pass" or "short_pass" ? PlayerIntent.Pass : PlayerIntent.ThroughBall,
-            "receive" or "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
-            "tackle" or "slide" or "shoulder_charge" => PlayerIntent.Tackle,
-            "dive" or "keeper_dive" => PlayerIntent.Dive,
+            "receive" or "trap" or "thigh_control" or "chest_control" or "header" or "pickup" or "catch" or "intercept" => PlayerIntent.Trap,
+            "tackle" or "slide" or "shoulder_charge" or "block" => PlayerIntent.Tackle,
+            "dive" or "keeper_dive" or "parry" => PlayerIntent.Dive,
             "celebrate" => PlayerIntent.Celebrate,
             "shield" => PlayerIntent.Shield,
             "carry" => fallback == PlayerIntent.Sprint ? PlayerIntent.Sprint : PlayerIntent.Move,
@@ -188,12 +188,12 @@ public sealed class MotionDriver
         {
             return p.Action switch
             {
-                "kick" or "volley" or "shoot" or "chip_shot" or "trivela" or "bicycle" => PlayerIntent.Shoot,
+                "kick" or "volley" or "shoot" or "chip_shot" or "trivela" or "bicycle" or "clear" => PlayerIntent.Shoot,
                 "pass" or "short_pass" => PlayerIntent.Pass,
                 "through_ball" or "cross" or "throw_in" => PlayerIntent.ThroughBall,
-                "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
-                "tackle" or "slide" or "shoulder_charge" => PlayerIntent.Tackle,
-                "dive" or "keeper_dive" => PlayerIntent.Dive,
+                "trap" or "thigh_control" or "chest_control" or "header" or "pickup" or "catch" or "intercept" => PlayerIntent.Trap,
+                "tackle" or "slide" or "shoulder_charge" or "block" => PlayerIntent.Tackle,
+                "dive" or "keeper_dive" or "parry" => PlayerIntent.Dive,
                 "celebrate" => PlayerIntent.Celebrate,
                 "cut" or "turn" => PlayerIntent.Cut,
                 // Skill moves have their own Sprite Forge clips now (SoccerClipRig plays
