@@ -460,7 +460,10 @@ public sealed partial class MatchEngine
             b.PassReceiver = b.PendingReceiver;
             b.PassTarget = b.PendingTarget;
             if (LastActionContracts.TryGetValue(actor.Index, out var ac))
+            {
                 ac.Intent = isPass ? "pass" : "shoot";
+                ac.RequiresBallContact = true;
+            }
             if (isPass && b.PendingReceiver < State.Players.Length)
             {
                 var recv = State.Players[b.PendingReceiver];
