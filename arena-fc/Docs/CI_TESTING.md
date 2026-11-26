@@ -16,7 +16,7 @@ A local agent must never describe a build, runtime test or rendered capture as s
 
 `.github/workflows/arena-fc-quality.yml` adds:
 
-- **Asset and Python contracts:** Python syntax compilation, validation against the repository's actual v1 clip manifest schema, normalized foot-plant/contact fields, unique clip and pose keys, finite motion metadata, and GLB header/length checks.
+- **Asset and Python contracts:** Python syntax compilation and schema-aware validation of both v1 and v2 clip manifests. The v2 checks cover normalized left/right plant curves, paired 32-sample phase curves, 64 finite X/Z root-velocity samples, contact windows, source/provenance consistency and the GLB header/declared length.
 - **Seeded simulation stress:** paired identical-seed 5v5, 7v7 and 11v11 matches; compares authoritative state each tick and rejects non-finite player/ball state.
 - **.NET coverage reports:** collects Cobertura reports from the existing CoreTests and MatchCoreTests console test runners using Microsoft's cross-platform `dotnet-coverage`.
 - **Rendered evidence:** uses Xvfb and Mesa software rendering to execute the existing procedural-rig and browser-game screenshot scripts. PNGs are uploaded as workflow artifacts.
@@ -28,20 +28,13 @@ Pull-request stress runs use 3 seeds and 30 simulated seconds per team size. The
 1. Make changes on the PR branch and add regression tests.
 2. Commit and push the changes.
 3. Wait for both **Arena FC tests** and **Arena FC quality gates** on the exact new head SHA.
-4. Inspect failed job logs and annotations; do not rely only on the green/red summary.
-5. Download the stress log, Cobertura files and rendered-capture artifact when relevant.
-6. Fix the underlying defect, push again and repeat.
+4. Inspect failed job logs and annotations; do not rely only on the green/red sum.
+5. Download and inspect the stress logs, coverage reports and rendered captures from the workflow artifacts.
 
-The sandbox can author code and inspect source, but it must not claim to have run Godot or .NET locally unless those executables really exist there.
+## What a passing run does and does not prove
 
-## Coverage interpretation
-
-The Cobertura reports are a baseline, not a quality score. These console suites are not yet converted to a standard test-framework project, so this workflow collects coverage around their existing executable runners. Review which assemblies and source files are represented before setting hard percentage gates. Do not set arbitrary global thresholds until the baseline has been inspected and the important domain code has adequate tests.
-
-## Visual-test limitations
-
-The rendered-capture job proves that the existing rig and browser gameplay capture scripts execute and produce PNGs under a software-rendered display. It does not yet compare the images against approved golden images, measure world-space foot sliding, validate the C# SoccerClipRig on every skeleton, or replace human review of animation quality. Those require dedicated deterministic Godot scenes and metrics before visual regression can be a strict merge gate.
-
-## Branch protection
-
-Repository administrators should configure a ruleset for `main` that requires the existing Arena FC test workflow and the new Arena FC quality-gates workflow. Select required check names from actual completed PR runs. Also require the branch to be up to date and block force pushes. The GitHub Actions files cannot safely grant or change repository branch-protection permissions themselves.
+- A passing asset job proves the committed manifest and GLB satisfy the checked structural contracts; it does not prove animation quality.
+- A passing stress job proves the tested seeds/team sizes remained finite and matched their paired deterministic run; it is not exhaustive simulation verification.
+- Coverage artifacts are an initial baseline, not a percentage gate. Inspect the reports before setting thresholds.
+- Render captures prove scripts execute and emit PNGs. They do **not** prove golden-image equivalence, perceptual animation quality, correct world-space foot planting or absence of foot sliding. Those require the next visual-validation stage: deterministic camera/pose scenarios, golden or metric-based comparisons, and explicit world-space foot-contact/slide measurements.
+- Branch protection remains a repository administrator configuration step.
