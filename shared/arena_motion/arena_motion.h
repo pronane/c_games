@@ -65,6 +65,10 @@ float am_bounded_rotation_weight(float angle, float limit, float blend);
  * nonfinite or near-zero vectors, leaving out unchanged on failure. Useful
  * for bone-segment diagnostics; it does not infer anatomy or contact. */
 int am_direction_angle(const float a[3], const float b[3], float *out);
+/* Reflect a local xyzw rotation across the coordinate system's X plane.
+ * Caller must establish that the left/right local bases actually mirror.
+ * Returns 0 on invalid input, leaving out unchanged; in-place is supported. */
+int am_mirror_rotation_x(const float input[4], float out[4]);
 /* Accumulate horizontal world-space drift while the caller's contact proxy is
  * true in consecutive samples. One independent instance per foot and stream.
  * Distance / seconds is mean path speed, not a sole-contact detector. Invalid

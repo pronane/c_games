@@ -119,7 +119,7 @@ def compare(model, tool, mode=1, fps=30):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__); p.add_argument('model'); p.add_argument('--tool',required=True)
-    p.add_argument('--mode',type=int,choices=(0,1,2),default=1); p.add_argument('--fps',type=int,choices=(30,60),default=30)
+    p.add_argument('--mode',type=int,choices=(0,1,2,3),default=1); p.add_argument('--fps',type=int,choices=(30,60),default=30)
     a=p.parse_args(); print(json.dumps(compare(a.model,a.tool,a.mode,a.fps),indent=2))
 
 if __name__=='__main__': main()

@@ -246,3 +246,15 @@ int am_direction_angle(const float a[3], const float b[3], float *out)
     *out = (float)acos(fmax(-1.0, fmin(1.0, ab/(sqrt(aa)*sqrt(bb)))));
     return 1;
 }
+
+int am_mirror_rotation_x(const float input[4], float out[4])
+{
+    double norm=0; float q[4];
+    if (!input || !out) return 0;
+    for (int i=0;i<4;++i) { if (!isfinite(input[i])) return 0; norm+=(double)input[i]*input[i]; }
+    if (norm<1e-12) return 0;
+    norm=sqrt(norm); q[0]=(float)(input[0]/norm); q[1]=(float)(-input[1]/norm);
+    q[2]=(float)(-input[2]/norm); q[3]=(float)(input[3]/norm);
+    for (int i=0;i<4;++i) out[i]=q[i];
+    return 1;
+}

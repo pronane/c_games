@@ -390,13 +390,13 @@ static int validate_jog_hand_relax(void)
 
 /* The stronger pose is a separately opted-in experiment, with the same
  * exclusions and a larger but still bounded local joint correction. */
-static int validate_strong_hand_relax(void)
+static int validate_extra_hand_relax(int mode)
 {
     AnimState *s=&as[9]; Transform before[MAX_BONES]; int changed=0;
     detectJogHandProfile(); game_init(&game); game.ball_team=-1; game.ball_player=-1;
     game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=0;
     memset(s,0,sizeof *s); s->speed=3; s->clip=C_JOG; s->prevClip=C_JOG; s->blend=1;
-    jogHandRelax=2;
+    jogHandRelax=mode;
     for (int f=0;f<ANIM_FRAMES(*animFor(C_JOG))-1;f+=3) {
         sampleClip(C_JOG,f/ANIM_FPS,s->pose); memcpy(before,s->pose,sizeof(Transform)*(size_t)model.boneCount);
         relaxJogHands(s,C_JOG);
@@ -407,7 +407,7 @@ static int validate_strong_hand_relax(void)
             Quaternion a=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(before[parent].rotation),before[b].rotation));
             Quaternion z=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(s->pose[parent].rotation),s->pose[b].rotation));
             float dot=fabsf(a.x*z.x+a.y*z.y+a.z*z.z+a.w*z.w), angle=2*acosf(Clamp(dot,0,1));
-            if (!finite3(s->pose[b].translation) || angle>.501f ||
+            if (!finite3(s->pose[b].translation) || angle>(mode == 2 ? .501f : .251f) ||
                 fabsf(Vector3Distance(before[parent].translation,before[b].translation)-Vector3Distance(s->pose[parent].translation,s->pose[b].translation))>.0001f) return 0;
             if (angle>.001f) ++changed;
         }
@@ -421,7 +421,9 @@ static int validate_strong_hand_relax(void)
     if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
     game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG);
     if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    jogHandRelax=0; printf("jog_hand_strong changed_samples=%d guards=ok (bone_proxy_only)\n",changed); return 1;
+    { int mirrored=0; for (int b=0;b<model.boneCount;++b) mirrored+=jogFingerMirrorValid[b]!=0;
+      printf("jog_hand_extra mode=%d changed_samples=%d mirrored_right=%d guards=ok (bone_proxy_only)\n",mode,changed,mirrored); }
+    jogHandRelax=0; return 1;
 }
 
 static int validate_jog_stride_ramp(void)
@@ -783,7 +785,7 @@ static int export_jog_poses(const char *asset, const char *out, float speed, int
 static int export_hand_poses(const char *asset, const char *out, int mode, int fps)
 {
     FILE *f; AnimState *s = &as[9]; Transform raw[MAX_BONES];
-    if ((mode < 0 || mode > 2) || (fps != 30 && fps != 60) || !strcmp(asset,out)) return 0;
+    if ((mode < 0 || mode > 3) || (fps != 30 && fps != 60) || !strcmp(asset,out)) return 0;
     if (!load_model_animation(asset)) return 0;
     detectJogDirection(); detectJogHandProfile();
     game_init(&game); game.ball_team = -1; game.ball_player = -1;
@@ -875,7 +877,7 @@ int main(int argc, char **argv)
     const char *asset, *cache;
     if (argc == 6 && !strcmp(argv[1], "--export-hand-poses")) {
         char *endMode, *endFps; long mode=strtol(argv[4],&endMode,10), fps=strtol(argv[5],&endFps,10);
-        if (*endMode || *endFps || mode < 0 || mode > 2 || (fps != 30 && fps != 60) ||
+        if (*endMode || *endFps || mode < 0 || mode > 3 || (fps != 30 && fps != 60) ||
             !export_hand_poses(argv[2],argv[3],(int)mode,(int)fps)) {
             fprintf(stderr,"Hand pose export failed\n"); return 1;
         }
@@ -927,7 +929,7 @@ int main(int argc, char **argv)
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
-        !validate_interruption() || !validate_leg_ik() || !validate_jog_arm_assist() || !validate_jog_hand_relax() || !validate_strong_hand_relax() || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
+        !validate_interruption() || !validate_leg_ik() || !validate_jog_arm_assist() || !validate_jog_hand_relax() || !validate_extra_hand_relax(2) || !validate_extra_hand_relax(3) || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
         !compare_entry_poses(GAME_ACT_SOLO) || !benchmark_search()) {
         fprintf(stderr, "Action integration check failed\n"); return 1;
     }

@@ -167,4 +167,14 @@ static void direction_angle(void)
     y[1] = NAN; assert(!am_direction_angle(x,y,&angle));
     assert(!am_direction_angle(NULL,x,&angle)); assert(!am_direction_angle(x,x,NULL));
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); puts("arena motion tests passed"); return 0; }
+static void mirrored_rotation(void)
+{
+    float q[4]={.2f,.3f,.4f,.5f}, a[4], b[4], zero[4]={0};
+    assert(am_mirror_rotation_x(q,a)); assert(a[0]>0 && a[1]<0 && a[2]<0 && a[3]>0);
+    assert(am_mirror_rotation_x(a,b));
+    for (int i=0;i<4;++i) assert(fabsf(b[i]-q[i]/sqrtf(.54f))<.00001f);
+    assert(am_mirror_rotation_x(a,a));
+    assert(!am_mirror_rotation_x(zero,a)); q[0]=NAN; assert(!am_mirror_rotation_x(q,a));
+    assert(!am_mirror_rotation_x(NULL,a)); assert(!am_mirror_rotation_x(b,NULL));
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); puts("arena motion tests passed"); return 0; }

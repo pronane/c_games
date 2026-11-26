@@ -104,7 +104,8 @@ static int reverseJog = 0;
 static int jogArmAssist = 0;    /* experimental opt-in, never simulation authority */
 static int jogHandRelax = 0;
 static float jogFingerGain[MAX_BONES];
-static Quaternion jogFingerTarget[MAX_BONES];
+static Quaternion jogFingerTarget[MAX_BONES], jogFingerMirrorTarget[MAX_BONES];
+static unsigned char jogFingerMirrorValid[MAX_BONES];
 static float jogArmGain[2], jogLegCentre[2], jogLegRadius[2];
 
 static Model model;
@@ -760,6 +761,7 @@ static void detectJogHandProfile(void)
 {
     ModelAnimation *jog, *idle; Transform *ref; float *samples; int n, refFrame;
     memset(jogFingerGain, 0, sizeof jogFingerGain);
+    memset(jogFingerMirrorValid, 0, sizeof jogFingerMirrorValid);
     if (boneHandL < 0 || boneHandR < 0 || clipIdx[C_JOG] < 0 || clipIdx[C_IDLE] < 0) return;
     jog = animFor(C_JOG); idle = animFor(C_IDLE); n = ANIM_FRAMES(*jog)-1;
     if (n < 8 || n > 1000000 || ANIM_FRAMES(*idle) < 1) return;
@@ -779,6 +781,33 @@ static void detectJogHandProfile(void)
         }
         jogFingerGain[b] = am_rotation_stillness(samples, n);
         jogFingerTarget[b] = QuaternionNormalize(QuaternionMultiply(QuaternionInvert(ref[parent].rotation), ref[b].rotation));
+    }
+    /* Reflect the left reference into matching right-hand local bases only
+     * when names, hierarchy, near-static profiles and source rotations agree.
+     * This is an experiment, not an anatomical calibration. */
+    for (int b=0; b<MODEL_BONECOUNT(model); ++b) if (boneUnder(b,boneHandR) && b!=boneHandR) {
+        const char *name=MODEL_BONES(model)[b].name; size_t len=strlen(name);
+        char leftName[64]; int l, lp, rp=boneChild(b); Quaternion lq,rq; float in[4],out[4],dot;
+        if (len < 3 || len >= sizeof leftName || strcmp(name+len-2,"_r")) continue;
+        memcpy(leftName,name,len+1); leftName[len-1]='l'; l=findBone(leftName);
+        if (l<0 || !boneUnder(l,boneHandL) || l==boneHandL || rp<0 || jogFingerGain[b]<.99f || jogFingerGain[l]<.99f) continue;
+        lp=boneChild(l); if (lp<0 || ((rp==boneHandR)!=(lp==boneHandL))) continue;
+        if (rp!=boneHandR) {
+            const char *rn=MODEL_BONES(model)[rp].name, *ln=MODEL_BONES(model)[lp].name;
+            size_t rlen=strlen(rn), llen=strlen(ln);
+            if (rlen != llen || rlen<3 || strcmp(rn+rlen-2,"_r") || strcmp(ln+llen-2,"_l") || strncmp(rn,ln,rlen-1)) continue;
+        }
+        Transform *first=ANIM_POSES(*jog)[0]; if (!first) continue;
+        lq=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(first[lp].rotation),first[l].rotation));
+        rq=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(first[rp].rotation),first[b].rotation));
+        in[0]=lq.x; in[1]=lq.y; in[2]=lq.z; in[3]=lq.w;
+        if (!am_mirror_rotation_x(in,out)) continue;
+        dot=fabsf(out[0]*rq.x+out[1]*rq.y+out[2]*rq.z+out[3]*rq.w);
+        if (2.0f*acosf(Clamp(dot,0,1))>.08f) continue;
+        lq=jogFingerTarget[l]; in[0]=lq.x; in[1]=lq.y; in[2]=lq.z; in[3]=lq.w;
+        if (!am_mirror_rotation_x(in,out)) continue;
+        jogFingerMirrorTarget[b]=(Quaternion){out[0],out[1],out[2],out[3]};
+        jogFingerMirrorValid[b]=1;
     }
     free(samples);
 }
@@ -1263,6 +1292,10 @@ static void relaxJogHands(AnimState *s, int clip)
         offset = Vector3RotateByQuaternion(Vector3Subtract(before[b].translation, before[parent].translation), QuaternionInvert(before[parent].rotation));
         local = QuaternionNormalize(QuaternionMultiply(QuaternionInvert(before[parent].rotation), before[b].rotation));
         target = jogFingerTarget[b];
+        if (jogHandRelax == 3 && boneUnder(b,boneHandR)) {
+            if (jogFingerMirrorValid[b]) target = jogFingerMirrorTarget[b];
+            else target = local; /* still inherit parent movement; no local correction */
+        }
         dot = fabsf(local.x*target.x + local.y*target.y + local.z*target.z + local.w*target.w);
         angle = 2.0f*acosf(Clamp(dot, 0, 1));
         blend = am_bounded_rotation_weight(angle, jogHandRelax == 2 ? .5f : .25f, weight*jogFingerGain[b]);
@@ -3680,6 +3713,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--jog-arm-assist") == 0) jogArmAssist = 1;
         else if (strcmp(argv[i], "--jog-hand-relax") == 0) jogHandRelax = 1;
         else if (strcmp(argv[i], "--jog-hand-relax-strong") == 0) jogHandRelax = 2;
+        else if (strcmp(argv[i], "--jog-hand-relax-mirrored") == 0) jogHandRelax = 3;
         else if (strcmp(argv[i], "--motion-cache") == 0 && i + 1 < argc) motionCache = argv[++i];
         else if (strcmp(argv[i], "--bake-motion") == 0 && i + 1 < argc) motionBake = argv[++i];
         else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) playerGlb = argv[++i];

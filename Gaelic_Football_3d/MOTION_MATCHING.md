@@ -383,3 +383,16 @@ improvement. These are sampled cap metrics, not triangle collisions, and the
 three captures are not proof of frame-perfect comparison. Do not promote the
 stronger setting on this evidence; a more suitable, validated hand reference
 and mesh-level intersection checks remain open.
+
+### Mirrored-reference experiment
+
+`--jog-hand-relax-mirrored` is a separate opt-in experiment, capped at 0.25
+radians per joint. It uses the existing idle left-hand local finger reference
+on the left and an X-reflected copy on the right, using the shared quaternion
+reflection helper. The adapter checks matching bone and parent names, very low
+jog finger motion and approximate mirrored source local rotations; if a right
+joint fails these checks it receives no local correction. These heuristics do
+not prove mirrored rig bases, anatomy, triangle clearance or visual quality.
+Mode 3 in the fingertip mesh tool evaluates this experiment. Carry, jump,
+action and locomotion transition guards are the same as the other prototypes.
+All remain off by default; no motion capture finger data is being claimed.

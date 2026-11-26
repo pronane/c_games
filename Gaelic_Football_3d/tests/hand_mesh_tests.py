@@ -23,7 +23,7 @@ assert control['samples']==30
 for data in control['sides'].values():
     assert data['max_tip_vertex_displacement_m'] < 1e-10
     assert data['mean_adjacent_tip_centroid_gap_raw_m'] == data['mean_adjacent_tip_centroid_gap_adjusted_m']
-for mode in (1,2):
+for mode in (1,2,3):
     for fps in (30,60):
         report=compare(sys.argv[2],sys.argv[1],mode,fps)
         assert report['samples']==fps and all(v>=3 for v in report['tip_vertex_counts'].values())

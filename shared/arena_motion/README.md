@@ -67,3 +67,8 @@ sampled point-distance primitives for offline tooling in any game or asset
 pipeline. Callers must supply compatible bind/pose matrices and meaningful
 vertex sets. A positive sampled-point distance does **not** establish that mesh
 triangles do not intersect, and these helpers do not assess hand anatomy.
+
+`am_mirror_rotation_x` reflects a local quaternion across the caller's X
+plane and normalizes it. The caller must establish compatible mirrored local
+joint bases; the operation alone cannot establish skeleton symmetry or produce
+an anatomically valid pose.
