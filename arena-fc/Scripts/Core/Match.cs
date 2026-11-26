@@ -336,13 +336,38 @@ public sealed partial class MatchEngine
     /// <summary>Phase 0: start a one-shot action with event-synced contact.
     /// contactFrac is the clip's ball_contact fraction (see soccer_motions.CLIP_EVENTS).
     /// The ball is released/captured when elapsed time reaches ActionContactAt.</summary>
-    private static void SetAction(PlayerState p, string action, float duration, float contactFrac = 0.5f)
+    private void SetAction(PlayerState p, string action, float duration, float contactFrac = 0.5f)
     {
         p.Action = action;
         p.ActionTimer = duration;
         p.ActionDuration = duration;
         p.ActionContactAt = duration * Mx.Clamp(contactFrac, 0f, 1f);
         p.ActionReleased = false;
+        RecordActionContract(p, action, duration, contactFrac);
+    }
+
+    private void RecordActionContract(PlayerState p, string action, float duration, float contactFrac)
+    {
+        string intent = action switch
+        {
+            "kick" => "kick",
+            "volley" => "shoot",
+            "throw_in" => "throw_in",
+            "slide" or "shoulder_charge" or "tackle" => "tackle",
+            "dive" => "dive",
+            _ when action.StartsWith("sc_") => "skill",
+            _ => action,
+        };
+        LastActionContracts[p.Index] = new ArenaFC.Core.Football.PlayerActionContract
+        {
+            PlayerIndex = p.Index,
+            Intent = intent,
+            Action = action,
+            MovementTarget = p.Target,
+            FacingTarget = State.Ball.Pos,
+            BallContactTime = duration * Mx.Clamp(contactFrac, 0f, 1f),
+            RequiresBallContact = action is "kick" or "volley" or "throw_in" or "slide" or "tackle",
+        };
     }
 
     /// <summary>Fire a pending ball release/capture whose contact time has elapsed.</summary>
@@ -356,7 +381,8 @@ public sealed partial class MatchEngine
         if (b.PendingKind == 1)
         {
             // Release: ball leaves the foot now (pass/shoot contact).
-            if (b.PendingReceiver >= 0) State.Passes[actor.Team]++;
+            bool isPass = b.PendingReceiver >= 0;
+            if (isPass) State.Passes[actor.Team]++;
             b.Owner = -1;
             b.Vel = b.PendingVel;
             b.Spin = b.PendingSpin;
@@ -369,6 +395,21 @@ public sealed partial class MatchEngine
             b.PassFrom = b.PendingFrom;
             b.PassReceiver = b.PendingReceiver;
             b.PassTarget = b.PendingTarget;
+            if (LastActionContracts.TryGetValue(actor.Index, out var ac))
+                ac.Intent = isPass ? "pass" : "shoot";
+            if (isPass && b.PendingReceiver < State.Players.Length)
+            {
+                var recv = State.Players[b.PendingReceiver];
+                float dist = Mx.FlatDist(b.Pos, b.PendingTarget);
+                float spd = MathF.Max(1f, Mx.Flat(b.Vel).Length());
+                LastActionContracts[recv.Index] = new ArenaFC.Core.Football.PlayerActionContract
+                {
+                    PlayerIndex = recv.Index, Intent = "receive", Action = "receive",
+                    MovementTarget = b.PendingTarget, FacingTarget = b.Pos,
+                    BallContactTime = MathF.Clamp(dist / spd, 0.05f, 2.0f),
+                    RequiresBallContact = true, DesiredSpeed = 7.5f,
+                };
+            }
         }
         else if (b.PendingKind == 2)
         {
@@ -543,6 +584,7 @@ public sealed partial class MatchEngine
     {
         _tick++;
         _globalTime += dt;
+        LastActionContracts.Clear();
         var S = State;
         if (S.Phase == Phase.FullTime || S.Phase == Phase.Paused) return;
 
@@ -1497,6 +1539,12 @@ public sealed partial class MatchEngine
                     Vector3 focus = BallFocus();
                     Vector3 intercept = focus != ball.Pos ? focus
                         : ball.Pos + Mx.Flat(ball.Vel) * Mx.Clamp(Mx.FlatDist(p.Pos, ball.Pos) / 14f, 0f, .7f);
+                    if (ball.Owner < 0 && !ball.HasPending)
+                    {
+                        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(ball.Pos, ball.Vel, ball.Spin, 1.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
+                        if (pred.TryInterceptXZ(p.Pos, 7.2f, 12f, out var s, 0f))
+                            intercept = new Vector3(s.Position.X, 0f, s.Position.Z);
+                    }
                     p.Target = intercept;
                 }
                 if (p.ActionTimer <= 0f) p.Action = "run";
@@ -1759,16 +1807,17 @@ public sealed partial class MatchEngine
         var b = State.Ball; point = default;
         if (b.Pos.Y < 1.2f && b.Vel.Y <= 0f) return false;
         if (Mx.Flat(b.Vel).Length() < 4f) return false;
-        // time until it falls through 2.3 m
-        float h = 2.3f, vy = b.Vel.Y, y = b.Pos.Y;
-        float disc = vy * vy + 2f * 9.81f * (y - h);
-        if (disc < 0f) return false;
-        float t = (vy + MathF.Sqrt(disc)) / 9.81f;
-        if (t <= 0f || t > 2.2f) return false;
-        Vector3 p = new(b.Pos.X + b.Vel.X * t, 0, b.Pos.Z + b.Vel.Z * t);
+        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 2.2f, Weather.Raining, Weather.WindX, Weather.WindZ);
+        float t = -1f; Vector3 p = default;
+        for (int i = 1; i < pred.Samples.Count; i++)
+        {
+            var s = pred.Samples[i];
+            if (s.Position.Y <= 2.3f && s.Velocity.Y <= 0f)
+            { t = s.Time; p = new Vector3(s.Position.X, 0f, s.Position.Z); break; }
+        }
+        if (t <= 0f) return false;
         Vector3 own = OwnGoalPos(k.Team);
         if (MathF.Abs(p.X - own.X) > 7f || MathF.Abs(p.Z) > 9f || MathF.Abs(p.X) > Mx.HalfLength) return false;
-        // Only if he gets there first (or at least as soon as anyone else).
         float mine = Mx.FlatDist(k.Pos, p) / 6.5f;
         if (mine > t + .25f) return false;
         foreach (var q in State.Players)
@@ -1788,8 +1837,10 @@ public sealed partial class MatchEngine
         float planeX = MathF.Abs(k.Pos.X - gx) < 6f ? k.Pos.X : gx - MathF.Sign(gx) * .6f;
         t = (planeX - b.Pos.X) / vx;
         if (t < 0f || t > 1.6f) return false;
-        float z = b.Pos.Z + b.Vel.Z * t;
-        float y = b.Pos.Y + b.Vel.Y * t - .5f * 9.81f * t * t;
+        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, MathF.Min(1.6f, t + 0.1f), Weather.Raining, Weather.WindX, Weather.WindZ);
+        var s = pred.At(t);
+        float z = s.Position.Z;
+        float y = s.Position.Y;
         if (MathF.Abs(z) > Mx.GoalHalfWidth + .3f || y > Mx.GoalHeight + .3f) return false;   // going wide: let it go
         cross = new Vector3(planeX, MathF.Max(Mx.BallRadius, y), z);
         return true;
@@ -1854,9 +1905,25 @@ public sealed partial class MatchEngine
         else SetAction(from, "kick", .34f, .50f);
         Vector3 aim = aimAt ?? to.Pos + Mx.Flat(to.Vel) * (through ? .55f : .22f);
         if (through && aimAt == null) aim += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * 4f;
-        Vector3 dir = Mx.FlatDir(b.Pos, aim);
         float skill = from.Spec.Passing;
         float dist = Mx.FlatDist(b.Pos, aim);
+        if (aimAt == null)
+        {
+            float estSpeed = through ? Mx.Clamp(dist * 0.9f, 10f, 24f) : Mx.Clamp(dist * 1.1f, 8f, 22f);
+            float tBall = dist / MathF.Max(1f, estSpeed);
+            float leadT = MathF.Min(tBall, through ? 0.85f : 0.35f);
+            Vector3 recvLead = to.Pos + Mx.Flat(to.Vel) * leadT;
+            if (through)
+                recvLead += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * MathF.Min(5f, 2f + tBall * 4f);
+            // Only adopt lead if receiver can plausibly reach it around ball arrival.
+            float tRecv = ArenaFC.Core.Football.PlayerPerception.TimeToReach(to.Pos, to.Vel, recvLead, 7.2f, 12f);
+            if (tRecv <= tBall + 0.30f)
+            {
+                aim = Vector3.Lerp(aim, recvLead, through ? 0.70f : 0.35f);
+                dist = Mx.FlatDist(b.Pos, aim);
+            }
+        }
+        Vector3 dir = Mx.FlatDir(b.Pos, aim);
         // Pass error grows with pressure, distance and difficulty (it was a flat
         // ~4 deg from skill alone, so AI passes almost never strayed - the main
         // source of throw-ins, corners and turnovers in real football).
@@ -3346,35 +3413,26 @@ public sealed partial class MatchEngine
     private readonly ArenaFC.Core.Football.TacticalCoordinator _tactical = new();
     private int _tacticalTick = -1;
     private readonly Dictionary<int, ArenaFC.Core.Football.TacticalCoordinator.Assignment> _tacticalByPlayer = new();
-    private readonly Dictionary<int, (string role, int ticks)> _tacticalHysteresis = new();
     public int TacticalRoleChanges;
+    public readonly Dictionary<int, ArenaFC.Core.Football.PlayerActionContract> LastActionContracts = new();
 
     private ArenaFC.Core.Football.TacticalCoordinator.Assignment? GetTacticalAssignment(int playerIndex)
     {
         if (_tacticalTick != _tick)
         {
+            var prev = new Dictionary<int, string>(_tacticalByPlayer.Count);
+            foreach (var kv in _tacticalByPlayer) prev[kv.Key] = kv.Value.Role;
             _tacticalTick = _tick;
             _tacticalByPlayer.Clear();
             var t0 = _tactical.BuildAssignments(State, 0);
             var t1 = _tactical.BuildAssignments(State, 1);
-            void AddWithHysteresis(ArenaFC.Core.Football.TacticalCoordinator.Assignment a)
+            void Add(ArenaFC.Core.Football.TacticalCoordinator.Assignment a)
             {
-                if (_tacticalHysteresis.TryGetValue(a.PlayerIndex, out var h) && h.ticks > 0 && h.role != a.Role)
-                {
-                    // Keep stable roles briefly unless urgent press/carrier change.
-                    bool urgent = a.Role == "press" || a.Role == "carrier" || h.role == "carrier";
-                    if (!urgent) { a.Role = h.role; a.Intent = h.role; _tacticalHysteresis[a.PlayerIndex] = (h.role, h.ticks - 1); }
-                    else { TacticalRoleChanges++; _tacticalHysteresis[a.PlayerIndex] = (a.Role, 30); }
-                }
-                else
-                {
-                    if (!_tacticalHysteresis.TryGetValue(a.PlayerIndex, out var prev) || prev.role != a.Role) TacticalRoleChanges++;
-                    _tacticalHysteresis[a.PlayerIndex] = (a.Role, 20);
-                }
+                if (prev.TryGetValue(a.PlayerIndex, out var oldRole) && oldRole != a.Role) TacticalRoleChanges++;
                 _tacticalByPlayer[a.PlayerIndex] = a;
             }
-            foreach (var a in t0) AddWithHysteresis(a);
-            foreach (var a in t1) AddWithHysteresis(a);
+            foreach (var a in t0) Add(a);
+            foreach (var a in t1) Add(a);
         }
         return _tacticalByPlayer.TryGetValue(playerIndex, out var asn) ? asn : null;
     }
@@ -3383,8 +3441,8 @@ public sealed partial class MatchEngine
     {
         _tacticalTick = -1;
         _tacticalByPlayer.Clear();
-        _tacticalHysteresis.Clear();
         TacticalRoleChanges = 0;
+        LastActionContracts.Clear();
     }
 
     private static int RunTypeFor(string type) => type switch

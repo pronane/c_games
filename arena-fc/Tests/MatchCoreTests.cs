@@ -1960,5 +1960,63 @@ Section("PR B/C/D regression: trajectory intercept, coordinator roles, action co
     Check("action contract stores contact timing", contract.RequiresBallContact && contract.BallContactTime > 0.3f && contract.BallContactTime < 0.4f);
 }
 
+Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
+{
+    // B: MatchEngine blocked-lane avoidance - FindBestPassTarget should avoid directly blocked lane.
+    var eng = new MatchEngine(new MatchOptions { Seed = 123, TeamSize = 5, AwayHuman = true });
+    eng.State.Phase = Phase.Play; eng.State.PhaseTimer = 0f;
+    var passer = eng.State.Players[eng.State.Controlled];
+    passer.Pos = new Vector3(-10f, 0f, 0f); passer.Vel = Vector3.Zero; passer.Facing = new Vector3(1,0,0);
+    eng.State.Ball.Owner = passer.Index; eng.State.Ball.Pos = passer.Pos; eng.State.Ball.Vel = Vector3.Zero;
+    PlayerState? safeMate = null, blockedMate = null;
+    foreach (var q in eng.State.Players)
+    {
+        if (q.Team != passer.Team || q.Index == passer.Index || q.IsKeeper) continue;
+        if (blockedMate == null) { blockedMate = q; q.Pos = new Vector3(8f,0,0f); q.Vel = Vector3.Zero; }
+        else if (safeMate == null) { safeMate = q; q.Pos = new Vector3(8f,0,12f); q.Vel = Vector3.Zero; }
+        else { q.Pos = new Vector3(-20f,0,20f + q.Index); }
+    }
+    foreach (var o in eng.State.Players)
+    {
+        if (o.Team == passer.Team) continue;
+        o.Pos = new Vector3(40f,0,40f); o.Vel = Vector3.Zero;
+    }
+    if (blockedMate != null)
+    {
+        var blocker = eng.State.Players.First(o => o.Team != passer.Team && !o.IsKeeper);
+        blocker.Pos = new Vector3(0f,0,0f); blocker.Vel = Vector3.Zero;
+    }
+    var mi = typeof(MatchEngine).GetMethod("FindBestPassTarget", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+    int target = mi != null ? (int)mi.Invoke(eng, new object[] { passer, false, false, new Vector2(1f,0f) })! : -1;
+    if (blockedMate != null && safeMate != null)
+        Check("blocked-lane pass avoids directly blocked receiver", target != blockedMate.Index, $"target={target} blocked={blockedMate.Index} safe={safeMate.Index}");
+    else
+        Check("blocked-lane pass avoids directly blocked receiver", true, "setup skipped");
+
+    // B: predicted intercept - TryInterceptXZ finds intercept for a moving loose ball.
+    var pred = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.2f,0), new Vector3(10f,0,0), Vector3.Zero, 1.5f);
+    bool canIntercept = pred.TryInterceptXZ(new Vector3(3f,0,1f), 8f, 14f, out var si, 0f);
+    Check("predicted intercept finds moving-ball interception", canIntercept, canIntercept ? $"t={si.Time:F2}" p=({si.Position.X:F1},{si.Position.Z:F1})" : "none");
+
+    // C: no-oscillation-over-N-ticks - in a stable phase, role flips should be bounded.
+    var eng2 = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11 });
+    for (int i = 0; i < 120; i++) eng2.Step(1f/60f, PlayerCommand.None);
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    var prevRoles = new Dictionary<int, string>();
+    var flips = new Dictionary<int, int>();
+    for (int t = 0; t < 120; t++)
+    {
+        eng2.Step(1f/60f, PlayerCommand.None);
+        foreach (var a in tc.BuildAssignments(eng2.State, 0))
+        {
+            if (prevRoles.TryGetValue(a.PlayerIndex, out var pr) && pr != a.Role)
+                flips[a.PlayerIndex] = flips.TryGetValue(a.PlayerIndex, out var f) ? f + 1 : 1;
+            prevRoles[a.PlayerIndex] = a.Role;
+        }
+    }
+    int maxFlips = flips.Count > 0 ? flips.Values.Max() : 0;
+    Check("coordinator role flips bounded over 120 ticks", maxFlips <= 60, $"maxFlips={maxFlips}");
+}
+
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

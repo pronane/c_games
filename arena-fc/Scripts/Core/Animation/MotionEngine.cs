@@ -14,6 +14,7 @@ public sealed class MotionEngine
     private readonly List<ClipMeta> _ordered = new();
 
     public int ClipCount => _ordered.Count;
+    public AnimationMetrics Metrics { get; } = new();
 
     /// <summary>Pose-level motion matching (schema v2 feature table).  When set, every
     /// clip switch - and running cycles about ten times a second - searches the
@@ -133,6 +134,12 @@ public sealed class MotionEngine
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
             if (!_clips.TryGetValue(motion.CurrentClipId, out var from)) from = selected;
             float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent, motion.ApproachWeight, ttc);
+            if (selected.HasContact && ttc > 0f)
+            {
+                float contactPhase = selected.BallContactSec / MathF.Max(0.001f, selected.Duration);
+                float predPhase = Wrap01(start + ttc / MathF.Max(0.001f, selected.Duration));
+                Metrics.RecordContact(CircularDistance(predPhase, contactPhase));
+            }
             motion.NextClipId = selected.Id;
             motion.NextPhase = selected.Loop ? Wrap01(start) : Clamp01(start);
             motion.CrossfadeDuration = DefaultCrossfadeSeconds;
@@ -373,6 +380,8 @@ public sealed class MotionEngine
         state.NextPhase = state.Phase;
         state.CrossfadeRemaining = 0f;
         state.BlendWeight = 1f;
+        Metrics.TransitionEvents++;
+        Metrics.TransitionDiscontinuityAccum += 0f; // hook: Godot/runtime can supply measured discontinuity
     }
 
     private static void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)
