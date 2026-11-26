@@ -1897,6 +1897,8 @@ Section("Football intelligence Milestone 1 (trajectory/perception/coordinator)")
     for (int i = 0; det && i < a1.Count; i++) det = a1[i].PlayerIndex == a2[i].PlayerIndex && a1[i].Role == a2[i].Role;
     Check("tactical coordinator deterministic", det && a1.Count > 0);
     { var seen = new System.Collections.Generic.HashSet<int>(); bool uniq = true; foreach (var a in a1) uniq &= seen.Add(a.PlayerIndex); Check("tactical coordinator assigns unique roles per player", uniq && seen.Count == a1.Count); }
+
+
 }
 
 Section("Animation telemetry metrics (contact/transition/plant continuity)");
@@ -1979,6 +1981,28 @@ Section("PR B/C/D regression: trajectory intercept, coordinator roles, action co
         PlayerIndex = 3, Intent = "receive", BallContactTime = 0.35f, RequiresBallContact = true, DesiredSpeed = 7f
     };
     Check("action contract stores contact timing", contract.RequiresBallContact && contract.BallContactTime > 0.3f && contract.BallContactTime < 0.4f);
+
+    // Contact actions must keep a finite, action-relative remaining-time contract
+    // across ticks, and retain the simulation's intended facing rather than always
+    // turning the animation toward the current ball position.
+    var lifecycleEngine = new MatchEngine(new MatchOptions { Seed = 125, TeamSize = 5 });
+    var headerPlayer = lifecycleEngine.State.Players.First(p => p.Team == 0 && !p.IsKeeper);
+    headerPlayer.Pos = new Vector3(-2f, 0f, 0f);
+    headerPlayer.Facing = new Vector3(0f, 0f, 1f);
+    lifecycleEngine.State.Ball.Pos = new Vector3(4f, 0f, 0f);
+    var setAction = typeof(MatchEngine).GetMethod("SetAction", BindingFlags.NonPublic | BindingFlags.Instance);
+    setAction?.Invoke(lifecycleEngine, new object?[] { headerPlayer, "header", 0.8f, 0.4f, "header" });
+    bool initialContract = lifecycleEngine.LastActionContracts.TryGetValue(headerPlayer.Index, out var initialHeader)
+        && initialHeader.RequiresBallContact && initialHeader.BallContactTime > 0.3f
+        && Vector3.Dot(initialHeader.FacingDirection, headerPlayer.Facing) > 0.99f;
+    Check("header contract requires contact and preserves action facing", initialContract);
+    for (int tick = 0; tick < 6; tick++) lifecycleEngine.Step(1f / 60f, PlayerCommand.None);
+    bool persistentContract = lifecycleEngine.LastActionContracts.TryGetValue(headerPlayer.Index, out var activeHeader)
+        && activeHeader.RequiresBallContact && activeHeader.BallContactTime >= 0f
+        && activeHeader.BallContactTime <= 0.321f;
+    Check("contact action contract persists with decreasing remaining time", persistentContract,
+        lifecycleEngine.LastActionContracts.TryGetValue(headerPlayer.Index, out activeHeader)
+            ? $"remaining={activeHeader.BallContactTime:F3} intent={activeHeader.Intent}" : "contract missing");
 }
 
 Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
