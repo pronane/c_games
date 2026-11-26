@@ -127,6 +127,7 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
           ARENA_FC_EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
+          ARENA_FC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p "$ARENA_FC_EVIDENCE_DIR"
           xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
