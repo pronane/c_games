@@ -396,3 +396,12 @@ not prove mirrored rig bases, anatomy, triangle clearance or visual quality.
 Mode 3 in the fingertip mesh tool evaluates this experiment. Carry, jump,
 action and locomotion transition guards are the same as the other prototypes.
 All remain off by default; no motion capture finger data is being claimed.
+
+Run 45855729295 found all 15 candidate right-hand joints eligible for this
+mirrored experiment. Mean adjacent fingertip-cap gaps were 43.1/43.1 mm before,
+36.2/41.8 mm with the original idle reference and 36.2/36.2 mm with the
+mirrored reference (left/right). This shows improved *proxy symmetry*, not proof
+of natural hand shape or a reduction in intersections; the sampled close-ups
+still show open, splayed fingers. Maximum sampled tip displacement in the
+mirrored case was 18.3 mm. Keep it experimental pending better reference and
+surface/visual evaluation.
