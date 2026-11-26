@@ -2192,6 +2192,27 @@ Section("M3 runtime no-conflicting-chasers and stability");
         }
     }
     Check("M3 coordinator movement targets sane", targetBad == 0, $"bad={targetBad}/{targetChecks}");
+
+    // Per-player stability: no excessive role flapping.
+    var e4 = new MatchEngine(new MatchOptions { Seed = 87, TeamSize = 11, AwayHuman = true });
+    var tc4 = new ArenaFC.Core.Football.TacticalCoordinator();
+    var prevRoles = new Dictionary<int, string>();
+    var roleChangesPerPlayer = new Dictionary<int, int>();
+    for (int t = 0; t < 300; t++)
+    {
+        e4.Step(1f / 60f, PlayerCommand.None);
+        for (int team = 0; team < 2; team++)
+        {
+            foreach (var a in tc4.BuildAssignments(e4.State, team))
+            {
+                if (prevRoles.TryGetValue(a.PlayerIndex, out var pr) && pr != a.Role)
+                    roleChangesPerPlayer[a.PlayerIndex] = roleChangesPerPlayer.GetValueOrDefault(a.PlayerIndex, 0) + 1;
+                prevRoles[a.PlayerIndex] = a.Role;
+            }
+        }
+    }
+    int maxFlap = roleChangesPerPlayer.Count > 0 ? roleChangesPerPlayer.Values.Max() : 0;
+    Check("M3 per-player role flap bounded", maxFlap <= 80, $"maxFlap={maxFlap}");
 }
 
 Section("M4 authoritative action contracts");
@@ -2210,7 +2231,7 @@ Section("M4 authoritative action contracts");
             if (!float.IsFinite(c.FacingDirection.X) || !float.IsFinite(c.FacingDirection.Z)) fieldsOk = false;
             seenIntents.Add(c.Intent);
             if (c.Intent is "carry" or "shield" or "receive") sawCarrier = true;
-            if (c.Intent is "kick" or "shoot" or "pass" or "clear" or "receive" or "tackle" or "dive" or "throw_in" or "skill") sawAction = true;
+            if (c.Intent is "kick" or "shoot" or "pass" or "clear" or "receive" or "tackle" or "dive" or "throw_in" or "skill" or "intercept") sawAction = true;
         }
         if (!keyOk) break;
     }

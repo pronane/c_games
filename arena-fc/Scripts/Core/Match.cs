@@ -3414,6 +3414,7 @@ public sealed partial class MatchEngine
                 p.PossessionLock = .25f;
                 return;
             }
+            bool intercepted = b.LastTouchSide >= 0 && b.LastTouchSide != p.Team;
             b.Owner = best;
             b.Vel = Vector3.Zero;
             b.Spin = Vector3.Zero;
@@ -3421,6 +3422,10 @@ public sealed partial class MatchEngine
             p.PossessionLock = .12f;
             b.LastTouch = best; b.LastTouchSide = p.Team; b.LastTouchPos = b.Pos;
             if (p.Team == 0) State.Controlled = best;
+            if (intercepted)
+            {
+                RecordActionContract(p, "intercept", 0.35f, 0.5f, "intercept");
+            }
             if (b.PassFrom >= 0 && b.PassReceiver == best && b.PassFrom / Options.TeamSize == p.Team)
                 b.PassFrom = -1;
         }
