@@ -1438,6 +1438,9 @@ public sealed partial class MatchEngine
                 p.RunType = 3;
                 p.Target = support + new Vector3(attack * 2f, 0, Mx.Clamp(carrier.Z * .4f, -10f, 10f));
             }
+            var tacOff = GetTacticalAssignment(p.Index);
+            if (tacOff != null && tacOff.Role == "support")
+                p.Target = Mx.Lerp(p.Target, tacOff.MovementTarget, 0.20f);
             if (p.ActionTimer <= 0f) p.Action = "run";
         }
         else

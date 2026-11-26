@@ -31,12 +31,22 @@ public sealed partial class MatchEngine
     public Vector3 BallFocus()
     {
         var b = State.Ball;
-        if (b.Owner < 0 && !b.HasPending && (b.Pos.Y > .7f || b.Vel.Y > 1.5f || Mx.Flat(b.Vel).LengthSquared() > 9f))
+        if (b.Owner < 0 && !b.HasPending)
         {
-            var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 2.0f, Weather.Raining, Weather.WindX, Weather.WindZ);
-            if (pred.TryFirstGroundedBelow(1.35f, out var s))
+            if (b.Pos.Y > .7f || b.Vel.Y > 1.5f)
+            {
+                var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 2.0f, Weather.Raining, Weather.WindX, Weather.WindZ);
+                if (pred.TryFirstGroundedBelow(1.35f, out var s))
+                    return new Vector3(s.Position.X, 0f, s.Position.Z);
+                return LandingPoint(b, 1.3f);
+            }
+            float flatSpeed = Mx.Flat(b.Vel).Length();
+            if (flatSpeed > 8f)
+            {
+                var pred = ArenaFC.Core.Football.BallTrajectory.Predict(b.Pos, b.Vel, b.Spin, 0.5f, Weather.Raining, Weather.WindX, Weather.WindZ);
+                var s = pred.At(MathF.Min(0.25f, 6f / MathF.Max(1f, flatSpeed)));
                 return new Vector3(s.Position.X, 0f, s.Position.Z);
-            return LandingPoint(b, 1.3f);
+            }
         }
         return b.Pos;
     }
