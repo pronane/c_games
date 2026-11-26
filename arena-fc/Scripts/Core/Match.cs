@@ -336,19 +336,19 @@ public sealed partial class MatchEngine
     /// <summary>Phase 0: start a one-shot action with event-synced contact.
     /// contactFrac is the clip's ball_contact fraction (see soccer_motions.CLIP_EVENTS).
     /// The ball is released/captured when elapsed time reaches ActionContactAt.</summary>
-    private void SetAction(PlayerState p, string action, float duration, float contactFrac = 0.5f)
+    private void SetAction(PlayerState p, string action, float duration, float contactFrac = 0.5f, string? intentOverride = null)
     {
         p.Action = action;
         p.ActionTimer = duration;
         p.ActionDuration = duration;
         p.ActionContactAt = duration * Mx.Clamp(contactFrac, 0f, 1f);
         p.ActionReleased = false;
-        RecordActionContract(p, action, duration, contactFrac);
+        RecordActionContract(p, action, duration, contactFrac, intentOverride);
     }
 
-    private void RecordActionContract(PlayerState p, string action, float duration, float contactFrac)
+    private void RecordActionContract(PlayerState p, string action, float duration, float contactFrac, string? intentOverride = null)
     {
-        string intent = action switch
+        string intent = intentOverride ?? action switch
         {
             "kick" => "kick",
             "volley" => "shoot",
@@ -358,6 +358,8 @@ public sealed partial class MatchEngine
             _ when action.StartsWith("sc_") => "skill",
             _ => action,
         };
+        bool requiresBallContact = intent is "kick" or "shoot" or "pass" or "clear" or "throw_in" or "tackle" or "skill"
+            || action is "kick" or "volley" or "throw_in" or "slide" or "tackle";
         LastActionContracts[p.Index] = new ArenaFC.Core.Football.PlayerActionContract
         {
             PlayerIndex = p.Index,
@@ -368,7 +370,7 @@ public sealed partial class MatchEngine
             BallContactTime = duration * Mx.Clamp(contactFrac, 0f, 1f),
             DesiredSpeed = Mx.Flat(p.Vel).Length(),
             SpeedLimit = p.MaxSpeed,
-            RequiresBallContact = action is "kick" or "volley" or "throw_in" or "slide" or "tackle",
+            RequiresBallContact = requiresBallContact,
         };
     }
 
@@ -382,7 +384,7 @@ public sealed partial class MatchEngine
             if (LastActionContracts.TryGetValue(i, out var existing))
             {
                 // Preserve active action contracts set by SetAction/FirePending.
-                if (existing.Intent is "kick" or "shoot" or "pass" or "tackle" or "dive" or "skill" or "throw_in")
+                if (existing.Intent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "skill" or "throw_in" or "intercept" or "dribble")
                     continue;
             }
             if (b.Owner == i)
@@ -1845,8 +1847,12 @@ public sealed partial class MatchEngine
         var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff && (exclude == null || !exclude.Contains(p.Index)))
             .Select(p => {
                 float score = Mx.FlatDist2(p.Pos, focus);
-                if (pred != null && pred.TryInterceptXZ(p.Pos, 7.2f, 12f, out var s, 0f))
-                    score = s.Time * s.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(s.Position.X,0,s.Position.Z)) * 0.01f;
+                if (pred != null)
+                {
+                    float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
+                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var s, 0f))
+                        score = s.Time * s.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(s.Position.X,0,s.Position.Z)) * 0.01f;
+                }
                 return (p.Index, score);
             })
             .OrderBy(x => x.score).ToArray();
@@ -2049,7 +2055,7 @@ public sealed partial class MatchEngine
             b.Pos = new Vector3(b.Pos.X, b.Pos.Y, Mx.Clamp(b.Pos.Z, -zl0, zl0));
             b.Vel = Vector3.Zero;
         }
-        else SetAction(from, "kick", .34f, .50f);
+        else SetAction(from, "kick", .34f, .50f, "pass");
         Vector3 aim = aimAt ?? to.Pos + Mx.Flat(to.Vel) * (through ? .55f : .22f);
         if (through && aimAt == null) aim += Mx.FlatDir(from.Pos, GoalPos(from.Team)) * 4f;
         float skill = from.Spec.Passing;
@@ -2201,7 +2207,7 @@ public sealed partial class MatchEngine
         // Phase 0.2: volley plays the volley clip; release at ball_contact.
         // Phase 2.4: Dynamic Volley — first-time aerial (eFootball v6.0).
         bool isVolley = volley || (b.Pos.Y > .5f && b.Owner == p.Index);
-        SetAction(p, isVolley ? "volley" : "kick", .40f, .50f);
+        SetAction(p, isVolley ? "volley" : "kick", .40f, .50f, "shoot");
         int attack = SideSign(p.Team);
         Vector3 target = new(GoalPos(p.Team).X, Rng.Range(.4f, 2.0f), Rng.Range(-Mx.GoalHalfWidth * .78f, Mx.GoalHalfWidth * .78f));
         State.Xg[p.Team] += ShotXg(p, target);
@@ -2584,7 +2590,7 @@ public sealed partial class MatchEngine
         if (b.Owner != p.Index || b.HasPending) return;
         p.PossessionLock = .35f;
         ReleaseSetPiece(p);
-        SetAction(p, "kick", .34f, .50f);
+        SetAction(p, "kick", .34f, .50f, "clear");
         int attack = SideSign(p.Team);
         float side = MathF.Abs(p.Pos.Z) > 4f ? MathF.Sign(p.Pos.Z) : (Rng.Next() < .5f ? -1f : 1f);
         Vector3 target = new(p.Pos.X + attack * Rng.Range(22f, 40f), 0, side * Rng.Range(Mx.HalfWidth * .55f, Mx.HalfWidth + 6f));
