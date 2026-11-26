@@ -165,3 +165,135 @@ float am_smoothstep(float x)
     if (x >= 1.0f) return 1.0f;
     return x*x*(3.0f - 2.0f*x);
 }
+
+float am_arm_swing_profile(const float *arm, const float *leg, int n, float *centre, float *radius)
+{
+    double ma = 0, ml = 0, aa = 0, ll = 0, al = 0;
+    float amin = FLT_MAX, amax = -FLT_MAX, lmin = FLT_MAX, lmax = -FLT_MAX;
+    if (!arm || !leg || !centre || !radius || n < 8 || n > 1000000) return 0;
+    for (int i = 0; i < n; ++i) {
+        if (!isfinite(arm[i]) || !isfinite(leg[i])) return 0;
+        if (arm[i] < amin) amin = arm[i];
+        if (arm[i] > amax) amax = arm[i];
+        if (leg[i] < lmin) lmin = leg[i];
+        if (leg[i] > lmax) lmax = leg[i];
+        ma += arm[i]; ml += leg[i];
+    }
+    ma /= n; ml /= n;
+    for (int i = 0; i < n; ++i) {
+        double a = arm[i]-ma, l = leg[i]-ml;
+        aa += a*a; ll += l*l; al += a*l;
+    }
+    if (amax-amin < .06f || lmax-lmin < .12f || aa < 1e-8 || ll < 1e-8 || al/sqrt(aa*ll) < .5) return 0;
+    *centre = (float)ml; *radius = fmaxf((lmax-lmin)*.5f, .06f);
+    return am_smoothstep((.23f - (amax-amin))/.12f);
+}
+
+float am_rotation_stillness(const float *samples, int n)
+{
+    double reference[4], norm = 0, largest = 0;
+    if (!samples || n < 8 || n > 1000000) return 0;
+    for (int k = 0; k < 4; ++k) { if (!isfinite(samples[k])) return 0; norm += (double)samples[k]*samples[k]; }
+    if (norm < 1e-12) return 0;
+    norm = sqrt(norm); for (int k = 0; k < 4; ++k) reference[k] = samples[k]/norm;
+    for (int i = 0; i < n; ++i) {
+        double d = 0, len = 0;
+        for (int k = 0; k < 4; ++k) {
+            double v = samples[4*i+k]; if (!isfinite(v)) return 0;
+            len += v*v; d += reference[k]*v;
+        }
+        if (len < 1e-12) return 0;
+        d = fmin(1.0, fabs(d/sqrt(len)));
+        { double angle = 2*acos(d); if (angle > largest) largest = angle; }
+    }
+    return am_smoothstep((float)((.08-largest)/.04));
+}
+float am_bounded_rotation_weight(float angle, float limit, float blend)
+{
+    if (!isfinite(angle) || !isfinite(limit) || !isfinite(blend) || angle <= 0 || limit <= 0 || blend <= 0) return 0;
+    if (blend > 1) blend = 1;
+    return blend * fminf(1, limit/angle);
+}
+
+void am_contact_drift_reset(AMContactDrift *drift)
+{
+    if (drift) { drift->distance = 0; drift->seconds = 0; drift->intervals = 0;
+        drift->previous_x = drift->previous_z = 0; drift->previous_contact = 0; }
+}
+
+void am_contact_drift_sample(AMContactDrift *drift, float x, float z, float dt, int contact)
+{
+    if (!drift) return;
+    if (!isfinite(x) || !isfinite(z) || !isfinite(dt) || dt <= 0) {
+        drift->previous_contact = 0; return;
+    }
+    if (contact && drift->previous_contact) {
+        double dx = (double)x - drift->previous_x, dz = (double)z - drift->previous_z;
+        drift->distance += hypot(dx, dz); drift->seconds += dt; ++drift->intervals;
+    }
+    drift->previous_x = x; drift->previous_z = z; drift->previous_contact = !!contact;
+}
+
+int am_direction_angle(const float a[3], const float b[3], float *out)
+{
+    double aa = 0, bb = 0, ab = 0;
+    if (!a || !b || !out) return 0;
+    for (int i = 0; i < 3; ++i) {
+        if (!isfinite(a[i]) || !isfinite(b[i])) return 0;
+        aa += (double)a[i]*a[i]; bb += (double)b[i]*b[i]; ab += (double)a[i]*b[i];
+    }
+    if (aa < 1e-16 || bb < 1e-16) return 0;
+    *out = (float)acos(fmax(-1.0, fmin(1.0, ab/(sqrt(aa)*sqrt(bb)))));
+    return 1;
+}
+
+int am_mirror_rotation_x(const float input[4], float out[4])
+{
+    double norm=0; float q[4];
+    if (!input || !out) return 0;
+    for (int i=0;i<4;++i) { if (!isfinite(input[i])) return 0; norm+=(double)input[i]*input[i]; }
+    if (norm<1e-12) return 0;
+    norm=sqrt(norm); q[0]=(float)(input[0]/norm); q[1]=(float)(-input[1]/norm);
+    q[2]=(float)(-input[2]/norm); q[3]=(float)(input[3]/norm);
+    for (int i=0;i<4;++i) out[i]=q[i];
+    return 1;
+}
+
+int am_rotation_compose_local(const float rotation[4], const float axis[3], float radians, float out[4])
+{
+    double n=0, an=0, q[4], v[3], t[4], half;
+    if (!rotation || !axis || !out || !isfinite(radians)) return 0;
+    for (int i=0;i<4;i++) { if (!isfinite(rotation[i])) return 0; n+=(double)rotation[i]*rotation[i]; }
+    for (int i=0;i<3;i++) { if (!isfinite(axis[i])) return 0; an+=(double)axis[i]*axis[i]; }
+    if (n<1e-12 || an<1e-12) return 0;
+    n=sqrt(n); an=sqrt(an); half=(double)radians*.5;
+    for (int i=0;i<4;i++) q[i]=rotation[i]/n;
+    for (int i=0;i<3;i++) v[i]=axis[i]/an*sin(half);
+    t[0]=q[3]*v[0]+q[0]*cos(half)+q[1]*v[2]-q[2]*v[1];
+    t[1]=q[3]*v[1]-q[0]*v[2]+q[1]*cos(half)+q[2]*v[0];
+    t[2]=q[3]*v[2]+q[0]*v[1]-q[1]*v[0]+q[2]*cos(half);
+    t[3]=q[3]*cos(half)-q[0]*v[0]-q[1]*v[1]-q[2]*v[2];
+    for (int i=0;i<4;i++) out[i]=(float)t[i];
+    return 1;
+}
+
+int am_rotation_distance(const float a[4], const float b[4], float *out)
+{
+    double aa=0,bb=0,dot=0;
+    if (!a || !b || !out) return 0;
+    for (int i=0;i<4;i++) {
+        if (!isfinite(a[i]) || !isfinite(b[i])) return 0;
+        aa+=(double)a[i]*a[i]; bb+=(double)b[i]*b[i]; dot+=(double)a[i]*b[i];
+    }
+    if (aa<1e-12 || bb<1e-12) return 0;
+    *out=(float)(2*acos(fmin(1.0,fabs(dot/(sqrt(aa)*sqrt(bb))))));
+    return 1;
+}
+
+float am_guarded_fade(float current, int permitted, float dt, float attack_seconds)
+{
+    double value;
+    if (!permitted || !isfinite(current) || !isfinite(dt) || !isfinite(attack_seconds) || dt<0 || attack_seconds<=0) return 0;
+    value=fmax(0.0,fmin(1.0,(double)current))+(double)dt/attack_seconds;
+    return (float)fmin(1.0,value);
+}

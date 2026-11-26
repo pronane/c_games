@@ -93,6 +93,8 @@ goes back to the menu.
 
 Launch options:
 - `--no-motion-match` uses the original gait and action selectors (for A/B comparisons).
+- `--jog-arm-assist` opts into an experimental, bounded arm-swing adjustment for weak, coordinated forward-jog clips; it is off by default and does not affect ball-carrying or actions.
+- `--jog-hand-relax` opts into a separate experimental, bounded idle-reference finger pose for nearly static jog fingers. It is off by default and excluded during ball carrying, actions and jumps.
 - `--bake-motion FILE` samples the loaded model and writes a versioned gait and action cache, then exits (requires a graphics environment).
 - `--motion-cache FILE` loads that cache if it matches the model and raylib version; otherwise it samples the model at startup.
 - `--no-intro`

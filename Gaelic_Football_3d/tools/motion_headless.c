@@ -252,6 +252,180 @@ static int validate_leg_ik(void)
     return 1;
 }
 
+/* Validate the experimental assist on actual skeletons and verify that the
+ * opt-out, ball carrying and actions are strict no-ops. This measures bones,
+ * not rendered hand skin or perceived realism. */
+static int validate_jog_arm_assist(void)
+{
+    AnimState *s = &as[9]; Transform base[MAX_BONES]; float gain[2], beforeMin[2], beforeMax[2], afterMin[2], afterMax[2], beforeMean[2] = {0,0};
+    int n = ANIM_FRAMES(*animFor(C_JOG))-1, changed = 0;
+    boneArmUL = findBone("upperarm_l"); boneArmUR = findBone("upperarm_r");
+    boneArmLL = findBone("lowerarm_l"); boneArmLR = findBone("lowerarm_r");
+    if (boneArmUL < 0 || boneArmUR < 0 || boneArmLL < 0 || boneArmLR < 0 || n < 8) return 0;
+    detectJogArmProfile(); gain[0] = jogArmGain[0]; gain[1] = jogArmGain[1];
+    for (int side=0; side<2; ++side) { beforeMin[side] = afterMin[side] = 1e9f; beforeMax[side] = afterMax[side] = -1e9f; }
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    game.players[0][9].action = GAME_ACT_NONE; game.players[0][9].jump_time = 0;
+    memset(s, 0, sizeof *s); s->speed = 3; s->prevClip = C_JOG; s->clip = C_JOG; s->blend = 1;
+    for (int f=0; f<n; ++f) {
+        int arms[2]={boneArmUL,boneArmUR}, elbows[2]={boneArmLL,boneArmLR}, hands[2]={boneHandL,boneHandR};
+        sampleClip(C_JOG, f/ANIM_FPS, s->pose); memcpy(base, s->pose, sizeof(Transform)*(size_t)model.boneCount);
+        jogArmAssist = 1; assistJogArms(s, C_JOG);
+        for (int side=0; side<2; ++side) {
+            float old = base[hands[side]].translation.z-base[arms[side]].translation.z;
+            float now = s->pose[hands[side]].translation.z-s->pose[arms[side]].translation.z;
+            beforeMean[side] += old / n;
+            beforeMin[side] = fminf(beforeMin[side],old); beforeMax[side] = fmaxf(beforeMax[side],old);
+            afterMin[side] = fminf(afterMin[side],now); afterMax[side] = fmaxf(afterMax[side],now);
+            if (fabsf(Vector3Distance(base[arms[side]].translation,base[elbows[side]].translation) - Vector3Distance(s->pose[arms[side]].translation,s->pose[elbows[side]].translation)) > .0001f ||
+                fabsf(Vector3Distance(base[elbows[side]].translation,base[hands[side]].translation) - Vector3Distance(s->pose[elbows[side]].translation,s->pose[hands[side]].translation)) > .0001f) return 0;
+        }
+        for (int b=0; b<model.boneCount; ++b) if (!boneUnder(b,boneArmUL) && !boneUnder(b,boneArmUR) && memcmp(&base[b],&s->pose[b],sizeof(Transform))) return 0;
+        if (Vector3Distance(base[boneHandL].translation,s->pose[boneHandL].translation) > .00001f ||
+            Vector3Distance(base[boneHandR].translation,s->pose[boneHandR].translation) > .00001f) changed++;
+    }
+    printf("jog_arm_profile gain=%.3f,%.3f wrist_forward_mean=%.3f,%.3f range_before=%.3f,%.3f after=%.3f,%.3f changed_frames=%d (bone_proxy_only)\n",
+           gain[0],gain[1],beforeMean[0],beforeMean[1],beforeMax[0]-beforeMin[0],beforeMax[1]-beforeMin[1],afterMax[0]-afterMin[0],afterMax[1]-afterMin[1],changed);
+    if ((gain[0] > .01f || gain[1] > .01f) && !changed) return 0;
+    /* Force a nonzero profile so guard coverage also works for strong clips. */
+    jogArmGain[0] = jogArmGain[1] = 1; jogLegCentre[0] = jogLegCentre[1] = 0; jogLegRadius[0] = jogLegRadius[1] = .1f;
+    sampleClip(C_JOG, .15f, s->pose); memcpy(base, s->pose, sizeof(Transform)*(size_t)model.boneCount);
+    jogArmAssist = 0; assistJogArms(s,C_JOG); if (memcmp(base,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogArmAssist = 1; game.ball_team = 0; game.ball_player = 9; assistJogArms(s,C_JOG);
+    if (memcmp(base,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.ball_team = -1; game.players[0][9].action = GAME_ACT_HANDPASS; assistJogArms(s,C_JOG);
+    if (memcmp(base,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].action = GAME_ACT_NONE; game.players[0][9].jump_time = .2f; assistJogArms(s,C_JOG);
+    if (memcmp(base,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].jump_time = 0; s->prevClip = C_RUN; s->blend = 1; assistJogArms(s,C_RUN);
+    if (memcmp(base,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogArmAssist = 0; detectJogArmProfile();
+    puts("jog_arm_guards=ok"); return 1;
+}
+
+/* Hand-joint geometry proxies use the portable angle primitive. They cannot
+ * measure skin or decide whether a reference is anatomically natural. */
+static int hand_geometry(const Transform *pose, int side, float *bend, float *spread)
+{
+    static const char *names[4] = {"index", "middle", "ring", "pinky"};
+    float dirs[4][3], total = 0;
+    for (int i=0; i<4; ++i) {
+        int ids[3]; char name[32]; float a[3], b[3], angle;
+        for (int j=0; j<3; ++j) {
+            snprintf(name, sizeof name, "%s_%02d_%c", names[i], j+1, side ? 'r' : 'l');
+            ids[j] = findBone(name); if (ids[j] < 0) return 0;
+        }
+        Vector3 x=pose[ids[0]].translation, y=pose[ids[1]].translation, z=pose[ids[2]].translation;
+        a[0]=y.x-x.x; a[1]=y.y-x.y; a[2]=y.z-x.z;
+        b[0]=z.x-y.x; b[1]=z.y-y.y; b[2]=z.z-y.z;
+        for (int k=0;k<3;++k) dirs[i][k]=a[k]+b[k];
+        if (!am_direction_angle(a,b,&angle)) return 0;
+        total += angle;
+    }
+    if (!am_direction_angle(dirs[0],dirs[3],spread)) return 0;
+    *bend=total/4; return 1;
+}
+
+static int validate_jog_hand_relax(void)
+{
+    AnimState *s = &as[9]; Transform original[MAX_BONES]; int eligible = 0, changed = 0;
+    int n = ANIM_FRAMES(*animFor(C_JOG))-1;
+    double beforeBend[2]={0}, afterBend[2]={0}, beforeSpread[2]={0}, afterSpread[2]={0};
+    int geometrySamples=0;
+    detectJogHandProfile();
+    for (int b=0; b<model.boneCount; ++b) if (jogFingerGain[b] > .01f) eligible++;
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    game.players[0][9].action = GAME_ACT_NONE; game.players[0][9].jump_time = 0;
+    memset(s,0,sizeof *s); s->speed=3; s->clip=C_JOG; s->prevClip=C_JOG; s->blend=1;
+    jogHandRelax=1;
+    for (int f=0; f<n; f+=3) {
+        sampleClip(C_JOG, f/ANIM_FPS, s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        relaxJogHands(s,C_JOG,1.f/60.f);
+        for (int side=0;side<2;++side) {
+            float a,b,c,d;
+            if (!hand_geometry(original,side,&a,&b) || !hand_geometry(s->pose,side,&c,&d)) return 0;
+            beforeBend[side]+=a; beforeSpread[side]+=b; afterBend[side]+=c; afterSpread[side]+=d;
+        }
+        ++geometrySamples;
+        for (int b=0; b<model.boneCount; ++b) {
+            int parent = boneChild(b), isFinger = b != boneHandL && b != boneHandR && (boneUnder(b,boneHandL)||boneUnder(b,boneHandR));
+            if (!isFinger) { if (memcmp(&original[b],&s->pose[b],sizeof(Transform))) return 0; continue; }
+            if (parent < 0) return 0;
+            { Quaternion a=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(original[parent].rotation),original[b].rotation));
+              Quaternion z=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(s->pose[parent].rotation),s->pose[b].rotation));
+              float dot=fabsf(a.x*z.x+a.y*z.y+a.z*z.z+a.w*z.w);
+              float angle=2*acosf(Clamp(dot,0,1));
+              if (!finite3(s->pose[b].translation) || angle > .251f ||
+                  fabsf(Vector3Distance(original[parent].translation,original[b].translation)-Vector3Distance(s->pose[parent].translation,s->pose[b].translation)) > .0001f) return 0;
+              if (angle > .001f) changed++;
+            }
+        }
+    }
+    printf("jog_hand_profile eligible_joints=%d changed_samples=%d (bone_proxy_only)\n",eligible,changed);
+    for (int side=0;side<2;++side) {
+        float rb, rs; Transform reference[MAX_BONES];
+        sampleClip(C_IDLE,.2f,reference);
+        if (!hand_geometry(reference,side,&rb,&rs)) return 0;
+        printf("jog_hand_geometry side=%c bend_deg=%.1f->%.1f idle_ref=%.1f spread_deg=%.1f->%.1f idle_ref=%.1f (joint_proxy_only)\n",
+               side?'r':'l', beforeBend[side]/geometrySamples*RAD2DEG, afterBend[side]/geometrySamples*RAD2DEG, rb*RAD2DEG,
+               beforeSpread[side]/geometrySamples*RAD2DEG, afterSpread[side]/geometrySamples*RAD2DEG, rs*RAD2DEG);
+    }
+    if (eligible && !changed) return 0;
+    sampleClip(C_JOG,.15f,s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+    jogHandRelax=0; relaxJogHands(s,C_JOG,1.f/60.f); if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogHandRelax=1; game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=1; relaxJogHands(s,C_RUN,1.f/60.f);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    s->prevClip=C_JOG; s->blend=1; relaxJogHands(s,C_RUN,1.f/60.f);
+    if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogHandRelax=0; puts("jog_hand_guards=ok"); return 1;
+}
+
+/* The stronger pose is a separately opted-in experiment, with the same
+ * exclusions and a larger but still bounded local joint correction. */
+static int validate_extra_hand_relax(int mode)
+{
+    AnimState *s=&as[9]; Transform before[MAX_BONES]; int changed=0;
+    detectJogHandProfile(); game_init(&game); game.ball_team=-1; game.ball_player=-1;
+    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=0;
+    memset(s,0,sizeof *s); s->speed=3; s->clip=C_JOG; s->prevClip=C_JOG; s->blend=1;
+    jogHandRelax=mode;
+    for (int f=0;f<ANIM_FRAMES(*animFor(C_JOG))-1;f+=3) {
+        sampleClip(C_JOG,f/ANIM_FPS,s->pose); memcpy(before,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        relaxJogHands(s,C_JOG,1.f/60.f);
+        for (int b=0;b<model.boneCount;++b) {
+            int parent=boneChild(b), finger=b!=boneHandL && b!=boneHandR && (boneUnder(b,boneHandL)||boneUnder(b,boneHandR));
+            if (!finger) { if (memcmp(&before[b],&s->pose[b],sizeof(Transform))) return 0; continue; }
+            if (parent<0) return 0;
+            Quaternion a=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(before[parent].rotation),before[b].rotation));
+            Quaternion z=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(s->pose[parent].rotation),s->pose[b].rotation));
+            float dot=fabsf(a.x*z.x+a.y*z.y+a.z*z.z+a.w*z.w), angle=2*acosf(Clamp(dot,0,1));
+            if (!finite3(s->pose[b].translation) || angle>(mode == 2 ? .501f : mode == 4 ? .351f : .251f) ||
+                fabsf(Vector3Distance(before[parent].translation,before[b].translation)-Vector3Distance(s->pose[parent].translation,s->pose[b].translation))>.0001f) return 0;
+            if (angle>.001f) ++changed;
+        }
+    }
+    sampleClip(C_JOG,.15f,s->pose); memcpy(before,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+    game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG,1.f/60.f);
+    if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    { int mirrored=0; for (int b=0;b<model.boneCount;++b) mirrored+=jogFingerMirrorValid[b]!=0;
+      printf("jog_hand_extra mode=%d changed_samples=%d mirrored_right=%d guards=ok (bone_proxy_only)\n",mode,changed,mirrored); }
+    jogHandRelax=0; return 1;
+}
+
 static int validate_jog_stride_ramp(void)
 {
     const float speeds[] = {2.0f, 2.2f, 2.2001f, 2.7f, 3.2f, 3.5f};
@@ -279,6 +453,8 @@ static int report_jog_ground_proxy(float dt, float speed)
     double rawDist = 0, scaledDist = 0, adjustedDist = 0, activeDist = 0;
     float prevRaw[2] = {0}, prevScaled[2] = {0}, prevAdjusted[2] = {0}, prevY[2] = {0};
     int count = 0, active = 0, clip = -1; float t = 0;
+    AMContactDrift drift[2];
+    am_contact_drift_reset(&drift[0]); am_contact_drift_reset(&drift[1]);
     game_init(&game); game.ball_team = -1; game.ball_player = -1;
     p = &game.players[0][9]; p->action = GAME_ACT_NONE; p->jump_time = 0;
     memset(s, 0, sizeof *s); s->speed = speed;
@@ -298,6 +474,8 @@ static int report_jog_ground_proxy(float dt, float speed)
             rawWorld[side] = s->lastZ + raw[f].translation.z;
             adjustedWorld[side] = s->lastZ + s->pose[f].translation.z;
             if (!isfinite(adjustedWorld[side])) return 0;
+            am_contact_drift_sample(&drift[side], s->pose[f].translation.x, adjustedWorld[side], dt,
+                                    step > (int)(1.0f/dt) && raw[f].translation.y <= .11f);
             if (step > (int)(1.0f/dt) && raw[f].translation.y <= .11f && prevY[side] <= .11f) {
                 rawDist += fabs(rawWorld[side] - prevRaw[side]);
                 scaledDist += fabs(scaledWorld[side] - prevScaled[side]);
@@ -314,7 +492,11 @@ static int report_jog_ground_proxy(float dt, float speed)
     printf("jog_ground_proxy dt=%.4f speed=%.1f samples=%d raw_mps=%.3f scaled_mps=%.3f adjusted_mps=%.3f planted_samples=%d planted_mps=%.3f (ankle_proxy_only)\n",
            dt, speed, count, count ? rawDist/(count*dt) : 0, count ? scaledDist/(count*dt) : 0, count ? adjustedDist/(count*dt) : 0,
            active, active ? activeDist/(active*dt) : 0);
-    return count > 0;
+    printf("shared_contact_drift dt=%.4f speed=%.1f samples=%lu mean_mps=%.3f (low_ankle_proxy_2d)\n",
+           dt, speed, drift[0].intervals + drift[1].intervals,
+           (drift[0].seconds + drift[1].seconds) > 0 ?
+           (drift[0].distance + drift[1].distance)/(drift[0].seconds + drift[1].seconds) : 0);
+    return count > 0 && drift[0].intervals + drift[1].intervals > 0;
 }
 
 /* Exercise the plant's attack and release with a fixed real-model pose and
@@ -598,6 +780,198 @@ static int export_jog_poses(const char *asset, const char *out, float speed, int
     return 1;
 }
 
+/* Paired raw and hand-corrected global poses, with no arm or leg IK.
+ * Explicit experiment mode; no simulation or ball action is changed. */
+static int export_hand_poses(const char *asset, const char *out, int mode, int fps)
+{
+    FILE *f; AnimState *s = &as[9]; Transform raw[MAX_BONES];
+    if ((mode < 0 || mode > 4) || (fps != 30 && fps != 60) || !strcmp(asset,out)) return 0;
+    if (!load_model_animation(asset)) return 0;
+    detectJogDirection(); detectJogHandProfile();
+    game_init(&game); game.ball_team = -1; game.ball_player = -1;
+    memset(s,0,sizeof *s); s->speed=3; s->clip=C_JOG; s->prevClip=C_JOG; s->blend=1;
+    jogHandRelax=mode; s->handRelaxEnvelope=1; /* steady-state mesh comparison */
+    f=fopen(out,"wb"); if (!f) return 0;
+    fprintf(f,"{\"format\":1,\"fps\":%d,\"mode\":%d,\"bones\":[",fps,mode);
+    for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
+    fputs("],\"frames\":[",f);
+    for (int i=0;i<fps;++i) {
+        float time=clipLen(C_JOG)*(float)i/fps;
+        sampleClip(C_JOG,time,raw); memcpy(s->pose,raw,sizeof(Transform)*(size_t)model.boneCount);
+        relaxJogHands(s,C_JOG,1.f/60.f);
+        if (i) fputc(',',f);
+        fprintf(f,"{\"clip_time\":%.9g,\"raw\":",time);
+        if (!write_pose(f,raw,model.boneCount)) { fclose(f); return 0; }
+        fputs(",\"adjusted\":",f);
+        if (!write_pose(f,s->pose,model.boneCount)) { fclose(f); return 0; }
+        fputc('}',f);
+    }
+    fputs("]}\n",f); if (fclose(f)) return 0;
+    UnloadModelAnimations(anims,animCount); return 1;
+}
+
+/* Deliberately scripted presentation transitions and guard switches. Uses
+ * the same pose blend and correction functions as raylib 5.5 rendering, but
+ * is not a live match or a simulation input test. */
+static int export_hand_transition(const char *asset, const char *out, int fps)
+{
+    static const char *state[] = {"idle","jog-in","run","jog-before-carry","carry","jog-before-jump","jump","jog-before-handpass","handpass","jog-before-solo","solo","jog-return"};
+    static const int clips[] = {C_IDLE,C_JOG,C_RUN,C_JOG,C_RUN_BALL,C_JOG,C_JOG,C_JOG,C_HAND_PASS,C_JOG,C_SOLO,C_JOG};
+    AnimState *s=&as[9]; GamePlayer *p; Transform raw[MAX_BONES]; Quaternion previous[MAX_BONES];
+    float boundary[12]={0}, interior[12]={0}; int tested[12]={0}, noops[12]={0}, have_previous=0;
+    FILE *f;
+    if ((fps!=30 && fps!=60) || !strcmp(asset,out) || !load_model_animation(asset)) return 0;
+    detectJogDirection(); detectJogHandProfile(); game_init(&game); game.ball_team=-1; game.ball_player=-1;
+    p=&game.players[0][9]; memset(s,0,sizeof *s); s->speed=3; s->clip=C_IDLE; s->prevClip=C_IDLE; s->blend=1;
+    jogHandRelax=4; poseFar=0; f=fopen(out,"wb"); if (!f) return 0;
+    fprintf(f,"{\"format\":1,\"mode\":4,\"fps\":%d,\"scenario\":\"scripted-hand-transition\",\"bones\":[",fps);
+    for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
+    fputs("],\"frames\":[",f);
+    for (int step=0;step<12*fps;++step) {
+        int phase=step/fps, clip=clips[phase]; float t=fmodf((float)step/fps,clipLen(clip)), w, maxstep=0;
+        int guarded=(phase==4||phase==6||phase==8||phase==10);
+        game.ball_team=phase==4?0:-1; game.ball_player=phase==4?9:-1;
+        p->jump_time=phase==6?.2f:0;
+        p->action=phase==8?GAME_ACT_HANDPASS:phase==10?GAME_ACT_SOLO:GAME_ACT_NONE;
+        w=updatePoseBlend(s,clip,t,1.f/fps); sampleBlendedPose(s,clip,t,w);
+        memcpy(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        relaxJogHands(s,clip,1.f/fps);
+        if (guarded && memcmp(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount)) { fclose(f); return 0; }
+        if (guarded) ++noops[phase];
+        for (int b=0;b<model.boneCount;++b) {
+            int parent=boneChild(b); Quaternion a,z,delta; float now[4],old[4],angle;
+            if (parent<0 || b==boneHandL || b==boneHandR || (!boneUnder(b,boneHandL) && !boneUnder(b,boneHandR))) continue;
+            a=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(raw[parent].rotation),raw[b].rotation));
+            z=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(s->pose[parent].rotation),s->pose[b].rotation));
+            delta=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(a),z));
+            now[0]=delta.x; now[1]=delta.y; now[2]=delta.z; now[3]=delta.w;
+            if (have_previous) {
+                old[0]=previous[b].x; old[1]=previous[b].y; old[2]=previous[b].z; old[3]=previous[b].w;
+                if (!am_rotation_distance(now,old,&angle)) { fclose(f); return 0; }
+                if (angle>maxstep) maxstep=angle;
+            }
+            previous[b]=delta;
+        }
+        have_previous=1; ++tested[phase];
+        if (step%fps==0) boundary[phase]=maxstep; else if (maxstep>interior[phase]) interior[phase]=maxstep;
+        if (step%fps==fps/2) {
+            if (phase) fputc(',',f);
+            fputs("{\"state\":",f); write_json_string(f,state[phase]);
+            fputs(",\"raw\":",f); if (!write_pose(f,raw,model.boneCount)) { fclose(f); return 0; }
+            fputs(",\"adjusted\":",f); if (!write_pose(f,s->pose,model.boneCount)) { fclose(f); return 0; }
+            fputc('}',f);
+        }
+    }
+    fputs("]}\n",f); if (fclose(f)) return 0;
+    for (int phase=0;phase<12;++phase) {
+        printf("hand_transition fps=%d state=%s frames=%d guarded_noops=%d boundary_delta_deg=%.3f max_internal_delta_deg=%.3f (local_correction_only)\n",
+               fps,state[phase],tested[phase],noops[phase],boundary[phase]*RAD2DEG,interior[phase]*RAD2DEG);
+        if (tested[phase]!=fps || ((phase==4||phase==6||phase==8||phase==10) && noops[phase]!=fps)) return 0;
+    }
+    UnloadModelAnimations(anims,animCount); return 1;
+}
+
+/* Offline-only counterfactual: translate planted right finger joints by a
+ * fraction of the solved wrist displacement. Not used by game rendering. */
+static void diagnosticGrip(AnimState *s, int clip, Vector3 offset, float follow, int replant)
+{
+    Transform original[MAX_BONES]; Vector3 baseWrist, delta;
+    if (follow <= 0) { cradleBallWithSprintOffset(s,clip,offset); return; }
+    memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+    cradleBallWithSprintOffset(s,clip,(Vector3){0,0,0});
+    baseWrist=s->pose[boneHandR].translation;
+    memcpy(s->pose,original,sizeof(Transform)*(size_t)model.boneCount);
+    cradleBallWithSprintOffset(s,clip,offset);
+    delta=Vector3Scale(Vector3Subtract(s->pose[boneHandR].translation,baseWrist),follow);
+    for (int b=0;b<model.boneCount;++b)
+        if (b!=boneHandR && boneUnder(b,boneHandR))
+            s->pose[b].translation=Vector3Add(s->pose[b].translation,delta);
+    if (replant && s->cradleValid) {
+        const int fingers[]={27,28,30,29,31};
+        for (int i=0;i<5;++i) {
+            int b=fingers[i];
+            plantFingerClear(s->pose,b,b+10,b+20,s->cradleCenter,
+                             s->pose[b].translation,s->pose[b+10].translation,s->pose[b+20].translation);
+        }
+    }
+}
+
+/* Scripted ball-carry/action samples with the frontend's torso and cradle
+ * implementation. Bind rotations are supplied by a GLB-verified exporter. */
+static int export_grip_poses(const char *asset, const char *out, const char *bindpath, float clearance, Vector3 sprintOffset, float follow, int replant)
+{
+    static Transform bind[MAX_BONES];
+    static const struct { const char *name; int clip,action; float speed,phase; } cases[]={
+        {"stand",C_IDLE,GAME_ACT_NONE,0,.25f},{"jog-a",C_RUN_BALL,GAME_ACT_NONE,3,.2f},
+        {"jog-b",C_RUN_BALL,GAME_ACT_NONE,3,.7f},{"sprint-a",C_RUN_BALL,GAME_ACT_NONE,7,.2f},
+        {"sprint-b",C_RUN_BALL,GAME_ACT_NONE,7,.7f},{"solo-hold",C_SOLO,GAME_ACT_SOLO,3,.1f},
+        {"solo-release",C_SOLO,GAME_ACT_SOLO,3,.45f},{"solo-return",C_SOLO,GAME_ACT_SOLO,3,.72f},
+        {"solo-held",C_SOLO,GAME_ACT_SOLO,3,.95f},{"handpass",C_HAND_PASS,GAME_ACT_HANDPASS,3,.3f},
+        {"catch",C_CATCH,GAME_ACT_CATCH,3,.8f},{"pickup",C_PICKUP,GAME_ACT_PICKUP,3,.8f}};
+    static const char *finger_names[]={"index_01_l","middle_01_l","ring_01_l","pinky_01_l","thumb_01_l",
+                                       "index_01_r","middle_01_r","ring_01_r","pinky_01_r","thumb_01_r"};
+    static const int expected[]={22,23,25,24,26,27,28,30,29,31};
+    AnimState *s=&as[9]; GamePlayer *p; FILE *f,*bf; char name[128],extra[8];
+    if (!strcmp(asset,out) || !strcmp(bindpath,out) || !load_model_animation(asset)) return 0;
+    bf=fopen(bindpath,"r"); if (!bf) return 0;
+    for (int b=0;b<model.boneCount;++b) {
+        Quaternion q;
+        if (fscanf(bf,"%127s %f %f %f %f",name,&q.x,&q.y,&q.z,&q.w)!=5 || strcmp(name,model.bones[b].name) ||
+            !isfinite(q.x)||!isfinite(q.y)||!isfinite(q.z)||!isfinite(q.w) || QuaternionLength(q)<.99f || QuaternionLength(q)>1.01f) { fclose(bf); return 0; }
+        bind[b].rotation=QuaternionNormalize(q); bind[b].scale=(Vector3){1,1,1};
+    }
+    if (fscanf(bf,"%7s",extra)==1) { fclose(bf); return 0; } fclose(bf);
+    for (int k=0;k<10;++k) {
+        char joint[32];
+        if (findBone(finger_names[k])!=expected[k]) return 0;
+        for (int j=2;j<=3;++j) {
+            const char *suffix=strstr(finger_names[k],"_01_"); size_t prefix;
+            if (!suffix) return 0;
+            prefix=(size_t)(suffix-finger_names[k]);
+            if (snprintf(joint,sizeof joint,"%.*s_%02d_%c",(int)prefix,finger_names[k],j,finger_names[k][strlen(finger_names[k])-1]) >= (int)sizeof joint ||
+                findBone(joint)!=expected[k]+10*(j-1)) return 0;
+        }
+    }
+    model.bindPose=bind; boneSpine=findBone("spine_03"); boneSpine1=findBone("spine_01");
+    boneArmUL=findBone("upperarm_l"); boneArmUR=findBone("upperarm_r");
+    boneArmLL=findBone("lowerarm_l"); boneArmLR=findBone("lowerarm_r");
+    boneMidL=findBone("middle_01_l"); boneMidR=findBone("middle_01_r");
+    if (boneSpine<0 || boneSpine1<0 || boneArmUL<0 || boneArmUR<0 || boneArmLL<0 || boneArmLR<0 || boneMidL<0 || boneMidR<0) return 0;
+    loadGrip(asset);
+    if (clearance>0) { if (!isfinite(clearance) || clearance<.012f || clearance>.06f) return 0; ballClear=clearance; }
+    detectJogDirection(); detectJogHandProfile(); game_init(&game);
+    game.ball_team=0; game.ball_player=9; p=&game.players[0][9];
+    f=fopen(out,"wb"); if (!f) return 0;
+    fprintf(f,"{\"format\":1,\"mode\":4,\"scenario\":\"scripted-grip\",\"clearance_m\":%.9g,\"bones\":[",ballClear);
+    for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
+    fputs("],\"frames\":[",f);
+    for (int k=0;k<(int)(sizeof cases/sizeof cases[0]);++k) {
+        Transform raw[MAX_BONES], input[MAX_BONES]; Vector3 center={0}; int hasCenter, cradleValid; float cw;
+        memset(s,0,sizeof *s); s->speed=cases[k].speed; s->clip=cases[k].clip; s->prevClip=cases[k].clip; s->blend=1; s->handRelaxEnvelope=1;
+        p->action=cases[k].action; p->action_time=cases[k].phase*game_action_duration(p->action); p->jump_time=0;
+        sampleClip(cases[k].clip,clipLen(cases[k].clip)*cases[k].phase,s->pose);
+        balanceTorso(s,cases[k].clip); memcpy(input,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        jogHandRelax=0; relaxJogHands(s,cases[k].clip,1.f/30); diagnosticGrip(s,cases[k].clip,sprintOffset, cases[k].action==GAME_ACT_NONE && cases[k].speed>=5.96f ? follow : 0, replant);
+        cw=cradleWeight(s); cradleValid=s->cradleValid;
+        hasCenter=cradleValid && cases[k].action==GAME_ACT_NONE; if (hasCenter) center=s->cradleCenter;
+        memcpy(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount);
+        memcpy(s->pose,input,sizeof(Transform)*(size_t)model.boneCount); s->handRelaxEnvelope=1; jogHandRelax=4;
+        relaxJogHands(s,cases[k].clip,1.f/30); diagnosticGrip(s,cases[k].clip,sprintOffset, cases[k].action==GAME_ACT_NONE && cases[k].speed>=5.96f ? follow : 0, replant);
+        if (memcmp(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount) || cradleValid!=s->cradleValid ||
+            (hasCenter && Vector3Distance(center,s->cradleCenter)>1e-6f)) { fclose(f); return 0; }
+        if (k) fputc(',',f);
+        fputs("{\"state\":",f); write_json_string(f,cases[k].name);
+        fprintf(f,",\"cradle_weight\":%.9g,\"ball_radius\":%.9g,\"ball_center\":",cw,(float)BALL_R);
+        if (hasCenter) fprintf(f,"[%.9g,%.9g,%.9g]",center.x,center.y,center.z); else fputs("null",f);
+        fputs(",\"raw\":",f); if (!write_pose(f,raw,model.boneCount)) { fclose(f); return 0; }
+        fputs(",\"adjusted\":",f); if (!write_pose(f,s->pose,model.boneCount)) { fclose(f); return 0; }
+        fputc('}',f);
+    }
+    fputs("]}\n",f); if (fclose(f)) return 0;
+    puts("grip_pose cases=12 exact_guard_noops=12 (scripted_cpu_pose_only)");
+    UnloadModelAnimations(anims,animCount); return 1;
+}
+
 /* Synthetic moving player: one second warm-up then a one-second turn,
  * straight jog, sprint, jog and stop. Uses the renderer's matching and
  * raylib 5.5 blend helpers; no draw calls or simulation physics. */
@@ -663,6 +1037,43 @@ static int export_turn_poses(const char *asset, const char *out, int fps, int ap
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
+    if ((argc==5 || argc==6 || argc==9 || argc==10 || argc==11) && !strcmp(argv[1],"--export-grip-poses")) {
+        float clearance=0, follow=0; Vector3 offset={0}; char *end=NULL; int replant=0;
+        if (argc>=6) { clearance=strtof(argv[5],&end); if (end==argv[5] || *end || !isfinite(clearance) || clearance<.012f || clearance>.06f) { fprintf(stderr,"Invalid grip clearance\n"); return 1; } }
+        if (argc>=9) {
+            float *components[]={&offset.x,&offset.y,&offset.z};
+            for (int i=0;i<3;++i) {
+                *components[i]=strtof(argv[6+i],&end);
+                if (end==argv[6+i] || *end || !isfinite(*components[i]) || fabsf(*components[i])>.20f) { fprintf(stderr,"Invalid sprint offset\n"); return 1; }
+            }
+        }
+        if (argc>=10) {
+            follow=strtof(argv[9],&end);
+            if (end==argv[9] || *end || !isfinite(follow) || follow<0 || follow>1) { fprintf(stderr,"Invalid finger follow\n"); return 1; }
+        }
+        if (argc==11) {
+            if (strcmp(argv[10],"0") && strcmp(argv[10],"1")) { fprintf(stderr,"Invalid finger replant\n"); return 1; }
+            replant=argv[10][0]=='1';
+            if (replant && follow<=0) { fprintf(stderr,"Finger replant requires follow\n"); return 1; }
+        }
+        if (!export_grip_poses(argv[2],argv[3],argv[4],clearance,offset,follow,replant)) { fprintf(stderr,"Grip pose export failed\n"); return 1; }
+        return 0;
+    }
+    if (argc == 5 && !strcmp(argv[1], "--export-hand-transition")) {
+        char *end; long fps=strtol(argv[4],&end,10);
+        if (*end || (fps!=30 && fps!=60) || !export_hand_transition(argv[2],argv[3],(int)fps)) {
+            fprintf(stderr,"Hand transition export failed\n"); return 1;
+        }
+        return 0;
+    }
+    if (argc == 6 && !strcmp(argv[1], "--export-hand-poses")) {
+        char *endMode, *endFps; long mode=strtol(argv[4],&endMode,10), fps=strtol(argv[5],&endFps,10);
+        if (*endMode || *endFps || mode < 0 || mode > 4 || (fps != 30 && fps != 60) ||
+            !export_hand_poses(argv[2],argv[3],(int)mode,(int)fps)) {
+            fprintf(stderr,"Hand pose export failed\n"); return 1;
+        }
+        return 0;
+    }
     if ((argc == 5 || argc == 6) && !strcmp(argv[1], "--export-turn-poses")) {
         char *end; long fps = strtol(argv[4], &end, 10);
         if (*end || (fps != 30 && fps != 60) || (argc == 6 && strcmp(argv[5], "--no-ik")) ||
@@ -709,7 +1120,7 @@ int main(int argc, char **argv)
         !validate_offscreen_release(1.f/60.f, 1) || !validate_offscreen_release(1.f/30.f, 1) ||
         !validate_action(GAME_ACT_HANDPASS, 1.f/60.f) || !validate_action(GAME_ACT_HANDPASS, 1.f/30.f) ||
         !validate_action(GAME_ACT_SOLO, 1.f/60.f) || !validate_action(GAME_ACT_SOLO, 1.f/30.f) ||
-        !validate_interruption() || !validate_leg_ik() || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
+        !validate_interruption() || !validate_leg_ik() || !validate_jog_arm_assist() || !validate_jog_hand_relax() || !validate_extra_hand_relax(2) || !validate_extra_hand_relax(3) || !validate_extra_hand_relax(4) || !validate_jog_stride_ramp() || !report_jog_ground_proxy(1.f/30, 2.0f) || !report_jog_ground_proxy(1.f/60, 2.0f) || !report_jog_ground_proxy(1.f/30, 3.5f) || !report_jog_ground_proxy(1.f/60, 3.5f) || !validate_plant_envelope() || !validate_torso_and_grip() || !compare_entry_poses(GAME_ACT_HANDPASS) ||
         !compare_entry_poses(GAME_ACT_SOLO) || !benchmark_search()) {
         fprintf(stderr, "Action integration check failed\n"); return 1;
     }

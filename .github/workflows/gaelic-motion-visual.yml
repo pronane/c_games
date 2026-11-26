@@ -50,7 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 40
+      checks: write
+    timeout-minutes: 50
     env:
       LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
@@ -89,6 +90,22 @@ jobs:
           python3 tools/inspect_shorts_motion.py ../build/cmu-jog-local/candidate/gaelic_player.glb > ../build/cmu-jog-report/cmu-shorts-motion.json
           python3 tests/shorts_runtime_tests.py ./motion_headless assets/models/gaelic_player.glb
           python3 tests/shorts_runtime_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
+          python3 tests/hand_mesh_tests.py ./motion_headless assets/models/gaelic_player.glb
+          python3 tests/hand_mesh_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
+          python3 tests/hand_grip_tests.py ./motion_headless assets/models/gaelic_player.glb
+          python3 tests/hand_grip_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb
+          python3 tools/inspect_hand_grip.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless > ../build/cmu-jog-report/cmu-hand-grip.json
+          timeout 300 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --bake-motion ../build/cmu-jog-local/graphics-bind-check.gfmotion --dump-motion-bind ../build/cmu-jog-local/renderer-bind.txt > ../build/cmu-jog-report/renderer-bind.log 2>&1
+          python3 tools/inspect_hand_grip.py ../build/cmu-jog-local/candidate/gaelic_player.glb --check-renderer-bind ../build/cmu-jog-local/renderer-bind.txt > ../build/cmu-jog-report/renderer-bind-check.log
+
+          python3 tests/hand_transition_tests.py ./motion_headless assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-hand-transition.log
+          python3 tests/hand_transition_tests.py ./motion_headless ../build/cmu-jog-local/candidate/gaelic_player.glb --surface > ../build/cmu-jog-report/cmu-hand-transition.log
+          for mode in 0 1 2 3 4; do
+            python3 tools/inspect_hand_mesh.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless --mode "$mode" --fps 60 > "../build/cmu-jog-report/hand-mesh-mode-${mode}.json"
+          done
+          for mode in 3 4; do
+            python3 tools/inspect_hand_mesh.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless --mode "$mode" --fps 60 --surface > "../build/cmu-jog-report/hand-surface-mode-${mode}.json"
+          done
           for fps in 30 60; do
             python3 tools/inspect_shorts_runtime.py assets/models/gaelic_player.glb --tool ./motion_headless --scenario turn-transition --fps "$fps" > "../build/cmu-jog-report/original-shorts-turn-${fps}.json"
             python3 tools/inspect_shorts_runtime.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless --scenario turn-transition --fps "$fps" > "../build/cmu-jog-report/cmu-shorts-turn-${fps}.json"
@@ -99,6 +116,22 @@ jobs:
               python3 tools/inspect_shorts_runtime.py ../build/cmu-jog-local/candidate/gaelic_player.glb --tool ./motion_headless --speed "$speed" --fps "$fps" > "../build/cmu-jog-report/cmu-shorts-runtime-${speed}-${fps}.json"
             done
           done
+      - name: Publish hand and gait diagnostics
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/inspect_hand_references.py assets/models/gaelic_player.glb > ../build/cmu-jog-report/original-hand-references.json
+          python3 tools/inspect_hand_references.py ../build/cmu-jog-local/candidate/gaelic_player.glb > ../build/cmu-jog-report/cmu-hand-references.json
+          grep -E '^(jog_hand_profile|jog_hand_geometry|jog_hand_guards|jog_hand_extra|shared_contact_drift)' ../build/cmu-jog-report/model-test.log > ../build/cmu-jog-local/diagnostic-summary.txt
+          test -s ../build/cmu-jog-local/diagnostic-summary.txt
+          python3 -c 'import json,pathlib; p=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt"); f=p.open("a"); [(lambda r: [f.write("hand_mesh mode=%d side=%s %s\n"%(m,s,json.dumps(v,sort_keys=True))) for s,v in r["sides"].items()])(json.loads(pathlib.Path("../build/cmu-jog-report/hand-mesh-mode-%d.json"%m).read_text())) for m in (0,1,2,3,4)]; f.close()'
+          python3 -c 'import json,pathlib; p=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt"); f=p.open("a"); [(lambda r: f.write("hand_surface mode=%d samples=%d %s\n"%(m,r["surface_samples"],json.dumps(r["sampled_surface_overlap"],sort_keys=True))))(json.loads(pathlib.Path("../build/cmu-jog-report/hand-surface-mode-%d.json"%m).read_text())) for m in (3,4)]; f.close()'
+          grep -E '^hand_transition( |_)' ../build/cmu-jog-report/cmu-hand-transition.log >> ../build/cmu-jog-local/diagnostic-summary.txt
+          cat ../build/cmu-jog-report/renderer-bind-check.log >> ../build/cmu-jog-local/diagnostic-summary.txt
+          python3 -c 'import json,pathlib; r=json.loads(pathlib.Path("../build/cmu-jog-report/cmu-hand-grip.json").read_text()); f=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt").open("a"); f.write("grip_surface "+json.dumps({"ball_available":r["ball_available"],"states":r["states"]},separators=(",",":"))+"\n"); f.close()'
+          python3 -c 'import json,os,pathlib; text=pathlib.Path("../build/cmu-jog-local/diagnostic-summary.txt").read_text(); assert len(text)<60000; print(json.dumps({"name":"Motion diagnostics: CMU candidate", "head_sha":os.environ["GITHUB_SHA"], "external_id":os.environ["GITHUB_RUN_ID"], "status":"completed", "conclusion":"neutral", "output":{"title":"Headless joint proxy diagnostics", "summary":"Not rendered mesh, contact or anatomical validation.", "text":text}}))' > ../build/cmu-jog-local/diagnostic-check.json
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/diagnostic-check.json > /dev/null
       # Same scripted input and render settings; GF_QUICK stops after frame 340,
       # so these videos cover standing, walking, jogging, sprinting and stopping.
       - name: Record original and experimental jog
@@ -110,6 +143,55 @@ jobs:
           timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog.mp4 > ../build/cmu-jog-report/cmu-jog.log 2>&1
           test -s ../build/cmu-jog-report/original.mp4
           test -s ../build/cmu-jog-report/cmu-jog.mp4
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-arm-assist.mp4 > ../build/cmu-jog-report/cmu-jog-arm-assist.log 2>&1
+          test -s ../build/cmu-jog-report/cmu-jog-arm-assist.mp4
+      - name: Record jog hand-pose close-ups
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_JOG_CLOSEUP: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-before.mp4 > ../build/cmu-jog-report/cmu-hands-before.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --jog-hand-relax --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-relaxed.mp4 > ../build/cmu-jog-report/cmu-hands-relaxed.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --jog-hand-relax-strong --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-strong.mp4 > ../build/cmu-jog-report/cmu-hands-strong.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --jog-hand-relax-mirrored --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-mirrored.mp4 > ../build/cmu-jog-report/cmu-hands-mirrored.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --jog-arm-assist --jog-hand-relax-curled --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-hands-curled.mp4 > ../build/cmu-jog-report/cmu-hands-curled.log 2>&1
+          test -s ../build/cmu-jog-report/cmu-hands-curled.mp4
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-curled.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-curled.log
+          test -s ../build/cmu-jog-report/cmu-hands-mirrored.mp4
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-mirrored.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-mirrored.log
+          test -s ../build/cmu-jog-report/cmu-hands-strong.mp4
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-strong.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-strong.log
+          test -s ../build/cmu-jog-report/cmu-hands-before.mp4
+          test -s ../build/cmu-jog-report/cmu-hands-relaxed.mp4
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-before.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-before.log
+          grep -q 'MOTION jog-closeup begin frame 120' ../build/cmu-jog-report/cmu-hands-relaxed.log
+          grep -q 'MOTION jog-closeup end frame 210' ../build/cmu-jog-report/cmu-hands-relaxed.log
+      # Check-run output is readable through api.github.com even when the
+      # artifact CDN is blocked. These stills are not a substitute for video.
+      - name: Publish sampled hand review frames to GitHub checks
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for label in cmu-hands-before cmu-hands-relaxed cmu-hands-strong cmu-hands-mirrored cmu-hands-curled; do
+            python3 tools/review_frame_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --hand-crop > "../build/cmu-jog-local/${label}-check.json"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-check.json" > /dev/null
+          done
+      - name: Publish higher-detail hand motion previews
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pose in before curled; do
+            label="cmu-hands-detail-${pose}"
+            python3 tools/review_video_payload.py "../build/cmu-jog-report/cmu-hands-${pose}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --hand-detail > "../build/cmu-jog-local/${label}-preview.json"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-preview.json" > /dev/null
+          done
       - name: Record fixed-camera jog comparison
         working-directory: Gaelic_Football_3d
         env:
@@ -125,6 +207,58 @@ jobs:
           grep -q 'MOTION fixed-camera begin frame 120' ../build/cmu-jog-report/cmu-jog-fixed.log
           grep -q 'MOTION fixed-camera end frame 210' ../build/cmu-jog-report/cmu-jog-fixed.log
           diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-fixed.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-fixed.log)
+      # A second, closer stationary pass; both runs use identical simulation input.
+      - name: Record fixed-world foot and shorts detail
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_FIXED_JOG_DETAIL: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/original-feet.mp4 > ../build/cmu-jog-report/original-feet.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-feet.mp4 > ../build/cmu-jog-report/cmu-jog-feet.log 2>&1
+          for label in original-feet cmu-jog-feet; do
+            test -s "../build/cmu-jog-report/${label}.mp4"
+            grep -q 'MOTION fixed-camera begin frame 120' "../build/cmu-jog-report/${label}.log"
+            grep -q 'MOTION fixed-camera end frame 210' "../build/cmu-jog-report/${label}.log"
+          done
+          diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-feet.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-feet.log)
+      - name: Record tighter fixed-world sole comparison
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_FIXED_JOG_SOLES: '1'
+        run: |
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/original-soles.mp4 > ../build/cmu-jog-report/original-soles.log 2>&1
+          timeout 600 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --model ../build/cmu-jog-local/candidate/gaelic_player.glb --motion-cache ../build/cmu-jog-local/candidate.gfmotion --record-motion ../build/cmu-jog-report/cmu-jog-soles.mp4 > ../build/cmu-jog-report/cmu-jog-soles.log 2>&1
+          for label in original-soles cmu-jog-soles; do
+            test -s "../build/cmu-jog-report/${label}.mp4"
+            grep -q 'MOTION fixed-camera begin frame 120' "../build/cmu-jog-report/${label}.log"
+            grep -q 'MOTION fixed-camera end frame 210' "../build/cmu-jog-report/${label}.log"
+          done
+          diff <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/original-soles.log) <(grep 'MOTION fixed-camera begin' ../build/cmu-jog-report/cmu-jog-soles.log)
+      - name: Record scripted sprint-carry grip review
+        working-directory: Gaelic_Football_3d
+        env:
+          GF_QUICK: '1'
+          GF_GRIP_REVIEW: '1'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          timeout 900 xvfb-run -a -s '-screen 0 1280x720x24' ./gaelic_football --cpu-skin --record-motion ../build/cmu-jog-report/sprint-grip.mp4 > ../build/cmu-jog-report/sprint-grip.log 2>&1
+          test -s ../build/cmu-jog-report/sprint-grip.mp4
+          grep -q 'MOTION grip-review frame 620 .*action 0 holder 0/9 cradle 1' ../build/cmu-jog-report/sprint-grip.log
+          python3 tools/review_video_payload.py ../build/cmu-jog-report/sprint-grip.mp4 --label sprint-grip --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --grip-detail > ../build/cmu-jog-local/sprint-grip-preview.json
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input ../build/cmu-jog-local/sprint-grip-preview.json > /dev/null
+      - name: Publish short motion previews to GitHub checks
+        working-directory: Gaelic_Football_3d
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for label in cmu-hands-before cmu-hands-relaxed cmu-hands-strong cmu-hands-mirrored cmu-hands-curled original-fixed cmu-jog-fixed original-feet cmu-jog-feet original-soles cmu-jog-soles; do
+            crop=()
+            case "$label" in cmu-hands-*) crop=(--hand-crop);; *-feet) crop=(--foot-detail);; *-soles) crop=(--sole-detail);; esac
+            python3 tools/review_video_payload.py "../build/cmu-jog-report/${label}.mp4" --label "$label" --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" "${crop[@]}" > "../build/cmu-jog-local/${label}-preview.json"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input "../build/cmu-jog-local/${label}-preview.json" > /dev/null
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

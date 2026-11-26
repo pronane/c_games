@@ -244,3 +244,391 @@ thigh-local step was 1.4 mm during turns, 3.7 mm during non-turn cross-fades,
 and 6.4 mm during non-turn, non-cross-fade frames; the largest paired leg-IK
 change was 4.1 mm. This does not cover actual gameplay, camera perspective,
 raylib 6 or occlusion and does not establish the cause of the reported issue.
+
+### Experimental jog arm assist
+
+`--jog-arm-assist` is an **opt-in experiment**, not the default. A shared
+helper profiles each hand's forward movement relative to its shoulder and the
+opposite knee's forward movement relative to its hip. It enables a bounded
+additional shoulder swing only where the source arm motion is small but
+already correlates with the opposite leg. Strong, ambiguous and uncorrelated
+source motion is left unchanged. The adjustment is phased by the current
+opposite leg, fades through locomotion cross-fades, and rigidly rotates each arm
+subtree so bone lengths are preserved. It is excluded during ball possession,
+jumps and actions, and does not affect simulation or gait selection.
+
+With the local experimental CMU clip, unblended wrist forward ranges relative
+to the shoulder change from roughly 0.137/0.110 m to 0.191/0.160 m in the
+headless bone proxy; the shipped jog's stronger arm motion is unchanged. This
+is not a visual quality, hand-mesh, transition or performance guarantee. The
+manual visual workflow records a separate `cmu-jog-arm-assist.mp4` beside the
+unmodified CMU version for review. Do not make it the default based on these
+numbers alone.
+
+### Experimental relaxed jog fingers
+
+The CMU BVH does not capture fingers. In the locally retargeted candidate,
+its hand and finger joint rotations remain almost static and near the target
+bind pose; this is not captured hand motion. The candidate's unblended wrist
+centres average approximately 0.108/0.113 m forward of their corresponding
+shoulders (bone proxy, not a rendered posture measurement). Increasing swing
+alone does not change that mean arm posture reliably.
+
+`--jog-hand-relax` is a separate **opt-in** experiment. For nearly static
+finger joints only, it blends their local rotations toward the game's existing
+idle pose, with a maximum correction of 0.25 radians per joint. It rebuilds
+finger descendants parent-first so segments remain connected. Strongly moving
+source joints retain their local animation, and both experiments are excluded
+from carrying, jumps and actions. The target is a heuristic reference, not
+captured CMU finger data or a claim of anatomically correct hands. Headless
+checks cover local-angle bounds, bone lengths, unrelated bones, transitions,
+and disabled/carry/action/jump guards; they do not check rendered hand mesh,
+self-intersection, perspective or visual quality. The visual workflow records
+`cmu-hands-before.mp4` and `cmu-hands-relaxed.mp4` with a closer tracking view
+from frames 120–209, with arm assist enabled in both. Keep both experiments
+off by default until reviewed.
+
+### API-accessible review stills
+
+The manual visual workflow also publishes two machine-readable GitHub check
+runs with six downscaled stills per hand comparison video. They are bounded to
+60,000 characters per check output and are not committed to the repository.
+To retrieve them where the GitHub API is reachable but the artifact CDN is
+not, run `python3 tools/download_review_frames.py RUN_ID --out build/review`
+from the game directory (with authenticated `gh`). Full videos remain workflow
+artifacts; still frames cannot establish fluid motion, timing, or foot slide.
+This check publishing requires `checks: write` in the manual `jog-ab` job.
+
+### API-accessible motion previews
+
+The same workflow publishes bounded, three-second, 12 fps compressed MP4
+previews for the two hand close-ups and two fixed-camera jog recordings. Run
+`python3 tools/download_review_videos.py RUN_ID --out build/review` from the
+game directory with authenticated `gh`. Each preview fits within one check
+output, has a SHA-256 integrity check, and may be downscaled further to fit.
+The hand view is cropped around the upper body; the fixed view is uncropped.
+These are useful for inspecting timing, but their reduced resolution and frame
+rate cannot replace the original 30 fps artifact or prove foot contact, mesh
+intersection, or gameplay quality.
+
+### Fixed-world detail and shared drift diagnostic
+
+The visual workflow also records `original-feet.mp4` and `cmu-jog-feet.mp4`
+with the same scripted motion and a closer stationary world-space camera during
+frames 120–209. A shorter 15 fps preview is published through GitHub checks;
+the player may leave this narrow view, and a compressed preview cannot resolve
+all sole or fabric details. The original 30 fps recordings remain artifacts.
+
+The shared `am_contact_drift_sample` utility accumulates horizontal world-space
+path distance only across consecutive contact-proxy samples. The headless gait
+report now uses it on each adjusted ankle with the existing low raw-ankle height
+proxy; it reports a 2D mean speed in addition to the historical 1D forward
+metric. It does not establish actual sole contact, rendered mesh clearance, or
+correctness in a turning gameplay scenario. No simulation state depends on it.
+
+### Sole detail and hand reference investigation
+
+The visual workflow records matched `original-soles.mp4` and
+`cmu-jog-soles.mp4` with a tighter **stationary** world-space view. The API
+preview covers only 0.8 seconds at 20 fps and may be further downscaled; it is
+not a substitute for the full 30 fps video. The scripted sole view hides selection markers to avoid covering the ground;
+camera perspective and compression can still obscure true sole contact.
+
+`tools/inspect_hand_references.py MODEL.glb` compares index-through-pinky bone
+geometry across selected non-possession clips. Its spread and middle-joint bend
+are direction proxies, not anatomical measures; it excludes the thumb, the end
+of each finger and the skinned mesh. The workflow saves reports for both models
+and publishes headless candidate before/after and idle-reference measurements
+through a check. The headless report calls the reusable `am_direction_angle`
+primitive from `shared/arena_motion`. None of these metrics select a reference or
+change poses. No alternative is enabled without rendered review and joint/mesh
+validation; the previous idle-reference experiment remains opt-in.
+
+The shipped-model scan found that idle at 0.2 s has different left/right
+middle-joint bend proxies (about 22 vs 5 degrees), while run and sidestep tend
+to be substantially more curled. Keeper poses are purpose-specific; none is
+established as a better relaxed running reference. The CMU candidate's
+headless test reported index-to-pinky direction spread of 28.9 degrees on both
+sides before the existing experimental correction and 13.1/21.5 afterward,
+but captured images still look splayed. These are joint proxies, not fingertip
+mesh spread or evidence of an anatomically correct pose. The asymmetry and
+rendered uncertainty argue against automatically promoting another clip.
+
+### Experimental fingertip mesh probes
+
+`tools/inspect_hand_mesh.py MODEL --tool ./motion_headless --mode N` compares
+paired raylib 5.5 jog poses using CPU linear skinning of the model's `v0_body`.
+It selects the distal 20% of vertices strongly weighted to each index, middle,
+ring and pinky tip bone, and reports adjacent fingertip-cap centroid gaps,
+minimum *sampled vertex* distances and maximum paired displacement. It excludes
+the thumb, most finger surfaces, triangles and self-occlusion. The result is
+not collision detection, anatomical validation or a substitute for a render.
+The basic point and skinning operations live in `shared/arena_motion` for reuse.
+
+Mode 0 is an unmodified control; 1 is the existing opt-in 0.25-radian idle
+reference; 2 is an additional opt-in **experiment**, `--jog-hand-relax-strong`,
+which permits at most 0.5 radians per eligible joint using the same shared
+bounded rotation helper. Neither is enabled by default. Both retain the
+possession/action/jump and transition guards. The stronger correction is not a
+new reference or a validated natural pose, and should not be promoted based on
+point gaps alone. The workflow produces three matched hand videos, sampled
+stills and mesh proxy reports for comparison.
+
+In workflow run 45854098631, the CMU candidate's mean adjacent fingertip-cap
+centroid gaps (left/right) were 43.1/43.1 mm unmodified, 36.2/41.8 mm with
+mode 1, and 33.5/45.4 mm with mode 2. The stronger setting moved some sampled
+tip vertices by up to 44.5 mm and increased the right-hand gap. The six
+close-up stills still showed splayed fingers, with no persuasive overall visual
+improvement. These are sampled cap metrics, not triangle collisions, and the
+three captures are not proof of frame-perfect comparison. Do not promote the
+stronger setting on this evidence; a more suitable, validated hand reference
+and mesh-level intersection checks remain open.
+
+### Mirrored-reference experiment
+
+`--jog-hand-relax-mirrored` is a separate opt-in experiment, capped at 0.25
+radians per joint. It uses the existing idle left-hand local finger reference
+on the left and an X-reflected copy on the right, using the shared quaternion
+reflection helper. The adapter checks matching bone and parent names, very low
+jog finger motion and approximate mirrored source local rotations; if a right
+joint fails these checks it receives no local correction. These heuristics do
+not prove mirrored rig bases, anatomy, triangle clearance or visual quality.
+Mode 3 in the fingertip mesh tool evaluates this experiment. Carry, jump,
+action and locomotion transition guards are the same as the other prototypes.
+All remain off by default; no motion capture finger data is being claimed.
+
+Run 45855729295 found all 15 candidate right-hand joints eligible for this
+mirrored experiment. Mean adjacent fingertip-cap gaps were 43.1/43.1 mm before,
+36.2/41.8 mm with the original idle reference and 36.2/36.2 mm with the
+mirrored reference (left/right). This shows improved *proxy symmetry*, not proof
+of natural hand shape or a reduction in intersections; the sampled close-ups
+still show open, splayed fingers. Maximum sampled tip displacement in the
+mirrored case was 18.3 mm. Keep it experimental pending better reference and
+surface/visual evaluation.
+
+### Authored curl and sampled finger-surface check
+
+`--jog-hand-relax-curled` is an opt-in, authored procedural reference (mode 4),
+not external motion capture or a claim of a natural pose. Starting from the
+mirrored idle reference, it composes local-X offsets on the four named finger
+chains (not the thumb), for joints with the existing stillness and mirrored
+source guards. Per-joint deviation from the jog is capped at 0.35 radians. The
+local-X axis and offset choices are rig-specific, not general anatomy; moving
+source joints are preserved, and possession/action/jump/transition guards are
+unchanged. Shared `am_rotation_compose_local` supplies only the generic math.
+
+`inspect_hand_mesh.py --surface` also skins selected proximal/distal finger
+triangles from `v0_body` and tests pairwise overlap across five fingers at 12
+sampled clip phases, using the shared floating-point triangle-overlap helper.
+It intentionally excludes weakly finger-weighted and palm triangles, so it can
+miss intersections, containment, self-overlap within a finger or collisions
+between phases. Contact/touch within numerical tolerance counts as overlap.
+This is a screen for selected surfaces, not proof that the mesh is collision
+free or that a pose is anatomically correct. Neither correction is default.
+
+In run 45857933327, the candidate's mean fingertip-cap centroid gaps were
+43.1/43.1 mm before, 36.2/36.2 mm with the mirrored idle reference and
+30.9/30.9 mm with the authored curl (left/right). Max sampled tip displacement
+was 33.4 mm. The selected-triangle screen found zero pair overlaps in 12
+sampled phases for both the raw CMU pose and the curled pose; this does not
+cover the excluded surfaces, between-frame motion or containment. Retrieved
+close-up stills show noticeably more curled, less open fingers than before,
+but this is not an anatomical or motion-quality verdict. Keep the experiment
+off by default until it is reviewed in full-resolution motion and broader
+scenarios.
+
+### Curled-hand transition and guard investigation
+
+`tests/hand_transition_tests.py` drives the raylib 5.5 presentation blend and
+hand correction through scripted idle, jog, run, carry, jump, handpass and solo
+states at 30/60 Hz. Guarded states must be exact no-ops. It reports the largest
+per-frame change in the *local correction quaternion*, including state
+boundaries; this isolates the added hand correction, not the rendered pose or
+actual gameplay. At 30 Hz on the shipped model the hard guard switch removed up
+to about 20 degrees of correction in one frame when carrying, jumping or
+starting an action; an unguarded jog previously also resumed without a fade.
+Guard onset stays immediate because delaying it could interfere with ball or
+action posing. The subsequent re-entry ramp is documented below. The curled
+experiment is not ready to default on.
+
+With `--surface`, the script also checks selected skinned finger triangles at
+one mid-state sample for each scripted state; guarded samples must match the
+uncorrected geometry. This is not complete mesh, live gameplay, continuous
+collision or visual validation. The workflow publishes 1.2-second 24 fps
+closer hand crops through the API; original 30 fps videos remain artifacts.
+
+In candidate run 45860524131, the synthetic guard switches produced an
+approximately 20.08 degree one-frame local-correction removal at both 30 and
+60 Hz, despite exact no-op behavior during carry, jump, handpass and solo.
+The selected-triangle mid-state scan also reported overlapping triangle pairs
+in the unmodified run, carry and solo clip poses; adjusted and raw counts were
+identical at those samples. These are partial headless clip/blend poses without
+ball IK or a live match, so they are a warning to investigate, not a diagnosis
+of the complete rendered hand. The detail previews were retrieved at 480 pixels
+wide and 24 fps; sampled images show a less-open curled pose, but neither the
+full-resolution video nor transition motion was visually verified here.
+
+### Guarded re-entry ramp
+
+The opt-in curled mode uses the shared `am_guarded_fade` helper to reintroduce
+its correction over 0.20 seconds after an exclusion ends. Guard activation
+still resets the envelope immediately to zero, so possession, action and jump
+poses remain exact no-ops. The envelope also resets on match/training start and
+when a player is hidden or culled, preventing stale re-entry after missed
+frames. The ramp multiplies the existing locomotion blend; modes 1–3 and
+simulation state are unchanged. A 30/60 Hz scripted regression checks the
+previously abrupt jump-to-jog correction re-entry. Abrupt **guard onset** still
+exists by design and needs an action-aware solution and rendered validation.
+
+Candidate run 45862807573 reduced the scripted jump-to-jog first-frame
+correction change from 20.08 degrees to 1.49 degrees at 30 Hz and 0.40 degrees
+at 60 Hz. Carry, jump, handpass and solo still remained exact no-ops, while
+entry into those guards continued to remove up to 20.08 degrees in one frame.
+These are local-quaternion correction deltas in a synthetic presentation
+scenario, not proof of visually smooth real gameplay or full mesh clearance.
+
+### Scripted cradled-hand surface screen
+
+`tools/inspect_hand_grip.py MODEL --tool ./motion_headless` generates and
+verifies actual bind rotations from the GLB, runs 12 hand-picked standing,
+carrying, solo, handpass, catch and pickup clip states through the frontend's
+`balanceTorso` and `cradleBall` functions, and skins selected finger surfaces.
+Its paired curled/disabled outputs must be exactly equal while possession or
+action guards apply. The workflow also checks the generated bind rotations
+against raylib 5.5's actual renderer-loaded bind pose.
+
+The surface report covers selected triangles only. Where normal non-action
+carrying gives a valid cradle centre, it also screens the selected triangles
+against a radius-0.11 m sphere using a shared point-to-triangle distance helper.
+It deliberately omits the sphere for action states: `carriedBall` uses a
+different, time-dependent ball position there. This is a small synthetic set,
+not real input, complete mesh intersection, live ball physics, animated
+transitions or rendered validation; partial cradle blends can also obscure
+whether an overlap comes from the clip or procedural adjustment.
+
+A diagnostic-only `--clearance METRES` override allows a controlled offline
+sweep; it does not change the game's grip settings. On the shipped model's
+five sampled non-action cradle poses, the default 0.012 m clearance produced
+29 selected ball-triangle overlaps in jog-b (left) and 9/6 in sprint-a/b
+(right); 0.025 m reduced these to 0 and 3/3, and 0.040 m produced none in
+these samples. Triangle counts are not penetration depth, and zero here does
+not establish whole-hand clearance or a natural-looking grip. In particular,
+changing the game default on this evidence alone could make the hands float.
+
+The grip report also gives the minimum selected-triangle distance to the ball
+surface (negative means the selected surface enters the sphere), and how many
+selected triangles are within 10 mm. These counts are not area-weighted; the
+minimum is not a maximum penetration-depth or whole-hand contact measure.
+For the shipped-model samples, raising clearance from 12 to 25 mm removed the
+jog-b overlap but put the closest selected triangles of both standing/jogging
+hands 11.5–16.1 mm away, with none within 10 mm; sprint still overlapped.
+At 40 mm the closest standing/jogging selected triangles were 25.3–30.3 mm
+away, again with none within 10 mm. Sprint intentionally cradles with only the
+right hand; the left hand is not expected to contact the ball. This tradeoff
+argues against simply increasing the global clearance; more representative
+surface coverage and rendered review are needed before modifying the grip.
+
+#### Wider hand-influence screen
+
+The ball report additionally selects each `v0_body` triangle if **any** vertex
+has at least 25% combined influence from that hand or its finger joints. This
+includes more palm, proximal finger and seam triangles than the distal screen,
+but is still weight-selected rather than an anatomical segmentation. Forearm,
+weakly weighted hand vertices, other meshes, triangle containment and frames
+between samples are not fully covered. Gap is nearest triangle-to-centre
+distance minus sphere radius, not penetration depth or contact area; triangle
+counts are not area-weighted.
+
+On the shipped GLB, this selects 3,263 triangles per side. At 12 mm clearance,
+every standing/jogging sample has 78–112 selected triangles per hand within
+the ball sphere. At 25 mm there are still 32–54; at 40 mm none in these samples,
+with nearest selected surfaces 5.8–6.6 mm from the sphere. That refines the
+finger-only finding: a large distal gap does not imply the whole selected hand
+is equally far away. In the one-handed sprint samples, 566/578 right-hand
+triangles intersect at 12 mm and 321/319 even at 40 mm; the nearest selected
+surface to the sphere centre is approximately 14 mm and 41 mm respectively
+for a 110 mm radius sphere. These are synthetic poses and a sphere proxy, not
+rendered proof or reliable penetration depth. They do suggest the sprint grip
+needs separate investigation rather than a global clearance increase.
+
+The broader report further identifies the subset of triangles where at least
+one vertex has 25% hand-bone influence, and records wrist-origin distance to
+the sphere centre. Subsets overlap, so do not add their counts. On the shipped
+GLB this subset contains 684 triangles per side. In the two sprint samples at
+12 mm clearance, the right wrist origin is 124 mm from the centre of the
+110 mm sphere, yet 526/549 palm-influenced triangles overlap it. At 40 mm,
+the wrist is 152 mm out, but 321/319 palm-influenced triangles still overlap.
+For comparison, standing/jogging show 72–91 palm-influenced overlaps at the
+default and zero at 40 mm. The sprint target is behind and close to the ball
+centre, and hand orientation places a substantial amount of palm-influenced
+surface inside the sphere despite the wrist being outside. This is evidence to
+investigate wrist placement and orientation together, not a proof of the best
+correction: these weight-selected triangles may include seams, and rendered
+and continuously animated gripping still need examination.
+
+#### Offline sprint wrist offset experiment
+
+`inspect_hand_grip.py --clearance 0.012 --sprint-offset X Y Z` applies a
+bounded model-space offset in metres to the sprint wrist target *after* the
+normal ball projection, before the existing arm IK and hand orientation. It
+uses the same cradle implementation; the game always passes zero and gains no
+new gameplay setting. It does not alter the scripted ball centre or finger
+plant targets. Offsets can push the target past arm reach, where IK clamps it.
+
+At the default clearance on the shipped GLB, a deliberately large offset of
+(-0.08, 0, -0.08) m reduced the wider right-hand sphere-overlap counts from
+566/578 to 68/66 in the two sprint samples; 4/6 selected distal triangles
+still overlapped. The wrist moved from 124 mm to 233 mm from the centre. A
+side-only (-0.08, 0, 0) m offset yielded 139/135 overlaps; a backward-only
+(0, 0, -0.08) m offset yielded 302/299. This is only a coarse numerical
+experiment, not a proposed setting: such large displacement could stretch the
+palm/finger skin, distort the arm or float visibly. It leaves the ball and
+finger targets unchanged and does not prove continuous, full-mesh or rendered
+contact. A useful correction would need to address wrist, orientation and
+finger shape coherently and be reviewed in motion.
+
+The grip report also compares wrist-to-finger-root and arm joint-origin spans
+with the GLB bind pose. These are geometry proxies, **not** skin strain or
+proof of anatomical correctness. On the shipped model's sprint samples, the
+default wrist-to-index-root span is 172 mm versus 117 mm in bind (1.47×), and
+wrist-to-thumb-root is 153 mm versus 49.5 mm (3.09×). With the large
+(-0.08, 0, -0.08) m experimental offset, they increase to 231 mm (1.98×) and
+206 mm (4.15×) respectively. Upper-arm and forearm origin spans stay within
+0.1% of bind in those samples. The wrist-only offset therefore makes an already
+large wrist-to-root discrepancy worse, even as the sphere screen improves.
+Because finger origins are deliberately planted independently of the wrist,
+this proxy motivates a coherent wrist/finger adjustment and skin inspection;
+it cannot alone establish the shape or amount of visible deformation.
+
+`--finger-follow 0..1` adds another **headless-only** counterfactual to the
+sprint offset experiment: after the regular cradle, it translates the right
+finger-joint origins by that fraction of the actual solved wrist displacement.
+It does not reorient the hand, rebuild finger targets, run collision response,
+or change the game. Full follow preserves the original wrist-to-finger-root
+spans, including their pre-existing discrepancy from bind.
+
+With an (-80, 0, -80) mm offset, no follow gave 68/66 wider selected-surface
+sphere overlaps in the two shipped sprint samples. Full follow maintained the
+default wrist-to-index and wrist-to-thumb spans (1.47× and 3.09× bind) but gave
+192/472 wider overlaps, all in the selected distal-finger triangles. Half
+follow gave 429/446 wider overlaps. With a smaller (-40, 0, -40) mm offset,
+full follow gave 583/596 wider overlaps, compared with 252/241 without follow.
+Counts can increase as planted fingers move into the ball; they are not an
+area or depth measure. These synthetic tests demonstrate the tradeoff, not a
+viable hand pose: rigidly following the wrist does not re-wrap the fingers,
+restore bind anatomy, or establish rendered/live motion. A coordinated grip
+solver or authored poses should be evaluated before changing the default.
+
+`--finger-replant` is a further headless-only probe, requiring a positive
+`--finger-follow`. It applies the existing segment-based `plantFingerClear`
+step to the translated right finger chains relative to the scripted ball, with
+its existing limited radial scaling. This is not a full finger IK or true mesh
+collision solver. For the large (-80, 0, -80) mm offset and full follow, it
+reduced sampled wider right-hand overlaps from 192/472 to 48/96, while the
+index wrist-to-root span rose from 1.47× to 1.56× bind (thumb remained 3.09×).
+Selected finger self-overlap pairs increased from 211/258 to 260/286. The
+smaller offset produced 198/174 wider ball overlaps; most were palm-influenced.
+These are two synthetic phases with a sphere proxy and overlapping triangle
+selections, not continuous contact or rendered evidence. Segment clearance
+alone cannot solve the palm and finger tradeoffs, and none of these experimental
+poses are used in gameplay.
