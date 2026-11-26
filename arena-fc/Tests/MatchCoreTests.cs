@@ -2315,6 +2315,27 @@ Section("M1 BallPred cache determinism");
     Check("M1 ball prediction/sim determinism across identical runs", same, same?"ok":"diverged");
 }
 
+Section("M1 BallTrajectory prediction parity scenarios");
+{
+    var scenarios = new[] {
+        (pos:new Vector3(0,0.11f,0), vel:new Vector3(8,0,2), spin:Vector3.Zero, rain:false),
+        (pos:new Vector3(0,1.5f,0), vel:new Vector3(6,5,1), spin:new Vector3(0,2,0), rain:false),
+        (pos:new Vector3(-10,0.11f,5), vel:new Vector3(12,0,-3), spin:Vector3.Zero, rain:true),
+    };
+    bool allOk = true; string detail = "ok";
+    foreach (var sc in scenarios)
+    {
+        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(sc.pos, sc.vel, sc.spin, 1.0f, sc.rain, 0f, 0f);
+        Vector3 p=sc.pos, v=sc.vel, s=sc.spin;
+        for (int i=0;i<60;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p, ref v, ref s, 1f/60f, sc.rain, 0f, 0f);
+        var sample = pred.At(1.0f);
+        float dpos = (p - sample.Position).Length();
+        float dvel = (v - sample.Velocity).Length();
+        if (dpos > 0.01f || dvel > 0.05f) { allOk = false; detail = $"dpos={dpos:F4} dvel={dvel:F4}"; break; }
+    }
+    Check("M1 BallTrajectory.Predict matches Step over scenarios", allOk, detail);
+}
+
 Section("M3 support destination spacing");
 {
     var e = new MatchEngine(new MatchOptions { Seed = 91, TeamSize = 11, AwayHuman = true });
