@@ -2284,6 +2284,7 @@ Section("M4 authoritative action contracts");
             var c = kv.Value;
             if (c.PlayerIndex != kv.Key) { keyOk = false; break; }
             if (!float.IsFinite(c.DesiredSpeed) || !float.IsFinite(c.SpeedLimit) || c.SpeedLimit <= 0f) fieldsOk = false;
+            if (!float.IsFinite(c.DesiredTurnRate) || c.DesiredTurnRate <= 0f) fieldsOk = false;
             if (!float.IsFinite(c.FacingDirection.X) || !float.IsFinite(c.FacingDirection.Z)) fieldsOk = false;
             seenIntents.Add(c.Intent);
             if (c.Intent is "carry" or "shield" or "receive") sawCarrier = true;
@@ -2313,6 +2314,7 @@ Section("M4 authoritative action contracts");
                 var c2 = kv.Value;
                 if (c2.PlayerIndex != kv.Key) multiOk = false;
                 if (!float.IsFinite(c2.DesiredSpeed) || c2.SpeedLimit <= 0f) multiOk = false;
+                if (!float.IsFinite(c2.DesiredTurnRate) || c2.DesiredTurnRate <= 0f) multiOk = false;
                 allIntents.Add(c2.Intent);
                 if (c2.Intent is "pass" or "shoot" or "clear" or "tackle" or "throw_in" or "skill")
                 {
