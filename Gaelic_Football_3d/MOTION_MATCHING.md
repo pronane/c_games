@@ -425,3 +425,14 @@ miss intersections, containment, self-overlap within a finger or collisions
 between phases. Contact/touch within numerical tolerance counts as overlap.
 This is a screen for selected surfaces, not proof that the mesh is collision
 free or that a pose is anatomically correct. Neither correction is default.
+
+In run 45857933327, the candidate's mean fingertip-cap centroid gaps were
+43.1/43.1 mm before, 36.2/36.2 mm with the mirrored idle reference and
+30.9/30.9 mm with the authored curl (left/right). Max sampled tip displacement
+was 33.4 mm. The selected-triangle screen found zero pair overlaps in 12
+sampled phases for both the raw CMU pose and the curled pose; this does not
+cover the excluded surfaces, between-frame motion or containment. Retrieved
+close-up stills show noticeably more curled, less open fingers than before,
+but this is not an anatomical or motion-quality verdict. Keep the experiment
+off by default until it is reviewed in full-resolution motion and broader
+scenarios.
