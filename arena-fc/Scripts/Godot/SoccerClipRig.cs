@@ -1197,16 +1197,23 @@ public sealed partial class SoccerClipRig : Node3D
             {
                 ref bool hasPrev = ref (isLeft ? ref _hasPrevFootL : ref _hasPrevFootR);
                 ref Vector3 prev = ref (isLeft ? ref _prevFootWorldL : ref _prevFootWorldR);
-                if (hasPrev)
+                float pw = Mathf.Clamp(isLeft ? leftPlantW : rightPlantW, 0f, 1f);
+
+                // Latch the world-space contact point once when a plant begins.
+                // Updating this every frame turns the lock into a slowly drifting target.
+                if (!hasPrev)
                 {
-                    float slide = new Vector2(footWorld.X - prev.X, footWorld.Z - prev.Z).Length();
-                    if (dt > 1e-4f) AnimMetrics?.RecordSample(slide / dt, 0f, false);
-                    Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
-                    float pw = isLeft ? leftPlantW : rightPlantW;
-                    float lockW = Mathf.Clamp(1f - height / 0.18f, 0.25f, 0.85f) * Mathf.Clamp(pw, 0f, 1f);
-                    targetWorld = targetWorld.Lerp(locked, lockW);
+                    prev = new Vector3(footWorld.X, groundY + 0.012f, footWorld.Z);
+                    hasPrev = true;
                 }
-                if (height < .22f)
+
+                Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
+                targetWorld = targetWorld.Lerp(locked, pw);
+
+                // A contract-marked plant is an explicit contact request. Do not
+                // gate it on the animated ankle already being almost at ground level:
+                // that prevents IK from correcting the very lift/slide it is meant to fix.
+                if (pw > 0.01f || height < .18f)
                 {
                     Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
                     SolveTwoBone(b, skelInv * targetWorld, yaw);
@@ -1215,9 +1222,15 @@ public sealed partial class SoccerClipRig : Node3D
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
                 }
                 ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
-                prev = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
-                prev.Y = groundY + 0.012f;
-                hasPrev = true;
+
+                // Measure the corrected foot, not the pre-IK animation pose. Compare
+                // against the latched anchor so residual motion cannot hide as drift.
+                Vector3 correctedWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                if (dt > 1e-4f && pw > 0.01f)
+                {
+                    float slide = new Vector2(correctedWorld.X - prev.X, correctedWorld.Z - prev.Z).Length();
+                    AnimMetrics?.RecordSample(slide / dt, 0f, false);
+                }
             }
             else
             {
