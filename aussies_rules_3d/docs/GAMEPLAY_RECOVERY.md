@@ -51,7 +51,7 @@ Run `45417811569` (post-PR #268) passed build/metrics but failed visual-ab. All 
 
 ## Local verification and comparison
 
-`node scripts/check.mjs`: TypeScript, **189 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
+`node scripts/check.mjs`: TypeScript, **190 tests**, production build and both asset-contract checks pass. Shell syntax, JS syntax, workflow YAML parse and `git diff --check` were also checked.
 
 A local numerical comparison used source from branch HEAD `440626d` and the first candidate `18efb2b`, identical input trace/seeds, 60 simulated seconds per seed. No branch switch or baseline source modification was involved. This is a simulation comparison, not before/after video or human acceptance:
 
@@ -106,3 +106,16 @@ Follow-up implementation:
 - New capture states record ground projection and world ball coordinates. Normal fresh captures now check ground context too. Evidence-only republication explicitly labels legacy source data rather than retroactively demanding a field that old captures did not record.
 
 This change still needs a fresh workflow capture. Ball readability/continuity, natural movement and team/contact behaviour are not all visually signed off. Empty plant metadata, full pivot/contact animation coverage and pressure/tackle-frequency calibration remain outstanding. Nothing in a green numeric gate overrides these limitations.
+
+
+## Boundary-camera root cause from per-frame evidence
+
+Fresh run `45724096115` passed all jobs, with 36 states, zero ball/ground framing failures and zero emergency corrections. Its intact previews still showed poor boundary composition. This means the ball+ground numeric guard was insufficient; it is not treated as visual acceptance.
+
+Compact state annotations were added and evidence-only run `45725287383` republished the exact source states. At source frame 018 the phase was `throwIn`, ball Z was 50.44 m and camera Z was 47.27 m; at frame 024 the ball was on the ground, Z 50.36 m, while camera Z was 41.31 m. Thus the camera was **inside** the near wing, looking outward toward the ball/stands. This was not simply an elevated-flight problem.
+
+The next correction keeps the broadcast camera outside the touchline (at least boundary half-width +12 m), with a damped lens to maintain action scale rather than moving the camera through the near wing. Other intentional chase views retain their own policies. A boundary fixture asserts the outside-side invariant. Captures now record/guard that invariant explicitly.
+
+Around-ground ball-ups/throw-ins also reserve four distinct inward staging positions (two per team), without granting tackle permissions. Previously the blanket non-live shape policy could send everyone home during a boundary restart. Centre restarts still retain their home/6-6-6 policy. This is regression-tested; full team-flow calibration is not claimed.
+
+These final boundary/staging changes need a new capture before visual acceptance. Priorities 1–3 are **not all signed off**: the foot-contact metadata gap and natural transition/contact animation remain open, and a green geometric check alone has repeatedly proved insufficient.

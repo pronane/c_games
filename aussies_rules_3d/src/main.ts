@@ -14,7 +14,7 @@ import { loadMotionAssets, type MotionAssets } from './render/motionBinding';
 import { MatchSim, HumanIntent, emptyHumanIntent } from './sim/match';
 import type { PlayerState } from './rules/types';
 import { RulesEngine } from './rules/engine';
-import { AFL_SETTINGS, MatchEvent, MatchSettings, scoreString } from './rules/types';
+import { AFL_SETTINGS, FIELD, MatchEvent, MatchSettings, scoreString } from './rules/types';
 import { BroadcastCamera } from './render/camera';
 import { createWorld, drawScoreboard, updateLedScorebug, World } from './render/scene';
 import {
@@ -228,7 +228,9 @@ class Game {
         const crowd5 = this.sim!.state.players.filter(p => !p.onBench && Math.hypot(p.x - b.x, p.z - b.z) < 5).length;
         const ballNdc = new THREE.Vector3(b.x, b.y, b.z).project(this.world.camera);
         const groundNdc = new THREE.Vector3(b.x, 0.15, b.z).project(this.world.camera);
-        const state = { groundNdc: [groundNdc.x, groundNdc.y, groundNdc.z],
+        const state = { view: this.broadcast.view,
+          cameraOutsideBroadcastSide: this.broadcast.mode !== 'broadcast' || this.broadcast.view !== 'broadcast' || this.world.camera.position.z >= FIELD.boundaryB + 8,
+          groundNdc: [groundNdc.x, groundNdc.y, groundNdc.z],
           worldBall: [b.x, b.y, b.z], ballNdc: [ballNdc.x, ballNdc.y, ballNdc.z],
           cameraPosition: this.world.camera.position.toArray(),
           motion: this.motionProbe.snapshot(), team: this.sim!.teamDiagnostics,

@@ -52,7 +52,7 @@ export class BroadcastCamera {
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
-    this.camera.position.set(-26, 19, 46);
+    this.camera.position.set(-26, 24, FIELD.boundaryB + 23);
     this.lookAt.set(0, 1, 0);
   }
 
@@ -192,7 +192,7 @@ export class BroadcastCamera {
       this.desired.set(
         b.x * 0.86 + leadX * 0.6 - 4,
         13.5 + o * 17 + Math.abs(b.z) * 0.045,
-        Math.max(38 + o * 19 - Math.abs(b.z) * 0.09, 24)
+        Math.max(FIELD.boundaryB + 12, b.z + 24)
       );
       this.lookAt.lerp(
         new THREE.Vector3(b.x + leadX, 1.4, b.z + leadZ),
@@ -211,6 +211,16 @@ export class BroadcastCamera {
     const nearby = controlled && Math.hypot(controlled.x - b.x, controlled.z - b.z) < 22;
     this.diagnostics.playerExcluded = !!controlled && !nearby;
     if (nearby && controlled) subjects.push(controlled);
+    // Remain on the TV side of the touchline, using a damped lens to retain
+    // action scale at the far side rather than driving inside the near wing.
+    const range = Math.max(1, this.desired.distanceTo(this.target));
+    const lens = this.mode === 'broadcast' && this.view === 'broadcast'
+      ? THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan((22 + this.openness * 8) / range)), 24, 52)
+      : 46;
+    if (Math.abs(lens - this.camera.fov) > 0.35) {
+      this.camera.fov += (lens - this.camera.fov) * (1 - Math.exp(-dt * 1.6));
+      this.camera.updateProjectionMatrix();
+    }
     if (this.mode !== 'celebration') {
       const plan = enforceFraming(this.desired, this.lookAt, this.camera.fov, this.camera.aspect, subjects, 0.60);
       if (plan) { this.desired.copy(plan.position); this.lookAt.copy(plan.lookAt); }

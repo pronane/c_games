@@ -199,7 +199,7 @@ export function aiIntentFor(p: PlayerState, ctx: AiContext): AiIntent {
   }
 
   // Persistent receivers hold distinct lanes instead of re-ranking every tick.
-  if (job && (job.kind === 'short' || job.kind === 'outlet' || job.kind === 'mark')) {
+  if (job && (job.kind === 'short' || job.kind === 'outlet' || job.kind === 'mark' || job.kind === 'stage')) {
     const tx = Math.max(-FIELD.boundaryA + 8, Math.min(FIELD.boundaryA - 8, job.x));
     const tz = Math.max(-FIELD.boundaryB + 8, Math.min(FIELD.boundaryB - 8, job.z));
     const d = Math.hypot(tx - p.x, tz - p.z);

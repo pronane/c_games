@@ -39,7 +39,8 @@ describe('team plan restart and roster ownership', () => {
     sim.state.phase = 'ballUp';
     const restart = plan.update(sim.state, 1 / 60);
     expect(restart).not.toBe(live);
-    expect([...restart.values()].every(job => job.kind === 'shape')).toBe(true);
+    expect([...restart.values()].every(job => job.kind !== 'contest')).toBe(true);
+    expect([...restart.values()].filter(job => job.kind === 'stage')).toHaveLength(4);
     sim.state.phase = 'live';
     expect(plan.update(sim.state, 1 / 60)).not.toBe(restart);
   });

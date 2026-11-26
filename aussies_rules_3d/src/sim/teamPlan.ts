@@ -1,7 +1,7 @@
 import { predictDrop } from './ball';
 import { clampInside, defendGoalX } from '../rules/field';
 import type { MatchState } from '../rules/types';
-export interface TeamJob { kind: 'contest' | 'short' | 'outlet' | 'mark' | 'shape'; x: number; z: number }
+export interface TeamJob { kind: 'contest' | 'short' | 'outlet' | 'mark' | 'stage' | 'shape'; x: number; z: number }
 /** Persistent assignments: no re-ranking every player tick and no RNG consumption. */
 export class TeamPlan {
   private remaining = 0;
@@ -29,7 +29,22 @@ export class TeamPlan {
         .sort((a, c) => Math.hypot(a.x - anchor.x, a.z - anchor.z) - Math.hypot(c.x - anchor.x, c.z - anchor.z) || a.id - c.id);
       for (const p of players) this.jobs.set(p.id, { kind: 'shape', x: p.x, z: p.z });
       // Restarts retain role homes, not inherited contest/receiving pressure.
-      if (state.phase !== 'live') continue;
+      if (state.phase !== 'live') {
+        // Around-ground restarts need nearby participants, not everyone at home.
+        // These are reserved positions, not chase/tackle permissions.
+        if (state.phase === 'ballUp' || state.phase === 'throwIn') {
+          const length = Math.hypot(anchor.x, anchor.z) || 1;
+          const ix = length > 1 ? -anchor.x / length : 1, iz = length > 1 ? -anchor.z / length : 0;
+          const side = team === 0 ? 1 : -1;
+          players.slice(0, 2).forEach((p, rank) => {
+            const lateral = side * (rank === 0 ? 2.5 : 4);
+            const spot = clampInside(anchor.x + ix * (4 + rank * 5) - iz * lateral,
+              anchor.z + iz * (4 + rank * 5) + ix * lateral, 3);
+            this.jobs.set(p.id, { kind: 'stage', x: spot.x, z: spot.z });
+          });
+        }
+        continue;
+      }
       const attack = carrier?.team === team;
       const count = attack ? 0 : 2;
       players.slice(0, count).forEach(p => this.jobs.set(p.id, { kind: 'contest', x: anchor.x, z: anchor.z }));

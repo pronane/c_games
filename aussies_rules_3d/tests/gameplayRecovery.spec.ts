@@ -101,3 +101,14 @@ describe('gameplay recovery regressions', () => {
     expect(run()).toBe(run());
   });
 });
+
+it('keeps the broadcast camera outside the near touchline during a boundary contest', () => {
+  const sim = new MatchSim({ ...AFL_SETTINGS, seed: 42 }); sim.start();
+  Object.assign(sim.state.ball, { x: -68, y: 2, z: 50, vx: 0, vy: 0, vz: 0 });
+  const camera = new PerspectiveCamera(46, 16 / 9, 0.5, 1600);
+  const rig = new BroadcastCamera(camera);
+  for (let i = 0; i < 180; i++) rig.update(1 / 60, sim.state);
+  expect(camera.position.z).toBeGreaterThanOrEqual(81); // field half-width 73 + 8m clearance
+  expect(camera.fov).toBeGreaterThanOrEqual(24);
+  expect(camera.fov).toBeLessThanOrEqual(52);
+});
