@@ -4,11 +4,16 @@ import math
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from inspect_hand_mesh import compare, select_tips, skin_point, sampled_min_distance, centroid, triangles_intersect, triangle_overlap_pairs, point_triangle_distance
+from inspect_hand_mesh import compare, select_tips, select_influenced_triangles, skin_point, sampled_min_distance, centroid, triangles_intersect, triangle_overlap_pairs, point_triangle_distance
 
 try: select_tips([(0,0,0)]*5,[(0,)]*5,[(1,)]*5,0,(0,0,0),(0,0,0))
 except ValueError: pass
 else: raise AssertionError('degenerate axis accepted')
+assert select_influenced_triangles([0,1,2, 2,3,4], [(0,),(1,),(1,),(1,),(1,)], [(0.25,),(1,),(1,),(1,),(1,)], {0}) == [(0,1,2)]
+assert select_influenced_triangles([0,1,2], [(0,),(1,),(1,)], [(0.24,),(1,),(1,)], {0}) == []
+try: select_influenced_triangles([0,1,3], [(0,)]*3, [(1,)]*3, {0})
+except ValueError: pass
+else: raise AssertionError('invalid selected index accepted')
 ident=[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
 assert skin_point((1,2,3),(0,),(1,),[ident]) == [1,2,3]
 assert centroid([(0,0,0),(2,0,0)]) == [1,0,0]

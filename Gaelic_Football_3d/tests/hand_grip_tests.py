@@ -18,6 +18,7 @@ for bad in ('nan', '0', '0.061', 'garbage'):
 r=compare(sys.argv[2],sys.argv[1])
 assert 0.012 <= r['clearance_m'] <= 0.06
 assert r['samples']==12 and len(r['states'])==12
+assert all(r['hand_surface_triangles'][s] >= sum(r['triangle_counts'][s+'_'+f] for f in ('index','middle','ring','pinky','thumb')) for s in ('l','r'))
 assert {'stand','jog-a','jog-b','sprint-a','sprint-b'}==set(r['ball_available'])
 for row in r['states']:
     for side in row['sides'].values(): assert side['raw']==side['adjusted']
@@ -26,6 +27,11 @@ for row in r['states']:
         assert side['raw']==side['adjusted']
         assert 0 <= side['raw']['triangles_within_10mm'] <= side['raw']['triangle_count']
         assert side['raw']['min_surface_gap_m'] >= -0.11
+    for side in row.get('ball_hand_surface',{}).values():
+        assert side['raw']==side['adjusted']
+        h=side['raw']
+        assert 0 <= h['triangles_inside_sphere'] <= h['triangles_within_10mm'] <= h['triangle_count']
+        assert (h['min_surface_gap_m'] < 0) == (h['triangles_inside_sphere'] > 0)
     for key, side in row.get('ball_proximity',{}).items():
         assert (side['raw']['min_surface_gap_m'] < 0) == (row['ball_triangle_overlap'][key]['raw'] > 0)
 print('scripted grip checks passed (selected surfaces only; no live or rendered validation)')

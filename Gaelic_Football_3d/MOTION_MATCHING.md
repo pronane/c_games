@@ -527,3 +527,26 @@ away, again with none within 10 mm. Sprint intentionally cradles with only the
 right hand; the left hand is not expected to contact the ball. This tradeoff
 argues against simply increasing the global clearance; more representative
 surface coverage and rendered review are needed before modifying the grip.
+
+#### Wider hand-influence screen
+
+The ball report additionally selects each `v0_body` triangle if **any** vertex
+has at least 25% combined influence from that hand or its finger joints. This
+includes more palm, proximal finger and seam triangles than the distal screen,
+but is still weight-selected rather than an anatomical segmentation. Forearm,
+weakly weighted hand vertices, other meshes, triangle containment and frames
+between samples are not fully covered. Gap is nearest triangle-to-centre
+distance minus sphere radius, not penetration depth or contact area; triangle
+counts are not area-weighted.
+
+On the shipped GLB, this selects 3,263 triangles per side. At 12 mm clearance,
+every standing/jogging sample has 78–112 selected triangles per hand within
+the ball sphere. At 25 mm there are still 32–54; at 40 mm none in these samples,
+with nearest selected surfaces 5.8–6.6 mm from the sphere. That refines the
+finger-only finding: a large distal gap does not imply the whole selected hand
+is equally far away. In the one-handed sprint samples, 566/578 right-hand
+triangles intersect at 12 mm and 321/319 even at 40 mm; the nearest selected
+surface to the sphere centre is approximately 14 mm and 41 mm respectively
+for a 110 mm radius sphere. These are synthetic poses and a sphere proxy, not
+rendered proof or reliable penetration depth. They do suggest the sprint grip
+needs separate investigation rather than a global clearance increase.
