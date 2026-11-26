@@ -1287,11 +1287,15 @@ public sealed partial class SoccerClipRig : Node3D
         fwd = (fwd - groundNormal * fwd.Dot(groundNormal));
         if (fwd.LengthSquared() < 1e-6f) fwd = footTx.Basis.Z;
         fwd = fwd.Normalized();
-        Vector3 right = fwd.Cross(groundNormal);
+        // Build a right-handed orthonormal frame.  The previous cross-product
+        // order produced a reflected basis (determinant < 0), which cannot be
+        // represented by a unit quaternion and makes Basis.Slerp throw.
+        Vector3 right = groundNormal.Cross(fwd);
         if (right.LengthSquared() < 1e-6f) return;
         right = right.Normalized();
-        Vector3 up = right.Cross(fwd).Normalized();
+        Vector3 up = fwd.Cross(right).Normalized();
         var basis = new Basis(right, up, fwd).Orthonormalized();
+        if (basis.Determinant() < 0f) return;
         // Blend gently toward ground-aligned orientation.
         footTx.Basis = footTx.Basis.Slerp(basis, 0.35f).Orthonormalized();
         Skel.SetBoneGlobalPoseOverride(b.Foot, footTx, 1f, true);
