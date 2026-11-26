@@ -1,7 +1,7 @@
 # Master Hypermotion/AME + Football Intelligence Validation Status
 
 Branch: `arena/8459237b-c-games`  
-PR: https://github.com/pronane/c_games/pull/271 (do-not-merge)  
+PR: https://github.com/pronane/c_games/pull/271 (do-not-merge until combined CI green). PR #274 (Arena FC quality gates) merged into #271 at `f88aec2` on 2026-11-26.  
 Status date: 2026-11-26 (sandbox evidence; visual/runtime Godot checks are limited). Reviewed latest technical report: `arena_fc_pr271_latest_review_2026-11-26.pdf`.
 
 ## CI / automated evidence

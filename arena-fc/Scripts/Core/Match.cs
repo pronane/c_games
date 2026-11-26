@@ -369,6 +369,7 @@ public sealed partial class MatchEngine
         float elapsed = (p.ActionTimer > 0f && p.ActionDuration > 1e-6f) ? MathF.Max(0f, p.ActionDuration - p.ActionTimer) : 0f;
         float contactRemaining = requiresBallContact ? MathF.Max(0f, contactAt - elapsed) : -1f;
         bool requiresFootPlant = intent is "kick" or "shoot" or "pass" or "clear" or "tackle" or "dive" or "throw_in" or "header" or "catch" or "parry" or "block";
+        float desiredTurnRate = MathF.Min(6f, 1.5f + Mx.Flat(p.Vel).Length() * 0.35f);
         LastActionContracts[p.Index] = new ArenaFC.Core.Football.PlayerActionContract
         {
             PlayerIndex = p.Index,
@@ -379,6 +380,7 @@ public sealed partial class MatchEngine
             BallContactPosition = State.Ball.Pos,
             BallContactTime = contactRemaining,
             DesiredSpeed = Mx.Flat(p.Vel).Length(),
+            DesiredTurnRate = desiredTurnRate,
             SpeedLimit = p.MaxSpeed,
             RequiresBallContact = requiresBallContact,
             RequiresFootPlant = requiresFootPlant,
@@ -419,6 +421,7 @@ public sealed partial class MatchEngine
                     HasTarget = true,
                     FacingDirection = p.Facing,
                     DesiredSpeed = Mx.Flat(p.Vel).Length(),
+                    DesiredTurnRate = MathF.Min(6f, 1.5f + Mx.Flat(p.Vel).Length() * 0.35f),
                     SpeedLimit = p.MaxSpeed,
                     ShouldSprint = p.Sprinting,
                     Pressing = p.Pressing,
@@ -441,6 +444,7 @@ public sealed partial class MatchEngine
                     BallContactPosition = recvPos,
                     BallContactTime = ttc,
                     DesiredSpeed = 7.5f,
+                    DesiredTurnRate = 3.0f,
                     SpeedLimit = p.MaxSpeed,
                     RequiresBallContact = true,
                     ShouldSprint = p.Sprinting,
@@ -459,6 +463,7 @@ public sealed partial class MatchEngine
                     HasTarget = true,
                     FacingDirection = p.Facing.LengthSquared() > 1e-6f ? p.Facing : Mx.FlatDir(p.Pos, b.Pos),
                     DesiredSpeed = speed,
+                    DesiredTurnRate = speed > 0.5f ? 2.8f : 1.5f,
                     SpeedLimit = p.MaxSpeed,
                     ShouldSprint = p.Sprinting,
                     Pressing = p.Pressing,
@@ -510,6 +515,7 @@ public sealed partial class MatchEngine
                     TargetPosition = b.PendingTarget, HasTarget = true, FacingDirection = Mx.FlatDir(recv.Pos, b.Pos),
                     BallContactTime = Mx.Clamp(dist / spd, 0.05f, 2.0f),
                     RequiresBallContact = true, DesiredSpeed = 7.5f,
+                    DesiredTurnRate = 3.0f,
                     ShouldSprint = recv.Sprinting,
                     Pressing = recv.Pressing,
                     Role = recv.Role.ToString().ToLowerInvariant(),
