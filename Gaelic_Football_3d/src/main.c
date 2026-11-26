@@ -3593,7 +3593,7 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
             fflush(stdout);
             if (footHi - footLo < 0.08f) motionBad("skinned foot vertex did not move through the gait");
             if (!gpuSkin && bufHi - bufLo < 0.08f) motionBad("CPU vertex buffer did not move through the gait");
-            if (getenv("GF_QUICK")) motionDone = 1;
+            if (getenv("GF_QUICK") && !getenv("GF_GRIP_REVIEW")) motionDone = 1;
         }
         fflush(stdout);
         if (head < 1.15f) motionBad("head has folded");
@@ -3612,6 +3612,14 @@ static void shotScriptMotion(int frame, int *state, float *stateT, int *introDem
     else if (frame >= 500 && frame < 580) { pad.axis[0] = 0.55f; camHands = 1; }
     else if (frame >= 580 && frame < 660) { pad.axis[0] = 1.0f; pad.btn[GAMEPAD_BUTTON_RIGHT_TRIGGER_1] = 1; camHands = 1; }
     if (frame == 480 || frame == 640) checkHold(frame == 480 ? "motion-stand" : "motion-sprint");
+    if (getenv("GF_GRIP_REVIEW") && frame == 620) {
+        printf("MOTION grip-review frame %d speed %.3f action %d holder %d/%d cradle %d\n",
+               frame, s->speed, p->action, game.ball_team, game.ball_player, s->cradleValid);
+        fflush(stdout);
+        if (s->speed < 5.96f || p->action != GAME_ACT_NONE || game.ball_team != 0 ||
+            game.ball_player != me || !s->cradleValid) motionBad("grip review is not a full-weight sprint carry");
+    }
+    if (getenv("GF_GRIP_REVIEW") && frame == 660) motionDone = 1;
     /* scrub the contact actions so the ball is seen on the toe, the ground, the fist and the foot */
     if (frame >= 670 && frame < 820) {
         float u = (float)(frame - 670) / 150.0f;
