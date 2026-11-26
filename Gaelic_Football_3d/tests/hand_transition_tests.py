@@ -27,6 +27,12 @@ with tempfile.TemporaryDirectory() as tmp:
         for name in ('carry','jump','handpass','solo'):
             line=next(x for x in lines if f'state={name} ' in x)
             assert f'guarded_noops={fps} ' in line and re.search(r'boundary_delta_deg=[0-9.]+',line)
+        # After a jump ends while the selected clip stays jog, the previous
+        # implementation reapplied roughly 20 degrees in one frame. The safe
+        # re-entry ramp must bound that correction while hard guards stay exact.
+        line=next(x for x in lines if 'state=jog-before-handpass ' in x)
+        boundary=float(re.search(r'boundary_delta_deg=([0-9.]+)',line).group(1))
+        assert boundary < (2.5 if fps==30 else .8), (fps,boundary)
         if surface and fps==30:
             doc,blob=load_glb(model); report=measure(doc,blob,data,surface=True)
             assert report['surface_samples']==12 and len(report['sampled_surface_by_state'])==12

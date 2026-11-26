@@ -89,6 +89,10 @@ typedef struct {
 void am_contact_drift_reset(AMContactDrift *drift);
 void am_contact_drift_sample(AMContactDrift *drift, float x, float z, float dt, int contact);
 
+/* Hard-reset to zero while forbidden, otherwise linearly reintroduce a
+ * presentation weight over attack_seconds. Invalid inputs fail closed.
+ * The caller supplies guards and must update even while the effect is blocked. */
+float am_guarded_fade(float current, int permitted, float dt, float attack_seconds);
 /* Advance a looping animation clock in seconds. Invalid inputs leave it unchanged. */
 float am_loop_advance(float time, float dt, float rate, float length);
 /* Clamped cubic easing for smoothly introducing a bounded correction. */

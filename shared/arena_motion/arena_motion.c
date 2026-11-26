@@ -289,3 +289,11 @@ int am_rotation_distance(const float a[4], const float b[4], float *out)
     *out=(float)(2*acos(fmin(1.0,fabs(dot/(sqrt(aa)*sqrt(bb))))));
     return 1;
 }
+
+float am_guarded_fade(float current, int permitted, float dt, float attack_seconds)
+{
+    double value;
+    if (!permitted || !isfinite(current) || !isfinite(dt) || !isfinite(attack_seconds) || dt<0 || attack_seconds<=0) return 0;
+    value=fmax(0.0,fmin(1.0,(double)current))+(double)dt/attack_seconds;
+    return (float)fmin(1.0,value);
+}

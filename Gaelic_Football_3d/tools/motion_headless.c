@@ -340,7 +340,7 @@ static int validate_jog_hand_relax(void)
     jogHandRelax=1;
     for (int f=0; f<n; f+=3) {
         sampleClip(C_JOG, f/ANIM_FPS, s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
-        relaxJogHands(s,C_JOG);
+        relaxJogHands(s,C_JOG,1.f/60.f);
         for (int side=0;side<2;++side) {
             float a,b,c,d;
             if (!hand_geometry(original,side,&a,&b) || !hand_geometry(s->pose,side,&c,&d)) return 0;
@@ -372,18 +372,18 @@ static int validate_jog_hand_relax(void)
     }
     if (eligible && !changed) return 0;
     sampleClip(C_JOG,.15f,s->pose); memcpy(original,s->pose,sizeof(Transform)*(size_t)model.boneCount);
-    jogHandRelax=0; relaxJogHands(s,C_JOG); if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    jogHandRelax=1; game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG);
+    jogHandRelax=0; relaxJogHands(s,C_JOG,1.f/60.f); if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
+    jogHandRelax=1; game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG);
+    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG);
+    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=1; relaxJogHands(s,C_RUN);
+    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=1; relaxJogHands(s,C_RUN,1.f/60.f);
     if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG);
+    s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    s->prevClip=C_JOG; s->blend=1; relaxJogHands(s,C_RUN);
+    s->prevClip=C_JOG; s->blend=1; relaxJogHands(s,C_RUN,1.f/60.f);
     if (memcmp(original,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
     jogHandRelax=0; puts("jog_hand_guards=ok"); return 1;
 }
@@ -399,7 +399,7 @@ static int validate_extra_hand_relax(int mode)
     jogHandRelax=mode;
     for (int f=0;f<ANIM_FRAMES(*animFor(C_JOG))-1;f+=3) {
         sampleClip(C_JOG,f/ANIM_FPS,s->pose); memcpy(before,s->pose,sizeof(Transform)*(size_t)model.boneCount);
-        relaxJogHands(s,C_JOG);
+        relaxJogHands(s,C_JOG,1.f/60.f);
         for (int b=0;b<model.boneCount;++b) {
             int parent=boneChild(b), finger=b!=boneHandL && b!=boneHandR && (boneUnder(b,boneHandL)||boneUnder(b,boneHandR));
             if (!finger) { if (memcmp(&before[b],&s->pose[b],sizeof(Transform))) return 0; continue; }
@@ -413,13 +413,13 @@ static int validate_extra_hand_relax(int mode)
         }
     }
     sampleClip(C_JOG,.15f,s->pose); memcpy(before,s->pose,sizeof(Transform)*(size_t)model.boneCount);
-    game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG);
+    game.ball_team=0; game.ball_player=9; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG);
+    game.ball_team=-1; game.players[0][9].action=GAME_ACT_HANDPASS; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG);
+    game.players[0][9].action=GAME_ACT_NONE; game.players[0][9].jump_time=.1f; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
-    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG);
+    game.players[0][9].jump_time=0; s->prevClip=C_RUN; s->blend=0; relaxJogHands(s,C_JOG,1.f/60.f);
     if (memcmp(before,s->pose,sizeof(Transform)*(size_t)model.boneCount)) return 0;
     { int mirrored=0; for (int b=0;b<model.boneCount;++b) mirrored+=jogFingerMirrorValid[b]!=0;
       printf("jog_hand_extra mode=%d changed_samples=%d mirrored_right=%d guards=ok (bone_proxy_only)\n",mode,changed,mirrored); }
@@ -790,7 +790,7 @@ static int export_hand_poses(const char *asset, const char *out, int mode, int f
     detectJogDirection(); detectJogHandProfile();
     game_init(&game); game.ball_team = -1; game.ball_player = -1;
     memset(s,0,sizeof *s); s->speed=3; s->clip=C_JOG; s->prevClip=C_JOG; s->blend=1;
-    jogHandRelax=mode;
+    jogHandRelax=mode; s->handRelaxEnvelope=1; /* steady-state mesh comparison */
     f=fopen(out,"wb"); if (!f) return 0;
     fprintf(f,"{\"format\":1,\"fps\":%d,\"mode\":%d,\"bones\":[",fps,mode);
     for (int b=0;b<model.boneCount;++b) { if (b) fputc(',',f); write_json_string(f,model.bones[b].name); }
@@ -798,7 +798,7 @@ static int export_hand_poses(const char *asset, const char *out, int mode, int f
     for (int i=0;i<fps;++i) {
         float time=clipLen(C_JOG)*(float)i/fps;
         sampleClip(C_JOG,time,raw); memcpy(s->pose,raw,sizeof(Transform)*(size_t)model.boneCount);
-        relaxJogHands(s,C_JOG);
+        relaxJogHands(s,C_JOG,1.f/60.f);
         if (i) fputc(',',f);
         fprintf(f,"{\"clip_time\":%.9g,\"raw\":",time);
         if (!write_pose(f,raw,model.boneCount)) { fclose(f); return 0; }
@@ -835,7 +835,7 @@ static int export_hand_transition(const char *asset, const char *out, int fps)
         p->action=phase==8?GAME_ACT_HANDPASS:phase==10?GAME_ACT_SOLO:GAME_ACT_NONE;
         w=updatePoseBlend(s,clip,t,1.f/fps); sampleBlendedPose(s,clip,t,w);
         memcpy(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount);
-        relaxJogHands(s,clip);
+        relaxJogHands(s,clip,1.f/fps);
         if (guarded && memcmp(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount)) { fclose(f); return 0; }
         if (guarded) ++noops[phase];
         for (int b=0;b<model.boneCount;++b) {

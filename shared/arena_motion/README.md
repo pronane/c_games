@@ -84,3 +84,8 @@ full closed-volume containment tests.
 quaternions, treating opposite signs as the same rotation. It can diagnose
 frame-to-frame correction changes without depending on a renderer; it does not
 on its own establish that a visible pose transition is smooth.
+
+`am_guarded_fade` provides an immediate fail-closed reset while an effect is
+forbidden and a bounded linear re-entry over a caller-chosen duration. It is
+presentation-only math: callers must update/reset it across hidden or skipped
+frames and decide which guards take priority over smoothing.

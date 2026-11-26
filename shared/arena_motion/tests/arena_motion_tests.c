@@ -195,4 +195,16 @@ static void rotation_distance(void)
     assert(!am_rotation_distance(a,z,&angle) && fabsf(angle-.5f)<1e-6f);
     assert(!am_rotation_distance(NULL,c,&angle)); c[0]=NAN; assert(!am_rotation_distance(a,c,&angle));
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); rotation_distance(); puts("arena motion tests passed"); return 0; }
+static void guarded_fade(void)
+{
+    float a=0,b=0;
+    for (int i=0;i<3;i++) a=am_guarded_fade(a,1,1.f/30,.2f);
+    for (int i=0;i<6;i++) b=am_guarded_fade(b,1,1.f/60,.2f);
+    assert(fabsf(a-b)<1e-6f && fabsf(a-.5f)<1e-6f);
+    assert(am_guarded_fade(1,0,1.f/60,.2f)==0);
+    assert(am_guarded_fade(1,1,-1,.2f)==0);
+    assert(am_guarded_fade(NAN,1,1,.2f)==0);
+    assert(am_guarded_fade(0,1,1,0)==0);
+    assert(am_guarded_fade(0,1,1,.2f)==1);
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); rotation_distance(); guarded_fade(); puts("arena motion tests passed"); return 0; }

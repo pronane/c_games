@@ -446,10 +446,10 @@ per-frame change in the *local correction quaternion*, including state
 boundaries; this isolates the added hand correction, not the rendered pose or
 actual gameplay. At 30 Hz on the shipped model the hard guard switch removed up
 to about 20 degrees of correction in one frame when carrying, jumping or
-starting an action; the same risk exists when an unguarded jog resumes without
-a clip fade. No automatic fade was added: a delayed guard could interfere with
-ball or action posing, and requires a safe design and live validation. The
-curled experiment is therefore not ready to default on.
+starting an action; an unguarded jog previously also resumed without a fade.
+Guard onset stays immediate because delaying it could interfere with ball or
+action posing. The subsequent re-entry ramp is documented below. The curled
+experiment is not ready to default on.
 
 With `--surface`, the script also checks selected skinned finger triangles at
 one mid-state sample for each scripted state; guarded samples must match the
@@ -467,3 +467,15 @@ ball IK or a live match, so they are a warning to investigate, not a diagnosis
 of the complete rendered hand. The detail previews were retrieved at 480 pixels
 wide and 24 fps; sampled images show a less-open curled pose, but neither the
 full-resolution video nor transition motion was visually verified here.
+
+### Guarded re-entry ramp
+
+The opt-in curled mode uses the shared `am_guarded_fade` helper to reintroduce
+its correction over 0.20 seconds after an exclusion ends. Guard activation
+still resets the envelope immediately to zero, so possession, action and jump
+poses remain exact no-ops. The envelope also resets on match/training start and
+when a player is hidden or culled, preventing stale re-entry after missed
+frames. The ramp multiplies the existing locomotion blend; modes 1–3 and
+simulation state are unchanged. A 30/60 Hz scripted regression checks the
+previously abrupt jump-to-jog correction re-entry. Abrupt **guard onset** still
+exists by design and needs an action-aware solution and rendered validation.

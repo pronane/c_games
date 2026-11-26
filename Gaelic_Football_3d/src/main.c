@@ -145,6 +145,7 @@ typedef struct {
     float plantX[2], plantZ[2];
     int plantOn[2];
     float plantWeight[2];
+    float handRelaxEnvelope;       /* visual-only, hard reset when guarded or culled */
     int lastAction;
     float lastActionTime;
     GAActionState matchedAction;
@@ -1238,14 +1239,18 @@ static void plantFeet(AnimState *s, float dt)
 /* Small extra swing about each shoulder, phase-linked to the opposite knee.
  * Rotate the whole arm subtree rigidly, retaining elbow/hand/finger shape.
  * Excluded from ball carrying, actions, jumping and ambiguous source clips. */
-static float jogPresentationWeight(AnimState *s, int clip)
+static int jogPresentationBlocked(AnimState *s)
 {
     int idx = (int)(s - as);
-    float weight;
-    if (idx < 0 || idx >= 2*GAME_TEAM_SIZE || s->useBounce ||
+    return idx < 0 || idx >= 2*GAME_TEAM_SIZE || s->useBounce ||
         game.players[idx/GAME_TEAM_SIZE][idx%GAME_TEAM_SIZE].action != GAME_ACT_NONE ||
         game.players[idx/GAME_TEAM_SIZE][idx%GAME_TEAM_SIZE].jump_time > 0 ||
-        (game.ball_team == idx/GAME_TEAM_SIZE && game.ball_player == idx%GAME_TEAM_SIZE)) return 0;
+        (game.ball_team == idx/GAME_TEAM_SIZE && game.ball_player == idx%GAME_TEAM_SIZE);
+}
+static float jogPresentationWeight(AnimState *s, int clip)
+{
+    float weight;
+    if (jogPresentationBlocked(s)) return 0;
     weight = clip == C_JOG ? (s->prevClip == C_JOG ? 1.0f : am_smoothstep(s->blend)) :
              (s->prevClip == C_JOG && s->blend < 1.0f ? 1.0f-am_smoothstep(s->blend) : 0.0f);
     return weight * am_smoothstep((s->speed-.55f)/.9f);
@@ -1273,14 +1278,19 @@ static void assistJogArms(AnimState *s, int clip)
 }
 
 /* Rebuild child transforms parent-first so finger joints remain connected.
- * At most .25 radians per joint (.5 for a separate opt-in experiment),
- * fading with locomotion transitions. */
-static void relaxJogHands(AnimState *s, int clip)
+ * Per-joint correction is bounded (.25 normally, .5 for the strong test,
+ * .35 for authored curl) and fades with locomotion transitions. */
+static void relaxJogHands(AnimState *s, int clip, float dt)
 {
     Transform before[MAX_BONES]; unsigned char finger[MAX_BONES] = {0}, done[MAX_BONES] = {0};
     int nb = MODEL_BONECOUNT(model), remaining = 0; float weight;
-    if (!jogHandRelax || boneHandL < 0 || boneHandR < 0) return;
-    weight = jogPresentationWeight(s, clip); if (weight <= 0) return;
+    if (!jogHandRelax || boneHandL < 0 || boneHandR < 0) { s->handRelaxEnvelope=0; return; }
+    if (jogHandRelax == 4)
+        s->handRelaxEnvelope = am_guarded_fade(s->handRelaxEnvelope, !jogPresentationBlocked(s), dt, .20f);
+    else s->handRelaxEnvelope=0;
+    weight = jogPresentationWeight(s, clip);
+    if (jogHandRelax == 4) weight *= am_smoothstep(s->handRelaxEnvelope);
+    if (weight <= 0) return;
     memcpy(before, s->pose, sizeof(Transform)*(size_t)nb);
     for (int b = 0; b < nb; ++b) {
         finger[b] = b != boneHandL && b != boneHandR && (boneUnder(b, boneHandL) || boneUnder(b, boneHandR));
@@ -1448,7 +1458,7 @@ static void poseCharacter(AnimState *s, int clip, float t, float dt)
 #endif
     balanceTorso(s, clip);
     assistJogArms(s, clip);
-    relaxJogHands(s, clip);
+    relaxJogHands(s, clip, dt);
     cradleBall(s, clip);
     lengthenStride(s);
     plantFeet(s, dt);
@@ -2850,7 +2860,7 @@ static void drawWorld(float dt)
             s->speed = Lerp(s->speed, sp, 0.35f);
             s->accel = dt > 0 ? (s->speed - s->prevSpeed) / dt : 0;
             s->lastX = p->x; s->lastZ = p->z;
-            if (hiddenOff(team, i) || (benchSkip & 2)) continue;
+            if (hiddenOff(team, i) || (benchSkip & 2)) { s->handRelaxEnvelope=0; continue; }
             face = yawOf(p->facing_x, p->facing_z);
             if (p->off && s->speed > 0.6f && (dx * dx + dz * dz) > 1e-6f) face = yawOf(dx, dz);
             if (p->action == GAME_ACT_DIVE) face += (float)game.keeper_guess * PI / 2 * (team == 0 ? 1.0f : -1.0f);
@@ -2872,8 +2882,8 @@ static void drawWorld(float dt)
                 matchGaitTransition(s, clip, &t);
             int kit = i == 0 ? (team ? KIT_GK_AWAY : KIT_GK_HOME) : (team ? KIT_AWAY : KIT_HOME);
             Vector3 at = W(p->x, 0, p->z);
-            if (Vector3Distance(at, cam.target) > 95.0f && camMode != 4 && !camOverride) { s->clip = clip; s->t = t; continue; }
-            if (!inView(Vector3Add(at, (Vector3){ 0, 1.0f, 0 }), 1.6f)) { s->clip = clip; s->t = t; continue; }   /* off-screen: skip pose + draw */
+            if (Vector3Distance(at, cam.target) > 95.0f && camMode != 4 && !camOverride) { s->clip = clip; s->t = t; s->handRelaxEnvelope=0; continue; }
+            if (!inView(Vector3Add(at, (Vector3){ 0, 1.0f, 0 }), 1.6f)) { s->clip = clip; s->t = t; s->handRelaxEnvelope=0; continue; }   /* off-screen: skip pose + draw */
             drawCharacter(s, p->x, p->z, yaw, kit, dt, clip, t);
         }
     drawOfficials(dt);
@@ -2998,7 +3008,7 @@ static void newMatch(void)
     game.dissent_chance = 0.05f;
     game_start_half(&game, 1);
     clockT = 0; fullTime = 0; celebT = 0;
-    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; as[i].lastAction = GAME_ACT_NONE; as[i].lastActionTime = 0; as[i].poseValid = 0; memset(&as[i].matchedAction, 0, sizeof as[i].matchedAction); }
+    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; as[i].lastAction = GAME_ACT_NONE; as[i].lastActionTime = 0; as[i].poseValid = 0; as[i].handRelaxEnvelope = 0; memset(&as[i].matchedAction, 0, sizeof as[i].matchedAction); }
 }
 
 /* ---- training: you, two team-mates to pass to, and their keeper ---------- */
@@ -3028,7 +3038,7 @@ static void newTraining(void)
             p->x = GAME_PITCH_LENGTH * 0.5f + (t == 0 ? -1.0f : 1.0f) * (7.0f + (float)i * 0.9f);
             p->z = -6.5f;
         }
-    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; as[i].lastAction = GAME_ACT_NONE; as[i].lastActionTime = 0; as[i].poseValid = 0; memset(&as[i].matchedAction, 0, sizeof as[i].matchedAction); }
+    for (int i = 0; i < 2 * GAME_TEAM_SIZE; i++) { as[i].lastX = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].x; as[i].lastZ = game.players[i / GAME_TEAM_SIZE][i % GAME_TEAM_SIZE].z; as[i].lastAction = GAME_ACT_NONE; as[i].lastActionTime = 0; as[i].poseValid = 0; as[i].handRelaxEnvelope = 0; memset(&as[i].matchedAction, 0, sizeof as[i].matchedAction); }
     trainingPlace();
     camMode = 2;
 }
