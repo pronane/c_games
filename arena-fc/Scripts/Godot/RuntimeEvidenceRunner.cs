@@ -76,6 +76,21 @@ public partial class RuntimeEvidenceRunner : Node3D
         AddChild(rig);
         if (rig.Soccer == null || !SoccerClipRig.Available)
             throw new InvalidOperationException("Production SoccerClipRig/GLB was not loaded; refusing a procedural fallback capture.");
+        if (rig.Soccer.Skel == null)
+            throw new InvalidOperationException("Production rig has no Skeleton3D.");
+        var missingFootBones = new List<string>();
+        foreach (var side in new[] { "L", "R" })
+        foreach (var bone in new[] { "thigh", "shin", "foot" })
+            if (SoccerClipRig.FindBoneLoose(rig.Soccer.Skel, $"{bone}_{side}") < 0)
+                missingFootBones.Add($"{bone}_{side}");
+        if (missingFootBones.Count > 0)
+        {
+            var actualBones = Enumerable.Range(0, rig.Soccer.Skel.GetBoneCount())
+                .Select(i => rig.Soccer.Skel.GetBoneName(i));
+            throw new InvalidOperationException(
+                $"Production skeleton is missing grounding bones: {string.Join(", ", missingFootBones)}. " +
+                $"Available bones: {string.Join(", ", actualBones)}");
+        }
 
         var metrics = new AnimationMetrics();
         rig.Soccer.AnimMetrics = metrics;
