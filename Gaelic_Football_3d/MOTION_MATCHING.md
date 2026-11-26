@@ -331,8 +331,8 @@ correctness in a turning gameplay scenario. No simulation state depends on it.
 The visual workflow records matched `original-soles.mp4` and
 `cmu-jog-soles.mp4` with a tighter **stationary** world-space view. The API
 preview covers only 0.8 seconds at 20 fps and may be further downscaled; it is
-not a substitute for the full 30 fps video. The selected-player ring, camera
-perspective and compression can obscure true sole contact.
+not a substitute for the full 30 fps video. The scripted sole view hides selection markers to avoid covering the ground;
+camera perspective and compression can still obscure true sole contact.
 
 `tools/inspect_hand_references.py MODEL.glb` compares index-through-pinky bone
 geometry across selected non-possession clips. Its spread and middle-joint bend
@@ -343,3 +343,13 @@ through a check. The headless report calls the reusable `am_direction_angle`
 primitive from `shared/arena_motion`. None of these metrics select a reference or
 change poses. No alternative is enabled without rendered review and joint/mesh
 validation; the previous idle-reference experiment remains opt-in.
+
+The shipped-model scan found that idle at 0.2 s has different left/right
+middle-joint bend proxies (about 22 vs 5 degrees), while run and sidestep tend
+to be substantially more curled. Keeper poses are purpose-specific; none is
+established as a better relaxed running reference. The CMU candidate's
+headless test reported index-to-pinky direction spread of 28.9 degrees on both
+sides before the existing experimental correction and 13.1/21.5 afterward,
+but captured images still look splayed. These are joint proxies, not fingertip
+mesh spread or evidence of an anatomically correct pose. The asymmetry and
+rendered uncertainty argue against automatically promoting another clip.

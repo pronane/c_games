@@ -2822,7 +2822,9 @@ static void drawWorld(float dt)
             drawCharacter(s, p->x, p->z, yaw, kit, dt, clip, t);
         }
     drawOfficials(dt);
-    if (showMarkers) drawSelectionMarkers();
+    /* Keep scripted sole-review captures free of the selection ring, which
+     * otherwise overlays the ground. Normal gameplay markers are unchanged. */
+    if (showMarkers && camMotionDetail != 2) drawSelectionMarkers();
 
     /* ball: in the carrier's hands / on the foot, otherwise physics position */
     if (game.ball_team >= 0 && game.ball_player >= 0 && haveModel)
