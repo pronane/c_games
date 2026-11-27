@@ -15,6 +15,7 @@ public sealed class AnimationMetrics
     public int ContactEvents;
     public int TransitionEvents;
     public int TransitionMeasurements;
+    public int FootstepEvents;
 
     public float AvgFootSlide => Samples > 0 ? FootSlideAccum / Samples : 0f;
     public float AvgContactFrameError => ContactEvents > 0 ? ContactFrameErrorAccum / ContactEvents : 0f;
@@ -40,9 +41,14 @@ public sealed class AnimationMetrics
         ContactFrameErrorAccum += MathF.Max(0f, frameError);
     }
 
+    public void RecordFootstep()
+    {
+        FootstepEvents++;
+    }
+
     public void Reset()
     {
         Samples = 0; FootSlideAccum = 0f; ContactFrameErrorAccum = 0f; TransitionDiscontinuityAccum = 0f;
-        ContactEvents = 0; TransitionEvents = 0; TransitionMeasurements = 0;
+        ContactEvents = 0; TransitionEvents = 0; TransitionMeasurements = 0; FootstepEvents = 0;
     }
 }
