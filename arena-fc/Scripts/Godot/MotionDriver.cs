@@ -100,6 +100,14 @@ public sealed class MotionDriver
             yaw = MathF.Atan2(contract.FacingDirection.X, contract.FacingDirection.Z);
         float turnRate = 0f;
         if (slot.HasYaw && dt > 1e-5f) turnRate = Mx.AngleDiff(yaw, slot.LastYaw) / dt;
+        // Priority 2: velocity-aware turn ceiling so sprint turns cannot snap.
+        float speedForTurn = Mx.Flat(player.Vel).Length();
+        float agility = player.Spec.Archetype == Archetype.Explosive ? 0.85f
+                      : player.Spec.Archetype == Archetype.Lengthy ? 0.4f
+                      : 0.55f;
+        agility = Math.Clamp(agility * 0.5f + player.Spec.Pace * 0.5f, 0f, 1f);
+        float maxTurn = MomentumLimits.MaxTurnRate(speedForTurn, agility);
+        turnRate = Math.Clamp(turnRate, -maxTurn, maxTurn);
         if (contract != null && contract.DesiredTurnRate > 0f)
             turnRate = Math.Clamp(turnRate, -contract.DesiredTurnRate, contract.DesiredTurnRate);
         slot.LastYaw = yaw;
