@@ -2777,8 +2777,10 @@ public sealed partial class MatchEngine
     }
 
     private bool IsThrowInHold(PlayerState taker)
-        => taker.MustPlayBall && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - .6f
-           && MathF.Abs(State.Ball.Pos.X) < Mx.HalfLength - 1.5f;
+        // The restart phase is authoritative. The ball is deliberately clamped
+        // just inside the touchline during the thrower's wind-up, so inferring a
+        // throw-in from its current coordinates can turn a valid restart into a kick.
+        => State.Phase == Phase.ThrowIn && taker.MustPlayBall;
 
     private void AwardFreeKick(int side, Vector3 pos, bool penalty)
     {
