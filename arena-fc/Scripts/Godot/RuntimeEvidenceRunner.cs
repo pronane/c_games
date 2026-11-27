@@ -98,6 +98,39 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException(
                 "Production boot meshes did not provide sole vertices for both feet; refusing to substitute ankle-based measurements.");
 
+        // A second independently-instantiated production rig exercises a different
+        // body scale/identity in the same deterministic traversal.
+        var secondSpec = new CharacterSpec
+        {
+            Name = "Runtime Evidence Defender",
+            DisplayName = "RUNTIME B",
+            Number = 4,
+            Role = Role.Defender,
+            Height = 1.91f,
+            Pace = .72f
+        };
+        var secondRig = RigFactory.Create(secondSpec);
+        AddChild(secondRig);
+        if (secondRig.Soccer == null || secondRig.Soccer.Skel == null
+            || !secondRig.Soccer.HasFootIkBones || !secondRig.Soccer.HasSoleGeometry)
+            throw new InvalidOperationException("Second production player rig failed skeleton/sole validation.");
+        var secondMotion = new MotionState
+        {
+            CurrentClipId = "soccer_run",
+            LastIntent = PlayerIntent.Sprint,
+            FootPlantedLeft = true,
+            PlantWeightLeft = 1f
+        };
+        secondRig.Soccer.ApplyMotion(secondMotion);
+        secondRig.Position = new Vector3(-3.8f, .2f, 1.35f);
+        var secondPlayer = new PlayerState
+        {
+            Spec = secondSpec,
+            Action = "run",
+            Sprinting = true,
+            Facing = new NVector3(0, 0, 1)
+        };
+
         var authoredPlantWindows = LoadAuthoredPlantWindows();
         var metrics = new AnimationMetrics();
         rig.Soccer.AnimMetrics = metrics;
@@ -162,12 +195,29 @@ public partial class RuntimeEvidenceRunner : Node3D
                 motion.FootPlantedRight = plant.right;
                 motion.PlantWeightLeft = plant.left ? 1f : 0f;
                 motion.PlantWeightRight = plant.right ? 1f : 0f;
+                secondMotion.CurrentClipId = nextClip;
+                secondMotion.Phase = motion.Phase;
+                secondMotion.FootPlantedLeft = plant.left;
+                secondMotion.FootPlantedRight = plant.right;
+                secondMotion.PlantWeightLeft = plant.left ? 1f : 0f;
+                secondMotion.PlantWeightRight = plant.right ? 1f : 0f;
 
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 var sw = Stopwatch.StartNew();
                 rig.Soccer.Update(player, Dt);
                 sw.Stop();
-                // Exclude the first half-second of JIT/resource warm-up from rig timing.
+                // Time each production rig independently; warm-up is excluded.
+                if (i >= 30) updateMs.Add(sw.Elapsed.TotalMilliseconds);
+                float secondYaw = yaw + .16f;
+                var secondPosition = new Vector3(x, y, 1.35f);
+                secondRig.Position = secondPosition;
+                secondRig.Rotation = new Vector3(0f, secondYaw, 0f);
+                secondPlayer.Pos = new NVector3(secondPosition.X, secondPosition.Y, secondPosition.Z);
+                secondPlayer.Vel = new NVector3((movingPositiveX ? 1f : -1f) * speed * .82f, 0f, 0f);
+                secondPlayer.Facing = new NVector3(-MathF.Sin(secondYaw), 0f, -MathF.Cos(secondYaw));
+                sw.Restart();
+                secondRig.Soccer.Update(secondPlayer, Dt);
+                sw.Stop();
                 if (i >= 30) updateMs.Add(sw.Elapsed.TotalMilliseconds);
 
                 double frame = Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000.0;
@@ -236,7 +286,7 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["renderer"] = ProjectSettings.GetSetting("rendering/renderer/rendering_method").AsString(),
             ["scenario"] = "production_soccer_clip_rig_bidirectional_accelerating_turning_flat_and_8_percent_slope",
             ["frames"] = frames,
-            ["scenario_coverage"] = new[] { "multiple locomotion clips", "positive and negative travel direction", "acceleration and deceleration", "yaw changes", "flat-to-8-percent slope traversal", "clip transitions" },
+            ["scenario_coverage"] = new[] { "two independently instantiated player rigs with different body specs", "multiple locomotion clips", "positive and negative travel direction", "acceleration and deceleration", "yaw changes", "flat-to-8-percent slope traversal", "clip transitions" },
             ["physics_tick_rate_hz"] = 60,
             ["frame_budget_ms_at_60hz"] = 1000.0 / 60.0,
             ["animation_metric_samples"] = metrics.Samples,
