@@ -1269,7 +1269,9 @@ public sealed partial class SoccerClipRig : Node3D
                 }
             }
         }
-        ApplyPelvisStabilization(worldPos, leftPlantW, rightPlantW, skelGlobal, skelInv);
+        // Keep pelvis motion authored by the clip until the leg solve is validated
+        // against the production skeleton. The previous secondary pelvis override
+        // compounded foot IK and caused large upper-body/hip distortions.
         UpdateDebugOverlay();
         ApplyLookAndReach();
     }
@@ -1484,10 +1486,29 @@ public sealed partial class SoccerClipRig : Node3D
             }
         }
 
-        var thighQuat = ShortestArc(b.ThighRest.Normalized(), (knee - hip).Normalized());
-        var shinQuat = ShortestArc(b.ShinRest.Normalized(), (end - knee).Normalized());
-        Skel.SetBonePoseRotation(b.Thigh, thighQuat);
-        Skel.SetBonePoseRotation(b.Shin, shinQuat);
+        // Bone pose rotations are parent-local, while the analytic solution above
+        // is skeleton-local. Convert each solved segment into its actual parent
+        // coordinate frame before deriving the rotation from the rest offset.
+        int thighParent = Skel.GetBoneParent(b.Thigh);
+        Basis thighParentBasis = thighParent >= 0
+            ? Skel.GetBoneGlobalPose(thighParent).Basis
+            : Basis.Identity;
+        Vector3 thighTargetLocal = thighParentBasis.Inverse() * (knee - hip).Normalized();
+        Vector3 thighRestLocal = b.ThighRest.Normalized();
+        if (thighTargetLocal.LengthSquared() > 1e-8f && thighRestLocal.LengthSquared() > 1e-8f)
+            Skel.SetBonePoseRotation(b.Thigh, ShortestArc(thighRestLocal, thighTargetLocal));
+
+        // Refresh the hierarchy so the shin parent basis includes the thigh solve.
+        Skel.ForceUpdateAllBoneTransforms();
+        int shinParent = Skel.GetBoneParent(b.Shin);
+        Basis shinParentBasis = shinParent >= 0
+            ? Skel.GetBoneGlobalPose(shinParent).Basis
+            : Basis.Identity;
+        Vector3 shinTargetLocal = shinParentBasis.Inverse() * (end - knee).Normalized();
+        Vector3 shinRestLocal = b.ShinRest.Normalized();
+        if (shinTargetLocal.LengthSquared() > 1e-8f && shinRestLocal.LengthSquared() > 1e-8f)
+            Skel.SetBonePoseRotation(b.Shin, ShortestArc(shinRestLocal, shinTargetLocal));
+        Skel.ForceUpdateAllBoneTransforms();
     }
 
     private static Quaternion ShortestArc(Vector3 from, Vector3 to)
