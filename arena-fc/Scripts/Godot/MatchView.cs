@@ -606,8 +606,12 @@ public partial class MatchView : Node3D
             if (rig.Soccer != null)
             {
                 rig.Soccer.AnimMetrics = _motion.Metrics;
-                if (motion != null) rig.Soccer.ApplyMotion(motion);
-            }
+                if (motion != null)
+                {
+                    rig.Soccer.ApplyMotion(motion);
+                    MotionAudio.Play(this, motion);
+                }
+            }       
             RigAnimator.Pose(rig, p, dt, _time, b.Pos);
             var ambient = _ambient[i].Update(dt, _time, i == owner, i != owner, p.Stamina);
             var (faceYaw, facePitch, faceRoll) = _face[i].Update(dt);
