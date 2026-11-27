@@ -1334,7 +1334,7 @@ public sealed partial class SoccerClipRig : Node3D
             var ground = SampleGround(worldPos, footWorld);
             if (isLeft) _groundNormalL = ground.normal; else _groundNormalR = ground.normal;
             float groundY = ground.hit ? ground.y : worldPos.Y;
-            Vector3 targetWorld = new Vector3(footWorld.X, groundY + 0.006f, footWorld.Z);
+            Vector3 targetWorld = new Vector3(footWorld.X, groundY + (planted ? 0.006f : 0.035f), footWorld.Z);
 
             if (planted)
             {
