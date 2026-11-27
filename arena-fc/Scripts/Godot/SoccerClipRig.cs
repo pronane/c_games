@@ -1462,34 +1462,33 @@ public sealed partial class SoccerClipRig : Node3D
         groundNormalWorld = groundNormalWorld.Normalized();
         // Only apply when ground is reasonably level to avoid extreme ankle poses.
         if (groundNormalWorld.Dot(Vector3.Up) < 0.65f) return;
-        // Convert world-space normal/forward to skeleton space for bone override.
+        // Build the desired foot frame in skeleton space, then convert it to
+        // the bone's local pose rotation. A global-pose override pins the ankle
+        // independently of the shin and breaks the two-bone chain at the exact
+        // point where planted-foot IK needs that chain to remain connected.
         Vector3 groundNormal = (skelInv.Basis * groundNormalWorld).Normalized();
         var footTx = Skel.GetBoneGlobalPose(b.Foot);
         Vector3 fwdWorld = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
         Vector3 fwd = skelInv.Basis * fwdWorld;
-        // Project forward onto ground plane in skeleton space.
-        fwd = (fwd - groundNormal * fwd.Dot(groundNormal));
+        fwd = fwd - groundNormal * fwd.Dot(groundNormal);
         if (fwd.LengthSquared() < 1e-6f) fwd = footTx.Basis.Z;
         fwd = fwd.Normalized();
-        // Build a right-handed orthonormal frame.  The previous cross-product
-        // order produced a reflected basis (determinant < 0), which cannot be
-        // represented by a unit quaternion and makes Basis.Slerp throw.
         Vector3 right = groundNormal.Cross(fwd);
         if (right.LengthSquared() < 1e-6f) return;
         right = right.Normalized();
         Vector3 up = fwd.Cross(right).Normalized();
-        var basis = new Basis(right, up, fwd).Orthonormalized();
-        if (basis.Determinant() < 0f) return;
-        // Animation bone bases may contain scale or small numerical drift.
-        // Convert proper orthonormal frames to unit quaternions explicitly:
-        // Basis.Slerp can throw when either extracted quaternion is not unit.
-        var fromBasis = footTx.Basis.Orthonormalized();
-        if (fromBasis.Determinant() < 0f)
-            fromBasis = new Basis(-fromBasis.X, fromBasis.Y, fromBasis.Z).Orthonormalized();
-        var fromRotation = fromBasis.GetRotationQuaternion().Normalized();
-        var toRotation = basis.GetRotationQuaternion().Normalized();
-        footTx.Basis = new Basis(fromRotation.Slerp(toRotation, 0.35f).Normalized());
-        Skel.SetBoneGlobalPoseOverride(b.Foot, footTx, 1f, true);
+        var desiredGlobalBasis = new Basis(right, up, fwd).Orthonormalized();
+        if (desiredGlobalBasis.Determinant() < 0f) return;
+
+        int parent = Skel.GetBoneParent(b.Foot);
+        Basis parentBasis = parent >= 0
+            ? Skel.GetBoneGlobalPose(parent).Basis.Orthonormalized()
+            : Basis.Identity;
+        Basis restBasis = Skel.GetBoneRest(b.Foot).Basis.Orthonormalized();
+        Basis desiredPoseBasis = restBasis.Inverse() * parentBasis.Inverse() * desiredGlobalBasis;
+        var desiredPose = desiredPoseBasis.Orthonormalized().GetRotationQuaternion().Normalized();
+        var currentPose = Skel.GetBonePoseRotation(b.Foot).Normalized();
+        Skel.SetBonePoseRotation(b.Foot, currentPose.Slerp(desiredPose, 0.35f).Normalized());
     }
 
     private void UpdateDebugOverlay()
@@ -1660,12 +1659,21 @@ public sealed partial class SoccerClipRig : Node3D
         Vector3 current = Skel.GetBoneGlobalPose(child).Origin - bonePose.Origin;
         if (current.LengthSquared() < 1e-8f) return;
         int parent = Skel.GetBoneParent(bone);
-        Basis parentBasis = parent >= 0 ? Skel.GetBoneGlobalPose(parent).Basis : Basis.Identity;
-        Basis inverse = parentBasis.Inverse();
-        Vector3 from = (inverse * current).Normalized();
-        Vector3 to = (inverse * targetDirection).Normalized();
-        Quaternion delta = ShortestArc(from, to);
-        Skel.SetBonePoseRotation(bone, (delta * Skel.GetBonePoseRotation(bone)).Normalized());
+        Basis parentBasis = parent >= 0
+            ? Skel.GetBoneGlobalPose(parent).Basis.Orthonormalized()
+            : Basis.Identity;
+        Vector3 from = (parentBasis.Inverse() * current).Normalized();
+        Vector3 to = (parentBasis.Inverse() * targetDirection).Normalized();
+        Quaternion deltaInParent = ShortestArc(from, to);
+
+        // Bone pose rotation is expressed after the authored local rest basis:
+        // G = parentGlobal * restLocal * poseLocal. Convert the parent-space
+        // swing into pose-local space before composing it with the clip pose.
+        Quaternion restLocal = Skel.GetBoneRest(bone).Basis.Orthonormalized()
+            .GetRotationQuaternion().Normalized();
+        Quaternion deltaInPose = restLocal.Inverse() * deltaInParent * restLocal;
+        Skel.SetBonePoseRotation(bone,
+            (deltaInPose * Skel.GetBonePoseRotation(bone)).Normalized());
     }
 
     private static Quaternion ShortestArc(Vector3 from, Vector3 to)
