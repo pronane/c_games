@@ -138,7 +138,7 @@ jobs:
         env:
           EVIDENCE_JSON: ${{ runner.temp }}/arena-runtime-evidence/runtime-evidence.json
         run: |
-          python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} bone_stretch={:.3f} bone={} transitions={} ankle_clearance_m=[{:.3f},{:.3f}]".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["max_bone_parent_distance_vs_rest"], d["max_bone_parent_distance_bone"], d["transition_measurements"], d["ankle_ground_clearance_min_m"], d["ankle_ground_clearance_max_m"]))'
+          python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} sole_clearance_m=[{:.4f},{:.4f}] contact_events={} contact_error_frames={:.3f} bone_stretch={:.3f} bone={} transitions={}".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["sole_ground_clearance_min_m"], d["sole_ground_clearance_max_m"], d["contact_events"], d["avg_contact_frame_error"], d["max_bone_parent_distance_vs_rest"], d["max_bone_parent_distance_bone"], d["transition_measurements"]))'
       - name: Publish compact diagnostic thumbnails
         env:
           EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
