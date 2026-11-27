@@ -1,6 +1,11 @@
 name: Arena FC quality gates
 
 on:
+  push:
+    branches: ["arena/**"]
+    paths:
+      - "arena-fc/**"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "arena-fc/**"
