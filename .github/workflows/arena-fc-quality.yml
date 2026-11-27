@@ -144,7 +144,11 @@ jobs:
           EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
         run: |
           for label in run-flat sprint-flat-to-ramp turn-ramp; do
-            echo "::notice title=Rig thumbnail $label::$(base64 -w0 "$EVIDENCE_DIR/$label-thumbnail.png")"
+            index=0
+            while IFS= read -r chunk; do
+              echo "::notice title=Rig thumbnail $label part $index::$chunk"
+              index=$((index + 1))
+            done < <(base64 -w0 "$EVIDENCE_DIR/$label-thumbnail.png" | fold -w 3000)
           done
       - name: Render procedural rig captures
         working-directory: arena-fc
