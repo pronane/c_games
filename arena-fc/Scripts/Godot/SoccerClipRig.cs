@@ -43,6 +43,7 @@ public sealed partial class SoccerClipRig : Node3D
     private readonly HashSet<string> _loops = new();
     private readonly Dictionary<string, float> _clipDuration = new();
     private readonly Dictionary<string, float> _contactFrac = new();
+    private readonly Dictionary<string, float> _clipFps = new();
     private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
@@ -55,6 +56,20 @@ public sealed partial class SoccerClipRig : Node3D
     public bool HasFootIkBones => _bones.TryGetValue("L", out var l) && _bones.TryGetValue("R", out var r)
         && l.Thigh >= 0 && l.Shin >= 0 && l.Foot >= 0
         && r.Thigh >= 0 && r.Shin >= 0 && r.Foot >= 0;
+    public bool HasSoleGeometry => _bones.TryGetValue("L", out var l) && l.HasSoleGeometry
+        && _bones.TryGetValue("R", out var r) && r.HasSoleGeometry;
+
+    public Vector3 SoleWorldPosition(string side)
+    {
+        if (Skel == null || !_bones.TryGetValue(side, out var b)) return Vector3.Zero;
+        return Skel.GlobalTransform * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+    }
+
+    public float AuthoredContactTime(string clip)
+        => _clipDuration.TryGetValue(clip, out float duration) && _contactFrac.TryGetValue(clip, out float fraction)
+            ? duration * fraction : -1f;
+    public float AuthoredClipFps(string clip)
+        => _clipFps.TryGetValue(clip, out float fps) ? fps : 0f;
 
     // FIFA-style locomotion state.
     private Node3D? _sceneRoot;
@@ -117,6 +132,8 @@ public sealed partial class SoccerClipRig : Node3D
     {
         public int Thigh = -1, Shin = -1, Foot = -1, Spine = -1, Neck = -1, Head = -1, UpperArmL = -1, LowerArmL = -1, UpperArmR = -1, LowerArmR = -1;
         public Vector3 ThighRest, ShinRest, FootRest, SpineRest, NeckRest, HeadRest;
+        public Vector3 SoleLocal;
+        public bool HasSoleGeometry;
         public Vector3 UpperArmRestL, LowerArmRestL, UpperArmRestR, LowerArmRestR;
     }
 
@@ -296,7 +313,11 @@ public sealed partial class SoccerClipRig : Node3D
                     string clipName = nm.GetString() ?? "";
                     if (c.TryGetProperty("loop", out var loop) && loop.GetBoolean()) _loops.Add(clipName);
                     if (c.TryGetProperty("fps", out var fps) && c.TryGetProperty("frames", out var frames))
-                        _clipDuration[clipName] = frames.GetSingle() / Math.Max(1f, fps.GetSingle());
+                    {
+                        float clipFps = Math.Max(1f, fps.GetSingle());
+                        _clipFps[clipName] = clipFps;
+                        _clipDuration[clipName] = frames.GetSingle() / clipFps;
+                    }
                     if (c.TryGetProperty("events", out var ev)
                         && ev.TryGetProperty("ball_contact_frac", out var bc) && bc.ValueKind != JsonValueKind.Null)
                         _contactFrac[clipName] = bc.GetSingle();
@@ -1169,6 +1190,7 @@ public sealed partial class SoccerClipRig : Node3D
             b.ThighRest = Skel.GetBoneRest(b.Thigh).Origin;
             b.ShinRest = Skel.GetBoneRest(b.Shin).Origin;
             b.FootRest = Skel.GetBoneRest(b.Foot).Origin;
+            b.HasSoleGeometry = TryCacheBootSole(side, b.Foot, out b.SoleLocal);
             _bones[side] = b;
         }
         var spine = FindBoneLoose(Skel, "spine_02");
@@ -1201,6 +1223,46 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
+    // Derive the sole contact point from the selected production boot meshes, in
+    // the foot bone's rest-local space. This deliberately fails closed: if the
+    // GLB has no boot vertices near a foot, the runner reports missing geometry
+    // instead of fabricating an ankle-to-sole offset.
+    private bool TryCacheBootSole(string side, int footBone, out Vector3 soleLocal)
+    {
+        soleLocal = Vector3.Zero;
+        if (Skel == null || footBone < 0) return false;
+        var footRest = Skel.GetBoneGlobalRest(footBone);
+        var skeletonInv = Skel.GlobalTransform.AffineInverse();
+        var candidates = new List<Vector3>();
+        foreach (var mi in _meshes)
+        {
+            string nodeName = mi.Name.ToString().ToLowerInvariant();
+            if (!mi.Visible || !nodeName.Contains("boot") || mi.Mesh == null) continue;
+            for (int surface = 0; surface < mi.Mesh.GetSurfaceCount(); surface++)
+            {
+                var arrays = mi.Mesh.SurfaceGetArrays(surface);
+                if (arrays.Count <= (int)Godot.Mesh.ArrayType.Vertex
+                    || arrays[(int)Godot.Mesh.ArrayType.Vertex].VariantType == Variant.Type.Nil) continue;
+                var vertices = arrays[(int)Godot.Mesh.ArrayType.Vertex].AsVector3Array();
+                var meshToSkeleton = skeletonInv * mi.GlobalTransform;
+                foreach (var vertex in vertices)
+                {
+                    var point = meshToSkeleton * vertex;
+                    var delta = point - footRest.Origin;
+                    if (new Vector2(delta.X, delta.Z).LengthSquared() <= .20f * .20f)
+                        candidates.Add(point);
+                }
+            }
+        }
+        if (candidates.Count == 0) return false;
+        Vector3 soleInSkeleton = candidates.OrderBy(p => p.Y).First();
+        soleLocal = footRest.AffineInverse() * soleInSkeleton;
+        return float.IsFinite(soleLocal.X) && float.IsFinite(soleLocal.Y) && float.IsFinite(soleLocal.Z);
+    }
+
+    private static Vector3 SoleTargetToAnkle(BoneData bone, Transform3D footPose, Vector3 soleTargetSkeleton)
+        => bone.HasSoleGeometry ? soleTargetSkeleton - footPose.Basis * bone.SoleLocal : soleTargetSkeleton;
+
     private void UpdateFootIk(Vector3 worldPos, float yaw, float dt)
     {
         if (Skel == null || _bones.Count == 0) return;
@@ -1227,15 +1289,15 @@ public sealed partial class SoccerClipRig : Node3D
             // or feed an old global pose back into the new IK solve.
             Skel.SetBoneGlobalPoseOverride(b.Foot, Transform3D.Identity, 0f, false);
             Skel.ForceUpdateAllBoneTransforms();
-            var footSkel = Skel.GetBoneGlobalPose(b.Foot).Origin;
-            var footWorld = skelGlobal * footSkel;
+            var footPose = Skel.GetBoneGlobalPose(b.Foot);
+            var footWorld = skelGlobal * (footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
             float height = footWorld.Y - worldPos.Y;
             bool planted = (isLeft ? leftPlanted : rightPlanted) || height < .10f;
 
             var ground = SampleGround(worldPos, footWorld);
             if (isLeft) _groundNormalL = ground.normal; else _groundNormalR = ground.normal;
             float groundY = ground.hit ? ground.y : worldPos.Y;
-            Vector3 targetWorld = new Vector3(footWorld.X, groundY + 0.012f, footWorld.Z);
+            Vector3 targetWorld = new Vector3(footWorld.X, groundY + 0.006f, footWorld.Z);
 
             if (planted)
             {
@@ -1247,11 +1309,11 @@ public sealed partial class SoccerClipRig : Node3D
                 // Updating this every frame turns the lock into a slowly drifting target.
                 if (!hasPrev)
                 {
-                    prev = new Vector3(footWorld.X, groundY + 0.012f, footWorld.Z);
+                    prev = new Vector3(footWorld.X, groundY + 0.006f, footWorld.Z);
                     hasPrev = true;
                 }
 
-                Vector3 locked = new Vector3(prev.X, groundY + 0.012f, prev.Z);
+                Vector3 locked = new Vector3(prev.X, groundY + 0.006f, prev.Z);
                 targetWorld = targetWorld.Lerp(locked, pw);
 
                 // A contract-marked plant is an explicit contact request. Do not
@@ -1260,8 +1322,16 @@ public sealed partial class SoccerClipRig : Node3D
                 if (pw > 0.01f || height < .18f)
                 {
                     Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
-                    SolveTwoBone(b.Thigh, b.Shin, b.Foot, skelInv * targetWorld, yaw);
-                    Vector3 afterWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    SolveTwoBone(b.Thigh, b.Shin, b.Foot, SoleTargetToAnkle(b, Skel.GetBoneGlobalPose(b.Foot), skelInv * targetWorld), yaw);
+                    Skel.ForceUpdateAllBoneTransforms();
+                    if (b.HasSoleGeometry)
+                    {
+                        var currentSole = Skel.GetBoneGlobalPose(b.Foot) * b.SoleLocal;
+                        var correction = skelInv * targetWorld - currentSole;
+                        var ankleTarget = Skel.GetBoneGlobalPose(b.Foot).Origin + correction;
+                        SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
+                    }
+                    Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
                 }
@@ -1269,7 +1339,7 @@ public sealed partial class SoccerClipRig : Node3D
 
                 // Measure the corrected foot, not the pre-IK animation pose. Compare
                 // against the latched anchor so residual motion cannot hide as drift.
-                Vector3 correctedWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                Vector3 correctedWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                 ref bool hasLastMeasured = ref (isLeft ? ref _hasLastMeasuredFootL : ref _hasLastMeasuredFootR);
                 ref Vector3 lastMeasured = ref (isLeft ? ref _lastMeasuredFootWorldL : ref _lastMeasuredFootWorldR);
                 if (hasLastMeasured && dt > 1e-4f && pw > 0.01f)
@@ -1295,8 +1365,9 @@ public sealed partial class SoccerClipRig : Node3D
                 if (height < .18f)
                 {
                     Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
-                    SolveTwoBone(b.Thigh, b.Shin, b.Foot, skelInv * targetWorld, yaw);
-                    Vector3 afterWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    SolveTwoBone(b.Thigh, b.Shin, b.Foot, SoleTargetToAnkle(b, Skel.GetBoneGlobalPose(b.Foot), skelInv * targetWorld), yaw);
+                    Skel.ForceUpdateAllBoneTransforms();
+                    Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
                     ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
