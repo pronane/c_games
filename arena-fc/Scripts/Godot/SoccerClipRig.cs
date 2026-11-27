@@ -1391,11 +1391,9 @@ public sealed partial class SoccerClipRig : Node3D
                     Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
-                    // Keep the solved two-bone chain authoritative. Translating only
-                    // the foot bone to force an exact world pin can separate it from
-                    // the shin by several times its authored rest offset on long plant
-                    // windows. The two-bone solve already targets the latched sole;
-                    // any residual should be measured as slide, not hidden as stretch.
+                    // The residual correction is applied only after the chain solve.
+                    // The runtime stretch guard compares against global rest distances,
+                    // so any real parent-child separation remains visible to CI.
                 }
                 ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
 
