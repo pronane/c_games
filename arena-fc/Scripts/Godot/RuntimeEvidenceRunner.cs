@@ -98,7 +98,7 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException(
                 "Production boot meshes did not provide sole vertices for both feet; refusing to substitute ankle-based measurements.");
 
-        var authoredPlantWindows = LoadAuthoredPlantWindows();
+        var authoredPlantCurves = LoadAuthoredPlantCurves();
         var metrics = new AnimationMetrics();
         rig.Soccer.AnimMetrics = metrics;
         var motion = new MotionState
@@ -148,11 +148,11 @@ public partial class RuntimeEvidenceRunner : Node3D
                 if (!string.Equals(motion.CurrentClipId, nextClip, StringComparison.Ordinal)) motion.Phase = 0f;
                 motion.CurrentClipId = nextClip;
                 motion.Phase = (motion.Phase + Dt / (i < 240 ? 1.033333f : .833333f)) % 1f;
-                var plant = AuthoredPlantState(authoredPlantWindows, motion.CurrentClipId, motion.Phase);
-                motion.FootPlantedLeft = plant.left;
-                motion.FootPlantedRight = plant.right;
-                motion.PlantWeightLeft = plant.left ? 1f : 0f;
-                motion.PlantWeightRight = plant.right ? 1f : 0f;
+                var plant = AuthoredPlantState(authoredPlantCurves, motion.CurrentClipId, motion.Phase);
+                motion.FootPlantedLeft = plant.left > 0.01f;
+                motion.FootPlantedRight = plant.right > 0.01f;
+                motion.PlantWeightLeft = plant.left;
+                motion.PlantWeightRight = plant.right;
 
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 var sw = Stopwatch.StartNew();
@@ -232,7 +232,7 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["animation_metric_samples"] = metrics.Samples,
             ["avg_planted_foot_slide_mps"] = metrics.AvgFootSlide,
             ["foot_slide_metric_scope"] = "world_space_xz_velocity_during_authored_clip_foot_plant_windows",
-            ["plant_state_source"] = "Data/clips/clip_manifest.json footPlantFrames and footPlantSides",
+            ["plant_state_source"] = "Data/clips/clip_manifest.json plantCurveLeft and plantCurveRight interpolated at normalized clip phase",
             ["transition_measurements"] = metrics.TransitionMeasurements,
             ["avg_transition_discontinuity"] = metrics.AvgTransitionDiscontinuity,
             ["transition_metric_scope"] = "mean_raw_pose_offset_on_inertialized_upper_body_bones",
@@ -406,40 +406,49 @@ public partial class RuntimeEvidenceRunner : Node3D
         return (false, 0, $"{(shoot ? "shot" : "pass")} did not release the ball during its 60-tick action window; action={player.Action}, pending={ball.HasPending}, speed={ball.Vel.Length():F3}");
     }
 
-    private sealed record PlantWindow(string Side, float Phase);
+    private sealed record PlantCurve(float[] Left, float[] Right);
 
-    private static Dictionary<string, List<PlantWindow>> LoadAuthoredPlantWindows()
+    private static Dictionary<string, PlantCurve> LoadAuthoredPlantCurves()
     {
         const string path = "res://Data/clips/clip_manifest.json";
         using var file = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read);
         if (file == null) throw new InvalidOperationException($"Could not read authored clip manifest: {path}");
         var root = JsonDocument.Parse(file.GetAsText()).RootElement;
-        var result = new Dictionary<string, List<PlantWindow>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, PlantCurve>(StringComparer.Ordinal);
         foreach (var clip in root.GetProperty("clips").EnumerateArray())
         {
             string id = clip.GetProperty("id").GetString() ?? "";
-            var frames = clip.GetProperty("footPlantFrames").EnumerateArray().Select(x => x.GetSingle()).ToArray();
-            var sides = clip.GetProperty("footPlantSides").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
-            var windows = new List<PlantWindow>();
-            for (int i = 0; i < Math.Min(frames.Length, sides.Length); i++)
-                windows.Add(new PlantWindow(sides[i], frames[i]));
-            result[id] = windows;
+            float[] left = clip.TryGetProperty("plantCurveLeft", out var leftCurve)
+                && leftCurve.ValueKind == JsonValueKind.Array
+                ? leftCurve.EnumerateArray().Select(x => x.GetSingle()).ToArray()
+                : Array.Empty<float>();
+            float[] right = clip.TryGetProperty("plantCurveRight", out var rightCurve)
+                && rightCurve.ValueKind == JsonValueKind.Array
+                ? rightCurve.EnumerateArray().Select(x => x.GetSingle()).ToArray()
+                : Array.Empty<float>();
+            result[id] = new PlantCurve(left, right);
         }
         return result;
     }
 
-    private static (bool left, bool right) AuthoredPlantState(
-        Dictionary<string, List<PlantWindow>> windows, string clip, float phase)
+    private static (float left, float right) AuthoredPlantState(
+        Dictionary<string, PlantCurve> curves, string clip, float phase)
     {
-        if (!windows.TryGetValue(clip, out var markers)) return (false, false);
-        // A narrow interval around each authored plant event; avoids inventing
-        // alternating contacts unrelated to the clip's own timing metadata.
-        const float halfWindow = .10f;
-        bool left = markers.Any(m => m.Side.Equals("Left", StringComparison.OrdinalIgnoreCase)
-            && MathF.Abs(MathF.IEEERemainder(phase - m.Phase, 1f)) <= halfWindow);
-        bool right = markers.Any(m => m.Side.Equals("Right", StringComparison.OrdinalIgnoreCase)
-            && MathF.Abs(MathF.IEEERemainder(phase - m.Phase, 1f)) <= halfWindow);
-        return (left, right);
+        if (!curves.TryGetValue(clip, out var curve)) return (0f, 0f);
+        return (SamplePlantCurve(curve.Left, phase), SamplePlantCurve(curve.Right, phase));
+    }
+
+    private static float SamplePlantCurve(float[] samples, float phase)
+    {
+        if (samples.Length == 0) return 0f;
+        // The manifest curves are evenly sampled over a looping normalized clip
+        // phase. Interpolate circularly so the final sample blends into the first.
+        float wrapped = phase - MathF.Floor(phase);
+        float samplePosition = wrapped * samples.Length;
+        int first = (int)MathF.Floor(samplePosition) % samples.Length;
+        int second = (first + 1) % samples.Length;
+        float blend = samplePosition - MathF.Floor(samplePosition);
+        return Math.Clamp(Mathf.Lerp(samples[first], samples[second], blend), 0f, 1f);
     }
 
     private static double Percentile(List<double> values, double percentile)
