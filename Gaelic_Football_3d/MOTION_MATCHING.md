@@ -642,3 +642,20 @@ preview. This script forces possession and step state for the demo; it is not
 unmodified live gameplay. The preview shows the carrying hand over the ball,
 but compression, occlusion and angle limit inspection of palm/ball intersection
 and deformation. It does not render the offline wrist/finger experiments.
+
+The same scripted camera can render the rejected wrist/finger counterfactual
+when `GF_GRIP_REVIEW` and `GF_GRIP_PROBE` are set together during a motion
+recording. Only the scripted carrier during the sprint interval receives it;
+ordinary gameplay and the baseline recording use the original cradle. The
+probe keeps the large (-80, 0, -80) mm wrist offset, full finger follow and
+segment replant used above. The workflow confirms matching frame-620
+speed/holder/action/cradle values and records the probe's expected failure of
+the existing 0.20 m nearer-wrist proximity check. That specific failure is
+logged rather than aborting this experimental capture; baseline and all other
+checks retain their normal behavior.
+
+In workflow 45913473034, sampled frames from the compressed 480-pixel
+24 fps preview show the probe's fingers looking more spread and displaced to
+the side of the ball than the baseline. This supports rejecting the probe,
+not enabling it. The camera still obscures some surfaces, and inspecting
+sampled frames is not a full-motion or live-gameplay validation.
