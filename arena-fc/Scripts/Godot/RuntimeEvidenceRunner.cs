@@ -207,8 +207,8 @@ public partial class RuntimeEvidenceRunner : Node3D
         // Each child joint should remain near its authored parent offset; this
         // catches severe persistent global overrides that pull limbs apart.
 
-        var passContact = RunMatchContactScenario(spec, shoot: false);
-        var shotContact = RunMatchContactScenario(spec, shoot: true);
+        var passContact = await RunMatchContactScenario(spec, shoot: false);
+        var shotContact = await RunMatchContactScenario(spec, shoot: true);
         if (!passContact.success || !shotContact.success)
             throw new InvalidOperationException($"Match-engine contact scenario failed: pass={passContact.detail}; shot={shotContact.detail}");
         double averageContactErrorFrames = (passContact.errorFrames + shotContact.errorFrames) * .5;
@@ -311,7 +311,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         if (float.IsFinite(clearance)) values.Add(clearance);
     }
 
-    private (bool success, double errorFrames, string detail) RunMatchContactScenario(CharacterSpec spec, bool shoot)
+    private async Task<(bool success, double errorFrames, string detail)> RunMatchContactScenario(CharacterSpec spec, bool shoot)
     {
         var engine = new MatchEngine(new MatchOptions { Seed = shoot ? 7319 : 7318, TeamSize = 11, TimeSpeed = 15f });
         engine.State.Phase = Phase.Play;
@@ -350,6 +350,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         bool started = false;
         for (int tick = 0; tick < 60; tick++)
         {
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             var command = tick == 0
                 ? shoot ? new PlayerCommand { Shoot = true, Charge = .8f } : new PlayerCommand { Pass = true }
                 : PlayerCommand.None;
