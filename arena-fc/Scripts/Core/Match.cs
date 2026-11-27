@@ -2530,7 +2530,7 @@ public sealed partial class MatchEngine
                 float ang = Rng.Range(-1.0f, 1.0f);
                 Vector3 dir = new(through.X * MathF.Cos(ang) - through.Z * MathF.Sin(ang), 0,
                                   through.X * MathF.Sin(ang) + through.Z * MathF.Cos(ang));
-                if (byLine && Rng.Next() < .75f)
+                if (byLine && Rng.Next() < .82f)
                     dir = Mx.Norm(dir * .4f + new Vector3(0, 0, MathF.Sign(carrier.Pos.Z)));
                 b.Owner = -1;
                 b.Vel = dir * Rng.Range(4f, slide ? 10f : 7f);
