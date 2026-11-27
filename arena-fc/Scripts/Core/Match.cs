@@ -2522,7 +2522,7 @@ public sealed partial class MatchEngine
             // Near the touchline a challenge usually puts it out for a throw (real
             // matches have ~40 throw-ins; ours had ~2 once a repeat-throw bug went).
             float toLine = Mx.HalfWidth - MathF.Abs(carrier.Pos.Z);
-            bool byLine = toLine < 7f;
+            bool byLine = toLine < 9f;
             float pokeChance = (slide ? .55f : .48f) + (byLine ? .38f : 0f);
             if (Rng.Next() < pokeChance)
             {
