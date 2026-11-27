@@ -2318,7 +2318,7 @@ public sealed partial class MatchEngine
         }
         // Aim for the corners when skill is high (placement) or power (far post).
         float cornerBias = shotType == ShotType.Placement || shotType == ShotType.Finesse || shotType == ShotType.Trivela ? .9f : .6f;
-        target.Z = MathF.Sign(target.Z) * Mx.Lerp(Mx.GoalHalfWidth * .2f, Mx.GoalHalfWidth * .86f, p.Spec.Shooting * cornerBias * Rng.Next());
+        target.Z = MathF.Sign(target.Z) * Mx.Lerp(Mx.GoalHalfWidth * .2f, Mx.GoalHalfWidth * .76f, p.Spec.Shooting * cornerBias * Rng.Next());
         // The stick aims the shot: across the goal = that post (the side used to be
         // random, so "aim with the left stick" did nothing).
         if (aim.LengthSquared() > .1f && MathF.Abs(aim.Y) > .2f)
@@ -2341,7 +2341,9 @@ public sealed partial class MatchEngine
         if (shotType == ShotType.Power) err *= 1.3f;
         err *= weakFootPenalty;
         err *= (2f - timingQuality); // poor timing = more error
-        dir = Mx.Norm(dir + new Vector3(0, 0, Rng.Signed() * err * .16f));
+        // Keep the AI's placement error realistic without biasing routine shots
+        // outside the frame; the previous 0.16 multiplier yielded only 3% conversion.
+        dir = Mx.Norm(dir + new Vector3(0, 0, Rng.Signed() * err * .13f));
         float power = Mx.Lerp(17f, 31f, charge) * Mx.Lerp(.82f, 1.12f, p.Spec.Shooting);
         if (shotType == ShotType.Placement) power *= .75f;
         if (shotType == ShotType.Finesse) power *= .8f;
@@ -3020,7 +3022,7 @@ public sealed partial class MatchEngine
             // close, runs to one further away, and sprints only to a far target or a duel.
             float dist = d.Length();
             // (a forward attacking the box for a cross - RunType 5 - also goes hard)
-            bool urgent = p.Pressing || State.Ball.Owner == p.Index || (p.RunType == 5 && State.Ball.Owner >= 0)
+            bool urgent = p.Pressing || (p.RunType == 5 && State.Ball.Owner >= 0)
                           || (State.Ball.Owner < 0 && Mx.FlatDist(p.Target, BallFocus()) < 3f);
             sprint = !human && (dist > (urgent ? 5f : 20f) || p.Pressing) && p.Stamina > .25f;
             if (!urgent && !sprint && wish.LengthSquared() > 0f)
