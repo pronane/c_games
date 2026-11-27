@@ -1377,14 +1377,14 @@ public sealed partial class SoccerClipRig : Node3D
                     // under a latched plant; override keeps the sole on the contact point.
                     if (pw >= 0.5f)
                     {
-                        var footPose = Skel.GetBoneGlobalPose(b.Foot);
-                        Vector3 soleSk = footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
+                        var pinnedPose = Skel.GetBoneGlobalPose(b.Foot);
+                        Vector3 soleSk = pinnedPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
                         Vector3 soleW = skelGlobal * soleSk;
                         Vector3 deltaW = new Vector3(locked.X - soleW.X, 0f, locked.Z - soleW.Z);
                         if (deltaW.LengthSquared() > 1e-10f)
                         {
-                            Vector3 newOrigin = footPose.Origin + skelInv.Basis * deltaW;
-                            Skel.SetBoneGlobalPoseOverride(b.Foot, new Transform3D(footPose.Basis, newOrigin), 1f, true);
+                            Vector3 newOrigin = pinnedPose.Origin + skelInv.Basis * deltaW;
+                            Skel.SetBoneGlobalPoseOverride(b.Foot, new Transform3D(pinnedPose.Basis, newOrigin), 1f, true);
                             Skel.ForceUpdateAllBoneTransforms();
                         }
                     }
