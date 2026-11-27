@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="MatchCoreTests.cs" />
+    <Compile Include="PriorityHelpersTests.cs" />
     <Compile Include="../Scripts/Core/**/*.cs" />
   </ItemGroup>
 </Project>
