@@ -207,4 +207,18 @@ static void guarded_fade(void)
     assert(am_guarded_fade(0,1,1,0)==0);
     assert(am_guarded_fade(0,1,1,.2f)==1);
 }
-int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); rotation_distance(); guarded_fade(); puts("arena motion tests passed"); return 0; }
+static void rigid_rebase(void)
+{
+    float oldp[3]={1,0,0}, newp[3]={4,5,6}, cp[3]={2,0,0}, out[3]={7,7,7};
+    float id[4]={0,0,0,1}, q[4]={0,0,.70710678f,.70710678f}, rot[4]={0}, bad[4]={0};
+    assert(am_rebase_rigid_pose(oldp,id,newp,q,cp,id,out,rot));
+    assert(near(out[0],4) && near(out[1],6) && near(out[2],6));
+    assert(near(rot[2],q[2]) && near(rot[3],q[3]));
+    assert(am_rebase_rigid_pose(newp,q,oldp,id,out,rot,out,rot));
+    assert(near(out[0],2) && near(out[1],0) && near(out[2],0));
+    assert(near(rot[2],0) && near(rot[3],1));
+    out[0]=7; rot[0]=7;
+    assert(!am_rebase_rigid_pose(oldp,bad,newp,id,cp,id,out,rot) && out[0]==7 && rot[0]==7);
+    cp[0]=NAN; assert(!am_rebase_rigid_pose(oldp,id,newp,id,cp,id,out,rot));
+}
+int main(void) { features(); matching(); timing(); smoothing(); gait_direction(); loop_advance(); correction_ramp(); arm_profile(); still_rotation(); contact_drift(); direction_angle(); mirrored_rotation(); local_rotation(); rotation_distance(); rigid_rebase(); guarded_fade(); puts("arena motion tests passed"); return 0; }

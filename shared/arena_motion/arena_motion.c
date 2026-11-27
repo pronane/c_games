@@ -297,3 +297,38 @@ float am_guarded_fade(float current, int permitted, float dt, float attack_secon
     value=fmax(0.0,fmin(1.0,(double)current))+(double)dt/attack_seconds;
     return (float)fmin(1.0,value);
 }
+
+static void am_quat_multiply(const double a[4], const double b[4], double out[4])
+{
+    out[0]=a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1];
+    out[1]=a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0];
+    out[2]=a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3];
+    out[3]=a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2];
+}
+
+int am_rebase_rigid_pose(const float old_pos[3], const float old_rot[4],
+                         const float new_pos[3], const float new_rot[4],
+                         const float child_pos[3], const float child_rot[4],
+                         float out_pos[3], float out_rot[4])
+{
+    double q[3][4], n[3]={0}, inverse[4], delta[4], v[4], t[4], rotated[4], result[4], p[3];
+    const float *r[3]={old_rot,new_rot,child_rot};
+    if (!old_pos || !old_rot || !new_pos || !new_rot || !child_pos || !child_rot || !out_pos || !out_rot) return 0;
+    for (int j=0;j<3;++j) {
+        if (!isfinite(old_pos[j]) || !isfinite(new_pos[j]) || !isfinite(child_pos[j])) return 0;
+        for (int i=0;i<4;++i) { if (!isfinite(r[j][i])) return 0; n[j]+=(double)r[j][i]*r[j][i]; }
+        if (n[j]<1e-12) return 0;
+        n[j]=sqrt(n[j]); for (int i=0;i<4;++i) q[j][i]=r[j][i]/n[j];
+    }
+    for (int i=0;i<3;++i) inverse[i]=-q[0][i];
+    inverse[3]=q[0][3];
+    am_quat_multiply(q[1],inverse,delta);
+    for (int i=0;i<3;++i) { v[i]=(double)child_pos[i]-old_pos[i]; inverse[i]=-delta[i]; }
+    v[3]=0; inverse[3]=delta[3];
+    am_quat_multiply(delta,v,t); am_quat_multiply(t,inverse,rotated);
+    am_quat_multiply(delta,q[2],result);
+    for (int i=0;i<3;++i) { p[i]=new_pos[i]+rotated[i]; if (!isfinite(p[i]) || fabs(p[i])>FLT_MAX) return 0; }
+    for (int i=0;i<3;++i) out_pos[i]=(float)p[i];
+    for (int i=0;i<4;++i) out_rot[i]=(float)result[i];
+    return 1;
+}

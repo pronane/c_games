@@ -76,6 +76,14 @@ int am_rotation_compose_local(const float rotation[4], const float axis[3], floa
 /* Shortest angular separation (radians) of two xyzw rotations. Normalizes
  * inputs; quaternion signs are equivalent. Returns 0 on invalid input. */
 int am_rotation_distance(const float a[4], const float b[4], float *out);
+/* Rebase a model/world-space child rigid pose from an old parent pose to a
+ * new parent pose, preserving relative position and rotation. xyzw rotations
+ * are normalized; no scale, collision or anatomical constraints are applied.
+ * Failure leaves outputs untouched; inputs may alias their matching outputs. */
+int am_rebase_rigid_pose(const float old_pos[3], const float old_rot[4],
+                         const float new_pos[3], const float new_rot[4],
+                         const float child_pos[3], const float child_rot[4],
+                         float out_pos[3], float out_rot[4]);
 /* Accumulate horizontal world-space drift while the caller's contact proxy is
  * true in consecutive samples. One independent instance per foot and stream.
  * Distance / seconds is mean path speed, not a sole-contact detector. Invalid

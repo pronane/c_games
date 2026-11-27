@@ -101,3 +101,8 @@ and omit anatomy outside the selection; it is not a complete segmentation.
 `mesh_diagnostics.joint_span_ratio` compares a pair of bone-origin positions
 with a reference span. It is a geometric proxy, not a measure of skin strain
 or a guarantee of anatomical plausibility.
+
+`am_rebase_rigid_pose` maps a model/world-space child pose between parent
+poses without changing its relative rigid transform. It normalizes xyzw
+rotations and rejects invalid input; it does not handle scale, solve hand
+articulation, infer contacts, or prevent collisions.

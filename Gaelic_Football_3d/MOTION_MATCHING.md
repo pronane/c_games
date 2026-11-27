@@ -642,3 +642,61 @@ preview. This script forces possession and step state for the demo; it is not
 unmodified live gameplay. The preview shows the carrying hand over the ball,
 but compression, occlusion and angle limit inspection of palm/ball intersection
 and deformation. It does not render the offline wrist/finger experiments.
+
+The same scripted camera can render the rejected wrist/finger counterfactual
+when `GF_GRIP_REVIEW` and `GF_GRIP_PROBE` are set together during a motion
+recording. Only the scripted carrier during the sprint interval receives it;
+ordinary gameplay and the baseline recording use the original cradle. The
+probe keeps the large (-80, 0, -80) mm wrist offset, full finger follow and
+segment replant used above. The workflow confirms matching frame-620
+speed/holder/action/cradle values and records the probe's expected failure of
+the existing 0.20 m nearer-wrist proximity check. That specific failure is
+logged rather than aborting this experimental capture; baseline and all other
+checks retain their normal behavior.
+
+In workflow 45913473034, sampled frames from the compressed 480-pixel
+24 fps preview show the probe's fingers looking more spread and displaced to
+the side of the ball than the baseline. This supports rejecting the probe,
+not enabling it. The camera still obscures some surfaces, and inspecting
+sampled frames is not a full-motion or live-gameplay validation.
+
+### Coherent sampled-hand prototype (offline only)
+
+The shared engine now supplies a generic rigid child-pose rebase. The grip
+inspector's `--coherent --clearance 0.012 --sprint-offset X Y Z` uses it to
+carry the sampled clip's right-hand finger joints rigidly with the solved
+wrist. This preserves their relative sampled positions and rotations rather
+than independently planting each finger. It is an initial reference-pose
+probe, **not** a coordinated wrapping solver: it does not curl the fingers or
+apply surface contact, and it assumes rigid joint transforms without scale.
+Nothing is enabled in the game.
+
+On the shipped model, these two sampled sprint poses retain approximately 1×
+bind wrist-to-index and wrist-to-thumb spans, and selected finger self-overlap
+pairs fall from 211/258 in the default cradle to 56/49. But the unwrapped hand
+penetrates the approximate ball severely: 3,140/3,166 of 3,263 selected
+right-hand triangles intersect at zero offset. Even a large (-80, 0, -80) mm
+offset leaves 570/582 overlaps and places the wrist approximately 233 mm from
+the centre. The sampled clip's finger pose is not a gripping reference.
+These selected, discrete CPU-skin measurements are not full-mesh, continuous,
+rendered, or live gameplay validation. The next step requires a plausible
+articulated grip reference or constrained finger solver; rigid placement alone
+is not suitable to ship.
+
+The offline coherent probe also accepts `--curl-strength 0..3`: it applies
+this rig's existing authored local-X curl amounts (0.20/0.35/0.20 radians at
+strength 1) to the four non-thumb finger chains, rebuilding child transforms
+parent-first from the sampled local offsets. This preserves joint-segment
+lengths, but is not a ball-aware IK solver, anatomical validation, or captured
+hand motion. The thumb is unchanged. It does not alter gameplay.
+
+For the shipped model's two synthetic sprint phases and a large (-80, 0, -80)
+mm wrist offset, strength 2 reduced selected wider ball-overlap counts from
+570/582 uncurled to 235/287, while selected finger self-overlap pairs rose
+from 56/49 to 88/88. Wrist-to-index and wrist-to-thumb spans remain near bind,
+but the wrist is still about 233 mm from the 110 mm sphere centre. At the
+original wrist target, strength 2 still yields 3,140/3,166 wider overlaps;
+at (-40, 0, -40) mm it yields 1,951/1,963. These sampled, overlapping triangle
+counts are neither penetration depths nor contact area. The simple curl is not
+suitable for gameplay or a rendered comparison yet; wrist placement, finger
+articulation, thumb and surface contact must be solved together.
