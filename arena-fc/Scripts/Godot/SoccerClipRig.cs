@@ -1241,7 +1241,11 @@ public sealed partial class SoccerClipRig : Node3D
         soleLocal = Vector3.Zero;
         if (Skel == null || footBone < 0) return false;
         var footRest = Skel.GetBoneGlobalRest(footBone);
-        var skeletonInv = Skel.GlobalTransform.AffineInverse();
+        // Load() runs before the rig is AddChild'd. GlobalTransform is invalid then
+        // (!is_inside_tree). Build mesh->skeleton from local transforms instead.
+        var skeletonInv = Skel.IsInsideTree()
+            ? Skel.GlobalTransform.AffineInverse()
+            : Transform3D.Identity;
         var candidates = new List<Vector3>();
         foreach (var mi in _meshes)
         {
@@ -1259,7 +1263,10 @@ public sealed partial class SoccerClipRig : Node3D
                 if (arrays.Count <= (int)Godot.Mesh.ArrayType.Vertex
                     || arrays[(int)Godot.Mesh.ArrayType.Vertex].VariantType == Variant.Type.Nil) continue;
                 var vertices = arrays[(int)Godot.Mesh.ArrayType.Vertex].AsVector3Array();
-                var meshToSkeleton = skeletonInv * mi.GlobalTransform;
+                Transform3D meshXform = mi.IsInsideTree()
+                    ? mi.GlobalTransform
+                    : TransformRelativeTo(Skel, mi);
+                var meshToSkeleton = skeletonInv * meshXform;
                 foreach (var vertex in vertices)
                 {
                     var point = meshToSkeleton * vertex;
@@ -1273,6 +1280,21 @@ public sealed partial class SoccerClipRig : Node3D
         Vector3 soleInSkeleton = candidates.OrderBy(p => p.Y).First();
         soleLocal = footRest.AffineInverse() * soleInSkeleton;
         return float.IsFinite(soleLocal.X) && float.IsFinite(soleLocal.Y) && float.IsFinite(soleLocal.Z);
+    }
+
+    /// <summary>Compose local transforms from node up to ancestor (exclusive of ancestor).
+    /// Used when GlobalTransform is unavailable because the hierarchy is not yet in the tree.</summary>
+    private static Transform3D TransformRelativeTo(Node3D ancestor, Node3D node)
+    {
+        Transform3D t = Transform3D.Identity;
+        Node n = node;
+        while (n != null && n != ancestor)
+        {
+            if (n is Node3D n3)
+                t = n3.Transform * t;
+            n = n.GetParent();
+        }
+        return t;
     }
 
     private static Vector3 SoleTargetToAnkle(BoneData bone, Transform3D footPose, Vector3 soleTargetSkeleton)
@@ -1329,7 +1351,9 @@ public sealed partial class SoccerClipRig : Node3D
                 }
 
                 Vector3 locked = new Vector3(prev.X, groundY + 0.006f, prev.Z);
-                targetWorld = targetWorld.Lerp(locked, pw);
+                // Full world pin when plant weight is authoritative. Soft lerp at low
+                // weight left residual XZ velocity ~root speed (~1.2 m/s) and failed CI.
+                targetWorld = pw >= 0.5f ? locked : targetWorld.Lerp(locked, pw);
 
                 // A contract-marked plant is an explicit contact request. Do not
                 // gate it on the animated ankle already being almost at ground level:
@@ -1349,6 +1373,21 @@ public sealed partial class SoccerClipRig : Node3D
                     Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
+                    // Hard XZ pin: two-bone IK may undershoot when the root translates
+                    // under a latched plant; override keeps the sole on the contact point.
+                    if (pw >= 0.5f)
+                    {
+                        var footPose = Skel.GetBoneGlobalPose(b.Foot);
+                        Vector3 soleSk = footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
+                        Vector3 soleW = skelGlobal * soleSk;
+                        Vector3 deltaW = new Vector3(locked.X - soleW.X, 0f, locked.Z - soleW.Z);
+                        if (deltaW.LengthSquared() > 1e-10f)
+                        {
+                            Vector3 newOrigin = footPose.Origin + skelInv.Basis * deltaW;
+                            Skel.SetBoneGlobalPoseOverride(b.Foot, new Transform3D(footPose.Basis, newOrigin), 1f, true);
+                            Skel.ForceUpdateAllBoneTransforms();
+                        }
+                    }
                 }
                 ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
 
