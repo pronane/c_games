@@ -508,7 +508,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         Dictionary<string, List<PlantWindow>> windows, string clip, float phase)
     {
         if (!windows.TryGetValue(clip, out var markers)) return (false, false);
-        const float halfWindow = .10f;
+        // Match MotionEngine.NearPlant exactly: discrete authored plant frames are active only within +/- 0.035 phase.\n        // A wider evidence-only window overstates the production contract and pins the foot beyond its reachable stance.\n        const float halfWindow = .035f;
         bool left = markers.Any(m => m.Side.Equals("Left", StringComparison.OrdinalIgnoreCase)
             && MathF.Abs(MathF.IEEERemainder(phase - m.Phase, 1f)) <= halfWindow);
         bool right = markers.Any(m => m.Side.Equals("Right", StringComparison.OrdinalIgnoreCase)
