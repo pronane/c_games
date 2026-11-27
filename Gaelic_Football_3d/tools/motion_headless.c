@@ -894,9 +894,41 @@ static int coherentGrip(AnimState *s, int clip, Vector3 offset)
     return 1;
 }
 
+/* Offline rig-specific flexion probe; parent-first rebuild retains the clip's
+ * joint offsets. It is not inverse kinematics or an anatomical guarantee. */
+static int flexCoherentFingers(AnimState *s, float strength)
+{
+    Transform before[MAX_BONES]; unsigned char done[MAX_BONES]={0}, finger[MAX_BONES]={0};
+    int nb=model.boneCount, remaining=0;
+    memcpy(before,s->pose,sizeof(Transform)*(size_t)nb);
+    for (int b=0;b<nb;++b) {
+        finger[b]=(b!=boneHandR && boneUnder(b,boneHandR));
+        if (finger[b]) ++remaining; else done[b]=1;
+    }
+    for (int pass=0;pass<nb && remaining;++pass) for (int b=0;b<nb;++b) {
+        int parent=boneChild(b); Quaternion local; Vector3 offset;
+        const char *name=model.bones[b].name; float angle=0, axis[3]={1,0,0}, q[4], out[4];
+        if (!finger[b] || done[b] || parent<0 || parent>=nb || !done[parent]) continue;
+        offset=Vector3RotateByQuaternion(Vector3Subtract(before[b].translation,before[parent].translation),QuaternionInvert(before[parent].rotation));
+        local=QuaternionNormalize(QuaternionMultiply(QuaternionInvert(before[parent].rotation),before[b].rotation));
+        if (!strncmp(name,"index_",6) || !strncmp(name,"middle_",7) || !strncmp(name,"ring_",5) || !strncmp(name,"pinky_",6)) {
+            if (strstr(name,"_01_")) angle=.20f*strength;
+            else if (strstr(name,"_02_")) angle=.35f*strength;
+            else if (strstr(name,"_03_")) angle=.20f*strength;
+        }
+        q[0]=local.x; q[1]=local.y; q[2]=local.z; q[3]=local.w;
+        if (angle && !am_rotation_compose_local(q,axis,angle,out)) return 0;
+        if (angle) local=(Quaternion){out[0],out[1],out[2],out[3]};
+        s->pose[b].translation=Vector3Add(s->pose[parent].translation,Vector3RotateByQuaternion(offset,s->pose[parent].rotation));
+        s->pose[b].rotation=QuaternionNormalize(QuaternionMultiply(s->pose[parent].rotation,local));
+        done[b]=1; --remaining;
+    }
+    return remaining==0;
+}
+
 /* Scripted ball-carry/action samples with the frontend's torso and cradle
  * implementation. Bind rotations are supplied by a GLB-verified exporter. */
-static int export_grip_poses(const char *asset, const char *out, const char *bindpath, float clearance, Vector3 sprintOffset, float follow, int replant, int coherent)
+static int export_grip_poses(const char *asset, const char *out, const char *bindpath, float clearance, Vector3 sprintOffset, float follow, int replant, int coherent, float curl)
 {
     static Transform bind[MAX_BONES];
     static const struct { const char *name; int clip,action; float speed,phase; } cases[]={
@@ -950,14 +982,14 @@ static int export_grip_poses(const char *asset, const char *out, const char *bin
         sampleClip(cases[k].clip,clipLen(cases[k].clip)*cases[k].phase,s->pose);
         balanceTorso(s,cases[k].clip); memcpy(input,s->pose,sizeof(Transform)*(size_t)model.boneCount);
         jogHandRelax=0; relaxJogHands(s,cases[k].clip,1.f/30); if (coherent && cases[k].action==GAME_ACT_NONE && cases[k].speed>=5.96f) {
-            if (!coherentGrip(s,cases[k].clip,sprintOffset)) { fclose(f); return 0; }
+            if (!coherentGrip(s,cases[k].clip,sprintOffset) || (curl>0 && !flexCoherentFingers(s,curl))) { fclose(f); return 0; }
         } else diagnosticGrip(s,cases[k].clip,sprintOffset, cases[k].action==GAME_ACT_NONE && cases[k].speed>=5.96f ? follow : 0, replant);
         cw=cradleWeight(s); cradleValid=s->cradleValid;
         hasCenter=cradleValid && cases[k].action==GAME_ACT_NONE; if (hasCenter) center=s->cradleCenter;
         memcpy(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount);
         memcpy(s->pose,input,sizeof(Transform)*(size_t)model.boneCount); s->handRelaxEnvelope=1; jogHandRelax=4;
         relaxJogHands(s,cases[k].clip,1.f/30); if (coherent && cases[k].action==GAME_ACT_NONE && cases[k].speed>=5.96f) {
-            if (!coherentGrip(s,cases[k].clip,sprintOffset)) { fclose(f); return 0; }
+            if (!coherentGrip(s,cases[k].clip,sprintOffset) || (curl>0 && !flexCoherentFingers(s,curl))) { fclose(f); return 0; }
         } else diagnosticGrip(s,cases[k].clip,sprintOffset, cases[k].action==GAME_ACT_NONE && cases[k].speed>=5.96f ? follow : 0, replant);
         if (memcmp(raw,s->pose,sizeof(Transform)*(size_t)model.boneCount) || cradleValid!=s->cradleValid ||
             (hasCenter && Vector3Distance(center,s->cradleCenter)>1e-6f)) { fclose(f); return 0; }
@@ -1039,8 +1071,8 @@ static int export_turn_poses(const char *asset, const char *out, int fps, int ap
 int main(int argc, char **argv)
 {
     const char *asset, *cache;
-    if ((argc==5 || argc==6 || argc==9 || argc==10 || argc==11 || argc==12) && !strcmp(argv[1],"--export-grip-poses")) {
-        float clearance=0, follow=0; Vector3 offset={0}; char *end=NULL; int replant=0, coherent=0;
+    if ((argc==5 || argc==6 || argc==9 || argc==10 || argc==11 || argc==12 || argc==13) && !strcmp(argv[1],"--export-grip-poses")) {
+        float clearance=0, follow=0, curl=0; Vector3 offset={0}; char *end=NULL; int replant=0, coherent=0;
         if (argc>=6) { clearance=strtof(argv[5],&end); if (end==argv[5] || *end || !isfinite(clearance) || clearance<.012f || clearance>.06f) { fprintf(stderr,"Invalid grip clearance\n"); return 1; } }
         if (argc>=9) {
             float *components[]={&offset.x,&offset.y,&offset.z};
@@ -1058,12 +1090,16 @@ int main(int argc, char **argv)
             replant=argv[10][0]=='1';
             if (replant && follow<=0) { fprintf(stderr,"Finger replant requires follow\n"); return 1; }
         }
-        if (argc==12) {
+        if (argc>=12) {
             if (strcmp(argv[11],"0") && strcmp(argv[11],"1")) { fprintf(stderr,"Invalid coherent flag\n"); return 1; }
             coherent=argv[11][0]=='1';
             if (coherent && (follow>0 || replant)) { fprintf(stderr,"Coherent pose cannot use follow or replant\n"); return 1; }
         }
-        if (!export_grip_poses(argv[2],argv[3],argv[4],clearance,offset,follow,replant,coherent)) { fprintf(stderr,"Grip pose export failed\n"); return 1; }
+        if (argc==13) {
+            curl=strtof(argv[12],&end);
+            if (end==argv[12] || *end || !isfinite(curl) || curl<0 || curl>3 || (curl>0 && !coherent)) { fprintf(stderr,"Invalid coherent curl\n"); return 1; }
+        }
+        if (!export_grip_poses(argv[2],argv[3],argv[4],clearance,offset,follow,replant,coherent,curl)) { fprintf(stderr,"Grip pose export failed\n"); return 1; }
         return 0;
     }
     if (argc == 5 && !strcmp(argv[1], "--export-hand-transition")) {

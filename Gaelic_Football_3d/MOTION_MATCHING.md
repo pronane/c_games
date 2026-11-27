@@ -682,3 +682,21 @@ These selected, discrete CPU-skin measurements are not full-mesh, continuous,
 rendered, or live gameplay validation. The next step requires a plausible
 articulated grip reference or constrained finger solver; rigid placement alone
 is not suitable to ship.
+
+The offline coherent probe also accepts `--curl-strength 0..3`: it applies
+this rig's existing authored local-X curl amounts (0.20/0.35/0.20 radians at
+strength 1) to the four non-thumb finger chains, rebuilding child transforms
+parent-first from the sampled local offsets. This preserves joint-segment
+lengths, but is not a ball-aware IK solver, anatomical validation, or captured
+hand motion. The thumb is unchanged. It does not alter gameplay.
+
+For the shipped model's two synthetic sprint phases and a large (-80, 0, -80)
+mm wrist offset, strength 2 reduced selected wider ball-overlap counts from
+570/582 uncurled to 235/287, while selected finger self-overlap pairs rose
+from 56/49 to 88/88. Wrist-to-index and wrist-to-thumb spans remain near bind,
+but the wrist is still about 233 mm from the 110 mm sphere centre. At the
+original wrist target, strength 2 still yields 3,140/3,166 wider overlaps;
+at (-40, 0, -40) mm it yields 1,951/1,963. These sampled, overlapping triangle
+counts are neither penetration depths nor contact area. The simple curl is not
+suitable for gameplay or a rendered comparison yet; wrist placement, finger
+articulation, thumb and surface contact must be solved together.

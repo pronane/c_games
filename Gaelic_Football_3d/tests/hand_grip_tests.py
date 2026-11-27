@@ -70,6 +70,29 @@ with tempfile.TemporaryDirectory() as tmp:
             for right in roots:
                 i,j=names.index(left),names.index(right)
                 assert abs(math.dist(b['raw'][i][:3],b['raw'][j][:3])-math.dist(c['raw'][i][:3],c['raw'][j][:3])) < 1e-5
+    articulated=[]
+    for strength in ('0','2'):
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08','0','0','1',strength]
+        subprocess.run(cmd,check=True,capture_output=True); articulated.append(json.loads(out.read_text()))
+    nodes=doc['nodes']; parents={c:i for i,n in enumerate(nodes) for c in n.get('children',[])}
+    byname={nodes[i].get('name'):i for i in doc['skins'][0]['joints']}
+    for basepose,curled in zip(articulated[0]['frames'],articulated[1]['frames']):
+        assert curled['ball_center']==basepose['ball_center'] and curled['raw']==curled['adjusted']
+        if not curled['state'].startswith('sprint'):
+            assert curled==basepose
+            continue
+        names=articulated[0]['bones']
+        for f in ('index','middle','ring','pinky','thumb'):
+            for num in (1,2,3):
+                name=f'{f}_{num:02}_r'; parent=nodes[parents[byname[name]]]['name']
+                i,j=names.index(name),names.index(parent)
+                assert abs(math.dist(basepose['raw'][i][:3],basepose['raw'][j][:3])-math.dist(curled['raw'][i][:3],curled['raw'][j][:3])) < 1e-5
+        assert basepose['raw']!=curled['raw']
+    for value in ('nan','-1','3.1','','garbage'):
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08','0','0','1',value]
+        assert subprocess.run(cmd,capture_output=True).returncode != 0
+    cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08','0','0','0','1']
+    assert subprocess.run(cmd,capture_output=True).returncode != 0
     for follow,replant,coherent in (('1','0','1'),('0','0','2'),('0','0','nan')):
         cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08',follow,replant,coherent]
         assert subprocess.run(cmd,capture_output=True).returncode != 0
