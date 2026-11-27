@@ -78,6 +78,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
+      - name: Install native dependencies for the .NET coverage profiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2 libicu-dev zlib1g
+          ldd --version | head -n 1
+          ldconfig -p | grep -E 'libxml2\.so|libicuuc\.so' | head
       - name: Install cross-platform coverage collector
         run: |
           dotnet tool install --global dotnet-coverage --version 17.14.1
