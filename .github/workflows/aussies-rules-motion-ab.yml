@@ -14,6 +14,12 @@ name: Aussies Rules Motion A/B
 #                 and must not block merges.
 on:
   workflow_dispatch:
+    inputs:
+      review_run:
+        description: 'Optional completed run ID: republish its existing preview evidence only'
+        required: false
+        type: string
+        default: ''
   push:
     branches: [main]
     paths:
@@ -29,6 +35,7 @@ permissions:
 
 jobs:
   ab-metrics:
+    if: github.event_name != 'workflow_dispatch' || inputs.review_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -50,6 +57,9 @@ jobs:
       - name: Game health gate (tsc, tests, build, squad contract)
         working-directory: aussies_rules_3d
         run: node scripts/check.mjs
+      - name: Publish API-readable seeded gameplay audit
+        working-directory: aussies_rules_3d
+        run: node tools/gameplay_audit_report.mjs
       - name: Bake the LOD candidate from the shipped asset
         working-directory: aussies_rules_3d
         run: python tools/build_afl_lods.py
@@ -78,10 +88,12 @@ jobs:
             aussies_rules_3d/tools/out/ab_report.json
             aussies_rules_3d/tools/out/ab_report.md
             aussies_rules_3d/tools/out/lod_report.json
+            aussies_rules_3d/build/gameplay-audit/simulation.json
           if-no-files-found: warn
           retention-days: 14
 
   visual-ab:
+    if: github.event_name != 'workflow_dispatch' || inputs.review_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true   # experimental: SwiftShader WebGL on a GPU-less runner
@@ -114,6 +126,7 @@ jobs:
           pip install numpy pillow
           python tools/build_afl_lods.py
       - name: Build the production bundle
+        id: capture_build
         working-directory: aussies_rules_3d
         run: npm run build
       - name: Preflight electron under xvfb
@@ -122,6 +135,7 @@ jobs:
           mkdir -p build/motion-ab/original build/motion-ab/lod
           timeout 60 xvfb-run -a node_modules/.bin/electron --version 2>&1 | tee build/motion-ab/electron-version.log
       - name: Capture attract demo — shipped asset (original)
+        if: ${{ !cancelled() && steps.capture_build.outcome == 'success' }}
         working-directory: aussies_rules_3d
         env: { ELECTRON_DISABLE_SANDBOX: '1' }
         run: |
@@ -131,6 +145,7 @@ jobs:
             > build/motion-ab/original/electron.log 2>&1
           echo "electron exit: $?"
       - name: Capture attract demo — LOD candidate
+        if: ${{ !cancelled() && steps.capture_build.outcome == 'success' }}
         working-directory: aussies_rules_3d
         env: { ELECTRON_DISABLE_SANDBOX: '1' }
         run: |
@@ -141,16 +156,20 @@ jobs:
             --frames 24 --interval-ms 500 --settle-ms 15000 --query ab=1 \
             > build/motion-ab/lod/electron.log 2>&1
           echo "electron exit: $?"
-      - name: Capture live match — ball and controlled player (LOD candidate)
+      - name: Capture live match — shipped asset, ball and controlled player
+        if: ${{ !cancelled() && steps.capture_build.outcome == 'success' }}
         working-directory: aussies_rules_3d
         env: { ELECTRON_DISABLE_SANDBOX: '1' }
         run: |
           mkdir -p build/motion-ab/match
+          git show HEAD:aussies_rules_3d/public/assets/gaelic_player.glb > public/assets/gaelic_player.glb
+          npm run build
           timeout 240 xvfb-run -a -s '-screen 0 1440x810x24' \
             node_modules/.bin/electron --no-sandbox tools/ci_capture.cjs --out build/motion-ab/match \
-            --frames 24 --interval-ms 500 --settle-ms 15000 --query 'ab=1&scenario=match' \
+            --frames 36 --interval-ms 500 --settle-ms 15000 --query 'ab=1&scenario=match&drive=manual' \
             > build/motion-ab/match/electron.log 2>&1
       - name: Assemble MP4s
+        if: always()
         working-directory: aussies_rules_3d
         run: |
           set -e
@@ -172,8 +191,36 @@ jobs:
         run: |
           status=0
           node tools/check_framing.mjs build/motion-ab/original/console.log build/motion-ab/lod/console.log || status=1
-          node tools/check_framing.mjs --require-player build/motion-ab/match/console.log || status=1
+          node tools/check_framing.mjs --require-player --allow-distant-player build/motion-ab/match/console.log || status=1
           exit "$status"
+      - name: Publish API-readable gameplay diagnostics
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/capture_review.mjs build/motion-ab/match
+      - name: Publish integrity-checked gameplay preview 000
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/motion-ab/match/preview-000.jpg
+      - name: Publish integrity-checked gameplay preview 006
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/motion-ab/match/preview-006.jpg
+      - name: Publish integrity-checked gameplay preview 012
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/motion-ab/match/preview-012.jpg
+      - name: Publish integrity-checked gameplay preview 018
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/motion-ab/match/preview-018.jpg
+      - name: Publish integrity-checked gameplay preview 024
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/motion-ab/match/preview-024.jpg
+      - name: Publish integrity-checked gameplay preview 030
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/motion-ab/match/preview-030.jpg
       - name: Job summary
         working-directory: aussies_rules_3d
         if: always()
@@ -195,7 +242,7 @@ jobs:
             for leg in original lod match; do
               echo "**$leg**"
               echo '```'
-              grep -E 'AB_STATS|AB_CAMSTAT|capturePage failed' build/motion-ab/$leg/console.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
+              grep -E 'AB_STATS|AB_CAMSTAT|AB_PLAY|capturePage failed' build/motion-ab/$leg/console.log 2>/dev/null | tail -6 || echo 'no AB_STATS lines (capture may have failed earlier)'
               echo '```'
             done
             echo
@@ -215,3 +262,66 @@ jobs:
           path: aussies_rules_3d/build/motion-ab/
           if-no-files-found: warn
           retention-days: 14
+
+  republish-capture-evidence:
+    if: github.event_name == 'workflow_dispatch' && inputs.review_run != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate source run ID
+        env:
+          SOURCE_RUN: ${{ inputs.review_run }}
+        run: '[[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]'
+      - name: Download existing capture from this repository
+        uses: actions/download-artifact@v4
+        with:
+          name: aussies-rules-motion-ab-visual
+          path: aussies_rules_3d/build/review-source
+          run-id: ${{ inputs.review_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Repack existing frames (does not rerun gameplay)
+        working-directory: aussies_rules_3d
+        run: |
+          pip install pillow
+          python tools/repack_previews.py build/review-source/match
+      - name: Summarise source measurements
+        working-directory: aussies_rules_3d
+        env:
+          SOURCE_RUN: ${{ inputs.review_run }}
+        run: |
+          echo "Evidence republished from run $SOURCE_RUN; this is not a new gameplay verification." >> "$GITHUB_STEP_SUMMARY"
+          node tools/capture_review.mjs build/review-source/match --source-evidence
+      - name: Publish source preview 000
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/review-source/match/preview-000.jpg
+      - name: Publish source preview 006
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/review-source/match/preview-006.jpg
+      - name: Publish source preview 012
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/review-source/match/preview-012.jpg
+      - name: Publish source preview 018
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/review-source/match/preview-018.jpg
+      - name: Publish source preview 024
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/review-source/match/preview-024.jpg
+      - name: Publish source preview 030
+        if: always()
+        working-directory: aussies_rules_3d
+        run: node tools/publish_preview.mjs build/review-source/match/preview-030.jpg

@@ -13,6 +13,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { createCaptureServer } = require('./capture_server.cjs');
 
 app.commandLine.appendSwitch('enable-unsafe-swiftshader');
 app.commandLine.appendSwitch('use-angle', 'swiftshader');
@@ -36,6 +37,7 @@ const SETTLE_MS = Number(take('--settle-ms', '15000'));
 
 fs.mkdirSync(OUT, { recursive: true });
 const consoleLog = [];
+let finishing = false;
 
 function main() {
   const win = new BrowserWindow({
@@ -53,33 +55,69 @@ function main() {
     finish(1);
   });
 
-  const target = path.join(__dirname, '..', 'dist', 'index.html');
-  if (Object.keys(QUERY).length) {
-    win.loadFile(target, { query: QUERY });
-  } else {
-    win.loadFile(target);
-  }
-
-  win.webContents.once('did-finish-load', () => {
-    setTimeout(() => capture(win, 0), SETTLE_MS);
+  // Exercise the browser build over HTTP, as users do. file:// fetch support
+  // varies across Electron/Chromium and can strand GLB/JSON loading at startup.
+  const server = createCaptureServer(path.resolve(__dirname, '..', 'dist'));
+  server.on('error', err => { consoleLog.push('CAPTURE_SERVER_FAILED: ' + err); finish(1); });
+  server.listen(0, '127.0.0.1', () => {
+    const query = new URLSearchParams(QUERY).toString();
+    win.loadURL(`http://127.0.0.1:${server.address().port}/index.html?${query}`)
+      .catch(err => { consoleLog.push('LOAD_FAILED: ' + err); finish(1); });
   });
+
+  // Never call a successfully loaded HTML page a successfully booted game.
+  const deadline = Date.now() + 120000;
+  const waitForGame = async () => {
+    if (Date.now() > deadline) { consoleLog.push('CAPTURE_NOT_READY: game did not render within 120s'); return finish(1); }
+    try {
+      const ready = await win.webContents.executeJavaScript('window.__captureReady === true');
+      if (ready) {
+        consoleLog.push('CAPTURE_READY: first game frame rendered');
+        return setTimeout(() => capture(win, 0), SETTLE_MS);
+      }
+    } catch (err) { consoleLog.push('readiness probe: ' + err); }
+    setTimeout(waitForGame, 250);
+  };
+  win.webContents.once('did-finish-load', waitForGame);
+  win.webContents.on('did-fail-load', (_event, code, description) => {
+    consoleLog.push(`LOAD_FAILED ${code}: ${description}`); finish(1);
+  });
+  // Also covers a renderer IPC readiness probe that never resolves.
+  setTimeout(() => { consoleLog.push('CAPTURE_TIMEOUT'); finish(1); }, 220000);
 }
 
-function capture(win, i) {
+async function capture(win, i) {
   if (i >= FRAMES) return finish(0);
+  if (QUERY.drive === 'manual') {
+    try {
+      const state = await win.webContents.executeJavaScript('window.__advanceCapture ? window.__advanceCapture(30) : null');
+      if (!state) throw new Error('Scripted match did not become ready');
+      fs.writeFileSync(path.join(OUT, `state-${String(i).padStart(3, '0')}.json`), JSON.stringify(state, null, 2));
+    } catch (err) { consoleLog.push('capture scenario failed: ' + err); return finish(1); }
+  }
   win.webContents.capturePage().then((img) => {
     const file = path.join(OUT, `frame-${String(i).padStart(3, '0')}.png`);
     try {
       fs.writeFileSync(file, img.toPNG());
+      // A small set of game-only JPEGs can also travel through check annotations.
+      if (QUERY.drive === 'manual' && i % 6 === 0) {
+        let preview = img.resize({ width: 480 }).toJPEG(35);
+        if (preview.length > 10000) preview = img.resize({ width: 400 }).toJPEG(25);
+        if (preview.length > 10000) preview = img.resize({ width: 320 }).toJPEG(15);
+        if (preview.length > 10000) throw new Error('Preview exceeds annotation transport budget');
+        fs.writeFileSync(path.join(OUT, `preview-${String(i).padStart(3, '0')}.jpg`), preview);
+      }
     } catch (err) {
       consoleLog.push('capturePage failed: ' + err);
       return finish(1);
     }
     setTimeout(() => capture(win, i + 1), INTERVAL_MS);
-  });
+  }).catch(err => { consoleLog.push('capturePage failed: ' + err); finish(1); });
 }
 
 function finish(code) {
+  if (finishing) return;
+  finishing = true;
   try {
     fs.writeFileSync(path.join(OUT, 'console.log'), consoleLog.join('\n'));
     const frames = fs.readdirSync(OUT).filter((f) => f.endsWith('.png'));

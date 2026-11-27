@@ -1,5 +1,7 @@
 # Ball / controlled-player framing
 
+> **Current policy:** see `GAMEPLAY_RECOVERY.md`. The gameplay review supersedes the original always-fit-both requirement below. The camera now prioritises the live ball, plans nearby selection before easing, holds pullback distance, and uses the existing edge arrow for distant selection. The historical guarantee/test description below describes the first implementation, not current visual acceptance.
+
 Gameplay camera views and set shots retain their normal tracking and easing. A final framing correction checks ball and controlled-player centres against NDC ±0.78, recentres on a ball-weighted centroid when necessary, and pulls back enough to fit both. The solve includes each subject's perspective depth, not just their lateral spread. Attract mode frames only the ball. Celebration orbits remain cinematic and exempt.
 
 This is a centre-point framing constraint, not an occlusion test or a guarantee of readable subject size when the player and ball are far apart. Manual browser review is still required for camera feel, zoom pumping, occlusion, and GPU performance.

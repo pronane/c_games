@@ -41,7 +41,7 @@ import { BroadcastCamera, VIEW_ORDER } from '../src/render/camera';
 import { MatchSim } from '../src/sim/match';
 import { AFL_SETTINGS } from '../src/rules/types';
 
-it('keeps ball and player safe after easing in every gameplay view', () => {
+it('keeps the ball safe without fitting a distant player in every gameplay view', () => {
   const sim = new MatchSim({ ...AFL_SETTINGS, seed: 42 });
   sim.start();
   for (const aspect of [0.6, 16 / 9]) {
@@ -59,7 +59,7 @@ it('keeps ball and player safe after easing in every gameplay view', () => {
           const player = { x: -ball.x, y: 1, z: -ball.z };
           broadcast.update(1 / 60, sim.state, player);
           camera.updateMatrixWorld(true);
-          for (const s of [{ ...ball, y: Math.max(ball.y, 0.4) }, player]) {
+          for (const s of [{ ...ball, y: Math.max(ball.y, 0.15) }, { ...ball, y: 0.15 }]) {
             const ndc = new Vector3(s.x, s.y, s.z).project(camera);
             expect(Math.abs(ndc.x)).toBeLessThanOrEqual(0.78);
             expect(Math.abs(ndc.y)).toBeLessThanOrEqual(0.78);

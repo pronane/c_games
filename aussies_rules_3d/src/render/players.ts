@@ -1,3 +1,4 @@
+import { playerModelYaw } from '../sim/locomotion';
 /**
  * Players — the rigged, skinned, animated footballers from Gaelic_Football_3d
  * (`assets/gaelic_player.glb`, Sprite Forge squad, all nine appearance
@@ -163,7 +164,7 @@ export function createPlayerViews(
     tintKits(root, p.team, teams, p.number);
     root.scale.setScalar(1.0);
     root.position.set(p.x, 0, p.z);
-    root.rotation.y = -p.facing + Math.PI / 2;
+    root.rotation.y = playerModelYaw(p.facing);
 
     const mixer = new THREE.AnimationMixer(root);
     const actions = new Map<string, THREE.AnimationAction>();
@@ -383,7 +384,7 @@ export function syncPlayerViews(
         view.ring.scale.setScalar(1 + 0.16 * Math.sin(now * 5));
       } else {
         view.ring.material.color.setHex(view.team === 0 ? 0x7fd0ff : 0xff8f8f);
-        view.ring.material.opacity = 0.6;
+        view.ring.material.opacity = 0.22;
         view.ring.scale.setScalar(1);
       }
     }
@@ -456,7 +457,7 @@ export function syncPlayerViews(
     view.shadow.material.opacity = Math.max(0.09, 0.42 - jump * 0.24);
     view.shadow.scale.setScalar(1 + jump * 0.35);
     // the model faces -Z in glTF; sim facing is radians where 0 = +x
-    view.root.rotation.y = -p.facing - Math.PI / 2;
+    view.root.rotation.y = playerModelYaw(p.facing);
     view.mixer.update(dt);
     // Planted-foot IK (experimental, ?plantik=1) — re-solve legs post-pose.
     view.motion?.plantIk(dt, view.root, Math.cos(p.facing), Math.sin(p.facing));
