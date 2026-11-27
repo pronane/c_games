@@ -134,6 +134,7 @@ jobs:
             --rendering-driver opengl3 --audio-driver Dummy res://Scenes/RuntimeEvidence.tscn
           test -s "$ARENA_FC_EVIDENCE_DIR/runtime-evidence.json"
           test -s "$ARENA_FC_EVIDENCE_DIR/production-rig-grounding.png"
+      # The runtime evidence now measures mesh-derived boot soles and actual MatchEngine pass/shot release frames.
       - name: Summarize production rig measurements
         env:
           EVIDENCE_JSON: ${{ runner.temp }}/arena-runtime-evidence/runtime-evidence.json
