@@ -1306,8 +1306,10 @@ public sealed partial class MatchEngine
             // behind his defence (real keepers sit ~20 m behind the back line).
             if (distToGoal > 25f) cutDist = MathF.Max(cutDist, Mx.Clamp((distToGoal - 25f) * .40f, 0f, 16f));
             Vector3 cutPos = goalCentre - ballToGoal * cutDist;
-            float tx = cutPos.X;
-            float tz = Mx.Clamp(ball.Pos.Z * .62f, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
+            // Priority 3: angle cover + line depth from GkHeuristics.
+            Vector3 gkPos = GkHeuristics.DesiredPosition(goalCentre, Mx.GoalHalfWidth, ball.Pos);
+            float tx = (gkPos.X + cutPos.X) * 0.5f;
+            float tz = Mx.Clamp(gkPos.Z, -Mx.GoalHalfWidth * .92f, Mx.GoalHalfWidth * .92f);
             // 2.5: on the computer's shootout kicks the human picks the dive.
             bool humanKeeper = (IsShootout || !Options.AwayHuman) && S.ShootoutTakerSide == 1 && p.Team == 0 && S.ShootoutShotTaken;
             // He goes as the ball is struck, not during the wind-up (the taker reads an
@@ -1393,7 +1395,9 @@ public sealed partial class MatchEngine
                     SetAction(p, "dive", .65f, .50f);
                 return;
             }
-            if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f && (p.ActionTimer <= 0 || p.Action == "keeper_penalty_set"))
+            if (danger < 13f && ball.Owner < 0 && ball.Vel.Length() > 12f
+                && (humanKeeper || GkHeuristics.ShouldDive(p.Pos, ball.Pos, ball.Vel))
+                && (p.ActionTimer <= 0 || p.Action == "keeper_penalty_set"))
             {
                 SetAction(p, "dive", .65f, .50f);
                 p.Target += humanKeeper ? new Vector3(0, 0, S.ShootoutDive * 2.2f) : Mx.FlatDir(p.Pos, ball.Pos) * 1.6f;
@@ -3454,7 +3458,15 @@ public sealed partial class MatchEngine
                 float contactFrac;
                 // Foot below 0.45 m, thigh/knee to 0.95 m, chest to 1.55 m, head above.
                 touchAction = TouchFor(b.Pos.Y, b.Vel.Y);
-                contactFrac = touchAction == "trap" ? .60f : .55f;
+                // Priority 2: first-touch family from approach speed / height / pressure.
+                var ft = FirstTouch.Select(ballSpeed, b.Pos.Y, oppDist, skillFactor);
+                if (ft == FirstTouchKind.Clear)
+                    touchAction = "clear";
+                else if (ft == FirstTouchKind.Cushion && touchAction == "trap")
+                    touchAction = FirstTouch.ActionToken(ft); // thigh_control
+                else if (ft == FirstTouchKind.Redirect)
+                    touchAction = "trap";
+                contactFrac = FirstTouch.ContactFractionBias(ft);
                 SetAction(p, touchAction, .50f, contactFrac);
                 p.Target = b.Pos; // plant feet on the spot
                 // A ground ball is cushioned by the receiving foot: it slows into his
