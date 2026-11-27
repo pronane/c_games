@@ -1321,7 +1321,7 @@ public sealed partial class SoccerClipRig : Node3D
                 // that prevents IK from correcting the very lift/slide it is meant to fix.
                 if (pw > 0.01f || height < .18f)
                 {
-                    Vector3 beforeWorld = skelGlobal * Skel.GetBoneGlobalPose(b.Foot).Origin;
+                    Vector3 beforeWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     SolveTwoBone(b.Thigh, b.Shin, b.Foot, SoleTargetToAnkle(b, Skel.GetBoneGlobalPose(b.Foot), skelInv * targetWorld), yaw);
                     Skel.ForceUpdateAllBoneTransforms();
                     if (b.HasSoleGeometry)
