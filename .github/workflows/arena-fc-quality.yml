@@ -127,7 +127,7 @@ jobs:
         run: dotnet build ArenaFC.sln -c Release -v:q
       - name: Import Godot resources (textures, materials and scene assets)
         working-directory: arena-fc
-        run: "$GODOT" --headless --editor --path . --import --quit
+        run: '"$GODOT" --headless --editor --path . --import --quit'
       - name: Run production rig grounding and animation evidence
         working-directory: arena-fc
         env:
