@@ -802,13 +802,10 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = 0f;
             return;
         }
-        // Overrides are persistent in Godot. Remove last frame's output before
-        // reading this frame's authored poses, otherwise offsets feed back into
-        // themselves and can pull skin/joints farther away on each update.
+        // Foot overrides are persistent in Godot. Remove last frame's output
+        // before reading the new authored pose so swing feet do not stay pinned.
         if (Skel != null)
         {
-            foreach (var ib in _inertialBones)
-                Skel.SetBoneGlobalPoseOverride(ib.bone, Transform3D.Identity, 0f, false);
             foreach (var pair in _bones)
                 if (pair.Value.Foot >= 0)
                     Skel.SetBoneGlobalPoseOverride(pair.Value.Foot, Transform3D.Identity, 0f, false);
@@ -1055,6 +1052,7 @@ public sealed partial class SoccerClipRig : Node3D
             var oldTx = kv.Value;
             var newTx = Skel.GetBoneGlobalPose(b);
             Vector3 posOff = oldTx.Origin - newTx.Origin;
+            float rawPositionDiscontinuity = posOff.Length();
             if (posOff.Length() > .12f) posOff = posOff.Normalized() * .12f;
             Quaternion oldRot = oldTx.Basis.GetRotationQuaternion();
             Quaternion newRot = newTx.Basis.GetRotationQuaternion();
@@ -1062,7 +1060,7 @@ public sealed partial class SoccerClipRig : Node3D
             // Measure the raw pose discontinuity before inertialization masks it.
             // Translation is metres; angular error is scaled to a comparable small
             // displacement so the aggregate is stable across skeleton proportions.
-            transitionDiscontinuity += posOff.Length() + rotOff.GetAngle() * 0.1f;
+            transitionDiscontinuity += rawPositionDiscontinuity + rotOff.GetAngle() * 0.1f;
 
             // Velocity-aware capture: estimate old bone velocity from previous frame.
             Vector3 posVel = Vector3.Zero;
@@ -1114,10 +1112,19 @@ public sealed partial class SoccerClipRig : Node3D
             if (ib.posOff.Length() > 0.0008f || ib.posVel.Length() > 0.001f || ib.angVel.Length() > 0.01f || Mathf.Abs(ib.rotOff.W) < 0.9995f)
             {
                 any = true;
-                var cur = Skel.GetBoneGlobalPose(ib.bone);
-                Quaternion finalRot = (ib.rotOff * cur.Basis.GetRotationQuaternion()).Normalized();
-                Vector3 finalPos = cur.Origin + ib.posOff;
-                Skel.SetBoneGlobalPoseOverride(ib.bone, new Transform3D(new Basis(finalRot), finalPos), 1f, true);
+                // Apply a rotation delta in parent-local space. Independent global
+                // translations on connected bones detach joints and stretch the
+                // skinned mesh. Only the root may receive a positional offset.
+                int parent = Skel.GetBoneParent(ib.bone);
+                Basis parentBasis = parent >= 0 ? Skel.GetBoneGlobalPose(parent).Basis : Basis.Identity;
+                Quaternion parentRotation = parentBasis.Orthonormalized().GetRotationQuaternion().Normalized();
+                Quaternion localOffset = (parentRotation.Inverse() * ib.rotOff * parentRotation).Normalized();
+                Skel.SetBonePoseRotation(ib.bone,
+                    (localOffset * Skel.GetBonePoseRotation(ib.bone)).Normalized());
+                if (parent < 0)
+                    Skel.SetBonePosePosition(ib.bone,
+                        Skel.GetBonePosePosition(ib.bone) + parentBasis.Inverse() * ib.posOff);
+                Skel.ForceUpdateAllBoneTransforms();
             }
         }
         float energy = 0f;
@@ -1126,8 +1133,6 @@ public sealed partial class SoccerClipRig : Node3D
         if (!any || _inertialTime > 0.18f * 7f)
         {
             _inertialActive = false;
-            foreach (var ib in _inertialBones)
-                Skel.SetBoneGlobalPoseOverride(ib.bone, Transform3D.Identity, 0f, false);
             _inertialBones.Clear();
             _lastInertialEnergy = 0f;
         }
@@ -1590,18 +1595,18 @@ public sealed partial class SoccerClipRig : Node3D
         {
             var neckQ = new Quaternion(Vector3.Up, _lookYaw) *
                         new Quaternion(Vector3.Right, _lookPitch);
-            Skel.SetBonePoseRotation(b.Neck, neckQ);
+            Skel.SetBonePoseRotation(b.Neck, (neckQ * Skel.GetBonePoseRotation(b.Neck)).Normalized());
             var headQ = new Quaternion(Vector3.Up, _lookYaw * .5f) *
                         new Quaternion(Vector3.Right, _lookPitch * .5f);
-            Skel.SetBonePoseRotation(b.Head, headQ);
+            Skel.SetBonePoseRotation(b.Head, (headQ * Skel.GetBonePoseRotation(b.Head)).Normalized());
         }
         if (_reach > .01f)
         {
             var armQ = new Quaternion(Vector3.Right, -_reach * 1.1f);
-            if (b.UpperArmR >= 0) Skel.SetBonePoseRotation(b.UpperArmR, armQ);
+            if (b.UpperArmR >= 0) Skel.SetBonePoseRotation(b.UpperArmR, (armQ * Skel.GetBonePoseRotation(b.UpperArmR)).Normalized());
             if (b.LowerArmR >= 0)
                 Skel.SetBonePoseRotation(b.LowerArmR,
-                    new Quaternion(Vector3.Right, -_reach * .4f));
+                    (new Quaternion(Vector3.Right, -_reach * .4f) * Skel.GetBonePoseRotation(b.LowerArmR)).Normalized());
         }
     }
 

@@ -158,14 +158,14 @@ public partial class RuntimeEvidenceRunner : Node3D
                 if (frame > 0 && double.IsFinite(frame)) processMs.Add(frame);
                 if (physics > 0 && double.IsFinite(physics)) physicsMs.Add(physics);
 
+                var stretch = MeasureBoneStretch(rig.Soccer.Skel);
+                if (stretch.ratio > maxBoneStretchRatio)
+                {
+                    maxBoneStretchRatio = stretch.ratio;
+                    maxBoneStretchName = stretch.bone;
+                }
                 if (i % 6 == 0)
                 {
-                    var stretch = MeasureBoneStretch(rig.Soccer.Skel);
-                    if (stretch.ratio > maxBoneStretchRatio)
-                    {
-                        maxBoneStretchRatio = stretch.ratio;
-                        maxBoneStretchName = stretch.bone;
-                    }
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_L", ankleClearance);
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_R", ankleClearance);
                 }
@@ -197,8 +197,6 @@ public partial class RuntimeEvidenceRunner : Node3D
         // Gross anatomical safety guard, not an animation-quality threshold.
         // Each child joint should remain near its authored parent offset; this
         // catches severe persistent global overrides that pull limbs apart.
-        if (maxBoneStretchRatio > 2.5f)
-            throw new InvalidOperationException($"Severe bone stretch: {maxBoneStretchName} ratio={maxBoneStretchRatio:F3}");
 
         var report = new Dictionary<string, object>
         {
@@ -238,6 +236,9 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException("Could not save production rig evidence image.");
 
         GD.Print("[RuntimeEvidence] " + json);
+        // Write the evidence before failing so the bad frame remains inspectable.
+        if (maxBoneStretchRatio > 2.5f)
+            throw new InvalidOperationException($"Severe bone stretch: {maxBoneStretchName} ratio={maxBoneStretchRatio:F3}");
         GetTree().Quit(0);
     }
 

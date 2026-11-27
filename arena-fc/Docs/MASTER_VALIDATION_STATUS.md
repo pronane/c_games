@@ -4,6 +4,38 @@ Branch: `arena/8459237b-c-games`
 PR: https://github.com/pronane/c_games/pull/271 (do-not-merge until combined CI green). PR #274 (Arena FC quality gates) merged into #271 at `f88aec2` on 2026-11-26.  
 Status date: 2026-11-26 (sandbox evidence; visual/runtime Godot checks are limited). Reviewed latest technical report: `arena_fc_pr271_latest_review_2026-11-26.pdf`.
 
+## Production-rig distortion investigation (2026-11-27)
+
+The user supplied the `3d36b1d` production-rig image showing severe limb/mesh
+stretching. Its runtime JSON reports planted-foot slide 1.268 m/s and ankle
+origin clearance 0.427–0.799 m; the image is evidence of failure even though
+the workflow was green. These are not sole-clearance or perceptual-quality
+measurements. User commit `6b0b761` subsequently changed foot-IK parent-space
+rotation and disabled the pelvis override; the supplied capture predates it.
+
+Follow-up `eda6502` fixes leg segment lengths (shin and foot rest offsets),
+composes the rotation corrections with authored poses, releases stale foot
+overrides, fixes numbered bone aliases, and separates slide sample counts from
+measured transitions. Its synthetic Godot leg-chain self-test passed, and
+quality run `45966092132` reported slide 0.329 m/s, maximum parent-child
+joint distance 1.845 times rest (Head), three measured transitions, and ankle
+clearance 0.017–0.765 m. The metric definitions and capture are not equivalent
+to a full visual comparison, so this does **not** prove the distortion fixed.
+
+The next change removes independent global translations from non-root bones
+in inertialization, which could pull connected joints apart. The workflow now
+captures labelled run/sprint/turn PNGs, reports per-frame joint-length ratios,
+and fails for gross (>2.5x rest) bone stretch. This is an anatomical safety
+check, not an evidence-derived animation-quality threshold; it cannot detect
+all mesh-skinning defects. Inspect the resulting production images and repeat
+on varied poses before signoff. The user-supplied and workflow images were not
+reviewed as a before/after pair here: this environment cannot download Actions
+artifacts from their storage host. Request the latest artifact if needed.
+
+This update supersedes older wording below about active pelvis stabilization,
+missing transition instrumentation and the previously green head. No M5/M7
+completion percentage is increased until the new evidence is reviewed.
+
 ## CI / automated evidence
 
 - `9649645`: all green (dotnet-core, godot-gdscript, godot-selftest, node-hub, sim-compare/linux/windows, netplay, GitGuardian).
