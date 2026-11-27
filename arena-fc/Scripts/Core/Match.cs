@@ -2398,9 +2398,15 @@ public sealed partial class MatchEngine
             // inside, towards the middle, and swerves out to the aimed post.
             float side = target.Z >= 0f ? 1f : -1f;
             if (shotType == ShotType.Trivela) side = -side;
-            float spinMag = 3.2f + p.Spec.Shooting * 2.4f;
+            float spinMag = shotType == ShotType.Trivela
+                ? 5.2f + p.Spec.Shooting * 3.0f
+                : 3.2f + p.Spec.Shooting * 2.4f;
             float t = dist / MathF.Max(8f, power);
-            float bend = MathF.Min(.5f * .055f * spinMag * power * t * t * .6f, dist * .2f);
+            // Outside-boot curl must overcome the initial inside-foot aim and
+            // remain visible at the goal line; give the trivela its own stronger
+            // bend while keeping finesse curl at the calibrated level.
+            float bendScale = shotType == ShotType.Trivela ? .9f : .6f;
+            float bend = MathF.Min(.5f * .055f * spinMag * power * t * t * bendScale, dist * .2f);
             Vector3 outside = new(target.X, target.Y, target.Z + side * bend);
             dir = Mx.Norm(Mx.FlatDir(b.Pos, outside) + (dir - Mx.FlatDir(b.Pos, target)));
             spin = new Vector3(0, side * MathF.Sign(dir.X) * spinMag, 0);
@@ -2517,7 +2523,7 @@ public sealed partial class MatchEngine
             // matches have ~40 throw-ins; ours had ~2 once a repeat-throw bug went).
             float toLine = Mx.HalfWidth - MathF.Abs(carrier.Pos.Z);
             bool byLine = toLine < 7f;
-            float pokeChance = (slide ? .55f : .30f) + (byLine ? .25f : 0f);
+            float pokeChance = (slide ? .55f : .38f) + (byLine ? .32f : 0f);
             if (Rng.Next() < pokeChance)
             {
                 Vector3 through = Mx.FlatDir(p.Pos, carrier.Pos);
