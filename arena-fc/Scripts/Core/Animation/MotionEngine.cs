@@ -381,7 +381,6 @@ public sealed class MotionEngine
         state.CrossfadeRemaining = 0f;
         state.BlendWeight = 1f;
         Metrics.TransitionEvents++;
-        Metrics.TransitionDiscontinuityAccum += 0f; // hook: Godot/runtime can supply measured discontinuity
     }
 
     private static void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)

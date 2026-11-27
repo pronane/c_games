@@ -134,6 +134,11 @@ jobs:
             --rendering-driver opengl3 --audio-driver Dummy res://Scenes/RuntimeEvidence.tscn
           test -s "$ARENA_FC_EVIDENCE_DIR/runtime-evidence.json"
           test -s "$ARENA_FC_EVIDENCE_DIR/production-rig-grounding.png"
+      - name: Summarize production rig measurements
+        env:
+          EVIDENCE_JSON: ${{ runner.temp }}/arena-runtime-evidence/runtime-evidence.json
+        run: |
+          python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} bone_stretch={:.3f} bone={} transitions={} ankle_clearance_m=[{:.3f},{:.3f}]".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["max_bone_parent_distance_vs_rest"], d["max_bone_parent_distance_bone"], d["transition_measurements"], d["ankle_ground_clearance_min_m"], d["ankle_ground_clearance_max_m"]))'
       - name: Render procedural rig captures
         working-directory: arena-fc
         env:

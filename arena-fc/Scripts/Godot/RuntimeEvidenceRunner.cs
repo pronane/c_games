@@ -120,6 +120,8 @@ public partial class RuntimeEvidenceRunner : Node3D
         var processMs = new List<double>();
         var physicsMs = new List<double>();
         var ankleClearance = new List<float>();
+        float maxBoneStretchRatio = 0f;
+        string maxBoneStretchName = "";
         Image? centeredEvidenceCapture = null;
         int frames = 0;
 
@@ -158,6 +160,12 @@ public partial class RuntimeEvidenceRunner : Node3D
 
                 if (i % 6 == 0)
                 {
+                    var stretch = MeasureBoneStretch(rig.Soccer.Skel);
+                    if (stretch.ratio > maxBoneStretchRatio)
+                    {
+                        maxBoneStretchRatio = stretch.ratio;
+                        maxBoneStretchName = stretch.bone;
+                    }
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_L", ankleClearance);
                     SampleAnkleClearance(rig.Soccer.Skel, "foot_R", ankleClearance);
                 }
@@ -165,10 +173,16 @@ public partial class RuntimeEvidenceRunner : Node3D
                 // Capture near the centre of the deterministic traversal. Capturing
                 // only after frame 359 leaves the translated production rig clipped
                 // at the right edge and makes the evidence image hard to inspect.
-                if (i == 180)
+                if (i == 60 || i == 180 || i == 300)
                 {
+                    camera.Position = new Vector3(x, y + 1.8f, 6.5f);
+                    camera.LookAt(new Vector3(x, y + .9f, 0));
                     await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-                    centeredEvidenceCapture = GetViewport().GetTexture().GetImage();
+                    var capture = GetViewport().GetTexture().GetImage();
+                    string label = i == 60 ? "run-flat" : i == 180 ? "sprint-flat-to-ramp" : "turn-ramp";
+                    if (capture.SavePng(Path.Combine(output, label + ".png")) != Error.Ok)
+                        throw new InvalidOperationException("Could not save " + label + " evidence image.");
+                    if (i == 180) centeredEvidenceCapture = capture;
                 }
                 frames++;
         }
@@ -176,10 +190,15 @@ public partial class RuntimeEvidenceRunner : Node3D
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         if (metrics.Samples < 20)
             throw new InvalidOperationException($"Insufficient planted-foot measurements: {metrics.Samples}");
-        if (metrics.TransitionEvents < 2)
-            throw new InvalidOperationException($"Expected clip-transition measurements, got {metrics.TransitionEvents}");
-        if (updateMs.Count != frames || ankleClearance.Count == 0)
+        if (metrics.TransitionMeasurements < 2)
+            throw new InvalidOperationException($"Expected clip-transition measurements, got {metrics.TransitionMeasurements}");
+        if (updateMs.Count != frames || ankleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
             throw new InvalidOperationException("Runtime evidence collection was incomplete.");
+        // Gross anatomical safety guard, not an animation-quality threshold.
+        // Each child joint should remain near its authored parent offset; this
+        // catches severe persistent global overrides that pull limbs apart.
+        if (maxBoneStretchRatio > 2.5f)
+            throw new InvalidOperationException($"Severe bone stretch: {maxBoneStretchName} ratio={maxBoneStretchRatio:F3}");
 
         var report = new Dictionary<string, object>
         {
@@ -193,12 +212,15 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["animation_metric_samples"] = metrics.Samples,
             ["avg_planted_foot_slide_mps"] = metrics.AvgFootSlide,
             ["foot_slide_metric_scope"] = "world_space_xz_velocity_during_contract_planted_frames",
-            ["transition_events"] = metrics.TransitionEvents,
+            ["transition_measurements"] = metrics.TransitionMeasurements,
             ["avg_transition_discontinuity"] = metrics.AvgTransitionDiscontinuity,
             ["transition_metric_scope"] = "mean_raw_pose_offset_on_inertialized_upper_body_bones",
             ["contact_events"] = metrics.ContactEvents,
-            ["avg_contact_frame_error"] = metrics.AvgContactFrameError,
+            ["avg_contact_frame_error"] = metrics.ContactEvents > 0 ? (object)metrics.AvgContactFrameError : "not_measured",
             ["ground_clearance_metric"] = "ankle_bone_origin_to_collision_surface_not_sole_clearance",
+            ["max_bone_parent_distance_vs_rest"] = maxBoneStretchRatio,
+            ["max_bone_parent_distance_bone"] = maxBoneStretchName,
+            ["bone_stretch_metric_scope"] = "maximum parent-child joint distance divided by authored rest offset; not mesh deformation",
             ["ankle_ground_clearance_min_m"] = ankleClearance.Min(),
             ["ankle_ground_clearance_max_m"] = ankleClearance.Max(),
             ["rig_update_avg_ms"] = updateMs.Average(),
@@ -217,6 +239,24 @@ public partial class RuntimeEvidenceRunner : Node3D
 
         GD.Print("[RuntimeEvidence] " + json);
         GetTree().Quit(0);
+    }
+
+    private static (float ratio, string bone) MeasureBoneStretch(Skeleton3D skeleton)
+    {
+        skeleton.ForceUpdateAllBoneTransforms();
+        float maximum = 0f;
+        string name = "";
+        for (int i = 0; i < skeleton.GetBoneCount(); i++)
+        {
+            int parent = skeleton.GetBoneParent(i);
+            float restLength = skeleton.GetBoneRest(i).Origin.Length();
+            if (parent < 0 || restLength < .02f) continue;
+            float actualLength = skeleton.GetBoneGlobalPose(i).Origin.DistanceTo(skeleton.GetBoneGlobalPose(parent).Origin);
+            float ratio = actualLength / restLength;
+            if (!float.IsFinite(ratio)) throw new InvalidOperationException("Non-finite skeleton bone pose.");
+            if (ratio > maximum) { maximum = ratio; name = skeleton.GetBoneName(i); }
+        }
+        return (maximum, name);
     }
 
     private void AddGround(float centerX, float slope, float centerY)

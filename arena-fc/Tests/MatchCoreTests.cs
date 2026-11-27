@@ -1903,6 +1903,20 @@ Section("Football intelligence Milestone 1 (trajectory/perception/coordinator)")
 
 Section("Animation telemetry metrics (contact/transition/plant continuity)");
 {
+    var accounting = new ArenaFC.Core.Animation.AnimationMetrics();
+    accounting.RecordFootSlide(2f);
+    accounting.RecordFootSlide(4f);
+    accounting.TransitionEvents = 7; // clip switches do not imply a pose measurement
+    accounting.RecordTransitionDiscontinuity(0.2f);
+    accounting.RecordTransitionDiscontinuity(0.4f);
+    Check("independent animation metric sample counts",
+        accounting.Samples == 2 && accounting.TransitionMeasurements == 2 &&
+        MathF.Abs(accounting.AvgFootSlide - 3f) < 1e-5f &&
+        MathF.Abs(accounting.AvgTransitionDiscontinuity - 0.3f) < 1e-5f);
+    accounting.Reset();
+    Check("animation metric reset clears independent counters",
+        accounting.Samples == 0 && accounting.TransitionMeasurements == 0 && accounting.TransitionEvents == 0);
+
     string manifestJson = """
     {
       "version": 2,
