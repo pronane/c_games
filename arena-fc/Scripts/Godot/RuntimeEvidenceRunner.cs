@@ -134,6 +134,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         var authoredPlantWindows = LoadAuthoredPlantWindows();
         var metrics = new AnimationMetrics();
         rig.Soccer.AnimMetrics = metrics;
+        secondRig.Soccer!.AnimMetrics = metrics;
         var motion = new MotionState
         {
             CurrentClipId = "soccer_run",
