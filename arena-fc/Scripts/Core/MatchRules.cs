@@ -168,8 +168,19 @@ public sealed partial class MatchEngine
                 if (q.EncroachedAt != S.RestartId)
                 {
                     q.EncroachedAt = S.RestartId;     // one caution per restart; after that he is just sent back
-                    Add(EventKind.Foul, $"Encroachment - {q.Spec.DisplayName} wasn't back the full {(need < 3f ? "2 metres" : "10 yards")}.");
-                    Caution(q, "encroachment");
+                    // AI players can begin a restart inside the exclusion radius
+                    // because their previous open-play position is frozen at the
+                    // whistle. They are moved back below; booking them before they
+                    // have had a chance to retreat creates implausible automatic
+                    // cards at nearly every restart. Keep the caution for a human
+                    // who deliberately encroaches.
+                    bool humanControlled = q.Index == S.Controlled
+                        || (Options.AwayHuman && q.Index == S.ControlledAway);
+                    if (humanControlled)
+                    {
+                        Add(EventKind.Foul, $"Encroachment - {q.Spec.DisplayName} wasn't back the full {(need < 3f ? "2 metres" : "10 yards")}.");
+                        Caution(q, "encroachment");
+                    }
                 }
                 if (!q.SentOff)
                 {
