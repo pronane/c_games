@@ -122,7 +122,8 @@ public partial class RuntimeEvidenceRunner : Node3D
         var updateMs = new List<double>();
         var processMs = new List<double>();
         var physicsMs = new List<double>();
-        var soleClearance = new List<float>();
+        var plantedSoleClearance = new List<float>();
+        var swingSoleClearance = new List<float>();
         float maxBoneStretchRatio = 0f;
         string maxBoneStretchName = "";
         Image? centeredEvidenceCapture = null;
@@ -154,7 +155,8 @@ public partial class RuntimeEvidenceRunner : Node3D
                 var sw = Stopwatch.StartNew();
                 rig.Soccer.Update(player, Dt);
                 sw.Stop();
-                updateMs.Add(sw.Elapsed.TotalMilliseconds);
+                // Exclude the first half-second of JIT/resource warm-up from rig timing.
+                if (i >= 30) updateMs.Add(sw.Elapsed.TotalMilliseconds);
 
                 double frame = Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000.0;
                 double physics = Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000.0;
@@ -169,8 +171,10 @@ public partial class RuntimeEvidenceRunner : Node3D
                 }
                 if (i % 6 == 0)
                 {
-                    SampleSoleClearance(rig.Soccer, "L", soleClearance);
-                    SampleSoleClearance(rig.Soccer, "R", soleClearance);
+                    SampleSoleClearance(rig.Soccer, "L", motion.FootPlantedLeft && motion.PlantWeightLeft >= .5f
+                        ? plantedSoleClearance : swingSoleClearance);
+                    SampleSoleClearance(rig.Soccer, "R", motion.FootPlantedRight && motion.PlantWeightRight >= .5f
+                        ? plantedSoleClearance : swingSoleClearance);
                 }
 
                 // Capture near the centre of the deterministic traversal. Capturing
@@ -201,8 +205,8 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException($"Insufficient planted-foot measurements: {metrics.Samples}");
         if (metrics.TransitionMeasurements < 2)
             throw new InvalidOperationException($"Expected clip-transition measurements, got {metrics.TransitionMeasurements}");
-        if (updateMs.Count != frames || soleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
-            throw new InvalidOperationException("Runtime evidence collection was incomplete.");
+        if (updateMs.Count != frames - 30 || plantedSoleClearance.Count == 0 || swingSoleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
+            throw new InvalidOperationException("Runtime evidence collection was incomplete (including separate planted/swing sole samples).");
         // Gross anatomical safety guard, not an animation-quality threshold.
         // Each child joint should remain near its authored parent offset; this
         // catches severe persistent global overrides that pull limbs apart.
@@ -236,12 +240,20 @@ public partial class RuntimeEvidenceRunner : Node3D
                 ["pass"] = new { error_frames = passContact.errorFrames, detail = passContact.detail },
                 ["shot"] = new { error_frames = shotContact.errorFrames, detail = shotContact.detail }
             },
-            ["ground_clearance_metric"] = "lowest production boot mesh sole vertex to collision surface",
+            ["ground_clearance_metric"] = "production boot sole point to collision surface, partitioned by contract plant state",
+            ["planted_sole_clearance_samples"] = plantedSoleClearance.Count,
+            ["planted_sole_clearance_min_m"] = plantedSoleClearance.Min(),
+            ["planted_sole_clearance_p05_m"] = Percentile(plantedSoleClearance.Select(x => (double)x).ToList(), .05),
+            ["planted_sole_clearance_p95_m"] = Percentile(plantedSoleClearance.Select(x => (double)x).ToList(), .95),
+            ["planted_sole_penetration_samples"] = plantedSoleClearance.Count(x => x < -.005f),
+            ["swing_sole_clearance_samples"] = swingSoleClearance.Count,
+            ["swing_sole_clearance_min_m"] = swingSoleClearance.Min(),
+            ["swing_sole_clearance_p95_m"] = Percentile(swingSoleClearance.Select(x => (double)x).ToList(), .95),
             ["max_bone_parent_distance_vs_rest"] = maxBoneStretchRatio,
             ["max_bone_parent_distance_bone"] = maxBoneStretchName,
             ["bone_stretch_metric_scope"] = "maximum parent-child joint distance divided by authored rest offset; not mesh deformation",
-            ["sole_ground_clearance_min_m"] = soleClearance.Min(),
-            ["sole_ground_clearance_max_m"] = soleClearance.Max(),
+            ["sole_ground_clearance_min_m"] = plantedSoleClearance.Concat(swingSoleClearance).Min(),
+            ["sole_ground_clearance_max_m"] = plantedSoleClearance.Concat(swingSoleClearance).Max(),
             ["rig_update_avg_ms"] = updateMs.Average(),
             ["rig_update_p95_ms"] = Percentile(updateMs, .95),
             ["rig_update_max_ms"] = updateMs.Max(),
@@ -260,6 +272,16 @@ public partial class RuntimeEvidenceRunner : Node3D
         // Write the evidence before failing so the bad frame remains inspectable.
         if (maxBoneStretchRatio > 2.5f)
             throw new InvalidOperationException($"Severe bone stretch: {maxBoneStretchName} ratio={maxBoneStretchRatio:F3}");
+        // Baseline gates intentionally reject material regressions while leaving
+        // the tighter 1-frame contact target visible as a follow-up objective.
+        if (metrics.AvgFootSlide > .80f)
+            throw new InvalidOperationException($"Planted-foot slide regression: {metrics.AvgFootSlide:F3} m/s exceeds 0.80 m/s gate.");
+        if (plantedSoleClearance.Min() < -.05f)
+            throw new InvalidOperationException($"Planted boot sole penetrates ground by {-plantedSoleClearance.Min():F3} m (limit 0.05 m).");
+        if (passContact.errorFrames > 4.0 || shotContact.errorFrames > 4.0)
+            throw new InvalidOperationException($"Contact timing regression: pass={passContact.errorFrames:F2} frames, shot={shotContact.errorFrames:F2} frames (each limit 4.0).");
+        if (Percentile(updateMs, .95) > 1.0)
+            throw new InvalidOperationException($"Rig update p95 {Percentile(updateMs, .95):F3} ms exceeds 1.0 ms budget.");
         GetTree().Quit(0);
     }
 
