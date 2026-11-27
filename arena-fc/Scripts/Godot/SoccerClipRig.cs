@@ -1370,6 +1370,24 @@ public sealed partial class SoccerClipRig : Node3D
                         var ankleTarget = Skel.GetBoneGlobalPose(b.Foot).Origin + correction;
                         SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
                     }
+                    // The two-bone solve preserves joint lengths, but can leave a
+                    // small residual when the latched contact target approaches the
+                    // leg's reach limit. Apply the residual only after solving the
+                    // whole chain; the stretch metric compares global pose to global
+                    // rest distances, so inherited parent scale is accounted for.
+                    if (pw >= 0.5f)
+                    {
+                        var pinnedPose = Skel.GetBoneGlobalPose(b.Foot);
+                        Vector3 soleSk = pinnedPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
+                        Vector3 soleW = skelGlobal * soleSk;
+                        Vector3 deltaW = new Vector3(locked.X - soleW.X, 0f, locked.Z - soleW.Z);
+                        if (deltaW.LengthSquared() > 1e-10f)
+                        {
+                            Vector3 newOrigin = pinnedPose.Origin + skelInv.Basis * deltaW;
+                            Skel.SetBoneGlobalPoseOverride(b.Foot, new Transform3D(pinnedPose.Basis, newOrigin), 1f, true);
+                            Skel.ForceUpdateAllBoneTransforms();
+                        }
+                    }
                     Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
@@ -1411,24 +1429,6 @@ public sealed partial class SoccerClipRig : Node3D
                     Vector3 beforeWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     SolveTwoBone(b.Thigh, b.Shin, b.Foot, SoleTargetToAnkle(b, Skel.GetBoneGlobalPose(b.Foot), skelInv * targetWorld), yaw);
                     Skel.ForceUpdateAllBoneTransforms();
-                    // The two-bone solve preserves joint lengths, but can leave a
-                    // small residual when the latched contact target approaches the
-                    // leg's reach limit. Apply that residual only after solving the
-                    // whole chain; the stretch metric now compares global pose to
-                    // global rest distances, so inherited parent scale is accounted for.
-                    if (pw >= 0.5f)
-                    {
-                        var pinnedPose = Skel.GetBoneGlobalPose(b.Foot);
-                        Vector3 soleSk = pinnedPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
-                        Vector3 soleW = skelGlobal * soleSk;
-                        Vector3 deltaW = new Vector3(locked.X - soleW.X, 0f, locked.Z - soleW.Z);
-                        if (deltaW.LengthSquared() > 1e-10f)
-                        {
-                            Vector3 newOrigin = pinnedPose.Origin + skelInv.Basis * deltaW;
-                            Skel.SetBoneGlobalPoseOverride(b.Foot, new Transform3D(pinnedPose.Basis, newOrigin), 1f, true);
-                            Skel.ForceUpdateAllBoneTransforms();
-                        }
-                    }
                     Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
