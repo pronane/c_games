@@ -918,6 +918,15 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = _speedScale;
         }
         float clipLen = (float)Player.GetAnimation(clip).Length;
+        if (!motionDriven && oneShot && p.ActionTimer > 0f && p.ActionDuration > 1e-4f)
+        {
+            // Drive action pose from the authoritative simulation clock. AnimationPlayer
+            // process scheduling can otherwise drift a few frames from MatchEngine ticks.
+            // With contact-aligned SpeedScale, this lands exactly on the authored
+            // ball_contact frame when ActionDuration - ActionTimer == ActionContactAt.
+            float actionElapsed = Math.Clamp(p.ActionDuration - p.ActionTimer, 0f, p.ActionDuration);
+            Player.Seek(Math.Clamp(actionElapsed * Player.SpeedScale, 0f, clipLen), true);
+        }
         if (motionDriven)
         {
             // The shared engine owns normalized phase and contact timing. Seeking here
