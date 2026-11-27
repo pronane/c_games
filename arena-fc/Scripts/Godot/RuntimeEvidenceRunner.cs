@@ -278,7 +278,7 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException($"Insufficient planted-foot measurements: {metrics.Samples}");
         if (metrics.TransitionMeasurements < 2)
             throw new InvalidOperationException($"Expected clip-transition measurements, got {metrics.TransitionMeasurements}");
-        if (updateMs.Count != frames - 30 || plantedSoleClearance.Count == 0 || swingSoleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
+        if (updateMs.Count != (frames - 30) * 2 || plantedSoleClearance.Count == 0 || swingSoleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
             throw new InvalidOperationException("Runtime evidence collection was incomplete (including separate planted/swing sole samples).");
         // Gross anatomical safety guard, not an animation-quality threshold.
         // Each child joint should remain near its authored parent offset; this
