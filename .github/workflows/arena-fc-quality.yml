@@ -78,6 +78,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
+      - name: Install native dependencies for the cross-platform coverage profiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2 libxrender1 libfontconfig1 libxext6
       - name: Install cross-platform coverage collector
         run: |
           dotnet tool install --global dotnet-coverage --version 17.14.1
@@ -86,10 +90,14 @@ jobs:
         working-directory: arena-fc
         run: |
           dotnet-coverage collect "dotnet run --project Tests/CoreTests.csproj -c Release" --output coverage-core.cobertura.xml --output-format cobertura
+          test -s coverage-core.cobertura.xml
+          grep -q '<class ' coverage-core.cobertura.xml
       - name: Collect match-core test coverage
         working-directory: arena-fc
         run: |
           dotnet-coverage collect "dotnet run --project Tests/MatchCoreTests.csproj -c Release" --output coverage-match-core.cobertura.xml --output-format cobertura
+          test -s coverage-match-core.cobertura.xml
+          grep -q '<class ' coverage-match-core.cobertura.xml
       - name: Upload Cobertura coverage reports
         if: always()
         uses: actions/upload-artifact@v4
