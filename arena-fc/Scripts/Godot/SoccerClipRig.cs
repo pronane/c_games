@@ -1373,21 +1373,11 @@ public sealed partial class SoccerClipRig : Node3D
                     Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
                     float corr = beforeWorld.DistanceTo(afterWorld);
                     if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
-                    // Hard XZ pin: two-bone IK may undershoot when the root translates
-                    // under a latched plant; override keeps the sole on the contact point.
-                    if (pw >= 0.5f)
-                    {
-                        var pinnedPose = Skel.GetBoneGlobalPose(b.Foot);
-                        Vector3 soleSk = pinnedPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
-                        Vector3 soleW = skelGlobal * soleSk;
-                        Vector3 deltaW = new Vector3(locked.X - soleW.X, 0f, locked.Z - soleW.Z);
-                        if (deltaW.LengthSquared() > 1e-10f)
-                        {
-                            Vector3 newOrigin = pinnedPose.Origin + skelInv.Basis * deltaW;
-                            Skel.SetBoneGlobalPoseOverride(b.Foot, new Transform3D(pinnedPose.Basis, newOrigin), 1f, true);
-                            Skel.ForceUpdateAllBoneTransforms();
-                        }
-                    }
+                    // Keep the solved two-bone chain authoritative. Translating only
+                    // the foot bone to force an exact world pin can separate it from
+                    // the shin by several times its authored rest offset on long plant
+                    // windows. The two-bone solve already targets the latched sole;
+                    // any residual should be measured as slide, not hidden as stretch.
                 }
                 ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
 
