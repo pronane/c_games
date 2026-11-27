@@ -80,13 +80,11 @@ jobs:
       - name: Collect core test coverage
         working-directory: arena-fc
         run: |
-          dotnet-coverage collect --output coverage-core.cobertura.xml --output-format cobertura \
-            bash -c 'dotnet run --project Tests/CoreTests.csproj -c Release'
+          dotnet-coverage collect "dotnet run --project Tests/CoreTests.csproj -c Release" --output coverage-core.cobertura.xml --output-format cobertura
       - name: Collect match-core test coverage
         working-directory: arena-fc
         run: |
-          dotnet-coverage collect --output coverage-match-core.cobertura.xml --output-format cobertura \
-            bash -c 'dotnet run --project Tests/MatchCoreTests.csproj -c Release'
+          dotnet-coverage collect "dotnet run --project Tests/MatchCoreTests.csproj -c Release" --output coverage-match-core.cobertura.xml --output-format cobertura
       - name: Upload Cobertura coverage reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -122,6 +120,9 @@ jobs:
       - name: Build Godot C# assemblies
         working-directory: arena-fc
         run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Import Godot resources (textures, materials and scene assets)
+        working-directory: arena-fc
+        run: "$GODOT" --headless --editor --path . --import --quit
       - name: Run production rig grounding and animation evidence
         working-directory: arena-fc
         env:
@@ -139,7 +140,7 @@ jobs:
         env:
           EVIDENCE_JSON: ${{ runner.temp }}/arena-runtime-evidence/runtime-evidence.json
         run: |
-          python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} sole_clearance_m=[{:.4f},{:.4f}] contact_events={} contact_error_frames={:.3f} bone_stretch={:.3f} bone={} transitions={}".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["sole_ground_clearance_min_m"], d["sole_ground_clearance_max_m"], d["contact_events"], d["avg_contact_frame_error"], d["max_bone_parent_distance_vs_rest"], d["max_bone_parent_distance_bone"], d["transition_measurements"]))'
+          python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); p=d["match_contact_scenarios"]; print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} planted_clearance_min_m={:.4f} planted_penetrations={} swing_clearance_p95_m={:.4f} pass_contact_frames={:.3f} shot_contact_frames={:.3f} rig_p95_ms={:.3f} rig_max_ms={:.3f} bone_stretch={:.3f}".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["planted_sole_clearance_min_m"], d["planted_sole_penetration_samples"], d["swing_sole_clearance_p95_m"], p["pass"]["error_frames"], p["shot"]["error_frames"], d["rig_update_p95_ms"], d["rig_update_max_ms"], d["max_bone_parent_distance_vs_rest"]))'
       - name: Publish compact diagnostic thumbnails
         env:
           EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
