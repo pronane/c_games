@@ -659,3 +659,26 @@ In workflow 45913473034, sampled frames from the compressed 480-pixel
 the side of the ball than the baseline. This supports rejecting the probe,
 not enabling it. The camera still obscures some surfaces, and inspecting
 sampled frames is not a full-motion or live-gameplay validation.
+
+### Coherent sampled-hand prototype (offline only)
+
+The shared engine now supplies a generic rigid child-pose rebase. The grip
+inspector's `--coherent --clearance 0.012 --sprint-offset X Y Z` uses it to
+carry the sampled clip's right-hand finger joints rigidly with the solved
+wrist. This preserves their relative sampled positions and rotations rather
+than independently planting each finger. It is an initial reference-pose
+probe, **not** a coordinated wrapping solver: it does not curl the fingers or
+apply surface contact, and it assumes rigid joint transforms without scale.
+Nothing is enabled in the game.
+
+On the shipped model, these two sampled sprint poses retain approximately 1×
+bind wrist-to-index and wrist-to-thumb spans, and selected finger self-overlap
+pairs fall from 211/258 in the default cradle to 56/49. But the unwrapped hand
+penetrates the approximate ball severely: 3,140/3,166 of 3,263 selected
+right-hand triangles intersect at zero offset. Even a large (-80, 0, -80) mm
+offset leaves 570/582 overlaps and places the wrist approximately 233 mm from
+the centre. The sampled clip's finger pose is not a gripping reference.
+These selected, discrete CPU-skin measurements are not full-mesh, continuous,
+rendered, or live gameplay validation. The next step requires a plausible
+articulated grip reference or constrained finger solver; rigid placement alone
+is not suitable to ship.

@@ -102,7 +102,7 @@ def joint_spans(doc,data):
     return results
 
 
-def compare(model,tool,clearance=None,sprint_offset=None,finger_follow=0,finger_replant=False):
+def compare(model,tool,clearance=None,sprint_offset=None,finger_follow=0,finger_replant=False,coherent=False):
     doc,blob=load_glb(model)
     with tempfile.TemporaryDirectory(prefix='hand-grip-') as tmp:
         tmp=Path(tmp); bind=tmp/'bind.txt'; out=tmp/'poses.json'
@@ -110,9 +110,10 @@ def compare(model,tool,clearance=None,sprint_offset=None,finger_follow=0,finger_
         command=[str(Path(tool).resolve()),'--export-grip-poses',str(Path(model).resolve()),str(out),str(bind)]
         if sprint_offset is not None and clearance is None: raise ValueError('sprint offset requires explicit clearance')
         if finger_follow and sprint_offset is None: raise ValueError('finger follow requires sprint offset')
+        if coherent and (sprint_offset is None or finger_follow or finger_replant): raise ValueError('coherent pose requires offset and excludes follow/replant')
         if finger_replant and finger_follow<=0: raise ValueError('finger replant requires positive follow')
         if clearance is not None: command.append(str(clearance))
-        if sprint_offset is not None: command.extend(str(x) for x in sprint_offset); command.append(str(finger_follow)); command.append('1' if finger_replant else '0')
+        if sprint_offset is not None: command.extend(str(x) for x in sprint_offset); command.append(str(finger_follow)); command.append('1' if finger_replant else '0'); command.append('1' if coherent else '0')
         proc=subprocess.run(command,capture_output=True,text=True,check=True)
         data=json.loads(out.read_text())
     if data.get('scenario')!='scripted-grip' or len(data['frames'])!=12: raise ValueError('invalid grip export')
@@ -123,17 +124,17 @@ def compare(model,tool,clearance=None,sprint_offset=None,finger_follow=0,finger_
     for state in report['sampled_surface_by_state']:
         state['joint_spans']=spans[state['state']]
     return {'limitation':'12 synthetic sampled CPU poses, selected finger surfaces, approximate ball sphere; no gameplay, full mesh, rendered or continuous collision validation',
-            'samples':report['surface_samples'], 'clearance_m':data['clearance_m'], 'sprint_offset_m':sprint_offset or [0,0,0], 'finger_follow':finger_follow, 'finger_replant':finger_replant, 'pose_export':proc.stdout.strip(),
+            'samples':report['surface_samples'], 'clearance_m':data['clearance_m'], 'sprint_offset_m':sprint_offset or [0,0,0], 'finger_follow':finger_follow, 'finger_replant':finger_replant, 'coherent':coherent, 'pose_export':proc.stdout.strip(),
             'triangle_counts':report['selected_surface_triangles'], 'palm_surface_triangles':report['palm_surface_triangles'], 'hand_surface_triangles':report['hand_surface_triangles'], 'states':report['sampled_surface_by_state'],
             'ball_available':[f['state'] for f in data['frames'] if f['ball_center'] is not None],
             'cradle_weights':{f['state']:f['cradle_weight'] for f in data['frames']}}
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__); p.add_argument('model'); p.add_argument('--tool'); p.add_argument('--check-renderer-bind'); p.add_argument('--clearance',type=float); p.add_argument('--sprint-offset',type=float,nargs=3,metavar=('X','Y','Z')); p.add_argument('--finger-follow',type=float,default=0); p.add_argument('--finger-replant',action='store_true')
+    p=argparse.ArgumentParser(description=__doc__); p.add_argument('model'); p.add_argument('--tool'); p.add_argument('--check-renderer-bind'); p.add_argument('--clearance',type=float); p.add_argument('--sprint-offset',type=float,nargs=3,metavar=('X','Y','Z')); p.add_argument('--finger-follow',type=float,default=0); p.add_argument('--finger-replant',action='store_true'); p.add_argument('--coherent',action='store_true')
     a=p.parse_args()
     if a.check_renderer_bind:
         d,b=load_glb(a.model); print('renderer_bind_max_rad',compare_renderer_bind(bind_rotations(d,b),Path(a.check_renderer_bind).read_text()))
-    elif a.tool: print(json.dumps(compare(a.model,a.tool,a.clearance,a.sprint_offset,a.finger_follow,a.finger_replant),indent=2))
+    elif a.tool: print(json.dumps(compare(a.model,a.tool,a.clearance,a.sprint_offset,a.finger_follow,a.finger_replant,a.coherent),indent=2))
     else: p.error('--tool or --check-renderer-bind required')
 if __name__=='__main__': main()

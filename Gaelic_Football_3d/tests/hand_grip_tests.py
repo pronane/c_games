@@ -3,6 +3,7 @@
 import sys
 import subprocess
 import json
+import math
 import tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
@@ -54,6 +55,23 @@ with tempfile.TemporaryDirectory() as tmp:
         assert subprocess.run(cmd,capture_output=True).returncode != 0
     for follow,replant in (('1','2'),('0','1'),('1','nan')):
         cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08',follow,replant]
+        assert subprocess.run(cmd,capture_output=True).returncode != 0
+    rigid=[]
+    for offset in ((0,0,0),(-.08,0,-.08)):
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012',*(str(v) for v in offset),'0','0','1']
+        subprocess.run(cmd,check=True,capture_output=True); rigid.append(json.loads(out.read_text()))
+    for a,b,c in zip(exports[0]['frames'],rigid[0]['frames'],rigid[1]['frames']):
+        assert b['ball_center']==c['ball_center'] and b['raw']==b['adjusted'] and c['raw']==c['adjusted']
+        if not a['state'].startswith('sprint'):
+            assert a==b==c
+            continue
+        names=rigid[0]['bones']; roots=['hand_r']+[f'{f}_01_r' for f in ('index','middle','ring','pinky','thumb')]
+        for left in roots:
+            for right in roots:
+                i,j=names.index(left),names.index(right)
+                assert abs(math.dist(b['raw'][i][:3],b['raw'][j][:3])-math.dist(c['raw'][i][:3],c['raw'][j][:3])) < 1e-5
+    for follow,replant,coherent in (('1','0','1'),('0','0','2'),('0','0','nan')):
+        cmd=[sys.argv[1],'--export-grip-poses',sys.argv[2],str(out),str(bind),'0.012','-.08','0','-.08',follow,replant,coherent]
         assert subprocess.run(cmd,capture_output=True).returncode != 0
 r=compare(sys.argv[2],sys.argv[1])
 assert 0.012 <= r['clearance_m'] <= 0.06
