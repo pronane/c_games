@@ -1666,14 +1666,12 @@ public sealed partial class SoccerClipRig : Node3D
         Vector3 to = (parentBasis.Inverse() * targetDirection).Normalized();
         Quaternion deltaInParent = ShortestArc(from, to);
 
-        // Bone pose rotation is expressed after the authored local rest basis:
-        // G = parentGlobal * restLocal * poseLocal. Convert the parent-space
-        // swing into pose-local space before composing it with the clip pose.
-        Quaternion restLocal = Skel.GetBoneRest(bone).Basis.Orthonormalized()
-            .GetRotationQuaternion().Normalized();
-        Quaternion deltaInPose = restLocal.Inverse() * deltaInParent * restLocal;
+        // Godot's pose rotation is already local to this bone with respect
+        // to its parent. The swing is expressed in that same parent frame;
+        // conjugating it by the rest basis rotates the correction into the
+        // wrong frame and prevents the ankle from following the solved target.
         Skel.SetBonePoseRotation(bone,
-            (deltaInPose * Skel.GetBonePoseRotation(bone)).Normalized());
+            (deltaInParent * Skel.GetBonePoseRotation(bone)).Normalized());
     }
 
     private static Quaternion ShortestArc(Vector3 from, Vector3 to)
