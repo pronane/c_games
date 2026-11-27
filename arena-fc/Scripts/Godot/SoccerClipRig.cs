@@ -1237,9 +1237,15 @@ public sealed partial class SoccerClipRig : Node3D
         foreach (var mi in _meshes)
         {
             string nodeName = mi.Name.ToString().ToLowerInvariant();
-            if (!mi.Visible || !nodeName.Contains("boot") || mi.Mesh == null) continue;
+            if (!mi.Visible || mi.Mesh == null) continue;
             for (int surface = 0; surface < mi.Mesh.GetSurfaceCount(); surface++)
             {
+                var material = mi.GetSurfaceOverrideMaterial(surface) ?? mi.Mesh.SurfaceGetMaterial(surface);
+                string materialName = material?.ResourceName?.ToLowerInvariant() ?? "";
+                if (!nodeName.Contains("boot") && materialName != "boots"
+                    && !(materialName == "" && surface < _materialOrder.Count
+                        && _materialOrder[surface].Equals("boots", StringComparison.OrdinalIgnoreCase)))
+                    continue;
                 var arrays = mi.Mesh.SurfaceGetArrays(surface);
                 if (arrays.Count <= (int)Godot.Mesh.ArrayType.Vertex
                     || arrays[(int)Godot.Mesh.ArrayType.Vertex].VariantType == Variant.Type.Nil) continue;
