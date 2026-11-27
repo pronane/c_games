@@ -227,16 +227,26 @@ public partial class RuntimeEvidenceRunner : Node3D
                 if (i >= 30 && physics > 0 && double.IsFinite(physics)) physicsMs.Add(physics);
 
                 var stretch = MeasureBoneStretch(rig.Soccer.Skel);
+                var secondStretch = MeasureBoneStretch(secondRig.Soccer!.Skel!);
                 if (stretch.ratio > maxBoneStretchRatio)
                 {
                     maxBoneStretchRatio = stretch.ratio;
-                    maxBoneStretchName = stretch.bone;
+                    maxBoneStretchName = "A:" + stretch.bone;
+                }
+                if (secondStretch.ratio > maxBoneStretchRatio)
+                {
+                    maxBoneStretchRatio = secondStretch.ratio;
+                    maxBoneStretchName = "B:" + secondStretch.bone;
                 }
                 if (i % 6 == 0)
                 {
                     SampleSoleClearance(rig.Soccer, "L", motion.FootPlantedLeft && motion.PlantWeightLeft >= .5f
                         ? plantedSoleClearance : swingSoleClearance);
                     SampleSoleClearance(rig.Soccer, "R", motion.FootPlantedRight && motion.PlantWeightRight >= .5f
+                        ? plantedSoleClearance : swingSoleClearance);
+                    SampleSoleClearance(secondRig.Soccer, "L", secondMotion.FootPlantedLeft && secondMotion.PlantWeightLeft >= .5f
+                        ? plantedSoleClearance : swingSoleClearance);
+                    SampleSoleClearance(secondRig.Soccer, "R", secondMotion.FootPlantedRight && secondMotion.PlantWeightRight >= .5f
                         ? plantedSoleClearance : swingSoleClearance);
                 }
 
