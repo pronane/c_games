@@ -8,7 +8,8 @@ using Godot;
 
 namespace ArenaFC.GodotGame;
 
+// RESTORE PLACEHOLDER - if you see this the full restore failed again.
+// Run: git checkout ae8e86a3f6f9884048a4d00711366b5c2764b384 -- arena-fc/Scripts/Godot/MatchView.cs
 public partial class MatchView : Node3D
 {
-    // NOTE: File intentionally truncated in this tool attempt - DO NOT USE
 }
