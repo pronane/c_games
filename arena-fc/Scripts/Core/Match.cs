@@ -1769,7 +1769,7 @@ public sealed partial class MatchEngine
             // Defenders step up less than the rest: real teams in possession are
             // ~34 m long back-to-front (ours were 23 m - the back line pushed up to
             // the forwards).
-            float push = p.Role == Role.Defender ? .10f + .45f * progress : .22f + .66f * progress;
+            float push = p.Role == Role.Defender ? .10f + .45f * progress : .235f + .66f * progress;
             x = slot.x + push;
             // Wide players and full-backs stretch to the touchline in possession
             // (the ball used to never go wider than ~25 m from the centre line).
@@ -1785,8 +1785,12 @@ public sealed partial class MatchEngine
         {
             // Compact block centred a little goal-side of the ball.
             // Real blocks out of possession: ~30 m long, ~33 m wide (ours: 23 / 39).
-            float centre = bx * .50f - .16f;
-            x = centre + (slot.x + .34f) * .76f;
+            // The previous block sat ~12 m too far upfield relative to its
+            // keeper (33 m versus the 21 m tracking reference). Shift the whole
+            // defensive block goal-side while preserving its shape, then open the
+            // slot scale slightly to retain a 25-30 m team length.
+            float centre = bx * .50f - .40f;
+            x = centre + (slot.x + .34f) * .79f;
             z = (slot.z * .66f + bz * .28f) * width;
             if (p.Role == Role.Defender) x = MathF.Min(x, bx - .03f);
             x = MathF.Max(x, -.80f);
@@ -2777,10 +2781,13 @@ public sealed partial class MatchEngine
     }
 
     private bool IsThrowInHold(PlayerState taker)
-        // The restart phase is authoritative. The ball is deliberately clamped
-        // just inside the touchline during the thrower's wind-up, so inferring a
-        // throw-in from its current coordinates can turn a valid restart into a kick.
-        => State.Phase == Phase.ThrowIn && taker.MustPlayBall;
+        // Restart() changes Phase to Play as soon as the taker is placed. Keep
+        // identifying the restart from the authoritative out-of-bounds restart
+        // position, not Phase or Ball.Pos (the latter is clamped inside the line
+        // during the thrower's wind-up).
+        => taker.MustPlayBall
+           && MathF.Abs(State.RestartPos.Z) >= Mx.HalfWidth - .6f
+           && MathF.Abs(State.RestartPos.X) < Mx.HalfLength - 1.5f;
 
     private void AwardFreeKick(int side, Vector3 pos, bool penalty)
     {
