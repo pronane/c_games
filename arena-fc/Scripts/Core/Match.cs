@@ -2318,7 +2318,7 @@ public sealed partial class MatchEngine
         }
         // Aim for the corners when skill is high (placement) or power (far post).
         float cornerBias = shotType == ShotType.Placement || shotType == ShotType.Finesse || shotType == ShotType.Trivela ? .9f : .6f;
-        target.Z = MathF.Sign(target.Z) * Mx.Lerp(Mx.GoalHalfWidth * .2f, Mx.GoalHalfWidth * .76f, p.Spec.Shooting * cornerBias * Rng.Next());
+        target.Z = MathF.Sign(target.Z) * Mx.Lerp(Mx.GoalHalfWidth * .2f, Mx.GoalHalfWidth * .86f, p.Spec.Shooting * cornerBias * Rng.Next());
         // The stick aims the shot: across the goal = that post (the side used to be
         // random, so "aim with the left stick" did nothing).
         if (aim.LengthSquared() > .1f && MathF.Abs(aim.Y) > .2f)
@@ -2862,6 +2862,25 @@ public sealed partial class MatchEngine
                              || State.Phase == Phase.Corner || State.Phase == Phase.GoalKick
                              || penalty;
         taker.Facing = throwIn ? new Vector3(0, 0, -MathF.Sign(State.Ball.Pos.Z)) : Mx.FlatDir(taker.Pos, GoalPos(side));
+        // Put AI opponents outside the restart radius before open play resumes.
+        // Waiting for the next movement tick caused a one-frame encroachment at
+        // some restarts, even though the referee then moved the players back.
+        if (taker.MustPlayBall)
+        {
+            float required = RestartDistance(taker) + .5f;
+            bool ownArea = OwnAreaRestart(taker);
+            float ownGoalX = OwnGoalPos(side).X;
+            foreach (var q in State.Players)
+            {
+                if (q.Team == side || q.SentOff || (penalty && q.IsKeeper)) continue;
+                if (ownArea && InArea(q.Pos, ownGoalX))
+                    q.Pos = OutsideArea(q.Pos, ownGoalX);
+                if (Mx.FlatDist(q.Pos, State.Ball.Pos) < required)
+                    q.Pos = OutsideCircle(State.Ball.Pos, q.Pos, required);
+                q.Target = q.Pos;
+                q.Vel = Vector3.Zero;
+            }
+        }
         // Phase 2.8: set-piece routines.
         bool isCorner = MathF.Abs(State.Ball.Pos.X) > Mx.HalfLength - 3f && MathF.Abs(State.Ball.Pos.Z) > Mx.HalfWidth - 3f;
         bool isThrowIn = State.Phase == Phase.ThrowIn;
@@ -3022,9 +3041,13 @@ public sealed partial class MatchEngine
             // close, runs to one further away, and sprints only to a far target or a duel.
             float dist = d.Length();
             // (a forward attacking the box for a cross - RunType 5 - also goes hard)
-            bool urgent = p.Pressing || (p.RunType == 5 && State.Ball.Owner >= 0)
+            // Close down at a controlled run inside 7 m; only sprint while
+            // pressing when there is still ground to cover. This trims the
+            // high-speed tail without slowing ordinary recovery runs.
+            bool pressingSprint = p.Pressing && dist > 7f;
+            bool urgent = pressingSprint || (p.RunType == 5 && State.Ball.Owner >= 0)
                           || (State.Ball.Owner < 0 && Mx.FlatDist(p.Target, BallFocus()) < 3f);
-            sprint = !human && (dist > (urgent ? 5f : 20f) || p.Pressing) && p.Stamina > .25f;
+            sprint = !human && (dist > (urgent ? 5f : 24f) || pressingSprint) && p.Stamina > .25f;
             if (!urgent && !sprint && wish.LengthSquared() > 0f)
             {
                 // Arrival in real units: walk (<2 m away), jog (~2.5-3.5 m/s up to 10 m),
