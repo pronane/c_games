@@ -10,27 +10,48 @@ namespace ArenaFC.Core;
 /// </summary>
 public static class Shielding
 {
-    /// <summary>Calculate shielding pose offsets.</summary>
-    /// <param name="opponentDirection">Direction to nearest opponent (normalised)</param>
-    /// <param name="opponentDistance">Distance to nearest opponent (metres)</param>
-    /// <param name="strength">Player strength attribute (0-99)</param>
-    /// <returns>(leanX, leanZ, rotationY) — body lean and turn offsets</returns>
+    /// <summary>Calculate shielding pose offsets.
+    /// Orient the body so the torso sits between the ball and the nearest threat,
+    /// lean into the contact, and face the opponent (FC-style hold-up).</summary>
     public static (float leanX, float leanZ, float rotationY) GetPose(
         float opponentDirX, float opponentDirZ,
         float opponentDistance, int strength)
+        => GetPose(opponentDirX, opponentDirZ, opponentDistance, strength, 0f, 0f);
+
+    /// <summary>Same as GetPose, with optional ball direction so the lean keeps
+    /// the body between the ball and the opponent when both are known.</summary>
+    public static (float leanX, float leanZ, float rotationY) GetPose(
+        float opponentDirX, float opponentDirZ,
+        float opponentDistance, int strength,
+        float ballDirX, float ballDirZ)
     {
-        // Shielding activates when opponent is close
         if (opponentDistance > 3f) return (0f, 0f, 0f);
 
-        // Lean away from opponent (protect ball)
+        float invLen = 1f / MathF.Max(1e-4f, MathF.Sqrt(opponentDirX * opponentDirX + opponentDirZ * opponentDirZ));
+        float oX = opponentDirX * invLen;
+        float oZ = opponentDirZ * invLen;
+
+        // Protective face: toward the opponent (primary). When a ball direction is
+        // available, bias slightly so the chest still covers the ball side.
+        float faceX = oX, faceZ = oZ;
+        float bLen = MathF.Sqrt(ballDirX * ballDirX + ballDirZ * ballDirZ);
+        if (bLen > 1e-3f)
+        {
+            float bX = ballDirX / bLen, bZ = ballDirZ / bLen;
+            faceX = oX * 0.85f - bX * 0.15f;
+            faceZ = oZ * 0.85f - bZ * 0.15f;
+            float fLen = MathF.Sqrt(faceX * faceX + faceZ * faceZ);
+            if (fLen > 1e-4f) { faceX /= fLen; faceZ /= fLen; }
+        }
+
         float leanAmount = Math.Clamp(1f - opponentDistance / 3f, 0f, 1f);
-        float leanX = -opponentDirX * leanAmount * 0.15f;
-        float leanZ = -opponentDirZ * leanAmount * 0.15f;
+        // Lean into the opponent (absorb contact) rather than purely away.
+        float leanX = faceX * leanAmount * 0.12f;
+        float leanZ = faceZ * leanAmount * 0.12f;
 
-        // Turn body to face opponent (shield position)
-        float rotationY = (float)Math.Atan2(opponentDirX, opponentDirZ) * 0.3f;
+        float rotationY = MathF.Atan2(faceX, faceZ) * 0.35f;
 
-        // Stronger players shield more effectively (less lean needed)
+        // Stronger players need less exaggerated lean to hold position.
         float strengthFactor = 1f - (strength / 100f) * 0.3f;
         leanX *= strengthFactor;
         leanZ *= strengthFactor;
