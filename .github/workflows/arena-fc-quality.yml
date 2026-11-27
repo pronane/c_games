@@ -122,6 +122,18 @@ jobs:
       - name: Build Godot C# assemblies
         working-directory: arena-fc
         run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Run production rig grounding and animation evidence
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          ARENA_FC_EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
+          ARENA_FC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p "$ARENA_FC_EVIDENCE_DIR"
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy res://Scenes/RuntimeEvidence.tscn
+          test -s "$ARENA_FC_EVIDENCE_DIR/runtime-evidence.json"
+          test -s "$ARENA_FC_EVIDENCE_DIR/production-rig-grounding.png"
       - name: Render procedural rig captures
         working-directory: arena-fc
         env:
@@ -150,4 +162,11 @@ jobs:
         with:
           name: arena-fc-rendered-captures
           path: ${{ runner.temp }}/arena-captures/
+          if-no-files-found: warn
+      - name: Upload production runtime metrics and captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-production-runtime-evidence
+          path: ${{ runner.temp }}/arena-runtime-evidence/
           if-no-files-found: warn
