@@ -144,8 +144,10 @@ public partial class RuntimeEvidenceRunner : Node3D
                 player.Vel = new NVector3(1.27f, 0f, 0f);
                 player.Facing = new NVector3(-MathF.Sin(.55f), 0f, -MathF.Cos(.55f));
 
-                motion.CurrentClipId = i < 120 ? "soccer_run" : i < 240 ? "soccer_sprint" : "soccer_turn";
-                motion.Phase = (motion.Phase + Dt / (i < 120 ? 1.033333f : i < 240 ? 1.033333f : .833333f)) % 1f;
+                string nextClip = i < 120 ? "soccer_run" : i < 240 ? "soccer_sprint" : "soccer_turn";
+                if (!string.Equals(motion.CurrentClipId, nextClip, StringComparison.Ordinal)) motion.Phase = 0f;
+                motion.CurrentClipId = nextClip;
+                motion.Phase = (motion.Phase + Dt / (i < 240 ? 1.033333f : .833333f)) % 1f;
                 var plant = AuthoredPlantState(authoredPlantWindows, motion.CurrentClipId, motion.Phase);
                 motion.FootPlantedLeft = plant.left;
                 motion.FootPlantedRight = plant.right;
