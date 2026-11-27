@@ -130,21 +130,30 @@ public partial class RuntimeEvidenceRunner : Node3D
         Image? centeredEvidenceCapture = null;
         int frames = 0;
 
-        // Each run has 3 deterministic clip segments on both a flat and an 8%
-        // grade. Non-zero yaw and world translation exercise skeleton/world
-        // conversions rather than a rig placed at the origin.
+        // Exercise both travel directions, acceleration/deceleration, changing
+        // yaw, three clip families, and the flat-to-slope boundary. The triangular
+        // path keeps the production rig on the measured collision surface while
+        // testing reversals instead of only one constant-speed traversal.
         rig.Rotation = new Vector3(0f, .55f, 0f);
-        for (int i = 0; i < 360; i++)
+        for (int i = 0; i < 720; i++)
         {
-                float x = -3.8f + 7.6f * i / 359f;
+                int leg = i / 180;
+                float localPhase = (i % 180) / 179f;
+                bool movingPositiveX = (leg % 2) == 0;
+                float x = movingPositiveX
+                    ? -3.8f + 7.6f * localPhase
+                    : 3.8f - 7.6f * localPhase;
                 float y = .2f + MathF.Tan(.08f) * MathF.Max(0f, x);
+                float speed = .45f + 1.65f * (0.5f - 0.5f * MathF.Cos(MathF.PI * localPhase));
+                float yaw = (movingPositiveX ? .55f : 2.59f) + .12f * MathF.Sin(localPhase * MathF.Tau);
                 var worldPosition = new Vector3(x, y, 0f);
                 rig.Position = worldPosition;
+                rig.Rotation = new Vector3(0f, yaw, 0f);
                 player.Pos = new NVector3(worldPosition.X, worldPosition.Y, worldPosition.Z);
-                player.Vel = new NVector3(1.27f, 0f, 0f);
-                player.Facing = new NVector3(-MathF.Sin(.55f), 0f, -MathF.Cos(.55f));
+                player.Vel = new NVector3((movingPositiveX ? 1f : -1f) * speed, 0f, 0f);
+                player.Facing = new NVector3(-MathF.Sin(yaw), 0f, -MathF.Cos(yaw));
 
-                string nextClip = i < 120 ? "soccer_run" : i < 240 ? "soccer_sprint" : "soccer_turn";
+                string nextClip = leg % 3 == 0 ? "soccer_run" : leg % 3 == 1 ? "soccer_sprint" : "soccer_turn";
                 if (!string.Equals(motion.CurrentClipId, nextClip, StringComparison.Ordinal)) motion.Phase = 0f;
                 motion.CurrentClipId = nextClip;
                 motion.Phase = (motion.Phase + Dt / (i < 240 ? 1.033333f : .833333f)) % 1f;
@@ -225,8 +234,9 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["commit_sha"] = System.Environment.GetEnvironmentVariable("ARENA_FC_COMMIT_SHA") ?? "local",
             ["godot_version"] = Engine.GetVersionInfo().ToString(),
             ["renderer"] = ProjectSettings.GetSetting("rendering/renderer/rendering_method").AsString(),
-            ["scenario"] = "production_soccer_clip_rig_flat_and_8_percent_slope_translated_rotated",
+            ["scenario"] = "production_soccer_clip_rig_bidirectional_accelerating_turning_flat_and_8_percent_slope",
             ["frames"] = frames,
+            ["scenario_coverage"] = new[] { "multiple locomotion clips", "positive and negative travel direction", "acceleration and deceleration", "yaw changes", "flat-to-8-percent slope traversal", "clip transitions" },
             ["physics_tick_rate_hz"] = 60,
             ["frame_budget_ms_at_60hz"] = 1000.0 / 60.0,
             ["animation_metric_samples"] = metrics.Samples,
