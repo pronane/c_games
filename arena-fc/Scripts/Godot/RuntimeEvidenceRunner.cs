@@ -303,9 +303,15 @@ public partial class RuntimeEvidenceRunner : Node3D
         for (int i = 0; i < skeleton.GetBoneCount(); i++)
         {
             int parent = skeleton.GetBoneParent(i);
-            float restLength = skeleton.GetBoneRest(i).Origin.Length();
-            if (parent < 0 || restLength < .02f) continue;
-            float actualLength = skeleton.GetBoneGlobalPose(i).Origin.DistanceTo(skeleton.GetBoneGlobalPose(parent).Origin);
+            if (parent < 0) continue;
+            // Both poses are in skeleton space. Compare against the global rest
+            // joint distance too; GetBoneRest(i).Origin is parent-local and can
+            // be scaled by its parent, producing false 3-4x "stretch" reports.
+            float restLength = skeleton.GetBoneGlobalRest(i).Origin.DistanceTo(
+                skeleton.GetBoneGlobalRest(parent).Origin);
+            if (restLength < .02f) continue;
+            float actualLength = skeleton.GetBoneGlobalPose(i).Origin.DistanceTo(
+                skeleton.GetBoneGlobalPose(parent).Origin);
             float ratio = actualLength / restLength;
             if (!float.IsFinite(ratio)) throw new InvalidOperationException("Non-finite skeleton bone pose.");
             if (ratio > maximum) { maximum = ratio; name = skeleton.GetBoneName(i); }
