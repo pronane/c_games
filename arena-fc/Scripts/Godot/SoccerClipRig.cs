@@ -1594,8 +1594,11 @@ public sealed partial class SoccerClipRig : Node3D
         // A bone's rest origin is its offset from its parent. The thigh's
         // length is the shin offset, and the shin's length is the foot offset;
         // the thigh offset itself is hip width, not an upper-leg segment.
-        float l1 = Skel.GetBoneRest(shin).Origin.Length();
-        float l2 = Skel.GetBoneRest(foot).Origin.Length();
+        // hip/knee/ankle positions and IK targets are all in skeleton space,
+        // so use the corresponding global rest joint distances (not parent-local
+        // offsets that omit inherited rest-bone scale).
+        float l1 = Skel.GetBoneGlobalRest(shin).Origin.DistanceTo(Skel.GetBoneGlobalRest(thigh).Origin);
+        float l2 = Skel.GetBoneGlobalRest(foot).Origin.DistanceTo(Skel.GetBoneGlobalRest(shin).Origin);
         if (l1 < 0.001f || l2 < 0.001f) return;
         var toTarget = targetSkel - hip;
         float targetDist = toTarget.Length();
