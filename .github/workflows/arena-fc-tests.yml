@@ -145,7 +145,7 @@ jobs:
           dotnet build ArenaFC.sln -c Debug -v:q 2>&1 | tee build-debug.log
       - name: Import Godot resources (textures, materials and scene assets)
         working-directory: arena-fc
-        run: "$GODOT" --headless --editor --path . --import --quit
+        run: '"$GODOT" --headless --editor --path . --import --quit'
       - name: In-engine selftest (real nodes, real match)
         working-directory: arena-fc
         run: |
