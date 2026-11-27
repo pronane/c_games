@@ -94,6 +94,9 @@ public partial class RuntimeEvidenceRunner : Node3D
         if (!rig.Soccer.HasFootIkBones)
             throw new InvalidOperationException(
                 "Production skeleton bones were found by validation but were not cached by the runtime foot-IK solver.");
+        if (!rig.Soccer.HasSoleGeometry)
+            throw new InvalidOperationException(
+                "Production boot meshes did not provide sole vertices for both feet; refusing to substitute ankle-based measurements.");
 
         var metrics = new AnimationMetrics();
         rig.Soccer.AnimMetrics = metrics;
@@ -119,7 +122,7 @@ public partial class RuntimeEvidenceRunner : Node3D
         var updateMs = new List<double>();
         var processMs = new List<double>();
         var physicsMs = new List<double>();
-        var ankleClearance = new List<float>();
+        var soleClearance = new List<float>();
         float maxBoneStretchRatio = 0f;
         string maxBoneStretchName = "";
         Image? centeredEvidenceCapture = null;
@@ -166,8 +169,8 @@ public partial class RuntimeEvidenceRunner : Node3D
                 }
                 if (i % 6 == 0)
                 {
-                    SampleAnkleClearance(rig.Soccer.Skel, "foot_L", ankleClearance);
-                    SampleAnkleClearance(rig.Soccer.Skel, "foot_R", ankleClearance);
+                    SampleSoleClearance(rig.Soccer, "L", soleClearance);
+                    SampleSoleClearance(rig.Soccer, "R", soleClearance);
                 }
 
                 // Capture near the centre of the deterministic traversal. Capturing
@@ -198,11 +201,17 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException($"Insufficient planted-foot measurements: {metrics.Samples}");
         if (metrics.TransitionMeasurements < 2)
             throw new InvalidOperationException($"Expected clip-transition measurements, got {metrics.TransitionMeasurements}");
-        if (updateMs.Count != frames || ankleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
+        if (updateMs.Count != frames || soleClearance.Count == 0 || maxBoneStretchRatio <= 0f)
             throw new InvalidOperationException("Runtime evidence collection was incomplete.");
         // Gross anatomical safety guard, not an animation-quality threshold.
         // Each child joint should remain near its authored parent offset; this
         // catches severe persistent global overrides that pull limbs apart.
+
+        var passContact = RunMatchContactScenario(spec, shoot: false);
+        var shotContact = RunMatchContactScenario(spec, shoot: true);
+        if (!passContact.success || !shotContact.success)
+            throw new InvalidOperationException($"Match-engine contact scenario failed: pass={passContact.detail}; shot={shotContact.detail}");
+        double averageContactErrorFrames = (passContact.errorFrames + shotContact.errorFrames) * .5;
 
         var report = new Dictionary<string, object>
         {
@@ -219,14 +228,20 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["transition_measurements"] = metrics.TransitionMeasurements,
             ["avg_transition_discontinuity"] = metrics.AvgTransitionDiscontinuity,
             ["transition_metric_scope"] = "mean_raw_pose_offset_on_inertialized_upper_body_bones",
-            ["contact_events"] = metrics.ContactEvents,
-            ["avg_contact_frame_error"] = metrics.ContactEvents > 0 ? (object)metrics.AvgContactFrameError : "not_measured",
-            ["ground_clearance_metric"] = "ankle_bone_origin_to_collision_surface_not_sole_clearance",
+            ["contact_events"] = 2,
+            ["avg_contact_frame_error"] = averageContactErrorFrames,
+            ["contact_measurement_scope"] = "actual MatchEngine pass/shot ball release sampled against the production kick clip authored ball_contact frame",
+            ["match_contact_scenarios"] = new Dictionary<string, object>
+            {
+                ["pass"] = new { error_frames = passContact.errorFrames, detail = passContact.detail },
+                ["shot"] = new { error_frames = shotContact.errorFrames, detail = shotContact.detail }
+            },
+            ["ground_clearance_metric"] = "lowest production boot mesh sole vertex to collision surface",
             ["max_bone_parent_distance_vs_rest"] = maxBoneStretchRatio,
             ["max_bone_parent_distance_bone"] = maxBoneStretchName,
             ["bone_stretch_metric_scope"] = "maximum parent-child joint distance divided by authored rest offset; not mesh deformation",
-            ["ankle_ground_clearance_min_m"] = ankleClearance.Min(),
-            ["ankle_ground_clearance_max_m"] = ankleClearance.Max(),
+            ["sole_ground_clearance_min_m"] = soleClearance.Min(),
+            ["sole_ground_clearance_max_m"] = soleClearance.Max(),
             ["rig_update_avg_ms"] = updateMs.Average(),
             ["rig_update_p95_ms"] = Percentile(updateMs, .95),
             ["rig_update_max_ms"] = updateMs.Max(),
@@ -284,19 +299,72 @@ public partial class RuntimeEvidenceRunner : Node3D
         AddChild(body);
     }
 
-    private void SampleAnkleClearance(Skeleton3D skeleton, string boneName, List<float> values)
+    private void SampleSoleClearance(SoccerClipRig soccer, string side, List<float> values)
     {
-        if (skeleton == null) return;
-        int index = SoccerClipRig.FindBoneLoose(skeleton, boneName);
-        if (index < 0) return;
-        Vector3 ankleWorld = (skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(index)).Origin;
+        Vector3 soleWorld = soccer.SoleWorldPosition(side);
         var query = PhysicsRayQueryParameters3D.Create(
-            ankleWorld + Vector3.Up * .5f, ankleWorld - Vector3.Up * .8f);
+            soleWorld + Vector3.Up * .5f, soleWorld - Vector3.Up * .8f);
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
         if (hit.Count == 0 || !hit.ContainsKey("position")) return;
         var ground = (Vector3)hit["position"];
-        float clearance = ankleWorld.Y - ground.Y;
+        float clearance = soleWorld.Y - ground.Y;
         if (float.IsFinite(clearance)) values.Add(clearance);
+    }
+
+    private (bool success, double errorFrames, string detail) RunMatchContactScenario(CharacterSpec spec, bool shoot)
+    {
+        var engine = new MatchEngine(new MatchOptions { Seed = shoot ? 7319 : 7318, TeamSize = 11, TimeSpeed = 15f });
+        engine.State.Phase = Phase.Play;
+        engine.State.PhaseTimer = 0f;
+        engine.State.ControlLock = 10f;
+        engine.State.Controlled = 0;
+        var player = engine.State.Players[0];
+        player.DecisionTimer = 10f;
+        player.PossessionLock = 0f;
+        player.TackleLock = 0f;
+        player.Stamina = 1f;
+        player.Facing = NVector3.UnitX;
+        player.Target = player.Pos;
+        var receiver = engine.State.Players[1];
+        receiver.Pos = player.Pos + new NVector3(8f, 0f, 2f);
+        var ball = engine.State.Ball;
+        ball.Owner = player.Index;
+        ball.Vel = NVector3.Zero;
+        ball.Spin = NVector3.Zero;
+        ball.FreeTime = .2f;
+        ball.NoPickup = 0f;
+        ball.PassFrom = -1;
+        ball.PassReceiver = -1;
+        ball.Pos = player.Pos + new NVector3(.4f, Mx.BallRadius, 0f);
+
+        var actionRig = RigFactory.Create(spec);
+        AddChild(actionRig);
+        if (actionRig.Soccer == null || actionRig.Soccer.Player == null)
+            return (false, 0, "production action rig unavailable");
+        const string actionClip = "soccer_kick_place"; // engine pass and standard shot both author the kick action
+        float authoredContactTime = actionRig.Soccer.AuthoredContactTime(actionClip);
+        float authoredFps = actionRig.Soccer.AuthoredClipFps(actionClip);
+        if (authoredContactTime <= 0f || authoredFps <= 0f)
+            return (false, 0, $"{actionClip} has no authored ball_contact frame in the production manifest");
+
+        bool started = false;
+        for (int tick = 0; tick < 60; tick++)
+        {
+            var command = tick == 0
+                ? shoot ? new PlayerCommand { Shoot = true, Charge = .8f } : new PlayerCommand { Pass = true }
+                : PlayerCommand.None;
+            engine.Step(Dt, command);
+            actionRig.Soccer.Update(player, Dt);
+            if (player.ActionTimer > 0f && player.Action == "kick") started = true;
+            if (started && !ball.HasPending && ball.Vel.LengthSquared() > .1f)
+            {
+                float animationTime = actionRig.Soccer.Player.CurrentAnimationPosition;
+                double errorFrames = Math.Abs(animationTime - authoredContactTime) * authoredFps;
+                return (true, errorFrames,
+                    $"release_tick={tick} animation_time={animationTime:F4}s authored_contact={authoredContactTime:F4}s fps={authoredFps:F1}");
+            }
+        }
+        return (false, 0, $"{(shoot ? "shot" : "pass")} did not release the ball during its 60-tick action window; action={player.Action}, pending={ball.HasPending}, speed={ball.Vel.Length():F3}");
     }
 
     private static double Percentile(List<double> values, double percentile)
