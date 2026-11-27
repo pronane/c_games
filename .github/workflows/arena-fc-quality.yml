@@ -139,6 +139,13 @@ jobs:
           EVIDENCE_JSON: ${{ runner.temp }}/arena-runtime-evidence/runtime-evidence.json
         run: |
           python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} bone_stretch={:.3f} bone={} transitions={} ankle_clearance_m=[{:.3f},{:.3f}]".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["max_bone_parent_distance_vs_rest"], d["max_bone_parent_distance_bone"], d["transition_measurements"], d["ankle_ground_clearance_min_m"], d["ankle_ground_clearance_max_m"]))'
+      - name: Publish compact diagnostic thumbnails
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
+        run: |
+          for label in run-flat sprint-flat-to-ramp turn-ramp; do
+            echo "::notice title=Rig thumbnail $label::$(base64 -w0 "$EVIDENCE_DIR/$label-thumbnail.png")"
+          done
       - name: Render procedural rig captures
         working-directory: arena-fc
         env:

@@ -182,6 +182,12 @@ public partial class RuntimeEvidenceRunner : Node3D
                     string label = i == 60 ? "run-flat" : i == 180 ? "sprint-flat-to-ramp" : "turn-ramp";
                     if (capture.SavePng(Path.Combine(output, label + ".png")) != Error.Ok)
                         throw new InvalidOperationException("Could not save " + label + " evidence image.");
+                    // Compact copy used to inspect workflow evidence when the
+                    // artifact storage service is unreachable from a client.
+                    var thumbnail = GetViewport().GetTexture().GetImage();
+                    thumbnail.Resize(320, 180, Image.Interpolation.Bilinear);
+                    if (thumbnail.SavePng(Path.Combine(output, label + "-thumbnail.png")) != Error.Ok)
+                        throw new InvalidOperationException("Could not save evidence thumbnail.");
                     if (i == 180) centeredEvidenceCapture = capture;
                 }
                 frames++;
