@@ -160,8 +160,8 @@ public partial class RuntimeEvidenceRunner : Node3D
 
                 double frame = Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000.0;
                 double physics = Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000.0;
-                if (frame > 0 && double.IsFinite(frame)) processMs.Add(frame);
-                if (physics > 0 && double.IsFinite(physics)) physicsMs.Add(physics);
+                if (i >= 30 && frame > 0 && double.IsFinite(frame)) processMs.Add(frame);
+                if (i >= 30 && physics > 0 && double.IsFinite(physics)) physicsMs.Add(physics);
 
                 var stretch = MeasureBoneStretch(rig.Soccer.Skel);
                 if (stretch.ratio > maxBoneStretchRatio)
@@ -257,8 +257,12 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["rig_update_avg_ms"] = updateMs.Average(),
             ["rig_update_p95_ms"] = Percentile(updateMs, .95),
             ["rig_update_max_ms"] = updateMs.Max(),
+            ["rig_update_spikes_over_16_67ms"] = updateMs.Count(x => x > 1000.0 / 60.0),
             ["engine_frame_avg_ms"] = processMs.Count > 0 ? processMs.Average() : 0,
+            ["engine_frame_p95_ms"] = Percentile(processMs, .95),
+            ["engine_frame_max_ms"] = processMs.Count > 0 ? processMs.Max() : 0,
             ["engine_physics_avg_ms"] = physicsMs.Count > 0 ? physicsMs.Average() : 0,
+            ["engine_physics_p95_ms"] = Percentile(physicsMs, .95),
             ["static_memory_bytes"] = Performance.GetMonitor(Performance.Monitor.MemoryStatic),
             ["draw_calls"] = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame)
         };
@@ -282,6 +286,8 @@ public partial class RuntimeEvidenceRunner : Node3D
             throw new InvalidOperationException($"Contact timing regression: pass={passContact.errorFrames:F2} frames, shot={shotContact.errorFrames:F2} frames (each limit 4.0).");
         if (Percentile(updateMs, .95) > 1.0)
             throw new InvalidOperationException($"Rig update p95 {Percentile(updateMs, .95):F3} ms exceeds 1.0 ms budget.");
+        if (updateMs.Count(x => x > 1000.0 / 60.0) > 2)
+            throw new InvalidOperationException($"Rig update had {updateMs.Count(x => x > 1000.0 / 60.0)} spikes above the 16.67 ms frame budget (limit 2).");
         GetTree().Quit(0);
     }
 
