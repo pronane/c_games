@@ -359,7 +359,7 @@ public partial class RuntimeEvidenceRunner : Node3D
             if (player.ActionTimer > 0f && player.Action == "kick") started = true;
             if (started && !ball.HasPending && ball.Vel.LengthSquared() > .1f)
             {
-                float animationTime = actionRig.Soccer.Player.CurrentAnimationPosition;
+                double animationTime = actionRig.Soccer.Player.CurrentAnimationPosition;
                 double errorFrames = Math.Abs(animationTime - authoredContactTime) * authoredFps;
                 return (true, errorFrames,
                     $"release_tick={tick} animation_time={animationTime:F4}s authored_contact={authoredContactTime:F4}s fps={authoredFps:F1}");
