@@ -181,8 +181,6 @@ jobs:
     name: Graphics shots (${{ matrix.side }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # The base side can't take shots until this benchmark has merged (no --shot-out flag yet).
-    continue-on-error: ${{ matrix.side == 'base' }}
     strategy:
       fail-fast: false
       matrix:
@@ -239,7 +237,9 @@ jobs:
           rc=0; bash Tools/graphics_shots.sh "$out" opengl3 || rc=$?
           python3 Tools/graphics_benchmark.py measure --shots "$out" --glb Data/models/soccer_player.glb \
             --out "$out/graphics.json" > /dev/null
-          exit $rc   # a missing shot fails the job (after measuring the rest)
+          # A missing shot fails the head side. The base side may predate the shot flags
+          # (until this benchmark has merged), so there it only means fewer base numbers.
+          if [ "${{ matrix.side }}" = head ]; then exit $rc; fi
       - uses: actions/upload-artifact@v4
         if: always() && steps.ref.outputs.sha != ''
         with:
