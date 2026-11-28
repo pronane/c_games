@@ -12,7 +12,8 @@
 "source_url": "https://www.ianxmason.com/100style/",
 "redistribution": "yes",
 "attribution": "The 100STYLE Dataset - Ian Mason",
-"notes": "Retargeted onto the Arena FC skeleton; loops cut from the dataset's Frame_Cuts spans."
+"notes": "Retargeted onto the Arena FC skeleton; loops cut from the dataset's Frame_Cuts spans.",
+"ml_training": "yes"
 },
 "duration": 0.8667,
 "keys": [
@@ -1663,5 +1664,13 @@
 0.031,
 -1.088
 ]
+},
+"tags": {
+"action": "backpedal",
+"gait": "walk",
+"direction": "back",
+"style": "bentknees",
+"source": "100style",
+"capture": "studio"
 }
 }

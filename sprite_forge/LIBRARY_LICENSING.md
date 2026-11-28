@@ -14,6 +14,7 @@ It is practical guidance, not legal advice.
 | `source_url` | where you got it |
 | `redistribution` | `yes` / `no` / `unknown`. May it be passed on to other people as a file? |
 | `attribution` | the credit line to show (required for CC-BY and similar) |
+| `ml_training` | `yes` / `no` / `unknown` (v11.40). May machine-learning models be trained on it? See below. |
 | `includes` | added automatically: clips retargeted from other assets, with their licences |
 | `rights_override` | added only by an explicit "I own the rights" confirmation (who, when, statement) |
 
@@ -36,10 +37,23 @@ It is practical guidance, not legal advice.
   * refuses unsafe paths;
   * records where each asset came from.
 
+## Training models on assets (`ml_training`)
+Redistribution and training are separate questions. A Mixamo clip may ship inside your game but Adobe's terms
+forbid using it to train models. A free pack whose terms say nothing about training is not a yes.
+* Set it with `--ml-training yes|no|unknown` (`library add` / `library licence`, `motion import`) or the
+  Licence dialog.
+* When a record has no `ml_training`, `sforge.motiontags.training_allowed` reads it from the licence:
+  * CC0, CC-BY, MIT, Apache, BSD and your own footage give `yes`;
+  * NC or ND variants and Mixamo give `no`;
+  * anything else (store EULAs, packs whose terms are silent) gives `unknown`.
+* Learned motion matching, motion generators and the pose lifter train **only** on `yes`. `unknown` stays out
+  until you have checked the terms (or asked the author) and set it.
+* `python3 tools/retag_motions.py FOLDER` reports how many moves per source may be used for training.
+
 ## Third-party stores (terms differ and change: read them)
 * **Mixamo (Adobe):** characters and animations are royalty-free to use in your own projects and games, but
   the raw files may not be redistributed (for example as an asset pack).
-  * Keep Mixamo downloads at `redistribution = no`.
+  * Keep Mixamo downloads at `redistribution = no` and `ml_training = no`.
   * Clips retargeted from Mixamo are still Mixamo data, and the `includes` tracking keeps them out of packs.
   * Do not use the "I own the rights" confirmation for them.
   * Source: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html

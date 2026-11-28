@@ -13,7 +13,8 @@
   "source_url": "",
   "redistribution": "yes",
   "attribution": "",
-  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips."
+  "notes": "Generated from Sprite Forge's own procedural motions. No third-party clips.",
+  "ml_training": "yes"
  },
  "duration": 0.8,
  "keys": [
@@ -169,5 +170,9 @@
    }
   ]
  ],
- "cleanup": null
+ "cleanup": null,
+ "tags": {
+  "action": "celebration",
+  "capture": "procedural"
+ }
 }

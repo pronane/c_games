@@ -12,7 +12,8 @@
 "source_url": "https://huggingface.co/datasets/atomscott/soccertrack-v2",
 "redistribution": "yes",
 "attribution": "Motion derived from SoccerTrack v2 (Scott et al., CC BY 4.0); changed: 3D pose estimated and fitted to a game skeleton.",
-"notes": "Anonymous joint motion from match video (no images kept). Models: RTMPose-l body + feet (Halpe-26), OpenMMLab (Apache-2.0 (code and weights release)); Sprite Forge 2D->3D pose lifter v1 (trained here) (MIT (derived from SkillCorner Open Data body pose, MIT))"
+"notes": "Anonymous joint motion from match video (no images kept). Models: RTMPose-l body + feet (Halpe-26), OpenMMLab (Apache-2.0 (code and weights release)); Sprite Forge 2D->3D pose lifter v1 (trained here) (MIT (derived from SkillCorner Open Data body pose, MIT))",
+"ml_training": "yes"
 },
 "duration": 0.48,
 "keys": [
@@ -787,5 +788,12 @@
 0.0,
 4.287
 ]
+},
+"tags": {
+"action": "dribble",
+"gait": "run",
+"direction": "forward",
+"source": "soccertrack",
+"capture": "match_video"
 }
 }

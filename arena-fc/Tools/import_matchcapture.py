@@ -50,7 +50,7 @@ LICENCE = dict(
                 "and allows its use in Arena FC and Sprite Forge.",
     author="Arena FC (own match recordings)",
     source_url="",
-    redistribution="yes",
+    redistribution="yes", ml_training="yes",  # v11.40: our own footage
     attribution="Real match motion from our own recordings.",
     notes="",
 )

@@ -51,7 +51,7 @@ LICENCE = dict(
     custom_text="",
     author="SkillCorner (with PySport)",
     source_url="https://huggingface.co/datasets/SkillCorner/opendata-bodypose",
-    redistribution="yes",
+    redistribution="yes", ml_training="yes",  # v11.40: MIT
     attribution="Body pose and event data: SkillCorner Open Data (MIT licence).",
     notes=("3D joints estimated from broadcast video (7-15 cm per joint). Events from "
            "github.com/SkillCorner/opendata. Fitted onto the shared skeleton with sforge.jointtrack."),

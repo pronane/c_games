@@ -12,7 +12,8 @@
 "source_url": "https://www.ianxmason.com/100style/",
 "redistribution": "yes",
 "attribution": "The 100STYLE Dataset - Ian Mason",
-"notes": "Retargeted onto the Arena FC skeleton; loops cut from the dataset's Frame_Cuts spans."
+"notes": "Retargeted onto the Arena FC skeleton; loops cut from the dataset's Frame_Cuts spans.",
+"ml_training": "yes"
 },
 "duration": 0.8333,
 "keys": [
@@ -1603,5 +1604,13 @@
 -0.078,
 1.716
 ]
+},
+"tags": {
+"action": "run",
+"gait": "jog",
+"direction": "forward",
+"style": "proud",
+"source": "100style",
+"capture": "studio"
 }
 }
