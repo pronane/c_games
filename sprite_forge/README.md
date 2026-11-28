@@ -76,6 +76,9 @@ fewer frames. The starter has no Mixamo or Meshy clips (v11.41's owned Meshy cli
   spelled out in the prompt (run-up steps, plant foot, follow-through height, where the arms go). The free kick,
   penalty and header now play Meshy (**64 actions**); the tackle, poke tackle, shoulder charge and ball roll keep
   their clips after three takes each, and the reasons are in `MESHY_REJECTED`.
+* **v11.45:** two more prime takes each for those four, the opponent described as an object and the body shape
+  spelled out (a deep lunge with the leg along the ground, a sideways barge with bent knees, the sole across the
+  body). The picked takes beat the old clips on the Arena player: **all 68 reviewed actions now play Meshy**.
 
 ## New in v11.42: full move catalogues (soccer, Gaelic, hurling), in Arena FC and Gaelic Football 3D
 

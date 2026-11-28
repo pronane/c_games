@@ -466,10 +466,10 @@
   },
   "ball_roll": {
    "category": "Skill",
-   "duration": 2.5,
+   "duration": 3.0,
    "loop": false,
    "library": "run",
-   "prompt": "A professional football (soccer) player rolls the ball: standing over the ball, puts the sole of the right foot on top of it and drags it sideways across in front of the body to the left, taking two side steps to the left with it, the right foot sliding across the ground, then pushes it forward.",
+   "prompt": "A professional football (soccer) player stands with the ball in front, lifts the right foot, places the sole on top of the ball and rolls it from right to left across the front of the body, then takes a side step to the left after it, and does it once more.",
    "mode": "prime"
   },
   "heel_chop": {
@@ -616,7 +616,7 @@
    "duration": 2.5,
    "loop": false,
    "library": "kick",
-   "prompt": "A professional football (soccer) player makes a block tackle: sprints two steps towards an opponent, plants the left foot and lunges forward low, the right leg stretched far out in front with the inside of the foot blocking the ball, the body leaning hard into the challenge, then recovers to standing.",
+   "prompt": "A professional football (soccer) player jogs in and makes a block tackle: plants the left foot and throws the right leg forward along the ground, knee bent, the inside of the right foot facing forward to block the ball, upper body low over the front knee, arms out wide, then pushes back up to standing.",
    "mode": "prime"
   },
   "slide_tackle": {
@@ -632,7 +632,7 @@
    "duration": 2.5,
    "loop": false,
    "library": "kick",
-   "prompt": "A professional football (soccer) player pokes the ball away: from a crouched defensive stance, lunges forward and to the side with a big step, stretching the right leg out fully along the ground to toe the ball away, both arms out for balance, then pulls back to standing.",
+   "prompt": "A professional football (soccer) player in a defending stance takes one long step to the side and stretches the right leg straight out along the ground, reaching as far as possible with the toe to poke the ball away, body leaning the other way, arms out, then recovers.",
    "mode": "prime"
   },
   "block_shot": {
@@ -648,7 +648,7 @@
    "duration": 2.5,
    "loop": false,
    "library": "walk",
-   "prompt": "A professional football (soccer) player barges an opponent: runs, then leans the whole upper body sideways hard into the opponent on the left, the left shoulder driving into them, elbow tucked in, feet wide, pushing with the legs, then straightens up and keeps running.",
+   "prompt": "A professional football (soccer) player stands side-on with feet wide, bends the knees and drives the left shoulder sideways into an opponent with a short strong push of the legs, staying on the feet, arms tucked in, then steps back.",
    "mode": "prime"
   },
   "interception": {

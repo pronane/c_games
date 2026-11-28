@@ -6977,11 +6977,11 @@
    "loop": false,
    "category": "Skill",
    "source": "meshy:mz_soccer_ball_roll",
-   "frames": 75,
+   "frames": 90,
    "fps": 30.0,
    "events": {
-    "ball_contact": 44,
-    "ball_contact_frac": 0.595,
+    "ball_contact": 19,
+    "ball_contact_frac": 0.213,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8723,11 +8723,11 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 26,
-    "ball_contact_frac": 0.351,
+    "ball_contact": 15,
+    "ball_contact_frac": 0.203,
     "footsteps": [],
-    "hit_start": 17,
-    "hit_end": 35
+    "hit_start": 6,
+    "hit_end": 24
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -8966,11 +8966,11 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 16,
-    "ball_contact_frac": 0.216,
+    "ball_contact": 19,
+    "ball_contact_frac": 0.257,
     "footsteps": [],
-    "hit_start": 7,
-    "hit_end": 25
+    "hit_start": 10,
+    "hit_end": 28
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -9448,11 +9448,11 @@
   "toe_lift": "soccer_mz_flick_up",
   "pickup": "soccer_pickup",
   "catch": "soccer_mz_gk_catch_chest",
-  "tackle": "soccer_tackle",
+  "tackle": "soccer_mz_tackle",
   "slide": "soccer_mz_slide_tackle",
   "slide_tackle": "soccer_mz_slide_tackle",
-  "shoulder_charge": "soccer_shoulder_charge",
-  "dispossess": "soccer_dispossess",
+  "shoulder_charge": "soccer_mz_shoulder_challenge",
+  "dispossess": "soccer_mz_poke_tackle",
   "block": "soccer_mz_block_shot",
   "foul": "soccer_mz_fall_tripped",
   "stumble": "soccer_mz_stumble",
@@ -9509,7 +9509,7 @@
   "skill_roulette": "soccer_mz_roulette",
   "skill_drag_back": "soccer_mz_drag_back",
   "skill_elastico": "soccer_mz_elastico",
-  "skill_ball_roll": "soccer_skill_ball_roll",
+  "skill_ball_roll": "soccer_mz_ball_roll",
   "skill_rainbow": "soccer_mz_rainbow_flick",
   "skill_fake_shot": "soccer_mz_fake_shot",
   "skill_heel_to_heel": "soccer_mz_heel_to_heel",

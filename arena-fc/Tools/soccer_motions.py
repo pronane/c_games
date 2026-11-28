@@ -577,12 +577,12 @@ MESHY_ACTIONS = {           # kept after a side-by-side review of old vs Meshy o
     "keeper_ground_catch": "gk_collect_low", "skill_heel_to_heel": "heel_to_heel", "skill_step_over": "stepover",
     # v11.44: prime takes with sharper prompts (body mechanics spelled out), reviewed and kept
     "free_kick": "free_kick_curl", "penalty_kick": "penalty_kick", "header": "header_jump",
+    # v11.45: two prime takes each, the opponent described as an object and the body shape spelled out
+    "tackle": "tackle", "dispossess": "poke_tackle", "shoulder_charge": "shoulder_challenge",
+    "skill_ball_roll": "ball_roll",
 }
 # Reviewed and left on their old clips: the swift Meshy take was weaker (see sprite_forge/README v11.42).
-MESHY_REJECTED = {          # still on their old clips after three Meshy takes each (swift, prime, sharper prime)
-    "tackle": "a crouch and stand, no lunge, in all three", "dispossess": "a milder lunge than the old clip",
-    "shoulder_charge": "the sharper take drops almost to the ground", "skill_ball_roll": "no clearer than the old clip",
-}
+MESHY_REJECTED = {}         # v11.45: every reviewed action now has a Meshy take that beat its old clip
 BASE_ACTIONS = set(ACTION_ALIASES)
 for _a, _m in MESHY_ACTIONS.items():
     ACTION_ALIASES[_a] = _mz(_m, ACTION_ALIASES.get(_a, "soccer_idle"))
