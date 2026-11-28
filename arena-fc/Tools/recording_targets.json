@@ -11,7 +11,7 @@
     "min_pitch_fraction": 0.2
   },
   "gameplay": {
-    "min_passes": 4,
+    "min_passes": 3,
     "min_possession_changes": 1,
     "min_ball_distance_m": 60,
     "min_player_distance_m": 600,
