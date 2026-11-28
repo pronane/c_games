@@ -260,10 +260,14 @@ public partial class Boot : Node3D
         _shot = false;
         var tex = GetViewport().GetTexture();
         if (tex == null) { GD.Print("ARENA_FC_SCREENSHOT_SKIPPED (headless)"); GetTree().Quit(0); return; }
-        string path = "user://screenshot.png";
+        // --shot-out PATH: where to save it (default user://screenshot.png)
+        var ua = OS.GetCmdlineUserArgs();
+        int so = Array.IndexOf(ua, "--shot-out");
+        string path = so >= 0 && so + 1 < ua.Length ? ua[so + 1] : "user://screenshot.png";
         var img = tex.GetImage();
         var err = img.SavePng(path);
         GD.Print($"ARENA_FC_SCREENSHOT {ProjectSettings.GlobalizePath(path)} err={err} size={img.GetWidth()}x{img.GetHeight()}");
+        if (GraphicsReport.PathFromArgs() is string gr) GraphicsReport.Write(gr, GetViewport(), img);
         img.Dispose();
         GetTree().Quit(0);
     }
