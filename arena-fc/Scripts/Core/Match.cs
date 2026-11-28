@@ -130,6 +130,11 @@ public sealed class PlayerState
     /// <summary>Authoritative action intent for the active one-shot (pass/shoot/clear/tackle...).
     /// Preserved across ticks while ActionTimer > 0 so animation contracts persist.</summary>
     public string ActionIntent = "";
+    /// <summary>TacticalCoordinator hysteresis: the role held last tick and for how many
+    /// ticks.  Lives in the state (not the coordinator) so checkpoints, rollback and
+    /// CopyFrom carry it - otherwise a resimulated tick can pick a different presser.</summary>
+    public string TacticalRole = "";
+    public int TacticalRoleHold;
     /// <summary>Phase 0 event sync: total duration of the current one-shot and the
     /// elapsed seconds at which ball contact occurs (ball_contact_frac * duration).
     /// The sim releases/captures the ball at that moment; the animation layer
@@ -204,6 +209,8 @@ public sealed class MatchState
     public float PhaseTimer, Clock;
     public int Half = 1;
     public int[] Score = new int[2];
+    /// <summary>TacticalCoordinator hysteresis: each team's presser last tick (-1 none).</summary>
+    public int[] TacticalPresser = { -1, -1 };
     public int[] Shots = new int[2], ShotsOnTarget = new int[2], Passes = new int[2], Fouls = new int[2], Corners = new int[2];
     public int[] YellowCards = new int[2], RedCards = new int[2];
     /// <summary>Stoppage time for the current half, in game seconds. Accrued from
@@ -3699,10 +3706,10 @@ public sealed partial class MatchEngine
         _ballPredLong = null;
         _ballPredLongTick = -1;
         _ballPredLongHorizon = 0f;
-        _tactical.ClearState();
-        TacticalRoleChanges = 0;
-        TacticalPressAssignments = 0;
-        TacticalCoverAssignments = 0;
+        // The coordinator's hysteresis is part of MatchState (TacticalRole / TacticalPresser),
+        // so a restore keeps it: clearing it here made resimulated ticks pick a different
+        // presser than the peer that never rolled back (netplay desync).  Only per-tick
+        // caches are dropped; the telemetry counters keep counting.
         LastActionContracts.Clear();
     }
 

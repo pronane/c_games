@@ -26,17 +26,9 @@ public sealed class TacticalCoordinator
         public float Priority;
     }
 
-    private readonly Dictionary<int, string> _prevRole = new();
-    private readonly Dictionary<int, int> _roleHoldTicks = new();
-    private readonly int[] _prevPresserByTeam = { -1, -1 };
-
-    public void ClearState()
-    {
-        _prevRole.Clear();
-        _roleHoldTicks.Clear();
-        _prevPresserByTeam[0] = -1;
-        _prevPresserByTeam[1] = -1;
-    }
+    // Hysteresis lives in the match state (PlayerState.TacticalRole / TacticalRoleHold,
+    // MatchState.TacticalPresser) so engine checkpoints and rollback restore it: the
+    // coordinator itself is stateless and every peer resimulates the same presser.
 
     public List<Assignment> BuildAssignments(MatchState s, int team, BallTrajectory? ballPred = null)
     {
@@ -77,9 +69,9 @@ public sealed class TacticalCoordinator
         {
             presser = byReach.Count > 0 ? byReach[0].idx : -1;
             // Hysteresis: keep current presser if close enough to avoid oscillation.
-            if (presser >= 0 && (!_prevRole.TryGetValue(presser, out var prRole) || prRole != "press"))
+            if (presser >= 0 && s.Players[presser].TacticalRole != "press")
             {
-                int prevPresser = (team >= 0 && team < _prevPresserByTeam.Length) ? _prevPresserByTeam[team] : -1;
+                int prevPresser = (team >= 0 && team < s.TacticalPresser.Length) ? s.TacticalPresser[team] : -1;
                 if (prevPresser >= 0 && prevPresser != presser && prevPresser < s.Players.Length)
                 {
                     var pp = s.Players[prevPresser];
@@ -189,14 +181,14 @@ public sealed class TacticalCoordinator
 
             // Stability bookkeeping: track how long the assigned role has been held.
             // (True target-consistent hysteresis enforcement is a follow-up; this fixes the broken counter.)
-            bool roleChanged = _prevRole.TryGetValue(p.Index, out var prev) && prev != a.Role;
-            _roleHoldTicks[p.Index] = roleChanged ? 0 : (_roleHoldTicks.TryGetValue(p.Index, out int h) ? h + 1 : 1);
-            _prevRole[p.Index] = a.Role;
+            bool roleChanged = p.TacticalRole != "" && p.TacticalRole != a.Role;
+            p.TacticalRoleHold = roleChanged ? 0 : p.TacticalRoleHold + 1;
+            p.TacticalRole = a.Role;
             list.Add(a);
         }
         int newPresser = -1;
         foreach (var a in list) if (a.Role == "press") { newPresser = a.PlayerIndex; break; }
-        if (team >= 0 && team < _prevPresserByTeam.Length) _prevPresserByTeam[team] = newPresser;
+        if (team >= 0 && team < s.TacticalPresser.Length) s.TacticalPresser[team] = newPresser;
         return list;
     }
 
