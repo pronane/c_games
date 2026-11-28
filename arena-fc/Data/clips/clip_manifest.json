@@ -168,7 +168,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.3033
     },
     {
       "id": "soccer_bicycle_kick",
@@ -1937,7 +1938,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.5586
     },
     {
       "id": "soccer_drop_kick",
@@ -4507,7 +4509,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.1377
     },
     {
       "id": "soccer_juke_feint",
@@ -8179,7 +8182,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.512
     },
     {
       "id": "soccer_mocap_jog_b",
@@ -8348,7 +8352,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.4369
     },
     {
       "id": "soccer_mocap_jog_c",
@@ -8517,7 +8522,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.0673
     },
     {
       "id": "soccer_mocap_kick_a",
@@ -9652,7 +9658,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.1105
     },
     {
       "id": "soccer_mocap_run_b",
@@ -9821,7 +9828,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.9554
     },
     {
       "id": "soccer_mocap_run_c",
@@ -9990,7 +9998,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.148
     },
     {
       "id": "soccer_mocap_run_d",
@@ -10159,7 +10168,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.1524
     },
     {
       "id": "soccer_mocap_stop_a",
@@ -11291,7 +11301,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.1088
     },
     {
       "id": "soccer_run_ball",
@@ -11459,7 +11470,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.9579
     },
     {
       "id": "soccer_shield",
@@ -14240,7 +14252,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 4.0572
     },
     {
       "id": "soccer_stop",
@@ -14572,7 +14585,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.0865
     },
     {
       "id": "soccer_strafe_r",
@@ -14739,7 +14753,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.9013
     },
     {
       "id": "soccer_stumble",
@@ -16986,7 +17001,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.0944
     },
     {
       "id": "soccer_sc_win_ball_01",
@@ -18293,7 +18309,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.149
     },
     {
       "id": "soccer_sc_pass_04",
@@ -21234,7 +21251,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.7487
     },
     {
       "id": "soccer_sc_pass_high_01",
@@ -22050,7 +22068,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.8037
     },
     {
       "id": "soccer_sc_carry_04",
@@ -22213,7 +22232,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.8563
     },
     {
       "id": "soccer_sc_carry_05",
@@ -22376,7 +22396,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.9901
     },
     {
       "id": "soccer_sc_carry_06",
@@ -22539,7 +22560,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.3003
     },
     {
       "id": "soccer_sc_carry_07",
@@ -22702,7 +22724,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2357
     },
     {
       "id": "soccer_sc_carry_08",
@@ -22865,7 +22888,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.164
     },
     {
       "id": "soccer_sc_win_ball_08",
@@ -26470,7 +26494,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.9567
     },
     {
       "id": "soccer_vo_run_02",
@@ -26632,7 +26657,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.0116
     },
     {
       "id": "soccer_vo_run_03",
@@ -26794,7 +26820,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.243
     },
     {
       "id": "soccer_vo_run_04",
@@ -26956,7 +26983,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.1156
     },
     {
       "id": "soccer_vo_run_05",
@@ -27118,7 +27146,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.8282
     },
     {
       "id": "soccer_vo_run_06",
@@ -27280,7 +27309,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2552
     },
     {
       "id": "soccer_vo_run_07",
@@ -27442,7 +27472,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2552
     },
     {
       "id": "soccer_vo_run_08",
@@ -27604,7 +27635,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.5556
     },
     {
       "id": "soccer_vo_run_09",
@@ -27766,7 +27798,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.5556
     },
     {
       "id": "soccer_vo_run_10",
@@ -27928,7 +27961,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.1233
     },
     {
       "id": "soccer_vo_run_11",
@@ -28090,7 +28124,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2057
     },
     {
       "id": "soccer_vo_run_12",
@@ -28252,7 +28287,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.0208
     },
     {
       "id": "soccer_vo_run_13",
@@ -28414,7 +28450,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.7249
     },
     {
       "id": "soccer_vo_run_14",
@@ -28576,7 +28613,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.9994
     },
     {
       "id": "soccer_vo_run_15",
@@ -28738,7 +28776,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.3802
     },
     {
       "id": "soccer_vo_run_16",
@@ -28900,7 +28939,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.0246
     },
     {
       "id": "soccer_vo_run_17",
@@ -29062,7 +29102,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.998
     },
     {
       "id": "soccer_vo_run_18",
@@ -29224,7 +29265,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2994
     },
     {
       "id": "soccer_vo_run_19",
@@ -29386,7 +29428,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.7869
     },
     {
       "id": "soccer_vo_run_20",
@@ -29548,7 +29591,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.9673
     },
     {
       "id": "soccer_vo_run_21",
@@ -29710,7 +29754,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.1695
     },
     {
       "id": "soccer_vo_run_22",
@@ -29872,7 +29917,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.262
     },
     {
       "id": "soccer_vo_run_23",
@@ -30034,7 +30080,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.5683
     },
     {
       "id": "soccer_vo_run_24",
@@ -30196,7 +30243,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.1758
     },
     {
       "id": "soccer_st_pass_01",
@@ -39871,7 +39919,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2372
     },
     {
       "id": "soccer_st_lofted_13",
@@ -40690,7 +40739,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.057
     },
     {
       "id": "soccer_st_lofted_16",
@@ -41017,7 +41067,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.3199
     },
     {
       "id": "soccer_st_lofted_17",
@@ -42327,7 +42378,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.9965
     },
     {
       "id": "soccer_st_block_01",
@@ -43143,7 +43195,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.5218
     },
     {
       "id": "soccer_st_block_02",
@@ -43469,7 +43522,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.3446
     },
     {
       "id": "soccer_st_block_03",
@@ -44285,7 +44339,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.2897
     },
     {
       "id": "soccer_st_carry_08",
@@ -44448,7 +44503,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.9337
     },
     {
       "id": "soccer_st_tackle_05",
@@ -44774,7 +44830,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.6969
     },
     {
       "id": "soccer_st_free_kick_06",
@@ -45101,7 +45158,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.3851
     },
     {
       "id": "soccer_st_carry_11",
@@ -45264,7 +45322,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.8331
     },
     {
       "id": "soccer_st_carry_12",
@@ -45427,7 +45486,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.1551
     },
     {
       "id": "soccer_st_block_05",
@@ -45916,7 +45976,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.8649
     },
     {
       "id": "soccer_st_block_06",
@@ -46242,7 +46303,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.8877
     },
     {
       "id": "soccer_st_free_kick_07",
@@ -46569,7 +46631,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.4392
     },
     {
       "id": "soccer_st_carry_16",
@@ -46732,7 +46795,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2886
     },
     {
       "id": "soccer_st_free_kick_08",
@@ -47059,7 +47123,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.4771
     },
     {
       "id": "soccer_st_block_07",
@@ -47549,7 +47614,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 3.0017
     },
     {
       "id": "soccer_st_block_08",
@@ -47875,7 +47941,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.7745
     },
     {
       "id": "soccer_st_carry_20",
@@ -48038,7 +48105,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.8696
     },
     {
       "id": "soccer_st_tackle_07",
@@ -49018,7 +49086,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.1602
     },
     {
       "id": "soccer_st_carry_22",
@@ -49181,7 +49250,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.5939
     },
     {
       "id": "soccer_st_tackle_10",
@@ -49507,7 +49577,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.2233
     },
     {
       "id": "soccer_st_carry_24",
@@ -49670,7 +49741,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 2.434
     },
     {
       "id": "soccer_st_tackle_11",
@@ -50979,7 +51051,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.68
     },
     {
       "id": "soccer_ss_walk_neutral",
@@ -51142,7 +51215,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.8233
     },
     {
       "id": "soccer_ss_backrun_neutral",
@@ -51305,7 +51379,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.2503
     },
     {
       "id": "soccer_ss_backwalk_neutral",
@@ -51468,7 +51543,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.6864
     },
     {
       "id": "soccer_ss_siderun_neutral",
@@ -51631,7 +51707,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.3064
     },
     {
       "id": "soccer_ss_sidewalk_neutral",
@@ -51794,7 +51871,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.4904
     },
     {
       "id": "soccer_ss_walk_rushed",
@@ -51957,7 +52035,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.9661
     },
     {
       "id": "soccer_ss_siderun_rushed",
@@ -52120,7 +52199,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.6145
     },
     {
       "id": "soccer_ss_walk_bigsteps",
@@ -52283,7 +52363,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.3167
     },
     {
       "id": "soccer_ss_run_proud",
@@ -52446,7 +52527,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.5053
     },
     {
       "id": "soccer_ss_walk_proud",
@@ -52609,7 +52691,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.0232
     },
     {
       "id": "soccer_ss_backrun_proud",
@@ -52772,7 +52855,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.2469
     },
     {
       "id": "soccer_ss_run_heavyset",
@@ -52935,7 +53019,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.3108
     },
     {
       "id": "soccer_ss_walk_heavyset",
@@ -53098,7 +53183,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.8651
     },
     {
       "id": "soccer_ss_siderun_bentknees",
@@ -53261,7 +53347,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.2123
     },
     {
       "id": "soccer_ss_sidewalk_bentknees",
@@ -53424,7 +53511,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.267
     },
     {
       "id": "soccer_ss_backrun_bentknees",
@@ -53587,7 +53675,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.037
     },
     {
       "id": "soccer_ss_backwalk_bentknees",
@@ -53750,7 +53839,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.5593
     },
     {
       "id": "soccer_ss_siderun_crouched",
@@ -53913,7 +54003,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 1.2388
     },
     {
       "id": "soccer_ss_sidewalk_crouched",
@@ -54076,7 +54167,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.4334
     },
     {
       "id": "soccer_ss_backwalk_crouched",
@@ -54239,7 +54331,8 @@
       "provenance": {
         "type": "glb",
         "glb": "soccer_player.glb"
-      }
+      },
+      "strideSpeed": 0.515
     }
   ],
   "hypermotionDataPlumbing": {

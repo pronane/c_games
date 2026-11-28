@@ -71,6 +71,7 @@ public static class ClipManifestLoader
                 ContactWindowStart = OptionalSingle(item, "contactWindowStart", -1f),
                 ContactWindowEnd = OptionalSingle(item, "contactWindowEnd", -1f),
                 RootVelocitySamples = ReadFloats(item, "rootVelocitySamples"),
+                StrideSpeed = OptionalSingle(item, "strideSpeed", 0f),
             };
             if (meta.PreferredSpeed < 0f || !float.IsFinite(meta.PreferredSpeed))
                 throw new FormatException($"Clip '{id}' has invalid preferredSpeed.");

@@ -45,6 +45,10 @@ public sealed class ClipMeta
     public string[] Tags { get; set; } = Array.Empty<string>();
     public int BoneCount { get; set; } = 18;
     public bool Loop { get; set; }
+    /// <summary>Ground speed the loop's stride is authored for (m/s, GLB-baked: how fast a foot
+    /// that is flat on the ground moves back under the body).  0 = unknown, use PreferredSpeed.
+    /// Playing a loop at speed / StrideSpeed keeps the planted foot still in the world.</summary>
+    public float StrideSpeed { get; set; }
 
     // Hypermotion data plumbing (manifest v2): sampled curves for grounded IK/contact.
     /// <summary>Uniformly sampled left-plant weight over clip duration (0..1). Empty = use FootPlantFrames.</summary>

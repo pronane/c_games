@@ -2592,6 +2592,20 @@ Section("M6 clip manifest provenance/root velocity");
         Check("M6 all clips have provenance/source", withProv == clips, $"withProv={withProv}/{clips}");
         Check("M6 locomotion clips mostly have nonzero root velocity", locoNonZero >= locoTotal - 3 && locoTotal > 0, $"nonzero={locoNonZero}/{locoTotal}");
         Check("M6 rootVelocity/plant curve schema", schemaBad == 0, $"bad={schemaBad}/{clips}");
+
+        // Stride-matched locomotion: a loop with a baked strideSpeed plays at speed / strideSpeed,
+        // so the foot flat on the ground stays put; without one it falls back to preferredSpeed.
+        var metas = ClipManifestLoader.Parse(System.IO.File.ReadAllText(manifestPath));
+        var run = metas.Find(m => m.Id == "soccer_run");
+        Check("M6 soccer_run has a baked stride speed", run != null && run.StrideSpeed > 2f && run.StrideSpeed < run.PreferredSpeed,
+              run == null ? "missing" : $"stride={run.StrideSpeed:F2} preferred={run.PreferredSpeed:F2}");
+        if (run != null)
+            Check("M6 locomotion playback is stride-matched",
+                  MathF.Abs(MotionEngine.LocomotionPlaybackScale(run, run.StrideSpeed * 1.2f) - 1.2f) < 1e-4f);
+        var noStride = new ClipMeta { Id = "t", Category = ClipCategory.Locomotion, PreferredSpeed = 4f };
+        Check("M6 playback falls back to preferredSpeed", MathF.Abs(MotionEngine.LocomotionPlaybackScale(noStride, 2f) - .5f) < 1e-4f);
+        Check("M6 non-locomotion clips play at 1x",
+              MotionEngine.LocomotionPlaybackScale(new ClipMeta { Id = "k", Category = ClipCategory.Kick, StrideSpeed = 3f }, 6f) == 1f);
     }
     else
     {

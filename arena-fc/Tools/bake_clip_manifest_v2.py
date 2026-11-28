@@ -319,6 +319,7 @@ class GlbAnimations:
                 world[node] = mat4_mul(world[p], local) if p in world else local
             return world
 
+        self._last_eval = (eval_world_at, max_t, lfoot_idx, rfoot_idx)
         # sample poses
         poses = []
         for i in range(samples):
@@ -380,6 +381,33 @@ class GlbAnimations:
             "rootVelocitySamples": rv,
             "source": "glb",
         }
+
+    def stride_speed(self, clip_name: str, samples: int = 96) -> Optional[float]:
+        """Ground speed a looping clip is authored for: the median horizontal speed of
+        each foot over the frames it is at its lowest (within 1.5 cm), i.e. while it is
+        flat on the ground and the body travels over it.  Playing the clip at
+        speed / strideSpeed keeps a planted foot still in the world."""
+        if self.sample_clip_curves(clip_name, 4) is None:
+            return None
+        eval_world_at, max_t, lf, rf = self._last_eval
+        pts = []
+        for i in range(samples):
+            w = eval_world_at(i / samples * max_t)
+            pts.append((mat4_transform_point(w[lf], (0, 0, 0)), mat4_transform_point(w[rf], (0, 0, 0))))
+        dt = max_t / samples
+        speeds = []
+        for j in (0, 1):
+            ys = [p[j][1] for p in pts]
+            low = min(ys) + 0.015
+            for k in range(samples):
+                if ys[k] > low:
+                    continue
+                a, b = pts[k - 1][j], pts[(k + 1) % samples][j]
+                speeds.append(math.hypot(b[0] - a[0], b[2] - a[2]) / (2 * dt))
+        if not speeds:
+            return None
+        speeds.sort()
+        return speeds[len(speeds) // 2]
 
     def _node_depth(self, node: int) -> int:
         d = 0
@@ -455,6 +483,11 @@ def enrich_clip(c, glb: Optional[GlbAnimations], stats: Dict[str, int]):
             if abs(vx) > 1e-6 or abs(vz) > 1e-6:
                 rv = root_velocity_samples_heuristic(vx, vz, len(rv) // 2)
         c["rootVelocitySamples"] = rv
+        cat = str(c.get("category", "")).lower()
+        if c.get("loop") and cat in ("locomotion", "dribble", "carry") and float(c.get("preferredSpeed", 0) or 0) > 0.3:
+            st = glb.stride_speed(clip_id)
+            if st is not None and st > 0.2:
+                c["strideSpeed"] = round(st, 4)
         c["source"] = "glb"
         c["provenance"] = {"type": "glb", "glb": os.path.basename(glb.path) if glb else GLB_DEFAULT}
         stats["glb"] += 1

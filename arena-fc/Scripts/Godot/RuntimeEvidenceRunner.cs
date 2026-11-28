@@ -168,40 +168,57 @@ public partial class RuntimeEvidenceRunner : Node3D
         // yaw, three clip families, and the flat-to-slope boundary. The triangular
         // path keeps the production rig on the measured collision surface while
         // testing reversals instead of only one constant-speed traversal.
-        rig.Rotation = new Vector3(0f, .55f, 0f);
+        // Drive the rigs the way MatchView + MotionEngine drive them in a match, so the
+        // numbers describe the game and not the harness:
+        //  - the root travels x = A sin(wt): it accelerates to a sprint, decelerates to a
+        //    stop at each end and reverses, over the flat surface and the 8% ramp;
+        //  - the body faces its travel direction (MatchView: rotation = atan2(F.x, F.z)),
+        //    turning at a bounded rate through each reversal, with a small heading wobble;
+        //  - the clip is the locomotion loop for the current speed (walk / jog / run /
+        //    sprint), switched without resetting phase (the loops share one stride phase),
+        //    and played at MotionEngine.LocomotionPlaybackScale (stride-matched, as in a match).
+        // The old path moved a fixed-rate run/sprint clip crab-wise at up to 60 degrees
+        // off its facing, so a planted foot had to slide whatever the IK did.
+        const float amplitude = 3.6f, peakSpeed = 5.0f;
+        float omega = peakSpeed / amplitude;
+        float facingYaw = MathF.PI * .5f;   // +X
+        string[] gaitClips = { "soccer_walk", "soccer_jog", "soccer_run", "soccer_sprint" };
         for (int i = 0; i < 720; i++)
         {
-                int leg = i / 180;
-                float localPhase = (i % 180) / 179f;
-                bool movingPositiveX = (leg % 2) == 0;
-                float x = movingPositiveX
-                    ? -3.8f + 7.6f * localPhase
-                    : 3.8f - 7.6f * localPhase;
+                float t = i * Dt;
+                float x = amplitude * MathF.Sin(omega * t);
+                float vx = amplitude * omega * MathF.Cos(omega * t);
+                float speed = MathF.Abs(vx);
                 float y = .2f + MathF.Tan(.08f) * MathF.Max(0f, x);
-                float speed = .45f + 1.65f * (0.5f - 0.5f * MathF.Cos(MathF.PI * localPhase));
-                float yaw = (movingPositiveX ? .55f : 2.59f) + .12f * MathF.Sin(localPhase * MathF.Tau);
+                float wantYaw = (vx >= 0f ? MathF.PI * .5f : -MathF.PI * .5f) + .08f * MathF.Sin(t * 2.1f);
+                float dyaw = MathF.IEEERemainder(wantYaw - facingYaw, MathF.Tau);
+                float maxTurn = 7f * Dt;    // ~400 deg/s, a sharp but human turn
+                facingYaw += Math.Clamp(dyaw, -maxTurn, maxTurn);
                 var worldPosition = new Vector3(x, y, 0f);
+                var facing = new NVector3(MathF.Sin(facingYaw), 0f, MathF.Cos(facingYaw));
                 rig.Position = worldPosition;
-                rig.Rotation = new Vector3(0f, yaw, 0f);
+                rig.Rotation = new Vector3(0f, MathF.Atan2(facing.X, facing.Z), 0f);
                 player.Pos = new NVector3(worldPosition.X, worldPosition.Y, worldPosition.Z);
-                player.Vel = new NVector3((movingPositiveX ? 1f : -1f) * speed, 0f, 0f);
-                player.Facing = new NVector3(-MathF.Sin(yaw), 0f, -MathF.Cos(yaw));
+                player.Vel = new NVector3(vx, 0f, 0f);
+                player.Facing = facing;
+                player.Sprinting = speed > 4.6f;
 
-                string nextClip = leg % 3 == 0 ? "soccer_run" : leg % 3 == 1 ? "soccer_sprint" : "soccer_turn";
-                if (!string.Equals(motion.CurrentClipId, nextClip, StringComparison.Ordinal)) motion.Phase = 0f;
+                string nextClip = gaitClips[speed < 1.4f ? 0 : speed < 3.0f ? 1 : speed < 4.6f ? 2 : 3];
+                var clipMeta = authoredPlantWindows[nextClip];
                 motion.CurrentClipId = nextClip;
-                motion.Phase = (motion.Phase + Dt / (i < 240 ? 1.033333f : .833333f)) % 1f;
+                float playback = MotionEngine.LocomotionPlaybackScale(clipMeta, speed);
+                motion.Phase = MotionEngine.AdvancePhase(clipMeta, motion.Phase, Dt, playback);
                 var plant = AuthoredPlantState(authoredPlantWindows, motion.CurrentClipId, motion.Phase);
                 motion.FootPlantedLeft = plant.left;
                 motion.FootPlantedRight = plant.right;
-                motion.PlantWeightLeft = plant.left ? 1f : 0f;
-                motion.PlantWeightRight = plant.right ? 1f : 0f;
+                motion.PlantWeightLeft = plant.weightLeft;
+                motion.PlantWeightRight = plant.weightRight;
                 secondMotion.CurrentClipId = nextClip;
                 secondMotion.Phase = motion.Phase;
                 secondMotion.FootPlantedLeft = plant.left;
                 secondMotion.FootPlantedRight = plant.right;
-                secondMotion.PlantWeightLeft = plant.left ? 1f : 0f;
-                secondMotion.PlantWeightRight = plant.right ? 1f : 0f;
+                secondMotion.PlantWeightLeft = plant.weightLeft;
+                secondMotion.PlantWeightRight = plant.weightRight;
 
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 var sw = Stopwatch.StartNew();
@@ -209,13 +226,12 @@ public partial class RuntimeEvidenceRunner : Node3D
                 sw.Stop();
                 // Time each production rig independently; warm-up is excluded.
                 if (i >= 30) updateMs.Add(sw.Elapsed.TotalMilliseconds);
-                float secondYaw = yaw + .16f;
                 var secondPosition = new Vector3(x, y, 1.35f);
                 secondRig.Position = secondPosition;
-                secondRig.Rotation = new Vector3(0f, secondYaw, 0f);
+                secondRig.Rotation = rig.Rotation;
                 secondPlayer.Pos = new NVector3(secondPosition.X, secondPosition.Y, secondPosition.Z);
-                secondPlayer.Vel = new NVector3((movingPositiveX ? 1f : -1f) * speed * .82f, 0f, 0f);
-                secondPlayer.Facing = new NVector3(-MathF.Sin(secondYaw), 0f, -MathF.Cos(secondYaw));
+                secondPlayer.Vel = player.Vel;
+                secondPlayer.Facing = facing;
                 sw.Restart();
                 secondRig.Soccer.Update(secondPlayer, Dt);
                 sw.Stop();
@@ -256,8 +272,12 @@ public partial class RuntimeEvidenceRunner : Node3D
                 if (i == 60 || i == 180 || i == 300)
                 {
                     camera.Position = new Vector3(x, y + 1.8f, 6.5f);
-                    camera.LookAt(new Vector3(x, y + .9f, 0));
-                    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                    camera.LookAt(new Vector3(x, y + .9f, .6f));
+                    // The viewport texture is the last frame drawn: wait until a frame has
+                    // been drawn with the moved camera (one process frame was not enough, so
+                    // two of the three captures showed the previous camera and no players).
+                    await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                    await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                     var capture = GetViewport().GetTexture().GetImage();
                     string label = i == 60 ? "run-flat" : i == 180 ? "sprint-flat-to-ramp" : "turn-ramp";
                     if (capture.SavePng(Path.Combine(output, label + ".png")) != Error.Ok)
@@ -302,13 +322,17 @@ public partial class RuntimeEvidenceRunner : Node3D
             ["frame_budget_ms_at_60hz"] = 1000.0 / 60.0,
             ["animation_metric_samples"] = metrics.Samples,
             ["avg_planted_foot_slide_mps"] = metrics.AvgFootSlide,
+            ["planted_foot_slide_metric_scope"] = "locked plant frames only (SoccerClipRig foot lock engaged)",
+            ["plant_window_lock_coverage"] = (rig.Soccer.PlantFrames + secondRig.Soccer!.PlantFrames) > 0
+                ? (double)(rig.Soccer.LockedPlantFrames + secondRig.Soccer.LockedPlantFrames) / (rig.Soccer.PlantFrames + secondRig.Soccer.PlantFrames) : 0.0,
+            ["plant_window_slide_mps_all_frames"] = (rig.Soccer.ContractPlantSlide + secondRig.Soccer.ContractPlantSlide) * .5f,
             ["max_ankle_target_residual_m"] = Math.Max(rig.Soccer.MaxAnkleTargetResidual, secondRig.Soccer!.MaxAnkleTargetResidual),
             ["mean_ankle_target_residual_m"] = (rig.Soccer.MeanAnkleTargetResidual + secondRig.Soccer!.MeanAnkleTargetResidual) * 0.5f,
             ["max_planted_anchor_error_m"] = Math.Max(rig.Soccer.MaxPlantedAnchorError, secondRig.Soccer!.MaxPlantedAnchorError),
             ["ankle_residual_metric_scope"] = "distance between solved foot-bone origin and requested ankle target after IK",
             ["planted_anchor_error_metric_scope"] = "world-space XZ distance from corrected sole to latched authored plant anchor",
             ["foot_slide_metric_scope"] = "world_space_xz_velocity_during_authored_clip_foot_plant_windows",
-            ["plant_state_source"] = "Data/clips/clip_manifest.json footPlantFrames and footPlantSides",
+            ["plant_state_source"] = "Data/clips/clip_manifest.json plantCurveLeft/Right (GLB-baked), weight >= MotionEngine.PlantEdgeThreshold",
             ["transition_measurements"] = metrics.TransitionMeasurements,
             ["avg_transition_discontinuity"] = metrics.AvgTransitionDiscontinuity,
             ["transition_metric_scope"] = "mean_raw_pose_offset_on_inertialized_upper_body_bones",
@@ -482,40 +506,28 @@ public partial class RuntimeEvidenceRunner : Node3D
         return (false, 0, $"{(shoot ? "shot" : "pass")} did not release the ball during its 60-tick action window; action={player.Action}, pending={ball.HasPending}, speed={ball.Vel.Length():F3}");
     }
 
-    private sealed record PlantWindow(string Side, float Phase);
-
-    private static Dictionary<string, List<PlantWindow>> LoadAuthoredPlantWindows()
+    // Plant state comes from the same place production does: MotionEngine.UpdatePlantState
+    // samples each clip's GLB-baked plant curve (clip_manifest v2 plantCurveLeft/Right) and
+    // calls a foot planted at weight >= MotionEngine.PlantEdgeThreshold.  The discrete
+    // footPlantFrames/footPlantSides markers are only a fallback for clips without curves -
+    // and for the procedural run/sprint/turn clips their sides disagree with the baked foot
+    // motion, so pinning on them latched the swinging foot in the air.
+    private static Dictionary<string, ClipMeta> LoadAuthoredPlantWindows()
     {
         const string path = "res://Data/clips/clip_manifest.json";
         using var file = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read);
         if (file == null) throw new InvalidOperationException($"Could not read authored clip manifest: {path}");
-        var root = JsonDocument.Parse(file.GetAsText()).RootElement;
-        var result = new Dictionary<string, List<PlantWindow>>(StringComparer.Ordinal);
-        foreach (var clip in root.GetProperty("clips").EnumerateArray())
-        {
-            string id = clip.GetProperty("id").GetString() ?? "";
-            var frames = clip.GetProperty("footPlantFrames").EnumerateArray().Select(x => x.GetSingle()).ToArray();
-            var sides = clip.GetProperty("footPlantSides").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
-            var windows = new List<PlantWindow>();
-            for (int i = 0; i < Math.Min(frames.Length, sides.Length); i++)
-                windows.Add(new PlantWindow(sides[i], frames[i]));
-            result[id] = windows;
-        }
+        var result = new Dictionary<string, ClipMeta>(StringComparer.Ordinal);
+        foreach (var clip in ClipManifestLoader.Parse(file.GetAsText())) result[clip.Id] = clip;
         return result;
     }
 
-    private static (bool left, bool right) AuthoredPlantState(
-        Dictionary<string, List<PlantWindow>> windows, string clip, float phase)
+    private static (bool left, bool right, float weightLeft, float weightRight) AuthoredPlantState(
+        Dictionary<string, ClipMeta> clips, string clip, float phase)
     {
-        if (!windows.TryGetValue(clip, out var markers)) return (false, false);
-        // Match MotionEngine.NearPlant exactly: discrete authored plant frames are active only within +/- 0.035 phase.
-        // A wider evidence-only window overstates the production contract and pins the foot beyond its reachable stance.
-        const float halfWindow = .035f;
-        bool left = markers.Any(m => m.Side.Equals("Left", StringComparison.OrdinalIgnoreCase)
-            && MathF.Abs(MathF.IEEERemainder(phase - m.Phase, 1f)) <= halfWindow);
-        bool right = markers.Any(m => m.Side.Equals("Right", StringComparison.OrdinalIgnoreCase)
-            && MathF.Abs(MathF.IEEERemainder(phase - m.Phase, 1f)) <= halfWindow);
-        return (left, right);
+        if (!clips.TryGetValue(clip, out var meta)) return (false, false, 0f, 0f);
+        float wl = meta.SamplePlantWeight(true, phase), wr = meta.SamplePlantWeight(false, phase);
+        return (wl >= MotionEngine.PlantEdgeThreshold, wr >= MotionEngine.PlantEdgeThreshold, wl, wr);
     }
 
     private static double Percentile(List<double> values, double percentile)

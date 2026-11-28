@@ -340,9 +340,16 @@ public sealed class MotionEngine
             if (remaining > .01f) return Math.Clamp(remaining / secondsUntilContact, .4f, 3f);
             return 1f;
         }
-        if (IsLocomotion(clip.Category) && clip.PreferredSpeed > .1f)
-            return Math.Clamp(speed / clip.PreferredSpeed, .45f, 2.8f);
-        return 1f;
+        return LocomotionPlaybackScale(clip, speed);
+    }
+
+    /// <summary>Playback rate of a locomotion loop at a ground speed: stride-matched when the
+    /// clip's stride speed is baked (planted feet stay put), else relative to PreferredSpeed.</summary>
+    public static float LocomotionPlaybackScale(ClipMeta clip, float speed)
+    {
+        if (!IsLocomotion(clip.Category)) return 1f;
+        float basis = clip.StrideSpeed > .2f ? clip.StrideSpeed : clip.PreferredSpeed;
+        return basis > .1f ? Math.Clamp(speed / basis, .45f, 2.8f) : 1f;
     }
 
     private void CommitTransition(MotionState state)
@@ -357,7 +364,7 @@ public sealed class MotionEngine
         Metrics.TransitionEvents++;
     }
 
-    private const float PlantEdgeThreshold = 0.5f;
+    public const float PlantEdgeThreshold = 0.5f;
 
     private void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)
     {

@@ -109,10 +109,25 @@ public sealed partial class SoccerClipRig : Node3D
     // Phase 1.2 foot-planting IK state.
     private readonly Dictionary<string, BoneData> _bones = new();
     // Latched plant anchors and independent previous corrected poses for velocity measurement.
-    private Vector3 _prevFootWorldL, _prevFootWorldR;
-    private Vector3 _lastMeasuredFootWorldL, _lastMeasuredFootWorldR;
-    private bool _hasPrevFootL, _hasPrevFootR;
-    private bool _hasLastMeasuredFootL, _hasLastMeasuredFootR;
+    /// <summary>Frames a foot was in the clip's plant window, and of those how many it was locked.</summary>
+    public int PlantFrames { get; private set; }
+    public int LockedPlantFrames { get; private set; }
+    /// <summary>Mean world-space sole speed over every plant-window frame, locked or not (m/s).</summary>
+    public float ContractPlantSlide => ContractPlantSlideSamples > 0 ? ContractPlantSlideAccum / ContractPlantSlideSamples : 0f;
+    private float ContractPlantSlideAccum;
+    private int ContractPlantSlideSamples;
+    private struct FootLock
+    {
+        public bool Active, Consumed, Releasing, HasMeasured, HasContract;
+        public Vector3 Anchor, ReleaseFrom, LastSolved, LastMeasured, LastContract;
+        public float ReleaseT;
+    }
+    private FootLock _lockL, _lockR;
+    /// <summary>Let a locked foot go once the clip's foot is this far (m, ground plane) from the
+    /// anchor: past it the leg straightens and the pinned foot lifts.</summary>
+    public const float MaxLockStretch = .22f;
+    /// <summary>Seconds a released foot takes to ease back onto the clip's foot.</summary>
+    public const float LockReleaseTime = .12f;
     private Vector3 _prevPelvisPos;
     private bool _hasPrevPelvisPos;
     private Vector3 _groundNormalL = Vector3.Up;
@@ -1302,9 +1317,6 @@ public sealed partial class SoccerClipRig : Node3D
         return t;
     }
 
-    private static Vector3 SoleTargetToAnkle(BoneData bone, Transform3D footPose, Vector3 soleTargetSkeleton)
-        => bone.HasSoleGeometry ? soleTargetSkeleton - footPose.Basis * bone.SoleLocal : soleTargetSkeleton;
-
     private void UpdateFootIk(Vector3 worldPos, float yaw, float dt)
     {
         if (Skel == null || _bones.Count == 0) return;
@@ -1327,6 +1339,7 @@ public sealed partial class SoccerClipRig : Node3D
         {
             if (!_bones.TryGetValue(side, out var b)) continue;
             bool isLeft = side == "L";
+            ref FootLock fl = ref (isLeft ? ref _lockL : ref _lockR);
             // The previous frame's persistent override must not pin a swing foot
             // or feed an old global pose back into the new IK solve.
             Skel.SetBoneGlobalPoseOverride(b.Foot, Transform3D.Identity, 0f, false);
@@ -1335,108 +1348,114 @@ public sealed partial class SoccerClipRig : Node3D
             var footWorld = skelGlobal * (footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
             float height = footWorld.Y - worldPos.Y;
             bool contractPlanted = isLeft ? leftPlanted : rightPlanted;
-            bool planted = contractPlanted || height < .10f;
+            float pw = Mathf.Clamp(isLeft ? leftPlantW : rightPlantW, 0f, 1f);
 
             var ground = SampleGround(worldPos, footWorld);
             if (isLeft) _groundNormalL = ground.normal; else _groundNormalR = ground.normal;
             float groundY = ground.hit ? ground.y : worldPos.Y;
-            Vector3 targetWorld = new Vector3(footWorld.X, groundY + (planted ? 0.006f : 0.035f), footWorld.Z);
+            Vector3 animated = new Vector3(footWorld.X, footWorld.Y, footWorld.Z);
 
-            if (planted)
+            // Foot lock (HyperMotion-style plant lock):
+            //  - it engages when the clip's plant weight crosses MotionEngine.PlantEdgeThreshold
+            //    and latches the animated contact point, so touchdown never jumps;
+            //  - while engaged the sole is pinned to that point on the ground;
+            //  - it lets go when the weight drops, or early when the body has moved so far
+            //    that the pinned foot is MaxLockStretch from where the clip has its foot
+            //    (holding on past that straightens the leg and lifts the foot off the ground);
+            //  - on letting go the foot eases back to the clip over LockReleaseTime instead of
+            //    snapping, which is what the slide metric used to count as metres-per-second.
+            bool wantLock = contractPlanted && pw >= MotionEngine.PlantEdgeThreshold;
+            if (!contractPlanted) fl.Consumed = false;
+            if (wantLock && !fl.Active && !fl.Consumed)
             {
-                ref bool hasPrev = ref (isLeft ? ref _hasPrevFootL : ref _hasPrevFootR);
-                ref Vector3 prev = ref (isLeft ? ref _prevFootWorldL : ref _prevFootWorldR);
-                float pw = Mathf.Clamp(isLeft ? leftPlantW : rightPlantW, 0f, 1f);
-
-                // Latch the world-space contact point once when a plant begins.
-                // Updating this every frame turns the lock into a slowly drifting target.
-                // Only authored plant windows may create a persistent world anchor.
-                // A merely low animated foot is a ground-proximity hint, not a plant
-                // event; latching it here poisoned the next real plant with a stale point.
-                if (contractPlanted && pw > 0.01f && !hasPrev)
+                fl.Active = true;
+                fl.Anchor = new Vector3(footWorld.X, groundY + 0.006f, footWorld.Z);
+                fl.HasMeasured = false;
+            }
+            if (fl.Active)
+            {
+                var stretch = new Vector2(animated.X - fl.Anchor.X, animated.Z - fl.Anchor.Z).Length();
+                if (!wantLock || stretch > MaxLockStretch)
                 {
-                    prev = new Vector3(footWorld.X, groundY + 0.006f, footWorld.Z);
-                    hasPrev = true;
+                    fl.Active = false;
+                    fl.Consumed = wantLock;            // stretched out: wait for the next plant
+                    fl.ReleaseFrom = fl.LastSolved;
+                    fl.ReleaseT = 0f;
+                    fl.Releasing = true;
+                    fl.HasMeasured = false;
                 }
+            }
 
-                Vector3 locked = hasPrev
-                    ? new Vector3(prev.X, groundY + 0.006f, prev.Z)
-                    : targetWorld;
-                // Blend plant weight into the anchor until full contact; authored
-                // plant weight >= .5 is a hard pin for the whole contact window.
-                if (contractPlanted && hasPrev)
-                    targetWorld = pw >= 0.5f ? locked : targetWorld.Lerp(locked, pw);
+            Vector3? target = null;
+            if (fl.Active)
+                target = new Vector3(fl.Anchor.X, groundY + 0.006f, fl.Anchor.Z);
+            else if (fl.Releasing)
+            {
+                fl.ReleaseT += dt;
+                float u = Mathf.Clamp(fl.ReleaseT / LockReleaseTime, 0f, 1f);
+                u = u * u * (3f - 2f * u);
+                var eased = fl.ReleaseFrom.Lerp(animated, u);
+                target = new Vector3(eased.X, Mathf.Max(eased.Y, groundY + 0.006f), eased.Z);
+                if (u >= 1f) fl.Releasing = false;
+            }
+            else if (height < .18f || footWorld.Y < groundY + 0.035f)
+            {
+                // Swing foot near the ground: keep the sole on or above the surface.
+                target = new Vector3(footWorld.X, Mathf.Max(footWorld.Y, groundY + 0.035f), footWorld.Z);
+            }
 
-                // A contract-marked plant is an explicit contact request. Do not
-                // gate it on the animated ankle already being almost at ground level:
-                // that prevents IK from correcting the very lift/slide it is meant to fix.
-                if (pw > 0.01f || height < .18f)
-                {
-                    Vector3 beforeWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
-                    // Orient first so the ankle target is derived from the final
-                    // sole offset, then solve the connected thigh/shin chain to it.
-                    ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
-                    var orientedFoot = Skel.GetBoneGlobalPose(b.Foot);
-                    Vector3 ankleTarget = SoleTargetToAnkle(b, orientedFoot, skelInv * targetWorld);
-                    SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
-                    Skel.ForceUpdateAllBoneTransforms();
-                    float ankleResidual = Skel.GetBoneGlobalPose(b.Foot).Origin.DistanceTo(ankleTarget);
-                    _ankleResidualAccum += ankleResidual;
-                    _ankleResidualSamples++;
-                    MaxAnkleTargetResidual = Mathf.Max(MaxAnkleTargetResidual, ankleResidual);
-                    MeanAnkleTargetResidual = _ankleResidualAccum / Mathf.Max(1, _ankleResidualSamples);
-                    Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
-                    float corr = beforeWorld.DistanceTo(afterWorld);
-                    if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
-                }
+            if (target is Vector3 tw)
+            {
+                Vector3 beforeWorld = skelGlobal * (footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+                // The foot's final orientation is decided first - the clip's own foot
+                // orientation, tilted onto the ground's slope (fully while locked) - so the
+                // ankle target that puts the sole on the target is known before the leg is
+                // solved.  Orienting the foot before the solve (as this used to) let the
+                // shin rotation carry the foot round afterwards and the sole point missed
+                // its target, through the ground on slopes.
+                Basis footBasis = FootBasisOnGround(footPose.Basis, ground.normal, skelInv, fl.Active ? 1f : .5f);
+                Vector3 ankleTarget = (skelInv * tw) - footBasis * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
+                SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
+                SetFootGlobalBasis(b.Foot, footBasis);
+                Skel.ForceUpdateAllBoneTransforms();
+                float ankleResidual = Skel.GetBoneGlobalPose(b.Foot).Origin.DistanceTo(ankleTarget);
+                _ankleResidualAccum += ankleResidual;
+                _ankleResidualSamples++;
+                MaxAnkleTargetResidual = Mathf.Max(MaxAnkleTargetResidual, ankleResidual);
+                MeanAnkleTargetResidual = _ankleResidualAccum / Mathf.Max(1, _ankleResidualSamples);
+                Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+                float corr = beforeWorld.DistanceTo(afterWorld);
+                if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
+            }
 
-                // Measure the corrected foot, not the pre-IK animation pose. Compare
-                // against the latched anchor so residual motion cannot hide as drift.
-                Vector3 correctedWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
-                if (contractPlanted && hasPrev)
+            // Measure the corrected foot, not the pre-IK animation pose: while locked, the
+            // world-space slide of the sole and its distance from the latched anchor.
+            Vector3 correctedWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+            fl.LastSolved = correctedWorld;
+            // Coverage of the lock over the clip's own plant windows (honest reporting: a
+            // lock that lets go early hides slide from the locked-slide number above).
+            if (wantLock)
+            {
+                PlantFrames++;
+                if (fl.Active) LockedPlantFrames++;
+                if (fl.HasContract && dt > 1e-4f)
+                    ContractPlantSlideAccum += new Vector2(correctedWorld.X - fl.LastContract.X, correctedWorld.Z - fl.LastContract.Z).Length() / dt;
+                if (fl.HasContract) ContractPlantSlideSamples++;
+                fl.LastContract = correctedWorld;
+                fl.HasContract = true;
+            }
+            else fl.HasContract = false;
+            if (fl.Active)
+            {
+                float anchorError = new Vector2(correctedWorld.X - fl.Anchor.X, correctedWorld.Z - fl.Anchor.Z).Length();
+                MaxPlantedAnchorError = Mathf.Max(MaxPlantedAnchorError, anchorError);
+                if (fl.HasMeasured && dt > 1e-4f)
                 {
-                    float anchorError = new Vector2(correctedWorld.X - prev.X, correctedWorld.Z - prev.Z).Length();
-                    MaxPlantedAnchorError = Mathf.Max(MaxPlantedAnchorError, anchorError);
-                }
-                ref bool hasLastMeasured = ref (isLeft ? ref _hasLastMeasuredFootL : ref _hasLastMeasuredFootR);
-                ref Vector3 lastMeasured = ref (isLeft ? ref _lastMeasuredFootWorldL : ref _lastMeasuredFootWorldR);
-                if (hasLastMeasured && dt > 1e-4f && pw > 0.01f)
-                {
-                    float slide = new Vector2(correctedWorld.X - lastMeasured.X, correctedWorld.Z - lastMeasured.Z).Length();
+                    float slide = new Vector2(correctedWorld.X - fl.LastMeasured.X, correctedWorld.Z - fl.LastMeasured.Z).Length();
                     AnimMetrics?.RecordFootSlide(slide / dt);
                 }
-                lastMeasured = correctedWorld;
-                hasLastMeasured = pw > 0.01f;
-            }
-            else
-            {
-                if (isLeft)
-                {
-                    _hasPrevFootL = false;
-                    _hasLastMeasuredFootL = false;
-                }
-                else
-                {
-                    _hasPrevFootR = false;
-                    _hasLastMeasuredFootR = false;
-                }
-                if (height < .18f || footWorld.Y < groundY + 0.035f)
-                {
-                    Vector3 beforeWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
-                    ApplyFootGroundOrientation(b, ground.normal, skelInv, yaw);
-                    var swingFoot = Skel.GetBoneGlobalPose(b.Foot);
-                    Vector3 ankleTarget = SoleTargetToAnkle(b, swingFoot, skelInv * targetWorld);
-                    SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
-                    Skel.ForceUpdateAllBoneTransforms();
-                    float ankleResidual = Skel.GetBoneGlobalPose(b.Foot).Origin.DistanceTo(ankleTarget);
-                    _ankleResidualAccum += ankleResidual;
-                    _ankleResidualSamples++;
-                    MaxAnkleTargetResidual = Mathf.Max(MaxAnkleTargetResidual, ankleResidual);
-                    MeanAnkleTargetResidual = _ankleResidualAccum / Mathf.Max(1, _ankleResidualSamples);
-                    Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
-                    float corr = beforeWorld.DistanceTo(afterWorld);
-                    if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
-                }
+                fl.LastMeasured = correctedWorld;
+                fl.HasMeasured = true;
             }
         }
         // Keep pelvis motion authored by the clip until the leg solve is validated
@@ -1480,41 +1499,6 @@ public sealed partial class SoccerClipRig : Node3D
         return (hit, y, normal);
     }
 
-    private void ApplyFootGroundOrientation(BoneData b, Vector3 groundNormalWorld, Transform3D skelInv, float yaw)
-    {
-        if (Skel == null) return;
-        if (groundNormalWorld.LengthSquared() < 1e-6f) groundNormalWorld = Vector3.Up;
-        groundNormalWorld = groundNormalWorld.Normalized();
-        // Only apply when ground is reasonably level to avoid extreme ankle poses.
-        if (groundNormalWorld.Dot(Vector3.Up) < 0.65f) return;
-        // Build the desired foot frame in skeleton space, then convert it to
-        // the bone's local pose rotation. A global-pose override pins the ankle
-        // independently of the shin and breaks the two-bone chain at the exact
-        // point where planted-foot IK needs that chain to remain connected.
-        Vector3 groundNormal = (skelInv.Basis * groundNormalWorld).Normalized();
-        var footTx = Skel.GetBoneGlobalPose(b.Foot);
-        Vector3 fwdWorld = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-        Vector3 fwd = skelInv.Basis * fwdWorld;
-        fwd = fwd - groundNormal * fwd.Dot(groundNormal);
-        if (fwd.LengthSquared() < 1e-6f) fwd = footTx.Basis.Z;
-        fwd = fwd.Normalized();
-        Vector3 right = groundNormal.Cross(fwd);
-        if (right.LengthSquared() < 1e-6f) return;
-        right = right.Normalized();
-        Vector3 up = fwd.Cross(right).Normalized();
-        var desiredGlobalBasis = new Basis(right, up, fwd).Orthonormalized();
-        if (desiredGlobalBasis.Determinant() < 0f) return;
-
-        int parent = Skel.GetBoneParent(b.Foot);
-        Basis parentBasis = parent >= 0
-            ? Skel.GetBoneGlobalPose(parent).Basis.Orthonormalized()
-            : Basis.Identity;
-        Basis restBasis = Skel.GetBoneRest(b.Foot).Basis.Orthonormalized();
-        Basis desiredPoseBasis = restBasis.Inverse() * parentBasis.Inverse() * desiredGlobalBasis;
-        var desiredPose = desiredPoseBasis.Orthonormalized().GetRotationQuaternion().Normalized();
-        var currentPose = Skel.GetBonePoseRotation(b.Foot).Normalized();
-        Skel.SetBonePoseRotation(b.Foot, currentPose.Slerp(desiredPose, 0.35f).Normalized());
-    }
 
     private void UpdateDebugOverlay()
     {
@@ -1566,9 +1550,9 @@ public sealed partial class SoccerClipRig : Node3D
 
         // Continuous plant-weighted midpoint pull when feet are planted.
         float both = Mathf.Min(lW, rW);
-        if (both > 0.01f && _hasPrevFootL && _hasPrevFootR)
+        if (both > 0.01f && _lockL.Active && _lockR.Active)
         {
-            Vector3 mid = (_prevFootWorldL * lW + _prevFootWorldR * rW) / Mathf.Max(0.001f, lW + rW);
+            Vector3 mid = (_lockL.Anchor * lW + _lockR.Anchor * rW) / Mathf.Max(0.001f, lW + rW);
             mid.Y = pelvis.Y;
             Vector3 err = mid - pelvis; err.Y = 0;
             if (err.Length() > 0.06f) err = err.Normalized() * 0.06f;
@@ -1577,9 +1561,9 @@ public sealed partial class SoccerClipRig : Node3D
 
         // Continuous lateral weight shift toward the more planted foot.
         float diff = lW - rW;
-        if (Mathf.Abs(diff) > 0.01f && _hasPrevFootL && _hasPrevFootR)
+        if (Mathf.Abs(diff) > 0.01f && _lockL.Active && _lockR.Active)
         {
-            Vector3 lat = _prevFootWorldL - _prevFootWorldR; lat.Y = 0;
+            Vector3 lat = _lockL.Anchor - _lockR.Anchor; lat.Y = 0;
             if (lat.LengthSquared() > 1e-6f)
             {
                 lat = lat.Normalized();
@@ -1598,7 +1582,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
 
         // Soft vertical clamp to keep pelvis grounded.
-        float avgFootY = ((_hasPrevFootL ? _prevFootWorldL.Y : worldPos.Y) + (_hasPrevFootR ? _prevFootWorldR.Y : worldPos.Y)) * 0.5f;
+        float avgFootY = ((_lockL.Active ? _lockL.Anchor.Y : worldPos.Y) + (_lockR.Active ? _lockR.Anchor.Y : worldPos.Y)) * 0.5f;
         float targetY = avgFootY + _height * 0.52f;
         float yErr = Mathf.Clamp(targetY - pelvis.Y, -0.04f, 0.04f);
         pelvis.Y += yErr * (0.20f + 0.15f * Mathf.Max(lW, rW));
@@ -1609,6 +1593,29 @@ public sealed partial class SoccerClipRig : Node3D
         _hasPrevPelvisPos = true;
     }
 
+
+    /// <summary>The clip's foot orientation (skeleton space) tilted by `amount` of the rotation
+    /// that takes world up onto the ground normal.</summary>
+    private Basis FootBasisOnGround(Basis animated, Vector3 groundNormalWorld, Transform3D skelInv, float amount)
+    {
+        if (groundNormalWorld.LengthSquared() < 1e-6f || groundNormalWorld.Normalized().Dot(Vector3.Up) < .65f || amount <= 0f)
+            return animated;
+        Vector3 up = (skelInv.Basis * Vector3.Up).Normalized();
+        Vector3 n = (skelInv.Basis * groundNormalWorld.Normalized()).Normalized();
+        var tilt = Quaternion.Identity.Slerp(ShortestArc(up, n), Mathf.Clamp(amount, 0f, 1f));
+        return new Basis(tilt) * animated;
+    }
+
+    /// <summary>Give a bone a skeleton-space orientation by setting its pose rotation
+    /// relative to its (already solved) parent; position and scale are kept.</summary>
+    private void SetFootGlobalBasis(int bone, Basis desiredGlobal)
+    {
+        if (Skel == null) return;
+        int parent = Skel.GetBoneParent(bone);
+        Basis parentBasis = parent >= 0 ? Skel.GetBoneGlobalPose(parent).Basis.Orthonormalized() : Basis.Identity;
+        var q = (parentBasis.Inverse() * desiredGlobal.Orthonormalized()).GetRotationQuaternion().Normalized();
+        Skel.SetBonePoseRotation(bone, q);
+    }
 
     internal void SolveTwoBone(int thigh, int shin, int foot, Vector3 targetSkel, float yaw)
     {
