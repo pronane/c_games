@@ -14,12 +14,8 @@ public sealed class MotionEngine
     private readonly List<ClipMeta> _ordered = new();
 
     public int ClipCount => _ordered.Count;
+    public AnimationMetrics Metrics { get; } = new();
 
-    /// <summary>Pose-level motion matching (schema v2 feature table).  When set, every
-    /// clip switch - and running cycles about ten times a second - searches the
-    /// baked frames for the best continuation: the pose the body is in, the path it
-    /// is about to take and, for ball actions, the wind-up time left before contact.
-    /// Without it the rule selector below runs exactly as before.</summary>
     public MotionDatabase? Database { get; set; }
     public const float LocomotionQueryInterval = .1f;
 
@@ -45,14 +41,11 @@ public sealed class MotionEngine
 
     public static float InitialPhase(int playerIndex)
     {
-        // Stable, index-derived staggering; no RNG stream and no platform dependence.
         uint x = unchecked((uint)(playerIndex + 1) * 0x9E3779B9u);
         x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15;
         return (x & 0x00FFFFFFu) / (float)0x01000000u;
     }
 
-    /// <summary>Update once per fixed match tick. `secondsUntilContact` is presentation
-    /// input derived from ActionDuration/ActionContactAt; it never schedules the sim event.</summary>
     public void Update(MotionState motion, float speed, float turnRate, BallState ball,
         PlayerIntent intent, float dt, float secondsUntilContact = -1f,
         float bodyTypeFactor = 1f, string? styleTag = null,
@@ -61,13 +54,23 @@ public sealed class MotionEngine
         if (motion == null) throw new ArgumentNullException(nameof(motion));
         dt = Math.Max(0f, dt);
         motion.ContactCrossed = false;
+        motion.FootstepLeft = false;
+        motion.FootstepRight = false;
         motion.Speed = Math.Max(0f, speed);
         motion.TurnRate = turnRate;
         motion.Ball = ball;
         motion.LastIntent = intent;
         motion.TimeSinceContact += dt;
 
-        ClipMeta? selected = SelectClip(intent, ball, speed, turnRate, bodyTypeFactor, styleTag);
+        float ttc = secondsUntilContact > 0f ? secondsUntilContact : -1f;
+        bool approaching = (ball == BallState.Approaching || ttc > 0f) && (ttc < 1.5f || ball == BallState.Approaching);
+        float targetApproach = approaching ? 1f : 0f;
+        motion.ApproachWeight = MoveToward(motion.ApproachWeight, targetApproach, 3.5f * dt);
+        motion.IsApproachingBall = motion.ApproachWeight > 0.05f;
+        motion.TimeToBallContact = ttc;
+        motion.DistanceToBall = ttc > 0f ? ttc * Math.Max(0.1f, speed) : (ball == BallState.Approaching ? 3f : float.MaxValue);
+
+        ClipMeta? selected = SelectClip(intent, ball, speed, turnRate, bodyTypeFactor, styleTag, motion.ApproachWeight, ttc);
         if (forcedClipId != null && _clips.TryGetValue(forcedClipId, out var forcedClip)) selected = forcedClip;
         float? matchedPhase = null;
         motion.SinceQuery += dt;
@@ -82,13 +85,20 @@ public sealed class MotionEngine
                               desiredLocalVelocity, secondsUntilContact, forcedClipId);
                 if (m != null && _clips.TryGetValue(m.Value.Row.ClipId, out var mc))
                 {
-                    // A running cycle that already plays the matched clip near the matched
-                    // phase carries on (no needless restart); anything else enters at the match.
                     bool sameSpot = string.Equals(mc.Id, motion.RenderClipId, StringComparison.Ordinal)
                                     && CircularDistance(motion.RenderPhase, m.Value.Row.Phase) < .15f;
                     if (!sameSpot || switching) { selected = mc; matchedPhase = m.Value.Row.Phase; }
                     motion.MotionMatchRowIndex = m.Value.RowIndex;
                 }
+            }
+        }
+        bool switchingToSelected = selected != null && !string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal);
+        if (selected != null && selected.HasContact && ttc > 0f && motion.IsApproachingBall)
+        {
+            if (switchingToSelected || motion.CurrentClipId.Length == 0)
+            {
+                float phaseMatched = selected.Loop ? Wrap01(motion.Phase) : 0f;
+                matchedPhase = BallApproach.ContactLockedStartPhase(selected, ttc, phaseMatched, motion.ApproachWeight);
             }
         }
         if (selected == null)
@@ -105,17 +115,31 @@ public sealed class MotionEngine
             motion.Phase = matchedPhase ?? (selected.Loop ? Wrap01(motion.Phase) : 0f);
             motion.BlendWeight = 1f;
         }
-        else if (!string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal) || matchedPhase != null)
+        else if (switchingToSelected || (matchedPhase != null && switchingToSelected))
         {
-            // If a transition is interrupted, begin from its visible destination phase.
             if (motion.NextClipId.Length > 0) CommitTransition(motion);
             if (!_clips.TryGetValue(motion.CurrentClipId, out var from)) from = selected;
-            float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent);
+            float start = matchedPhase ?? ComputeStartPhase(from, selected, motion.Phase, intent, motion.ApproachWeight, ttc);
+            if (selected.HasContact && ttc > 0f)
+            {
+                float contactPhase = selected.ContactFraction;
+                float predPhase = Wrap01(start + ttc / MathF.Max(0.001f, selected.Duration));
+                Metrics.RecordContact(CircularDistance(predPhase, contactPhase));
+            }
             motion.NextClipId = selected.Id;
             motion.NextPhase = selected.Loop ? Wrap01(start) : Clamp01(start);
             motion.CrossfadeDuration = DefaultCrossfadeSeconds;
             motion.CrossfadeRemaining = motion.CrossfadeDuration;
             motion.BlendWeight = 0f;
+        }
+        else if (matchedPhase != null && string.Equals(selected.Id, motion.RenderClipId, StringComparison.Ordinal))
+        {
+            float currentP = motion.RenderPhase;
+            if (CircularDistance(currentP, matchedPhase.Value) > 0.20f)
+            {
+                if (motion.NextClipId.Length > 0) CommitTransition(motion);
+                motion.Phase = selected.Loop ? Wrap01(matchedPhase.Value) : Clamp01(matchedPhase.Value);
+            }
         }
 
         var current = _clips.TryGetValue(motion.CurrentClipId, out var c) ? c : selected;
@@ -146,6 +170,12 @@ public sealed class MotionEngine
             motion.TimeSinceContact = 0f;
         }
         UpdateFootPlants(motion, visible, visiblePhase);
+        var rv = visible.SampleRootVelocity(visiblePhase);
+        motion.RootVelocitySampleX = rv.X;
+        motion.RootVelocitySampleZ = rv.Y;
+        motion.InContactWindow = visible.HasContactWindow
+            ? (visiblePhase >= visible.ContactWindowStart && visiblePhase <= visible.ContactWindowEnd)
+            : (visible.HasContact && CircularDistance(visiblePhase, visible.ContactFraction) < 0.08f);
         motion.LastPoseClipId = motion.RenderClipId;
         motion.LastPosePhase = motion.RenderPhase;
     }
@@ -169,25 +199,22 @@ public sealed class MotionEngine
     }
 
     public ClipMeta? SelectClip(PlayerIntent intent, BallState ball, float speed, float turnRate,
-        float bodyTypeFactor = 1f, string? styleTag = null)
+        float bodyTypeFactor = 1f, string? styleTag = null, float approachWeight = 0f, float timeToBallContact = -1f)
     {
         ClipCategory category = SelectCategory(intent, ball);
-        // Standing still is idle, not the slowest "locomotion" clip: with blocks,
-        // appeals and victories filed under Locomotion at speed 0, stationary
-        // players stood with their arms in the air at every stoppage.
         if (category == ClipCategory.Locomotion && ball != BallState.Possessed && speed < .35f)
         {
-            ClipMeta? idle = SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, styleTag);
+            ClipMeta? idle = SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, styleTag, 0f, -1f);
             if (idle != null) return idle;
         }
-        ClipMeta? best = SelectBest(category, ball, speed, turnRate, bodyTypeFactor, styleTag);
+        ClipMeta? best = SelectBest(category, ball, speed, turnRate, bodyTypeFactor, styleTag, approachWeight, timeToBallContact);
         if (best != null) return best;
         if (category != ClipCategory.Locomotion)
         {
-            best = SelectBest(ClipCategory.Locomotion, ball, speed, turnRate, bodyTypeFactor, styleTag);
+            best = SelectBest(ClipCategory.Locomotion, ball, speed, turnRate, bodyTypeFactor, styleTag, approachWeight, timeToBallContact);
             if (best != null) return best;
         }
-        return SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, null);
+        return SelectBest(ClipCategory.Idle, BallState.None, 0f, 0f, 1f, null, 0f, -1f);
     }
 
     public static ClipCategory SelectCategory(PlayerIntent intent, BallState ball) => intent switch
@@ -206,20 +233,31 @@ public sealed class MotionEngine
         _ => ClipCategory.Locomotion,
     };
 
-    public static float ComputeStartPhase(ClipMeta from, ClipMeta to, float currentPhase, PlayerIntent intent)
+    public static float ComputeStartPhase(ClipMeta from, ClipMeta to, float currentPhase, PlayerIntent intent,
+        float approachWeight = 0f, float timeToBallContact = -1f)
     {
         if (!to.Loop || IsOneShot(to.Category) || intent is PlayerIntent.Pass or PlayerIntent.ThroughBall
             or PlayerIntent.Shoot or PlayerIntent.Trap or PlayerIntent.Tackle or PlayerIntent.Dive
             or PlayerIntent.Celebrate)
-            return 0f;
+        {
+            float start = 0f;
+            if (to.HasContact && timeToBallContact > 0f && approachWeight > 0.05f)
+                start = BallApproach.ContactLockedStartPhase(to, timeToBallContact, 0f, approachWeight);
+            return start;
+        }
         if (from.Loop && IsLocomotion(from.Category) && IsLocomotion(to.Category))
-            return AlignToNearestFootEvent(from, to, currentPhase);
-        return Clamp01(currentPhase);
+        {
+            float phase = AlignToNearestFootEvent(from, to, currentPhase);
+            if (to.HasContact && timeToBallContact > 0f && approachWeight > 0.05f)
+                phase = BallApproach.ContactLockedStartPhase(to, timeToBallContact, phase, approachWeight);
+            return phase;
+        }
+        float basePhase = Clamp01(currentPhase);
+        if (to.HasContact && timeToBallContact > 0f && approachWeight > 0.05f)
+            basePhase = BallApproach.ContactLockedStartPhase(to, timeToBallContact, basePhase, approachWeight);
+        return basePhase;
     }
 
-    /// <summary>Map the nearest source plant to the nearest target plant for that same
-    /// side, preserving the circular offset from the source event. Legacy metadata
-    /// infers alternating Left/Right sides from event order.</summary>
     public static float AlignToNearestFootEvent(ClipMeta from, ClipMeta to, float phase)
     {
         if (from.FootPlantFrames.Length == 0 || to.FootPlantFrames.Length == 0)
@@ -231,7 +269,6 @@ public sealed class MotionEngine
             float d = CircularDistance(phase, from.FootPlantFrames[i]);
             if (d < bestDistance) { bestDistance = d; nearest = i; }
         }
-
         float sourcePlant = from.FootPlantFrames[nearest];
         FootSide side = from.FootPlantSideAt(nearest);
         int targetIndex = -1;
@@ -260,7 +297,8 @@ public sealed class MotionEngine
     }
 
     private ClipMeta? SelectBest(ClipCategory category, BallState ball, float speed,
-        float turnRate, float bodyTypeFactor, string? styleTag)
+        float turnRate, float bodyTypeFactor, string? styleTag,
+        float approachWeight = 0f, float timeToBallContact = -1f)
     {
         ClipMeta? best = null;
         float bestScore = float.MaxValue;
@@ -274,7 +312,7 @@ public sealed class MotionEngine
         }
         foreach (var c in _ordered)
         {
-            if (c.Dedicated) continue;      // only ever played for the action that names it
+            if (c.Dedicated) continue;
             if (c.Category != category || (exactBallStateExists && c.BallState != ball)
                 || (!exactBallStateExists && neutralBallStateExists && c.BallState != BallState.None)) continue;
             float speedError = MathF.Abs(c.PreferredSpeed - speed) * Math.Clamp(bodyTypeFactor, .5f, 1.5f);
@@ -283,6 +321,11 @@ public sealed class MotionEngine
             float tagBonus = styleTag != null && Array.Exists(c.Tags, t =>
                 string.Equals(t, styleTag, StringComparison.OrdinalIgnoreCase)) ? -.1f : 0f;
             float score = speedError + turnError + rootError + tagBonus;
+            if (approachWeight > 0.05f)
+            {
+                score += BallApproach.ContactTimingCost(c, timeToBallContact) * approachWeight;
+                score += BallApproach.StrideShorteningCost(c, speed, approachWeight);
+            }
             if (score < bestScore) { bestScore = score; best = c; }
         }
         return best;
@@ -293,14 +336,20 @@ public sealed class MotionEngine
     {
         if (clip.HasContact && secondsUntilContact > .001f)
         {
-            // Play the wind-up that is LEFT (from the entry frame) in the time left.
             float remaining = (clip.ContactFraction - Clamp01(phase)) * clip.Duration;
             if (remaining > .01f) return Math.Clamp(remaining / secondsUntilContact, .4f, 3f);
             return 1f;
         }
-        if (IsLocomotion(clip.Category) && clip.PreferredSpeed > .1f)
-            return Math.Clamp(speed / clip.PreferredSpeed, .45f, 2.8f);
-        return 1f;
+        return LocomotionPlaybackScale(clip, speed);
+    }
+
+    /// <summary>Playback rate of a locomotion loop at a ground speed: stride-matched when the
+    /// clip's stride speed is baked (planted feet stay put), else relative to PreferredSpeed.</summary>
+    public static float LocomotionPlaybackScale(ClipMeta clip, float speed)
+    {
+        if (!IsLocomotion(clip.Category)) return 1f;
+        float basis = clip.StrideSpeed > .2f ? clip.StrideSpeed : clip.PreferredSpeed;
+        return basis > .1f ? Math.Clamp(speed / basis, .45f, 2.8f) : 1f;
     }
 
     private void CommitTransition(MotionState state)
@@ -312,17 +361,51 @@ public sealed class MotionEngine
         state.NextPhase = state.Phase;
         state.CrossfadeRemaining = 0f;
         state.BlendWeight = 1f;
+        Metrics.TransitionEvents++;
     }
 
-    private static void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)
+    public const float PlantEdgeThreshold = 0.5f;
+
+    private void UpdateFootPlants(MotionState state, ClipMeta? clip, float phase)
     {
+        float prevL = state.PlantWeightLeft;
+        float prevR = state.PlantWeightRight;
+        state.PrevPlantWeightLeft = prevL;
+        state.PrevPlantWeightRight = prevR;
         state.FootPlantedLeft = state.FootPlantedRight = false;
-        if (clip == null || clip.FootPlantFrames.Length == 0) return;
-        for (int i = 0; i < clip.FootPlantFrames.Length; i++)
+        state.PlantWeightLeft = 0f;
+        state.PlantWeightRight = 0f;
+        if (clip == null) return;
+
+        state.PlantWeightLeft = clip.SamplePlantWeight(true, phase);
+        state.PlantWeightRight = clip.SamplePlantWeight(false, phase);
+
+        if (clip.HasPlantCurves || clip.FootPlantFrames.Length == 0)
         {
-            if (!NearPlant(phase, clip.FootPlantFrames[i])) continue;
-            if (clip.FootPlantSideAt(i) == FootSide.Left) state.FootPlantedLeft = true;
-            else state.FootPlantedRight = true;
+            state.FootPlantedLeft = state.PlantWeightLeft >= PlantEdgeThreshold;
+            state.FootPlantedRight = state.PlantWeightRight >= PlantEdgeThreshold;
+        }
+        else
+        {
+            for (int i = 0; i < clip.FootPlantFrames.Length; i++)
+            {
+                if (!NearPlant(phase, clip.FootPlantFrames[i])) continue;
+                if (clip.FootPlantSideAt(i) == FootSide.Left) state.FootPlantedLeft = true;
+                else state.FootPlantedRight = true;
+            }
+            if (state.FootPlantedLeft) state.PlantWeightLeft = MathF.Max(state.PlantWeightLeft, 1f);
+            if (state.FootPlantedRight) state.PlantWeightRight = MathF.Max(state.PlantWeightRight, 1f);
+        }
+
+        if (state.PlantWeightLeft >= PlantEdgeThreshold && prevL < PlantEdgeThreshold)
+        {
+            state.FootstepLeft = true;
+            Metrics.RecordFootstep();
+        }
+        if (state.PlantWeightRight >= PlantEdgeThreshold && prevR < PlantEdgeThreshold)
+        {
+            state.FootstepRight = true;
+            Metrics.RecordFootstep();
         }
     }
 
@@ -338,6 +421,11 @@ public sealed class MotionEngine
         if (d > .5f) d -= 1f;
         if (d < -.5f) d += 1f;
         return d;
+    }
+    private static float MoveToward(float current, float target, float maxDelta)
+    {
+        if (MathF.Abs(target - current) <= maxDelta) return target;
+        return current + MathF.Sign(target - current) * maxDelta;
     }
     private static float Wrap01(float v) => v - MathF.Floor(v);
     private static float Clamp01(float v) => Math.Clamp(v, 0f, 1f);

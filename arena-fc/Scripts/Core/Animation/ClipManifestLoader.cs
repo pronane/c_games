@@ -9,15 +9,16 @@ namespace ArenaFC.Core.Animation;
 
 public static class ClipManifestLoader
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
+    public const int MinSupportedVersion = 1;
 
     public static List<ClipMeta> Parse(string json)
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         int version = root.TryGetProperty("version", out var v) ? v.GetInt32() : 0;
-        if (version != CurrentVersion)
-            throw new FormatException($"Unsupported clip manifest version {version}; expected {CurrentVersion}.");
+        if (version < MinSupportedVersion || version > CurrentVersion)
+            throw new FormatException($"Unsupported clip manifest version {version}; expected {MinSupportedVersion}..{CurrentVersion}.");
         if (!root.TryGetProperty("clips", out var clips) || clips.ValueKind != JsonValueKind.Array)
             throw new FormatException("Clip manifest must contain a clips array.");
 
@@ -64,6 +65,13 @@ public static class ClipManifestLoader
                 Tags = tags,
                 BoneCount = bones,
                 Loop = item.TryGetProperty("loop", out var loop) && loop.GetBoolean(),
+                // v2 Hypermotion data plumbing
+                PlantCurveLeft = ReadFloats(item, "plantCurveLeft"),
+                PlantCurveRight = ReadFloats(item, "plantCurveRight"),
+                ContactWindowStart = OptionalSingle(item, "contactWindowStart", -1f),
+                ContactWindowEnd = OptionalSingle(item, "contactWindowEnd", -1f),
+                RootVelocitySamples = ReadFloats(item, "rootVelocitySamples"),
+                StrideSpeed = OptionalSingle(item, "strideSpeed", 0f),
             };
             if (meta.PreferredSpeed < 0f || !float.IsFinite(meta.PreferredSpeed))
                 throw new FormatException($"Clip '{id}' has invalid preferredSpeed.");

@@ -28,6 +28,56 @@ public static class SelfTest
         foreach (string shader in new[] { "pitch", "ball", "net", "crowd", "sky" })
             Check("shader " + shader + " loads", GD.Load<Shader>($"res://Shaders/{shader}.gdshader") != null);
 
+        Section("Production bone-name lookup");
+        var namedBones = new Skeleton3D();
+        foreach (string name in new[] { "spine_01", "spine_02", "LThigh", "RForearm_2" })
+            namedBones.AddBone(name);
+        Check("numbered spine names remain distinct",
+            SoccerClipRig.FindBoneLoose(namedBones, "spine_01") == 0 &&
+            SoccerClipRig.FindBoneLoose(namedBones, "spine_02") == 1);
+        Check("side-prefix and duplicate bone suffix resolve",
+            SoccerClipRig.FindBoneLoose(namedBones, "thigh_L") == 2 &&
+            SoccerClipRig.FindBoneLoose(namedBones, "lowerarm_R") == 3);
+        namedBones.Free();
+        var productionNames = new Skeleton3D();
+        productionNames.AddBone("Spine");
+        productionNames.AddBone("Chest");
+        Check("production spine aliases resolve to separate bones",
+            SoccerClipRig.FindBoneLoose(productionNames, "spine_01") == 0 &&
+            SoccerClipRig.FindBoneLoose(productionNames, "spine_02") == 1);
+        productionNames.Free();
+
+        Section("Foot IK chain geometry");
+        var ikHost = new SoccerClipRig();
+        var ikSkeleton = new Skeleton3D();
+        root.AddChild(ikHost);
+        ikHost.AddChild(ikSkeleton);
+        ikHost.Position = new Vector3(12f, 0f, -7f);
+        ikHost.Rotation = new Vector3(0f, .55f, 0f);
+        ikSkeleton.AddBone("thigh"); ikSkeleton.AddBone("shin"); ikSkeleton.AddBone("foot");
+        ikSkeleton.SetBoneParent(1, 0); ikSkeleton.SetBoneParent(2, 1);
+        var positions = new[] { new Vector3(.11f, 1f, 0f), new Vector3(0f, -.44f, 0f), new Vector3(0f, -.42f, 0f) };
+        for (int i = 0; i < positions.Length; i++)
+        {
+            ikSkeleton.SetBoneRest(i, new Transform3D(Basis.Identity, positions[i]));
+            ikSkeleton.SetBonePosePosition(i, positions[i]);
+        }
+        ikHost.Skel = ikSkeleton;
+        ikSkeleton.ForceUpdateAllBoneTransforms();
+        var ikTarget = new Vector3(.23f, .22f, .10f);
+        var beforeIk = ikSkeleton.GetBoneGlobalPose(2).Origin.DistanceTo(ikTarget);
+        ikHost.SolveTwoBone(0, 1, 2, ikTarget, .55f);
+        ikSkeleton.ForceUpdateAllBoneTransforms();
+        var hipPos = ikSkeleton.GetBoneGlobalPose(0).Origin;
+        var kneePos = ikSkeleton.GetBoneGlobalPose(1).Origin;
+        var anklePos = ikSkeleton.GetBoneGlobalPose(2).Origin;
+        Check("foot IK moves toward target and preserves authored leg lengths",
+            anklePos.DistanceTo(ikTarget) < beforeIk && anklePos.DistanceTo(ikTarget) < .04f &&
+            MathF.Abs(hipPos.DistanceTo(kneePos) - .44f) < .005f &&
+            MathF.Abs(kneePos.DistanceTo(anklePos) - .42f) < .005f,
+            $"before={beforeIk:F3} after={anklePos.DistanceTo(ikTarget):F3}");
+        ikHost.QueueFree();
+
         Section("Procedural rig in Godot (Skeleton3D + Skin + skinned ArrayMesh)");
         var spec = new CharacterSpec { Name = "Test Player", DisplayName = "TEST", Number = 9 };
         spec.SetBoneRotation("LThigh", 22f, 0, 0);
@@ -179,6 +229,26 @@ public static class SelfTest
         ed.QueueFree();
         hud.QueueFree();
         stadium.QueueFree();
+
+        Section("Foot IK coordinate-space assumptions (report P0)");
+        {
+            var skelNode = new Skeleton3D();
+            skelNode.Position = new Vector3(10f, 0f, -5f);
+            skelNode.RotationDegrees = new Vector3(0f, 35f, 0f);
+            root.AddChild(skelNode);
+            skelNode.AddBone("Hips");
+            skelNode.SetBoneRest(0, new Transform3D(Basis.Identity, new Vector3(0f, 1f, 0f)));
+            skelNode.SetBonePosePosition(0, new Vector3(0f, 1f, 0f));
+            skelNode.ResetBonePoses();
+            var boneSkel = skelNode.GetBoneGlobalPose(0).Origin;
+            var boneWorld = skelNode.GlobalTransform * boneSkel;
+            var skelInv = skelNode.GlobalTransform.AffineInverse();
+            var roundTrip = skelInv * boneWorld;
+            Check("GetBoneGlobalPose treated as skeleton-space converts to world", (boneWorld - (skelNode.GlobalTransform * boneSkel)).Length() < 0.001f);
+            Check("world/skeleton round-trip stable off-origin rotated rig", (roundTrip - boneSkel).Length() < 0.001f);
+            Check("offset rig bone world position not at skeleton origin", boneWorld.DistanceTo(skelNode.GlobalTransform.Origin) > 0.1f);
+            skelNode.QueueFree();
+        }
 
         Section("Full 3D match pipeline (5v5, 12 simulated seconds)");
         var view = new MatchView();

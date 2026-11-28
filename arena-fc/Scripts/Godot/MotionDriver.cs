@@ -25,6 +25,7 @@ public sealed class MotionDriver
 
     public bool IsLoaded => _engine.ClipCount > 0;
     public bool Matching => _engine.Database != null;
+    public ArenaFC.Core.Animation.AnimationMetrics Metrics => _engine.Metrics;
     private readonly Dictionary<string, string> _dedicated = new(StringComparer.Ordinal);
 
     /// <summary>Turn on pose-level motion matching: the baked feature table, and the
@@ -86,7 +87,7 @@ public sealed class MotionDriver
 
     /// <summary>Returns null when the manifest is absent, preserving the existing rig selector.</summary>
     public MotionState? UpdatePlayer(int index, PlayerState player, ArenaFC.Core.BallState ball,
-        bool ownsBall, int currentTick)
+        bool ownsBall, int currentTick, ArenaFC.Core.Football.PlayerActionContract? contract = null)
     {
         if (!IsLoaded || index < 0 || index >= _slots.Length) return null;
         var slot = _slots[index];
@@ -95,8 +96,20 @@ public sealed class MotionDriver
         slot.HasTick = true;
         float dt = elapsedTicks * MatchEngine.Dt;
         float yaw = MathF.Atan2(player.Facing.X, player.Facing.Z);
+        if (contract != null && contract.FacingDirection.LengthSquared() > 1e-6f)
+            yaw = MathF.Atan2(contract.FacingDirection.X, contract.FacingDirection.Z);
         float turnRate = 0f;
         if (slot.HasYaw && dt > 1e-5f) turnRate = Mx.AngleDiff(yaw, slot.LastYaw) / dt;
+        // Priority 2: velocity-aware turn ceiling so sprint turns cannot snap.
+        float speedForTurn = Mx.Flat(player.Vel).Length();
+        float agility = player.Spec.Archetype == Archetype.Explosive ? 0.85f
+                      : player.Spec.Archetype == Archetype.Lengthy ? 0.4f
+                      : 0.55f;
+        agility = Math.Clamp(agility * 0.5f + player.Spec.Pace * 0.5f, 0f, 1f);
+        float maxTurn = MomentumLimits.MaxTurnRate(speedForTurn, agility);
+        turnRate = Math.Clamp(turnRate, -maxTurn, maxTurn);
+        if (contract != null && contract.DesiredTurnRate > 0f)
+            turnRate = Math.Clamp(turnRate, -contract.DesiredTurnRate, contract.DesiredTurnRate);
         slot.LastYaw = yaw;
         slot.HasYaw = true;
 
@@ -109,8 +122,12 @@ public sealed class MotionDriver
         PlayerIntent intent = IntentFor(player);
         if (ball.HasPending && ball.PendingFrom == player.Index && ball.PendingReceiver >= 0)
             intent = PlayerIntent.Pass;
+        if (contract != null)
+            intent = IntentFromContract(contract.Intent, intent);
         bool actionClip = intent is PlayerIntent.Pass or PlayerIntent.ThroughBall or PlayerIntent.Shoot
             or PlayerIntent.Trap or PlayerIntent.Tackle or PlayerIntent.Dive or PlayerIntent.Celebrate or PlayerIntent.Cut;
+        if (!actionClip && contract != null && contract.ShouldSprint && intent == PlayerIntent.Move)
+            intent = PlayerIntent.Sprint;
         if (!actionClip) slot.LastAction = "";
         else if (!string.Equals(slot.LastAction, player.Action, StringComparison.Ordinal))
         {
@@ -128,13 +145,31 @@ public sealed class MotionDriver
         float elapsedAction = Math.Max(0f, player.ActionDuration - player.ActionTimer);
         float untilContact = player.ActionContactAt > 0f
             ? Math.Max(0f, player.ActionContactAt - elapsedAction) : -1f;
+        // Tighten TTC/contact wiring from sim pending ball events.
+        if (ball.HasPending && ball.PendingFrom == player.Index)
+        {
+            float pendingTtc = Math.Max(0f, player.ActionTimer);
+            if (untilContact < 0f || pendingTtc < untilContact) untilContact = pendingTtc;
+        }
+        if (contract != null && contract.BallContactTime > 0f)
+        {
+            if (untilContact < 0f || contract.BallContactTime < untilContact) untilContact = contract.BallContactTime;
+        }
         float speed = Mx.Flat(player.Vel).Length();
+        if (contract != null && contract.DesiredSpeed > 0f) speed = MathF.Max(speed, MathF.Min(contract.DesiredSpeed, contract.SpeedLimit));
+        slot.State.ContractShouldSprint = contract?.ShouldSprint ?? player.Sprinting;
+        slot.State.ContractPressing = contract?.Pressing ?? player.Pressing;
+        slot.State.ContractRequiresFootPlant = contract?.RequiresFootPlant ?? false;
+        slot.State.ContractRole = contract?.Role ?? player.Role.ToString().ToLowerInvariant();
         // Facing-root XZ (x = right, z = forward), the space the feature table is baked in.
         var fwd = Mx.Norm(Mx.Flat(player.Facing));
         if (fwd.LengthSquared() < 1e-6f) fwd = new System.Numerics.Vector3(0, 0, 1);
         var right = new System.Numerics.Vector3(-fwd.Z, 0, fwd.X);   // same handedness as SoccerClipRig's strafe test
         var vel = Mx.Flat(player.Vel);
-        var toTarget = Mx.Flat(player.Target - player.Pos);
+        var targetPos = player.Target;
+        if (contract != null && contract.HasTarget)
+            targetPos = contract.TargetPosition;
+        var toTarget = Mx.Flat(targetPos - player.Pos);
         var desired = toTarget.LengthSquared() > .04f ? Mx.Norm(toTarget) * MathF.Max(speed, MathF.Min(toTarget.Length() * 2f, 8f))
                                                        : System.Numerics.Vector3.Zero;
         var localVel = new System.Numerics.Vector2(System.Numerics.Vector3.Dot(vel, right), System.Numerics.Vector3.Dot(vel, fwd));
@@ -146,18 +181,37 @@ public sealed class MotionDriver
         return slot.State;
     }
 
+    private static PlayerIntent IntentFromContract(string intent, PlayerIntent fallback)
+    {
+        return intent switch
+        {
+            "kick" or "shoot" or "volley" or "chip_shot" or "trivela" or "bicycle" or "clear" => PlayerIntent.Shoot,
+            "pass" or "short_pass" or "through_ball" or "cross" or "throw_in" => intent is "pass" or "short_pass" ? PlayerIntent.Pass : PlayerIntent.ThroughBall,
+            "receive" or "trap" or "thigh_control" or "chest_control" or "header" or "pickup" or "catch" or "intercept" => PlayerIntent.Trap,
+            "tackle" or "slide" or "shoulder_charge" or "block" => PlayerIntent.Tackle,
+            "dive" or "keeper_dive" or "parry" => PlayerIntent.Dive,
+            "celebrate" => PlayerIntent.Celebrate,
+            "shield" => PlayerIntent.Shield,
+            "carry" => fallback == PlayerIntent.Sprint ? PlayerIntent.Sprint : PlayerIntent.Move,
+            "move" or "run" or "jog" => PlayerIntent.Move,
+            "idle" or "stand" => fallback == PlayerIntent.Shield ? PlayerIntent.Shield : PlayerIntent.Move,
+            "skill" => PlayerIntent.Cut,
+            _ => fallback,
+        };
+    }
+
     private static PlayerIntent IntentFor(PlayerState p)
     {
         if (p.ActionTimer > 0f)
         {
             return p.Action switch
             {
-                "kick" or "volley" or "shoot" or "chip_shot" or "trivela" or "bicycle" => PlayerIntent.Shoot,
+                "kick" or "volley" or "shoot" or "chip_shot" or "trivela" or "bicycle" or "clear" => PlayerIntent.Shoot,
                 "pass" or "short_pass" => PlayerIntent.Pass,
                 "through_ball" or "cross" or "throw_in" => PlayerIntent.ThroughBall,
-                "trap" or "thigh_control" or "chest_control" or "header" or "pickup" => PlayerIntent.Trap,
-                "tackle" or "slide" or "shoulder_charge" => PlayerIntent.Tackle,
-                "dive" or "keeper_dive" => PlayerIntent.Dive,
+                "trap" or "thigh_control" or "chest_control" or "header" or "pickup" or "catch" or "intercept" => PlayerIntent.Trap,
+                "tackle" or "slide" or "shoulder_charge" or "block" => PlayerIntent.Tackle,
+                "dive" or "keeper_dive" or "parry" => PlayerIntent.Dive,
                 "celebrate" => PlayerIntent.Celebrate,
                 "cut" or "turn" => PlayerIntent.Cut,
                 // Skill moves have their own Sprite Forge clips now (SoccerClipRig plays

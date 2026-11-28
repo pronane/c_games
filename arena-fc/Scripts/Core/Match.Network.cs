@@ -43,6 +43,7 @@ public sealed partial class MatchEngine
         _tick = other._tick;
         Events.Clear();
         Events.AddRange(other.Events.Select(CloneEvent));
+        ResetTacticalCache();   // per-tick caches are keyed on _tick and would be stale
     }
 
     /// <summary>One authoritative fixed tick with per-player human commands.</summary>
@@ -89,6 +90,7 @@ public sealed partial class MatchEngine
         _tick = c.Tick;
         Events.Clear();
         Events.AddRange(c.Events.Select(CloneEvent));
+        ResetTacticalCache();
     }
 
     /// <summary>Rewind to an authoritative snapshot state (rollback / reconnect).</summary>
@@ -99,6 +101,7 @@ public sealed partial class MatchEngine
         _globalTime = globalTime;
         _acc = 0f;
         _tick = tick;
+        ResetTacticalCache();
     }
 
     /// <summary>Set only the timing/RNG words (snapshot application on a mirror engine).</summary>
@@ -108,6 +111,7 @@ public sealed partial class MatchEngine
         _globalTime = globalTime;
         _acc = 0f;
         _tick = tick;
+        ResetTacticalCache();
     }
 
     /// <summary>Overlay the networked fields of an authoritative state on a restored
@@ -237,6 +241,7 @@ public sealed partial class MatchEngine
         CalledForBall = p.CalledForBall, CallForBallTimer = p.CallForBallTimer,
         Personality = p.Personality, Morale = p.Morale,
         IsInjured = p.IsInjured, InjurySeverity = p.InjurySeverity,
+        ActionIntent = p.ActionIntent, TacticalRole = p.TacticalRole, TacticalRoleHold = p.TacticalRoleHold,
     };
 
     private static BallState CloneBall(BallState b) => new()
@@ -257,6 +262,7 @@ public sealed partial class MatchEngine
         {
             Phase = s.Phase, PhaseTimer = s.PhaseTimer, Clock = s.Clock, Half = s.Half,
             Score = (int[])s.Score.Clone(), Shots = (int[])s.Shots.Clone(),
+            TacticalPresser = (int[])s.TacticalPresser.Clone(),
             ShotsOnTarget = (int[])s.ShotsOnTarget.Clone(), Passes = (int[])s.Passes.Clone(),
             Fouls = (int[])s.Fouls.Clone(), Corners = (int[])s.Corners.Clone(),
             PossessionTime = (float[])s.PossessionTime.Clone(),
@@ -285,6 +291,7 @@ public sealed partial class MatchEngine
         var s = State;
         s.Phase = src.Phase; s.PhaseTimer = src.PhaseTimer; s.Clock = src.Clock; s.Half = src.Half;
         s.Score = (int[])src.Score.Clone(); s.Shots = (int[])src.Shots.Clone();
+        s.TacticalPresser = (int[])src.TacticalPresser.Clone();
         s.ShotsOnTarget = (int[])src.ShotsOnTarget.Clone(); s.Passes = (int[])src.Passes.Clone();
         s.Fouls = (int[])src.Fouls.Clone(); s.Corners = (int[])src.Corners.Clone();
         s.PossessionTime = (float[])src.PossessionTime.Clone();

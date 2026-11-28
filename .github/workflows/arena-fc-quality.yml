@@ -1,0 +1,205 @@
+name: Arena FC quality gates
+
+on:
+  push:
+    branches: ["arena/**"]
+    paths:
+      - "arena-fc/**"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "arena-fc/**"
+      - ".github/workflows/**"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arena-fc-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  asset-contracts:
+    name: Asset and Python contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python tooling
+        run: python -m compileall -q arena-fc/Tools
+      - name: Validate committed clip manifest and GLB container
+        working-directory: arena-fc
+        run: python Tools/ci_validate_assets.py
+
+  simulation-stress:
+    name: Seeded simulation stress and determinism
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STRESS_SEEDS: ${{ github.event_name == 'schedule' && '12' || '3' }}
+      STRESS_SECONDS: ${{ github.event_name == 'schedule' && '90' || '30' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Run deterministic 5v5, 7v7 and 11v11 stress scenarios
+        working-directory: arena-fc
+        run: |
+          set -o pipefail
+          dotnet run --project Tests/CiStressTests.csproj -c Release -- \
+            --seeds "$STRESS_SEEDS" --seconds "$STRESS_SECONDS" 2>&1 | tee ci-stress.log
+      - name: Upload simulation stress log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-simulation-stress
+          path: arena-fc/ci-stress.log
+          if-no-files-found: warn
+
+  dotnet-coverage:
+    name: .NET core coverage report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Install native dependencies for the .NET coverage profiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2 libicu-dev zlib1g
+          ldd --version | head -n 1
+          ldconfig -p | grep -E 'libxml2\.so|libicuuc\.so' | head
+      - name: Install cross-platform coverage collector
+        run: |
+          dotnet tool install --global dotnet-coverage --version 17.14.1
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Collect core test coverage
+        working-directory: arena-fc
+        run: |
+          dotnet-coverage collect "dotnet run --project Tests/CoreTests.csproj -c Release" --output coverage-core.cobertura.xml --output-format cobertura
+          test -s coverage-core.cobertura.xml
+          grep -q '<class ' coverage-core.cobertura.xml
+      - name: Collect match-core test coverage
+        working-directory: arena-fc
+        run: |
+          dotnet-coverage collect "dotnet run --project Tests/MatchCoreTests.csproj -c Release" --output coverage-match-core.cobertura.xml --output-format cobertura
+          test -s coverage-match-core.cobertura.xml
+          grep -q '<class ' coverage-match-core.cobertura.xml
+      - name: Upload Cobertura coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-dotnet-coverage
+          path: |
+            arena-fc/coverage-core.cobertura.xml
+            arena-fc/coverage-match-core.cobertura.xml
+          if-no-files-found: warn
+
+  godot-render-captures:
+    name: Godot rendered rig and gameplay captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Install software rendering and virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+      - name: Download Godot 4.7.2 Mono
+        run: |
+          curl -fsSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x "$RUNNER_TEMP"/godot/*/Godot_v4.7.2-stable_mono_linux.x86_64
+      - name: Build Godot C# assemblies
+        working-directory: arena-fc
+        run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Import Godot resources (textures, materials and scene assets)
+        working-directory: arena-fc
+        run: '"$GODOT" --headless --editor --path . --import --quit'
+      - name: Run production rig grounding and animation evidence
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          ARENA_FC_EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
+          ARENA_FC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p "$ARENA_FC_EVIDENCE_DIR"
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy res://Scenes/RuntimeEvidence.tscn
+          test -s "$ARENA_FC_EVIDENCE_DIR/runtime-evidence.json"
+          test -s "$ARENA_FC_EVIDENCE_DIR/production-rig-grounding.png"
+      # The runtime evidence now measures mesh-derived boot soles and actual MatchEngine pass/shot release frames.
+      - name: Summarize production rig measurements
+        env:
+          EVIDENCE_JSON: ${{ runner.temp }}/arena-runtime-evidence/runtime-evidence.json
+        run: |
+          python -c 'import json,os; d=json.load(open(os.environ["EVIDENCE_JSON"])); p=d["match_contact_scenarios"]; print("::notice title=Production rig evidence::commit={} slide_mps={:.4f} planted_clearance_min_m={:.4f} planted_penetrations={} swing_clearance_p95_m={:.4f} pass_contact_frames={:.3f} shot_contact_frames={:.3f} rig_p95_ms={:.3f} rig_max_ms={:.3f} bone_stretch={:.3f}".format(d["commit_sha"], d["avg_planted_foot_slide_mps"], d["planted_sole_clearance_min_m"], d["planted_sole_penetration_samples"], d["swing_sole_clearance_p95_m"], p["pass"]["error_frames"], p["shot"]["error_frames"], d["rig_update_p95_ms"], d["rig_update_max_ms"], d["max_bone_parent_distance_vs_rest"]))'
+      - name: Publish compact diagnostic thumbnails
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/arena-runtime-evidence
+        run: |
+          for label in run-flat sprint-flat-to-ramp turn-ramp; do
+            index=0
+            while IFS= read -r chunk; do
+              echo "::notice title=Rig thumbnail $label part $index::$chunk"
+              index=$((index + 1))
+            done < <(base64 -w0 "$EVIDENCE_DIR/$label-thumbnail.png" | fold -w 3000)
+          done
+      - name: Render procedural rig captures
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/arena-captures/rig"
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy \
+            --script res://Tools/rig_shot.gd -- "$RUNNER_TEMP/arena-captures/rig"
+          test -s "$RUNNER_TEMP/arena-captures/rig/lineup.png"
+          test -s "$RUNNER_TEMP/arena-captures/rig/upper.png"
+      - name: Render browser gameplay smoke captures
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/arena-captures/gameplay"
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy \
+            --script res://Tools/shot.gd -- "$RUNNER_TEMP/arena-captures/gameplay"
+          test -s "$RUNNER_TEMP/arena-captures/gameplay/play_0.png"
+          test -s "$RUNNER_TEMP/arena-captures/gameplay/goal.png"
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-rendered-captures
+          path: ${{ runner.temp }}/arena-captures/
+          if-no-files-found: warn
+      - name: Upload production runtime metrics and captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-production-runtime-evidence
+          path: ${{ runner.temp }}/arena-runtime-evidence/
+          if-no-files-found: warn

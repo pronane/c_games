@@ -154,22 +154,33 @@ public sealed partial class MatchEngine
         foreach (var q in S.Players)
         {
             if (q.Team == holder.Team || q.SentOff) continue;
-            // In the area but beyond 10 yards at a goal kick: the referee waves him
-            // out (no caution unless he is also inside 9.15 m).
-            if (areaRule && InArea(q.Pos, areaGx, -.3f) && Mx.FlatDist(q.Pos, b.Pos) >= need - .35f)
+            // At a goal kick / own-area free kick opponents must be outside the
+            // penalty area until the ball is in play, regardless of distance.
+            if (areaRule && InArea(q.Pos, areaGx, 0f))
             {
                 q.Pos = OutsideArea(q.Pos, areaGx); q.Target = q.Pos; q.Vel = Vector3.Zero;
                 continue;
             }
-            if (q.IsKeeper && !IsThrowInHold(holder) && MathF.Abs(b.Pos.X) > Mx.HalfLength - 12f) continue; // keeper on his line at a penalty
+            if (q.IsKeeper && AtPenaltySpot(S.RestartPos) && MathF.Abs(b.Pos.X) > Mx.HalfLength - 12f) continue; // keeper on his line at a penalty
             float d = Mx.FlatDist(q.Pos, b.Pos);
             if (d < need - .35f)
             {
                 if (q.EncroachedAt != S.RestartId)
                 {
                     q.EncroachedAt = S.RestartId;     // one caution per restart; after that he is just sent back
-                    Add(EventKind.Foul, $"Encroachment - {q.Spec.DisplayName} wasn't back the full {(need < 3f ? "2 metres" : "10 yards")}.");
-                    Caution(q, "encroachment");
+                    // AI players can begin a restart inside the exclusion radius
+                    // because their previous open-play position is frozen at the
+                    // whistle. They are moved back below; booking them before they
+                    // have had a chance to retreat creates implausible automatic
+                    // cards at nearly every restart. Keep the caution for a human
+                    // who deliberately encroaches.
+                    bool humanControlled = q.Index == S.Controlled
+                        || (Options.AwayHuman && q.Index == S.ControlledAway);
+                    if (humanControlled)
+                    {
+                        Add(EventKind.Foul, $"Encroachment - {q.Spec.DisplayName} wasn't back the full {(need < 3f ? "2 metres" : "10 yards")}.");
+                        Caution(q, "encroachment");
+                    }
                 }
                 if (!q.SentOff)
                 {

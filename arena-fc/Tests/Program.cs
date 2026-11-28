@@ -316,6 +316,30 @@ Check("capture/restore forks a bit-identical engine",
       $"{NetProtocol.Hash(ckA.State):X8} vs {NetProtocol.Hash(ckC.State):X8}");
 Check("checkpoint does not alias the live state",
       ckPoint.State.Players[0].Pos.X != ckA.State.Players[0].Pos.X || ckPoint.Tick == 90);
+// Rollback with identical inputs must not change the future: predict 8 ticks ahead,
+// rewind, replay.  Engine-side state that is not in the checkpoint (the tactical
+// coordinator's presser hysteresis once was) makes the replay pick different players.
+{
+    int rbFirst = -1;
+    foreach (var (ts, seed) in new[] { (5, 4242), (11, 777) })
+    {
+        var rbo = new MatchOptions { Seed = seed, TeamSize = ts, AwayHuman = true };
+        var rbA = new MatchEngine(rbo); var rbB = new MatchEngine(rbo);
+        for (int i = 0; i < 1200 && rbFirst < 0; i++)
+        {
+            CkStep(rbA, i);
+            if (i % 30 == 0)
+            {
+                var c = rbB.Capture();
+                for (int k = 0; k < 8; k++) CkStep(rbB, i + k);
+                rbB.Restore(c);
+            }
+            CkStep(rbB, i);
+            if (NetProtocol.Hash(rbA.State) != NetProtocol.Hash(rbB.State)) rbFirst = i;
+        }
+    }
+    Check("rollback + replay of the same inputs stays bit-identical", rbFirst < 0, rbFirst < 0 ? "" : $"diverged at tick {rbFirst}");
+}
 
 Section("Full authoritative state transfer (resume / peer host handoff)");
 var fsOpts = new MatchOptions { Seed = 8181, TeamSize = 5, AwayHuman = true };

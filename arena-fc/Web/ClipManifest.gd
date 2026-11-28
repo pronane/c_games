@@ -4,14 +4,18 @@
 extends RefCounted
 
 const DEFAULT_PATH := "res://Data/clips/clip_manifest.json"
-const VERSION := 1
+const SUPPORTED_VERSIONS := [1, 2]
 
 static func load_manifest(path: String = DEFAULT_PATH) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		push_warning("AME clip manifest not found: %s" % path)
 		return {}
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if typeof(parsed) != TYPE_DICTIONARY or int(parsed.get("version", -1)) != VERSION:
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_error("Unsupported or malformed AME clip manifest: %s" % path)
+		return {}
+	var version := int(parsed.get("version", -1))
+	if not version in SUPPORTED_VERSIONS:
 		push_error("Unsupported or malformed AME clip manifest: %s" % path)
 		return {}
 	var source: Variant = parsed.get("clips", null)
@@ -43,7 +47,7 @@ static func load_manifest(path: String = DEFAULT_PATH) -> Dictionary:
 				push_error("AME clip has invalid foot plant side: %s" % id)
 				return {}
 		by_id[id] = raw
-	return {"version": VERSION, "skeleton": str(parsed.get("skeleton", "")), "by_id": by_id}
+	return {"version": version, "skeleton": str(parsed.get("skeleton", "")), "by_id": by_id}
 
 static func phase_from_seconds(clip_id: String, seconds: float, manifest: Dictionary) -> float:
 	var meta: Dictionary = manifest.get("by_id", {}).get(clip_id, {})

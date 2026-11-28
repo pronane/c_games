@@ -600,11 +600,18 @@ public partial class MatchView : Node3D
             rig.Position = new Vector3(p.Pos.X, 0, p.Pos.Z);
             float yaw = MathF.Atan2(p.Facing.X, p.Facing.Z);
             rig.Rotation = new Vector3(0, yaw, 0);
-            // MotionDriver owns only render-phase state; simulation PlayerState and BallState
-            // remain read-only inputs. Keep the mature procedural selector if metadata is absent.
-            var motion = _motion.UpdatePlayer(i, p, b, owner == i, Engine.CurrentTick);
-            if (rig.Soccer != null && motion != null)
-                rig.Soccer.ApplyMotion(motion);
+            // M4: consume authoritative sim contracts; do not synthesize local copies.
+            Engine.LastActionContracts.TryGetValue(i, out var contract);
+            var motion = _motion.UpdatePlayer(i, p, b, owner == i, Engine.CurrentTick, contract);
+            if (rig.Soccer != null)
+            {
+                rig.Soccer.AnimMetrics = _motion.Metrics;
+                if (motion != null)
+                {
+                    rig.Soccer.ApplyMotion(motion);
+                    MotionAudio.Play(this, motion);
+                }
+            }       
             RigAnimator.Pose(rig, p, dt, _time, b.Pos);
             var ambient = _ambient[i].Update(dt, _time, i == owner, i != owner, p.Stamina);
             var (faceYaw, facePitch, faceRoll) = _face[i].Update(dt);

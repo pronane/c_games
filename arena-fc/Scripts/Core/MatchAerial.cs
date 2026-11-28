@@ -13,7 +13,8 @@ namespace ArenaFC.Core;
 public sealed partial class MatchEngine
 {
     /// <summary>Where a ball in flight comes down to height <paramref name="h"/> (ballistic,
-    /// with a little drag).  Falls back to the ground if it never rises to h.</summary>
+    /// with a little drag).  Falls back to the ground if it never rises to h.
+    /// M1 scope: analytical fallback (fixed 0.93 horizontal drag factor), not BallTrajectory.Step parity.</summary>
     public static Vector3 LandingPoint(BallState b, float h)
     {
         const float g = 9.81f;
@@ -31,7 +32,30 @@ public sealed partial class MatchEngine
     public Vector3 BallFocus()
     {
         var b = State.Ball;
-        if (b.Owner < 0 && !b.HasPending && (b.Pos.Y > .7f || b.Vel.Y > 1.5f)) return LandingPoint(b, 1.3f);
+        if (b.Owner < 0 && !b.HasPending)
+        {
+            if (IsSkill)
+            {
+                if (b.Pos.Y > .7f || b.Vel.Y > 1.5f || Mx.Flat(b.Vel).LengthSquared() > 9f)
+                    return LandingPoint(b, 1.3f);
+                return b.Pos;
+            }
+            if (b.Pos.Y > .7f || b.Vel.Y > 1.5f)
+            {
+                var pred = BallPred(2.0f);
+                if (pred.TryFirstGroundedBelow(1.35f, out var s))
+                    return new Vector3(s.Position.X, 0f, s.Position.Z);
+                var end = pred.At(2.0f);
+                return new Vector3(end.Position.X, 0f, end.Position.Z);
+            }
+            float flatSpeed = Mx.Flat(b.Vel).Length();
+            if (flatSpeed > 8f)
+            {
+                var pred = BallPred(0.5f);
+                var s = pred.At(MathF.Min(0.25f, 6f / MathF.Max(1f, flatSpeed)));
+                return new Vector3(s.Position.X, 0f, s.Position.Z);
+            }
+        }
         return b.Pos;
     }
 

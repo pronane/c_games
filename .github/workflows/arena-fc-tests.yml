@@ -42,6 +42,11 @@ jobs:
             exit 1
           fi
           echo "Scripts/Core is engine-free."
+      - name: Validate Hypermotion v2 clip manifest bake
+        working-directory: arena-fc
+        run: |
+          python3 -c "import json; d=json.load(open('Data/clips/clip_manifest.json')); assert d.get('version')==2, d.get('version'); assert len(d.get('clips',[]))>0"
+          python3 Tools/bake_clip_manifest_v2.py --check Data/clips/clip_manifest.json Data/models/soccer_player.glb
       - name: Build the Godot C# assemblies with .NET 9
         working-directory: arena-fc
         run: |
@@ -138,6 +143,10 @@ jobs:
         run: |
           set -o pipefail
           dotnet build ArenaFC.sln -c Debug -v:q 2>&1 | tee build-debug.log
+      - name: Import Godot resources (textures, materials and scene assets)
+        working-directory: arena-fc
+        run: |
+          "$GODOT" --headless --editor --path . --import --quit
       - name: In-engine selftest (real nodes, real match)
         working-directory: arena-fc
         run: |

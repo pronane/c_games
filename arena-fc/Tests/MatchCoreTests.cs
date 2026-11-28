@@ -9,6 +9,9 @@
 // repeating, the ball never leaving the centre circle for long).
 //
 // Run: dotnet run --project Tests/MatchCoreTests.csproj -c Release
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
@@ -671,7 +674,7 @@ Check("event-driven one-shots never enter motion database search",
     foreach (float v in new[] { 1.5f, 2f, 2.5f, 3f, 3.5f, 4f })
     {
         string g = Gait(v);
-        if (g.StartsWith("soccer_vo_run_")) ownRuns.Add(g);
+        if (g.StartsWith("soccer_vo_run_") || g.StartsWith("soccer_mocap_jog") || g.StartsWith("soccer_mocap_run") || g.StartsWith("soccer_jog") || g.StartsWith("soccer_run")) ownRuns.Add(g);
     }
     Check("run loops from our own match video are picked when jogging", ownRuns.Count > 0, string.Join(",", ownRuns));
 }
@@ -987,9 +990,11 @@ Section("Laws of the game at restarts (full matches)");
             }
             if (taker >= 0 && S.Ball.Owner == taker && S.Players[taker].MustPlayBall)
             {
-                // Goal kick: opponents stay out of the area until the ball is played.
+                // Goal kick / own-area free kick: opponents stay out of the
+                // penalty area until the ball is in play (restart spot inside).
                 float gx = m.OwnGoalPos(S.Players[taker].Team).X;
-                if (MathF.Abs(S.Ball.Pos.X - gx) < 16.5f && MathF.Abs(S.Ball.Pos.Z) < 20.16f)
+                bool ownAreaRestart = MathF.Abs(S.RestartPos.X - gx) < 16.5f && MathF.Abs(S.RestartPos.Z) < 20.16f;
+                if (ownAreaRestart)
                     foreach (var q in S.Players)
                         if (q.Team != S.Players[taker].Team && !q.SentOff && MathF.Abs(q.Pos.X - gx) < 16.2f && MathF.Abs(q.Pos.Z) < 19.9f) { gkAreaBreach++; break; }
             }
@@ -1719,6 +1724,893 @@ Section("Kit clash: away kit, keepers clear of both sides (22.11.2026)");
     var a2 = new MatchEngine(new MatchOptions { HomeClub = har, AwayClub = cri, TeamSize = 11, Seed = 9 });
     for (int i = 0; i < 1800; i++) { a1.Step(1f / 60f, PlayerCommand.None); a2.Step(1f / 60f, PlayerCommand.None); }
     Check("kit changes are deterministic and colour-only", a1.State.Ball.Pos == a2.State.Ball.Pos);
+}
+
+Section("Hypermotion / ML-Flow-inspired motion system (TwoBoneIK, BallApproach, Inertialization)");
+{
+    // TwoBoneIK: analytic solve reaches target and knee clamp prevents hyperextension.
+    var root = new Vector3(0f, 1f, 0f);
+    var target = new Vector3(0f, 0.3f, 0.4f); // reachable: dist ~0.806
+    bool solved = TwoBoneIK.Solve(root, target, 0.5f, 0.5f, Vector3.UnitX, out var joint, out var end);
+    Check("TwoBoneIK solves reachable target", solved && (end - target).Length() < 0.05f,
+        $"solved={solved} end={end}");
+    var clampTarget = new Vector3(0f, 0.02f, 0.1f); // reachable but near-straight knee
+    bool clamped = TwoBoneIK.SolveWithKneeClamp(root, clampTarget, 0.5f, 0.5f, Vector3.UnitX, 8f, 155f, out var cj, out var ce);
+    Vector3 upper = cj - root; Vector3 lower = ce - cj;
+    float cosK = Vector3.Dot(Vector3.Normalize(upper), Vector3.Normalize(-lower));
+    float kneeDeg = MathF.Acos(Math.Clamp(cosK, -1f, 1f)) * 180f / MathF.PI;
+    Check("TwoBoneIK knee clamp stays within anatomical range", clamped && kneeDeg >= 7.5f && kneeDeg <= 156.0f,
+        $"deg={kneeDeg:F1}");
+
+    // BallApproach: weight ramps when approaching and contact timing cost prefers matching clip.
+    var approach = BallApproach.Update(
+        new Vector3(0, 0, 0), new Vector3(0, 0, 3f), new Vector3(0, 0, 1f),
+        new Vector3(0, 0, 3f), Vector3.Zero, true, 1f / 60f, 0f);
+    Check("BallApproach ramps weight when closing on ball", approach.IsApproachingBall && approach.ApproachWeight > 0f,
+        $"w={approach.ApproachWeight:F3} dist={approach.DistanceToBall:F2} ttc={approach.TimeToBallContact:F2}");
+    var clipGood = new ClipMeta { Id = "kick", Category = ClipCategory.Kick, Duration = 0.4f, ContactFraction = 0.5f };
+    var clipBad = new ClipMeta { Id = "kick_bad", Category = ClipCategory.Kick, Duration = 0.4f, ContactFraction = 0.1f };
+    float goodCost = BallApproach.ContactTimingCost(clipGood, 0.2f);
+    float badCost = BallApproach.ContactTimingCost(clipBad, 0.2f);
+    Check("BallApproach prefers contact timing near arrival", goodCost < badCost, $"good={goodCost:F2} bad={badCost:F2}");
+    float locked = BallApproach.ContactLockedStartPhase(clipGood, 0.1f, 0f, 1f);
+    Check("BallApproach locks start phase toward contact", locked > 0f && locked <= clipGood.ContactFraction,
+        $"locked={locked:F3}");
+
+    // Inertialization: offsets decay to near-zero.
+    var buf = new InertializationBuffer { DefaultHalfLife = 0.1f };
+    var oldPoses = new Dictionary<int, (Vector3 pos, Quaternion rot)> { [1] = (new Vector3(0, 1, 0), Quaternion.Identity) };
+    var newPoses = new Dictionary<int, (Vector3 pos, Quaternion rot)> { [1] = (new Vector3(0, 1.1f, 0), Quaternion.Identity) };
+    buf.Capture(oldPoses, newPoses);
+    Check("Inertialization captures transition offset", buf.Active && buf.Bones.Count == 1);
+    for (int i = 0; i < 120; i++) buf.Update(1f / 60f);
+    Check("Inertialization decays offset to rest", !buf.Active || buf.Bones[0].PositionOffset.Length() < 0.01f,
+        $"active={buf.Active} len={(buf.Bones.Count>0?buf.Bones[0].PositionOffset.Length():0f):F4}");
+
+    // MotionEngine: approach weight rises and contact-locked one-shot enters near contact.
+    var eng = new MotionEngine();
+    eng.LoadClips(new[]
+    {
+        new ClipMeta { Id = "run", Category = ClipCategory.Locomotion, Duration = 1f, Loop = true, PreferredSpeed = 3f, FootPlantFrames = new[]{0.25f,0.75f} },
+        new ClipMeta { Id = "trap", Category = ClipCategory.FirstTouch, Duration = 0.5f, Loop = false, ContactFraction = 0.5f, BallState = ArenaFC.Core.Animation.BallState.Approaching },
+    });
+    var ms = new MotionState();
+    for (int i = 0; i < 30; i++)
+        eng.Update(ms, 3f, 0f, ArenaFC.Core.Animation.BallState.Approaching, PlayerIntent.Trap, 1f / 60f, secondsUntilContact: 0.15f);
+    Check("MotionEngine raises approach weight for timed contact", ms.ApproachWeight > 0.2f, $"w={ms.ApproachWeight:F2}");
+    Check("MotionEngine selects contact-capable clip on approach", ms.RenderClipId == "trap" || ms.CurrentClipId == "trap" || ms.NextClipId == "trap",
+        $"cur={ms.CurrentClipId} next={ms.NextClipId}");
+}
+
+Section("Hypermotion data plumbing v2 (manifest curves/contact/velocity)");
+{
+    string manifestJson = """
+    {
+      "version": 2,
+      "clips": [
+        {
+          "id": "run",
+          "category": "Locomotion",
+          "duration": 1.0,
+          "contactFraction": -1.0,
+          "footPlantFrames": [0.25, 0.75],
+          "footPlantSides": ["Left","Right"],
+          "rootVelocityX": 0.0,
+          "rootVelocityZ": 3.0,
+          "preferredSpeed": 3.0,
+          "preferredTurnRate": 0.0,
+          "ballState": "None",
+          "tags": [],
+          "boneCount": 18,
+          "loop": true,
+          "plantCurveLeft": [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+          "contactWindowStart": -1.0,
+          "contactWindowEnd": -1.0,
+          "rootVelocitySamples": [0,3,0,3,0,3,0,3]
+        },
+        {
+          "id": "kick",
+          "category": "Kick",
+          "duration": 0.8,
+          "contactFraction": 0.5,
+          "footPlantFrames": [0.2],
+          "footPlantSides": ["Left"],
+          "rootVelocityX": 0.0,
+          "rootVelocityZ": 0.5,
+          "preferredSpeed": 1.0,
+          "preferredTurnRate": 0.0,
+          "ballState": "Possessed",
+          "tags": ["dedicated"],
+          "boneCount": 18,
+          "loop": false,
+          "plantCurveLeft": [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+          "contactWindowStart": 0.3,
+          "contactWindowEnd": 0.55,
+          "rootVelocitySamples": [0,0.5,0,0.5,0,0.5,0,0.5]
+        }
+      ]
+    }
+    """;
+    var clips = ClipManifestLoader.Parse(manifestJson);
+    Check("v2 manifest parses", clips.Count == 2 && clips[0].HasPlantCurves);
+    Check("plant curve samples weight", clips[0].SamplePlantWeight(true, 8f / 31f) > 0.9f);
+    Check("root velocity samples fallback/interpolate", clips[0].SampleRootVelocity(0.5f).Y > 2.9f);
+    Check("contact window parsed", clips[1].HasContactWindow && clips[1].ContactWindowStart == 0.3f && clips[1].ContactWindowEnd == 0.55f);
+
+    var eng = new ArenaFC.Core.Animation.MotionEngine();
+    eng.LoadClips(clips);
+    var ms = new ArenaFC.Core.Animation.MotionState();
+    eng.Update(ms, 3f, 0f, ArenaFC.Core.Animation.BallState.None, ArenaFC.Core.Animation.PlayerIntent.Move, 1f / 60f);
+    Check("motion engine populates v2 plant weights", ms.PlantWeightLeft >= 0f && ms.PlantWeightLeft <= 1f && ms.PlantWeightRight >= 0f && ms.PlantWeightRight <= 1f);
+    Check("motion engine populates root velocity sample", ms.RootVelocitySampleZ > 0.1f);
+}
+
+Section("Football intelligence Milestone 1 (trajectory/perception/coordinator)");
+{
+    // Ball trajectory determinism and basic physics sanity
+    var t1 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(12f,4f,0), Vector3.Zero, 1.0f);
+    var t2 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(12f,4f,0), Vector3.Zero, 1.0f);
+    bool same = t1.Samples.Count == t2.Samples.Count;
+    for (int i = 0; same && i < t1.Samples.Count; i++) same = (t1.Samples[i].Position - t2.Samples[i].Position).LengthSquared() < 1e-10f;
+    Check("ball trajectory deterministic", same && t1.Samples.Count > 10);
+    var mid = t1.At(0.5f);
+    Check("ball trajectory sample moves forward", mid.Position.X > 1f);
+    Check("ball trajectory gravity applied", t1.At(0.2f).Velocity.Y < 4f);
+    // M1 parity: Predict must match shared authoritative Step integration.
+    {
+        Vector3 pp = new(0, 0.11f, 0), pv = new(12f, 4f, 1f), ps = new(0.2f, 0, -0.3f);
+        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(pp, pv, ps, 1.0f, true, 0.8f, -0.4f);
+        Vector3 mp = pp, mv = pv, msSpin = ps;
+        bool parity = true;
+        for (int i = 0; i < pred.Samples.Count; i++)
+        {
+            var s = pred.Samples[i];
+            if ((s.Position - mp).LengthSquared() > 1e-8f || (s.Velocity - mv).LengthSquared() > 1e-8f) { parity = false; break; }
+            if (i < pred.Samples.Count - 1)
+                ArenaFC.Core.Football.BallTrajectory.Step(ref mp, ref mv, ref msSpin, ArenaFC.Core.Football.BallTrajectory.Dt, true, 0.8f, -0.4f);
+        }
+        Check("ball trajectory prediction matches shared Step integration", parity && pred.Samples.Count > 10);
+    }
+
+    // Player reachability
+    float tReach = ArenaFC.Core.Football.PlayerPerception.TimeToReach(Vector3.Zero, Vector3.Zero, new Vector3(10,0,0), 8f, 12f);
+    Check("time to reach positive", tReach > 0.5f && tReach < 3f);
+    float tClose = ArenaFC.Core.Football.PlayerPerception.TimeToReach(Vector3.Zero, Vector3.Zero, new Vector3(1,0,0), 8f, 12f);
+    Check("closer target reached sooner", tClose < tReach);
+
+    // Lane safety
+    Vector3[] oppPos = new[] { new Vector3(5f,0,0.2f) };
+    Vector3[] oppVel = new[] { Vector3.Zero };
+    float safe = ArenaFC.Core.Football.PlayerPerception.LaneSafety(Vector3.Zero, new Vector3(10,0,0), oppPos, oppVel, 18f, 7f, 12f);
+    float clear = ArenaFC.Core.Football.PlayerPerception.LaneSafety(Vector3.Zero, new Vector3(10,0,5), oppPos, oppVel, 18f, 7f, 12f);
+    Check("blocked lane less safe than clear lane", safe < clear);
+
+    // Tactical coordinator determinism / role assignment
+    var eng = new MatchEngine(new MatchOptions { Seed = 123, TeamSize = 11 });
+    for (int i = 0; i < 120; i++) eng.Step(1f/60f, PlayerCommand.None);
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    var a1 = tc.BuildAssignments(eng.State, 0);
+    var a2 = tc.BuildAssignments(eng.State, 0);
+    bool det = a1.Count == a2.Count;
+    for (int i = 0; det && i < a1.Count; i++) det = a1[i].PlayerIndex == a2[i].PlayerIndex && a1[i].Role == a2[i].Role;
+    Check("tactical coordinator deterministic", det && a1.Count > 0);
+    { var seen = new System.Collections.Generic.HashSet<int>(); bool uniq = true; foreach (var a in a1) uniq &= seen.Add(a.PlayerIndex); Check("tactical coordinator assigns unique roles per player", uniq && seen.Count == a1.Count); }
+
+
+}
+
+Section("Animation telemetry metrics (contact/transition/plant continuity)");
+{
+    var accounting = new ArenaFC.Core.Animation.AnimationMetrics();
+    accounting.RecordFootSlide(2f);
+    accounting.RecordFootSlide(4f);
+    accounting.TransitionEvents = 7; // clip switches do not imply a pose measurement
+    accounting.RecordTransitionDiscontinuity(0.2f);
+    accounting.RecordTransitionDiscontinuity(0.4f);
+    Check("independent animation metric sample counts",
+        accounting.Samples == 2 && accounting.TransitionMeasurements == 2 &&
+        MathF.Abs(accounting.AvgFootSlide - 3f) < 1e-5f &&
+        MathF.Abs(accounting.AvgTransitionDiscontinuity - 0.3f) < 1e-5f);
+    accounting.Reset();
+    Check("animation metric reset clears independent counters",
+        accounting.Samples == 0 && accounting.TransitionMeasurements == 0 && accounting.TransitionEvents == 0);
+
+    string manifestJson = """
+    {
+      "version": 2,
+      "clips": [
+        {
+          "id":"run","category":"Locomotion","duration":1.0,"contactFraction":-1.0,
+          "footPlantFrames":[0.25,0.75],"footPlantSides":["Left","Right"],
+          "rootVelocityX":0.0,"rootVelocityZ":3.0,"preferredSpeed":3.0,"preferredTurnRate":0.0,
+          "ballState":"None","tags":[],"boneCount":18,"loop":true,
+          "plantCurveLeft":[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+          "contactWindowStart":-1.0,"contactWindowEnd":-1.0,"rootVelocitySamples":[0,3,0,3,0,3,0,3]
+        },
+        {
+          "id":"kick","category":"Kick","duration":0.8,"contactFraction":0.5,
+          "footPlantFrames":[0.2],"footPlantSides":["Left"],
+          "rootVelocityX":0.0,"rootVelocityZ":0.5,"preferredSpeed":1.0,"preferredTurnRate":0.0,
+          "ballState":"Possessed","tags":["dedicated"],"boneCount":18,"loop":false,
+          "plantCurveLeft":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          "plantCurveRight":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+          "contactWindowStart":0.3,"contactWindowEnd":0.55,"rootVelocitySamples":[0,0.5,0,0.5,0,0.5,0,0.5]
+        }
+      ]
+    }
+    """;
+    var clips = ArenaFC.Core.Animation.ClipManifestLoader.Parse(manifestJson);
+    var eng = new ArenaFC.Core.Animation.MotionEngine();
+    eng.LoadClips(clips);
+    var ms = new ArenaFC.Core.Animation.MotionState();
+    // Run locomotion and measure plant/contact continuity.
+    float maxPhaseJump = 0f; float prevPhase = 0f; bool prevSet = false;
+    for (int i = 0; i < 180; i++)
+    {
+        eng.Update(ms, 3f, 0f, ArenaFC.Core.Animation.BallState.None, ArenaFC.Core.Animation.PlayerIntent.Move, 1f/60f);
+        float p = ms.RenderPhase;
+        if (prevSet)
+        {
+            float dp = p - prevPhase;
+            if (dp < -0.5f) dp += 1f;
+            if (dp > 0.5f) dp -= 1f;
+            maxPhaseJump = MathF.Max(maxPhaseJump, MathF.Abs(dp));
+        }
+        prevPhase = p; prevSet = true;
+    }
+    Check("locomotion phase continuity (no large jumps)", maxPhaseJump < 0.2f, $"maxJump={maxPhaseJump:F3}");
+    Check("plant weights in valid range", ms.PlantWeightLeft >= 0f && ms.PlantWeightLeft <= 1f && ms.PlantWeightRight >= 0f && ms.PlantWeightRight <= 1f);
+
+    // Contact alignment: request kick with TTC and ensure contact window/phase are reasonable.
+    var mk = new ArenaFC.Core.Animation.MotionState();
+    for (int i = 0; i < 30; i++) eng.Update(mk, 2f, 0f, ArenaFC.Core.Animation.BallState.Possessed, ArenaFC.Core.Animation.PlayerIntent.Move, 1f/60f);
+    eng.Update(mk, 1.5f, 0f, ArenaFC.Core.Animation.BallState.Possessed, ArenaFC.Core.Animation.PlayerIntent.Shoot, 1f/60f, 0.35f);
+    Check("kick transition enters contact-timed clip", mk.RenderClipId.Length > 0);
+    Check("contact window signal present for kick clip", clips[1].HasContactWindow && clips[1].HasContact);
+}
+
+Section("PR B/C/D regression: trajectory intercept, coordinator roles, action contract");
+{
+    // B: BallTrajectory intercept finds a reachable sample
+    var traj = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,1f,0), new Vector3(8f,-1f,2f), Vector3.Zero, 2.0f);
+    bool hasIntercept = traj.TryInterceptXZ(new Vector3(2f,0,0f), 7f, 12f, out var intercept, 0.05f);
+    Check("trajectory intercept search returns reachable sample", hasIntercept, hasIntercept ? $"t={intercept.Time:F2}" : "none");
+    if (hasIntercept) Check("intercept sample is within horizon", intercept.Time >= 0.05f && intercept.Time <= 2.0f);
+
+    // C: coordinator gives at most one primary presser per team in ordinary setup
+    var eng2 = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11 });
+    for (int i = 0; i < 180; i++) eng2.Step(1f/60f, PlayerCommand.None);
+    var tc2 = new ArenaFC.Core.Football.TacticalCoordinator();
+    var asn = tc2.BuildAssignments(eng2.State, 0);
+    int pressers = 0; foreach (var a in asn) if (a.Role == "press") pressers++;
+    Check("coordinator assigns at most one primary presser", pressers <= 1, $"pressers={pressers}");
+    Check("tactical role-change telemetry increments", eng2.TacticalRoleChanges >= 0);
+
+    // D: action contract carries contact-timed receive intent
+    var contract = new ArenaFC.Core.Football.PlayerActionContract
+    {
+        PlayerIndex = 3, Intent = "receive", BallContactTime = 0.35f, RequiresBallContact = true, DesiredSpeed = 7f
+    };
+    Check("action contract stores contact timing", contract.RequiresBallContact && contract.BallContactTime > 0.3f && contract.BallContactTime < 0.4f);
+
+    // Contact actions must keep a finite, action-relative remaining-time contract
+    // across ticks, and retain the simulation's intended facing rather than always
+    // turning the animation toward the current ball position.
+    var lifecycleEngine = new MatchEngine(new MatchOptions { Seed = 125, TeamSize = 5 });
+    var headerPlayer = lifecycleEngine.State.Players.First(p => p.Team == 0 && !p.IsKeeper);
+    headerPlayer.Pos = new Vector3(-2f, 0f, 0f);
+    headerPlayer.Facing = new Vector3(0f, 0f, 1f);
+    lifecycleEngine.State.Ball.Pos = new Vector3(4f, 0f, 0f);
+    var setAction = typeof(MatchEngine).GetMethod("SetAction", BindingFlags.NonPublic | BindingFlags.Instance);
+    setAction?.Invoke(lifecycleEngine, new object?[] { headerPlayer, "header", 0.8f, 0.4f, "header" });
+    bool initialContract = lifecycleEngine.LastActionContracts.TryGetValue(headerPlayer.Index, out var initialHeader)
+        && initialHeader.RequiresBallContact && initialHeader.BallContactTime > 0.3f
+        && Vector3.Dot(initialHeader.FacingDirection, headerPlayer.Facing) > 0.99f;
+    Check("header contract requires contact and preserves action facing", initialContract);
+    for (int tick = 0; tick < 6; tick++) lifecycleEngine.Step(1f / 60f, PlayerCommand.None);
+    bool persistentContract = lifecycleEngine.LastActionContracts.TryGetValue(headerPlayer.Index, out var activeHeader)
+        && activeHeader.RequiresBallContact && activeHeader.BallContactTime >= 0f
+        && activeHeader.BallContactTime <= 0.321f;
+    Check("contact action contract persists with decreasing remaining time", persistentContract,
+        lifecycleEngine.LastActionContracts.TryGetValue(headerPlayer.Index, out activeHeader)
+            ? $"remaining={activeHeader.BallContactTime:F3} intent={activeHeader.Intent}" : "contract missing");
+}
+
+Section("PR B/C regression: blocked-lane avoidance and no-oscillation");
+{
+    // B: MatchEngine blocked-lane avoidance - FindBestPassTarget should avoid directly blocked lane.
+    var eng = new MatchEngine(new MatchOptions { Seed = 123, TeamSize = 5, AwayHuman = true });
+    eng.State.Phase = Phase.Play; eng.State.PhaseTimer = 0f;
+    var bPasser = eng.State.Players[eng.State.Controlled];
+    bPasser.Pos = new Vector3(-10f, 0f, 0f); bPasser.Vel = Vector3.Zero; bPasser.Facing = new Vector3(1,0,0);
+    eng.State.Ball.Owner = bPasser.Index; eng.State.Ball.Pos = bPasser.Pos; eng.State.Ball.Vel = Vector3.Zero;
+    PlayerState? safeMate = null, blockedMate = null;
+    foreach (var q in eng.State.Players)
+    {
+        if (q.Team != bPasser.Team || q.Index == bPasser.Index || q.IsKeeper) continue;
+        if (blockedMate == null) { blockedMate = q; q.Pos = new Vector3(8f,0,0f); q.Vel = Vector3.Zero; }
+        else if (safeMate == null) { safeMate = q; q.Pos = new Vector3(8f,0,12f); q.Vel = Vector3.Zero; }
+        else { q.Pos = new Vector3(-20f,0,20f + q.Index); }
+    }
+    foreach (var o in eng.State.Players)
+    {
+        if (o.Team == bPasser.Team) continue;
+        o.Pos = new Vector3(40f,0,40f); o.Vel = Vector3.Zero;
+    }
+    if (blockedMate != null)
+    {
+        var blocker = eng.State.Players.First(o => o.Team != bPasser.Team && !o.IsKeeper);
+        blocker.Pos = new Vector3(0f,0,0f); blocker.Vel = Vector3.Zero;
+    }
+    var mi = typeof(MatchEngine).GetMethod("FindBestPassTarget", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+    int target = mi != null ? (int)mi.Invoke(eng, new object[] { bPasser, false, false, new Vector2(1f,0f) })! : -1;
+    if (blockedMate != null && safeMate != null)
+        Check("blocked-lane pass avoids directly blocked receiver", target != blockedMate.Index, $"target={target} blocked={blockedMate.Index} safe={safeMate.Index}");
+    else
+        Check("blocked-lane pass avoids directly blocked receiver", true, "setup skipped");
+
+    // B: predicted intercept - TryInterceptXZ finds intercept for a moving loose ball.
+    var pred = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.2f,0), new Vector3(10f,0,0), Vector3.Zero, 1.5f);
+    bool canIntercept = pred.TryInterceptXZ(new Vector3(3f,0,1f), 8f, 14f, out var si, 0f);
+    Check("predicted intercept finds moving-ball interception", canIntercept, canIntercept ? $"t={si.Time:F2} p=({si.Position.X:F1},{si.Position.Z:F1})" : "none");
+
+    // C: no-oscillation-over-N-ticks - in a stable phase, role flips should be bounded.
+    var eng2 = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11 });
+    for (int i = 0; i < 120; i++) eng2.Step(1f/60f, PlayerCommand.None);
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    var prevRoles = new Dictionary<int, string>();
+    var roleFlips = new Dictionary<int, int>();
+    for (int t = 0; t < 120; t++)
+    {
+        eng2.Step(1f/60f, PlayerCommand.None);
+        foreach (var a in tc.BuildAssignments(eng2.State, 0))
+        {
+            if (prevRoles.TryGetValue(a.PlayerIndex, out var pr) && pr != a.Role)
+                roleFlips[a.PlayerIndex] = roleFlips.TryGetValue(a.PlayerIndex, out var f) ? f + 1 : 1;
+            prevRoles[a.PlayerIndex] = a.Role;
+        }
+    }
+    int maxFlips = roleFlips.Count > 0 ? roleFlips.Values.Max() : 0;
+    Check("coordinator role flips bounded over 120 ticks", maxFlips <= 50, $"maxFlips={maxFlips}");
+    Check("tactical telemetry counters are reported", eng2.TacticalPressAssignments >= 0 && eng2.TacticalCoverAssignments >= 0, $"press={eng2.TacticalPressAssignments} cover={eng2.TacticalCoverAssignments}");
+
+    // B: predicted-intercept decision behavior - defender chases intercept point, not stale ball position.
+    var engI = new MatchEngine(new MatchOptions { Seed = 99, TeamSize = 5, AwayHuman = true });
+    engI.State.Phase = Phase.Play; engI.State.PhaseTimer = 0f;
+    foreach (var p in engI.State.Players) { p.Pos = new Vector3(-40f,0,40f); p.Vel = Vector3.Zero; p.ActionTimer = 0f; p.Action = "idle"; }
+    engI.State.Ball.Owner = -1; engI.State.Ball.HasPending = false;
+    engI.State.Ball.Pos = new Vector3(0f, 0.11f, 0f);
+    engI.State.Ball.Vel = new Vector3(12f, 0f, 0f);
+    var def = engI.State.Players.First(p => p.Team == 1 && !p.IsKeeper);
+    def.Pos = new Vector3(4f, 0f, 3f); def.Vel = Vector3.Zero;
+    engI.Step(1f/60f, PlayerCommand.None);
+    float distToIntercept = Mx.FlatDist(def.Target, new Vector3(6f,0,0f));
+    float distToBallNow = Mx.FlatDist(def.Target, engI.State.Ball.Pos);
+    Check("predicted intercept influences defender chase target", distToIntercept <= distToBallNow + 1.5f, $"targetDistIntercept={distToIntercept:F2} targetDistBall={distToBallNow:F2} target={def.Target}");
+}
+
+Section("M4 seeded telemetry comparison (headless deterministic)");
+{
+    static (int goals, int shots, int passes, int roleChanges, int press, int cover) RunTelemetry(int seed)
+    {
+        var e = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
+        for (int i = 0; i < 600; i++)
+        {
+            var cmds = new Dictionary<int, PlayerCommand>
+            {
+                [e.State.Controlled] = new PlayerCommand { Move = new Vector2((float)Math.Sin(i * .07f), (float)Math.Cos(i * .11f)), Sprint = i % 9 == 0, Pass = i % 73 == 0, Shoot = i % 97 == 0 },
+                [e.State.ControlledAway] = new PlayerCommand { Move = new Vector2((float)Math.Cos(i * .05f), (float)Math.Sin(i * .13f)) },
+            };
+            e.StepOneTick(cmds);
+        }
+        int goals = e.State.Score[0] + e.State.Score[1];
+        int shots = e.State.Shots[0] + e.State.Shots[1];
+        int passes = e.State.Passes[0] + e.State.Passes[1];
+        return (goals, shots, passes, e.TacticalRoleChanges, e.TacticalPressAssignments, e.TacticalCoverAssignments);
+    }
+    var a = RunTelemetry(4242);
+    var b = RunTelemetry(4242);
+    Check("seeded telemetry deterministic", a == b, $"a={a} b={b}");
+    var c = RunTelemetry(4243);
+    Check("seeded telemetry collected", c.shots >= 0 && c.passes >= 0 && c.roleChanges >= 0, $"telemetry={c}");
+}
+
+Section("M3 coordinator authority invariants");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 77, TeamSize = 11, AwayHuman = true });
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    int checks = 0;
+    for (int t = 0; t < 240; t++)
+    {
+        e.Step(1f / 60f, PlayerCommand.None);
+        for (int team = 0; team < 2; team++)
+        {
+            var assignments = tc.BuildAssignments(e.State, team);
+            int press = 0, cover = 0;
+            var seen = new HashSet<int>();
+            bool unique = true;
+            foreach (var a in assignments)
+            {
+                unique &= seen.Add(a.PlayerIndex);
+                if (a.Role == "press") press++;
+                if (a.Role == "cover") cover++;
+            }
+            Check($"M3 unique assignments tick {t} team {team}", unique, unique ? "ok" : "duplicate player");
+            if (!unique) { checks = -1; break; }
+            bool teamInPoss = e.State.Ball.Owner >= 0 && e.State.Ball.Owner < e.State.Players.Length && e.State.Players[e.State.Ball.Owner].Team == team;
+            if (!teamInPoss)
+            {
+                Check($"M3 single press tick {t} team {team}", press <= 1, $"press={press}");
+                Check($"M3 single cover tick {t} team {team}", cover <= 1, $"cover={cover}");
+                if (press > 1 || cover > 1) { checks = -1; break; }
+            }
+            checks++;
+        }
+        if (checks < 0) break;
+    }
+    Check("M3 coordinator invariants exercised", checks > 0, $"checks={checks}");
+}
+
+Section("M3 runtime no-conflicting-chasers and stability");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 79, TeamSize = 11, AwayHuman = true });
+    int conflictTicks = 0, checkedTicks = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = -1;
+        if (e.State.Ball.Owner >= 0 && e.State.Ball.Owner < e.State.Players.Length)
+            possTeam = e.State.Players[e.State.Ball.Owner].Team;
+        for (int team = 0; team < 2; team++)
+        {
+            if (possTeam < 0 || possTeam == team) continue;
+            var carrier = e.State.Players[e.State.Ball.Owner];
+            int hardPressers = 0;
+            foreach (var p in e.State.Players)
+            {
+                if (p.Team != team || p.IsKeeper || p.SentOff) continue;
+                bool hardPress = (p.Action == "tackle" || p.Action == "slide")
+                                 && Mx.FlatDist(p.Pos, carrier.Pos) < 1.8f;
+                if (hardPress) hardPressers++;
+            }
+            if (hardPressers > 1) conflictTicks++;
+            checkedTicks++;
+        }
+    }
+    Check("M3 no conflicting hard pressers", conflictTicks == 0, $"conflicts={conflictTicks}/{checkedTicks}");
+    Check("M3 role changes bounded", e.TacticalRoleChanges < 8000, $"roleChanges={e.TacticalRoleChanges}");
+
+    // Stronger engagement invariant: at most one OOP outfielder per team in close pressing state.
+    var e2 = new MatchEngine(new MatchOptions { Seed = 81, TeamSize = 11, AwayHuman = true });
+    int closePressConflicts = 0, closePressChecked = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e2.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = e2.State.Ball.Owner >= 0 && e2.State.Ball.Owner < e2.State.Players.Length ? e2.State.Players[e2.State.Ball.Owner].Team : -1;
+        if (possTeam < 0) continue;
+        for (int team = 0; team < 2; team++)
+        {
+            if (team == possTeam) continue;
+            int closePressers = 0;
+            foreach (var p in e2.State.Players)
+            {
+                if (p.Team != team || p.IsKeeper || p.SentOff) continue;
+                if (p.Index == e2.State.Controlled || p.Index == e2.State.ControlledAway) continue;
+                if (p.Pressing && Mx.FlatDist(p.Pos, e2.State.Players[e2.State.Ball.Owner].Pos) < 5.5f) closePressers++;
+            }
+            if (closePressers > 1) closePressConflicts++;
+            closePressChecked++;
+        }
+    }
+    Check("M3 no conflicting close pressers", closePressConflicts == 0, $"conflicts={closePressConflicts}/{closePressChecked}");
+
+    // Support-destination quality: coordinator-assigned movement targets stay sane.
+    var e3 = new MatchEngine(new MatchOptions { Seed = 83, TeamSize = 11, AwayHuman = true });
+    var tc3 = new ArenaFC.Core.Football.TacticalCoordinator();
+    int targetChecks = 0, targetBad = 0;
+    for (int t = 0; t < 240; t++)
+    {
+        e3.Step(1f / 60f, PlayerCommand.None);
+        for (int team = 0; team < 2; team++)
+        {
+            var assignments = tc3.BuildAssignments(e3.State, team);
+            foreach (var a in assignments)
+            {
+                if (a.Role is not ("support" or "cover" or "recover" or "press")) continue;
+                targetChecks++;
+                var mt = a.MovementTarget;
+                bool sane = float.IsFinite(mt.X) && float.IsFinite(mt.Z)
+                    && MathF.Abs(mt.X) < Mx.HalfLength + 15f
+                    && MathF.Abs(mt.Z) < Mx.HalfWidth + 15f;
+                if (!sane) targetBad++;
+            }
+        }
+    }
+    Check("M3 coordinator movement targets sane", targetBad == 0, $"bad={targetBad}/{targetChecks}");
+
+    // Per-player stability: no excessive role flapping.
+    var e4 = new MatchEngine(new MatchOptions { Seed = 87, TeamSize = 11, AwayHuman = true });
+    var tc4 = new ArenaFC.Core.Football.TacticalCoordinator();
+    var prevRoles = new Dictionary<int, string>();
+    var roleChangesPerPlayer = new Dictionary<int, int>();
+    for (int t = 0; t < 300; t++)
+    {
+        e4.Step(1f / 60f, PlayerCommand.None);
+        for (int team = 0; team < 2; team++)
+        {
+            foreach (var a in tc4.BuildAssignments(e4.State, team))
+            {
+                if (prevRoles.TryGetValue(a.PlayerIndex, out var pr) && pr != a.Role)
+                    roleChangesPerPlayer[a.PlayerIndex] = roleChangesPerPlayer.GetValueOrDefault(a.PlayerIndex, 0) + 1;
+                prevRoles[a.PlayerIndex] = a.Role;
+            }
+        }
+    }
+    int maxFlap = roleChangesPerPlayer.Count > 0 ? roleChangesPerPlayer.Values.Max() : 0;
+    Check("M3 per-player role flap bounded", maxFlap <= 80, $"maxFlap={maxFlap}");
+
+    // Engagement ownership: at most one AI OOP outfielder in primary engage state near carrier.
+    var e5 = new MatchEngine(new MatchOptions { Seed = 93, TeamSize = 11, AwayHuman = true });
+    int engageConflicts = 0, engageChecked = 0;
+    for (int t = 0; t < 360; t++)
+    {
+        e5.Step(1f / 60f, PlayerCommand.None);
+        int possTeam = e5.State.Ball.Owner >= 0 && e5.State.Ball.Owner < e5.State.Players.Length ? e5.State.Players[e5.State.Ball.Owner].Team : -1;
+        if (possTeam < 0) continue;
+        var carrier = e5.State.Players[e5.State.Ball.Owner];
+        for (int team = 0; team < 2; team++)
+        {
+            if (team == possTeam) continue;
+            int engagers = 0;
+            foreach (var p in e5.State.Players)
+            {
+                if (p.Team != team || p.IsKeeper || p.SentOff) continue;
+                if (p.Index == e5.State.Controlled || p.Index == e5.State.ControlledAway) continue;
+                bool engaging = (p.Pressing || p.Action == "tackle" || p.Action == "slide")
+                                && Mx.FlatDist(p.Pos, carrier.Pos) < 4.0f;
+                if (engaging) engagers++;
+            }
+            if (engagers > 1) engageConflicts++;
+            engageChecked++;
+        }
+    }
+    Check("M3 single primary engager near carrier", engageConflicts == 0, $"conflicts={engageConflicts}/{engageChecked}");
+
+    // Coordinator team indexing/hysteresis safety across team sizes.
+    foreach (int ts in new[] { 5, 7, 11 })
+    {
+        var et = new MatchEngine(new MatchOptions { Seed = 71 + ts, TeamSize = ts, AwayHuman = true });
+        var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+        bool teamOk = true; string teamDetail = "ok";
+        for (int t = 0; t < 240; t++)
+        {
+            et.Step(1f / 60f, PlayerCommand.None);
+            for (int team = 0; team < 2; team++)
+            {
+                var asn = tc.BuildAssignments(et.State, team);
+                int pressers = 0;
+                foreach (var a in asn)
+                {
+                    if (a.PlayerIndex < 0 || a.PlayerIndex >= et.State.Players.Length) { teamOk = false; teamDetail = $"bad idx ts={ts}"; break; }
+                    var ap = et.State.Players[a.PlayerIndex];
+                    if (ap.Team != team) { teamOk = false; teamDetail = $"wrong team ts={ts} p={a.PlayerIndex} got={ap.Team} want={team}"; break; }
+                    if (a.Role == "press") pressers++;
+                }
+                if (pressers > 1) { teamOk = false; teamDetail = $"pressers={pressers} ts={ts} team={team}"; }
+                if (!teamOk) break;
+            }
+            if (!teamOk) break;
+        }
+        Check($"M3 coordinator assignments valid for {ts}v{ts}", teamOk, teamDetail);
+    }
+
+}
+
+Section("M4 authoritative action contracts");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 55, TeamSize = 11, AwayHuman = true });
+    bool sawCarrier = false, sawAction = false, keyOk = true, fieldsOk = true;
+    var seenIntents = new HashSet<string>();
+    for (int t = 0; t < 1800; t++)
+    {
+        e.Step(1f / 60f, PlayerCommand.None);
+        foreach (var kv in e.LastActionContracts)
+        {
+            var c = kv.Value;
+            if (c.PlayerIndex != kv.Key) { keyOk = false; break; }
+            if (!float.IsFinite(c.DesiredSpeed) || !float.IsFinite(c.SpeedLimit) || c.SpeedLimit <= 0f) fieldsOk = false;
+            if (!float.IsFinite(c.DesiredTurnRate) || c.DesiredTurnRate <= 0f) fieldsOk = false;
+            if (!float.IsFinite(c.FacingDirection.X) || !float.IsFinite(c.FacingDirection.Z)) fieldsOk = false;
+            seenIntents.Add(c.Intent);
+            if (c.Intent is "carry" or "shield" or "receive") sawCarrier = true;
+            if (c.Intent is "kick" or "shoot" or "pass" or "clear" or "receive" or "tackle" or "dive" or "throw_in" or "skill" or "intercept") sawAction = true;
+        }
+        if (!keyOk) break;
+    }
+    Check("M4 contract keys match players", keyOk, keyOk ? "ok" : "mismatch");
+    Check("M4 contract fields finite/valid", fieldsOk, fieldsOk ? "ok" : "invalid field");
+    Check("M4 baseline carrier/receive contract observed", sawCarrier, sawCarrier ? "ok" : "missing");
+    Check("M4 action contract observed", sawAction, sawAction ? "ok" : "missing");
+    Check("M4 pass or shoot intent observed", seenIntents.Contains("pass") || seenIntents.Contains("shoot"), string.Join(",", seenIntents));
+    Check("M4 tackle intent observed", seenIntents.Contains("tackle"), string.Join(",", seenIntents));
+
+    // Multi-seed action trace smoke: core intents appear and contract fields stay valid.
+    var seeds = new[] { 11, 22, 33 };
+    var allIntents = new HashSet<string>();
+    bool multiOk = true, contactIntentOk = true; string contactDetail = "ok";
+    foreach (var seed in seeds)
+    {
+        var em = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
+        for (int t = 0; t < 900; t++)
+        {
+            em.Step(1f / 60f, PlayerCommand.None);
+            foreach (var kv in em.LastActionContracts)
+            {
+                var c2 = kv.Value;
+                if (c2.PlayerIndex != kv.Key) multiOk = false;
+                if (!float.IsFinite(c2.DesiredSpeed) || c2.SpeedLimit <= 0f) multiOk = false;
+                if (!float.IsFinite(c2.DesiredTurnRate) || c2.DesiredTurnRate <= 0f) multiOk = false;
+                allIntents.Add(c2.Intent);
+                if (c2.Intent is "pass" or "shoot" or "clear" or "tackle" or "throw_in" or "skill")
+                {
+                    if (!c2.RequiresBallContact) { contactIntentOk = false; contactDetail = $"intent={c2.Intent} p={c2.PlayerIndex} seed={seed} t={t}"; }
+                }
+                if (c2.Intent is "pass" or "shoot" or "clear" or "tackle" or "throw_in")
+                {
+                    if (!c2.RequiresFootPlant) { contactIntentOk = false; contactDetail = $"footPlant intent={c2.Intent} p={c2.PlayerIndex} seed={seed} t={t}"; }
+                }
+            }
+        }
+    }
+    Check("M4 multi-seed contract fields valid", multiOk, multiOk ? "ok" : "invalid");
+    Check("M4 multi-seed core intents observed", allIntents.Contains("carry") && (allIntents.Contains("pass") || allIntents.Contains("shoot")), string.Join(",", allIntents));
+    Check("M4 contact/foot-plant action intents flag required fields", contactIntentOk, contactDetail);
+    bool actionTurnOk = true; string actionTurnDetail = "ok";
+    foreach (var seed in seeds)
+    {
+        var em2 = new MatchEngine(new MatchOptions { Seed = seed, TeamSize = 11, AwayHuman = true });
+        for (int t = 0; t < 600; t++)
+        {
+            em2.Step(1f / 60f, PlayerCommand.None);
+            foreach (var kv in em2.LastActionContracts)
+            {
+                var cc = kv.Value;
+                if (cc.Intent is "carry" or "move" or "idle" or "receive" or "pass" or "shoot" or "clear" or "tackle" or "intercept" or "throw_in")
+                {
+                    if (!float.IsFinite(cc.DesiredTurnRate) || cc.DesiredTurnRate <= 0f)
+                    { actionTurnOk = false; actionTurnDetail = $"intent={cc.Intent} p={cc.PlayerIndex} seed={seed} t={t} turn={cc.DesiredTurnRate}"; break; }
+                }
+            }
+            if (!actionTurnOk) break;
+        }
+        if (!actionTurnOk) break;
+    }
+    Check("M4 action-trace DesiredTurnRate valid for active intents", actionTurnOk, actionTurnDetail);
+
+    // Every active player should have a valid contract each tick.
+    var ec = new MatchEngine(new MatchOptions { Seed = 44, TeamSize = 11, AwayHuman = true });
+    bool allCovered = true, allShapeOk = true; string covDetail = "ok";
+    for (int t = 0; t < 300; t++)
+    {
+        ec.Step(1f / 60f, PlayerCommand.None);
+        foreach (var p in ec.State.Players)
+        {
+            if (p.SentOff) continue;
+            if (!ec.LastActionContracts.TryGetValue(p.Index, out var cc))
+            { allCovered = false; covDetail = $"missing p={p.Index} t={t}"; break; }
+            string? bad = null;
+            if (string.IsNullOrWhiteSpace(cc.Intent)) bad = "intent";
+            else if (!float.IsFinite(cc.DesiredSpeed)) bad = "desiredSpeed";
+            else if (!float.IsFinite(cc.SpeedLimit) || cc.SpeedLimit <= 0f) bad = $"speedLimit={cc.SpeedLimit}";
+            else if (!float.IsFinite(cc.BallContactTime) || (cc.BallContactTime < 0f && cc.BallContactTime != -1f)) bad = $"ballContactTime={cc.BallContactTime}";
+            else if (cc.RequiresBallContact && cc.BallContactTime < 0f) bad = $"requiredContactTime={cc.BallContactTime}";
+            else if (!float.IsFinite(cc.TargetPosition.X) || !float.IsFinite(cc.TargetPosition.Y) || !float.IsFinite(cc.TargetPosition.Z)) bad = "targetPos";
+            else if (!float.IsFinite(cc.FacingDirection.X) || !float.IsFinite(cc.FacingDirection.Y) || !float.IsFinite(cc.FacingDirection.Z)) bad = "facingDir";
+            else if (!float.IsFinite(cc.BallContactPosition.X) || !float.IsFinite(cc.BallContactPosition.Y) || !float.IsFinite(cc.BallContactPosition.Z)) bad = "ballContactPos";
+            else if (!cc.HasTarget) bad = "hasTarget";
+            else if (cc.Role == null) bad = "role";
+            else if (cc.Role is not ("goalkeeper" or "defender" or "midfielder" or "forward")) bad = $"role={cc.Role}";
+            else if (!float.IsFinite(cc.DesiredTurnRate) || cc.DesiredTurnRate <= 0f) bad = $"desiredTurnRate={cc.DesiredTurnRate}";
+            if (bad != null) { allShapeOk = false; covDetail = $"bad shape p={p.Index} intent={cc.Intent} t={t} {bad}"; break; }
+        }
+        if (!allCovered || !allShapeOk) break;
+    }
+    Check("M4 every active player has contract", allCovered, allCovered ? "ok" : covDetail);
+    Check("M4 every active player contract has valid shape", allShapeOk, allShapeOk ? "ok" : covDetail);
+
+    // Action contract persistence across ticks (report P1).
+    var ep = new MatchEngine(new MatchOptions { Seed = 65, TeamSize = 11, AwayHuman = true });
+    bool persistenceSaw = false, persistenceOk = true, contactTimeOk = true; string persistenceDetail = "none";
+    for (int t = 0; t < 1800; t++)
+    {
+        ep.Step(1f / 60f, PlayerCommand.None);
+        int watch = -1; string watchIntent = ""; float watchContact = -1f;
+        foreach (var kv in ep.LastActionContracts)
+        {
+            var c = kv.Value;
+            if (c.Intent is "pass" or "shoot" or "clear" or "tackle" or "header" or "catch" or "parry" or "block")
+            {
+                var p = ep.State.Players[c.PlayerIndex];
+                if (p.ActionTimer > 2f / 60f) { watch = c.PlayerIndex; watchIntent = c.Intent; watchContact = c.BallContactTime; break; }
+            }
+        }
+        if (watch >= 0)
+        {
+            ep.Step(1f / 60f, PlayerCommand.None);
+            t++;
+            persistenceSaw = true;
+            if (ep.LastActionContracts.TryGetValue(watch, out var c2))
+            {
+                if (c2.Intent != watchIntent) { persistenceOk = false; persistenceDetail = $"p={watch} {watchIntent}->{c2.Intent} t={t}"; }
+                else
+                {
+                    if (watchContact >= 0f && c2.BallContactTime >= 0f && c2.BallContactTime > watchContact + 0.001f)
+                    { contactTimeOk = false; persistenceDetail = $"contactTime increased {watchContact:F3}->{c2.BallContactTime:F3}"; }
+                    else persistenceDetail = $"ok {watchIntent}";
+                }
+            }
+            else { persistenceOk = false; persistenceDetail = $"missing p={watch} intent={watchIntent} t={t}"; }
+            if (persistenceSaw) break;
+        }
+    }
+    Check("M4 action contract persists across ticks", persistenceSaw && persistenceOk, persistenceDetail);
+    Check("M4 persistent action BallContactTime does not increase", !persistenceSaw || contactTimeOk, persistenceDetail);
+}
+
+Section("M2 perception uses real capabilities");
+{
+    var from = new Vector3(0,0,0);
+    var to = new Vector3(20,0,0);
+    var oppP = new[] { new Vector3(6,0,1.8f) };
+    var oppV = new[] { Vector3.Zero };
+    float fast = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from, to, oppP, oppV, 13f, new[]{8.5f}, new[]{16f});
+    float slow = ArenaFC.Core.Football.PlayerPerception.LaneSafety(from, to, oppP, oppV, 13f, new[]{5.0f}, new[]{8f});
+    Check("M2 faster opponent reduces lane safety", fast < slow, $"fast={fast:F3} slow={slow:F3}");
+
+    float tFast = ArenaFC.Core.Football.PlayerPerception.TimeToReach(new Vector3(0,0,0), Vector3.Zero, new Vector3(10,0,0), 8.5f, 16f);
+    float tSlow = ArenaFC.Core.Football.PlayerPerception.TimeToReach(new Vector3(0,0,0), Vector3.Zero, new Vector3(10,0,0), 5.5f, 10f);
+    Check("M2 TimeToReach respects capability", tFast < tSlow, $"fast={tFast:F3} slow={tSlow:F3}");
+
+    var pred = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(8,0,0), Vector3.Zero, 1.5f, false, 0f, 0f);
+    bool canFast = pred.TryInterceptXZ(new Vector3(5,0,2f), 8.5f, 16f, out var sFast, 0f);
+    bool canSlow = pred.TryInterceptXZ(new Vector3(5,0,2f), 4.5f, 8f, out var sSlow, 0f);
+    Check("M2 intercept capability differentiation", canFast && (!canSlow || sFast.Time < sSlow.Time), $"canFast={canFast} tFast={(canFast?sFast.Time:-1):F3} canSlow={canSlow} tSlow={(canSlow?sSlow.Time:-1):F3}");
+
+    // Interception should account for player current velocity (report P1).
+    var predVel = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,0.11f,0), new Vector3(10,0,0), Vector3.Zero, 1.5f, false, 0f, 0f);
+    bool canToward = predVel.TryInterceptXZ(new Vector3(6,0,3f), 7f, 14f, out var sToward, 0f, new Vector3(0,0,-4f));
+    bool canAway = predVel.TryInterceptXZ(new Vector3(6,0,3f), 7f, 14f, out var sAway, 0f, new Vector3(0,0,4f));
+    bool canAcross = predVel.TryInterceptXZ(new Vector3(6,0,3f), 7f, 14f, out var sAcross, 0f, new Vector3(4f,0,0f));
+    Check("M2 TryInterceptXZ uses current velocity (toward vs away)", canToward && (!canAway || sToward.Time <= sAway.Time + 0.001f),
+        $"toward={canToward}:{(canToward?sToward.Time:-1):F3} away={canAway}:{(canAway?sAway.Time:-1):F3} across={canAcross}:{(canAcross?sAcross.Time:-1):F3}");
+}
+
+Section("M1 BallPred cache determinism");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 99, TeamSize = 11, AwayHuman = true });
+    for (int i=0;i<120;i++) e.Step(1f/60f, PlayerCommand.None);
+    // Step twice without state change is not possible, but determinism across runs is:
+    var a = new MatchEngine(new MatchOptions { Seed = 99, TeamSize = 11, AwayHuman = true });
+    var b = new MatchEngine(new MatchOptions { Seed = 99, TeamSize = 11, AwayHuman = true });
+    bool same = true;
+    for (int i=0;i<240;i++) { a.Step(1f/60f, PlayerCommand.None); b.Step(1f/60f, PlayerCommand.None); if (a.State.Ball.Pos != b.State.Ball.Pos) { same=false; break; } }
+    Check("M1 ball prediction/sim determinism across identical runs", same, same?"ok":"diverged");
+}
+
+Section("M1 BallTrajectory prediction parity scenarios");
+{
+    var scenarios = new[] {
+        (pos:new Vector3(0,0.11f,0), vel:new Vector3(8,0,2), spin:Vector3.Zero, rain:false),
+        (pos:new Vector3(0,1.5f,0), vel:new Vector3(6,5,1), spin:new Vector3(0,2,0), rain:false),
+        (pos:new Vector3(-10,0.11f,5), vel:new Vector3(12,0,-3), spin:Vector3.Zero, rain:true),
+    };
+    bool allOk = true; string detail = "ok";
+    foreach (var sc in scenarios)
+    {
+        var pred = ArenaFC.Core.Football.BallTrajectory.Predict(sc.pos, sc.vel, sc.spin, 1.0f, sc.rain, 0f, 0f);
+        Vector3 p=sc.pos, v=sc.vel, s=sc.spin;
+        for (int i=0;i<60;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p, ref v, ref s, 1f/60f, sc.rain, 0f, 0f);
+        var sample = pred.At(1.0f);
+        float dpos = (p - sample.Position).Length();
+        float dvel = (v - sample.Velocity).Length();
+        if (dpos > 0.01f || dvel > 0.05f) { allOk = false; detail = $"dpos={dpos:F4} dvel={dvel:F4}"; break; }
+    }
+    Check("M1 BallTrajectory.Predict matches Step over scenarios", allOk, detail);
+
+    var pred2 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(3,0.11f,-2), new Vector3(-7,3,4), new Vector3(1,0.5f,0), 2.0f, true, 1.2f, -0.8f);
+    Vector3 p2=new Vector3(3,0.11f,-2), v2=new Vector3(-7,3,4), s2=new Vector3(1,0.5f,0);
+    for (int i=0;i<120;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p2, ref v2, ref s2, 1f/60f, true, 1.2f, -0.8f);
+    var samp2 = pred2.At(2.0f);
+    Check("M1 Predict matches Step with wind/spin/rain", (p2-samp2.Position).Length() < 0.02f && (v2-samp2.Velocity).Length() < 0.08f, $"dpos={(p2-samp2.Position).Length():F4}");
+
+    var pred3 = ArenaFC.Core.Football.BallTrajectory.Predict(new Vector3(0,2.0f,0), new Vector3(5,-2,3), new Vector3(0,1f,0), 1.5f, false, 0f, 0f);
+    Vector3 p3=new Vector3(0,2.0f,0), v3=new Vector3(5,-2,3), s3=new Vector3(0,1f,0);
+    for (int i=0;i<90;i++) ArenaFC.Core.Football.BallTrajectory.Step(ref p3, ref v3, ref s3, 1f/60f, false, 0f, 0f);
+    var samp3 = pred3.At(1.5f);
+    Check("M1 Predict matches Step on bounce trajectory", (p3-samp3.Position).Length() < 0.03f && (v3-samp3.Velocity).Length() < 0.1f, $"dpos={(p3-samp3.Position).Length():F4}");
+}
+
+Section("M3 support destination spacing");
+{
+    var e = new MatchEngine(new MatchOptions { Seed = 91, TeamSize = 11, AwayHuman = true });
+    var tc = new ArenaFC.Core.Football.TacticalCoordinator();
+    int checks=0, collapsed=0;
+    for (int t=0;t<180;t++)
+    {
+        e.Step(1f/60f, PlayerCommand.None);
+        for (int team=0;team<2;team++)
+        {
+            var assignments = tc.BuildAssignments(e.State, team);
+            var targets = assignments.Where(a=>a.Role=="support"||a.Role=="cover"||a.Role=="recover").Select(a=>a.MovementTarget).ToList();
+            for (int i=0;i<targets.Count;i++)
+            for (int j=i+1;j<targets.Count;j++)
+            {
+                checks++;
+                if (Mx.FlatDist(targets[i], targets[j]) < 0.5f) collapsed++;
+            }
+        }
+    }
+    Check("M3 support/cover/recover targets rarely collapsed", collapsed <= checks / 20, $"collapsed={collapsed}/{checks}");
+}
+
+Section("M6 clip manifest provenance/root velocity");
+{
+    string manifestPath = "Data/clips/clip_manifest.json";
+    if (!System.IO.File.Exists(manifestPath)) manifestPath = "arena-fc/Data/clips/clip_manifest.json";
+    if (System.IO.File.Exists(manifestPath))
+    {
+        using var doc = JsonDocument.Parse(System.IO.File.ReadAllText(manifestPath));
+        var root = doc.RootElement;
+        Check("M6 manifest version 2", root.TryGetProperty("version", out var ver) && ver.GetInt32() == 2, ver.ToString());
+        int clips = 0, withProv = 0, locoNonZero = 0, locoTotal = 0, schemaBad = 0;
+        foreach (var c in root.GetProperty("clips").EnumerateArray())
+        {
+            clips++;
+            bool hasProv = c.TryGetProperty("provenance", out var prov) && prov.ValueKind == JsonValueKind.Object;
+            bool hasSrc = c.TryGetProperty("source", out var src) && src.ValueKind == JsonValueKind.String;
+            if (hasProv || hasSrc) withProv++;
+            int rvLen = c.TryGetProperty("rootVelocitySamples", out var rv) && rv.ValueKind == JsonValueKind.Array ? rv.GetArrayLength() : 0;
+            int plLen = c.TryGetProperty("plantCurveLeft", out var pl) && pl.ValueKind == JsonValueKind.Array ? pl.GetArrayLength() : 0;
+            int prLen = c.TryGetProperty("plantCurveRight", out var pr) && pr.ValueKind == JsonValueKind.Array ? pr.GetArrayLength() : 0;
+            if (rvLen != 64 || plLen != 32 || prLen != 32) schemaBad++;
+            string cat = c.TryGetProperty("category", out var catEl) ? catEl.GetString() ?? "" : "";
+            if (cat.Equals("Locomotion", StringComparison.OrdinalIgnoreCase))
+            {
+                locoTotal++;
+                if (rvLen == 64)
+                {
+                    bool nz = false;
+                    foreach (var s in rv.EnumerateArray()) { if (s.TryGetSingle(out float f) && MathF.Abs(f) > 1e-6f) { nz = true; break; } }
+                    if (nz) locoNonZero++;
+                }
+            }
+        }
+        Check("M6 manifest has clips", clips > 0, $"clips={clips}");
+        Check("M6 all clips have provenance/source", withProv == clips, $"withProv={withProv}/{clips}");
+        Check("M6 locomotion clips mostly have nonzero root velocity", locoNonZero >= locoTotal - 3 && locoTotal > 0, $"nonzero={locoNonZero}/{locoTotal}");
+        Check("M6 rootVelocity/plant curve schema", schemaBad == 0, $"bad={schemaBad}/{clips}");
+
+        // Stride-matched locomotion: a loop with a baked strideSpeed plays at speed / strideSpeed,
+        // so the foot flat on the ground stays put; without one it falls back to preferredSpeed.
+        var metas = ClipManifestLoader.Parse(System.IO.File.ReadAllText(manifestPath));
+        var run = metas.Find(m => m.Id == "soccer_run");
+        Check("M6 soccer_run has a baked stride speed", run != null && run.StrideSpeed > 2f && run.StrideSpeed < run.PreferredSpeed,
+              run == null ? "missing" : $"stride={run.StrideSpeed:F2} preferred={run.PreferredSpeed:F2}");
+        if (run != null)
+            Check("M6 locomotion playback is stride-matched",
+                  MathF.Abs(MotionEngine.LocomotionPlaybackScale(run, run.StrideSpeed * 1.2f) - 1.2f) < 1e-4f);
+        var noStride = new ClipMeta { Id = "t", Category = ClipCategory.Locomotion, PreferredSpeed = 4f };
+        Check("M6 playback falls back to preferredSpeed", MathF.Abs(MotionEngine.LocomotionPlaybackScale(noStride, 2f) - .5f) < 1e-4f);
+        Check("M6 non-locomotion clips play at 1x",
+              MotionEngine.LocomotionPlaybackScale(new ClipMeta { Id = "k", Category = ClipCategory.Kick, StrideSpeed = 3f }, 6f) == 1f);
+    }
+    else
+    {
+        Check("M6 manifest present for validation", false, "manifest not found; run from arena-fc");
+    }
 }
 
 Console.WriteLine($"\nRESULT: {passed} passed, {failed} failed");

@@ -32,9 +32,38 @@ public sealed class MotionState
     public BallState Ball;
     public PlayerIntent LastIntent;
     public float TimeSinceContact;
+    /// <summary>One-frame edge: true on the tick the visible clip crosses its contact fraction.</summary>
     public bool ContactCrossed;
+    /// <summary>Continuous plant state from plant curves / discrete plant frames.</summary>
     public bool FootPlantedLeft;
     public bool FootPlantedRight;
+    /// <summary>One-frame edge: true on the tick left plant weight/frame crosses the plant threshold.
+    /// Use for footstep audio, turf response and FX. Cleared every Update before recompute.</summary>
+    public bool FootstepLeft;
+    /// <summary>One-frame edge: true on the tick right plant weight/frame crosses the plant threshold.</summary>
+    public bool FootstepRight;
+
+    // Hypermotion/ML-Flow-style ball approach (presentation-only, deterministic).
+    public float ApproachWeight;
+    public float DistanceToBall = float.MaxValue;
+    public float TimeToBallContact = -1f;
+    public bool IsApproachingBall;
+
+    // v2 data plumbing / debug
+    public float RootVelocitySampleX;
+    public float RootVelocitySampleZ;
+    public float PlantWeightLeft;
+    public float PlantWeightRight;
+    /// <summary>Previous-frame plant weights used only for rising-edge footstep detection.</summary>
+    public float PrevPlantWeightLeft;
+    public float PrevPlantWeightRight;
+    public bool InContactWindow;
+
+    // Presentation-only contract hints (M4 plumbing; no sim authority).
+    public bool ContractShouldSprint;
+    public bool ContractPressing;
+    public bool ContractRequiresFootPlant;
+    public string ContractRole = "";
 
     public string RenderClipId => NextClipId.Length > 0 ? NextClipId : CurrentClipId;
     public float RenderPhase => NextClipId.Length > 0 ? NextPhase : Phase;

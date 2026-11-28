@@ -43,6 +43,7 @@ public sealed partial class SoccerClipRig : Node3D
     private readonly HashSet<string> _loops = new();
     private readonly Dictionary<string, float> _clipDuration = new();
     private readonly Dictionary<string, float> _contactFrac = new();
+    private readonly Dictionary<string, float> _clipFps = new();
     private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
@@ -51,6 +52,29 @@ public sealed partial class SoccerClipRig : Node3D
 
     /// <summary>Presentation-only motion input; never written back to PlayerState.</summary>
     public void ApplyMotion(MotionState? motion) => _motionState = motion;
+    public ArenaFC.Core.Animation.AnimationMetrics? AnimMetrics { get; set; }
+    public float MaxAnkleTargetResidual { get; private set; }
+    public float MaxPlantedAnchorError { get; private set; }
+    public float MeanAnkleTargetResidual { get; private set; }
+    private float _ankleResidualAccum;
+    private int _ankleResidualSamples;
+    public bool HasFootIkBones => _bones.TryGetValue("L", out var l) && _bones.TryGetValue("R", out var r)
+        && l.Thigh >= 0 && l.Shin >= 0 && l.Foot >= 0
+        && r.Thigh >= 0 && r.Shin >= 0 && r.Foot >= 0;
+    public bool HasSoleGeometry => _bones.TryGetValue("L", out var l) && l.HasSoleGeometry
+        && _bones.TryGetValue("R", out var r) && r.HasSoleGeometry;
+
+    public Vector3 SoleWorldPosition(string side)
+    {
+        if (Skel == null || !_bones.TryGetValue(side, out var b)) return Vector3.Zero;
+        return Skel.GlobalTransform * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+    }
+
+    public float AuthoredContactTime(string clip)
+        => _clipDuration.TryGetValue(clip, out float duration) && _contactFrac.TryGetValue(clip, out float fraction)
+            ? duration * fraction : -1f;
+    public float AuthoredClipFps(string clip)
+        => _clipFps.TryGetValue(clip, out float fps) ? fps : 0f;
 
     // FIFA-style locomotion state.
     private Node3D? _sceneRoot;
@@ -84,11 +108,52 @@ public sealed partial class SoccerClipRig : Node3D
 
     // Phase 1.2 foot-planting IK state.
     private readonly Dictionary<string, BoneData> _bones = new();
+    // Latched plant anchors and independent previous corrected poses for velocity measurement.
+    /// <summary>Frames a foot was in the clip's plant window, and of those how many it was locked.</summary>
+    public int PlantFrames { get; private set; }
+    public int LockedPlantFrames { get; private set; }
+    /// <summary>Mean world-space sole speed over every plant-window frame, locked or not (m/s).</summary>
+    public float ContractPlantSlide => ContractPlantSlideSamples > 0 ? ContractPlantSlideAccum / ContractPlantSlideSamples : 0f;
+    private float ContractPlantSlideAccum;
+    private int ContractPlantSlideSamples;
+    private struct FootLock
+    {
+        public bool Active, Consumed, Releasing, HasMeasured, HasContract;
+        public Vector3 Anchor, ReleaseFrom, LastSolved, LastMeasured, LastContract;
+        public float ReleaseT;
+    }
+    private FootLock _lockL, _lockR;
+    /// <summary>Let a locked foot go once the clip's foot is this far (m, ground plane) from the
+    /// anchor: past it the leg straightens and the pinned foot lifts.</summary>
+    public const float MaxLockStretch = .22f;
+    /// <summary>Seconds a released foot takes to ease back onto the clip's foot.</summary>
+    public const float LockReleaseTime = .12f;
+    private Vector3 _prevPelvisPos;
+    private bool _hasPrevPelvisPos;
+    private Vector3 _groundNormalL = Vector3.Up;
+    private Vector3 _groundNormalR = Vector3.Up;
+    private float _lastIkCorrectionL;
+    private float _lastIkCorrectionR;
+    private float _lastInertialEnergy;
+    private Label? _debugLabel;
+    private bool _debugOverlayEnabled = !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("ARENA_FC_DEBUG_OVERLAY"));
+
+    // Hypermotion-style inertialization (presentation-only).
+    private readonly Dictionary<int, Transform3D> _prevBonePoses = new();
+    private readonly Dictionary<int, Transform3D> _inertialPrevFramePoses = new();
+    private readonly List<(int bone, Vector3 posOff, Quaternion rotOff, Vector3 posVel, Vector3 angVel, float halfLife)> _inertialBones = new();
+    private bool _inertialActive;
+    private float _inertialTime;
+    private float _inertialPrevDt = 1f / 60f;
+    private Vector3 _prevPelvisWorld;
+    private bool _hasPrevPelvis;
 
     private sealed class BoneData
     {
-        public int Thigh, Shin, Foot, Spine, Neck, Head, UpperArmL, LowerArmL, UpperArmR, LowerArmR;
+        public int Thigh = -1, Shin = -1, Foot = -1, Spine = -1, Neck = -1, Head = -1, UpperArmL = -1, LowerArmL = -1, UpperArmR = -1, LowerArmR = -1;
         public Vector3 ThighRest, ShinRest, FootRest, SpineRest, NeckRest, HeadRest;
+        public Vector3 SoleLocal;
+        public bool HasSoleGeometry;
         public Vector3 UpperArmRestL, LowerArmRestL, UpperArmRestR, LowerArmRestR;
     }
 
@@ -210,16 +275,41 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    /// <summary>Bone by name, tolerating the "_2" suffixes Godot adds each time one GltfState generates
-    /// another scene (every player shares the parsed GLB).</summary>
+    /// <summary>Resolve common GLTF bone-name variants, including side-prefix names
+    /// (LThigh) and side-suffix names (thigh_L), plus Godot duplicate suffixes.</summary>
     public static int FindBoneLoose(Skeleton3D skel, string name)
     {
-        int b = skel.FindBone(name);
-        if (b >= 0) return b;
-        for (int i = 0; i < skel.GetBoneCount(); i++)
+        static string Normalize(string value)
+            => new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+        // First prefer an exact name: numeric suffixes can be meaningful bone
+        // names (spine_01 versus spine_02), not Godot duplicate suffixes.
+        int exact = skel.FindBone(name);
+        if (exact >= 0) return exact;
+
+        string wanted = Normalize(name);
+        string alias = wanted switch
         {
-            string n = skel.GetBoneName(i);
-            if (n.StartsWith(name + "_") && n.Substring(name.Length).Replace("_2", "") == "") return i;
+            "spine01" => "spine", "spine02" => "chest", "neck01" => "neck",
+            "lowerarml" => "lforearm", "lowerarmr" => "rforearm",
+            _ when wanted.EndsWith("l") || wanted.EndsWith("r")
+                => wanted[^1] + wanted[..^1],
+            _ => wanted
+        };
+        for (int pass = 0; pass < 2; pass++)
+        {
+            for (int i = 0; i < skel.GetBoneCount(); i++)
+            {
+                string actual = skel.GetBoneName(i);
+                if (pass == 1)
+                {
+                    int split = actual.LastIndexOf('_');
+                    if (split < 0 || !int.TryParse(actual[(split + 1)..], out _)) continue;
+                    actual = actual[..split];
+                }
+                string normalized = Normalize(actual);
+                if (normalized == wanted || normalized == alias) return i;
+            }
         }
         return -1;
     }
@@ -243,7 +333,11 @@ public sealed partial class SoccerClipRig : Node3D
                     string clipName = nm.GetString() ?? "";
                     if (c.TryGetProperty("loop", out var loop) && loop.GetBoolean()) _loops.Add(clipName);
                     if (c.TryGetProperty("fps", out var fps) && c.TryGetProperty("frames", out var frames))
-                        _clipDuration[clipName] = frames.GetSingle() / Math.Max(1f, fps.GetSingle());
+                    {
+                        float clipFps = Math.Max(1f, fps.GetSingle());
+                        _clipFps[clipName] = clipFps;
+                        _clipDuration[clipName] = frames.GetSingle() / clipFps;
+                    }
                     if (c.TryGetProperty("events", out var ev)
                         && ev.TryGetProperty("ball_contact_frac", out var bc) && bc.ValueKind != JsonValueKind.Null)
                         _contactFrac[clipName] = bc.GetSingle();
@@ -749,6 +843,15 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = 0f;
             return;
         }
+        // Foot overrides are persistent in Godot. Remove last frame's output
+        // before reading the new authored pose so swing feet do not stay pinned.
+        if (Skel != null)
+        {
+            foreach (var pair in _bones)
+                if (pair.Value.Foot >= 0)
+                    Skel.SetBoneGlobalPoseOverride(pair.Value.Foot, Transform3D.Identity, 0f, false);
+            Skel.ForceUpdateAllBoneTransforms();
+        }
         Player.SpeedScale = _speedScale;
         float speed = Mx.Flat(p.Vel).Length();
         bool hasBall = p.Dribbling || p.Shielding;
@@ -792,6 +895,7 @@ public sealed partial class SoccerClipRig : Node3D
         }
         if (clip != _current)
         {
+            CaptureInertialOldPoses();
             // Locomotion clips inherit cycle phase; one-shots must begin at frame zero.
             float startPhase = motionDriven ? _motionState!.RenderPhase : oneShot ? 0f : _phase;
             Player.Play(clip, oneShot ? .08f : .12f);
@@ -799,6 +903,7 @@ public sealed partial class SoccerClipRig : Node3D
             _current = clip;
             _oneShotDone = false;
             _blend = 0f;
+            CaptureInertialTransition();
         }
         _blend = Mathf.Min(_blend + dt / .18f, 1f);
         if (oneShot && !Player.IsPlaying()) _oneShotDone = true;
@@ -833,6 +938,15 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = _speedScale;
         }
         float clipLen = (float)Player.GetAnimation(clip).Length;
+        if (!motionDriven && oneShot && p.ActionTimer > 0f && p.ActionDuration > 1e-4f)
+        {
+            // Drive action pose from the authoritative simulation clock. AnimationPlayer
+            // process scheduling can otherwise drift a few frames from MatchEngine ticks.
+            // With contact-aligned SpeedScale, this lands exactly on the authored
+            // ball_contact frame when ActionDuration - ActionTimer == ActionContactAt.
+            float actionElapsed = Math.Clamp(p.ActionDuration - p.ActionTimer, 0f, p.ActionDuration);
+            Player.Seek(Math.Clamp(actionElapsed * Player.SpeedScale, 0f, clipLen), true);
+        }
         if (motionDriven)
         {
             // The shared engine owns normalized phase and contact timing. Seeking here
@@ -847,7 +961,9 @@ public sealed partial class SoccerClipRig : Node3D
         UpdateFlutter(speed, dt);
         UpdateLookAt(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateReach(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
-        UpdateFootIk(worldPos, yaw);
+        UpdateInertialization(dt);
+        UpdateFootIk(worldPos, yaw, dt);
+        StoreInertialPrevPoses(dt);
         _prevFacing = Mx.Norm(Mx.Flat(p.Facing));
         if (_prevFacing.LengthSquared() < 0.001f) _prevFacing = new System.Numerics.Vector3(0, 0, 1);
     }
@@ -951,6 +1067,139 @@ public sealed partial class SoccerClipRig : Node3D
         _sceneRoot.Rotation = new Vector3(_lean, 0, _roll);
     }
 
+
+    // ---- Hypermotion-style inertialization (velocity-aware) -------------
+
+    // M5 scope: upper-body only (9 bones). Feet/legs excluded to avoid fighting foot IK/contact.
+    private static readonly string[] InertialBoneNames =
+    {
+        "Hips", "spine_01", "spine_02", "neck_01", "head",
+        "upperarm_L", "lowerarm_L", "upperarm_R", "lowerarm_R"
+    };
+
+    private void CaptureInertialOldPoses()
+    {
+        _prevBonePoses.Clear();
+        if (Skel == null) return;
+        foreach (var name in InertialBoneNames)
+        {
+            int b = FindBoneLoose(Skel, name);
+            if (b >= 0) _prevBonePoses[b] = Skel.GetBoneGlobalPose(b);
+        }
+    }
+
+    private void CaptureInertialTransition()
+    {
+        if (Skel == null || _prevBonePoses.Count == 0) return;
+        _inertialBones.Clear();
+        _inertialActive = true;
+        _inertialTime = 0f;
+        float dt = Mathf.Max(0.0001f, _inertialPrevDt);
+        float transitionDiscontinuity = 0f;
+        foreach (var kv in _prevBonePoses)
+        {
+            int b = kv.Key;
+            var oldTx = kv.Value;
+            var newTx = Skel.GetBoneGlobalPose(b);
+            Vector3 posOff = oldTx.Origin - newTx.Origin;
+            float rawPositionDiscontinuity = posOff.Length();
+            if (posOff.Length() > .12f) posOff = posOff.Normalized() * .12f;
+            Quaternion oldRot = oldTx.Basis.GetRotationQuaternion();
+            Quaternion newRot = newTx.Basis.GetRotationQuaternion();
+            Quaternion rotOff = (oldRot * newRot.Inverse()).Normalized();
+            // Measure the raw pose discontinuity before inertialization masks it.
+            // Translation is metres; angular error is scaled to a comparable small
+            // displacement so the aggregate is stable across skeleton proportions.
+            transitionDiscontinuity += rawPositionDiscontinuity + rotOff.GetAngle() * 0.1f;
+
+            // Velocity-aware capture: estimate old bone velocity from previous frame.
+            Vector3 posVel = Vector3.Zero;
+            Vector3 angVel = Vector3.Zero;
+            if (_inertialPrevFramePoses.TryGetValue(b, out var prevTx))
+            {
+                posVel = (oldTx.Origin - prevTx.Origin) / dt;
+                Quaternion prevRot = prevTx.Basis.GetRotationQuaternion();
+                Quaternion dq = (oldRot * prevRot.Inverse()).Normalized();
+                Vector3 axis = dq.GetAxis();
+                float angle = dq.GetAngle();
+                if (angle > Mathf.Pi) angle -= Mathf.Tau;
+                if (axis.LengthSquared() > 1e-6f) angVel = axis.Normalized() * (angle / dt);
+                if (angVel.Length() > 12f) angVel = angVel.Normalized() * 12f;
+            }
+
+            _inertialBones.Add((b, posOff, rotOff, posVel, angVel, 0.18f));
+        }
+        if (_inertialBones.Count > 0)
+            AnimMetrics?.RecordTransitionDiscontinuity(transitionDiscontinuity / _inertialBones.Count);
+    }
+
+    private void UpdateInertialization(float dt)
+    {
+        if (!_inertialActive || Skel == null) return;
+        _inertialTime += dt;
+        bool any = false;
+        for (int i = 0; i < _inertialBones.Count; i++)
+        {
+            var ib = _inertialBones[i];
+            float lambda = 0.69314718056f / Mathf.Max(0.001f, ib.halfLife);
+            float decay = Mathf.Exp(-lambda * dt);
+            // Velocity-aware integration then decay (Hypermotion-style continuity).
+            ib.posOff += ib.posVel * dt;
+            ib.posVel *= decay;
+            ib.posOff *= decay;
+            if (ib.posOff.Length() > .12f) ib.posOff = ib.posOff.Normalized() * .12f;
+
+            float angLen = ib.angVel.Length();
+            if (angLen > 1e-6f)
+            {
+                Quaternion dq = new Quaternion(ib.angVel / angLen, angLen * dt);
+                ib.rotOff = (dq * ib.rotOff).Normalized();
+            }
+            ib.rotOff = ib.rotOff.Slerp(Quaternion.Identity, 1f - decay).Normalized();
+            ib.angVel *= decay;
+            _inertialBones[i] = ib;
+
+            if (ib.posOff.Length() > 0.0008f || ib.posVel.Length() > 0.001f || ib.angVel.Length() > 0.01f || Mathf.Abs(ib.rotOff.W) < 0.9995f)
+            {
+                any = true;
+                // Apply a rotation delta in parent-local space. Independent global
+                // translations on connected bones detach joints and stretch the
+                // skinned mesh. Only the root may receive a positional offset.
+                int parent = Skel.GetBoneParent(ib.bone);
+                Basis parentBasis = parent >= 0 ? Skel.GetBoneGlobalPose(parent).Basis : Basis.Identity;
+                Quaternion parentRotation = parentBasis.Orthonormalized().GetRotationQuaternion().Normalized();
+                Quaternion localOffset = (parentRotation.Inverse() * ib.rotOff * parentRotation).Normalized();
+                Skel.SetBonePoseRotation(ib.bone,
+                    (localOffset * Skel.GetBonePoseRotation(ib.bone)).Normalized());
+                if (parent < 0)
+                    Skel.SetBonePosePosition(ib.bone,
+                        Skel.GetBonePosePosition(ib.bone) + parentBasis.Inverse() * ib.posOff);
+                Skel.ForceUpdateAllBoneTransforms();
+            }
+        }
+        float energy = 0f;
+        for (int i = 0; i < _inertialBones.Count; i++) energy += _inertialBones[i].posOff.LengthSquared() + _inertialBones[i].rotOff.GetAngle() * 0.1f;
+        _lastInertialEnergy = energy;
+        if (!any || _inertialTime > 0.18f * 7f)
+        {
+            _inertialActive = false;
+            _inertialBones.Clear();
+            _lastInertialEnergy = 0f;
+        }
+    }
+
+    private void StoreInertialPrevPoses(float dt)
+    {
+        if (Skel == null) return;
+        _inertialPrevDt = Mathf.Max(0.0001f, dt);
+        _inertialPrevFramePoses.Clear();
+        foreach (var name in InertialBoneNames)
+        {
+            int b = FindBoneLoose(Skel, name);
+            if (b >= 0) _inertialPrevFramePoses[b] = Skel.GetBoneGlobalPose(b);
+        }
+    }
+
     // ---- Phase 1.2 foot-planting IK -------------------------------------
 
     private void CacheBones()
@@ -961,23 +1210,25 @@ public sealed partial class SoccerClipRig : Node3D
         {
             var b = new BoneData
             {
-                Thigh = Skel.FindBone("thigh_" + side),
-                Shin = Skel.FindBone("shin_" + side),
-                Foot = Skel.FindBone("foot_" + side),
+                Thigh = FindBoneLoose(Skel, "thigh_" + side),
+                Shin = FindBoneLoose(Skel, "shin_" + side),
+                Foot = FindBoneLoose(Skel, "foot_" + side),
             };
-            if (b.Thigh < 0 || b.Shin < 0 || b.Foot < 0) continue;
+            if (b.Thigh < 0 || b.Shin < 0 || b.Foot < 0 ||
+                Skel.GetBoneParent(b.Shin) != b.Thigh || Skel.GetBoneParent(b.Foot) != b.Shin) continue;
             b.ThighRest = Skel.GetBoneRest(b.Thigh).Origin;
             b.ShinRest = Skel.GetBoneRest(b.Shin).Origin;
             b.FootRest = Skel.GetBoneRest(b.Foot).Origin;
+            b.HasSoleGeometry = TryCacheBootSole(side, b.Foot, out b.SoleLocal);
             _bones[side] = b;
         }
-        var spine = Skel.FindBone("spine_02");
-        var neck = Skel.FindBone("neck_01");
-        var head = Skel.FindBone("head");
-        var uaL = Skel.FindBone("upperarm_L");
-        var laL = Skel.FindBone("lowerarm_L");
-        var uaR = Skel.FindBone("upperarm_R");
-        var laR = Skel.FindBone("lowerarm_R");
+        var spine = FindBoneLoose(Skel, "spine_02");
+        var neck = FindBoneLoose(Skel, "neck_01");
+        var head = FindBoneLoose(Skel, "head");
+        var uaL = FindBoneLoose(Skel, "upperarm_L");
+        var laL = FindBoneLoose(Skel, "lowerarm_L");
+        var uaR = FindBoneLoose(Skel, "upperarm_R");
+        var laR = FindBoneLoose(Skel, "lowerarm_R");
         if (spine >= 0 && neck >= 0 && head >= 0)
         {
             var b = _bones.TryGetValue("L", out var bl) ? bl : new BoneData();
@@ -1001,42 +1252,458 @@ public sealed partial class SoccerClipRig : Node3D
         }
     }
 
-    private void UpdateFootIk(Vector3 worldPos, float yaw)
+    // Derive the sole contact point from the selected production boot meshes, in
+    // the foot bone's rest-local space. This deliberately fails closed: if the
+    // GLB has no boot vertices near a foot, the runner reports missing geometry
+    // instead of fabricating an ankle-to-sole offset.
+    private bool TryCacheBootSole(string side, int footBone, out Vector3 soleLocal)
+    {
+        soleLocal = Vector3.Zero;
+        if (Skel == null || footBone < 0) return false;
+        var footRest = Skel.GetBoneGlobalRest(footBone);
+        // Load() runs before the rig is AddChild'd. GlobalTransform is invalid then
+        // (!is_inside_tree). Build mesh->skeleton from local transforms instead.
+        var skeletonInv = Skel.IsInsideTree()
+            ? Skel.GlobalTransform.AffineInverse()
+            : Transform3D.Identity;
+        var candidates = new List<Vector3>();
+        foreach (var mi in _meshes)
+        {
+            string nodeName = mi.Name.ToString().ToLowerInvariant();
+            if (!mi.Visible || mi.Mesh == null) continue;
+            for (int surface = 0; surface < mi.Mesh.GetSurfaceCount(); surface++)
+            {
+                var material = mi.GetSurfaceOverrideMaterial(surface) ?? mi.Mesh.SurfaceGetMaterial(surface);
+                string materialName = material?.ResourceName?.ToLowerInvariant() ?? "";
+                if (!nodeName.Contains("boot") && materialName != "boots"
+                    && !(materialName == "" && surface < _materialOrder.Count
+                        && _materialOrder[surface].Equals("boots", StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                var arrays = mi.Mesh.SurfaceGetArrays(surface);
+                if (arrays.Count <= (int)Godot.Mesh.ArrayType.Vertex
+                    || arrays[(int)Godot.Mesh.ArrayType.Vertex].VariantType == Variant.Type.Nil) continue;
+                var vertices = arrays[(int)Godot.Mesh.ArrayType.Vertex].AsVector3Array();
+                Transform3D meshXform = mi.IsInsideTree()
+                    ? mi.GlobalTransform
+                    : TransformRelativeTo(Skel, mi);
+                var meshToSkeleton = skeletonInv * meshXform;
+                foreach (var vertex in vertices)
+                {
+                    var point = meshToSkeleton * vertex;
+                    var delta = point - footRest.Origin;
+                    if (new Vector2(delta.X, delta.Z).LengthSquared() <= .20f * .20f)
+                        candidates.Add(point);
+                }
+            }
+        }
+        if (candidates.Count == 0) return false;
+        Vector3 soleInSkeleton = candidates.OrderBy(p => p.Y).First();
+        soleLocal = footRest.AffineInverse() * soleInSkeleton;
+        return float.IsFinite(soleLocal.X) && float.IsFinite(soleLocal.Y) && float.IsFinite(soleLocal.Z);
+    }
+
+    /// <summary>Compose local transforms from node up to ancestor (exclusive of ancestor).
+    /// Used when GlobalTransform is unavailable because the hierarchy is not yet in the tree.</summary>
+    private static Transform3D TransformRelativeTo(Node3D ancestor, Node3D node)
+    {
+        Transform3D t = Transform3D.Identity;
+        Node n = node;
+        while (n != null && n != ancestor)
+        {
+            if (n is Node3D n3)
+                t = n3.Transform * t;
+            n = n.GetParent();
+        }
+        return t;
+    }
+
+    private void UpdateFootIk(Vector3 worldPos, float yaw, float dt)
     {
         if (Skel == null || _bones.Count == 0) return;
+        // P0 fix: GetBoneGlobalPose is skeleton-space; convert to/from world explicitly.
+        var skelGlobal = Skel.GlobalTransform;
+        var skelInv = skelGlobal.AffineInverse();
+        bool leftPlanted = _motionState?.FootPlantedLeft ?? false;
+        bool rightPlanted = _motionState?.FootPlantedRight ?? false;
+        float leftPlantW = _motionState?.PlantWeightLeft ?? (leftPlanted ? 1f : 0f);
+        float rightPlantW = _motionState?.PlantWeightRight ?? (rightPlanted ? 1f : 0f);
+        // M4 presentation hint: strengthen plant lock when contract requires foot plant.
+        if (_motionState?.ContractRequiresFootPlant == true)
+        {
+            if (leftPlanted) leftPlantW = MathF.Max(leftPlantW, 0.35f);
+            if (rightPlanted) rightPlantW = MathF.Max(rightPlantW, 0.35f);
+        }
+        _lastIkCorrectionL = 0f; _lastIkCorrectionR = 0f;
+
         foreach (var side in new[] { "L", "R" })
         {
             if (!_bones.TryGetValue(side, out var b)) continue;
-            var footGlobal = Skel.GetBoneGlobalPose(b.Foot).Origin;
-            var target = new Vector3(footGlobal.X, worldPos.Y, footGlobal.Z);
-            float height = footGlobal.Y - worldPos.Y;
-            if (height < .18f)
-                SolveTwoBone(b, target, worldPos, yaw);
+            bool isLeft = side == "L";
+            ref FootLock fl = ref (isLeft ? ref _lockL : ref _lockR);
+            // The previous frame's persistent override must not pin a swing foot
+            // or feed an old global pose back into the new IK solve.
+            Skel.SetBoneGlobalPoseOverride(b.Foot, Transform3D.Identity, 0f, false);
+            Skel.ForceUpdateAllBoneTransforms();
+            var footPose = Skel.GetBoneGlobalPose(b.Foot);
+            var footWorld = skelGlobal * (footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+            float height = footWorld.Y - worldPos.Y;
+            bool contractPlanted = isLeft ? leftPlanted : rightPlanted;
+            float pw = Mathf.Clamp(isLeft ? leftPlantW : rightPlantW, 0f, 1f);
+
+            var ground = SampleGround(worldPos, footWorld);
+            if (isLeft) _groundNormalL = ground.normal; else _groundNormalR = ground.normal;
+            float groundY = ground.hit ? ground.y : worldPos.Y;
+            Vector3 animated = new Vector3(footWorld.X, footWorld.Y, footWorld.Z);
+
+            // Foot lock (HyperMotion-style plant lock):
+            //  - it engages when the clip's plant weight crosses MotionEngine.PlantEdgeThreshold
+            //    and latches the animated contact point, so touchdown never jumps;
+            //  - while engaged the sole is pinned to that point on the ground;
+            //  - it lets go when the weight drops, or early when the body has moved so far
+            //    that the pinned foot is MaxLockStretch from where the clip has its foot
+            //    (holding on past that straightens the leg and lifts the foot off the ground);
+            //  - on letting go the foot eases back to the clip over LockReleaseTime instead of
+            //    snapping, which is what the slide metric used to count as metres-per-second.
+            bool wantLock = contractPlanted && pw >= MotionEngine.PlantEdgeThreshold;
+            if (!contractPlanted) fl.Consumed = false;
+            if (wantLock && !fl.Active && !fl.Consumed)
+            {
+                fl.Active = true;
+                fl.Anchor = new Vector3(footWorld.X, groundY + 0.006f, footWorld.Z);
+                fl.HasMeasured = false;
+            }
+            if (fl.Active)
+            {
+                var stretch = new Vector2(animated.X - fl.Anchor.X, animated.Z - fl.Anchor.Z).Length();
+                if (!wantLock || stretch > MaxLockStretch)
+                {
+                    fl.Active = false;
+                    fl.Consumed = wantLock;            // stretched out: wait for the next plant
+                    fl.ReleaseFrom = fl.LastSolved;
+                    fl.ReleaseT = 0f;
+                    fl.Releasing = true;
+                    fl.HasMeasured = false;
+                }
+            }
+
+            Vector3? target = null;
+            if (fl.Active)
+                target = new Vector3(fl.Anchor.X, groundY + 0.006f, fl.Anchor.Z);
+            else if (fl.Releasing)
+            {
+                fl.ReleaseT += dt;
+                float u = Mathf.Clamp(fl.ReleaseT / LockReleaseTime, 0f, 1f);
+                u = u * u * (3f - 2f * u);
+                var eased = fl.ReleaseFrom.Lerp(animated, u);
+                target = new Vector3(eased.X, Mathf.Max(eased.Y, groundY + 0.006f), eased.Z);
+                if (u >= 1f) fl.Releasing = false;
+            }
+            else if (height < .18f || footWorld.Y < groundY + 0.035f)
+            {
+                // Swing foot near the ground: keep the sole on or above the surface.
+                target = new Vector3(footWorld.X, Mathf.Max(footWorld.Y, groundY + 0.035f), footWorld.Z);
+            }
+
+            if (target is Vector3 tw)
+            {
+                Vector3 beforeWorld = skelGlobal * (footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+                // The foot's final orientation is decided first - the clip's own foot
+                // orientation, tilted onto the ground's slope (fully while locked) - so the
+                // ankle target that puts the sole on the target is known before the leg is
+                // solved.  Orienting the foot before the solve (as this used to) let the
+                // shin rotation carry the foot round afterwards and the sole point missed
+                // its target, through the ground on slopes.
+                Basis footBasis = FootBasisOnGround(footPose.Basis, ground.normal, skelInv, fl.Active ? 1f : .5f);
+                Vector3 ankleTarget = (skelInv * tw) - footBasis * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
+                SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
+                SetFootGlobalBasis(b.Foot, footBasis);
+                Skel.ForceUpdateAllBoneTransforms();
+                float ankleResidual = Skel.GetBoneGlobalPose(b.Foot).Origin.DistanceTo(ankleTarget);
+                _ankleResidualAccum += ankleResidual;
+                _ankleResidualSamples++;
+                MaxAnkleTargetResidual = Mathf.Max(MaxAnkleTargetResidual, ankleResidual);
+                MeanAnkleTargetResidual = _ankleResidualAccum / Mathf.Max(1, _ankleResidualSamples);
+                Vector3 afterWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+                float corr = beforeWorld.DistanceTo(afterWorld);
+                if (isLeft) _lastIkCorrectionL = corr; else _lastIkCorrectionR = corr;
+            }
+
+            // Measure the corrected foot, not the pre-IK animation pose: while locked, the
+            // world-space slide of the sole and its distance from the latched anchor.
+            Vector3 correctedWorld = skelGlobal * (Skel.GetBoneGlobalPose(b.Foot) * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
+            fl.LastSolved = correctedWorld;
+            // Coverage of the lock over the clip's own plant windows (honest reporting: a
+            // lock that lets go early hides slide from the locked-slide number above).
+            if (wantLock)
+            {
+                PlantFrames++;
+                if (fl.Active) LockedPlantFrames++;
+                if (fl.HasContract && dt > 1e-4f)
+                    ContractPlantSlideAccum += new Vector2(correctedWorld.X - fl.LastContract.X, correctedWorld.Z - fl.LastContract.Z).Length() / dt;
+                if (fl.HasContract) ContractPlantSlideSamples++;
+                fl.LastContract = correctedWorld;
+                fl.HasContract = true;
+            }
+            else fl.HasContract = false;
+            if (fl.Active)
+            {
+                float anchorError = new Vector2(correctedWorld.X - fl.Anchor.X, correctedWorld.Z - fl.Anchor.Z).Length();
+                MaxPlantedAnchorError = Mathf.Max(MaxPlantedAnchorError, anchorError);
+                if (fl.HasMeasured && dt > 1e-4f)
+                {
+                    float slide = new Vector2(correctedWorld.X - fl.LastMeasured.X, correctedWorld.Z - fl.LastMeasured.Z).Length();
+                    AnimMetrics?.RecordFootSlide(slide / dt);
+                }
+                fl.LastMeasured = correctedWorld;
+                fl.HasMeasured = true;
+            }
         }
+        // Keep pelvis motion authored by the clip until the leg solve is validated
+        // against the production skeleton. The previous secondary pelvis override
+        // compounded foot IK and caused large upper-body/hip distortions.
+        UpdateDebugOverlay();
         ApplyLookAndReach();
     }
 
-    private void SolveTwoBone(BoneData b, Vector3 targetWorld, Vector3 rootWorld, float yaw)
+    private (bool hit, float y, Vector3 normal) SampleGround(Vector3 worldPos, Vector3 footWorld)
     {
-        var hip = Skel.GetBoneGlobalPose(b.Thigh).Origin;
-        float l1 = b.ThighRest.Length();
-        float l2 = b.ShinRest.Length();
-        var toTarget = targetWorld - hip;
-        float dist = Mathf.Clamp(toTarget.Length(), .01f, l1 + l2 - .001f);
-        var dir = toTarget.Normalized();
+        // Default to pitch plane at the player's current base.
+        Vector3 normal = Vector3.Up;
+        float y = worldPos.Y;
+        bool hit = false;
+        try
+        {
+            var space = Skel?.GetWorld3D()?.DirectSpaceState;
+            if (space != null)
+            {
+                // Use a sufficiently long vertical probe: a lifted swing foot can
+                // be more than 0.8m above the turf, and a short ray silently fell back
+                // to the player's root height, producing a false floating ground plane.
+                var from = new Vector3(footWorld.X, footWorld.Y + 2.5f, footWorld.Z);
+                var to = new Vector3(footWorld.X, footWorld.Y - 2.5f, footWorld.Z);
+                var q = PhysicsRayQueryParameters3D.Create(from, to);
+                q.CollideWithAreas = false;
+                q.CollideWithBodies = true;
+                var res = space.IntersectRay(q);
+                if (res.Count > 0 && res.ContainsKey("position"))
+                {
+                    var pos = (Vector3)res["position"];
+                    var n = res.ContainsKey("normal") ? (Vector3)res["normal"] : Vector3.Up;
+                    if (n.LengthSquared() > 1e-6f) normal = n.Normalized();
+                    y = pos.Y;
+                    hit = true;
+                }
+            }
+        }
+        catch { /* headless / no physics: plane fallback */ }
+        return (hit, y, normal);
+    }
+
+
+    private void UpdateDebugOverlay()
+    {
+        if (!_debugOverlayEnabled) return;
+        try
+        {
+            if (_debugLabel == null || !IsInstanceValid(_debugLabel))
+            {
+                var canvas = new CanvasLayer { Name = "HypermotionDebugCanvas", Layer = 100 };
+                AddChild(canvas);
+                _debugLabel = new Label
+                {
+                    Name = "HypermotionDebugLabel",
+                    Position = new Vector2(12, 12),
+                    Modulate = new Color(1, 1, 0.6f, 0.95f),
+                };
+                _debugLabel.AddThemeFontSizeOverride("font_size", 14);
+                canvas.AddChild(_debugLabel);
+            }
+            float approach = _motionState?.ApproachWeight ?? 0f;
+            float ttc = _motionState?.TimeToBallContact ?? -1f;
+            bool lp = _motionState?.FootPlantedLeft ?? false;
+            bool rp = _motionState?.FootPlantedRight ?? false;
+            float pwL = _motionState?.PlantWeightLeft ?? 0f;
+            float pwR = _motionState?.PlantWeightRight ?? 0f;
+            float rvx = _motionState?.RootVelocitySampleX ?? 0f;
+            float rvz = _motionState?.RootVelocitySampleZ ?? 0f;
+            bool cw = _motionState?.InContactWindow ?? false;
+            _debugLabel.Text =
+                $"AME dbg\napproach={approach:F2} ttc={ttc:F2} contactWin={cw}\n" +
+                $"plant L={lp}({pwL:F2}) R={rp}({pwR:F2})\n" +
+                $"rv=({rvx:F2},{rvz:F2})\n" +
+                $"ikCorr L={_lastIkCorrectionL:F3} R={_lastIkCorrectionR:F3}\n" +
+                $"inertial={(_inertialActive ? _inertialTime : 0f):F2} E={_lastInertialEnergy:F3}";
+        }
+        catch { /* debug overlay is non-fatal */ }
+    }
+
+    private void ApplyPelvisStabilization(Vector3 worldPos, float plantLeft, float plantRight, Transform3D skelGlobal, Transform3D skelInv)
+    {
+        if (Skel == null) return;
+        int pelvisIdx = FindBoneLoose(Skel, "Hips");
+        if (pelvisIdx < 0) return;
+        var pelvisTx = Skel.GetBoneGlobalPose(pelvisIdx);
+        // Work in world space (report P0: avoid skeleton/world mixing).
+        Vector3 pelvis = skelGlobal * pelvisTx.Origin;
+        float lW = Mathf.Clamp(plantLeft, 0f, 1f);
+        float rW = Mathf.Clamp(plantRight, 0f, 1f);
+
+        // Continuous plant-weighted midpoint pull when feet are planted.
+        float both = Mathf.Min(lW, rW);
+        if (both > 0.01f && _lockL.Active && _lockR.Active)
+        {
+            Vector3 mid = (_lockL.Anchor * lW + _lockR.Anchor * rW) / Mathf.Max(0.001f, lW + rW);
+            mid.Y = pelvis.Y;
+            Vector3 err = mid - pelvis; err.Y = 0;
+            if (err.Length() > 0.06f) err = err.Normalized() * 0.06f;
+            pelvis += err * (0.20f + 0.25f * both);
+        }
+
+        // Continuous lateral weight shift toward the more planted foot.
+        float diff = lW - rW;
+        if (Mathf.Abs(diff) > 0.01f && _lockL.Active && _lockR.Active)
+        {
+            Vector3 lat = _lockL.Anchor - _lockR.Anchor; lat.Y = 0;
+            if (lat.LengthSquared() > 1e-6f)
+            {
+                lat = lat.Normalized();
+                pelvis += lat * (diff * 0.03f);
+            }
+        }
+
+        // Residual-motion correction: damp sudden pelvis XZ jumps relative to planted feet.
+        if (_hasPrevPelvisPos)
+        {
+            Vector3 vel = pelvis - _prevPelvisPos;
+            vel.Y = 0;
+            float maxStep = 0.035f + 0.02f * (1f - Mathf.Max(lW, rW));
+            if (vel.Length() > maxStep)
+                pelvis -= vel.Normalized() * (vel.Length() - maxStep) * 0.5f;
+        }
+
+        // Soft vertical clamp to keep pelvis grounded.
+        float avgFootY = ((_lockL.Active ? _lockL.Anchor.Y : worldPos.Y) + (_lockR.Active ? _lockR.Anchor.Y : worldPos.Y)) * 0.5f;
+        float targetY = avgFootY + _height * 0.52f;
+        float yErr = Mathf.Clamp(targetY - pelvis.Y, -0.04f, 0.04f);
+        pelvis.Y += yErr * (0.20f + 0.15f * Mathf.Max(lW, rW));
+
+        pelvisTx.Origin = skelInv * pelvis;
+        Skel.SetBoneGlobalPoseOverride(pelvisIdx, pelvisTx, 1f, true);
+        _prevPelvisPos = pelvis;
+        _hasPrevPelvisPos = true;
+    }
+
+
+    /// <summary>The clip's foot orientation (skeleton space) tilted by `amount` of the rotation
+    /// that takes world up onto the ground normal.</summary>
+    private Basis FootBasisOnGround(Basis animated, Vector3 groundNormalWorld, Transform3D skelInv, float amount)
+    {
+        if (groundNormalWorld.LengthSquared() < 1e-6f || groundNormalWorld.Normalized().Dot(Vector3.Up) < .65f || amount <= 0f)
+            return animated;
+        Vector3 up = (skelInv.Basis * Vector3.Up).Normalized();
+        Vector3 n = (skelInv.Basis * groundNormalWorld.Normalized()).Normalized();
+        var tilt = Quaternion.Identity.Slerp(ShortestArc(up, n), Mathf.Clamp(amount, 0f, 1f));
+        return new Basis(tilt) * animated;
+    }
+
+    /// <summary>Give a bone a skeleton-space orientation by setting its pose rotation
+    /// relative to its (already solved) parent; position and scale are kept.</summary>
+    private void SetFootGlobalBasis(int bone, Basis desiredGlobal)
+    {
+        if (Skel == null) return;
+        int parent = Skel.GetBoneParent(bone);
+        Basis parentBasis = parent >= 0 ? Skel.GetBoneGlobalPose(parent).Basis.Orthonormalized() : Basis.Identity;
+        var q = (parentBasis.Inverse() * desiredGlobal.Orthonormalized()).GetRotationQuaternion().Normalized();
+        Skel.SetBonePoseRotation(bone, q);
+    }
+
+    internal void SolveTwoBone(int thigh, int shin, int foot, Vector3 targetSkel, float yaw)
+    {
+        if (Skel == null) return;
+        var hip = Skel.GetBoneGlobalPose(thigh).Origin;
+        // A bone's rest origin is its offset from its parent. The thigh's
+        // length is the shin offset, and the shin's length is the foot offset;
+        // the thigh offset itself is hip width, not an upper-leg segment.
+        // hip/knee/ankle positions and IK targets are all in skeleton space,
+        // so use the corresponding global rest joint distances (not parent-local
+        // offsets that omit inherited rest-bone scale).
+        float l1 = Skel.GetBoneGlobalRest(shin).Origin.DistanceTo(Skel.GetBoneGlobalRest(thigh).Origin);
+        float l2 = Skel.GetBoneGlobalRest(foot).Origin.DistanceTo(Skel.GetBoneGlobalRest(shin).Origin);
+        if (l1 < 0.001f || l2 < 0.001f) return;
+        var toTarget = targetSkel - hip;
+        float targetDist = toTarget.Length();
+        float total = l1 + l2;
+        float minLen = Mathf.Abs(l1 - l2) + 0.002f;
+        float dist = Mathf.Clamp(targetDist, minLen, total * 0.995f);
+        var dir = targetDist > 1e-6f ? toTarget / targetDist : Vector3.Up;
+
         float cosA = (l1 * l1 + dist * dist - l2 * l2) / (2f * l1 * dist);
-        float angA = Mathf.Acos(Mathf.Clamp(cosA, -1f, 1f));
-        var fwd = new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw));
+        cosA = Mathf.Clamp(cosA, -1f, 1f);
+        float angA = Mathf.Acos(cosA);
+
+        var fwdWorld = new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw));
+        var fwd = (Skel.GlobalTransform.Basis.Inverse() * fwdWorld).Normalized();
         var axis = dir.Cross(fwd);
-        if (axis.LengthSquared() < 1e-6f) axis = Vector3.Up;
+        if (axis.LengthSquared() < 1e-6f) axis = Vector3.Right;
         axis = axis.Normalized();
         var kneeDir = dir.Rotated(axis, angA);
         var knee = hip + kneeDir * l1;
-        var thighQuat = ShortestArc(b.ThighRest.Normalized(), kneeDir);
-        var shinDir = (targetWorld - knee).Normalized();
-        var shinQuat = ShortestArc(b.ShinRest.Normalized(), shinDir);
-        Skel.SetBonePoseRotation(b.Thigh, thighQuat);
-        Skel.SetBonePoseRotation(b.Shin, shinQuat);
+        var end = hip + dir * dist;
+
+        // Hypermotion-style knee clamp: prevent hyperextension / impossible folds.
+        Vector3 upper = knee - hip;
+        Vector3 lower = end - knee;
+        if (upper.LengthSquared() > 1e-8f && lower.LengthSquared() > 1e-8f)
+        {
+            float cosK = Mathf.Clamp(upper.Normalized().Dot((-lower).Normalized()), -1f, 1f);
+            float kneeDeg = Mathf.RadToDeg(Mathf.Acos(cosK));
+            float clampedDeg = Mathf.Clamp(kneeDeg, 8f, 155f);
+            if (Mathf.Abs(clampedDeg - kneeDeg) > 0.5f)
+            {
+                float targetRad = Mathf.DegToRad(clampedDeg);
+                float proj = (l1 * l1 - l2 * l2 + dist * dist) / (2f * dist);
+                float h = Mathf.Sqrt(Mathf.Max(0.0001f, l1 * l1 - proj * proj));
+                Vector3 bendDir = (knee - (hip + dir * proj));
+                if (bendDir.LengthSquared() < 1e-8f) bendDir = axis;
+                bendDir = bendDir.Normalized();
+                knee = hip + dir * proj + bendDir * h;
+                Vector3 nu = knee - hip;
+                if (nu.LengthSquared() > 1e-8f) knee = hip + nu.Normalized() * l1;
+                Vector3 nl = end - knee;
+                if (nl.LengthSquared() > 1e-8f) end = knee + nl.Normalized() * l2;
+            }
+        }
+
+        // Rotate the currently animated segment toward the solved direction.
+        // The delta is computed in the parent's coordinates and composed with
+        // the authored local rotation, preserving its twist and bone rest axes.
+        RotateSegmentToward(thigh, shin, knee - hip);
+        Skel.ForceUpdateAllBoneTransforms();
+        Vector3 solvedKnee = Skel.GetBoneGlobalPose(shin).Origin;
+        RotateSegmentToward(shin, foot, end - solvedKnee);
+        Skel.ForceUpdateAllBoneTransforms();
+    }
+
+    private void RotateSegmentToward(int bone, int child, Vector3 targetDirection)
+    {
+        if (Skel == null || targetDirection.LengthSquared() < 1e-8f) return;
+        var bonePose = Skel.GetBoneGlobalPose(bone);
+        Vector3 current = Skel.GetBoneGlobalPose(child).Origin - bonePose.Origin;
+        if (current.LengthSquared() < 1e-8f) return;
+        int parent = Skel.GetBoneParent(bone);
+        Basis parentBasis = parent >= 0
+            ? Skel.GetBoneGlobalPose(parent).Basis.Orthonormalized()
+            : Basis.Identity;
+        Vector3 from = (parentBasis.Inverse() * current).Normalized();
+        Vector3 to = (parentBasis.Inverse() * targetDirection).Normalized();
+        Quaternion deltaInParent = ShortestArc(from, to);
+
+        // Godot's pose rotation is already local to this bone with respect
+        // to its parent. The swing is expressed in that same parent frame;
+        // conjugating it by the rest basis rotates the correction into the
+        // wrong frame and prevents the ankle from following the solved target.
+        Skel.SetBonePoseRotation(bone,
+            (deltaInParent * Skel.GetBonePoseRotation(bone)).Normalized());
     }
 
     private static Quaternion ShortestArc(Vector3 from, Vector3 to)
@@ -1079,22 +1746,22 @@ public sealed partial class SoccerClipRig : Node3D
     private void ApplyLookAndReach()
     {
         if (!_bones.TryGetValue("L", out var b)) return;
-        if (b.Neck >= 0 && b.Head >= 0)
+        if (b.Neck >= 0 && b.Head >= 0 && (Mathf.Abs(_lookYaw) > .001f || Mathf.Abs(_lookPitch) > .001f))
         {
             var neckQ = new Quaternion(Vector3.Up, _lookYaw) *
                         new Quaternion(Vector3.Right, _lookPitch);
-            Skel.SetBonePoseRotation(b.Neck, neckQ);
+            Skel.SetBonePoseRotation(b.Neck, (neckQ * Skel.GetBonePoseRotation(b.Neck)).Normalized());
             var headQ = new Quaternion(Vector3.Up, _lookYaw * .5f) *
                         new Quaternion(Vector3.Right, _lookPitch * .5f);
-            Skel.SetBonePoseRotation(b.Head, headQ);
+            Skel.SetBonePoseRotation(b.Head, (headQ * Skel.GetBonePoseRotation(b.Head)).Normalized());
         }
         if (_reach > .01f)
         {
             var armQ = new Quaternion(Vector3.Right, -_reach * 1.1f);
-            if (b.UpperArmR >= 0) Skel.SetBonePoseRotation(b.UpperArmR, armQ);
+            if (b.UpperArmR >= 0) Skel.SetBonePoseRotation(b.UpperArmR, (armQ * Skel.GetBonePoseRotation(b.UpperArmR)).Normalized());
             if (b.LowerArmR >= 0)
                 Skel.SetBonePoseRotation(b.LowerArmR,
-                    new Quaternion(Vector3.Right, -_reach * .4f));
+                    (new Quaternion(Vector3.Right, -_reach * .4f) * Skel.GetBonePoseRotation(b.LowerArmR)).Normalized());
         }
     }
 
