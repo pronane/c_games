@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-d066-768f-92df-3494dc7ba8c2",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871068993,
+ "finished_at": 1795871085104,
+ "prompt": "A professional football (soccer) player takes a powerful free kick: long straight run-up and hits the ball hard with the laces.",
+ "duration": 3.5,
+ "mode": "swift"
+}

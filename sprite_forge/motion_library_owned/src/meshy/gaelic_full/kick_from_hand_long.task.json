@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-58e0-73d6-91ad-9bd2490219d8",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870645157,
+ "finished_at": 1795870661784,
+ "prompt": "A Gaelic football player kicks a long ball from the hands up the field: run-up, drops the ball, big punt.",
+ "duration": 3.0,
+ "mode": "swift"
+}

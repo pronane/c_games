@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-d741-7455-954e-74ce81151d43",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871070558,
+ "finished_at": 1795871083556,
+ "prompt": "A professional football (soccer) player takes a stuttering penalty run-up with a pause and then side-foots the ball.",
+ "duration": 3.5,
+ "mode": "swift"
+}

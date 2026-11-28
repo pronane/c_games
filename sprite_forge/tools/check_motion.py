@@ -111,7 +111,7 @@ def check_clip(rec, name=None):
     h = float(np.median(head_up)) + 0.25                      # head bone to the top of the head
     # size: from the standing frames (a fall lies down)
     stand = float(np.percentile(head_up, 90)) + 0.25
-    seated = any(re.search(r"sit|seat|drive|kart|kneel|crawl|crouch", str(x or "").lower())
+    seated = any(re.search(r"sit|seat|drive|kart|kneel|crawl|crouch|lying", str(x or "").lower())
                  for x in (name, rec.get("name"), rec.get("from_motion"), rec.get("category")))
     res.append(("size", (0.7 if seated else 1.2) <= stand <= 2.1, "feet to head %.2f m%s" % (stand, " (seated)" if seated else "")))
     # floor

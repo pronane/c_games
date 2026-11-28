@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-4219-7495-a774-3969163dbcf8",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870967054,
+ "finished_at": 1795870984586,
+ "prompt": "A professional football (soccer) player heads the ball backwards over the head, leaning back.",
+ "duration": 2.0,
+ "mode": "swift"
+}

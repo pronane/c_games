@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-bc21-72ec-b4a8-6f5026f974e4",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871195594,
+ "finished_at": 1795871204758,
+ "prompt": "A professional football (soccer) player does a backflip in celebration.",
+ "duration": 2.5,
+ "mode": "swift"
+}

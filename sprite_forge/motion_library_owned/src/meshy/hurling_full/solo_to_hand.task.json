@@ -1,0 +1,10 @@
+{
+ "id": "01a22239-95c2-704a-b78d-60761a12122b",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870529614,
+ "finished_at": 1795870551796,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand, running, taps the ball up off the flat of the stick into the open left hand and catches it.",
+ "duration": 2.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-8d47-7525-a057-d76111bd2166",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871117369,
+ "finished_at": 1795871127451,
+ "prompt": "A professional football (soccer) player stands over a free kick, hands on hips, staring at the goal, taking deep breaths.",
+ "duration": 3.0,
+ "mode": "swift"
+}

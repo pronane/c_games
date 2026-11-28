@@ -1,0 +1,10 @@
+{
+ "id": "01a2223a-0a1d-741c-ba84-a91c66762ee9",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870559515,
+ "finished_at": 1795870581498,
+ "prompt": "A Gaelic football player runs on a treadmill, facing straight ahead, bouncing the round ball on the ground with one hand and catching it again, the same cycle over and over.",
+ "duration": 3.0,
+ "mode": "swift"
+}

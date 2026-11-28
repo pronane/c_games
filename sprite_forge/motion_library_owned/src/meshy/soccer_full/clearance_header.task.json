@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-dc8c-75f4-a30f-aa9bf3515130",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870941029,
+ "finished_at": 1795870953296,
+ "prompt": "A professional football (soccer) player jumps and heads the ball away high and far, defensive header.",
+ "duration": 2.0,
+ "mode": "swift"
+}

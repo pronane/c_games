@@ -1,0 +1,10 @@
+{
+ "id": "01a2223a-ad1c-7345-8e21-5a3ce2ac6655",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870601506,
+ "finished_at": 1795870621730,
+ "prompt": "A professional football (soccer) player whips in a cross from the wing: approaches at an angle, wraps the right foot around the ball with a big swing across the body.",
+ "duration": 2.5,
+ "mode": "swift"
+}

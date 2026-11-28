@@ -62,8 +62,17 @@ def main():
     try:
         import soccer_motions as SM
         check("motion library validates", SM.validate() == [], str(SM.validate()))
-        check("333 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner + 25 own match video + 126 SoccerTrack + 21 100STYLE)", len(SM.ALL_CLIPS) == 333, str(len(SM.ALL_CLIPS)))
-        check("98 action aliases", len(SM.ACTION_ALIASES) == 98, str(len(SM.ACTION_ALIASES)))
+        nmz = len(SM.MESHY_CLIPS)          # v11.42: Meshy Text to Motion clips (161 when sprite_forge has them all)
+        check("333 soccer clips (71 + 15 Sprite Forge field-sport + 19 CMU + 56 SkillCorner + 25 own match video + 126 SoccerTrack + 21 100STYLE) + %d Meshy" % nmz,
+              len(SM.ALL_CLIPS) == 333 + nmz and nmz in (0, 161), str(len(SM.ALL_CLIPS)))
+        check("98 action aliases + one per Meshy move without an action (%d)" % (len(SM.ACTION_ALIASES) - 98),
+              len(SM.BASE_ACTIONS) == 98 and len(SM.ACTION_ALIASES) == 98 + len(SM.MESHY_NEW_ACTIONS)
+              and all(SM.ACTION_ALIASES[a].startswith("soccer_mz_") for a in SM.MESHY_NEW_ACTIONS),
+              str(len(SM.ACTION_ALIASES)))
+        check("v11.42: every Meshy-backed action plays a Meshy clip, locomotion keeps its clips",
+              all(SM.ACTION_ALIASES[a].startswith("soccer_mz_") for a in SM.MESHY_ACTIONS if "soccer_mz_" + SM.MESHY_ACTIONS[a] in SM.MESHY_CLIPS)
+              and not any(SM.ACTION_ALIASES[a].startswith("soccer_mz_") for a in SM.MESHY_REJECTED)
+              and all(not SM.ACTION_ALIASES[a].startswith("soccer_mz_") for a in ("idle", "walk", "jog", "run", "sprint", "dribble")))
         core_actions = ["idle", "run", "kick", "tackle", "slide", "dive", "catch", "foul", "celebrate"]
         check("match-engine actions all aliased",
               all(a in SM.ACTION_ALIASES for a in core_actions),
@@ -116,7 +125,8 @@ def main():
         arena_bones = [b["n"] for b in arena["bones"]]
         check("GLB skeleton is Arena's 18 bones", joints == arena_bones, str(joints))
         anims = [a["name"] for a in j.get("animations", [])]
-        check("GLB carries 354 clips (333 soccer + 12 officials signals + 9 pitch-side)", len(anims) == 354, str(len(anims)))
+        check("GLB carries 354 clips (333 soccer + 12 officials signals + 9 pitch-side) + the Meshy clips",
+              len(anims) in (354, 354 + 161), str(len(anims)))
         check("every clip animates every bone",
               all(len(a["channels"]) >= 18 for a in j["animations"]),
               str(min(len(a["channels"]) for a in j["animations"])))

@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-e04d-755b-bdd0-edfe75864ef4",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870942259,
+ "finished_at": 1795870953152,
+ "prompt": "A professional football (soccer) player stands in the way of an attacker, arms tucked behind the back, side-on, to block.",
+ "duration": 2.0,
+ "mode": "swift"
+}

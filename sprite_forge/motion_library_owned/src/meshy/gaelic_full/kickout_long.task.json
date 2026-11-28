@@ -1,0 +1,10 @@
+{
+ "id": "01a2229b-2c4e-7793-ad01-ef33f98df31b",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795876925239,
+ "finished_at": 1795876945114,
+ "prompt": "A Gaelic football player is a goalkeeper taking a long kickout off the tee: long run-up and big kick high up the field.",
+ "duration": 3.5,
+ "mode": "prime"
+}

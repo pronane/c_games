@@ -1,0 +1,1189 @@
+{
+ "pack": "soccer_full",
+ "base": "soccer",
+ "also_packs": [
+  "soccer"
+ ],
+ "label": "Soccer - full move catalogue",
+ "description": "Every move a modern football game needs: locomotion, first touch, every pass and shot type, 30+ skill moves, defending, aerial duels, goalkeeping, set pieces, reactions and celebrations.",
+ "mode": "swift",
+ "clip_prefix": "mz_soccer_",
+ "notes": "Move catalogue for Meshy Text to Motion. forge.py meshy motion --pack soccer_full generates the clips; forge.py meshy pack --pack soccer_full writes game_packs/soccer_full.json.",
+ "moves": {
+  "jog": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "run",
+   "prompt": "A professional football (soccer) player jogs on a treadmill at an easy pace, facing straight ahead, relaxed arms, the same cycle over and over. No turning."
+  },
+  "sprint": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "run",
+   "prompt": "A professional football (soccer) player sprints on a treadmill flat out, facing straight ahead, long strides, arms pumping, the same cycle over and over. No turning."
+  },
+  "dribble": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "run",
+   "prompt": "A professional football (soccer) player dribbles on a treadmill, facing straight ahead, jogging with short steps and tapping an imaginary ball forward with the inside and outside of the right foot every two strides, the same cycle over and over."
+  },
+  "sprint_dribble": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "run",
+   "prompt": "A professional football (soccer) player runs fast on a treadmill, facing straight ahead, knocking an imaginary ball forward with the laces every few long strides, the same cycle over and over."
+  },
+  "jockey": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player defends by jockeying in place, facing straight ahead the whole time: knees bent, side-on stance, arms out, small shuffle steps left and right and back to the start, the same rhythm over and over. The body never turns.",
+   "no_clip": "two Meshy takes turned 57-63 degrees; the game keeps its own jockey"
+  },
+  "backpedal": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player backpedals on a treadmill, facing straight ahead, quick short steps backwards, arms out for balance, the same cycle over and over."
+  },
+  "strafe_left": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player side-steps to the left on a treadmill, facing straight ahead, quick shuffle steps without crossing the feet, the same cycle over and over."
+  },
+  "strafe_right": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player side-steps to the right on a treadmill, facing straight ahead, quick shuffle steps without crossing the feet, the same cycle over and over."
+  },
+  "turn_180": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player jogging forward, plants the right foot and turns sharply all the way round, then jogs back the way it came.",
+   "mode": "prime"
+  },
+  "decelerate": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player sprinting, slows down over three short braking steps and comes to a balanced stop, knees bent."
+  },
+  "idle_foot_on_ball": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player stands relaxed with the sole of the right foot resting on top of an imaginary ball, glancing around, shifting weight slightly."
+  },
+  "idle_tired": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player stands tired, bent forward with both hands on the knees, breathing hard, shoulders rising and falling."
+  },
+  "shield_ball": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player shields the ball in place, facing the same way the whole time: knees bent, left arm out behind to hold off a defender, small shuffle steps left and right, the same rhythm over and over. The body never turns."
+  },
+  "trap_sole": {
+   "category": "Control",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player stops a rolling ball dead under the sole of the right foot, then looks up."
+  },
+  "trap_inside": {
+   "category": "Control",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player receives a pass with the inside of the right foot, cushioning it so it stops beside the left foot, then looks up."
+  },
+  "chest_control": {
+   "category": "Control",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player controls a dropping ball on the chest: leans back, arms out, takes the ball on the chest and lets it drop to the feet, then traps it."
+  },
+  "thigh_control": {
+   "category": "Control",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player controls a dropping ball on the right thigh: lifts the thigh to cushion the ball, lets it fall, and traps it with the right foot."
+  },
+  "first_touch_turn": {
+   "category": "Control",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player takes the first touch with the outside of the right foot and turns ninety degrees to the right in one movement, then jogs away."
+  },
+  "flick_up": {
+   "category": "Control",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player flicks an imaginary ball up off the ground with the toe of the right foot and catches it on the instep, balancing.",
+   "mode": "prime"
+  },
+  "keepy_uppy": {
+   "category": "Control",
+   "duration": 4.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player juggles a ball in place, keeping it up with alternate feet, small light touches at knee height, arms out for balance."
+  },
+  "cushion_volley": {
+   "category": "Control",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player cushions a falling ball out of the air with the instep of the right foot, bringing it down dead to the ground."
+  },
+  "pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player plays a short ground pass with the inside of the right foot, side-foot, the standing foot beside the ball, short follow-through.",
+   "mode": "prime"
+  },
+  "driven_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player drives a hard low pass with the laces of the right foot, knee over the ball, firm follow-through."
+  },
+  "lofted_pass": {
+   "category": "Passing",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player plays a long lofted pass: two-step approach, leans back slightly and gets under the ball with the right foot, high follow-through.",
+   "mode": "prime"
+  },
+  "through_ball": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player slides a through ball into space with the inside of the right foot, weighted, arm pointing to where the pass goes.",
+   "mode": "prime"
+  },
+  "lobbed_through": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player dinks a lobbed through ball over the defence with a short stabbing chip of the right foot."
+  },
+  "cross_whipped": {
+   "category": "Passing",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player whips in a cross from the wing: approaches at an angle, wraps the right foot around the ball with a big swing across the body.",
+   "mode": "prime"
+  },
+  "cross_low": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player drills a low cross along the ground across the goal with the right foot."
+  },
+  "backheel_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player plays a backheel pass: steps past the ball and flicks it backwards with the heel of the right foot."
+  },
+  "outside_foot_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player passes with the outside of the right foot, a short flick of the ankle, the ball going to the right."
+  },
+  "no_look_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player stands upright, turns the head to look to the left, and at the same time passes the ball to the right with the inside of the right foot."
+  },
+  "header_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player heads a ball down to a team-mate: neck firm, nods the ball forward and down with the forehead."
+  },
+  "flick_on_header": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player jumps and glances a ball backwards with the top of the head as a flick-on."
+  },
+  "chest_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player cushions a ball off the chest straight to a team-mate in front."
+  },
+  "first_time_pass": {
+   "category": "Passing",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player jogging, passes a moving ball first time with the inside of the right foot without stopping."
+  },
+  "shoot": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player shoots: two-step approach, standing foot beside the ball, strikes through it with the laces of the right foot, body over the ball, follow-through."
+  },
+  "power_shot": {
+   "category": "Shooting",
+   "duration": 3.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player hits a power shot: long run-up, big backswing, smashes the ball with the laces, landing on the kicking foot."
+  },
+  "finesse_shot": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player curls a finesse shot: side-on approach, wraps the inside of the right foot around the ball, body opening up, follow-through across the body."
+  },
+  "chip_shot": {
+   "category": "Shooting",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player chips the goalkeeper: short approach, stabs under the ball with the right foot so it lifts gently, little follow-through."
+  },
+  "low_driven_shot": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player drills a low driven shot along the ground, knee over the ball, short sharp follow-through."
+  },
+  "volley": {
+   "category": "Shooting",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player volleys a dropping ball: leans back slightly, swings the right leg through and strikes the ball in the air at knee height.",
+   "mode": "prime"
+  },
+  "half_volley": {
+   "category": "Shooting",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player strikes a half volley, hitting the ball with the laces just as it bounces, body over it."
+  },
+  "side_volley": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player hits a side volley: leans far to the left, the right leg swinging round horizontally at hip height to strike the ball in the air."
+  },
+  "bicycle_kick": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player does an overhead bicycle kick: jumps, falls backwards, scissors the legs and strikes the ball above the head with the right foot, lands on the back and hands."
+  },
+  "scorpion_kick": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player dives forward and flicks the ball with both heels raised up behind the back, landing on the hands."
+  },
+  "rabona": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player strikes the ball with a rabona: the right leg wraps behind the standing left leg to kick the ball."
+  },
+  "trivela": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player strikes with the outside of the right foot, a trivela, the ankle turned in so the ball curls away to the right."
+  },
+  "toe_poke": {
+   "category": "Shooting",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player toe-pokes the ball quickly with a short jab of the right foot."
+  },
+  "tap_in": {
+   "category": "Shooting",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player slides in close to goal and taps the ball in with the inside of the right foot."
+  },
+  "diving_header": {
+   "category": "Shooting",
+   "duration": 3.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player starts standing, takes two running steps, dives forward horizontally to head the ball with arms out, lands on the chest, then gets back up to standing."
+  },
+  "header_shot": {
+   "category": "Shooting",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player jumps and powers a header downwards towards goal, neck snapping forward, eyes open."
+  },
+  "knuckle_shot": {
+   "category": "Shooting",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player strikes a knuckleball shot: straight run-up, stabs the laces through the middle of the ball with almost no follow-through."
+  },
+  "stepover": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does a stepover while dribbling: circles the right foot over the ball from inside to outside, drops the shoulder, then pushes off to the left.",
+   "mode": "prime"
+  },
+  "reverse_stepover": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does a reverse stepover: circles the right foot over the ball from outside to inside, then goes the other way.",
+   "mode": "prime"
+  },
+  "double_stepover": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does two quick stepovers, right foot then left foot, then accelerates to the right.",
+   "mode": "prime"
+  },
+  "body_feint": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player dribbling, feints with the body: drops the left shoulder and leans to the left without touching the ball, then goes right.",
+   "mode": "prime"
+  },
+  "roulette": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does a roulette turn: drags the ball back with the sole of the right foot while spinning round, then drags it again with the left sole, finishing a full turn."
+  },
+  "elastico": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does an elastico: pushes the ball out with the outside of the right foot and snaps it back inside with the inside of the same foot in one quick movement."
+  },
+  "reverse_elastico": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does a reverse elastico: pushes the ball in with the inside of the right foot and snaps it back out with the outside.",
+   "mode": "prime"
+  },
+  "rainbow_flick": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player does a rainbow flick: traps the ball between the heel of the right foot and the toe of the left, flicks it up behind the back and over the head, then runs on."
+  },
+  "drag_back": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player drags the ball back with the sole of the right foot and turns away the other way."
+  },
+  "cruyff_turn": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player does a Cruyff turn: fakes a pass, then drags the ball behind the standing leg with the inside of the right foot and turns away."
+  },
+  "la_croqueta": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player shifts the ball quickly from the right foot to the left foot sideways with two quick inside touches, gliding past a defender."
+  },
+  "ball_roll": {
+   "category": "Skill",
+   "duration": 3.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player stands with the ball in front, lifts the right foot, places the sole on top of the ball and rolls it from right to left across the front of the body, then takes a side step to the left after it, and does it once more.",
+   "mode": "prime"
+  },
+  "heel_chop": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player chops the ball behind the standing leg with the heel of the right foot and changes direction.",
+   "mode": "prime"
+  },
+  "fake_shot": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player shapes to shoot with a big backswing, then stops and drags the ball across instead."
+  },
+  "fake_pass": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player shapes to pass with the inside of the right foot, stops the swing, and goes the other way.",
+   "mode": "prime"
+  },
+  "ball_hop": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player hops with both feet over the ball while standing, feet together, landing on the other side."
+  },
+  "heel_flick": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player flicks the ball forward with the heel of the right foot behind the standing leg."
+  },
+  "scoop_turn": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player scoops the ball back with the inside of the right foot while turning a half circle."
+  },
+  "sombrero_flick": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player flicks the ball up with the toe and over a defender's head, then runs round to collect it.",
+   "mode": "prime"
+  },
+  "berba_spin": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player receives the ball, drags it across with the sole of one foot while spinning round, then pushes it forward with the other foot.",
+   "mode": "prime"
+  },
+  "sole_roll_turn": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player rolls the ball back with the sole and spins a full turn while keeping it under the foot."
+  },
+  "outside_hook": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player hooks the ball with the outside of the right foot to cut sharply to the right."
+  },
+  "inside_hook": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player hooks the ball with the inside of the right foot to cut sharply to the left."
+  },
+  "hesitation_burst": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player dribbling at a jog, hesitates with the sole on the ball for a moment, then suddenly accelerates away into a sprint."
+  },
+  "knock_on_and_run": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player knocks the ball far past a defender with the outside of the foot and sprints round to collect it.",
+   "mode": "prime"
+  },
+  "lane_change": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player dribbling, shifts the ball sideways one stride with the outside of the foot to change lane, then keeps running."
+  },
+  "tornado_spin": {
+   "category": "Skill",
+   "duration": 2.5,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player spins a full turn over the ball with a quick drag and flick, ending facing forward again."
+  },
+  "behind_leg_turn": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player passes the ball behind the standing leg with the inside of the right foot to turn left."
+  },
+  "heel_to_heel": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player flicks the ball with the heel of one foot onto the heel of the other foot, sending it forward.",
+   "mode": "prime"
+  },
+  "rabona_fake": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player fakes a rabona: swings the right leg behind the left, then stops and pulls the ball away."
+  },
+  "flair_pass": {
+   "category": "Skill",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player plays a flashy pass with the heel, flicking the ball sideways."
+  },
+  "tackle": {
+   "category": "Defending",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player jogs in and makes a block tackle: plants the left foot and throws the right leg forward along the ground, knee bent, the inside of the right foot facing forward to block the ball, upper body low over the front knee, arms out wide, then pushes back up to standing.",
+   "mode": "prime"
+  },
+  "slide_tackle": {
+   "category": "Defending",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player makes a slide tackle: runs and slides along the ground on the left side, the right leg extended to win the ball, then gets up.",
+   "mode": "prime"
+  },
+  "poke_tackle": {
+   "category": "Defending",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player in a defending stance takes one long step to the side and stretches the right leg straight out along the ground, reaching as far as possible with the toe to poke the ball away, body leaning the other way, arms out, then recovers.",
+   "mode": "prime"
+  },
+  "block_shot": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player blocks a shot: throws the body in front, turns side-on, arms tucked behind the back, the leg stretched out.",
+   "mode": "prime"
+  },
+  "shoulder_challenge": {
+   "category": "Defending",
+   "duration": 2.5,
+   "loop": false,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player stands side-on with feet wide, bends the knees and drives the left shoulder sideways into an opponent with a short strong push of the legs, staying on the feet, arms tucked in, then steps back.",
+   "mode": "prime"
+  },
+  "interception": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "run",
+   "prompt": "A professional football (soccer) player stretches out a leg to intercept a pass, lunging to the side."
+  },
+  "clearance_kick": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player clears the ball: big hoof with the right foot, ball going high and far."
+  },
+  "clearance_header": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player jumps and heads the ball away high and far, defensive header."
+  },
+  "standing_block": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player stands in the way of an attacker, arms tucked behind the back, side-on, to block."
+  },
+  "push_fight": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player grapples with an opponent at a corner, arms tangling, jostling for position."
+  },
+  "lunge_challenge": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player lunges in with a long stretching step to win the ball."
+  },
+  "track_back": {
+   "category": "Defending",
+   "duration": 2.0,
+   "loop": true,
+   "library": "run",
+   "prompt": "A professional football (soccer) player sprints back on a treadmill tracking back, facing straight ahead, looking over the shoulder."
+  },
+  "header_jump": {
+   "category": "Aerial",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player jumps for a header: bends both knees, swings both arms up and springs high off both feet, at the top of the jump arches the back and snaps the head and neck forward hard to head the ball, then lands on both feet with bent knees.",
+   "mode": "prime"
+  },
+  "header_standing": {
+   "category": "Aerial",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player heads a ball standing, neck snapping forward, both feet on the ground."
+  },
+  "leap_chest_control": {
+   "category": "Aerial",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player jumps to bring a high ball down on the chest, then lands and traps it."
+  },
+  "backward_header": {
+   "category": "Aerial",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player heads the ball backwards over the head, leaning back."
+  },
+  "gk_ready": {
+   "category": "Goalkeeper",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player is a goalkeeper in the ready stance: knees bent, weight on the balls of the feet, hands out in front, bouncing lightly."
+  },
+  "gk_shuffle": {
+   "category": "Goalkeeper",
+   "duration": 3.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player is a goalkeeper shuffling sideways across the goal in the ready stance, hands out, small quick steps, the same rhythm over and over."
+  },
+  "gk_dive_low_left": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "dive_left",
+   "prompt": "A professional football (soccer) player is a goalkeeper diving low to the left to save a shot along the ground, arms stretched to the side, lands on the side.",
+   "mode": "prime"
+  },
+  "gk_dive_low_right": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "dive_right",
+   "prompt": "A professional football (soccer) player is a goalkeeper who dives low to the right: pushes off the left foot and throws the whole body sideways to the ground, landing flat on the right side with both arms stretched out along the grass."
+  },
+  "gk_dive_high_left": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "dive_left",
+   "prompt": "A professional football (soccer) player is a goalkeeper diving high to the left, the body flying horizontally, both arms stretched above to save, lands on the side."
+  },
+  "gk_dive_high_right": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "dive_right",
+   "prompt": "A professional football (soccer) player is a goalkeeper diving high to the right, the body flying horizontally, both arms stretched above to save, lands on the side."
+  },
+  "gk_tip_over": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player is a goalkeeper leaping backwards to tip a ball over the crossbar with the fingertips of one hand."
+  },
+  "gk_parry": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A professional football (soccer) player is a goalkeeper parrying a hard shot away to the side with both palms."
+  },
+  "gk_catch_chest": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A professional football (soccer) player is a goalkeeper catching a shot at the chest, both arms wrapping around the ball."
+  },
+  "gk_catch_high": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player is a goalkeeper jumping off one leg, knee up, to catch a high cross above the head."
+  },
+  "gk_punch": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player is a goalkeeper jumping and punching a cross away with both fists."
+  },
+  "gk_collect_low": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A professional football (soccer) player is a goalkeeper standing upright who bends down, scoops a low ball into the chest with both hands, then stands upright again holding it.",
+   "mode": "prime"
+  },
+  "gk_smother": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A professional football (soccer) player is a goalkeeper diving at an attacker's feet to smother the ball, body spread along the ground."
+  },
+  "gk_spread": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A professional football (soccer) player is a goalkeeper in a one-on-one, rushing out and spreading the body wide with one knee down and arms out."
+  },
+  "gk_goal_kick": {
+   "category": "Goalkeeper",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player is a goalkeeper taking a goal kick: long approach, big kick of a ball on the ground.",
+   "mode": "prime"
+  },
+  "gk_drop_kick": {
+   "category": "Goalkeeper",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player is a goalkeeper drop-kicking the ball from the hands up the field."
+  },
+  "gk_throw_overarm": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "throw",
+   "prompt": "A professional football (soccer) player is a goalkeeper throwing the ball long overarm, the arm swinging over like a bowler."
+  },
+  "gk_roll_out": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "throw",
+   "prompt": "A professional football (soccer) player is a goalkeeper who starts standing upright holding the ball, steps forward, bends low and rolls the ball out underarm, then stands upright again."
+  },
+  "gk_get_up": {
+   "category": "Goalkeeper",
+   "duration": 4.0,
+   "loop": false,
+   "library": "get_up",
+   "reuse": "mz_soccer_get_up"
+  },
+  "gk_penalty_ready": {
+   "category": "Goalkeeper",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player is a goalkeeper on the goal line facing a penalty, waving the arms, bouncing side to side."
+  },
+  "throw_in": {
+   "category": "Set piece",
+   "duration": 2.5,
+   "loop": false,
+   "library": "throw",
+   "prompt": "A professional football (soccer) player takes a throw-in: both hands hold the ball behind the head, both feet on the ground, throws it forward."
+  },
+  "long_throw": {
+   "category": "Set piece",
+   "duration": 3.0,
+   "loop": false,
+   "library": "throw",
+   "prompt": "A professional football (soccer) player takes a long throw-in with a run-up, arching back and hurling the ball forward with both hands over the head."
+  },
+  "corner_kick": {
+   "category": "Set piece",
+   "duration": 3.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player takes a corner: a few steps of run-up at an angle, whips the ball in with the right foot.",
+   "mode": "prime"
+  },
+  "free_kick_curl": {
+   "category": "Set piece",
+   "duration": 4.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player takes a free kick: stands still behind the ball, then three steps of run-up at an angle, plants the left foot beside the ball and swings the right leg hard across the body, striking with the inside of the foot; the kicking leg follows through high across the body to hip height, arms out wide, then lands on the right foot.",
+   "mode": "prime"
+  },
+  "free_kick_power": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player takes a powerful free kick: long straight run-up and hits the ball hard with the laces."
+  },
+  "penalty_kick": {
+   "category": "Set piece",
+   "duration": 4.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player takes a penalty: stands still, takes four quick run-up steps, plants the left foot hard beside the ball and swings the right leg through powerfully, the knee over the ball; the kicking leg follows through forward to waist height and the player lands on the right foot, body leaning forward.",
+   "mode": "prime"
+  },
+  "penalty_stutter": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player takes a stuttering penalty run-up with a pause and then side-foots the ball."
+  },
+  "wall_jump": {
+   "category": "Set piece",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player stands in a defensive wall, hands covering the groin, then jumps straight up together."
+  },
+  "kick_off": {
+   "category": "Set piece",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player takes the kick-off: taps the ball forward to a team-mate."
+  },
+  "free_kick_stance": {
+   "category": "Set piece",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player stands over a free kick, hands on hips, staring at the goal, taking deep breaths."
+  },
+  "fall_tripped": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "fall",
+   "prompt": "A professional football (soccer) player running, is tripped from behind, falls forward onto the chest with arms out."
+  },
+  "fall_pushed": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "fall",
+   "prompt": "A professional football (soccer) player stands upright for a moment, is pushed hard in the back, stumbles forward two steps and falls flat onto the chest, arms out."
+  },
+  "dive_simulation": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "fall",
+   "prompt": "A professional football (soccer) player dives dramatically, throwing arms up and falling to the ground holding the shin."
+  },
+  "get_up": {
+   "category": "Reaction",
+   "duration": 3.5,
+   "loop": false,
+   "library": "get_up",
+   "prompt": "A professional football (soccer) player lying face down on the ground, pushes up and gets back on the feet, stands upright."
+  },
+  "stumble": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hit",
+   "prompt": "A professional football (soccer) player is shoved hard in the chest from the front: the upper body jolts backwards, takes two staggering steps backwards, arms flailing, then steadies."
+  },
+  "injured_lying": {
+   "category": "Reaction",
+   "duration": 4.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player lies on the back on the ground holding the right knee with both hands, rolling slowly from side to side in pain."
+  },
+  "limp": {
+   "category": "Reaction",
+   "duration": 3.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A professional football (soccer) player limps on a treadmill, facing straight ahead, favouring the right leg, the same cycle over and over."
+  },
+  "hands_on_head": {
+   "category": "Reaction",
+   "duration": 2.5,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player misses a chance and puts both hands on the head in frustration, looking up."
+  },
+  "appeal": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player appeals to the referee with one arm raised high, palm open."
+  },
+  "argue_referee": {
+   "category": "Reaction",
+   "duration": 3.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player argues with the referee: arms out wide, palms up, shaking the head."
+  },
+  "applaud": {
+   "category": "Reaction",
+   "duration": 3.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player applauds the fans, clapping the hands above the head while turning."
+  },
+  "high_five": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player high fives a team-mate with the right hand."
+  },
+  "handshake": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player shakes hands with an opponent."
+  },
+  "frustrated_kick_air": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A professional football (soccer) player kicks at the air in frustration."
+  },
+  "disappointed_kneel": {
+   "category": "Reaction",
+   "duration": 3.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player stands, then sinks down onto both knees with the shins flat on the ground, sits back on the heels, head bowed, disappointed.",
+   "no_clip": "Meshy's kneel leaves the ankles 23 cm up"
+  },
+  "point_to_teammate": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player points at a team-mate, acknowledging a great pass."
+  },
+  "call_for_ball": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player raises one arm and calls for the ball, waving."
+  },
+  "organise_defence": {
+   "category": "Reaction",
+   "duration": 3.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A professional football (soccer) player directs team-mates, pointing and waving the arms to organise the defence."
+  },
+  "celebrate": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player celebrates a goal: runs a few steps and jumps, punching the air with both fists."
+  },
+  "knee_slide": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player celebrates by running and sliding on both knees with the arms outstretched.",
+   "mode": "prime"
+  },
+  "aeroplane": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player celebrates by running with both arms spread out like an aeroplane wing, banking side to side."
+  },
+  "fist_pump": {
+   "category": "Celebration",
+   "duration": 2.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player clenches the fist and pumps it hard in celebration."
+  },
+  "point_to_sky": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player points both index fingers up at the sky."
+  },
+  "cup_ear": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player cups a hand behind the ear towards the crowd."
+  },
+  "shush": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player puts a finger on the lips to shush the crowd."
+  },
+  "jump_spin": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player jumps high and spins in the air, landing with arms wide."
+  },
+  "backflip": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player does a backflip in celebration."
+  },
+  "cartwheel": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A professional football (soccer) player does a cartwheel in celebration."
+  },
+  "heart_hands": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player makes a heart shape with the hands towards the crowd."
+  },
+  "salute": {
+   "category": "Celebration",
+   "duration": 2.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player stands to attention and salutes."
+  },
+  "dance": {
+   "category": "Celebration",
+   "duration": 4.0,
+   "loop": true,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player does a celebration dance, stepping side to side, hips moving, arms swinging."
+  },
+  "team_huddle": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player jumps up and down with arms around imaginary team-mates' shoulders."
+  },
+  "shirt_kiss": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player kisses the badge on the shirt, holding it out with both hands."
+  },
+  "arms_wide": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A professional football (soccer) player stands still with arms stretched wide, chest out, soaking up the cheers."
+  }
+ }
+}

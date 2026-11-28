@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-7610-7603-9b87-a0315e99783f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870980320,
+ "finished_at": 1795870989455,
+ "prompt": "A professional football (soccer) player is a goalkeeper diving low to the left to save a shot along the ground, arms stretched to the side, lands on the side.",
+ "duration": 2.0,
+ "mode": "swift"
+}

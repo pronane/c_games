@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-86c1-7681-b74f-33f4f3408100",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871050613,
+ "finished_at": 1795871062569,
+ "prompt": "A professional football (soccer) player takes a throw-in: both hands hold the ball behind the head, both feet on the ground, throws it forward.",
+ "duration": 2.5,
+ "mode": "swift"
+}

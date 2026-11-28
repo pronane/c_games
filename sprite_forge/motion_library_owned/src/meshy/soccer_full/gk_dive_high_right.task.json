@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-ef9b-7610-b5ef-ec37b3a8c2c0",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871011470,
+ "finished_at": 1795871021730,
+ "prompt": "A professional football (soccer) player is a goalkeeper diving high to the right, the body flying horizontally, both arms stretched above to save, lands on the side.",
+ "duration": 2.0,
+ "mode": "swift"
+}

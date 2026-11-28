@@ -1,0 +1,10 @@
+{
+ "id": "01a2229c-d2f2-73b6-991a-a2499062890b",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795877033405,
+ "finished_at": 1795877080284,
+ "prompt": "A professional football (soccer) player does a reverse stepover: circles the right foot over the ball from outside to inside, then goes the other way.",
+ "duration": 2.0,
+ "mode": "prime"
+}

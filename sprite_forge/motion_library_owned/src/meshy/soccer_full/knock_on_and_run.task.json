@@ -1,0 +1,10 @@
+{
+ "id": "01a222a1-6f97-74dc-8fae-f2f1adb6135a",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795877335692,
+ "finished_at": 1795877353800,
+ "prompt": "A professional football (soccer) player knocks the ball far past a defender with the outside of the foot and sprints round to collect it.",
+ "duration": 2.5,
+ "mode": "prime"
+}

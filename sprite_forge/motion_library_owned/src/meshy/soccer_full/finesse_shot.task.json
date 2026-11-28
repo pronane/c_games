@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-9f48-76cd-9feb-b793be232007",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870663313,
+ "finished_at": 1795870682649,
+ "prompt": "A professional football (soccer) player curls a finesse shot: side-on approach, wraps the inside of the right foot around the ball, body opening up, follow-through across the body.",
+ "duration": 2.5,
+ "mode": "swift"
+}

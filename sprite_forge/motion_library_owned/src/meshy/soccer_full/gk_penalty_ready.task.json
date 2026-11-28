@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-7d15-7467-8ae1-191e07831bbd",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871047710,
+ "finished_at": 1795871054877,
+ "prompt": "A professional football (soccer) player is a goalkeeper on the goal line facing a penalty, waving the arms, bouncing side to side.",
+ "duration": 3.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a2223e-17d2-739e-8c35-6c0e127d80ee",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870825392,
+ "finished_at": 1795870834518,
+ "prompt": "A Gaelic football player catches a long kick cleanly, then raises one arm to call a mark and stands still holding the ball.",
+ "duration": 3.0,
+ "mode": "swift"
+}

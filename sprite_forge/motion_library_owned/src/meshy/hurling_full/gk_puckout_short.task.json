@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-9050-76e5-8c94-31ab5a0ba32a",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870921611,
+ "finished_at": 1795870933782,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper hitting a short puckout to a nearby team-mate with a soft swing.",
+ "duration": 2.5,
+ "mode": "swift"
+}

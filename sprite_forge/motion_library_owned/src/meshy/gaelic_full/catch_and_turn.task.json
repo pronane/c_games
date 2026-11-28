@@ -1,0 +1,10 @@
+{
+ "id": "01a2223d-4c85-728b-b9d4-f1a940614e9a",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870773034,
+ "finished_at": 1795870790966,
+ "prompt": "A Gaelic football player catches a ball at the chest, and in one movement turns to face the goal.",
+ "duration": 2.5,
+ "mode": "swift"
+}

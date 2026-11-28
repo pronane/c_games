@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-4f90-765c-9d70-4e71abec03c1",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871101613,
+ "finished_at": 1795871111124,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand pumps the free fist in celebration.",
+ "duration": 2.0,
+ "mode": "swift"
+}

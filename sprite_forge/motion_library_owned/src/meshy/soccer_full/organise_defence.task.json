@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-0008-72ee-aa34-a2a392a9cb11",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871146668,
+ "finished_at": 1795871153685,
+ "prompt": "A professional football (soccer) player directs team-mates, pointing and waving the arms to organise the defence.",
+ "duration": 3.0,
+ "mode": "swift"
+}

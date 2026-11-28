@@ -1,0 +1,10 @@
+{
+ "id": "01a22238-4ed9-7522-81f3-13683231785e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870446448,
+ "finished_at": 1795870454397,
+ "prompt": "A professional football (soccer) player sprints on a treadmill flat out, facing straight ahead, long strides, arms pumping, the same cycle over and over. No turning.",
+ "duration": 2.0,
+ "mode": "swift"
+}

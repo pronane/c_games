@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-0bd0-7757-8a5e-11f819189891",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870953105,
+ "finished_at": 1795870967898,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands reaches in and knocks the ball off an opponent's stick while running beside them.",
+ "duration": 2.0,
+ "mode": "swift"
+}

@@ -12,6 +12,7 @@
 #include "motion_cache.h"
 #include "action_motion.h"
 #include "release_visual.h"
+#include "meshy_clips.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,7 +62,10 @@ enum { C_RUN, C_DROP_KICK, C_CATCH, C_IDLE, C_KICK_RUN, C_HAND_PASS, C_KICK_OUT,
        /* v3 clips */
        C_KICK_PLACE, C_HOOK, C_HEAD_HIT, C_HIT_REACT, C_KNOCKED_DOWN, C_TRIP, C_STUMBLE,
        C_PUSHED, C_TACKLE_REACH, C_CELEBRATE, C_JOG, C_SIDESTEP, C_TOE_LIFT, C_SOLO_LEFT,
-       C_KEEPER_HIGH_CATCH, C_KEEPER_SCOOP, C_KEEPER_IDLE, C_COUNT };
+       C_KEEPER_HIGH_CATCH, C_KEEPER_SCOOP, C_KEEPER_IDLE,
+       /* v11.42: optional slots for the Meshy clips in meshy_clips.h (names filled by initClipNames) */
+       C_MZ_0, C_MZ_LAST = C_MZ_0 + 15, C_COUNT };
+#define C_REQUIRED C_MZ_0     /* clips the player must have; the Meshy slots are optional */
 static const char *CLIP_NAMES[C_COUNT] = {
     "run", "drop_kick", "catch", "idle", "kick_run", "hand_pass", "kick_out", "solo",
     "dive_roll", "keeper_ready", "dive_high", "get_up", "run_ball", "dive_save", "pickup",
@@ -112,6 +116,27 @@ static Model model;
 static ModelAnimation *anims;
 static int animCount;
 static int clipIdx[C_COUNT];
+static int useMeshy = 1;      /* --no-meshy: keep the original clips for every action */
+static void initClipNames(void)
+{
+    for (int k = C_MZ_0; k < C_COUNT; k++) {
+        int i = k - C_MZ_0;
+        CLIP_NAMES[k] = (i < MESHY_ACTION_COUNT) ? MESHY_ACTIONS[i].clip : "";
+    }
+}
+/* Point each action in meshy_clips.h at its Meshy clip when the player has it (else keep the original). */
+static int applyMeshyActions(void)
+{
+    int n = 0;
+    if (!useMeshy) return 0;
+    for (int i = 0; i < MESHY_ACTION_COUNT && C_MZ_0 + i < C_COUNT; i++) {
+        const MeshyAction *m = &MESHY_ACTIONS[i];
+        if (clipIdx[C_MZ_0 + i] < 0 || m->action <= GAME_ACT_NONE || m->action >= GAME_ACT_COUNT) continue;
+        ACTION_CLIPS[m->action] = (ActionClip){ C_MZ_0 + i, m->start, m->end, m->rate, m->contactBy };
+        n++;
+    }
+    return n;
+}
 static int boneFootL = -1, boneFootR = -1, boneHandL = -1, boneHandR = -1, boneHead = -1;
 static int boneSpine = -1, boneSpine1 = -1, boneArmUL = -1, boneArmUR = -1, boneArmLL = -1, boneArmLR = -1;
 static int boneMidL = -1, boneMidR = -1, boneThumbL = -1, boneThumbR = -1;
@@ -3796,6 +3821,7 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshots") == 0) shots = 1;
         else if (strcmp(argv[i], "--no-motion-match") == 0) motionMatching = 0;
+        else if (strcmp(argv[i], "--no-meshy") == 0) useMeshy = 0;
         else if (strcmp(argv[i], "--jog-arm-assist") == 0) jogArmAssist = 1;
         else if (strcmp(argv[i], "--jog-hand-relax") == 0) jogHandRelax = 1;
         else if (strcmp(argv[i], "--jog-hand-relax-strong") == 0) jogHandRelax = 2;
@@ -3836,6 +3862,7 @@ int main(int argc, char **argv)
     SetRandomSeed(7);
     rlSetClipPlanes(0.3, 2600.0);
 
+    initClipNames();
     for (int i = 0; i < C_COUNT; i++) clipIdx[i] = -1;
     if (FileExists(playerGlb)) {
         model = LoadModel(playerGlb);
@@ -3843,12 +3870,13 @@ int main(int argc, char **argv)
         for (int i = 0; i < animCount; i++) {
             if (strcmp(anims[i].name, "bounce") == 0 && IsModelAnimationValid(model, anims[i])) clipBounce = i;
             for (int k = 0; k < C_COUNT; k++)
-                if (strcmp(anims[i].name, CLIP_NAMES[k]) == 0 && IsModelAnimationValid(model, anims[i])) clipIdx[k] = i;
+                if (CLIP_NAMES[k][0] && strcmp(anims[i].name, CLIP_NAMES[k]) == 0 && IsModelAnimationValid(model, anims[i])) clipIdx[k] = i;
         }
         haveModel = model.meshCount > 0 && MODEL_BONECOUNT(model) <= MAX_BONES;
         loadParts(playerGlb);
         loadGrip(playerGlb);
-        for (int k = 0; k < C_COUNT; k++) if (clipIdx[k] < 0) { haveModel = 0; TraceLog(LOG_WARNING, "GAME: clip '%s' missing", CLIP_NAMES[k]); }
+        for (int k = 0; k < C_REQUIRED; k++) if (clipIdx[k] < 0) { haveModel = 0; TraceLog(LOG_WARNING, "GAME: clip '%s' missing", CLIP_NAMES[k]); }
+        if (haveModel) TraceLog(LOG_INFO, "GAME: %d actions play Meshy clips", applyMeshyActions());
     }
     stadiumInit();
     if (haveModel) {

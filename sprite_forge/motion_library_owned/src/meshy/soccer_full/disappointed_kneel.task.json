@@ -1,0 +1,10 @@
+{
+ "id": "01a22247-5a3a-7614-9cd0-f59be31d0404",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871432538,
+ "finished_at": 1795871437299,
+ "prompt": "A professional football (soccer) player stands, then sinks down onto both knees with the shins flat on the ground, sits back on the heels, head bowed, disappointed.",
+ "duration": 3.0,
+ "mode": "swift"
+}

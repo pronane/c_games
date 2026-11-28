@@ -112,6 +112,13 @@ CONVENTIONS = {
         ("head", ["head"]), ("shoulder_%s", ["{S}shoulder"]), ("upperarm_%s", ["{S}arm"]), ("forearm_%s", ["{S}forearm"]),
         ("hand_%s", ["{S}hand"]), ("thigh_%s", ["{S}leg"]), ("shin_%s", ["{S}shin"]), ("foot_%s", ["{S}foot"]),
         ("toe_%s", ["{S}toebase"])]),
+    # SMPL / SMPL-H joint names (Meshy Text to Motion "prime" FBX, AMASS, many research datasets): joints, not bones -
+    # L_Hip is where the thigh starts, L_Knee the shin, L_Ankle the foot, L_Foot the toes; L_Collar is the clavicle.
+    "smpl": _side_table("l_", "r_", [
+        ("hips", ["pelvis"]), ("spine", ["spine1"]), ("chest", ["spine2"]), ("upperchest", ["spine3"]), ("neck", ["neck"]),
+        ("head", ["head"]), ("shoulder_%s", ["{S}collar"]), ("upperarm_%s", ["{S}shoulder"]), ("forearm_%s", ["{S}elbow"]),
+        ("hand_%s", ["{S}wrist"]), ("thigh_%s", ["{S}hip"]), ("shin_%s", ["{S}knee"]), ("foot_%s", ["{S}ankle"]),
+        ("toe_%s", ["{S}foot"])]),
     "sforge": {c: [re.escape(c.lower())] for c in CANON},
 }
 SKIP = re.compile(r"(twist|roll|_ik|ik_|\bik\b|pole|target|helper|_end$|end$|nub|mch|ctrl|wgt|tweak|_jnt_end|hairbone|breast|jaw|eye|finger|thumb|index|middle|ring|pinky|cheek|lip|brow|tongue|tooth|teeth|ear|pinkie|wing|tail|prop|weapon)", re.I)
@@ -137,6 +144,8 @@ def detect_convention(bones):
             bonus = -10
         if conv == "bvh_classic" and not any(re.search(r"(left|right)(collar|hip|knee|elbow|wrist)$", s) for s in stripped):
             bonus = -10                       # only for skeletons that really use joint-named bones
+        if conv == "smpl" and not any(re.search(r"^[lr]_(hip|knee|ankle|collar)$", s) for s in stripped):
+            bonus = -10                       # only SMPL-named skeletons
         if conv == "meshy" and not any(re.search(r"(left|right)shin$", s) for s in stripped):
             bonus = -10                       # only skeletons with a {S}Shin joint
         scores[conv] = (len(m) + bonus, m)

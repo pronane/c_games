@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-a8a9-7140-b222-28a2b5248862",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870993333,
+ "finished_at": 1795871009483,
+ "prompt": "A professional football (soccer) player is a goalkeeper leaping backwards to tip a ball over the crossbar with the fingertips of one hand.",
+ "duration": 2.0,
+ "mode": "swift"
+}

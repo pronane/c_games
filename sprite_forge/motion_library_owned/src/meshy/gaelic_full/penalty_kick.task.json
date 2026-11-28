@@ -1,0 +1,10 @@
+{
+ "id": "01a2229c-3837-763a-8df2-09a6c41ef597",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795876994013,
+ "finished_at": 1795877018008,
+ "prompt": "A Gaelic football player takes a penalty: places the ball, runs up and strikes it hard and low.",
+ "duration": 3.5,
+ "mode": "prime"
+}

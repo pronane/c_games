@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-0a56-7764-8c06-0a089c5b4e52",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871149582,
+ "finished_at": 1795871159271,
+ "prompt": "A professional football (soccer) player misses a chance and puts both hands on the head in frustration, looking up.",
+ "duration": 2.5,
+ "mode": "swift"
+}

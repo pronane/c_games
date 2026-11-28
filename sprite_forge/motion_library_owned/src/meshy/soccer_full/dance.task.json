@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-f5bd-7653-870a-639e5338e09c",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871209562,
+ "finished_at": 1795871213870,
+ "prompt": "A professional football (soccer) player does a celebration dance, stepping side to side, hips moving, arms swinging.",
+ "duration": 4.0,
+ "mode": "swift"
+}

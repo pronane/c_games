@@ -1,0 +1,10 @@
+{
+ "id": "01a22245-798a-715b-8576-26b8f2972ab1",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871309552,
+ "finished_at": 1795871318839,
+ "prompt": "A professional football (soccer) player shields the ball in place, facing the same way the whole time: knees bent, left arm out behind to hold off a defender, small shuffle steps left and right, the same rhythm over and over. The body never turns.",
+ "duration": 3.0,
+ "mode": "swift"
+}

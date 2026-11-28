@@ -1,0 +1,10 @@
+{
+ "id": "01a2223c-a2f6-7253-8f60-ccce573924e5",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870729605,
+ "finished_at": 1795870747326,
+ "prompt": "A professional football (soccer) player strikes with the outside of the right foot, a trivela, the ankle turned in so the ball curls away to the right.",
+ "duration": 2.5,
+ "mode": "swift"
+}

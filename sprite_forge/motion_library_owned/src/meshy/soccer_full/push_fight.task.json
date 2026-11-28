@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-2d49-7081-8489-156401fb1445",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870961623,
+ "finished_at": 1795870972547,
+ "prompt": "A professional football (soccer) player grapples with an opponent at a corner, arms tangling, jostling for position.",
+ "duration": 2.0,
+ "mode": "swift"
+}

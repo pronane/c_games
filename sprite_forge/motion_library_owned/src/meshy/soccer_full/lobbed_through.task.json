@@ -1,0 +1,10 @@
+{
+ "id": "01a2223a-8c4e-7661-823e-ec774423e75e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870592761,
+ "finished_at": 1795870613398,
+ "prompt": "A professional football (soccer) player dinks a lobbed through ball over the defence with a short stabbing chip of the right foot.",
+ "duration": 2.0,
+ "mode": "swift"
+}

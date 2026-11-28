@@ -1151,16 +1151,18 @@ public sealed partial class MatchEngine
                 if (IsTraining) chance = 1f; // the training ground teaches the input, not the odds
                 if (Rng.Next() < chance)
                 {
-                    p.CurrentSkill = cmd.Skill;
-                    p.SkillTimer = SkillMoves.Duration(cmd.Skill);
-                    SetAction(p, SkillMoves.ClipName(cmd.Skill), p.SkillTimer, 0.5f);
+                    // v11.42: play one of the input's family of moves (the training ground teaches the input itself).
+                    var played = IsTraining ? cmd.Skill : SkillMoves.Variant(cmd.Skill, Rng.Next());
+                    p.CurrentSkill = played;
+                    p.SkillTimer = SkillMoves.Duration(played);
+                    SetAction(p, SkillMoves.ClipName(played), p.SkillTimer, 0.5f);
                     // Evade: burst away from opponent
                     if (nearestOpp != null)
                     {
                         Vector3 away = Mx.Flat(p.Pos - nearestOpp.Pos);
                         p.Vel += Mx.Norm(away) * 2.5f;
                     }
-                    Add(EventKind.Info, $"{p.Spec.DisplayName} pulls off a {SkillMoves.DisplayName(cmd.Skill)}!");
+                    Add(EventKind.Info, $"{p.Spec.DisplayName} pulls off a {SkillMoves.DisplayName(played)}!");
                 }
                 else
                 {

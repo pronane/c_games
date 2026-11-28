@@ -1,0 +1,10 @@
+{
+ "id": "01a2223d-df52-77ce-9c5a-cc6bc1c9a7f1",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870810562,
+ "finished_at": 1795870826399,
+ "prompt": "A professional football (soccer) player does a rainbow flick: traps the ball between the heel of the right foot and the toe of the left, flicks it up behind the back and over the head, then runs on.",
+ "duration": 2.5,
+ "mode": "swift"
+}

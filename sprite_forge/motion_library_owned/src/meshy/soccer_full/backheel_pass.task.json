@@ -1,0 +1,10 @@
+{
+ "id": "01a2223a-fbc8-748a-b8d4-18f6c04e8430",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870622125,
+ "finished_at": 1795870641762,
+ "prompt": "A professional football (soccer) player plays a backheel pass: steps past the ball and flicks it backwards with the heel of the right foot.",
+ "duration": 2.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a2223c-45ec-7172-be4c-b8cb80e48d21",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870705946,
+ "finished_at": 1795870726605,
+ "prompt": "A professional football (soccer) player does an overhead bicycle kick: jumps, falls backwards, scissors the legs and strikes the ball above the head with the right foot, lands on the back and hands.",
+ "duration": 2.5,
+ "mode": "swift"
+}

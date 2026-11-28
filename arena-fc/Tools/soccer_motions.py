@@ -408,6 +408,46 @@ for _t in MOCAP_TAKES:
                        _MOCAP_CATEGORY.get(_t["category"], "Mocap"),
                        "motion capture: %s %s (%s)" % (_MOCAP_SOURCE[_t["dir"]], _t["take"], _t["category"].lower())))
 
+# ---------------------------------------------------------------------------
+# Meshy Text to Motion clips (Sprite Forge v11.42; owner-held, LicenseRef-Owned-Meshy):
+# sprite_forge/motion_library_owned/mz_soccer_<move>.json, catalogued in
+# sprite_forge/game_packs/meshy/soccer_full.json.  Each becomes soccer_mz_<move>.
+# ---------------------------------------------------------------------------
+MESHY_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "sprite_forge",
+                                         "motion_library_owned"))
+MESHY_CATALOGUE = os.path.abspath(os.path.join(MESHY_DIR, "..", "game_packs", "meshy", "soccer_full.json"))
+_MESHY_CATEGORY = {"Control": "Ball", "Passing": "Ball", "Shooting": "Ball", "Set piece": "Ball", "Aerial": "Ball",
+                   "Defending": "Defence", "Reaction": "Extra", "Celebration": "Extra"}
+
+
+def _meshy_takes():
+    if not os.path.isfile(MESHY_CATALOGUE):
+        return []
+    with open(MESHY_CATALOGUE) as f:
+        cat = json.load(f)
+    pre = cat.get("clip_prefix", "mz_soccer_")
+    out = []
+    for move, m in cat["moves"].items():
+        clip = m.get("reuse") or pre + move
+        if os.path.isfile(os.path.join(MESHY_DIR, clip + ".json")):
+            out.append(dict(move=move, clip=clip, loop=bool(m.get("loop")), category=m.get("category", "Ball"),
+                            desc=(m.get("prompt") or move).split(" player ", 1)[-1][:140]))
+    return out
+
+
+MESHY_TAKES = _meshy_takes()
+for _t in MESHY_TAKES:
+    MOCAP_DIR_OF[_t["clip"]] = MESHY_DIR
+    CLIP_SPECS.append(("soccer_mz_" + _t["move"], "mocap:" + _t["clip"], _t["loop"],
+                       _MESHY_CATEGORY.get(_t["category"], _t["category"]), "Meshy: " + _t["desc"]))
+MESHY_CLIPS = {"soccer_mz_" + _t["move"] for _t in MESHY_TAKES}
+
+
+def _mz(move, fallback):
+    """The Meshy clip for a move when it is in the library, else the clip the game used before."""
+    return "soccer_mz_" + move if "soccer_mz_" + move in MESHY_CLIPS else fallback
+
+
 # Match-engine / control actions -> clip name.  Keys cover the C# PlayerState
 # Action strings, the pad/keyboard actions and the restart phases.
 ACTION_ALIASES = {
@@ -513,6 +553,45 @@ ACTION_ALIASES = {
     "punch": "soccer_punch",
     "headbutt": "soccer_headbutt",
 }
+
+# v11.42: game actions play the Meshy soccer clip where one was made.  Locomotion (idle, walk, jog, run, sprint,
+# dribble) keeps its clips: they are tuned to the foot lock and motion matching.
+MESHY_ACTIONS = {           # kept after a side-by-side review of old vs Meshy on the Arena player (v11.42)
+    "backpedal": "backpedal", "bicycle": "bicycle_kick", "bicycle_kick": "bicycle_kick", "celebrate": "celebrate",
+    "celebrate_jump": "jump_spin", "chest_control": "chest_control", "chip_shot": "chip_shot", "stop": "decelerate",
+    "fall": "fall_pushed", "foul": "fall_tripped", "trip": "fall_tripped", "get_up": "get_up", "stumble": "stumble",
+    "catch": "gk_catch_chest", "keeper_catch": "gk_catch_chest", "keeper_dive_high": "gk_dive_high_left",
+    "keeper_dive_right": "gk_dive_low_right", "keeper_kick": "gk_drop_kick", "drop_kick": "gk_drop_kick",
+    "save": "gk_parry", "parry": "gk_parry", "keeper_save": "gk_parry", "keeper_penalty_set": "gk_penalty_ready",
+    "keeper_punch": "gk_punch", "keeper_ready": "gk_ready", "keeper_throw": "gk_throw_overarm",
+    "shield": "shield_ball", "shoot": "shoot", "strafe_l": "strafe_left", "strafe_r": "strafe_right",
+    "thigh_control": "thigh_control", "throw_in": "throw_in", "trap": "trap_sole", "trivela": "trivela",
+    "skill_drag_back": "drag_back", "skill_elastico": "elastico", "skill_fake_shot": "fake_shot",
+    "skill_rainbow": "rainbow_flick", "skill_roulette": "roulette",
+    # v11.43: Meshy prime takes, reviewed the same way, replace the swift clips that lost the first review
+    "pass": "pass", "short_pass": "pass", "long_pass": "lofted_pass", "long_ball": "lofted_pass",
+    "through": "through_ball", "through_ball": "through_ball", "cross": "cross_whipped", "corner_kick": "corner_kick",
+    "goal_kick": "gk_goal_kick", "kick_out": "gk_goal_kick", "toe_lift": "flick_up", "volley": "volley",
+    "turn": "turn_180", "slide": "slide_tackle", "slide_tackle": "slide_tackle", "block": "block_shot",
+    "juke_feint": "body_feint", "dive": "gk_dive_low_left", "keeper_dive_left": "gk_dive_low_left",
+    "keeper_ground_catch": "gk_collect_low", "skill_heel_to_heel": "heel_to_heel", "skill_step_over": "stepover",
+    # v11.44: prime takes with sharper prompts (body mechanics spelled out), reviewed and kept
+    "free_kick": "free_kick_curl", "penalty_kick": "penalty_kick", "header": "header_jump",
+    # v11.45: two prime takes each, the opponent described as an object and the body shape spelled out
+    "tackle": "tackle", "dispossess": "poke_tackle", "shoulder_charge": "shoulder_challenge",
+    "skill_ball_roll": "ball_roll",
+}
+# Reviewed and left on their old clips: the swift Meshy take was weaker (see sprite_forge/README v11.42).
+MESHY_REJECTED = {}         # v11.45: every reviewed action now has a Meshy take that beat its old clip
+BASE_ACTIONS = set(ACTION_ALIASES)
+for _a, _m in MESHY_ACTIONS.items():
+    ACTION_ALIASES[_a] = _mz(_m, ACTION_ALIASES.get(_a, "soccer_idle"))
+# New actions, one per catalogue move that has no action yet (skill_<move> for skills, mz_<move> for the rest),
+# so a game can call any move by name; SkillMoves.cs uses the skill_ ones.
+for _t in MESHY_TAKES:
+    _a = ("skill_" if _t["category"] == "Skill" else "mz_") + _t["move"]
+    ACTION_ALIASES.setdefault(_a, "soccer_mz_" + _t["move"])
+MESHY_NEW_ACTIONS = set(ACTION_ALIASES) - BASE_ACTIONS
 
 ALL_CLIPS = [c[0] for c in CLIP_SPECS]
 LOOP_CLIPS = {c[0] for c in CLIP_SPECS if c[2]}
@@ -636,6 +715,12 @@ def _mocap_events(name):
 
 for _t in MOCAP_TAKES:
     CLIP_EVENTS["soccer_" + _t["name"]] = _mocap_events(_t["name"])
+
+# Meshy clips: events measured from the clip (fastest foot / hand, head peak), see sforge.meshy_cli.clip_events.
+from sforge import meshy_cli as _mzc  # noqa: E402
+for _t in MESHY_TAKES:
+    with open(os.path.join(MESHY_DIR, _t["clip"] + ".json")) as _f:
+        CLIP_EVENTS["soccer_mz_" + _t["move"]] = _mzc.clip_events(json.load(_f), _t["category"], _t["move"])
 
 # Every clip must have an event entry (default: no events).
 for _n in ALL_CLIPS:

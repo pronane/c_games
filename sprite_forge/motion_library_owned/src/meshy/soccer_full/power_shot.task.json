@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-b4fa-7546-b341-c2cfe6eaac4d",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870668739,
+ "finished_at": 1795870686917,
+ "prompt": "A professional football (soccer) player hits a power shot: long run-up, big backswing, smashes the ball with the laces, landing on the kicking foot.",
+ "duration": 3.0,
+ "mode": "swift"
+}

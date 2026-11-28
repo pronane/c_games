@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-cf4d-7025-a9aa-388f9c7e79c8",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871199913,
+ "finished_at": 1795871207337,
+ "prompt": "A professional football (soccer) player stands still with arms stretched wide, chest out, soaking up the cheers.",
+ "duration": 2.5,
+ "mode": "swift"
+}

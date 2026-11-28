@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-b570-7559-95ca-dc95f900c359",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870668822,
+ "finished_at": 1795870691235,
+ "prompt": "A Gaelic football player kicks with the outside of the right boot, the ball curling away to the right, an outside-of-the-boot point.",
+ "duration": 2.5,
+ "mode": "swift"
+}

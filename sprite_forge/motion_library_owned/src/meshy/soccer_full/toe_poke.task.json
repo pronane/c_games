@@ -1,0 +1,10 @@
+{
+ "id": "01a2223c-a333-7746-a194-e2452f362054",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870729737,
+ "finished_at": 1795870751049,
+ "prompt": "A professional football (soccer) player toe-pokes the ball quickly with a short jab of the right foot.",
+ "duration": 2.0,
+ "mode": "swift"
+}

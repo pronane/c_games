@@ -1,0 +1,10 @@
+{
+ "id": "01a2223d-93bb-701a-b118-9267b0feef36",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870791199,
+ "finished_at": 1795870814084,
+ "prompt": "A professional football (soccer) player does a roulette turn: drags the ball back with the sole of the right foot while spinning round, then drags it again with the left sole, finishing a full turn.",
+ "duration": 2.5,
+ "mode": "swift"
+}

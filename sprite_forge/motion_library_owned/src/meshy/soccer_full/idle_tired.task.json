@@ -1,0 +1,10 @@
+{
+ "id": "01a22239-21b1-7545-88fd-b358e11ebf7c",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870500022,
+ "finished_at": 1795870519855,
+ "prompt": "A professional football (soccer) player stands tired, bent forward with both hands on the knees, breathing hard, shoulders rising and falling.",
+ "duration": 3.0,
+ "mode": "swift"
+}

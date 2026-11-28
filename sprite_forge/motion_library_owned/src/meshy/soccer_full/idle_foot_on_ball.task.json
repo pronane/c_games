@@ -1,0 +1,10 @@
+{
+ "id": "01a22239-09d1-757e-87ce-041096fe0747",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870494482,
+ "finished_at": 1795870515957,
+ "prompt": "A professional football (soccer) player stands relaxed with the sole of the right foot resting on top of an imaginary ball, glancing around, shifting weight slightly.",
+ "duration": 3.0,
+ "mode": "swift"
+}

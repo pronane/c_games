@@ -1,0 +1,10 @@
+{
+ "id": "01a2229d-0fc7-754b-8a38-16d985d4c683",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795877048940,
+ "finished_at": 1795877093317,
+ "prompt": "A professional football (soccer) player slides a through ball into space with the inside of the right foot, weighted, arm pointing to where the pass goes.",
+ "duration": 2.0,
+ "mode": "prime"
+}

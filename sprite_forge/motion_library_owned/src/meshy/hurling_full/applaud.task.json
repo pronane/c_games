@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-8319-71d1-bb7c-816b6f426582",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871114696,
+ "finished_at": 1795871123147,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) tucks the hurley under the arm and applauds the supporters.",
+ "duration": 3.0,
+ "mode": "swift"
+}

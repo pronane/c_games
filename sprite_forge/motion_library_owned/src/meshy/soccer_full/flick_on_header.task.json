@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-599c-72ca-8523-fb9a7df5478a",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870645447,
+ "finished_at": 1795870665652,
+ "prompt": "A professional football (soccer) player jumps and glances a ball backwards with the top of the head as a flick-on.",
+ "duration": 2.0,
+ "mode": "swift"
+}

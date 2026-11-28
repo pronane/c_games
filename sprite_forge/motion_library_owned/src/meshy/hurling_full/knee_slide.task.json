@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-06fd-7340-82b0-6853c62fd1af",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871082986,
+ "finished_at": 1795871095584,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand celebrates a goal by sliding on the knees, the stick raised high.",
+ "duration": 3.0,
+ "mode": "swift"
+}

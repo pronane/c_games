@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-bc6e-732b-95db-1bee170eb553",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871064454,
+ "finished_at": 1795871076131,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand waits, tapping the end of the stick on the ground, looking around.",
+ "duration": 3.0,
+ "mode": "swift"
+}

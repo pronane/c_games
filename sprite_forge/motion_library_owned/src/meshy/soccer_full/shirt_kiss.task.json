@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-dae9-7309-8ca4-70709a8aeb96",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871202802,
+ "finished_at": 1795871212645,
+ "prompt": "A professional football (soccer) player kisses the badge on the shirt, holding it out with both hands.",
+ "duration": 2.5,
+ "mode": "swift"
+}

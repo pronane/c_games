@@ -1,0 +1,10 @@
+{
+ "id": "01a2223c-3288-754b-9ae5-ba4f4660b450",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870700986,
+ "finished_at": 1795870722207,
+ "prompt": "A professional football (soccer) player hits a side volley: leans far to the left, the right leg swinging round horizontally at hip height to strike the ball in the air.",
+ "duration": 2.5,
+ "mode": "swift"
+}

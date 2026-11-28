@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-d5d6-70ab-ad4a-1bb3d926608e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870677214,
+ "finished_at": 1795870699581,
+ "prompt": "A professional football (soccer) player drills a low driven shot along the ground, knee over the ball, short sharp follow-through.",
+ "duration": 2.5,
+ "mode": "swift"
+}

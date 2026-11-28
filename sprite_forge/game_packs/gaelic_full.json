@@ -1,0 +1,1652 @@
+{
+ "name": "gaelic_full",
+ "label": "Gaelic football - full move catalogue",
+ "description": "The Gaelic pack plus the goalkeeper's work, kickouts, frees, sideline kicks and penalties, the bounce, dummies, contact play, reactions and celebrations.",
+ "camera": "three_quarter",
+ "prop": "none",
+ "props": [
+  "ball"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "figure": 0.58,
+ "notes": "Built by forge.py meshy pack from game_packs/meshy/gaelic_full.json (the move catalogue). Every move of the gaelic pack, then the catalogue's.",
+ "yaw": 65,
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "idle_athletic"
+   ]
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "prefer": [
+    "jog"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "sprint",
+   "library": "run",
+   "prefer": [
+    "sprint",
+    "jog",
+    "mz_aussie_sprint"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     4
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "stop",
+   "library": "idle",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "stop_sudden",
+    "mz_gaelic_stop"
+   ]
+  },
+  {
+   "name": "change_direction",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": "",
+   "prefer": [
+    "juke_feint",
+    "mz_gaelic_change_direction"
+   ]
+  },
+  {
+   "name": "pick_up_ground",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "gaa_toe_lift",
+    "catch_low",
+    "mz_gaelic_pick_up_ground"
+   ]
+  },
+  {
+   "name": "pick_up_aerial",
+   "library": "jump",
+   "prefer": [
+    "jump_vertical",
+    "mz_gaelic_pick_up_aerial"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "hold",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_gaelic_hold"
+   ]
+  },
+  {
+   "name": "carry",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": "",
+   "prefer": [
+    "gaa_carry",
+    "mz_gaelic_carry"
+   ]
+  },
+  {
+   "name": "bounce_solo",
+   "library": "run",
+   "prefer": [
+    "gaa_solo",
+    "dribble",
+    "mz_gaelic_bounce_solo"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "hand_pass",
+   "library": "pass",
+   "prefer": [
+    "gaa_hand_pass",
+    "punch_straight",
+    "mz_gaelic_hand_pass"
+   ],
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 3,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "low_kick_pass",
+   "library": "kick",
+   "prefer": [
+    "gaa_kick",
+    "soccer_kick",
+    "mz_gaelic_low_kick_pass"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "high_kick_pass",
+   "library": "kick",
+   "prefer": [
+    "gaa_kick",
+    "soccer_shoot",
+    "mz_gaelic_high_kick_pass"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "shoot_point",
+   "library": "shoot",
+   "prefer": [
+    "gaa_kick",
+    "soccer_shoot",
+    "mz_gaelic_shoot_point"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "shoot_goal",
+   "library": "shoot",
+   "prefer": [
+    "soccer_kick",
+    "mz_gaelic_shoot_goal"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "catch_ground",
+   "library": "crouch",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "catch_low",
+    "mz_gaelic_catch_ground"
+   ]
+  },
+  {
+   "name": "catch_aerial",
+   "library": "jump",
+   "prefer": [
+    "gaa_high_catch",
+    "keeper_catch",
+    "jump_shot",
+    "mz_gaelic_catch_aerial"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "tackle",
+   "library": "tackle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_gaelic_tackle"
+   ]
+  },
+  {
+   "name": "block",
+   "library": "block",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "block_high"
+   ]
+  },
+  {
+   "name": "juke_feint",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Evasion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "juke_feint",
+    "mz_gaelic_juke_feint"
+   ]
+  },
+  {
+   "name": "sidestep",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Evasion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     5
+    ]
+   },
+   "desc": "",
+   "prefer": [
+    "sidestep_shuffle",
+    "mz_gaelic_sidestep"
+   ]
+  },
+  {
+   "name": "spin",
+   "library": "wave",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Evasion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "pivot_left",
+    "mz_gaelic_spin"
+   ]
+  },
+  {
+   "name": "jump",
+   "library": "jump",
+   "prefer": [
+    "jump_vertical"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "leap_catch",
+   "library": "jump",
+   "prefer": [
+    "gaa_high_catch",
+    "keeper_catch",
+    "jump_shot",
+    "mz_gaelic_leap_catch"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "fist_pass",
+   "library": "punch",
+   "prefer": [
+    "gaa_hand_pass",
+    "punch_straight",
+    "mz_gaelic_fist_pass"
+   ],
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 3,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "fist_shoot",
+   "library": "punch",
+   "prefer": [
+    "punch_power",
+    "mz_gaelic_fist_shoot"
+   ],
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Kicking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "celebrate_point",
+   "library": "wave",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "celebrate_jump",
+    "mz_gaelic_celebrate_point"
+   ]
+  },
+  {
+   "name": "celebrate_goal",
+   "library": "wave",
+   "frames": 10,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "victory_2",
+    "celebrate_jump",
+    "mz_gaelic_celebrate_goal"
+   ]
+  },
+  {
+   "name": "fall",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "trip_fall",
+    "ko_fall_back",
+    "mz_gaelic_fall"
+   ]
+  },
+  {
+   "name": "get_up",
+   "library": "crouch",
+   "prefer": [
+    "get_up",
+    "mz_gaelic_get_up"
+   ],
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "injured_idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 6,
+   "loop": true,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_gaelic_injured_idle"
+   ]
+  },
+  {
+   "name": "goalkeeper_save",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "keeper_catch"
+   ]
+  },
+  {
+   "name": "goalkeeper_dive_left",
+   "library": "save",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "keeper_dive_left",
+    "dive_left"
+   ]
+  },
+  {
+   "name": "goalkeeper_dive_right",
+   "library": "save",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "keeper_dive_right",
+    "dive_right"
+   ]
+  },
+  {
+   "name": "goalkeeper_throw_out",
+   "library": "pass",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 5,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "throw_overhand"
+   ]
+  },
+  {
+   "name": "jog",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_soccer_jog"
+   ]
+  },
+  {
+   "name": "backpedal",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player backpedals on a treadmill, facing straight ahead, quick short steps backwards, arms out, the sa",
+   "prefer": [
+    "mz_gaelic_backpedal"
+   ]
+  },
+  {
+   "name": "jockey",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knees bent, arms out wide, small shuffle steps left and right and back to the start, the same rhythm over and over. The "
+  },
+  {
+   "name": "idle_tired",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player stands tired, hands on the knees, breathing hard.",
+   "prefer": [
+    "mz_gaelic_idle_tired"
+   ]
+  },
+  {
+   "name": "bounce",
+   "library": "carry",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player runs on a treadmill, facing straight ahead, bouncing the round ball on the ground with one hand",
+   "prefer": [
+    "mz_gaelic_bounce"
+   ]
+  },
+  {
+   "name": "dummy_hand_pass",
+   "library": "hand_pass",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player shapes to hand pass, swinging the fist, then pulls it back and keeps the ball, stepping the oth",
+   "prefer": [
+    "mz_gaelic_dummy_hand_pass"
+   ]
+  },
+  {
+   "name": "dummy_solo",
+   "library": "carry",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player shapes to drop the ball for a solo, then pulls it back into the chest and sidesteps.",
+   "prefer": [
+    "mz_gaelic_dummy_solo"
+   ]
+  },
+  {
+   "name": "kick_from_hand_long",
+   "library": "kick",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "run-up, drops the ball, big punt.",
+   "prefer": [
+    "mz_gaelic_kick_from_hand_long"
+   ]
+  },
+  {
+   "name": "outside_boot_kick",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player kicks with the outside of the right boot, the ball curling away to the right, an outside-of-the",
+   "prefer": [
+    "mz_gaelic_outside_boot_kick"
+   ]
+  },
+  {
+   "name": "hook_kick",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player snaps a curling kick across the body at goal, the right leg swinging round.",
+   "prefer": [
+    "mz_gaelic_hook_kick"
+   ]
+  },
+  {
+   "name": "ground_kick",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player kicks the ball off the ground, soccer style, a low pass.",
+   "prefer": [
+    "mz_gaelic_ground_kick"
+   ]
+  },
+  {
+   "name": "fisted_clearance",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player jumps and punches a high ball away with the fist to clear it.",
+   "prefer": [
+    "mz_gaelic_fisted_clearance"
+   ]
+  },
+  {
+   "name": "catch_and_turn",
+   "library": "carry",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player catches a ball at the chest, and in one movement turns to face the goal.",
+   "prefer": [
+    "mz_gaelic_catch_and_turn"
+   ]
+  },
+  {
+   "name": "contest_high_ball",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player jumps for a high ball alongside an opponent, both arms up, shoulders bumping in the air.",
+   "prefer": [
+    "mz_gaelic_contest_high_ball"
+   ]
+  },
+  {
+   "name": "mark_call",
+   "library": "idle",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player catches a long kick cleanly, then raises one arm to call a mark and stands still holding the ba",
+   "prefer": [
+    "mz_gaelic_mark_call"
+   ]
+  },
+  {
+   "name": "shoulder_charge",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "running beside an opponent, elbow tucked in, bumps side-on with the shoulder.",
+   "prefer": [
+    "mz_gaelic_shoulder_charge"
+   ]
+  },
+  {
+   "name": "block_down",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "throws the body and the hands down in front of a kicker's boot.",
+   "prefer": [
+    "mz_gaelic_block_down"
+   ]
+  },
+  {
+   "name": "hand_block",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player jumps with both arms straight up to block a kick at goal.",
+   "prefer": [
+    "mz_gaelic_hand_block"
+   ]
+  },
+  {
+   "name": "frontal_block",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player stands square to a runner and stops them with the chest, arms by the side, a frontal block.",
+   "prefer": [
+    "mz_gaelic_frontal_block"
+   ]
+  },
+  {
+   "name": "strip_ball",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player reaches in and slaps the ball out of an opponent's grip with one hand.",
+   "prefer": [
+    "mz_gaelic_strip_ball"
+   ]
+  },
+  {
+   "name": "dispossessed",
+   "library": "hit",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player has the ball knocked out of the hands from the side, reaching after it.",
+   "prefer": [
+    "mz_gaelic_dispossessed"
+   ]
+  },
+  {
+   "name": "kickout_long",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "long run-up and big kick high up the field.",
+   "prefer": [
+    "mz_gaelic_kickout_long"
+   ]
+  },
+  {
+   "name": "kickout_short",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "chips the ball gently off the tee to a nearby team-mate.",
+   "prefer": [
+    "mz_gaelic_kickout_short"
+   ]
+  },
+  {
+   "name": "gk_ready",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knees bent, hands out, bouncing lightly on the toes.",
+   "prefer": [
+    "mz_gaelic_gk_ready"
+   ]
+  },
+  {
+   "name": "gk_tip_over",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player is a goalkeeper leaping backwards to tip a ball over the crossbar.",
+   "prefer": [
+    "mz_gaelic_gk_tip_over"
+   ]
+  },
+  {
+   "name": "gk_catch_high",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player is a goalkeeper jumping to catch a high ball above the head.",
+   "prefer": [
+    "mz_gaelic_gk_catch_high"
+   ]
+  },
+  {
+   "name": "gk_low_save",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player is a goalkeeper diving down to save a low shot with the feet and body.",
+   "prefer": [
+    "mz_gaelic_gk_low_save"
+   ]
+  },
+  {
+   "name": "gk_spread",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player is a goalkeeper in a one-on-one, rushing out and spreading wide, arms out.",
+   "prefer": [
+    "mz_gaelic_gk_spread"
+   ]
+  },
+  {
+   "name": "free_from_hand",
+   "library": "kick",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "stands still, steps up and drops the ball onto the foot, kicking it over the bar.",
+   "prefer": [
+    "mz_gaelic_free_from_hand"
+   ]
+  },
+  {
+   "name": "free_from_ground",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "places the ball, steps back, runs up and kicks it high over the bar.",
+   "prefer": [
+    "mz_gaelic_free_from_ground"
+   ]
+  },
+  {
+   "name": "sideline_kick",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "places the ball on the line, steps back at an angle and curls it in.",
+   "prefer": [
+    "mz_gaelic_sideline_kick"
+   ]
+  },
+  {
+   "name": "penalty_kick",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "places the ball, runs up and strikes it hard and low.",
+   "prefer": [
+    "mz_gaelic_penalty_kick"
+   ]
+  },
+  {
+   "name": "stumble",
+   "library": "hit",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the upper body jolts backwards, takes two staggering steps backwards, then steadies.",
+   "prefer": [
+    "mz_gaelic_stumble"
+   ]
+  },
+  {
+   "name": "hands_on_head",
+   "library": "idle",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player misses a point and puts both hands on the head.",
+   "prefer": [
+    "mz_gaelic_hands_on_head"
+   ]
+  },
+  {
+   "name": "appeal",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player appeals to the referee with one arm raised.",
+   "prefer": [
+    "mz_gaelic_appeal"
+   ]
+  },
+  {
+   "name": "call_for_ball",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player raises an arm and calls for the ball.",
+   "prefer": [
+    "mz_gaelic_call_for_ball"
+   ]
+  },
+  {
+   "name": "knee_slide",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player celebrates a goal by sliding on the knees, arms out.",
+   "prefer": [
+    "mz_gaelic_knee_slide"
+   ]
+  },
+  {
+   "name": "point_to_crowd",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player points both fingers at the crowd, shouting.",
+   "prefer": [
+    "mz_gaelic_point_to_crowd"
+   ]
+  },
+  {
+   "name": "applaud",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A Gaelic football player applauds the supporters, clapping above the head.",
+   "prefer": [
+    "mz_gaelic_applaud"
+   ]
+  }
+ ]
+}

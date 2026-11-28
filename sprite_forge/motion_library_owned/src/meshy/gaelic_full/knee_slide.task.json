@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-4906-7536-8f89-d43f56ea91fb",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871165964,
+ "finished_at": 1795871172681,
+ "prompt": "A Gaelic football player celebrates a goal by sliding on the knees, arms out.",
+ "duration": 3.0,
+ "mode": "swift"
+}

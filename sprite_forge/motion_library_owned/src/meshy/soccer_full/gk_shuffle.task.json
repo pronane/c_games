@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-bcd9-715b-8334-cf8481147af5",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870998635,
+ "finished_at": 1795871005477,
+ "prompt": "A professional football (soccer) player is a goalkeeper shuffling sideways across the goal in the ready stance, hands out, small quick steps, the same rhythm over and over.",
+ "duration": 3.0,
+ "mode": "swift"
+}

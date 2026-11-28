@@ -54,6 +54,63 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. The starter has no Mixamo or Meshy clips (v11.41's owned Meshy clips are in motion_library_owned/). Do not commit a recording of a real person.
 
+## New in v11.43: Meshy prime takes for the moves swift got wrong
+
+* 36 moves redone in Meshy's prime mode (10 credits each, FBX, SMPL-H skeleton): the 23 Arena FC actions and 4
+  Gaelic Football 3D actions that lost the v11.42 review, 8 weak skill variants and the knee slide. The catalogue
+  records `"mode": "prime"` per move, and `forge.py meshy import` then reads the move's FBX instead of its BVH.
+* **Not an import bug after all:** prime's pose is right but its ground travel can be absurd (a slide tackle 30 m
+  in 2.5 s, a knee slide 16 m). `meshy_cli.cap_travel` scales the root's ground travel to a peak of 8 m/s and keeps
+  the original in the record; both games play these moves in place, so only the pose shows.
+* A prime take is checked under a temporary name and replaces the swift clip only when it passes
+  (`import_prime_safely`). All 36 passed `check_motion`.
+* Reviewed the same way (Godot render on the Arena player next to the old and the swift clip; stick figures over
+  the played window for Gaelic). **Arena FC: 61 actions now play Meshy** (passes, long and through balls, cross,
+  corner and goal kicks, volley, toe lift, turn, the slide tackle on the ground, block, juke, the low left dive
+  flat out, ground catch, step-over, heel-to-heel), 7 keep their clips (free kick, penalty, header, tackle,
+  dispossess, shoulder charge, ball roll). The skill families now hold 26 moves. **Gaelic Football 3D: 9 actions**
+  (kickout, penalty, pick-up and tackle added).
+* Tests: `test_meshy` 26 checks; Arena FC 112/112, 1263/1263 and `build.py --check` 6/6; Gaelic 3D `make test` and
+  `make test-motion-model` pass.
+* **v11.44:** the 7 Arena actions still on their old clips got a third take: prime again, with the body mechanics
+  spelled out in the prompt (run-up steps, plant foot, follow-through height, where the arms go). The free kick,
+  penalty and header now play Meshy (**64 actions**); the tackle, poke tackle, shoulder charge and ball roll keep
+  their clips after three takes each, and the reasons are in `MESHY_REJECTED`.
+* **v11.45:** two more prime takes each for those four, the opponent described as an object and the body shape
+  spelled out (a deep lunge with the leg along the ground, a sideways barge with bent knees, the sole across the
+  body). The picked takes beat the old clips on the Arena player: **all 68 reviewed actions now play Meshy**.
+
+## New in v11.42: full move catalogues (soccer, Gaelic, hurling), in Arena FC and Gaelic Football 3D
+
+* **Catalogues** (`game_packs/meshy/<sport>_full.json`, the move database): every move with its category, timing,
+  library fallback and prompt. Soccer 163 moves in 11 categories (locomotion, first touch, 14 passes, 17 shots,
+  31 skill moves, defending, aerial, 20 goalkeeper moves, set pieces, reactions, celebrations); Gaelic +39
+  (keepers, kickouts, frees, sidelines, penalties, the bounce, dummies, contact, reactions); hurling +32 (pulls,
+  flicks, hooks, steals, sideline cuts, 65s, penalties, the keeper's work).
+* `forge.py meshy pack --pack soccer_full` writes the full pack (base pack + catalogue);
+  `forge.py meshy catalogue --pack soccer_full` reports coverage by category; `"also_packs"` wires the same clips
+  into the core pack. New packs: `soccer_full` (169 moves, 161 with a Meshy clip), `gaelic_full` (75, 65),
+  `hurling_full` (53, 45); the rest play captured or starter clips. `check_motion`: every pack passes in full.
+* Generated in swift mode: 234 clips, 21 retried with sharper prompts, 8 left out with the reason in the catalogue
+  (`"no_clip"`). `check_motion` counts a lying move like a seated one (the injured-on-the-ground loop).
+* **Review on the real players, not only the checks:** every Meshy clip a game action would play was rendered on
+  the Arena FC player in Godot next to the clip it replaces. Swift takes are often too subtle for short strikes
+  (passes, crosses, corner kicks, slide tackles, a low dive that ends kneeling): those actions keep their clips.
+  **Arena FC** now plays 39 actions on Meshy (shot, trivela, chip, bicycle kick, throw-in, chest / thigh / sole
+  control, the keeper's ready stance, parry, chest catch, high and right dives, punch, throw, drop kick, falls,
+  trip, stumble, get-up, strafes, backpedal, shield, celebrations, five taught skills) and has every Meshy clip in
+  its GLB (515 clips) under `soccer_mz_<move>`, with events measured from each clip (`meshy_cli.clip_events`).
+  Skill inputs now play a family of reviewed moves (drag-back, Cruyff turn, scoop turn, la croqueta, outside
+  hook, stop-and-go, lane change, tornado spin, heel flick, ball hop) through Match's seeded RNG; 24 new
+  `SkillMove` values. **Gaelic Football 3D** has the 65 Gaelic clips in its player as `mz_<move>`, and its kick,
+  free kick, bounce (no clip before), catch and fall play them (`src/meshy_clips.h`, `--no-meshy` to compare).
+* **Prime vs swift, measured** (`prime` = 10 credits, FBX; `swift` = 3, BVH): on four moves swift got wrong, prime
+  did them: slide tackle hips 0.77 -> 0.27 m from the ground, low dive 0.48 -> 0.23 m, knee slide 0.87 -> 0.36 m, and
+  a real cross swing. Prime returns an SMPL-H skeleton: new `smpl` bone convention. Still to do before prime clips
+  ship: their root travel imports at about twice the speed (two of four fail the pops check).
+* Tests: `test_meshy` 23 checks; Arena FC `test_soccer_forge` 112/112 and MatchCoreTests 1263/1263; Gaelic 3D
+  `make test` and `make test-motion-model` pass on the new player.
+
 ## New in v11.41: Meshy AI - Gaelic football moves nobody has filmed
 
 There is no mocap of a hand pass, a solo, a toe-lift or a Gaelic high catch to copy. `forge.py meshy` generates them

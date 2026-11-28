@@ -1,10 +1,10 @@
 {
- "id": "01a22122-6daf-7253-8142-43961645d769",
+ "id": "01a2229b-2d15-7352-95ba-d0cd8525e171",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795852234792,
- "finished_at": 1795852240577,
+ "consumed_credits": 10,
+ "created_at": 1795876925308,
+ "finished_at": 1795876953295,
  "prompt": "A Gaelic football player does a toe-lift pick-up: jogging forward, slips the toe of the right foot under a ball on the ground and flicks it up into both hands, catching it at waist height, then stands tall.",
  "duration": 2.5,
- "mode": "swift"
+ "mode": "prime"
 }

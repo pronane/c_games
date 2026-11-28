@@ -1,0 +1,10 @@
+{
+ "id": "01a222a0-4703-71aa-ae6a-14d2542c0944",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795877259789,
+ "finished_at": 1795877281203,
+ "prompt": "A professional football (soccer) player receives the ball, drags it across with the sole of one foot while spinning round, then pushes it forward with the other foot.",
+ "duration": 2.5,
+ "mode": "prime"
+}

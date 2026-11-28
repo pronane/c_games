@@ -1,0 +1,10 @@
+{
+ "id": "01a22238-5660-76bd-81a6-e8a918919032",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870447889,
+ "finished_at": 1795870464374,
+ "prompt": "A professional football (soccer) player runs fast on a treadmill, facing straight ahead, knocking an imaginary ball forward with the laces every few long strides, the same cycle over and over.",
+ "duration": 3.0,
+ "mode": "swift"
+}

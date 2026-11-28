@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-c5c5-701c-b62b-43d2e049ef6f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871197412,
+ "finished_at": 1795871203700,
+ "prompt": "A professional football (soccer) player cups a hand behind the ear towards the crowd.",
+ "duration": 2.5,
+ "mode": "swift"
+}

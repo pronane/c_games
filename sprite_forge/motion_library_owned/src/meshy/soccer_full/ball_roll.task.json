@@ -1,0 +1,10 @@
+{
+ "id": "01a2231c-ae41-70a1-8218-ebcc0fe8c5e5",
+ "status": "SUCCEEDED",
+ "consumed_credits": 10,
+ "created_at": 1795885412789,
+ "finished_at": 1795885436329,
+ "prompt": "A professional football (soccer) player rolls the ball: standing over the ball, puts the sole of the right foot on top of it and drags it sideways across in front of the body to the left, taking two side steps to the left with it, the right foot sliding across the ground, then pushes it forward.",
+ "duration": 2.5,
+ "mode": "prime"
+}
