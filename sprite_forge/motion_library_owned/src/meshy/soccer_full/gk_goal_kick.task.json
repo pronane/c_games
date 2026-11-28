@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-223e-710d-9c51-4b47bfa7f16e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871024477,
+ "finished_at": 1795871034357,
+ "prompt": "A professional football (soccer) player is a goalkeeper taking a goal kick: long approach, big kick of a ball on the ground.",
+ "duration": 2.5,
+ "mode": "swift"
+}

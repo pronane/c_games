@@ -1,0 +1,10 @@
+{
+ "id": "01a22238-516d-73a0-991d-9b52873e4d7e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870446649,
+ "finished_at": 1795870459375,
+ "prompt": "A professional football (soccer) player dribbles on a treadmill, facing straight ahead, jogging with short steps and tapping an imaginary ball forward with the inside and outside of the right foot every two strides, the same cycle over and over.",
+ "duration": 3.0,
+ "mode": "swift"
+}

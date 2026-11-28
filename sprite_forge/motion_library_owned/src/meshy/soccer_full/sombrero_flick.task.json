@@ -1,0 +1,10 @@
+{
+ "id": "01a2223e-8b0c-7235-ae27-374c0cc90649",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870854694,
+ "finished_at": 1795870868972,
+ "prompt": "A professional football (soccer) player flicks the ball up with the toe and over a defender's head, then runs round to collect it.",
+ "duration": 2.5,
+ "mode": "swift"
+}

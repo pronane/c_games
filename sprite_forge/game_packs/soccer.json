@@ -118,13 +118,17 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_soccer_pass"
+   ]
   },
   {
    "name": "shoot",
    "library": "shoot",
    "prefer": [
-    "soccer_shoot"
+    "soccer_shoot",
+    "mz_soccer_shoot"
    ],
    "frames": 8,
    "fps": 14,
@@ -160,7 +164,8 @@
    "desc": "",
    "prefer": [
     "slide_tackle_mx",
-    "slide_tackle"
+    "slide_tackle",
+    "mz_soccer_tackle"
    ]
   },
   {
@@ -212,7 +217,8 @@
    "prefer": [
     "victory_2",
     "celebrate_jump",
-    "jump_shot"
+    "jump_shot",
+    "mz_soccer_celebrate"
    ],
    "frames": 8,
    "fps": 10,
@@ -251,6 +257,9 @@
    "desc": "step over the ball, outside-in, and drop the shoulder",
    "own": [
     "fs_stepover"
+   ],
+   "prefer": [
+    "mz_soccer_stepover"
    ]
   },
   {
@@ -275,6 +284,9 @@
    "desc": "Marseille turn: drag back with one sole, spin, take it on with the other",
    "own": [
     "fs_roulette"
+   ],
+   "prefer": [
+    "mz_soccer_roulette"
    ]
   },
   {
@@ -298,6 +310,9 @@
    "desc": "outside of the foot one way, snap it back inside the other",
    "own": [
     "fs_elastico"
+   ],
+   "prefer": [
+    "mz_soccer_elastico"
    ]
   },
   {
@@ -321,6 +336,9 @@
    "desc": "sole on the ball, roll it back and turn away",
    "own": [
     "fs_drag_back"
+   ],
+   "prefer": [
+    "mz_soccer_drag_back"
    ]
   },
   {
@@ -342,6 +360,9 @@
    "desc": "roll it up the back of the calf and flick it over the head",
    "own": [
     "fs_rainbow_flick"
+   ],
+   "prefer": [
+    "mz_soccer_rainbow_flick"
    ]
   },
   {
@@ -365,6 +386,9 @@
    "desc": "full shooting back-swing, then stop and cut the ball the other way",
    "own": [
     "fs_fake_shot"
+   ],
+   "prefer": [
+    "mz_soccer_fake_shot"
    ]
   },
   {
@@ -386,6 +410,9 @@
    "desc": "cushion a dropping ball on the thigh",
    "own": [
     "fs_thigh_control"
+   ],
+   "prefer": [
+    "mz_soccer_thigh_control"
    ]
   },
   {
@@ -407,6 +434,9 @@
    "desc": "short back-swing, toe under the ball, lean back - a lob over the keeper",
    "own": [
     "fs_chip_shot"
+   ],
+   "prefer": [
+    "mz_soccer_chip_shot"
    ]
   },
   {
@@ -428,6 +458,9 @@
    "desc": "outside-of-the-boot strike swung across the body",
    "own": [
     "fs_trivela"
+   ],
+   "prefer": [
+    "mz_soccer_trivela"
    ]
   },
   {
@@ -449,6 +482,9 @@
    "desc": "overhead scissor kick, back to goal, landing on the back",
    "own": [
     "fs_bicycle_kick"
+   ],
+   "prefer": [
+    "mz_soccer_bicycle_kick"
    ]
   }
  ],

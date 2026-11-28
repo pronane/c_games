@@ -1,0 +1,10 @@
+{
+ "id": "01a22238-4a54-720d-9412-3c805bb428cd",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870445070,
+ "finished_at": 1795870450084,
+ "prompt": "A professional football (soccer) player jogs on a treadmill at an easy pace, facing straight ahead, relaxed arms, the same cycle over and over. No turning.",
+ "duration": 2.0,
+ "mode": "swift"
+}

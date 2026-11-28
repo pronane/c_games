@@ -1,0 +1,10 @@
+{
+ "id": "01a22245-cec5-754a-9ccf-716597288995",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871330568,
+ "finished_at": 1795871339511,
+ "prompt": "A professional football (soccer) player starts standing, takes two running steps, dives forward horizontally to head the ball with arms out, lands on the chest, then gets back up to standing.",
+ "duration": 3.5,
+ "mode": "swift"
+}

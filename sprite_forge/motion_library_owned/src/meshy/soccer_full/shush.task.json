@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-83c6-724b-949a-20139e6ddb56",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871180466,
+ "finished_at": 1795871184584,
+ "prompt": "A professional football (soccer) player puts a finger on the lips to shush the crowd.",
+ "duration": 2.5,
+ "mode": "swift"
+}

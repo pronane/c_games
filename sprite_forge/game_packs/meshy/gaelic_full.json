@@ -1,0 +1,286 @@
+{
+ "pack": "gaelic_full",
+ "base": "gaelic",
+ "also_packs": [],
+ "label": "Gaelic football - full move catalogue",
+ "description": "The Gaelic pack plus the goalkeeper's work, kickouts, frees, sideline kicks and penalties, the bounce, dummies, contact play, reactions and celebrations.",
+ "mode": "swift",
+ "clip_prefix": "mz_gaelic_",
+ "notes": "Move catalogue for Meshy Text to Motion. forge.py meshy motion --pack gaelic_full generates the clips; forge.py meshy pack --pack gaelic_full writes game_packs/gaelic_full.json.",
+ "moves": {
+  "jog": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "run",
+   "reuse": "mz_soccer_jog"
+  },
+  "backpedal": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A Gaelic football player backpedals on a treadmill, facing straight ahead, quick short steps backwards, arms out, the same cycle over and over."
+  },
+  "jockey": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A Gaelic football player marks an opponent in place, facing straight ahead the whole time: knees bent, arms out wide, small shuffle steps left and right and back to the start, the same rhythm over and over. The body never turns.",
+   "no_clip": "two Meshy takes did not loop cleanly"
+  },
+  "idle_tired": {
+   "category": "Locomotion",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A Gaelic football player stands tired, hands on the knees, breathing hard."
+  },
+  "bounce": {
+   "category": "Ball",
+   "duration": 3.0,
+   "loop": true,
+   "library": "carry",
+   "prompt": "A Gaelic football player runs on a treadmill, facing straight ahead, bouncing the round ball on the ground with one hand and catching it again, the same cycle over and over."
+  },
+  "dummy_hand_pass": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hand_pass",
+   "prompt": "A Gaelic football player shapes to hand pass, swinging the fist, then pulls it back and keeps the ball, stepping the other way."
+  },
+  "dummy_solo": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "carry",
+   "prompt": "A Gaelic football player shapes to drop the ball for a solo, then pulls it back into the chest and sidesteps."
+  },
+  "kick_from_hand_long": {
+   "category": "Ball",
+   "duration": 3.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player kicks a long ball from the hands up the field: run-up, drops the ball, big punt."
+  },
+  "outside_boot_kick": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player kicks with the outside of the right boot, the ball curling away to the right, an outside-of-the-boot point."
+  },
+  "hook_kick": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player snaps a curling kick across the body at goal, the right leg swinging round."
+  },
+  "ground_kick": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player kicks the ball off the ground, soccer style, a low pass."
+  },
+  "fisted_clearance": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A Gaelic football player jumps and punches a high ball away with the fist to clear it."
+  },
+  "catch_and_turn": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "carry",
+   "prompt": "A Gaelic football player catches a ball at the chest, and in one movement turns to face the goal."
+  },
+  "contest_high_ball": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A Gaelic football player jumps for a high ball alongside an opponent, both arms up, shoulders bumping in the air."
+  },
+  "mark_call": {
+   "category": "Ball",
+   "duration": 3.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A Gaelic football player catches a long kick cleanly, then raises one arm to call a mark and stands still holding the ball."
+  },
+  "free_from_hand": {
+   "category": "Set piece",
+   "duration": 3.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player takes a free from the hands: stands still, steps up and drops the ball onto the foot, kicking it over the bar."
+  },
+  "free_from_ground": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player takes a free off the ground: places the ball, steps back, runs up and kicks it high over the bar."
+  },
+  "sideline_kick": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player takes a sideline kick: places the ball on the line, steps back at an angle and curls it in."
+  },
+  "penalty_kick": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player takes a penalty: places the ball, runs up and strikes it hard and low."
+  },
+  "kickout_long": {
+   "category": "Goalkeeper",
+   "duration": 3.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player is a goalkeeper taking a long kickout off the tee: long run-up and big kick high up the field."
+  },
+  "kickout_short": {
+   "category": "Goalkeeper",
+   "duration": 2.5,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player is a goalkeeper taking a short kickout: chips the ball gently off the tee to a nearby team-mate."
+  },
+  "gk_ready": {
+   "category": "Goalkeeper",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A Gaelic football player is a goalkeeper in the ready stance: knees bent, hands out, bouncing lightly on the toes."
+  },
+  "gk_tip_over": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A Gaelic football player is a goalkeeper leaping backwards to tip a ball over the crossbar."
+  },
+  "gk_catch_high": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A Gaelic football player is a goalkeeper jumping to catch a high ball above the head."
+  },
+  "gk_low_save": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A Gaelic football player is a goalkeeper diving down to save a low shot with the feet and body."
+  },
+  "gk_spread": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "save",
+   "prompt": "A Gaelic football player is a goalkeeper in a one-on-one, rushing out and spreading wide, arms out."
+  },
+  "shoulder_charge": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "walk",
+   "prompt": "A Gaelic football player gives a fair shoulder charge: running beside an opponent, elbow tucked in, bumps side-on with the shoulder."
+  },
+  "block_down": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "kick",
+   "prompt": "A Gaelic football player blocks down a kick: throws the body and the hands down in front of a kicker's boot."
+  },
+  "hand_block": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "jump",
+   "prompt": "A Gaelic football player jumps with both arms straight up to block a kick at goal."
+  },
+  "frontal_block": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "walk",
+   "prompt": "A Gaelic football player stands square to a runner and stops them with the chest, arms by the side, a frontal block."
+  },
+  "strip_ball": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "walk",
+   "prompt": "A Gaelic football player reaches in and slaps the ball out of an opponent's grip with one hand."
+  },
+  "dispossessed": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hit",
+   "prompt": "A Gaelic football player has the ball knocked out of the hands from the side, reaching after it."
+  },
+  "stumble": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hit",
+   "prompt": "A Gaelic football player is shoved hard in the chest from the front: the upper body jolts backwards, takes two staggering steps backwards, then steadies."
+  },
+  "hands_on_head": {
+   "category": "Reaction",
+   "duration": 2.5,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A Gaelic football player misses a point and puts both hands on the head."
+  },
+  "appeal": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A Gaelic football player appeals to the referee with one arm raised."
+  },
+  "call_for_ball": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A Gaelic football player raises an arm and calls for the ball."
+  },
+  "knee_slide": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A Gaelic football player celebrates a goal by sliding on the knees, arms out."
+  },
+  "point_to_crowd": {
+   "category": "Celebration",
+   "duration": 2.5,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A Gaelic football player points both fingers at the crowd, shouting."
+  },
+  "applaud": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A Gaelic football player applauds the supporters, clapping above the head."
+  }
+ }
+}

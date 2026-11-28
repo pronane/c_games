@@ -1,0 +1,10 @@
+{
+ "id": "01a22245-43c0-7788-a765-eebc4a0a3a37",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871295025,
+ "finished_at": 1795871304995,
+ "prompt": "A Gaelic football player marks an opponent in place, facing straight ahead the whole time: knees bent, arms out wide, small shuffle steps left and right and back to the start, the same rhythm over and over. The body never turns.",
+ "duration": 3.0,
+ "mode": "swift"
+}

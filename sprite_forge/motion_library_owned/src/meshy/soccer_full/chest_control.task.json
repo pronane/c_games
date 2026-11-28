@@ -1,0 +1,10 @@
+{
+ "id": "01a22239-82b9-729d-a710-058126539622",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870524870,
+ "finished_at": 1795870546982,
+ "prompt": "A professional football (soccer) player controls a dropping ball on the chest: leans back, arms out, takes the ball on the chest and lets it drop to the feet, then traps it.",
+ "duration": 2.5,
+ "mode": "swift"
+}

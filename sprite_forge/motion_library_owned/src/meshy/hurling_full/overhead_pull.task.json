@@ -1,0 +1,10 @@
+{
+ "id": "01a2223a-d7e4-75c6-9016-c08b256b2715",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870612249,
+ "finished_at": 1795870630256,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands pulls overhead: jumps and swings the stick hard at a ball in the air above the head, first time.",
+ "duration": 2.5,
+ "mode": "swift"
+}

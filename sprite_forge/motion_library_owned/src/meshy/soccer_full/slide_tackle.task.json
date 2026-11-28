@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-af83-727f-89f7-91048f457d6d",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870929441,
+ "finished_at": 1795870942598,
+ "prompt": "A professional football (soccer) player makes a slide tackle: runs and slides along the ground on the left side, the right leg extended to win the ball, then gets up.",
+ "duration": 2.5,
+ "mode": "swift"
+}

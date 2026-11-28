@@ -1,0 +1,10 @@
+{
+ "id": "01a2223d-58bc-7576-8a28-7aeb66748db6",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870776276,
+ "finished_at": 1795870795964,
+ "prompt": "A professional football (soccer) player does two quick stepovers, right foot then left foot, then accelerates to the right.",
+ "duration": 2.5,
+ "mode": "swift"
+}

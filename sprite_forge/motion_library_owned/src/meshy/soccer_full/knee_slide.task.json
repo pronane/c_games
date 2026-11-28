@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-90e9-75d6-af70-9e2a8ff0091f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871183668,
+ "finished_at": 1795871192426,
+ "prompt": "A professional football (soccer) player celebrates by running and sliding on both knees with the arms outstretched.",
+ "duration": 3.0,
+ "mode": "swift"
+}

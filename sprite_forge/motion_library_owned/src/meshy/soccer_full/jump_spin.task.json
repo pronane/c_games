@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-541f-726f-9d98-31217ba1dc35",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871168116,
+ "finished_at": 1795871180307,
+ "prompt": "A professional football (soccer) player jumps high and spins in the air, landing with arms wide.",
+ "duration": 2.5,
+ "mode": "swift"
+}

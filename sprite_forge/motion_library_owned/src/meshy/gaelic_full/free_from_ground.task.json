@@ -1,0 +1,10 @@
+{
+ "id": "01a2223e-9632-72db-b985-f83fc9ad71a7",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870857562,
+ "finished_at": 1795870869146,
+ "prompt": "A Gaelic football player takes a free off the ground: places the ball, steps back, runs up and kicks it high over the bar.",
+ "duration": 3.5,
+ "mode": "swift"
+}

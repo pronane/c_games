@@ -1,0 +1,10 @@
+{
+ "id": "01a2223a-66d5-7681-9f65-0f87209c4d33",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870583406,
+ "finished_at": 1795870604600,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands strikes from the left side: tosses the ball, swings the stick from the left shoulder across the body.",
+ "duration": 2.5,
+ "mode": "swift"
+}

@@ -1,0 +1,240 @@
+{
+ "pack": "hurling_full",
+ "base": "hurling",
+ "also_packs": [],
+ "label": "Hurling - full move catalogue",
+ "description": "The hurling pack plus overhead and ground pulls, flicks, hooks and steals, sideline cuts, 65s and penalties, the goalkeeper's work, reactions and celebrations.",
+ "mode": "swift",
+ "clip_prefix": "mz_hurling_",
+ "notes": "Move catalogue for Meshy Text to Motion. forge.py meshy motion --pack hurling_full generates the clips; forge.py meshy pack --pack hurling_full writes game_packs/hurling_full.json.",
+ "moves": {
+  "jog": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "run",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand jogs on a treadmill, facing straight ahead, the same cycle over and over. No turning."
+  },
+  "ready_stance": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands stands still in the ready stance, facing straight ahead, knees bent, stick held low in front, bouncing lightly on the spot, the same small bounce over and over.",
+   "no_clip": "two takes did not loop cleanly"
+  },
+  "backpedal": {
+   "category": "Locomotion",
+   "duration": 2.0,
+   "loop": true,
+   "library": "walk",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand backpedals on a treadmill, facing straight ahead, the same cycle over and over."
+  },
+  "solo_to_hand": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "solo",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand, running, taps the ball up off the flat of the stick into the open left hand and catches it."
+  },
+  "bounce_on_hurley": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": true,
+   "library": "solo",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand stands still facing straight ahead, bouncing the ball up and down on the flat of the stick held out in front, the same small bounce over and over. The body never turns.",
+   "no_clip": "two takes did not loop cleanly"
+  },
+  "strike_left_side": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands strikes from the left side: tosses the ball, swings the stick from the left shoulder across the body."
+  },
+  "overhead_pull": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands pulls overhead: jumps and swings the stick hard at a ball in the air above the head, first time."
+  },
+  "ground_pull": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "ground_strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands pulls first time on a moving ball on the ground with a short sharp swing."
+  },
+  "flick_pass": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "ground_strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands flicks a short pass along the ground with a wrist flick of the stick."
+  },
+  "dummy_strike": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands shapes to strike with a big backswing, then stops and steps the other way."
+  },
+  "roll_lift": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "lift",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand rolls the ball onto the stick with a stamp and roll, then lifts it to the hand."
+  },
+  "catch_and_turn": {
+   "category": "Ball",
+   "duration": 2.5,
+   "loop": false,
+   "library": "catch",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand raises both arms up in front of the face together, catches a ball in the open left hand at head height, then turns in one movement to face the other way.",
+   "no_clip": "a hurling catch is one-handed; the catch check needs both hands up"
+  },
+  "hand_tap_pass": {
+   "category": "Ball",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hand_pass",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand passes the ball off the left palm with a quick slap."
+  },
+  "sideline_cut": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands takes a sideline cut: places the ball on the ground, steps back, crouches and cuts under it with a big swing so it lifts and curls."
+  },
+  "free_65": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands takes a long free: lifts the ball, tosses it up and strikes it with a full swing over the bar."
+  },
+  "penalty_strike": {
+   "category": "Set piece",
+   "duration": 3.5,
+   "loop": false,
+   "library": "ground_strike",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands takes a penalty: lifts the ball, runs in and drives it low and hard."
+  },
+  "gk_ready": {
+   "category": "Goalkeeper",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper holding a hurley with a bigger flat end in the ready stance, stick out in front, bouncing on the toes."
+  },
+  "gk_block_low": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "block",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper dropping down to block a low shot with the flat of the stick."
+  },
+  "gk_block_high": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "block",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper reaching up with the stick to deflect a high shot."
+  },
+  "gk_catch_save": {
+   "category": "Goalkeeper",
+   "duration": 2.0,
+   "loop": false,
+   "library": "catch",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper holding the stick in the right hand who brings both hands up together in front of the chest and catches a hard shot in the open left hand, the stick held up beside it.",
+   "no_clip": "as catch_and_turn"
+  },
+  "gk_puckout_short": {
+   "category": "Goalkeeper",
+   "duration": 2.5,
+   "loop": false,
+   "library": "puckout",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper hitting a short puckout to a nearby team-mate with a soft swing."
+  },
+  "flick": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hook",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands flicks an opponent's stick away with a short quick tap to knock the ball loose."
+  },
+  "steal": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hook",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands reaches in and knocks the ball off an opponent's stick while running beside them."
+  },
+  "frontal_block": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "block",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands stands square and blocks a runner with the body, stick held across."
+  },
+  "tackle_dispossess": {
+   "category": "Contact",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hook",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands tackles: pressures from the side and knocks the ball out of the carrier's hand with the stick."
+  },
+  "stumble": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "hit",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand is shoved hard in the chest from the front: the upper body jolts backwards, takes two staggering steps backwards, then steadies."
+  },
+  "hands_on_head": {
+   "category": "Reaction",
+   "duration": 2.5,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand misses and puts both hands on the head, the stick held up."
+  },
+  "appeal": {
+   "category": "Reaction",
+   "duration": 2.0,
+   "loop": false,
+   "library": "idle",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand appeals to the referee, the free arm raised."
+  },
+  "tap_ground": {
+   "category": "Reaction",
+   "duration": 3.0,
+   "loop": true,
+   "library": "idle",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand waits, tapping the end of the stick on the ground, looking around."
+  },
+  "knee_slide": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand celebrates a goal by sliding on the knees, the stick raised high."
+  },
+  "fist_pump": {
+   "category": "Celebration",
+   "duration": 2.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand pumps the free fist in celebration."
+  },
+  "applaud": {
+   "category": "Celebration",
+   "duration": 3.0,
+   "loop": false,
+   "library": "wave",
+   "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) tucks the hurley under the arm and applauds the supporters."
+  }
+ }
+}

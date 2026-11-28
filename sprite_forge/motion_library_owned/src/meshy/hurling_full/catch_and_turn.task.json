@@ -1,0 +1,10 @@
+{
+ "id": "01a22245-acf1-7624-8013-67f9bd5d4ce3",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871322399,
+ "finished_at": 1795871332634,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand raises both arms up in front of the face together, catches a ball in the open left hand at head height, then turns in one movement to face the other way.",
+ "duration": 2.5,
+ "mode": "swift"
+}

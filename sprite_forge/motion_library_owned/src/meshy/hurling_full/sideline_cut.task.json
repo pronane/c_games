@@ -1,0 +1,10 @@
+{
+ "id": "01a2223d-823c-755d-960e-84fa184d3ade",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870787101,
+ "finished_at": 1795870809398,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands takes a sideline cut: places the ball on the ground, steps back, crouches and cuts under it with a big swing so it lifts and curls.",
+ "duration": 3.5,
+ "mode": "swift"
+}

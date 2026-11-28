@@ -193,6 +193,31 @@ try:
     pref = {mv["name"]: mv.get("prefer") for mv in json.load(open(os.path.join(gdir, "testpack.json")))["moves"]}
     check("a {\"reuse\": CLIP} move is wired with no credits; a missing reuse clip is left out",
           pref["idle"] == ["mz_test_hand_pass"] and sum(c[0] == "POST" for c in fake.calls) == n_posts, pref)
+    # -- a full catalogue: base pack + catalogue, also_packs wiring, coverage --------------------------------------
+    json.dump({"pack": "testpack_full", "base": "testpack", "also_packs": ["testpack"], "mode": "swift",
+               "clip_prefix": "mz_test_", "moves": {
+                   "hand_pass": {"category": "Passing", "duration": 2.0, "loop": False, "library": "pass", "prompt": "x"},
+                   "rabona": {"category": "Shooting", "duration": 2.5, "loop": False, "library": "kick",
+                              "prompt": "a player strikes the ball with the right leg wrapped behind the left"},
+                   "jockey": {"category": "Locomotion", "duration": 3.0, "loop": True, "library": "walk", "prompt": "a player shuffles"}}},
+              open(os.path.join(pdir, "testpack_full.json"), "w"))
+    MC.main(["pack", "--pack", "testpack_full", "--prompts", pdir, "--packs-dir", gdir])
+    full = json.load(open(os.path.join(gdir, "testpack_full.json")))
+    names = [mv["name"] for mv in full["moves"]]
+    check("meshy pack: the base pack's moves first, then the catalogue's new ones by category (Locomotion before Shooting)",
+          names[:3] == ["shoot_point", "hand_pass", "idle"] and names[3:] == ["jockey", "rabona"]
+          and full["moves"][3]["loop"] and full["moves"][4]["events"]["ball_contact"] == 5, names)
+    n_posts = sum(c[0] == "POST" for c in fake.calls)
+    MC.main(["motion", "--pack", "testpack_full", "--prompts", pdir, "--packs-dir", gdir, "--out", out], client=cl)
+    full = {mv["name"]: mv.get("prefer") for mv in json.load(open(os.path.join(gdir, "testpack_full.json")))["moves"]}
+    core = {mv["name"]: mv.get("prefer") for mv in json.load(open(os.path.join(gdir, "testpack.json")))["moves"]}
+    check("a catalogue generates only what is missing and wires the full pack and its also_packs",
+          sum(c[0] == "POST" for c in fake.calls) == n_posts + 2 and full["rabona"] == ["mz_test_rabona"]
+          and full["jockey"] == ["mz_test_jockey"] and "mz_test_hand_pass" in full["hand_pass"]
+          and core.get("rabona") is None, (full, core))
+    cov = MC.coverage(json.load(open(os.path.join(pdir, "testpack_full.json"))), gdir, out)
+    check("meshy catalogue counts, per category, the moves with a Meshy clip",
+          cov["Shooting"] == [1, 1, []] and cov["Locomotion"] == [1, 1, []] and cov["Game"][0] == 3, cov)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

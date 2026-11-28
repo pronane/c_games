@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-6547-7157-9c1e-0177d2d35dcc",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870910538,
+ "finished_at": 1795870925719,
+ "prompt": "A professional football (soccer) player makes a standing tackle: steps in and blocks the ball with the inside of the right foot, leaning in.",
+ "duration": 2.0,
+ "mode": "swift"
+}

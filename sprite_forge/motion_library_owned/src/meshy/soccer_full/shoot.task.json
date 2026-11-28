@@ -1,0 +1,10 @@
+{
+ "id": "01a2223b-79aa-734e-a3cd-3545f8d239e1",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870653776,
+ "finished_at": 1795870674100,
+ "prompt": "A professional football (soccer) player shoots: two-step approach, standing foot beside the ball, strikes through it with the laces of the right foot, body over the ball, follow-through.",
+ "duration": 2.5,
+ "mode": "swift"
+}

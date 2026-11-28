@@ -1,0 +1,10 @@
+{
+ "id": "01a22239-641b-76be-ade7-7856130e72c6",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870517026,
+ "finished_at": 1795870537974,
+ "prompt": "A professional football (soccer) player stops a rolling ball dead under the sole of the right foot, then looks up.",
+ "duration": 2.0,
+ "mode": "swift"
+}

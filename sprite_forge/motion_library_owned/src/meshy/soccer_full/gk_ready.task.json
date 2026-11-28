@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-5c9c-7100-abe5-08eae8217722",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870973877,
+ "finished_at": 1795870985183,
+ "prompt": "A professional football (soccer) player is a goalkeeper in the ready stance: knees bent, weight on the balls of the feet, hands out in front, bouncing lightly.",
+ "duration": 3.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-d8e3-7016-a2d0-e10a2a199ed5",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870940145,
+ "finished_at": 1795870948143,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands flicks an opponent's stick away with a short quick tap to knock the ball loose.",
+ "duration": 2.0,
+ "mode": "swift"
+}

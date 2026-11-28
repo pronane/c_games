@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-b837-744a-880b-63b1a7c1680f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871193783,
+ "finished_at": 1795871200085,
+ "prompt": "A Gaelic football player applauds the supporters, clapping above the head.",
+ "duration": 3.0,
+ "mode": "swift"
+}

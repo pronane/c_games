@@ -1,0 +1,3616 @@
+{
+ "name": "soccer_full",
+ "label": "Soccer - full move catalogue",
+ "description": "Every move a modern football game needs: locomotion, first touch, every pass and shot type, 30+ skill moves, defending, aerial duels, goalkeeping, set pieces, reactions and celebrations.",
+ "camera": "side",
+ "prop": "none",
+ "props": [
+  "ball"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "notes": "Built by forge.py meshy pack from game_packs/meshy/soccer_full.json (the move catalogue). Every move of the soccer pack, then the catalogue's.",
+ "version": 2,
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "idle_athletic"
+   ]
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "prefer": [
+    "walk_casual"
+   ],
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "prefer": [
+    "jog"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "kick",
+   "library": "kick",
+   "prefer": [
+    "soccer_kick"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "pass",
+   "library": "pass",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_soccer_pass"
+   ]
+  },
+  {
+   "name": "shoot",
+   "library": "shoot",
+   "prefer": [
+    "soccer_shoot",
+    "mz_soccer_shoot"
+   ],
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "tackle",
+   "library": "tackle",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "slide_tackle_mx",
+    "slide_tackle",
+    "mz_soccer_tackle"
+   ]
+  },
+  {
+   "name": "header",
+   "library": "jump",
+   "prefer": [
+    "header_jump",
+    "jump_vertical"
+   ],
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "jump to head the ball"
+  },
+  {
+   "name": "save",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "keeper_catch"
+   ]
+  },
+  {
+   "name": "celebrate",
+   "library": "wave",
+   "prefer": [
+    "victory_2",
+    "celebrate_jump",
+    "jump_shot",
+    "mz_soccer_celebrate"
+   ],
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Extra",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "stepover",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     3,
+     6
+    ]
+   },
+   "desc": "step over the ball, outside-in, and drop the shoulder",
+   "own": [
+    "fs_stepover"
+   ],
+   "prefer": [
+    "mz_soccer_stepover"
+   ]
+  },
+  {
+   "name": "roulette",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     3,
+     6
+    ]
+   },
+   "desc": "Marseille turn: drag back with one sole, spin, take it on with the other",
+   "own": [
+    "fs_roulette"
+   ],
+   "prefer": [
+    "mz_soccer_roulette"
+   ]
+  },
+  {
+   "name": "elastico",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 2,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     5
+    ]
+   },
+   "desc": "outside of the foot one way, snap it back inside the other",
+   "own": [
+    "fs_elastico"
+   ],
+   "prefer": [
+    "mz_soccer_elastico"
+   ]
+  },
+  {
+   "name": "drag_back",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 2,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     4
+    ]
+   },
+   "desc": "sole on the ball, roll it back and turn away",
+   "own": [
+    "fs_drag_back"
+   ],
+   "prefer": [
+    "mz_soccer_drag_back"
+   ]
+  },
+  {
+   "name": "rainbow_flick",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "roll it up the back of the calf and flick it over the head",
+   "own": [
+    "fs_rainbow_flick"
+   ],
+   "prefer": [
+    "mz_soccer_rainbow_flick"
+   ]
+  },
+  {
+   "name": "fake_shot",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     4
+    ]
+   },
+   "desc": "full shooting back-swing, then stop and cut the ball the other way",
+   "own": [
+    "fs_fake_shot"
+   ],
+   "prefer": [
+    "mz_soccer_fake_shot"
+   ]
+  },
+  {
+   "name": "thigh_control",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "cushion a dropping ball on the thigh",
+   "own": [
+    "fs_thigh_control"
+   ],
+   "prefer": [
+    "mz_soccer_thigh_control"
+   ]
+  },
+  {
+   "name": "chip_shot",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "short back-swing, toe under the ball, lean back - a lob over the keeper",
+   "own": [
+    "fs_chip_shot"
+   ],
+   "prefer": [
+    "mz_soccer_chip_shot"
+   ]
+  },
+  {
+   "name": "trivela",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "outside-of-the-boot strike swung across the body",
+   "own": [
+    "fs_trivela"
+   ],
+   "prefer": [
+    "mz_soccer_trivela"
+   ]
+  },
+  {
+   "name": "bicycle_kick",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "overhead scissor kick, back to goal, landing on the back",
+   "own": [
+    "fs_bicycle_kick"
+   ],
+   "prefer": [
+    "mz_soccer_bicycle_kick"
+   ]
+  },
+  {
+   "name": "jog",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jogs on a treadmill at an easy pace, facing straight ahead, relaxed arms, the sa",
+   "prefer": [
+    "mz_soccer_jog"
+   ]
+  },
+  {
+   "name": "sprint",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player sprints on a treadmill flat out, facing straight ahead, long strides, arms pumpi",
+   "prefer": [
+    "mz_soccer_sprint"
+   ]
+  },
+  {
+   "name": "dribble",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player dribbles on a treadmill, facing straight ahead, jogging with short steps and tap",
+   "prefer": [
+    "mz_soccer_dribble"
+   ]
+  },
+  {
+   "name": "sprint_dribble",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player runs fast on a treadmill, facing straight ahead, knocking an imaginary ball forw",
+   "prefer": [
+    "mz_soccer_sprint_dribble"
+   ]
+  },
+  {
+   "name": "jockey",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knees bent, side-on stance, arms out, small shuffle steps left and right and back to the start, the same rhythm over and"
+  },
+  {
+   "name": "backpedal",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player backpedals on a treadmill, facing straight ahead, quick short steps backwards, a",
+   "prefer": [
+    "mz_soccer_backpedal"
+   ]
+  },
+  {
+   "name": "strafe_left",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player side-steps to the left on a treadmill, facing straight ahead, quick shuffle step",
+   "prefer": [
+    "mz_soccer_strafe_left"
+   ]
+  },
+  {
+   "name": "strafe_right",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player side-steps to the right on a treadmill, facing straight ahead, quick shuffle ste",
+   "prefer": [
+    "mz_soccer_strafe_right"
+   ]
+  },
+  {
+   "name": "turn_180",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jogging forward, plants the right foot and turns sharply all the way round, then",
+   "prefer": [
+    "mz_soccer_turn_180"
+   ]
+  },
+  {
+   "name": "decelerate",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player sprinting, slows down over three short braking steps and comes to a balanced sto",
+   "prefer": [
+    "mz_soccer_decelerate"
+   ]
+  },
+  {
+   "name": "idle_foot_on_ball",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands relaxed with the sole of the right foot resting on top of an imaginary ba",
+   "prefer": [
+    "mz_soccer_idle_foot_on_ball"
+   ]
+  },
+  {
+   "name": "idle_tired",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands tired, bent forward with both hands on the knees, breathing hard, shoulde",
+   "prefer": [
+    "mz_soccer_idle_tired"
+   ]
+  },
+  {
+   "name": "shield_ball",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knees bent, left arm out behind to hold off a defender, small shuffle steps left and right, the same rhythm over and ove",
+   "prefer": [
+    "mz_soccer_shield_ball"
+   ]
+  },
+  {
+   "name": "trap_sole",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stops a rolling ball dead under the sole of the right foot, then looks up.",
+   "prefer": [
+    "mz_soccer_trap_sole"
+   ]
+  },
+  {
+   "name": "trap_inside",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player receives a pass with the inside of the right foot, cushioning it so it stops bes",
+   "prefer": [
+    "mz_soccer_trap_inside"
+   ]
+  },
+  {
+   "name": "chest_control",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "leans back, arms out, takes the ball on the chest and lets it drop to the feet, then traps it.",
+   "prefer": [
+    "mz_soccer_chest_control"
+   ]
+  },
+  {
+   "name": "first_touch_turn",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player takes the first touch with the outside of the right foot and turns ninety degree",
+   "prefer": [
+    "mz_soccer_first_touch_turn"
+   ]
+  },
+  {
+   "name": "flick_up",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player flicks an imaginary ball up off the ground with the toe of the right foot and ca",
+   "prefer": [
+    "mz_soccer_flick_up"
+   ]
+  },
+  {
+   "name": "keepy_uppy",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player juggles a ball in place, keeping it up with alternate feet, small light touches ",
+   "prefer": [
+    "mz_soccer_keepy_uppy"
+   ]
+  },
+  {
+   "name": "cushion_volley",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Control",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player cushions a falling ball out of the air with the instep of the right foot, bringi",
+   "prefer": [
+    "mz_soccer_cushion_volley"
+   ]
+  },
+  {
+   "name": "driven_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player drives a hard low pass with the laces of the right foot, knee over the ball, fir",
+   "prefer": [
+    "mz_soccer_driven_pass"
+   ]
+  },
+  {
+   "name": "lofted_pass",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "two-step approach, leans back slightly and gets under the ball with the right foot, high follow-through.",
+   "prefer": [
+    "mz_soccer_lofted_pass"
+   ]
+  },
+  {
+   "name": "through_ball",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player slides a through ball into space with the inside of the right foot, weighted, ar",
+   "prefer": [
+    "mz_soccer_through_ball"
+   ]
+  },
+  {
+   "name": "lobbed_through",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player dinks a lobbed through ball over the defence with a short stabbing chip of the r",
+   "prefer": [
+    "mz_soccer_lobbed_through"
+   ]
+  },
+  {
+   "name": "cross_whipped",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "approaches at an angle, wraps the right foot around the ball with a big swing across the body.",
+   "prefer": [
+    "mz_soccer_cross_whipped"
+   ]
+  },
+  {
+   "name": "cross_low",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player drills a low cross along the ground across the goal with the right foot.",
+   "prefer": [
+    "mz_soccer_cross_low"
+   ]
+  },
+  {
+   "name": "backheel_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "steps past the ball and flicks it backwards with the heel of the right foot.",
+   "prefer": [
+    "mz_soccer_backheel_pass"
+   ]
+  },
+  {
+   "name": "outside_foot_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player passes with the outside of the right foot, a short flick of the ankle, the ball ",
+   "prefer": [
+    "mz_soccer_outside_foot_pass"
+   ]
+  },
+  {
+   "name": "no_look_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands upright, turns the head to look to the left, and at the same time passes ",
+   "prefer": [
+    "mz_soccer_no_look_pass"
+   ]
+  },
+  {
+   "name": "header_pass",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "neck firm, nods the ball forward and down with the forehead.",
+   "prefer": [
+    "mz_soccer_header_pass"
+   ]
+  },
+  {
+   "name": "flick_on_header",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps and glances a ball backwards with the top of the head as a flick-on.",
+   "prefer": [
+    "mz_soccer_flick_on_header"
+   ]
+  },
+  {
+   "name": "chest_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player cushions a ball off the chest straight to a team-mate in front.",
+   "prefer": [
+    "mz_soccer_chest_pass"
+   ]
+  },
+  {
+   "name": "first_time_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jogging, passes a moving ball first time with the inside of the right foot witho",
+   "prefer": [
+    "mz_soccer_first_time_pass"
+   ]
+  },
+  {
+   "name": "power_shot",
+   "library": "kick",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "long run-up, big backswing, smashes the ball with the laces, landing on the kicking foot.",
+   "prefer": [
+    "mz_soccer_power_shot"
+   ]
+  },
+  {
+   "name": "finesse_shot",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "side-on approach, wraps the inside of the right foot around the ball, body opening up, follow-through across the body.",
+   "prefer": [
+    "mz_soccer_finesse_shot"
+   ]
+  },
+  {
+   "name": "low_driven_shot",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player drills a low driven shot along the ground, knee over the ball, short sharp follo",
+   "prefer": [
+    "mz_soccer_low_driven_shot"
+   ]
+  },
+  {
+   "name": "volley",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "leans back slightly, swings the right leg through and strikes the ball in the air at knee height.",
+   "prefer": [
+    "mz_soccer_volley"
+   ]
+  },
+  {
+   "name": "half_volley",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player strikes a half volley, hitting the ball with the laces just as it bounces, body ",
+   "prefer": [
+    "mz_soccer_half_volley"
+   ]
+  },
+  {
+   "name": "side_volley",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "leans far to the left, the right leg swinging round horizontally at hip height to strike the ball in the air.",
+   "prefer": [
+    "mz_soccer_side_volley"
+   ]
+  },
+  {
+   "name": "scorpion_kick",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player dives forward and flicks the ball with both heels raised up behind the back, lan",
+   "prefer": [
+    "mz_soccer_scorpion_kick"
+   ]
+  },
+  {
+   "name": "rabona",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the right leg wraps behind the standing left leg to kick the ball.",
+   "prefer": [
+    "mz_soccer_rabona"
+   ]
+  },
+  {
+   "name": "toe_poke",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player toe-pokes the ball quickly with a short jab of the right foot.",
+   "prefer": [
+    "mz_soccer_toe_poke"
+   ]
+  },
+  {
+   "name": "tap_in",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player slides in close to goal and taps the ball in with the inside of the right foot.",
+   "prefer": [
+    "mz_soccer_tap_in"
+   ]
+  },
+  {
+   "name": "diving_header",
+   "library": "jump",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player starts standing, takes two running steps, dives forward horizontally to head the",
+   "prefer": [
+    "mz_soccer_diving_header"
+   ]
+  },
+  {
+   "name": "header_shot",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps and powers a header downwards towards goal, neck snapping forward, eyes op",
+   "prefer": [
+    "mz_soccer_header_shot"
+   ]
+  },
+  {
+   "name": "knuckle_shot",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Shooting",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "straight run-up, stabs the laces through the middle of the ball with almost no follow-through.",
+   "prefer": [
+    "mz_soccer_knuckle_shot"
+   ]
+  },
+  {
+   "name": "reverse_stepover",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "circles the right foot over the ball from outside to inside, then goes the other way.",
+   "prefer": [
+    "mz_soccer_reverse_stepover"
+   ]
+  },
+  {
+   "name": "double_stepover",
+   "library": "run",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player does two quick stepovers, right foot then left foot, then accelerates to the rig",
+   "prefer": [
+    "mz_soccer_double_stepover"
+   ]
+  },
+  {
+   "name": "body_feint",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "drops the left shoulder and leans to the left without touching the ball, then goes right.",
+   "prefer": [
+    "mz_soccer_body_feint"
+   ]
+  },
+  {
+   "name": "reverse_elastico",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "pushes the ball in with the inside of the right foot and snaps it back out with the outside.",
+   "prefer": [
+    "mz_soccer_reverse_elastico"
+   ]
+  },
+  {
+   "name": "cruyff_turn",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "fakes a pass, then drags the ball behind the standing leg with the inside of the right foot and turns away.",
+   "prefer": [
+    "mz_soccer_cruyff_turn"
+   ]
+  },
+  {
+   "name": "la_croqueta",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player shifts the ball quickly from the right foot to the left foot sideways with two q",
+   "prefer": [
+    "mz_soccer_la_croqueta"
+   ]
+  },
+  {
+   "name": "ball_roll",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player rolls the ball sideways across the body with the sole of the right foot, steppin",
+   "prefer": [
+    "mz_soccer_ball_roll"
+   ]
+  },
+  {
+   "name": "heel_chop",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player chops the ball behind the standing leg with the heel of the right foot and chang",
+   "prefer": [
+    "mz_soccer_heel_chop"
+   ]
+  },
+  {
+   "name": "fake_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player shapes to pass with the inside of the right foot, stops the swing, and goes the ",
+   "prefer": [
+    "mz_soccer_fake_pass"
+   ]
+  },
+  {
+   "name": "ball_hop",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player hops with both feet over the ball while standing, feet together, landing on the ",
+   "prefer": [
+    "mz_soccer_ball_hop"
+   ]
+  },
+  {
+   "name": "heel_flick",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player flicks the ball forward with the heel of the right foot behind the standing leg.",
+   "prefer": [
+    "mz_soccer_heel_flick"
+   ]
+  },
+  {
+   "name": "scoop_turn",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player scoops the ball back with the inside of the right foot while turning a half circ",
+   "prefer": [
+    "mz_soccer_scoop_turn"
+   ]
+  },
+  {
+   "name": "sombrero_flick",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player flicks the ball up with the toe and over a defender's head, then runs round to c",
+   "prefer": [
+    "mz_soccer_sombrero_flick"
+   ]
+  },
+  {
+   "name": "berba_spin",
+   "library": "run",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player receives the ball, drags it across with the sole of one foot while spinning roun",
+   "prefer": [
+    "mz_soccer_berba_spin"
+   ]
+  },
+  {
+   "name": "sole_roll_turn",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player rolls the ball back with the sole and spins a full turn while keeping it under t",
+   "prefer": [
+    "mz_soccer_sole_roll_turn"
+   ]
+  },
+  {
+   "name": "outside_hook",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player hooks the ball with the outside of the right foot to cut sharply to the right.",
+   "prefer": [
+    "mz_soccer_outside_hook"
+   ]
+  },
+  {
+   "name": "inside_hook",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player hooks the ball with the inside of the right foot to cut sharply to the left.",
+   "prefer": [
+    "mz_soccer_inside_hook"
+   ]
+  },
+  {
+   "name": "hesitation_burst",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player dribbling at a jog, hesitates with the sole on the ball for a moment, then sudde",
+   "prefer": [
+    "mz_soccer_hesitation_burst"
+   ]
+  },
+  {
+   "name": "knock_on_and_run",
+   "library": "run",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player knocks the ball far past a defender with the outside of the foot and sprints rou",
+   "prefer": [
+    "mz_soccer_knock_on_and_run"
+   ]
+  },
+  {
+   "name": "lane_change",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player dribbling, shifts the ball sideways one stride with the outside of the foot to c",
+   "prefer": [
+    "mz_soccer_lane_change"
+   ]
+  },
+  {
+   "name": "tornado_spin",
+   "library": "run",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player spins a full turn over the ball with a quick drag and flick, ending facing forwa",
+   "prefer": [
+    "mz_soccer_tornado_spin"
+   ]
+  },
+  {
+   "name": "behind_leg_turn",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player passes the ball behind the standing leg with the inside of the right foot to tur",
+   "prefer": [
+    "mz_soccer_behind_leg_turn"
+   ]
+  },
+  {
+   "name": "heel_to_heel",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player flicks the ball with the heel of one foot onto the heel of the other foot, sendi",
+   "prefer": [
+    "mz_soccer_heel_to_heel"
+   ]
+  },
+  {
+   "name": "rabona_fake",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "swings the right leg behind the left, then stops and pulls the ball away.",
+   "prefer": [
+    "mz_soccer_rabona_fake"
+   ]
+  },
+  {
+   "name": "flair_pass",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Skill",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player plays a flashy pass with the heel, flicking the ball sideways.",
+   "prefer": [
+    "mz_soccer_flair_pass"
+   ]
+  },
+  {
+   "name": "slide_tackle",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "runs and slides along the ground on the left side, the right leg extended to win the ball, then gets up.",
+   "prefer": [
+    "mz_soccer_slide_tackle"
+   ]
+  },
+  {
+   "name": "poke_tackle",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stretches the right leg out to poke the ball away from an attacker with the toe.",
+   "prefer": [
+    "mz_soccer_poke_tackle"
+   ]
+  },
+  {
+   "name": "block_shot",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "throws the body in front, turns side-on, arms tucked behind the back, the leg stretched out.",
+   "prefer": [
+    "mz_soccer_block_shot"
+   ]
+  },
+  {
+   "name": "shoulder_challenge",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player runs alongside an attacker and leans in with the shoulder to barge them off the ",
+   "prefer": [
+    "mz_soccer_shoulder_challenge"
+   ]
+  },
+  {
+   "name": "interception",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stretches out a leg to intercept a pass, lunging to the side.",
+   "prefer": [
+    "mz_soccer_interception"
+   ]
+  },
+  {
+   "name": "clearance_kick",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "big hoof with the right foot, ball going high and far.",
+   "prefer": [
+    "mz_soccer_clearance_kick"
+   ]
+  },
+  {
+   "name": "clearance_header",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps and heads the ball away high and far, defensive header.",
+   "prefer": [
+    "mz_soccer_clearance_header"
+   ]
+  },
+  {
+   "name": "standing_block",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands in the way of an attacker, arms tucked behind the back, side-on, to block",
+   "prefer": [
+    "mz_soccer_standing_block"
+   ]
+  },
+  {
+   "name": "push_fight",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player grapples with an opponent at a corner, arms tangling, jostling for position.",
+   "prefer": [
+    "mz_soccer_push_fight"
+   ]
+  },
+  {
+   "name": "lunge_challenge",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player lunges in with a long stretching step to win the ball.",
+   "prefer": [
+    "mz_soccer_lunge_challenge"
+   ]
+  },
+  {
+   "name": "track_back",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Defending",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player sprints back on a treadmill tracking back, facing straight ahead, looking over t",
+   "prefer": [
+    "mz_soccer_track_back"
+   ]
+  },
+  {
+   "name": "header_jump",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Aerial",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps up to win a header, arms raised for leverage, heads the ball forward.",
+   "prefer": [
+    "mz_soccer_header_jump"
+   ]
+  },
+  {
+   "name": "header_standing",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Aerial",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player heads a ball standing, neck snapping forward, both feet on the ground.",
+   "prefer": [
+    "mz_soccer_header_standing"
+   ]
+  },
+  {
+   "name": "leap_chest_control",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Aerial",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps to bring a high ball down on the chest, then lands and traps it.",
+   "prefer": [
+    "mz_soccer_leap_chest_control"
+   ]
+  },
+  {
+   "name": "backward_header",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Aerial",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player heads the ball backwards over the head, leaning back.",
+   "prefer": [
+    "mz_soccer_backward_header"
+   ]
+  },
+  {
+   "name": "gk_ready",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "knees bent, weight on the balls of the feet, hands out in front, bouncing lightly.",
+   "prefer": [
+    "mz_soccer_gk_ready"
+   ]
+  },
+  {
+   "name": "gk_shuffle",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper shuffling sideways across the goal in the ready stance, hands ou",
+   "prefer": [
+    "mz_soccer_gk_shuffle"
+   ]
+  },
+  {
+   "name": "gk_dive_low_left",
+   "library": "dive_left",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper diving low to the left to save a shot along the ground, arms str",
+   "prefer": [
+    "mz_soccer_gk_dive_low_left"
+   ]
+  },
+  {
+   "name": "gk_dive_low_right",
+   "library": "dive_right",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "pushes off the left foot and throws the whole body sideways to the ground, landing flat on the right side with both arms",
+   "prefer": [
+    "mz_soccer_gk_dive_low_right"
+   ]
+  },
+  {
+   "name": "gk_dive_high_left",
+   "library": "dive_left",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper diving high to the left, the body flying horizontally, both arms",
+   "prefer": [
+    "mz_soccer_gk_dive_high_left"
+   ]
+  },
+  {
+   "name": "gk_dive_high_right",
+   "library": "dive_right",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper diving high to the right, the body flying horizontally, both arm",
+   "prefer": [
+    "mz_soccer_gk_dive_high_right"
+   ]
+  },
+  {
+   "name": "gk_tip_over",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper leaping backwards to tip a ball over the crossbar with the finge",
+   "prefer": [
+    "mz_soccer_gk_tip_over"
+   ]
+  },
+  {
+   "name": "gk_parry",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper parrying a hard shot away to the side with both palms.",
+   "prefer": [
+    "mz_soccer_gk_parry"
+   ]
+  },
+  {
+   "name": "gk_catch_chest",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper catching a shot at the chest, both arms wrapping around the ball",
+   "prefer": [
+    "mz_soccer_gk_catch_chest"
+   ]
+  },
+  {
+   "name": "gk_catch_high",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper jumping off one leg, knee up, to catch a high cross above the he",
+   "prefer": [
+    "mz_soccer_gk_catch_high"
+   ]
+  },
+  {
+   "name": "gk_punch",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper jumping and punching a cross away with both fists.",
+   "prefer": [
+    "mz_soccer_gk_punch"
+   ]
+  },
+  {
+   "name": "gk_collect_low",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper standing upright who bends down, scoops a low ball into the ches",
+   "prefer": [
+    "mz_soccer_gk_collect_low"
+   ]
+  },
+  {
+   "name": "gk_smother",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper diving at an attacker's feet to smother the ball, body spread al",
+   "prefer": [
+    "mz_soccer_gk_smother"
+   ]
+  },
+  {
+   "name": "gk_spread",
+   "library": "save",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper in a one-on-one, rushing out and spreading the body wide with on",
+   "prefer": [
+    "mz_soccer_gk_spread"
+   ]
+  },
+  {
+   "name": "gk_goal_kick",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "long approach, big kick of a ball on the ground.",
+   "prefer": [
+    "mz_soccer_gk_goal_kick"
+   ]
+  },
+  {
+   "name": "gk_drop_kick",
+   "library": "kick",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper drop-kicking the ball from the hands up the field.",
+   "prefer": [
+    "mz_soccer_gk_drop_kick"
+   ]
+  },
+  {
+   "name": "gk_throw_overarm",
+   "library": "throw",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper throwing the ball long overarm, the arm swinging over like a bow",
+   "prefer": [
+    "mz_soccer_gk_throw_overarm"
+   ]
+  },
+  {
+   "name": "gk_roll_out",
+   "library": "throw",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper who starts standing upright holding the ball, steps forward, ben",
+   "prefer": [
+    "mz_soccer_gk_roll_out"
+   ]
+  },
+  {
+   "name": "gk_get_up",
+   "library": "get_up",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_soccer_get_up"
+   ]
+  },
+  {
+   "name": "gk_penalty_ready",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player is a goalkeeper on the goal line facing a penalty, waving the arms, bouncing sid",
+   "prefer": [
+    "mz_soccer_gk_penalty_ready"
+   ]
+  },
+  {
+   "name": "throw_in",
+   "library": "throw",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "both hands hold the ball behind the head, both feet on the ground, throws it forward.",
+   "prefer": [
+    "mz_soccer_throw_in"
+   ]
+  },
+  {
+   "name": "long_throw",
+   "library": "throw",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player takes a long throw-in with a run-up, arching back and hurling the ball forward w",
+   "prefer": [
+    "mz_soccer_long_throw"
+   ]
+  },
+  {
+   "name": "corner_kick",
+   "library": "kick",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 6,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "a few steps of run-up at an angle, whips the ball in with the right foot.",
+   "prefer": [
+    "mz_soccer_corner_kick"
+   ]
+  },
+  {
+   "name": "free_kick_curl",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "stands still, takes a short angled run-up, and curls the ball with the inside of the right foot.",
+   "prefer": [
+    "mz_soccer_free_kick_curl"
+   ]
+  },
+  {
+   "name": "free_kick_power",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "long straight run-up and hits the ball hard with the laces.",
+   "prefer": [
+    "mz_soccer_free_kick_power"
+   ]
+  },
+  {
+   "name": "penalty_kick",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "stands, takes a short run-up and strikes the ball low and hard to the side.",
+   "prefer": [
+    "mz_soccer_penalty_kick"
+   ]
+  },
+  {
+   "name": "penalty_stutter",
+   "library": "kick",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player takes a stuttering penalty run-up with a pause and then side-foots the ball.",
+   "prefer": [
+    "mz_soccer_penalty_stutter"
+   ]
+  },
+  {
+   "name": "wall_jump",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands in a defensive wall, hands covering the groin, then jumps straight up tog",
+   "prefer": [
+    "mz_soccer_wall_jump"
+   ]
+  },
+  {
+   "name": "kick_off",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "taps the ball forward to a team-mate.",
+   "prefer": [
+    "mz_soccer_kick_off"
+   ]
+  },
+  {
+   "name": "free_kick_stance",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands over a free kick, hands on hips, staring at the goal, taking deep breaths",
+   "prefer": [
+    "mz_soccer_free_kick_stance"
+   ]
+  },
+  {
+   "name": "fall_tripped",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player running, is tripped from behind, falls forward onto the chest with arms out.",
+   "prefer": [
+    "mz_soccer_fall_tripped"
+   ]
+  },
+  {
+   "name": "fall_pushed",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands upright for a moment, is pushed hard in the back, stumbles forward two st",
+   "prefer": [
+    "mz_soccer_fall_pushed"
+   ]
+  },
+  {
+   "name": "dive_simulation",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player dives dramatically, throwing arms up and falling to the ground holding the shin.",
+   "prefer": [
+    "mz_soccer_dive_simulation"
+   ]
+  },
+  {
+   "name": "get_up",
+   "library": "get_up",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player lying face down on the ground, pushes up and gets back on the feet, stands uprig",
+   "prefer": [
+    "mz_soccer_get_up"
+   ]
+  },
+  {
+   "name": "stumble",
+   "library": "hit",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the upper body jolts backwards, takes two staggering steps backwards, arms flailing, then steadies.",
+   "prefer": [
+    "mz_soccer_stumble"
+   ]
+  },
+  {
+   "name": "injured_lying",
+   "library": "idle",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player lies on the back on the ground holding the right knee with both hands, rolling s",
+   "prefer": [
+    "mz_soccer_injured_lying"
+   ]
+  },
+  {
+   "name": "limp",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player limps on a treadmill, facing straight ahead, favouring the right leg, the same c",
+   "prefer": [
+    "mz_soccer_limp"
+   ]
+  },
+  {
+   "name": "hands_on_head",
+   "library": "idle",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player misses a chance and puts both hands on the head in frustration, looking up.",
+   "prefer": [
+    "mz_soccer_hands_on_head"
+   ]
+  },
+  {
+   "name": "appeal",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player appeals to the referee with one arm raised high, palm open.",
+   "prefer": [
+    "mz_soccer_appeal"
+   ]
+  },
+  {
+   "name": "argue_referee",
+   "library": "idle",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "arms out wide, palms up, shaking the head.",
+   "prefer": [
+    "mz_soccer_argue_referee"
+   ]
+  },
+  {
+   "name": "applaud",
+   "library": "idle",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player applauds the fans, clapping the hands above the head while turning.",
+   "prefer": [
+    "mz_soccer_applaud"
+   ]
+  },
+  {
+   "name": "high_five",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player high fives a team-mate with the right hand.",
+   "prefer": [
+    "mz_soccer_high_five"
+   ]
+  },
+  {
+   "name": "handshake",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player shakes hands with an opponent.",
+   "prefer": [
+    "mz_soccer_handshake"
+   ]
+  },
+  {
+   "name": "frustrated_kick_air",
+   "library": "kick",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player kicks at the air in frustration.",
+   "prefer": [
+    "mz_soccer_frustrated_kick_air"
+   ]
+  },
+  {
+   "name": "disappointed_kneel",
+   "library": "idle",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands, then sinks down onto both knees with the shins flat on the ground, sits "
+  },
+  {
+   "name": "point_to_teammate",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player points at a team-mate, acknowledging a great pass.",
+   "prefer": [
+    "mz_soccer_point_to_teammate"
+   ]
+  },
+  {
+   "name": "call_for_ball",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player raises one arm and calls for the ball, waving.",
+   "prefer": [
+    "mz_soccer_call_for_ball"
+   ]
+  },
+  {
+   "name": "organise_defence",
+   "library": "idle",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player directs team-mates, pointing and waving the arms to organise the defence.",
+   "prefer": [
+    "mz_soccer_organise_defence"
+   ]
+  },
+  {
+   "name": "knee_slide",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player celebrates by running and sliding on both knees with the arms outstretched.",
+   "prefer": [
+    "mz_soccer_knee_slide"
+   ]
+  },
+  {
+   "name": "aeroplane",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player celebrates by running with both arms spread out like an aeroplane wing, banking ",
+   "prefer": [
+    "mz_soccer_aeroplane"
+   ]
+  },
+  {
+   "name": "fist_pump",
+   "library": "wave",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player clenches the fist and pumps it hard in celebration.",
+   "prefer": [
+    "mz_soccer_fist_pump"
+   ]
+  },
+  {
+   "name": "point_to_sky",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player points both index fingers up at the sky.",
+   "prefer": [
+    "mz_soccer_point_to_sky"
+   ]
+  },
+  {
+   "name": "cup_ear",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player cups a hand behind the ear towards the crowd.",
+   "prefer": [
+    "mz_soccer_cup_ear"
+   ]
+  },
+  {
+   "name": "shush",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player puts a finger on the lips to shush the crowd.",
+   "prefer": [
+    "mz_soccer_shush"
+   ]
+  },
+  {
+   "name": "jump_spin",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps high and spins in the air, landing with arms wide.",
+   "prefer": [
+    "mz_soccer_jump_spin"
+   ]
+  },
+  {
+   "name": "backflip",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player does a backflip in celebration.",
+   "prefer": [
+    "mz_soccer_backflip"
+   ]
+  },
+  {
+   "name": "cartwheel",
+   "library": "jump",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player does a cartwheel in celebration.",
+   "prefer": [
+    "mz_soccer_cartwheel"
+   ]
+  },
+  {
+   "name": "heart_hands",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player makes a heart shape with the hands towards the crowd.",
+   "prefer": [
+    "mz_soccer_heart_hands"
+   ]
+  },
+  {
+   "name": "salute",
+   "library": "wave",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands to attention and salutes.",
+   "prefer": [
+    "mz_soccer_salute"
+   ]
+  },
+  {
+   "name": "dance",
+   "library": "wave",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player does a celebration dance, stepping side to side, hips moving, arms swinging.",
+   "prefer": [
+    "mz_soccer_dance"
+   ]
+  },
+  {
+   "name": "team_huddle",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player jumps up and down with arms around imaginary team-mates' shoulders.",
+   "prefer": [
+    "mz_soccer_team_huddle"
+   ]
+  },
+  {
+   "name": "shirt_kiss",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player kisses the badge on the shirt, holding it out with both hands.",
+   "prefer": [
+    "mz_soccer_shirt_kiss"
+   ]
+  },
+  {
+   "name": "arms_wide",
+   "library": "wave",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A professional football (soccer) player stands still with arms stretched wide, chest out, soaking up the cheers.",
+   "prefer": [
+    "mz_soccer_arms_wide"
+   ]
+  }
+ ]
+}

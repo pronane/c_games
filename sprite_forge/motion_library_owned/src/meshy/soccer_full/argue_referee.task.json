@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-acdc-71c6-bb8f-90e8f047b591",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871125422,
+ "finished_at": 1795871131594,
+ "prompt": "A professional football (soccer) player argues with the referee: arms out wide, palms up, shaking the head.",
+ "duration": 3.0,
+ "mode": "swift"
+}

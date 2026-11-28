@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-1752-71f7-ba25-3ccbc443bfbd",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871021706,
+ "finished_at": 1795871038300,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand misses and puts both hands on the head, the stick held up.",
+ "duration": 2.5,
+ "mode": "swift"
+}

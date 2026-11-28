@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-99bb-709f-a8e8-c215198ce62a",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871120473,
+ "finished_at": 1795871134662,
+ "prompt": "A professional football (soccer) player limps on a treadmill, facing straight ahead, favouring the right leg, the same cycle over and over.",
+ "duration": 3.0,
+ "mode": "swift"
+}

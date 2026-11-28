@@ -1,0 +1,10 @@
+{
+ "id": "01a22239-f35b-7225-bccb-554f62e925e0",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870553639,
+ "finished_at": 1795870572972,
+ "prompt": "A professional football (soccer) player juggles a ball in place, keeping it up with alternate feet, small light touches at knee height, arms out for balance.",
+ "duration": 4.0,
+ "mode": "swift"
+}

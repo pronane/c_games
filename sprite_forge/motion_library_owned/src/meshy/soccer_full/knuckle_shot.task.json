@@ -1,0 +1,10 @@
+{
+ "id": "01a2223d-12f4-723d-8090-c0ead845d684",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870758285,
+ "finished_at": 1795870774441,
+ "prompt": "A professional football (soccer) player strikes a knuckleball shot: straight run-up, stabs the laces through the middle of the ball with almost no follow-through.",
+ "duration": 2.5,
+ "mode": "swift"
+}

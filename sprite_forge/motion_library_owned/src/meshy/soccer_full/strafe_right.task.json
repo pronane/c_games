@@ -1,0 +1,10 @@
+{
+ "id": "01a22238-b1d4-71df-8361-2ff001d2268f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870471552,
+ "finished_at": 1795870493993,
+ "prompt": "A professional football (soccer) player side-steps to the right on a treadmill, facing straight ahead, quick shuffle steps without crossing the feet, the same cycle over and over.",
+ "duration": 2.0,
+ "mode": "swift"
+}

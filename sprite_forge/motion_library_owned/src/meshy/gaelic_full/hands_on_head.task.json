@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-c1db-7076-a275-06cb29668093",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871130781,
+ "finished_at": 1795871139181,
+ "prompt": "A Gaelic football player misses a point and puts both hands on the head.",
+ "duration": 2.5,
+ "mode": "swift"
+}

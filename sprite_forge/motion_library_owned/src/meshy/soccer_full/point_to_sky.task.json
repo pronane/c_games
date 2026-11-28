@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-861e-760d-bb31-f28702518aa2",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871181034,
+ "finished_at": 1795871188339,
+ "prompt": "A professional football (soccer) player points both index fingers up at the sky.",
+ "duration": 2.5,
+ "mode": "swift"
+}

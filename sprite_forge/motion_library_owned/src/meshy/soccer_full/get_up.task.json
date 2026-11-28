@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-c0f7-7591-a63c-35ccf37b47a2",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871130697,
+ "finished_at": 1795871143780,
+ "prompt": "A professional football (soccer) player lying face down on the ground, pushes up and gets back on the feet, stands upright.",
+ "duration": 3.5,
+ "mode": "swift"
+}

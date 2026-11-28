@@ -1,0 +1,10 @@
+{
+ "id": "01a22240-2b6e-7136-b448-d6c94dce4302",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870961375,
+ "finished_at": 1795870975747,
+ "prompt": "A professional football (soccer) player jumps to bring a high ball down on the chest, then lands and traps it.",
+ "duration": 2.5,
+ "mode": "swift"
+}

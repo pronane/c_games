@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-93bf-7529-b2f3-024bf44804b1",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870922440,
+ "finished_at": 1795870930468,
+ "prompt": "A Gaelic football player is a goalkeeper taking a short kickout: chips the ball gently off the tee to a nearby team-mate.",
+ "duration": 2.5,
+ "mode": "swift"
+}

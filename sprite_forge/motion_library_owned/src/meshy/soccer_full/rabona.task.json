@@ -1,0 +1,10 @@
+{
+ "id": "01a2223c-6d20-744a-86fb-5415ad437b83",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870715990,
+ "finished_at": 1795870735140,
+ "prompt": "A professional football (soccer) player strikes the ball with a rabona: the right leg wraps behind the standing left leg to kick the ball.",
+ "duration": 2.5,
+ "mode": "swift"
+}

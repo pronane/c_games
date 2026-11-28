@@ -1,0 +1,10 @@
+{
+ "id": "01a2223e-3efd-736c-ab57-b18512befd16",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870835134,
+ "finished_at": 1795870847837,
+ "prompt": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands takes a penalty: lifts the ball, runs in and drives it low and hard.",
+ "duration": 3.5,
+ "mode": "swift"
+}

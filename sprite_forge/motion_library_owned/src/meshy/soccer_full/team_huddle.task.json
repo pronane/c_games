@@ -1,0 +1,10 @@
+{
+ "id": "01a22244-2f97-7719-9f89-f19f425e0351",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871224665,
+ "finished_at": 1795871230431,
+ "prompt": "A professional football (soccer) player jumps up and down with arms around imaginary team-mates' shoulders.",
+ "duration": 3.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-e68e-7386-90aa-a9861f6f5e14",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871074732,
+ "finished_at": 1795871093417,
+ "prompt": "A professional football (soccer) player takes a long throw-in with a run-up, arching back and hurling the ball forward with both hands over the head.",
+ "duration": 3.0,
+ "mode": "swift"
+}

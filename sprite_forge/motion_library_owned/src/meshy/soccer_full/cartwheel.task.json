@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-fa71-772f-b453-94f8855acdb0",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871210702,
+ "finished_at": 1795871220517,
+ "prompt": "A professional football (soccer) player does a cartwheel in celebration.",
+ "duration": 2.5,
+ "mode": "swift"
+}

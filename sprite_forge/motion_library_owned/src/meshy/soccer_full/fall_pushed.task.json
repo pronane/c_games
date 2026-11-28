@@ -1,0 +1,10 @@
+{
+ "id": "01a22246-cd6c-77d5-b432-0387243dc1ac",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871395939,
+ "finished_at": 1795871404967,
+ "prompt": "A professional football (soccer) player stands upright for a moment, is pushed hard in the back, stumbles forward two steps and falls flat onto the chest, arms out.",
+ "duration": 2.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a2223f-1b6a-703a-b757-d245e256be81",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870891701,
+ "finished_at": 1795870901070,
+ "prompt": "A professional football (soccer) player spins a full turn over the ball with a quick drag and flick, ending facing forward again.",
+ "duration": 2.5,
+ "mode": "swift"
+}

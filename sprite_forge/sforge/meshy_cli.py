@@ -5,6 +5,11 @@
     forge.py meshy motion --pack gaelic --dry-run       what it would generate, and the credits
     forge.py meshy motion --pack gaelic [--moves hand_pass,tackle] [--mode swift|prime] [--max-credits 100]
     forge.py meshy import --pack gaelic                 free: re-import the saved BVH / FBX (after an importer change)
+    forge.py meshy pack --pack soccer_full              write the full pack from its catalogue (base pack + catalogue)
+    forge.py meshy catalogue --pack soccer_full         what the catalogue covers, by category
+
+A catalogue (game_packs/meshy/<sport>_full.json) is a prompt file with "base" (the core pack it extends),
+"also_packs" (core packs that should prefer the same clips) and per-move "category", "library" (fallback) and timing.
 
 A move in the prompt file may say {"reuse": "mz_gaelic_get_up"} instead of a prompt: another pack's clip that already
 passes, wired into this pack the same way (nothing is generated).
@@ -83,6 +88,80 @@ def import_clip(src, clip, loop, out_dir=OWNED, pack=None, move=None, prompt="")
     return rec_p, ["%s: %s" % (x[0], x[2]) for x in bad]
 
 
+def wire_targets(spec, pack, packs_dir=None):
+    """The pack itself, plus "also_packs" (a full catalogue also feeds its core pack), that exist."""
+    d = packs_dir or os.path.join(HERE, "game_packs")
+    return [pk for pk in [pack] + list(spec.get("also_packs") or []) if os.path.isfile(os.path.join(d, pk + ".json"))]
+
+
+CONTACT = {"Control", "Passing", "Shooting", "Skill", "Ball", "Set piece", "Goalkeeper", "Aerial"}
+CAT_ORDER = ["Locomotion", "Control", "Ball", "Passing", "Shooting", "Skill", "Defending", "Defence", "Aerial", "Contact",
+             "Goalkeeper", "Set piece", "Reaction", "Celebration", "Extra", "Game"]
+
+
+def build_full_pack(spec, packs_dir=None, log=print):
+    """game_packs/<pack>.json from a catalogue: the base pack's moves as they are, then every catalogue move it lacks,
+    grouped by category. Clips are wired afterwards (prefer), so a move with no clip yet plays its library fallback."""
+    d = packs_dir or os.path.join(HERE, "game_packs")
+    base = json.load(open(os.path.join(d, spec["base"] + ".json"), encoding="utf-8"))
+    pack = {k: v for k, v in base.items() if k not in ("moves", "v2_moves")}
+    pack.update(name=spec["pack"], label=spec.get("label") or spec["pack"].replace("_", " ").title(),
+                description=spec.get("description") or base.get("description", ""),
+                notes="Built by forge.py meshy pack from game_packs/meshy/%s.json (the move catalogue). Every "
+                      "move of the %s pack, then the catalogue's." % (spec["pack"], spec["base"]))
+    moves = [dict(m) for m in base["moves"]]
+    have = {m["name"] for m in moves}
+    pre = spec.get("clip_prefix", "")
+    old = {}
+    p_out = os.path.join(d, spec["pack"] + ".json")
+    if os.path.isfile(p_out):                       # keep the prefer lists already wired
+        old = {m["name"]: m.get("prefer") for m in json.load(open(p_out, encoding="utf-8"))["moves"]}
+    extra = []
+    for n, m in spec["moves"].items():
+        if n in have:
+            continue
+        cat = m.get("category", "Game")
+        fr = 8 if m.get("loop") else max(8, min(14, int(round(m.get("duration", 2.0) * 4))))
+        ev = {"hit_start": -1, "hit_end": -1, "ball_contact": fr // 2 if cat in CONTACT else -1, "throw_release": -1,
+              "shoot": -1, "reload": -1, "footsteps": []}
+        mv = {"name": n, "library": m.get("library") or "idle", "frames": m.get("frames", fr), "fps": m.get("fps", 12),
+              "loop": bool(m.get("loop")), "category": cat, "events": ev,
+              "desc": (m.get("desc") or m.get("prompt", "")).split(":")[-1].strip()[:120]}
+        if old.get(n):
+            mv["prefer"] = old[n]
+        elif m.get("reuse"):
+            mv["prefer"] = [m["reuse"]]
+        elif os.path.isfile(os.path.join(OWNED, pre + n + ".json")):
+            mv["prefer"] = [pre + n]
+        extra.append(mv)
+    extra.sort(key=lambda mv: CAT_ORDER.index(mv["category"]) if mv["category"] in CAT_ORDER else 99)
+    pack["moves"] = moves + extra
+    with open(p_out, "w", encoding="utf-8") as f:
+        json.dump(pack, f, indent=1)
+        f.write("\n")
+    log("game_packs/%s.json: %d moves (%d from %s, %d from the catalogue)" % (spec["pack"], len(pack["moves"]),
+                                                                          len(moves), spec["base"], len(extra)))
+    return p_out
+
+
+def coverage(spec, packs_dir=None, out=OWNED):
+    """Per category: catalogue moves, how many have a shipped Meshy clip (or a reuse), and which do not."""
+    d = packs_dir or os.path.join(HERE, "game_packs")
+    pk = json.load(open(os.path.join(d, spec["pack"] + ".json"), encoding="utf-8"))
+    pre = spec.get("clip_prefix", "")
+    rows = {}
+    for m in pk["moves"]:
+        pref = [c for c in (m.get("prefer") or []) if c.startswith("mz_") and os.path.isfile(os.path.join(out, c + ".json"))]
+        cat = m.get("category", "Game")
+        r = rows.setdefault(cat, [0, 0, []])
+        r[0] += 1
+        if pref:
+            r[1] += 1
+        else:
+            r[2].append(m["name"])
+    return rows
+
+
 def wire_pack(pack, move_to_clip, packs_dir=None):
     """Add each clip to its move's "prefer" list, after the clips already named there: a human-derived clip in
     your own library (CMU, Mixamo, the Gaelic key poses) still wins where you have it, and the Meshy clip fills the
@@ -136,7 +215,8 @@ def run_motion(a, client=None, log=print):
     if not names:
         made = reused(spec, out)
         if made and not a.no_wire:
-            wire_pack(a.pack, made, a.packs_dir)
+            for pk in wire_targets(spec, a.pack, a.packs_dir):
+                wire_pack(pk, made, a.packs_dir)
         return 0
     if a.max_credits is not None and credits > a.max_credits:
         raise SystemExit("would use %d credits, over --max-credits %d" % (credits, a.max_credits))
@@ -164,8 +244,9 @@ def run_motion(a, client=None, log=print):
     _report(rows, log)
     made.update(reused(spec, out))
     if made and not a.no_wire:
-        ch = wire_pack(a.pack, made, a.packs_dir)
-        log("game_packs/%s.json: %d moves now prefer their Meshy clip" % (a.pack, len(ch)))
+        for pk in wire_targets(spec, a.pack, a.packs_dir):
+            ch = wire_pack(pk, made, a.packs_dir)
+            log("game_packs/%s.json: %d more moves prefer their Meshy clip" % (pk, len(ch)))
     return 0
 
 
@@ -188,11 +269,12 @@ def run_import(a, log=print):
     _report(rows, log)
     if not a.no_wire:
         failed = [pre + n for n, c, s in rows if s != "ok"]
-        if failed:
-            unwire_pack(a.pack, failed, a.packs_dir)
         made.update(reused(spec, out))
-        if made:
-            wire_pack(a.pack, made, a.packs_dir)
+        for pk in wire_targets(spec, a.pack, a.packs_dir):
+            if failed:
+                unwire_pack(pk, failed, a.packs_dir)
+            if made:
+                wire_pack(pk, made, a.packs_dir)
     return 0
 
 
@@ -220,6 +302,12 @@ def main(argv=None, client=None):
     sub.add_parser("balance", help="credits left (free)")
     lb = sub.add_parser("library", help="Meshy's preset animations (free)")
     lb.add_argument("--search")
+    for nm in ("pack", "catalogue"):
+        s = sub.add_parser(nm, help="write game_packs/<pack>.json from its catalogue" if nm == "pack"
+                           else "what the catalogue covers, by category")
+        s.add_argument("--pack", required=True)
+        s.add_argument("--prompts")
+        s.add_argument("--packs-dir", help=argparse.SUPPRESS)
     for nm in ("motion", "import"):
         s = sub.add_parser(nm, help="generate Text to Motion clips for a pack" if nm == "motion" else "re-import the saved Meshy files (free)")
         s.add_argument("--pack", required=True)
@@ -244,6 +332,18 @@ def main(argv=None, client=None):
             for i in items:
                 print("%5d  %-36s %s / %s" % (i["action_id"], i["name"], i["category"], i["sub_category"]))
             print("%d biped animations" % len(items))
+            return 0
+        if a.cmd == "pack":
+            build_full_pack(load_prompts(a.pack, a.prompts or PROMPTS), a.packs_dir)
+            return 0
+        if a.cmd == "catalogue":
+            rows = coverage(load_prompts(a.pack, a.prompts or PROMPTS), a.packs_dir)
+            tot = [0, 0]
+            for cat in sorted(rows, key=lambda c: CAT_ORDER.index(c) if c in CAT_ORDER else 99):
+                n, got, miss = rows[cat]
+                tot[0] += n; tot[1] += got
+                print("%-12s %3d moves  %3d Meshy  %s" % (cat, n, got, ("other source: " + ", ".join(miss)) if miss else ""))
+            print("%d moves, %d with a Meshy clip" % tuple(tot))
             return 0
         if a.cmd == "motion":
             return run_motion(a, client)

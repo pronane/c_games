@@ -1,0 +1,1179 @@
+{
+ "name": "hurling_full",
+ "label": "Hurling - full move catalogue",
+ "description": "The hurling pack plus overhead and ground pulls, flicks, hooks and steals, sideline cuts, 65s and penalties, the goalkeeper's work, reactions and celebrations.",
+ "camera": "three_quarter",
+ "prop": "none",
+ "props": [
+  "sliotar",
+  "hurley"
+ ],
+ "frame": [
+  128,
+  160
+ ],
+ "figure": 0.56,
+ "yaw": 65,
+ "equip": [
+  "sport_hurley@hand_r",
+  "sport_hurl_helmet@head"
+ ],
+ "notes": "Built by forge.py meshy pack from game_packs/meshy/hurling_full.json (the move catalogue). Every move of the hurling pack, then the catalogue's.",
+ "moves": [
+  {
+   "name": "idle",
+   "library": "idle",
+   "frames": 6,
+   "fps": 8,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "idle_athletic"
+   ]
+  },
+  {
+   "name": "walk",
+   "library": "walk",
+   "frames": 8,
+   "fps": 10,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     6
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "run",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": ""
+  },
+  {
+   "name": "sprint",
+   "library": "run",
+   "frames": 8,
+   "fps": 14,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     4
+    ]
+   },
+   "desc": "",
+   "own": [
+    "sprint"
+   ],
+   "prefer": [
+    "mz_aussie_sprint"
+   ]
+  },
+  {
+   "name": "solo",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     1,
+     5
+    ]
+   },
+   "desc": "running with the sliotar balanced on the bas",
+   "own": [
+    "hurl_solo"
+   ],
+   "prefer": [
+    "mz_hurling_solo"
+   ]
+  },
+  {
+   "name": "strike",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "strike from the hand",
+   "own": [
+    "hurl_strike"
+   ],
+   "prefer": [
+    "mz_hurling_strike"
+   ]
+  },
+  {
+   "name": "ground_strike",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "ground stroke, the ball on the grass",
+   "own": [
+    "hurl_ground"
+   ],
+   "prefer": [
+    "mz_hurling_ground_strike"
+   ]
+  },
+  {
+   "name": "puckout",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the goalkeeper's long puck-out",
+   "own": [
+    "hurl_puckout"
+   ],
+   "prefer": [
+    "mz_hurling_puckout"
+   ]
+  },
+  {
+   "name": "free",
+   "library": "shoot",
+   "frames": 8,
+   "fps": 14,
+   "loop": false,
+   "category": "Striking",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "a free: lift and strike in one move",
+   "own": [
+    "hurl_free"
+   ],
+   "prefer": [
+    "mz_hurling_free"
+   ]
+  },
+  {
+   "name": "lift",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 3,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "lift the sliotar off the ground with the bas",
+   "own": [
+    "hurl_lift"
+   ],
+   "prefer": [
+    "mz_hurling_lift"
+   ]
+  },
+  {
+   "name": "catch",
+   "library": "jump",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball handling",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "overhead catch, the hurley raised to protect the hand",
+   "own": [
+    "hurl_catch"
+   ],
+   "prefer": [
+    "mz_hurling_catch"
+   ]
+  },
+  {
+   "name": "hand_pass",
+   "library": "pass",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Passing",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": 3,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "hand_pass"
+   ],
+   "prefer": [
+    "mz_hurling_hand_pass"
+   ]
+  },
+  {
+   "name": "hook",
+   "library": "tackle",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "hook the opponent's swing from behind",
+   "own": [
+    "hurl_hook"
+   ],
+   "prefer": [
+    "mz_hurling_hook"
+   ]
+  },
+  {
+   "name": "block",
+   "library": "block",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 2,
+    "hit_end": 4,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "block down the strike in front",
+   "own": [
+    "hurl_block"
+   ],
+   "prefer": [
+    "mz_hurling_block"
+   ]
+  },
+  {
+   "name": "shoulder",
+   "library": "tackle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Defence",
+   "events": {
+    "hit_start": 3,
+    "hit_end": 5,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "tackle"
+   ],
+   "prefer": [
+    "mz_hurling_shoulder"
+   ]
+  },
+  {
+   "name": "sidestep",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Evasion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": [
+     2,
+     5
+    ]
+   },
+   "desc": "",
+   "own": [
+    "sidestep"
+   ],
+   "prefer": [
+    "mz_hurling_sidestep"
+   ]
+  },
+  {
+   "name": "fall",
+   "library": "fall",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "prefer": [
+    "mz_hurling_fall"
+   ]
+  },
+  {
+   "name": "get_up",
+   "library": "crouch",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "get_up"
+   ],
+   "prefer": [
+    "mz_gaelic_get_up"
+   ]
+  },
+  {
+   "name": "hit",
+   "library": "hit",
+   "frames": 6,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": ""
+  },
+  {
+   "name": "celebrate_point",
+   "library": "wave",
+   "frames": 8,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "celebrate_point"
+   ],
+   "prefer": [
+    "mz_hurling_celebrate_point"
+   ]
+  },
+  {
+   "name": "celebrate_goal",
+   "library": "wave",
+   "frames": 10,
+   "fps": 10,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "",
+   "own": [
+    "celebrate_goal"
+   ],
+   "prefer": [
+    "mz_hurling_celebrate_goal"
+   ]
+  },
+  {
+   "name": "jog",
+   "library": "run",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand jogs on a t",
+   "prefer": [
+    "mz_hurling_jog"
+   ]
+  },
+  {
+   "name": "ready_stance",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands stands still in"
+  },
+  {
+   "name": "backpedal",
+   "library": "walk",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Locomotion",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand backpedals ",
+   "prefer": [
+    "mz_hurling_backpedal"
+   ]
+  },
+  {
+   "name": "solo_to_hand",
+   "library": "solo",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand, running, t",
+   "prefer": [
+    "mz_hurling_solo_to_hand"
+   ]
+  },
+  {
+   "name": "bounce_on_hurley",
+   "library": "solo",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand stands stil"
+  },
+  {
+   "name": "strike_left_side",
+   "library": "strike",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "tosses the ball, swings the stick from the left shoulder across the body.",
+   "prefer": [
+    "mz_hurling_strike_left_side"
+   ]
+  },
+  {
+   "name": "overhead_pull",
+   "library": "strike",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "jumps and swings the stick hard at a ball in the air above the head, first time.",
+   "prefer": [
+    "mz_hurling_overhead_pull"
+   ]
+  },
+  {
+   "name": "ground_pull",
+   "library": "ground_strike",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands pulls first tim",
+   "prefer": [
+    "mz_hurling_ground_pull"
+   ]
+  },
+  {
+   "name": "flick_pass",
+   "library": "ground_strike",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands flicks a short ",
+   "prefer": [
+    "mz_hurling_flick_pass"
+   ]
+  },
+  {
+   "name": "dummy_strike",
+   "library": "strike",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands shapes to strik",
+   "prefer": [
+    "mz_hurling_dummy_strike"
+   ]
+  },
+  {
+   "name": "roll_lift",
+   "library": "lift",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand rolls the b",
+   "prefer": [
+    "mz_hurling_roll_lift"
+   ]
+  },
+  {
+   "name": "catch_and_turn",
+   "library": "catch",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand raises both"
+  },
+  {
+   "name": "hand_tap_pass",
+   "library": "hand_pass",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Ball",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand passes the ",
+   "prefer": [
+    "mz_hurling_hand_tap_pass"
+   ]
+  },
+  {
+   "name": "flick",
+   "library": "hook",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands flicks an oppon",
+   "prefer": [
+    "mz_hurling_flick"
+   ]
+  },
+  {
+   "name": "steal",
+   "library": "hook",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands reaches in and ",
+   "prefer": [
+    "mz_hurling_steal"
+   ]
+  },
+  {
+   "name": "frontal_block",
+   "library": "block",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in both hands stands square a",
+   "prefer": [
+    "mz_hurling_frontal_block"
+   ]
+  },
+  {
+   "name": "tackle_dispossess",
+   "library": "hook",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Contact",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "pressures from the side and knocks the ball out of the carrier's hand with the stick.",
+   "prefer": [
+    "mz_hurling_tackle_dispossess"
+   ]
+  },
+  {
+   "name": "gk_ready",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper holding a hur",
+   "prefer": [
+    "mz_hurling_gk_ready"
+   ]
+  },
+  {
+   "name": "gk_block_low",
+   "library": "block",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper dropping down",
+   "prefer": [
+    "mz_hurling_gk_block_low"
+   ]
+  },
+  {
+   "name": "gk_block_high",
+   "library": "block",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper reaching up w",
+   "prefer": [
+    "mz_hurling_gk_block_high"
+   ]
+  },
+  {
+   "name": "gk_catch_save",
+   "library": "catch",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 4,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper holding the s"
+  },
+  {
+   "name": "gk_puckout_short",
+   "library": "puckout",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Goalkeeper",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 5,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) is a goalkeeper hitting a sho",
+   "prefer": [
+    "mz_hurling_gk_puckout_short"
+   ]
+  },
+  {
+   "name": "sideline_cut",
+   "library": "strike",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "places the ball on the ground, steps back, crouches and cuts under it with a big swing so it lifts and curls.",
+   "prefer": [
+    "mz_hurling_sideline_cut"
+   ]
+  },
+  {
+   "name": "free_65",
+   "library": "strike",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "lifts the ball, tosses it up and strikes it with a full swing over the bar.",
+   "prefer": [
+    "mz_hurling_free_65"
+   ]
+  },
+  {
+   "name": "penalty_strike",
+   "library": "ground_strike",
+   "frames": 14,
+   "fps": 12,
+   "loop": false,
+   "category": "Set piece",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": 7,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "lifts the ball, runs in and drives it low and hard.",
+   "prefer": [
+    "mz_hurling_penalty_strike"
+   ]
+  },
+  {
+   "name": "stumble",
+   "library": "hit",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "the upper body jolts backwards, takes two staggering steps backwards, then steadies.",
+   "prefer": [
+    "mz_hurling_stumble"
+   ]
+  },
+  {
+   "name": "hands_on_head",
+   "library": "idle",
+   "frames": 10,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand misses and ",
+   "prefer": [
+    "mz_hurling_hands_on_head"
+   ]
+  },
+  {
+   "name": "appeal",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand appeals to ",
+   "prefer": [
+    "mz_hurling_appeal"
+   ]
+  },
+  {
+   "name": "tap_ground",
+   "library": "idle",
+   "frames": 8,
+   "fps": 12,
+   "loop": true,
+   "category": "Reaction",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand waits, tapp",
+   "prefer": [
+    "mz_hurling_tap_ground"
+   ]
+  },
+  {
+   "name": "knee_slide",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand celebrates ",
+   "prefer": [
+    "mz_hurling_knee_slide"
+   ]
+  },
+  {
+   "name": "fist_pump",
+   "library": "wave",
+   "frames": 8,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) in the right hand pumps the f",
+   "prefer": [
+    "mz_hurling_fist_pump"
+   ]
+  },
+  {
+   "name": "applaud",
+   "library": "wave",
+   "frames": 12,
+   "fps": 12,
+   "loop": false,
+   "category": "Celebration",
+   "events": {
+    "hit_start": -1,
+    "hit_end": -1,
+    "ball_contact": -1,
+    "throw_release": -1,
+    "shoot": -1,
+    "reload": -1,
+    "footsteps": []
+   },
+   "desc": "A hurler holding a hurley (a short stick with a flat curved end, held like a hockey stick) tucks the hurley under the ar",
+   "prefer": [
+    "mz_hurling_applaud"
+   ]
+  }
+ ]
+}

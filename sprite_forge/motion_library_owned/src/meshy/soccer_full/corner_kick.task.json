@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-a2b5-73e8-8825-e2a5a15ffc80",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871057284,
+ "finished_at": 1795871067029,
+ "prompt": "A professional football (soccer) player takes a corner: a few steps of run-up at an angle, whips the ball in with the right foot.",
+ "duration": 3.0,
+ "mode": "swift"
+}

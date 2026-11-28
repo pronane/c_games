@@ -1,0 +1,10 @@
+{
+ "id": "01a22242-e337-7440-b07d-d0194a59f2fb",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871139218,
+ "finished_at": 1795871146398,
+ "prompt": "A professional football (soccer) player applauds the fans, clapping the hands above the head while turning.",
+ "duration": 3.0,
+ "mode": "swift"
+}

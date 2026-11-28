@@ -1,0 +1,10 @@
+{
+ "id": "01a22243-618d-748a-b313-42761015190e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871171747,
+ "finished_at": 1795871176973,
+ "prompt": "A professional football (soccer) player celebrates by running with both arms spread out like an aeroplane wing, banking side to side.",
+ "duration": 3.0,
+ "mode": "swift"
+}

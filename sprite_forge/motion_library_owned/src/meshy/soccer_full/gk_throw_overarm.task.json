@@ -1,0 +1,10 @@
+{
+ "id": "01a22241-3e79-700f-9e65-621a279df2a9",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795871031586,
+ "finished_at": 1795871044201,
+ "prompt": "A professional football (soccer) player is a goalkeeper throwing the ball long overarm, the arm swinging over like a bowler.",
+ "duration": 2.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a2223c-81b9-7278-b99b-43ea1d6751a4",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795870721090,
+ "finished_at": 1795870739329,
+ "prompt": "A professional football (soccer) player dives forward and flicks the ball with both heels raised up behind the back, landing on the hands.",
+ "duration": 2.5,
+ "mode": "swift"
+}
