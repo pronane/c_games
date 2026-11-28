@@ -47,6 +47,8 @@ jobs:
       - run: python tools/test_new_sports.py
       # v11.35: bone-naming conventions (classic BVH)
       - run: python tools/test_bonemap_conventions.py
+      # v11.41: Meshy client, Text to Motion -> owned library -> pack (fake API), the shipped Meshy clips
+      - run: python tools/test_meshy.py
       # v11.28: textured multi-part GLBs (several identities on one skeleton)
       - run: python tools/test_glb_parts.py
       # v11.30: tailored kits (straight hems, draped cloth, boots without toes) and the kit atlas

@@ -1,0 +1,10 @@
+{
+ "id": "01a22124-d6c4-7461-80a8-646949bf44d6",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852392917,
+ "finished_at": 1795852403109,
+ "prompt": "A Gaelic football player fists the ball over the bar: jumps up, the right arm swings up and the fist punches a high ball overhead, lands on both feet.",
+ "duration": 2.5,
+ "mode": "swift"
+}

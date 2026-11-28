@@ -1,0 +1,10 @@
+{
+ "id": "01a22124-a189-7493-984b-28325d469a68",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852379551,
+ "finished_at": 1795852385215,
+ "prompt": "A Gaelic football player fist passes a ball in the air: the ball drops in front of the face and the right fist punches it away to a team-mate, arm extended, the other arm out for balance.",
+ "duration": 2.0,
+ "mode": "swift"
+}

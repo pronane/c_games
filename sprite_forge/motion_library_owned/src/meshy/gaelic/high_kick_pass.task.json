@@ -1,0 +1,10 @@
+{
+ "id": "01a22123-08c7-7671-beed-86089838c69f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852274545,
+ "finished_at": 1795852280839,
+ "prompt": "A Gaelic football player kicks a long high pass: approaches with two steps, drops the ball from the hands onto the right instep and swings the leg through hard and high, big follow-through above the waist, left arm out.",
+ "duration": 2.5,
+ "mode": "swift"
+}

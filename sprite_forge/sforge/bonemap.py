@@ -105,6 +105,13 @@ CONVENTIONS = {
         ("neck", ["neck"]), ("head", ["head"]), ("shoulder_%s", ["{S}collar"]), ("upperarm_%s", ["{S}shoulder"]),
         ("forearm_%s", ["{S}elbow"]), ("hand_%s", ["{S}wrist"]), ("thigh_%s", ["{S}hip"]), ("shin_%s", ["{S}knee"]),
         ("foot_%s", ["{S}ankle"]), ("toe_%s", ["{S}toe"])]),
+    # Meshy Text to Motion BVH (and its 77-joint biped): Spine1 Spine2 Chest Neck1 Neck2, and the leg named one
+    # joint up from Mixamo's - {S}Leg = thigh, {S}Shin = shin. Mixamo would read {S}Leg as the shin.
+    "meshy": _side_table("Left", "Right", [
+        ("hips", ["hips"]), ("spine", ["spine1"]), ("chest", ["spine2"]), ("upperchest", ["chest"]), ("neck", ["neck1"]),
+        ("head", ["head"]), ("shoulder_%s", ["{S}shoulder"]), ("upperarm_%s", ["{S}arm"]), ("forearm_%s", ["{S}forearm"]),
+        ("hand_%s", ["{S}hand"]), ("thigh_%s", ["{S}leg"]), ("shin_%s", ["{S}shin"]), ("foot_%s", ["{S}foot"]),
+        ("toe_%s", ["{S}toebase"])]),
     "sforge": {c: [re.escape(c.lower())] for c in CANON},
 }
 SKIP = re.compile(r"(twist|roll|_ik|ik_|\bik\b|pole|target|helper|_end$|end$|nub|mch|ctrl|wgt|tweak|_jnt_end|hairbone|breast|jaw|eye|finger|thumb|index|middle|ring|pinky|cheek|lip|brow|tongue|tooth|teeth|ear|pinkie|wing|tail|prop|weapon)", re.I)
@@ -130,6 +137,8 @@ def detect_convention(bones):
             bonus = -10
         if conv == "bvh_classic" and not any(re.search(r"(left|right)(collar|hip|knee|elbow|wrist)$", s) for s in stripped):
             bonus = -10                       # only for skeletons that really use joint-named bones
+        if conv == "meshy" and not any(re.search(r"(left|right)shin$", s) for s in stripped):
+            bonus = -10                       # only skeletons with a {S}Shin joint
         scores[conv] = (len(m) + bonus, m)
     best = max(scores, key=lambda k: scores[k][0])
     return best, scores[best][1], {k: v[0] for k, v in scores.items()}

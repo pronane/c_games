@@ -585,6 +585,9 @@ def main(argv=None):
     if argv and argv[0] == "motion":        # v11.4 shared-skeleton motion library + character types
         from sforge import motion_cli
         return motion_cli.main(argv[1:])
+    if argv and argv[0] == "meshy":         # v11.41 Meshy AI: Text to Motion clips for a pack, balance, library
+        from sforge import meshy_cli
+        return meshy_cli.main(argv[1:])
     if argv and argv[0] == "game":          # v11.5 game-type packs
         from sforge import gamepack
         return gamepack.main(argv[1:])
@@ -628,6 +631,7 @@ def main(argv=None):
   turn        cut-out person seen side-on / from behind (--yaw 0|90|180|270 or any angle; estimated depth)
   export-ef   built character -> Egyptian Fighter / Padel Wars char_<name>/ folder (sprites.cfg, HD + low-res)
   motion      v11.4 motion library: list | record | import | retarget | clean | types | sets | shotlist
+  meshy       v11.41 Meshy AI: balance | library | motion --pack gaelic | import (key: MESHY_API_KEY)
   game        v11.5 game-type packs: list | show | validate | shotlist
   package     drop-in zip for a game's assets/ folder (<= 25 MB check)
   summary     one-page pipeline summary image

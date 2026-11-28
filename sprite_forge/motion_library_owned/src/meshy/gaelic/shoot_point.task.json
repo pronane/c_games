@@ -1,0 +1,10 @@
+{
+ "id": "01a22123-3b93-70e6-8cb1-6e63e23af809",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852287525,
+ "finished_at": 1795852292884,
+ "prompt": "A Gaelic football player kicks for a point over the bar: takes two steps, drops the ball onto the right foot and kicks it up high with the leg swinging through to head height, body leaning back slightly, arms wide.",
+ "duration": 2.5,
+ "mode": "swift"
+}

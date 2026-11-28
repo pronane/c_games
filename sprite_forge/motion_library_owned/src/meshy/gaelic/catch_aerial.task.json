@@ -1,0 +1,10 @@
+{
+ "id": "01a22123-c091-72cc-abf1-08d0ea600c43",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852321615,
+ "finished_at": 1795852327098,
+ "prompt": "A Gaelic football player catches a ball at head height: hands up with fingers spread in a W shape, takes the ball in both hands and pulls it down into the chest, elbows tucked.",
+ "duration": 2.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a22127-e3c7-71da-a33a-e301e5a7418b",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852592770,
+ "finished_at": 1795852600065,
+ "prompt": "A Gaelic football player runs in a dead straight line at a steady jog, facing forward the whole time, doing the solo over and over: every two strides drops the ball from the hands onto the right foot, toes it back up and catches it at the chest. No turning.",
+ "duration": 4.0,
+ "mode": "swift"
+}

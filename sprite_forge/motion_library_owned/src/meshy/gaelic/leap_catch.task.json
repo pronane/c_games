@@ -1,0 +1,10 @@
+{
+ "id": "01a22123-f381-741d-8299-b81ddff8a7eb",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852334838,
+ "finished_at": 1795852340583,
+ "prompt": "A Gaelic football player fields a high ball: takes one step, jumps high off one foot with the other knee raised, both arms fully stretched above the head to catch the ball, lands on both feet and pulls the ball into the chest.",
+ "duration": 2.5,
+ "mode": "swift"
+}

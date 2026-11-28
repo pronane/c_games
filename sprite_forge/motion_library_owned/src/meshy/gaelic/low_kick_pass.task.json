@@ -1,0 +1,10 @@
+{
+ "id": "01a22122-d5e1-7787-b47b-79d3e83b5a75",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852261652,
+ "finished_at": 1795852268409,
+ "prompt": "A Gaelic football player kicks a low pass: holding the ball in front, drops it onto the right foot and kicks it with a short, firm swing so it travels low and flat, short follow-through, arms out for balance.",
+ "duration": 2.5,
+ "mode": "swift"
+}

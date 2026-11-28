@@ -1,0 +1,10 @@
+{
+ "id": "01a22122-3b6c-7707-ae3a-501e84524ac1",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852221957,
+ "finished_at": 1795852227652,
+ "prompt": "A Gaelic football player stands holding the ball in both hands at chest height, knees soft, turning the head and shoulders left and right to look for a pass, shifting weight from foot to foot.",
+ "duration": 3.0,
+ "mode": "swift"
+}

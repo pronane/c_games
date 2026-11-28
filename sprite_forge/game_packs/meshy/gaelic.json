@@ -1,0 +1,138 @@
+{
+ "pack": "gaelic",
+ "mode": "swift",
+ "clip_prefix": "mz_gaelic_",
+ "notes": "Prompts for Meshy Text to Motion (forge.py meshy motion --pack gaelic). Moves with no human mocap to copy. Each generated clip goes to motion_library_owned/ and the pack prefers it.",
+ "moves": {
+  "hand_pass": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player does a hand pass: ball resting on the open left palm at waist height, the right hand closes into a fist and punches the ball forward off the palm, arm follows through towards the target. Feet planted, weight moves onto the front foot."
+  },
+  "bounce_solo": {
+   "duration": 4.0,
+   "loop": true,
+   "prompt": "A Gaelic football player runs in a dead straight line at a steady jog, facing forward the whole time, doing the solo over and over: every two strides drops the ball from the hands onto the right foot, toes it back up and catches it at the chest. No turning."
+  },
+  "carry": {
+   "duration": 2.5,
+   "loop": true,
+   "prompt": "A Gaelic football player runs forward carrying the ball, both hands holding it tight against the chest, elbows in, upright running posture, looking ahead."
+  },
+  "hold": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "A Gaelic football player stands holding the ball in both hands at chest height, knees soft, turning the head and shoulders left and right to look for a pass, shifting weight from foot to foot."
+  },
+  "pick_up_ground": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player does a toe-lift pick-up: jogging forward, slips the toe of the right foot under a ball on the ground and flicks it up into both hands, catching it at waist height, then stands tall."
+  },
+  "pick_up_aerial": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player gathers a bouncing ball: steps in, bends at the waist and scoops a ball at knee height into both hands, then brings it up to the chest."
+  },
+  "low_kick_pass": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player kicks a low pass: holding the ball in front, drops it onto the right foot and kicks it with a short, firm swing so it travels low and flat, short follow-through, arms out for balance."
+  },
+  "high_kick_pass": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player kicks a long high pass: approaches with two steps, drops the ball from the hands onto the right instep and swings the leg through hard and high, big follow-through above the waist, left arm out."
+  },
+  "shoot_point": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player kicks for a point over the bar: takes two steps, drops the ball onto the right foot and kicks it up high with the leg swinging through to head height, body leaning back slightly, arms wide."
+  },
+  "shoot_goal": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player shoots for goal: running, drops the ball onto the right foot and strikes it low and hard with the laces, body over the ball, short powerful follow-through."
+  },
+  "catch_ground": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player catches a low ball: bends the knees, reaches forward with both hands at knee height, scoops the ball and brings both hands up to the chest in front of the body, then stands up holding the ball at chest height."
+  },
+  "catch_aerial": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player catches a ball at head height: hands up with fingers spread in a W shape, takes the ball in both hands and pulls it down into the chest, elbows tucked."
+  },
+  "leap_catch": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player fields a high ball: takes one step, jumps high off one foot with the other knee raised, both arms fully stretched above the head to catch the ball, lands on both feet and pulls the ball into the chest."
+  },
+  "tackle": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player makes a legal front tackle: crouched in a defensive stance, steps in and swipes the open right hand down across in front of the body to knock the ball out of an opponent's hands, no grabbing, then recovers."
+  },
+  "juke_feint": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player holding the ball, dummies: drops the shoulder and steps hard to the left as if to go that way, then pushes off and goes to the right."
+  },
+  "sidestep": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player holding the ball at the chest, takes a big sidestep: plants the left foot and pushes off, moving the whole body one long stride (about a metre) sideways to the right, then a second step to the right, feet wide."
+  },
+  "spin": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player with the ball tucked into the chest, spins a full turn on the left foot to roll away from a defender, then keeps going forward."
+  },
+  "fist_pass": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player fist passes a ball in the air: the ball drops in front of the face and the right fist punches it away to a team-mate, arm extended, the other arm out for balance."
+  },
+  "fist_shoot": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player fists the ball over the bar: jumps up, the right arm swings up and the fist punches a high ball overhead, lands on both feet."
+  },
+  "celebrate_point": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A Gaelic football player celebrates a point: turns, clenches the right fist and pumps it once up beside the head, then jogs back."
+  },
+  "celebrate_goal": {
+   "duration": 3.0,
+   "loop": false,
+   "prompt": "A Gaelic football player celebrates a goal: runs forward with both arms spread wide, then leaps and punches both fists into the air, shouting."
+  },
+  "fall": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player running, is knocked off balance by a shoulder charge from the side, stumbles and falls onto the ground on the side, arms out to break the fall."
+  },
+  "get_up": {
+   "duration": 4.0,
+   "loop": false,
+   "prompt": "A Gaelic football player lying on the side on the ground gets up: pushes up with the hands, gets one knee under, rises and stands fully upright with straight legs, ready to play, and stays standing for the last second."
+  },
+  "injured_idle": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "A Gaelic football player stands injured, bent over with the right hand holding the back of the right thigh (hamstring), limping and shifting weight off the right leg."
+  },
+  "change_direction": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player running forward, plants the right foot hard and cuts sharply to the left at 90 degrees, then accelerates away."
+  },
+  "stop": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A Gaelic football player sprinting, stops suddenly: two short braking steps, knees bent, arms out, and comes to a balanced stop."
+  }
+ }
+}
