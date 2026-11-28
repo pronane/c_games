@@ -1,0 +1,24 @@
+{
+  "_doc": "Benchmark rules for Tools/compare_benchmarks.py. Performance: the PR may not be more than max_slowdown slower than its base, measured on the same runner. Gameplay: per-match numbers (both teams together) from full 90-minute AI-vs-AI matches; 'real' is roughly what a top-flight match produces (EPL-style averages), so the table also shows how far the game is from real football. A change fails if it moves a stat further from its real band than the base was, by more than 'tolerance'. Stats without a band only fail on the listed must-rules.",
+  "performance": {
+    "sim_us_per_tick": { "max_slowdown": 0.10, "label": "match simulation (us per tick, 11v11)" },
+    "motion_us_per_frame_22_players": { "max_slowdown": 0.10, "label": "motion matching (us per frame, 22 players)" }
+  },
+  "gameplay": {
+    "goals": { "real": [2.0, 3.5], "tolerance": 0.25 },
+    "shots": { "real": [20, 30], "tolerance": 1.5 },
+    "shots_on_target": { "real": [7, 11], "tolerance": 1.0 },
+    "xg": { "real": [2.2, 3.4], "tolerance": 0.25 },
+    "passes": { "real": [700, 1100], "tolerance": 25 },
+    "tackles": { "real": [25, 45], "tolerance": 4 },
+    "fouls": { "real": [16, 26], "tolerance": 2 },
+    "cards": { "real": [2, 5], "tolerance": 0.75 },
+    "corners": { "real": [8, 12], "tolerance": 1.0 },
+    "offsides": { "real": [2, 6], "tolerance": 1.0 },
+    "possession_home_pct": { "real": [40, 60], "tolerance": 3 }
+  },
+  "must": {
+    "finished": { "min": 1, "label": "every match reaches full time" },
+    "motion_first_15_min.contact_frame_error": { "max_increase": 0.5, "label": "ball-contact timing error (frames)" }
+  }
+}

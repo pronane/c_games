@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Arena FC benchmarks (Tests/Benchmarks/Bench.cs). CI builds this same project against the
+       PR and against its base, so both are measured by identical code on the same runner. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);CS8600;CS8602;CS8604;CS8618;CS0168;CS0219;CS0414;CS8603;CS8625;CS0162</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Bench.cs" />
+    <Compile Include="GodotShim.cs" />
+    <Compile Include="../../Scripts/Core/**/*.cs" />
+    <Compile Include="../../Scripts/Godot/MotionDriver.cs" />
+  </ItemGroup>
+</Project>
