@@ -236,9 +236,10 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           out="$RUNNER_TEMP/graphics-${{ matrix.side }}"
-          bash Tools/graphics_shots.sh "$out" opengl3
+          rc=0; bash Tools/graphics_shots.sh "$out" opengl3 || rc=$?
           python3 Tools/graphics_benchmark.py measure --shots "$out" --glb Data/models/soccer_player.glb \
             --out "$out/graphics.json" > /dev/null
+          exit $rc   # a missing shot fails the job (after measuring the rest)
       - uses: actions/upload-artifact@v4
         if: always() && steps.ref.outputs.sha != ''
         with:
