@@ -1,0 +1,10 @@
+{
+ "id": "01a22169-66d5-71f4-8357-384edd9e5cf3",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856886112,
+ "finished_at": 1795856908239,
+ "prompt": "A rugby union player kicks for touch: holds the oval ball out in front, drops it onto the right foot and punts it long, the leg swinging up high, arms out for balance.",
+ "duration": 2.5,
+ "mode": "swift"
+}

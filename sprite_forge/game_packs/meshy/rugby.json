@@ -1,0 +1,103 @@
+{
+ "pack": "rugby",
+ "mode": "swift",
+ "clip_prefix": "mz_rugby_",
+ "notes": "Prompts for Meshy Text to Motion (forge.py meshy motion --pack rugby).",
+ "moves": {
+  "sprint": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "A rugby union player sprints flat out in a dead straight line, facing forward, long powerful strides, arms pumping. No turning."
+  },
+  "carry": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "A rugby union player runs in a straight line carrying the oval ball in both hands in front of the chest, upright, ready to pass, steady fast jog. No turning."
+  },
+  "pass": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A rugby union player spin passes to the left: running, swings the oval ball from the right hip across the body with both hands and releases it to the left with a flick of the wrists, arms following through towards the target."
+  },
+  "offload": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A rugby union player offloads in the tackle: running, is being held around the waist, twists the upper body and pops the ball up with one hand to a team-mate behind."
+  },
+  "kick": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player kicks for touch: holds the oval ball out in front, drops it onto the right foot and punts it long, the leg swinging up high, arms out for balance."
+  },
+  "drop_goal": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player kicks a drop goal: drops the oval ball point-down to the ground in front and kicks it on the half-volley just as it bounces, leg swinging through and up."
+  },
+  "place_kick": {
+   "duration": 3.0,
+   "loop": false,
+   "prompt": "A rugby union player takes a place kick from a tee: steps back, stands still, then takes a curved run-up of four steps and kicks the ball off the ground with the inside of the right foot, following through high."
+  },
+  "catch": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player catches a high kick: jumps off one foot with the other knee raised high in front, both arms stretched up to catch the ball overhead, pulls it into the chest and lands."
+  },
+  "lineout": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player jumps at a lineout: crouches, springs straight up as high as possible with both arms fully stretched above the head to catch the ball, holds it overhead and comes back down."
+  },
+  "tackle": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player makes a low tackle: runs in, bends low, drives the shoulder into an opponent's thighs, wraps both arms tight around the legs and goes to the ground with them."
+  },
+  "hand_off": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A rugby union player hands off a tackler: running with the ball under the left arm, pushes the right arm out straight and fends the defender away with the open palm, then keeps running."
+  },
+  "scrum": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "A rugby forward in a scrum: torso bent forward flat and horizontal like a table at hip height, head up, arms reaching out sideways to bind, legs bent and set back wide, pushing forward with short driving steps in a steady repeating rhythm, staying bent over the whole time."
+  },
+  "ruck": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player hits a ruck: runs in, bends low with a flat back, drives forward over the ball on the ground with the shoulders, short powerful steps, then stays low."
+  },
+  "try": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player scores a try: runs in, dives forward holding the ball in both hands and lands on the chest, pressing the ball down onto the ground with both hands."
+  },
+  "pick_up": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A rugby union player picks up the ball: running, bends low and scoops the oval ball off the ground in both hands, brings it into the chest and keeps running."
+  },
+  "sidestep": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A rugby union player holding the ball in both hands, steps hard off the left foot one long stride sideways to the right to beat a defender, then a second step to the right."
+  },
+  "fall": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "A rugby union player running, is tackled from the side, loses balance and falls onto the ground on the side, holding the ball."
+  },
+  "get_up": {
+   "duration": 4.0,
+   "loop": false,
+   "prompt": "A rugby union player lying on the side on the ground gets up: pushes up with the hands, gets one knee under, rises and stands fully upright with straight legs, and stays standing for the last second."
+  },
+  "hit": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "A rugby union player is hit hard by a tackle from the front: jolts back, upper body folding forward, stumbles a step backwards and steadies."
+  }
+ }
+}

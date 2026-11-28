@@ -1,0 +1,10 @@
+{
+ "id": "01a2216d-a028-7731-86be-c1c7de44d6c3",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857162965,
+ "finished_at": 1795857177666,
+ "prompt": "An Australian rules football player celebrates kicking a goal: turns, runs a few steps with both arms raised high, fists clenched, then jumps and punches the air.",
+ "duration": 3.0,
+ "mode": "swift"
+}

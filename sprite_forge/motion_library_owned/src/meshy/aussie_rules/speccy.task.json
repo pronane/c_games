@@ -1,0 +1,10 @@
+{
+ "id": "01a2216a-5787-7477-87fb-8fa2c467e4dd",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856947736,
+ "finished_at": 1795856968895,
+ "prompt": "An Australian rules football player takes a spectacular high mark: runs in, leaps very high off one foot, the other knee raised high in front, both arms stretched above the head to catch the ball at the top of the jump, then lands on both feet.",
+ "duration": 3.0,
+ "mode": "swift"
+}

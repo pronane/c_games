@@ -1,0 +1,10 @@
+{
+ "id": "01a22168-3a92-7469-b6b3-5ab8757ddc48",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856809344,
+ "finished_at": 1795856829048,
+ "prompt": "A hurler holding a hurley (a short wooden stick with a flat curved end, held like a hockey stick) in both hands runs in a straight line doing the solo: holds the stick out in front at waist height with its flat end level, and bounces the small ball up and down on it while running at a jog. No turning.",
+ "duration": 4.0,
+ "mode": "swift"
+}

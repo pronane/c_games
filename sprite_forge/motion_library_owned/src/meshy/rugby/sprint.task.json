@@ -1,0 +1,10 @@
+{
+ "id": "01a22167-e4f9-72d4-bdc5-97916a81f754",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856787321,
+ "finished_at": 1795856811204,
+ "prompt": "A rugby union player sprints flat out in a dead straight line, facing forward, long powerful strides, arms pumping. No turning.",
+ "duration": 3.0,
+ "mode": "swift"
+}

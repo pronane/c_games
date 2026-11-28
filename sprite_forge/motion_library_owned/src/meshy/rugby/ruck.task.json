@@ -1,0 +1,10 @@
+{
+ "id": "01a2216c-83e5-7599-888e-dae69d7e3477",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857090152,
+ "finished_at": 1795857103107,
+ "prompt": "A rugby union player hits a ruck: runs in, bends low with a flat back, drives forward over the ball on the ground with the shoulders, short powerful steps, then stays low.",
+ "duration": 2.5,
+ "mode": "swift"
+}

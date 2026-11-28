@@ -87,7 +87,8 @@
    "library": "run",
    "prefer": [
     "sprint",
-    "jog"
+    "jog",
+    "mz_aussie_sprint"
    ],
    "frames": 8,
    "fps": 14,

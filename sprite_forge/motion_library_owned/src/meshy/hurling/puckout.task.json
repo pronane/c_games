@@ -1,0 +1,10 @@
+{
+ "id": "01a22169-4e98-713e-86a5-9172fd2fd17b",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856879910,
+ "finished_at": 1795856899540,
+ "prompt": "A hurler holding a hurley (a short wooden stick with a flat curved end, held like a hockey stick) in both hands is the goalkeeper taking a puckout: lifts the ball up off the stick, tosses it up, takes a big backswing and hits it as far as possible with a full swing, following through high.",
+ "duration": 3.0,
+ "mode": "swift"
+}

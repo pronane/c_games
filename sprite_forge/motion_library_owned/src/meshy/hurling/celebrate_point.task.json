@@ -1,0 +1,10 @@
+{
+ "id": "01a2216d-66db-7721-9439-46594d731fc2",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857148989,
+ "finished_at": 1795857166223,
+ "prompt": "A hurler holding a hurley (a short wooden stick with a flat curved end, held like a hockey stick) in the right hand celebrates a point: turns and raises the stick straight up in the air once, then jogs back.",
+ "duration": 2.5,
+ "mode": "swift"
+}

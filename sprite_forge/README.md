@@ -73,15 +73,25 @@ with Meshy's Text to Motion, straight from Meshy's REST API (the same calls as t
   passes, point and goal shots, low, chest and leap catches, the front tackle, dummy, sidestep, spin, fist pass and
   fist point, both celebrations, fall, get-up, injured idle, change of direction, stop). Four needed a second prompt
   (solo loop, low catch, sidestep width, get-up ending standing). `check_motion --pack gaelic`: 36 of 36 pass,
-  and only `sprint` is still procedural (26 were). Sprite QA on the mannequin: 0 FAIL.
+  with 0 procedural stand-ins left (26 were). Sprite QA on the mannequin: 0 FAIL.
+* **Aussie rules, hurling, rugby** (prompts in `game_packs/meshy/`): 17 + 15 + 18 clips. Aussie: running
+  bounce, drop punt, set shot, snap, handball, chest mark, speccy, ruck tap, tackle, shepherd, smother, pick-up,
+  sidestep, fall, get-up, goal celebration, sprint. Hurling (the prompts keep the hands where the hurley is held; the
+  pack attaches the hurley and helmet): solo, strike from the hand, ground strike, puckout, free, jab lift, catch,
+  hand pass, hook, block, shoulder, sidestep, fall, both celebrations. Rugby: carry, spin pass, offload, punt,
+  drop goal, place kick, high catch, lineout jump, low tackle, hand-off, ruck, try, pick-up, sidestep, fall,
+  get-up, hit, sprint. Procedural stand-ins: Aussie 14 -> 0, hurling 15 -> 0, rugby 15 -> 1 (the scrum: Meshy's
+  would not loop, so the pack keeps its own). Every clip passes `check_motion`; sprite QA 0 FAIL on all three.
+* **`"reuse"`:** a prompt-file move may name another pack's clip instead of a prompt (`{"reuse": "mz_aussie_sprint"}`),
+  wired the same way with no credits: hurling's sprint and get-up, and Gaelic's sprint (so Gaelic has 0 left).
 * **Meshy's skeleton:** its BVH names the thigh `{S}Leg` and the shin `{S}Shin` (Mixamo calls the shin `{S}Leg`). A
   `meshy` bone convention reads it the right way round.
 * **`motion_library_owned/`:** clips the project owner holds the rights to (Meshy paid-plan output), licensed
   `LicenseRef-Owned-Meshy`, redistributable with this project. Searched after your own library and before the
   CC0 starter, which stays CC0 and Meshy-free.
-* `tools/test_meshy.py`: 17 checks against a fake Meshy (no network, no credits), plus the shipped clips.
+* `tools/test_meshy.py`: 18 checks against a fake Meshy (no network, no credits), plus the shipped clips.
 
-Next: the same for hurling, Aussie rules and rugby (`game_packs/meshy/<pack>.json`), and Meshy player models
+Next: soccer, tennis and wrestling stand-ins the same way, and Meshy player models
 (text / image to 3D, rigged on the Mixamo skeleton, `forge.py library add --preset meshy-paid`).
 
 ## New in v11.40: real categories, sub-type tags and training rights for imported moves

@@ -6,6 +6,9 @@
     forge.py meshy motion --pack gaelic [--moves hand_pass,tackle] [--mode swift|prime] [--max-credits 100]
     forge.py meshy import --pack gaelic                 free: re-import the saved BVH / FBX (after an importer change)
 
+A move in the prompt file may say {"reuse": "mz_gaelic_get_up"} instead of a prompt: another pack's clip that already
+passes, wired into this pack the same way (nothing is generated).
+
 `motion` reads game_packs/meshy/<pack>.json (one Text to Motion prompt per move), generates each clip, keeps the
 source file in motion_library_owned/src/meshy/<pack>/, imports it onto the shared skeleton as <clip_prefix><move> in
 motion_library_owned/, runs check_motion on it and adds it to that move's "prefer" list in the pack, after any clips
@@ -40,6 +43,8 @@ def load_prompts(pack, folder=PROMPTS):
         raise SystemExit("no prompt file %s (have: %s)" % (p, ", ".join(sorted(f[:-5] for f in os.listdir(folder) if f.endswith(".json")))))
     d = json.load(open(p, encoding="utf-8"))
     for nm, m in d["moves"].items():
+        if m.get("reuse"):                    # {"reuse": "mz_gaelic_get_up"}: another pack's clip, nothing generated
+            continue
         if len(m["prompt"]) > 400:
             raise SystemExit("%s: prompt is %d characters (Meshy allows 400)" % (nm, len(m["prompt"])))
     return d
@@ -51,6 +56,7 @@ def plan(spec, moves=None, mode=None):
     bad = [m for m in names if m not in spec["moves"]]
     if bad:
         raise SystemExit("not in the prompt file: %s" % ", ".join(bad))
+    names = [m for m in names if not spec["moves"][m].get("reuse")]
     return names, mode, len(names) * MZ.COST["motion_" + mode]
 
 
@@ -125,7 +131,12 @@ def run_motion(a, client=None, log=print):
                                                                " (others already made; --force redoes them)" if not a.force else ""))
     for n in names:
         log("  %-18s %4.1fs  %s" % (n, spec["moves"][n]["duration"], spec["moves"][n]["prompt"][:90]))
-    if a.dry_run or not names:
+    if a.dry_run:
+        return 0
+    if not names:
+        made = reused(spec, out)
+        if made and not a.no_wire:
+            wire_pack(a.pack, made, a.packs_dir)
         return 0
     if a.max_credits is not None and credits > a.max_credits:
         raise SystemExit("would use %d credits, over --max-credits %d" % (credits, a.max_credits))
@@ -151,6 +162,7 @@ def run_motion(a, client=None, log=print):
         if rec_p and not bad:
             made[n] = clip
     _report(rows, log)
+    made.update(reused(spec, out))
     if made and not a.no_wire:
         ch = wire_pack(a.pack, made, a.packs_dir)
         log("game_packs/%s.json: %d moves now prefer their Meshy clip" % (a.pack, len(ch)))
@@ -164,6 +176,8 @@ def run_import(a, log=print):
     pre = spec.get("clip_prefix", "mz_%s_" % a.pack)
     made, rows = {}, []
     for n, m in spec["moves"].items():
+        if m.get("reuse"):
+            continue
         src = next((os.path.join(src_dir, n + e) for e in (".bvh", ".fbx") if os.path.isfile(os.path.join(src_dir, n + e))), None)
         if not src:
             continue
@@ -176,9 +190,22 @@ def run_import(a, log=print):
         failed = [pre + n for n, c, s in rows if s != "ok"]
         if failed:
             unwire_pack(a.pack, failed, a.packs_dir)
+        made.update(reused(spec, out))
         if made:
             wire_pack(a.pack, made, a.packs_dir)
     return 0
+
+
+def reused(spec, out):
+    """move -> clip for {"reuse": CLIP} entries whose clip is in the library (a missing one is reported, not wired)."""
+    got = {}
+    for n, m in spec["moves"].items():
+        c = m.get("reuse")
+        if c and os.path.isfile(os.path.join(out, c + ".json")):
+            got[n] = c
+        elif c:
+            print("%-18s reuse %s: not in %s, left out" % (n, c, out))
+    return got
 
 
 def _report(rows, log):

@@ -1,0 +1,10 @@
+{
+ "id": "01a22168-533f-77b0-b1b4-5d7f3e8cc67e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856816267,
+ "finished_at": 1795856834844,
+ "prompt": "A rugby union player runs in a straight line carrying the oval ball in both hands in front of the chest, upright, ready to pass, steady fast jog. No turning.",
+ "duration": 3.0,
+ "mode": "swift"
+}

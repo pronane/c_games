@@ -1,0 +1,10 @@
+{
+ "id": "01a22167-d57a-77a6-84b1-e747ca0d53ef",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856783543,
+ "finished_at": 1795856792688,
+ "prompt": "An Australian rules football player sprints flat out in a dead straight line, facing forward, long powerful strides, arms pumping. No turning.",
+ "duration": 3.0,
+ "mode": "swift"
+}

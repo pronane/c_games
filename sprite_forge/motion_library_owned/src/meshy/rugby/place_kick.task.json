@@ -1,0 +1,10 @@
+{
+ "id": "01a2216a-4676-72db-9aac-abdf4c606753",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856943388,
+ "finished_at": 1795856962032,
+ "prompt": "A rugby union player takes a place kick from a tee: steps back, stands still, then takes a curved run-up of four steps and kicks the ball off the ground with the inside of the right foot, following through high.",
+ "duration": 3.0,
+ "mode": "swift"
+}

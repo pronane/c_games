@@ -1,0 +1,10 @@
+{
+ "id": "01a22171-d05f-778e-abfc-3a692021b089",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857437958,
+ "finished_at": 1795857444422,
+ "prompt": "A rugby forward in a scrum: torso bent forward flat and horizontal like a table at hip height, head up, arms reaching out sideways to bind, legs bent and set back wide, pushing forward with short driving steps in a steady repeating rhythm, staying bent over the whole time.",
+ "duration": 3.0,
+ "mode": "swift"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "01a2216c-a289-7499-9f4b-36fade01a838",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857098006,
+ "finished_at": 1795857109696,
+ "prompt": "An Australian rules football player holding the ball at the chest, takes a big sidestep: plants the left foot and pushes off one long stride sideways to the right, then a second step to the right, feet wide.",
+ "duration": 2.0,
+ "mode": "swift"
+}

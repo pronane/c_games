@@ -184,6 +184,15 @@ try:
     MC.main(["import", "--pack", "testpack", "--prompts", pdir, "--packs-dir", gdir, "--out", out])
     check("meshy import re-imports from the saved BVH without the API", os.path.isfile(os.path.join(out, "mz_test_hand_pass.json"))
           and sum(c[0] == "POST" for c in fake.calls) == n_posts)
+    spec = json.load(open(os.path.join(pdir, "testpack.json")))
+    spec["moves"]["idle"] = {"reuse": "mz_test_hand_pass"}
+    spec["moves"]["walk"] = {"reuse": "mz_missing_clip"}
+    json.dump(spec, open(os.path.join(pdir, "testpack.json"), "w"))
+    n_posts = sum(c[0] == "POST" for c in fake.calls)
+    MC.main(base, client=cl)
+    pref = {mv["name"]: mv.get("prefer") for mv in json.load(open(os.path.join(gdir, "testpack.json")))["moves"]}
+    check("a {\"reuse\": CLIP} move is wired with no credits; a missing reuse clip is left out",
+          pref["idle"] == ["mz_test_hand_pass"] and sum(c[0] == "POST" for c in fake.calls) == n_posts, pref)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -199,7 +208,9 @@ if owned:
     import check_motion as CM
     gp = json.load(open(os.path.join(HERE, "game_packs", "gaelic.json")))
     names = {os.path.splitext(os.path.basename(p))[0] for p in owned}
-    missing = [c for mv in gp["moves"] for c in (mv.get("prefer") or []) if c.startswith("mz_") and c not in names]
+    missing = [(pk, c) for pk in ("gaelic", "aussie_rules", "hurling", "rugby")
+               for mv in json.load(open(os.path.join(HERE, "game_packs", pk + ".json")))["moves"]
+               for c in (mv.get("prefer") or []) if c.startswith("mz_") and c not in names]
     bad = []
     for p in owned:
         r = json.load(open(p))

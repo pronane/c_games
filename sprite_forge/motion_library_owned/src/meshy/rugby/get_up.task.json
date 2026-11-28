@@ -1,0 +1,10 @@
+{
+ "id": "01a2216e-260f-7433-ae39-4fc893ad6c11",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857197520,
+ "finished_at": 1795857203737,
+ "prompt": "A rugby union player lying on the side on the ground gets up: pushes up with the hands, gets one knee under, rises and stands fully upright with straight legs, and stays standing for the last second.",
+ "duration": 4.0,
+ "mode": "swift"
+}

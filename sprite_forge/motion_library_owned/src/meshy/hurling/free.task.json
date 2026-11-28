@@ -1,0 +1,10 @@
+{
+ "id": "01a22169-aae9-70a5-9563-07b92e2ecfd6",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856903667,
+ "finished_at": 1795856928283,
+ "prompt": "A hurler holding a hurley (a short wooden stick with a flat curved end, held like a hockey stick) in both hands takes a free: stands still, bends and lifts the ball onto the flat of the stick, flicks it up, then strikes it with a careful full swing over the bar, watching it.",
+ "duration": 3.0,
+ "mode": "swift"
+}

@@ -133,6 +133,10 @@
    "duration": 2.0,
    "loop": false,
    "prompt": "A Gaelic football player sprinting, stops suddenly: two short braking steps, knees bent, arms out, and comes to a balanced stop."
+  },
+  "sprint": {
+   "reuse": "mz_aussie_sprint",
+   "why": "a straight flat-out sprint, the same for every field sport"
   }
  }
 }

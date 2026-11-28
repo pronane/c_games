@@ -1,0 +1,93 @@
+{
+ "pack": "aussie_rules",
+ "mode": "swift",
+ "clip_prefix": "mz_aussie_",
+ "notes": "Prompts for Meshy Text to Motion (forge.py meshy motion --pack aussie_rules).",
+ "moves": {
+  "sprint": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "An Australian rules football player sprints flat out in a dead straight line, facing forward, long powerful strides, arms pumping. No turning."
+  },
+  "bounce": {
+   "duration": 3.0,
+   "loop": true,
+   "prompt": "An Australian rules football player runs on a treadmill, facing straight ahead the whole time, steady fast running stride, bouncing the oval ball into the ground in front with the right hand and catching it again at the chest, the same cycle over and over. No turning."
+  },
+  "drop_punt": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "An Australian rules football player kicks a drop punt: running, holds the oval ball upright in both hands, guides it down onto the right foot and kicks through it, leg swinging up to waist height, toes pointed, arms out."
+  },
+  "set_shot": {
+   "duration": 3.0,
+   "loop": false,
+   "prompt": "An Australian rules football player takes a set shot at goal: stands still, takes a slow curved approach of four steps, drops the ball onto the right foot and kicks long and high, big follow-through above the head, then watches it."
+  },
+  "snap": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "An Australian rules football player snaps at goal: running across the body, swings the right leg around in an arc and hooks a kick sideways around the body towards goal, body turning with the kick."
+  },
+  "handball": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "An Australian rules football player handballs: holds the oval ball flat on the open left palm at waist height, clenches the right fist and punches the ball off the palm to a team-mate, arm following through."
+  },
+  "mark": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "An Australian rules football player takes a chest mark: steps in, arms forward, catches the ball on the chest with both arms wrapped around it, holds it firmly and stands tall."
+  },
+  "speccy": {
+   "duration": 3.0,
+   "loop": false,
+   "prompt": "An Australian rules football player takes a spectacular high mark: runs in, leaps very high off one foot, the other knee raised high in front, both arms stretched above the head to catch the ball at the top of the jump, then lands on both feet."
+  },
+  "ruck_tap": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "An Australian rules football player is the ruckman at a centre bounce: crouches, runs two steps and jumps high, the right arm reaching up to tap the ball down to a team-mate with an open hand at the top of the jump, then lands."
+  },
+  "tackle": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "An Australian rules football player tackles: runs at the ball carrier, wraps both arms tight around the opponent's waist and pins the arms, drives forward and drags the opponent to the ground, falling on top."
+  },
+  "shepherd": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "An Australian rules football player shepherds for a team-mate: plants the feet wide, arms out sideways at shoulder height, and blocks an opponent with the shoulder and hip, shuffling sideways to keep them away."
+  },
+  "smother": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "An Australian rules football player smothers a kick: runs two steps and dives forward, launching the body low through the air with both arms stretched straight out in front, hands spread to block the ball, then lands on the chest and hands on the ground."
+  },
+  "pick_up": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "An Australian rules football player picks up the ball at speed: running, bends low and scoops a loose ball off the ground with one hand, brings it into the chest and keeps running."
+  },
+  "sidestep": {
+   "duration": 2.0,
+   "loop": false,
+   "prompt": "An Australian rules football player holding the ball at the chest, takes a big sidestep: plants the left foot and pushes off one long stride sideways to the right, then a second step to the right, feet wide."
+  },
+  "fall": {
+   "duration": 2.5,
+   "loop": false,
+   "prompt": "An Australian rules football player running, is bumped hard from the side, loses balance, stumbles and falls onto the ground on the side, arms out to break the fall."
+  },
+  "get_up": {
+   "duration": 4.0,
+   "loop": false,
+   "prompt": "An Australian rules football player lying on the side on the ground gets up: pushes up with the hands, gets one knee under, rises and stands fully upright with straight legs, and stays standing for the last second."
+  },
+  "celebrate": {
+   "duration": 3.0,
+   "loop": false,
+   "prompt": "An Australian rules football player celebrates kicking a goal: turns, runs a few steps with both arms raised high, fists clenched, then jumps and punches the air."
+  }
+ }
+}
