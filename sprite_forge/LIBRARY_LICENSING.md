@@ -50,6 +50,13 @@ forbid using it to train models. A free pack whose terms say nothing about train
   until you have checked the terms (or asked the author) and set it.
 * `python3 tools/retag_motions.py FOLDER` reports how many moves per source may be used for training.
 
+### Models (v11.41)
+A model asset has two licence questions. Its own licence record covers the weights: may they ship, and may
+they be fine-tuned. Its `trained_on` list covers the data it was trained on. A model trained here must list
+only data with `ml_training = yes`; otherwise packing refuses it. A pretrained model whose authors trained
+it on datasets with their own terms (OpenMMLab's Human-Art and Body7) is `ml_training = unknown` until you
+have checked those terms.
+
 ## Third-party stores (terms differ and change: read them)
 * **Mixamo (Adobe):** characters and animations are royalty-free to use in your own projects and games, but
   the raw files may not be redistributed (for example as an asset pack).

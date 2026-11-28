@@ -54,6 +54,50 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
 
+## New in v11.41: "models" and "environments" library kinds
+
+Two new kinds sit beside rigs, animations, kits, outfits and props. They are listed, licensed, packed and
+installed like the others.
+
+**models** (`sforge/modellib.py`): machine-learning models as versioned assets.
+* Each one is `library/models/<name>/model.json` + `licence.json` + its weights, when they are stored.
+* model.json gives the task (detector / pose2d / pose3d / lifter / motion_matching / motion_generator), the
+  version, the format, a sha256, the role, metrics, what uses it and a licence caveat to confirm.
+* A model trained here also lists `trained_on`, with each dataset's `ml_training`. A model trained on any
+  data that is not `ml_training = yes` is flagged, and `library pack` refuses it. Learned Motion Matching
+  networks go in this way.
+* `forge.py library models import-registry` brings in everything in `sforge/models/registry.json`:
+  * the lifter, with its weights and a checksum;
+  * the OpenMMLab and MediaPipe models, by URL.
+  * OpenMMLab models whose training data has a caveat (Human-Art, Body7) are `ml_training = unknown`.
+* `library models latest --task lifter` finds the highest version of a task.
+* `library models add --name lmm_v1 --task motion_matching --file lmm_v1.onnx --trained-on soccertrack=yes ...`
+
+**environments** (`sforge/environments.py`): a ground to play in, as one recipe.
+* A recipe sets the sport and a preset for each part:
+  * the stadium (bowl / classic / ground, plus overrides);
+  * the turf cut;
+  * crowd fill and colours;
+  * the board atlas;
+  * the goals;
+  * the touchline staff.
+* Presets: `soccer_bowl`, `soccer_classic`, `soccer_ground`, `gaelic_ground`, `hurling_ground`,
+  `rugby_ground` and `aussie_oval`, all CC0.
+* `library envs seed` adds the presets. `library envs add --name night_derby --from soccer_classic --set
+  crowd.fill=1 --set pitch.mow=rings` makes your own.
+* `library envs build --name soccer_ground --out DIR` writes:
+  * `stadium.glb` and its seats;
+  * `pitch.png`;
+  * `crowd.glb`;
+  * `adboards.png`;
+  * `goal.glb`;
+  * the touchline placements and props;
+  * an `environment.json` that a game reads first.
+* Parts a sport has no model for yet (rugby and Aussie rules posts, Aussie turf markings) are left out, and
+  `validate` says so.
+
+The Library tab shows both kinds, with their details and problems. Tests: `python3 tools/test_models_envs.py` (in CI).
+
 ## New in v11.40: real categories, sub-type tags and training rights for imported moves
 
 Imported moves used to be filed under catch-alls ("Mocap", "Imported", "Recorded", "Library"). They are now
