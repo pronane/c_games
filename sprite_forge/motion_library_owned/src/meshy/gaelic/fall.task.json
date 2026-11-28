@@ -1,0 +1,10 @@
+{
+ "id": "01a22125-71c1-7700-9b6b-0533f772d49e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852432687,
+ "finished_at": 1795852443410,
+ "prompt": "A Gaelic football player running, is knocked off balance by a shoulder charge from the side, stumbles and falls onto the ground on the side, arms out to break the fall.",
+ "duration": 2.0,
+ "mode": "swift"
+}

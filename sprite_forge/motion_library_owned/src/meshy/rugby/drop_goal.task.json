@@ -1,0 +1,10 @@
+{
+ "id": "01a22169-d647-70c1-9f5d-dd80016174c0",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856914918,
+ "finished_at": 1795856936756,
+ "prompt": "A rugby union player kicks a drop goal: drops the oval ball point-down to the ground in front and kicks it on the half-volley just as it bounces, leg swinging through and up.",
+ "duration": 2.5,
+ "mode": "swift"
+}

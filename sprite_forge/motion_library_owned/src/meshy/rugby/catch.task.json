@@ -1,0 +1,10 @@
+{
+ "id": "01a2216a-a1b3-707a-b4c6-e866bf24a604",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856966661,
+ "finished_at": 1795856986973,
+ "prompt": "A rugby union player catches a high kick: jumps off one foot with the other knee raised high in front, both arms stretched up to catch the ball overhead, pulls it into the chest and lands.",
+ "duration": 2.5,
+ "mode": "swift"
+}

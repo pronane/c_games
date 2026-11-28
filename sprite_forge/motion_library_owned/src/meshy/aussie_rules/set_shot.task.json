@@ -1,0 +1,10 @@
+{
+ "id": "01a22168-d644-70b1-9e69-748f76966dfd",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856849167,
+ "finished_at": 1795856864018,
+ "prompt": "An Australian rules football player takes a set shot at goal: stands still, takes a slow curved approach of four steps, drops the ball onto the right foot and kicks long and high, big follow-through above the head, then watches it.",
+ "duration": 3.0,
+ "mode": "swift"
+}

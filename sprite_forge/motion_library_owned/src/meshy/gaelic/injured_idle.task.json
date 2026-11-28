@@ -1,0 +1,10 @@
+{
+ "id": "01a22125-ef54-726c-82d7-e67fd6a969c9",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852464620,
+ "finished_at": 1795852473305,
+ "prompt": "A Gaelic football player stands injured, bent over with the right hand holding the back of the right thigh (hamstring), limping and shifting weight off the right leg.",
+ "duration": 3.0,
+ "mode": "swift"
+}

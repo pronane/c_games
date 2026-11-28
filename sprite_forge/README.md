@@ -52,7 +52,47 @@ same commands and the same limits.
 Limits: the starter is procedural keys, not motion capture. A video import needs MediaPipe
 (`python tools/setup_pose.py`); without it the checker says so and does not keep the video.
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
-fewer frames. No Mixamo or Meshy clips. Do not commit a recording of a real person.
+fewer frames. The starter has no Mixamo or Meshy clips (v11.41's owned Meshy clips are in motion_library_owned/). Do not commit a recording of a real person.
+
+## New in v11.41: Meshy AI - Gaelic football moves nobody has filmed
+
+There is no mocap of a hand pass, a solo, a toe-lift or a Gaelic high catch to copy. `forge.py meshy` generates them
+with Meshy's Text to Motion, straight from Meshy's REST API (the same calls as the Meshy MCP server, without needing it).
+
+* **Commands** (key: `MESHY_API_KEY`, or the first line of `~/.config/meshy/key`; never in the repo):
+  * `forge.py meshy balance` and `forge.py meshy library [--search kick]`: free.
+  * `forge.py meshy motion --pack gaelic --dry-run`: the moves and the credits. Without `--dry-run` it generates
+    them (`--moves a,b`, `--mode swift|prime`, `--max-credits N`, `--force` to redo a move).
+  * `forge.py meshy import --pack gaelic`: free re-import of the saved source files after an importer change.
+* **How it works:** one prompt per move in `game_packs/meshy/<pack>.json`. Each clip is generated (swift: 3
+  credits, BVH), its source kept in `motion_library_owned/src/meshy/<pack>/`, imported onto the shared skeleton
+  as `mz_<pack>_<move>` in `motion_library_owned/`, and checked by `check_motion`. A clip that passes is added to
+  that move's `"prefer"` list after the clips already there, so your own human-derived clips (CMU, Mixamo, the
+  Gaelic key poses) still win where you have them; one that fails is not shipped and the report says why.
+* **Gaelic:** 26 moves generated (hand pass, solo, carry, hold, toe-lift and aerial pick-ups, low and high kick
+  passes, point and goal shots, low, chest and leap catches, the front tackle, dummy, sidestep, spin, fist pass and
+  fist point, both celebrations, fall, get-up, injured idle, change of direction, stop). Four needed a second prompt
+  (solo loop, low catch, sidestep width, get-up ending standing). `check_motion --pack gaelic`: 36 of 36 pass,
+  with 0 procedural stand-ins left (26 were). Sprite QA on the mannequin: 0 FAIL.
+* **Aussie rules, hurling, rugby** (prompts in `game_packs/meshy/`): 17 + 15 + 18 clips. Aussie: running
+  bounce, drop punt, set shot, snap, handball, chest mark, speccy, ruck tap, tackle, shepherd, smother, pick-up,
+  sidestep, fall, get-up, goal celebration, sprint. Hurling (the prompts keep the hands where the hurley is held; the
+  pack attaches the hurley and helmet): solo, strike from the hand, ground strike, puckout, free, jab lift, catch,
+  hand pass, hook, block, shoulder, sidestep, fall, both celebrations. Rugby: carry, spin pass, offload, punt,
+  drop goal, place kick, high catch, lineout jump, low tackle, hand-off, ruck, try, pick-up, sidestep, fall,
+  get-up, hit, sprint. Procedural stand-ins: Aussie 14 -> 0, hurling 15 -> 0, rugby 15 -> 1 (the scrum: Meshy's
+  would not loop, so the pack keeps its own). Every clip passes `check_motion`; sprite QA 0 FAIL on all three.
+* **`"reuse"`:** a prompt-file move may name another pack's clip instead of a prompt (`{"reuse": "mz_aussie_sprint"}`),
+  wired the same way with no credits: hurling's sprint and get-up, and Gaelic's sprint (so Gaelic has 0 left).
+* **Meshy's skeleton:** its BVH names the thigh `{S}Leg` and the shin `{S}Shin` (Mixamo calls the shin `{S}Leg`). A
+  `meshy` bone convention reads it the right way round.
+* **`motion_library_owned/`:** clips the project owner holds the rights to (Meshy paid-plan output), licensed
+  `LicenseRef-Owned-Meshy`, redistributable with this project. Searched after your own library and before the
+  CC0 starter, which stays CC0 and Meshy-free.
+* `tools/test_meshy.py`: 18 checks against a fake Meshy (no network, no credits), plus the shipped clips.
+
+Next: soccer, tennis and wrestling stand-ins the same way, and Meshy player models
+(text / image to 3D, rigged on the Mixamo skeleton, `forge.py library add --preset meshy-paid`).
 
 ## New in v11.41: "models" and "environments" library kinds
 

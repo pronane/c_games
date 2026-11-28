@@ -87,7 +87,8 @@
    "library": "run",
    "prefer": [
     "sprint",
-    "jog"
+    "jog",
+    "mz_aussie_sprint"
    ],
    "frames": 8,
    "fps": 14,
@@ -125,7 +126,8 @@
    },
    "desc": "",
    "prefer": [
-    "stop_sudden"
+    "stop_sudden",
+    "mz_gaelic_stop"
    ]
   },
   {
@@ -149,7 +151,8 @@
    },
    "desc": "",
    "prefer": [
-    "juke_feint"
+    "juke_feint",
+    "mz_gaelic_change_direction"
    ]
   },
   {
@@ -171,14 +174,16 @@
    "desc": "",
    "prefer": [
     "gaa_toe_lift",
-    "catch_low"
+    "catch_low",
+    "mz_gaelic_pick_up_ground"
    ]
   },
   {
    "name": "pick_up_aerial",
    "library": "jump",
    "prefer": [
-    "jump_vertical"
+    "jump_vertical",
+    "mz_gaelic_pick_up_aerial"
    ],
    "frames": 8,
    "fps": 12,
@@ -211,7 +216,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_gaelic_hold"
+   ]
   },
   {
    "name": "carry",
@@ -234,7 +242,8 @@
    },
    "desc": "",
    "prefer": [
-    "gaa_carry"
+    "gaa_carry",
+    "mz_gaelic_carry"
    ]
   },
   {
@@ -242,7 +251,8 @@
    "library": "run",
    "prefer": [
     "gaa_solo",
-    "dribble"
+    "dribble",
+    "mz_gaelic_bounce_solo"
    ],
    "frames": 8,
    "fps": 12,
@@ -267,7 +277,8 @@
    "library": "pass",
    "prefer": [
     "gaa_hand_pass",
-    "punch_straight"
+    "punch_straight",
+    "mz_gaelic_hand_pass"
    ],
    "frames": 6,
    "fps": 12,
@@ -289,7 +300,8 @@
    "library": "kick",
    "prefer": [
     "gaa_kick",
-    "soccer_kick"
+    "soccer_kick",
+    "mz_gaelic_low_kick_pass"
    ],
    "frames": 8,
    "fps": 14,
@@ -311,7 +323,8 @@
    "library": "kick",
    "prefer": [
     "gaa_kick",
-    "soccer_shoot"
+    "soccer_shoot",
+    "mz_gaelic_high_kick_pass"
    ],
    "frames": 8,
    "fps": 14,
@@ -333,7 +346,8 @@
    "library": "shoot",
    "prefer": [
     "gaa_kick",
-    "soccer_shoot"
+    "soccer_shoot",
+    "mz_gaelic_shoot_point"
    ],
    "frames": 8,
    "fps": 14,
@@ -354,7 +368,8 @@
    "name": "shoot_goal",
    "library": "shoot",
    "prefer": [
-    "soccer_kick"
+    "soccer_kick",
+    "mz_gaelic_shoot_goal"
    ],
    "frames": 8,
    "fps": 14,
@@ -389,7 +404,8 @@
    },
    "desc": "",
    "prefer": [
-    "catch_low"
+    "catch_low",
+    "mz_gaelic_catch_ground"
    ]
   },
   {
@@ -398,7 +414,8 @@
    "prefer": [
     "gaa_high_catch",
     "keeper_catch",
-    "jump_shot"
+    "jump_shot",
+    "mz_gaelic_catch_aerial"
    ],
    "frames": 8,
    "fps": 12,
@@ -431,7 +448,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_gaelic_tackle"
+   ]
   },
   {
    "name": "block",
@@ -472,7 +492,8 @@
    },
    "desc": "",
    "prefer": [
-    "juke_feint"
+    "juke_feint",
+    "mz_gaelic_juke_feint"
    ]
   },
   {
@@ -496,7 +517,8 @@
    },
    "desc": "",
    "prefer": [
-    "sidestep_shuffle"
+    "sidestep_shuffle",
+    "mz_gaelic_sidestep"
    ]
   },
   {
@@ -517,7 +539,8 @@
    },
    "desc": "",
    "prefer": [
-    "pivot_left"
+    "pivot_left",
+    "mz_gaelic_spin"
    ]
   },
   {
@@ -547,7 +570,8 @@
    "prefer": [
     "gaa_high_catch",
     "keeper_catch",
-    "jump_shot"
+    "jump_shot",
+    "mz_gaelic_leap_catch"
    ],
    "frames": 8,
    "fps": 12,
@@ -569,7 +593,8 @@
    "library": "punch",
    "prefer": [
     "gaa_hand_pass",
-    "punch_straight"
+    "punch_straight",
+    "mz_gaelic_fist_pass"
    ],
    "frames": 6,
    "fps": 12,
@@ -590,7 +615,8 @@
    "name": "fist_shoot",
    "library": "punch",
    "prefer": [
-    "punch_power"
+    "punch_power",
+    "mz_gaelic_fist_shoot"
    ],
    "frames": 6,
    "fps": 12,
@@ -625,7 +651,8 @@
    },
    "desc": "",
    "prefer": [
-    "celebrate_jump"
+    "celebrate_jump",
+    "mz_gaelic_celebrate_point"
    ]
   },
   {
@@ -647,7 +674,8 @@
    "desc": "",
    "prefer": [
     "victory_2",
-    "celebrate_jump"
+    "celebrate_jump",
+    "mz_gaelic_celebrate_goal"
    ]
   },
   {
@@ -669,14 +697,16 @@
    "desc": "",
    "prefer": [
     "trip_fall",
-    "ko_fall_back"
+    "ko_fall_back",
+    "mz_gaelic_fall"
    ]
   },
   {
    "name": "get_up",
    "library": "crouch",
    "prefer": [
-    "get_up"
+    "get_up",
+    "mz_gaelic_get_up"
    ],
    "frames": 8,
    "fps": 10,
@@ -709,7 +739,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_gaelic_injured_idle"
+   ]
   },
   {
    "name": "goalkeeper_save",

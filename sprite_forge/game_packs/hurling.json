@@ -105,6 +105,9 @@
    "desc": "",
    "own": [
     "sprint"
+   ],
+   "prefer": [
+    "mz_aussie_sprint"
    ]
   },
   {
@@ -129,6 +132,9 @@
    "desc": "running with the sliotar balanced on the bas",
    "own": [
     "hurl_solo"
+   ],
+   "prefer": [
+    "mz_hurling_solo"
    ]
   },
   {
@@ -150,6 +156,9 @@
    "desc": "strike from the hand",
    "own": [
     "hurl_strike"
+   ],
+   "prefer": [
+    "mz_hurling_strike"
    ]
   },
   {
@@ -171,6 +180,9 @@
    "desc": "ground stroke, the ball on the grass",
    "own": [
     "hurl_ground"
+   ],
+   "prefer": [
+    "mz_hurling_ground_strike"
    ]
   },
   {
@@ -192,6 +204,9 @@
    "desc": "the goalkeeper's long puck-out",
    "own": [
     "hurl_puckout"
+   ],
+   "prefer": [
+    "mz_hurling_puckout"
    ]
   },
   {
@@ -213,6 +228,9 @@
    "desc": "a free: lift and strike in one move",
    "own": [
     "hurl_free"
+   ],
+   "prefer": [
+    "mz_hurling_free"
    ]
   },
   {
@@ -234,6 +252,9 @@
    "desc": "lift the sliotar off the ground with the bas",
    "own": [
     "hurl_lift"
+   ],
+   "prefer": [
+    "mz_hurling_lift"
    ]
   },
   {
@@ -255,6 +276,9 @@
    "desc": "overhead catch, the hurley raised to protect the hand",
    "own": [
     "hurl_catch"
+   ],
+   "prefer": [
+    "mz_hurling_catch"
    ]
   },
   {
@@ -276,6 +300,9 @@
    "desc": "",
    "own": [
     "hand_pass"
+   ],
+   "prefer": [
+    "mz_hurling_hand_pass"
    ]
   },
   {
@@ -297,6 +324,9 @@
    "desc": "hook the opponent's swing from behind",
    "own": [
     "hurl_hook"
+   ],
+   "prefer": [
+    "mz_hurling_hook"
    ]
   },
   {
@@ -318,6 +348,9 @@
    "desc": "block down the strike in front",
    "own": [
     "hurl_block"
+   ],
+   "prefer": [
+    "mz_hurling_block"
    ]
   },
   {
@@ -339,6 +372,9 @@
    "desc": "",
    "own": [
     "tackle"
+   ],
+   "prefer": [
+    "mz_hurling_shoulder"
    ]
   },
   {
@@ -363,6 +399,9 @@
    "desc": "",
    "own": [
     "sidestep"
+   ],
+   "prefer": [
+    "mz_hurling_sidestep"
    ]
   },
   {
@@ -381,7 +420,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_hurling_fall"
+   ]
   },
   {
    "name": "get_up",
@@ -402,6 +444,9 @@
    "desc": "",
    "own": [
     "get_up"
+   ],
+   "prefer": [
+    "mz_gaelic_get_up"
    ]
   },
   {
@@ -441,6 +486,9 @@
    "desc": "",
    "own": [
     "celebrate_point"
+   ],
+   "prefer": [
+    "mz_hurling_celebrate_point"
    ]
   },
   {
@@ -462,6 +510,9 @@
    "desc": "",
    "own": [
     "celebrate_goal"
+   ],
+   "prefer": [
+    "mz_hurling_celebrate_goal"
    ]
   }
  ]

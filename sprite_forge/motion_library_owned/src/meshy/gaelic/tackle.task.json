@@ -1,0 +1,10 @@
+{
+ "id": "01a22124-274a-712a-85f4-84550e5262d4",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852347962,
+ "finished_at": 1795852353277,
+ "prompt": "A Gaelic football player makes a legal front tackle: crouched in a defensive stance, steps in and swipes the open right hand down across in front of the body to knock the ball out of an opponent's hands, no grabbing, then recovers.",
+ "duration": 2.0,
+ "mode": "swift"
+}

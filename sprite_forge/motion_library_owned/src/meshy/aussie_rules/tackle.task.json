@@ -1,0 +1,10 @@
+{
+ "id": "01a2216b-2291-77ec-a158-e30fa38e3d1f",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856999790,
+ "finished_at": 1795857024024,
+ "prompt": "An Australian rules football player tackles: runs at the ball carrier, wraps both arms tight around the opponent's waist and pins the arms, drives forward and drags the opponent to the ground, falling on top.",
+ "duration": 2.5,
+ "mode": "swift"
+}

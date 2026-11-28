@@ -1,0 +1,10 @@
+{
+ "id": "01a2216a-fc94-76d5-83f6-9672e819af2d",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856990174,
+ "finished_at": 1795857015142,
+ "prompt": "A rugby union player jumps at a lineout: crouches, springs straight up as high as possible with both arms fully stretched above the head to catch the ball, holds it overhead and comes back down.",
+ "duration": 2.5,
+ "mode": "swift"
+}

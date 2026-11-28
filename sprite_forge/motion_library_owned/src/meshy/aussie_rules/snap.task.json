@@ -1,0 +1,10 @@
+{
+ "id": "01a22169-1c99-7719-a3d0-44746cb41e92",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856867207,
+ "finished_at": 1795856890076,
+ "prompt": "An Australian rules football player snaps at goal: running across the body, swings the right leg around in an arc and hooks a kick sideways around the body towards goal, body turning with the kick.",
+ "duration": 2.5,
+ "mode": "swift"
+}

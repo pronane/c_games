@@ -39,6 +39,9 @@ from .rigrec import FPS, inv_rigid
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILTIN = os.path.join(HERE, "motion_library")
+# v11.41: clips the project owner holds the rights to (Meshy Text to Motion on a paid plan). Shipped in git, not CC0.
+# Searched after your own library and before the CC0 starter; names are prefixed (mz_<pack>_<move>) so nothing is shadowed.
+OWNED = os.path.join(HERE, "motion_library_owned")
 
 CC0 = dict(spdx="CC0-1.0", custom_text="", author="Sprite Forge Studio",
            source_url="", redistribution="yes", attribution="",
@@ -109,9 +112,9 @@ class MotionLibrary:
             dirs.append(pref)
         if os.path.abspath(self.write_dir) not in dirs:
             dirs.append(self.write_dir)
-        b = os.path.abspath(BUILTIN)
-        if b not in dirs:
-            dirs.append(b)
+        for b in (os.path.abspath(OWNED), os.path.abspath(BUILTIN)):
+            if b not in dirs and (b != os.path.abspath(OWNED) or os.path.isdir(b)):
+                dirs.append(b)
         self.dirs = dirs
         self.prefer = pref
 

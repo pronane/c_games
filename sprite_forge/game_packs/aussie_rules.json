@@ -100,6 +100,9 @@
    "desc": "",
    "own": [
     "sprint"
+   ],
+   "prefer": [
+    "mz_aussie_sprint"
    ]
   },
   {
@@ -124,6 +127,9 @@
    "desc": "bounce on the run (every 15 m)",
    "own": [
     "bounce_solo"
+   ],
+   "prefer": [
+    "mz_aussie_bounce"
    ]
   },
   {
@@ -145,6 +151,9 @@
    "desc": "",
    "own": [
     "high_kick_pass"
+   ],
+   "prefer": [
+    "mz_aussie_drop_punt"
    ]
   },
   {
@@ -166,6 +175,9 @@
    "desc": "set shot at goal after a mark",
    "own": [
     "shoot_goal"
+   ],
+   "prefer": [
+    "mz_aussie_set_shot"
    ]
   },
   {
@@ -187,6 +199,9 @@
    "desc": "snap kick round the body",
    "own": [
     "low_kick_pass"
+   ],
+   "prefer": [
+    "mz_aussie_snap"
    ]
   },
   {
@@ -208,6 +223,9 @@
    "desc": "",
    "own": [
     "fist_pass"
+   ],
+   "prefer": [
+    "mz_aussie_handball"
    ]
   },
   {
@@ -229,6 +247,9 @@
    "desc": "chest mark",
    "own": [
     "aussie_mark"
+   ],
+   "prefer": [
+    "mz_aussie_mark"
    ]
   },
   {
@@ -250,6 +271,9 @@
    "desc": "spectacular high mark",
    "own": [
     "aussie_speccy"
+   ],
+   "prefer": [
+    "mz_aussie_speccy"
    ]
   },
   {
@@ -271,6 +295,9 @@
    "desc": "the ruckman's tap at the bounce",
    "own": [
     "aussie_ruck_tap"
+   ],
+   "prefer": [
+    "mz_aussie_ruck_tap"
    ]
   },
   {
@@ -292,6 +319,9 @@
    "desc": "",
    "own": [
     "tackle"
+   ],
+   "prefer": [
+    "mz_aussie_tackle"
    ]
   },
   {
@@ -313,6 +343,9 @@
    "desc": "shepherd an opponent off the ball carrier",
    "own": [
     "aussie_shepherd"
+   ],
+   "prefer": [
+    "mz_aussie_shepherd"
    ]
   },
   {
@@ -334,6 +367,9 @@
    "desc": "smother the kick",
    "own": [
     "block"
+   ],
+   "prefer": [
+    "mz_aussie_smother"
    ]
   },
   {
@@ -355,6 +391,9 @@
    "desc": "",
    "own": [
     "pick_up_ground"
+   ],
+   "prefer": [
+    "mz_aussie_pick_up"
    ]
   },
   {
@@ -379,6 +418,9 @@
    "desc": "",
    "own": [
     "sidestep"
+   ],
+   "prefer": [
+    "mz_aussie_sidestep"
    ]
   },
   {
@@ -397,7 +439,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_aussie_fall"
+   ]
   },
   {
    "name": "get_up",
@@ -418,6 +463,9 @@
    "desc": "",
    "own": [
     "get_up"
+   ],
+   "prefer": [
+    "mz_aussie_get_up"
    ]
   },
   {
@@ -457,6 +505,9 @@
    "desc": "",
    "own": [
     "celebrate_goal"
+   ],
+   "prefer": [
+    "mz_aussie_celebrate"
    ]
   }
  ]

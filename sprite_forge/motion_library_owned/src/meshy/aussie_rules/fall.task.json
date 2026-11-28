@@ -1,0 +1,10 @@
+{
+ "id": "01a2216c-e8a1-7411-af7e-a5bf17adf095",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857115878,
+ "finished_at": 1795857135963,
+ "prompt": "An Australian rules football player running, is bumped hard from the side, loses balance, stumbles and falls onto the ground on the side, arms out to break the fall.",
+ "duration": 2.5,
+ "mode": "swift"
+}

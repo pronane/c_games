@@ -1,0 +1,10 @@
+{
+ "id": "01a22123-59e4-7462-9aed-aa0a1d361630",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852295340,
+ "finished_at": 1795852301351,
+ "prompt": "A Gaelic football player shoots for goal: running, drops the ball onto the right foot and strikes it low and hard with the laces, body over the ball, short powerful follow-through.",
+ "duration": 2.5,
+ "mode": "swift"
+}

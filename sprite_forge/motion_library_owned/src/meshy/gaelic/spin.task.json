@@ -1,0 +1,10 @@
+{
+ "id": "01a22124-81c8-7156-8812-f1d6bf39f025",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852371099,
+ "finished_at": 1795852376223,
+ "prompt": "A Gaelic football player with the ball tucked into the chest, spins a full turn on the left foot to roll away from a defender, then keeps going forward.",
+ "duration": 2.0,
+ "mode": "swift"
+}

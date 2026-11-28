@@ -1,0 +1,10 @@
+{
+ "id": "01a22168-7b4e-7675-8afa-a02f4bbcb8f4",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856825805,
+ "finished_at": 1795856841843,
+ "prompt": "An Australian rules football player kicks a drop punt: running, holds the oval ball upright in both hands, guides it down onto the right foot and kicks through it, leg swinging up to waist height, toes pointed, arms out.",
+ "duration": 2.5,
+ "mode": "swift"
+}

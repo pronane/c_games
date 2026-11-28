@@ -124,8 +124,10 @@ def resolve_check():
         MS.apply_cfg(cfg)
         by = {m.name: MS.clip_id(m) for m in cfg.moves}
         for mv, mo in SIGNATURE[g].items():
-            if by.get(mv) != "motion:" + mo:
-                bad.append("%s/%s plays %s, want motion:%s" % (g, mv, by.get(mv), mo))
+            # v11.41: a Meshy clip the pack prefers (motion_library_owned/mz_*) is the move's own clip too
+            got = by.get(mv) or ""
+            if got != "motion:" + mo and not got.startswith("lib:mz_"):
+                bad.append("%s/%s plays %s, want motion:%s or its Meshy clip" % (g, mv, got, mo))
         seen = {}
         for mv, cid in by.items():
             seen.setdefault(cid, []).append(mv)

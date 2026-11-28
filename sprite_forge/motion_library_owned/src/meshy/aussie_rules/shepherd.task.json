@@ -1,0 +1,10 @@
+{
+ "id": "01a2216b-9262-72f7-9a1e-c8ab19b69b62",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857028355,
+ "finished_at": 1795857050325,
+ "prompt": "An Australian rules football player shepherds for a team-mate: plants the feet wide, arms out sideways at shoulder height, and blocks an opponent with the shoulder and hip, shuffling sideways to keep them away.",
+ "duration": 2.0,
+ "mode": "swift"
+}

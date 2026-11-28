@@ -74,6 +74,9 @@ have checked those terms.
   * Free-plan output is owned by Meshy and licensed CC BY 4.0. Use it with the credit line (`--preset meshy-free`).
   * Paid-plan output belongs to you (`--preset meshy-paid` sets redistribution no; change it if you want to share).
   * Clips from Meshy's animation library are "Service Assets", so they stay out of packs by default.
+  * v11.41: `motion_library_owned/` holds Text to Motion clips made on the project owner's paid plan. The owner
+    holds the rights and allows them in this repo and its builds (`LicenseRef-Owned-Meshy`, redistribution yes).
+    They are not CC0 and are kept apart from the CC0 starter in `motion_library/`.
   * Check the current terms: https://www.meshy.ai/terms-of-use
 * **MakeHuman:**
   * The assets (base mesh, skeleton, weights, targets) are CC0, so characters made from them can be packed

@@ -1,0 +1,10 @@
+{
+ "id": "01a2216c-aec3-712f-8493-0505c6fffa8e",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857101153,
+ "finished_at": 1795857119099,
+ "prompt": "A hurler holding a hurley (a short wooden stick with a flat curved end, held like a hockey stick) in the right hand, running, is knocked off balance, stumbles and falls onto the ground on the side, the free arm out to break the fall.",
+ "duration": 2.5,
+ "mode": "swift"
+}

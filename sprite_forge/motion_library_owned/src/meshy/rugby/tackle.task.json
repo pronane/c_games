@@ -1,0 +1,10 @@
+{
+ "id": "01a2216b-6ee7-75f5-a3b6-ae9f849f8e45",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857019314,
+ "finished_at": 1795857041626,
+ "prompt": "A rugby union player makes a low tackle: runs in, bends low, drives the shoulder into an opponent's thighs, wraps both arms tight around the legs and goes to the ground with them.",
+ "duration": 2.5,
+ "mode": "swift"
+}

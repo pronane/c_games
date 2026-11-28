@@ -1,0 +1,10 @@
+{
+ "id": "01a22126-53c5-77dc-be94-77492fed6c0d",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852490349,
+ "finished_at": 1795852497910,
+ "prompt": "A Gaelic football player sprinting, stops suddenly: two short braking steps, knees bent, arms out, and comes to a balanced stop.",
+ "duration": 2.0,
+ "mode": "swift"
+}

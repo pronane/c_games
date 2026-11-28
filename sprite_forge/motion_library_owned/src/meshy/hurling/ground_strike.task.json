@@ -1,0 +1,10 @@
+{
+ "id": "01a22168-f18e-76a6-b078-ab73fe142617",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856856599,
+ "finished_at": 1795856872791,
+ "prompt": "A hurler holding a hurley (a short wooden stick with a flat curved end, held like a hockey stick) in both hands strikes the ball off the ground: running, stays low and swings the stick along the ground in a fast flat arc like a hockey drive, following through to waist height.",
+ "duration": 2.5,
+ "mode": "swift"
+}

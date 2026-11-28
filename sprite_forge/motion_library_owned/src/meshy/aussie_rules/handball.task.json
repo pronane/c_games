@@ -1,0 +1,10 @@
+{
+ "id": "01a22169-8d3c-71c0-b629-e7267cdb4dff",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795856896012,
+ "finished_at": 1795856917600,
+ "prompt": "An Australian rules football player handballs: holds the oval ball flat on the open left palm at waist height, clenches the right fist and punches the ball off the palm to a team-mate, arm following through.",
+ "duration": 2.0,
+ "mode": "swift"
+}

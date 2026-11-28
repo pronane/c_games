@@ -1,0 +1,10 @@
+{
+ "id": "01a2216e-fc8d-734a-ac14-684f9601a119",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795857252286,
+ "finished_at": 1795857263257,
+ "prompt": "A hurler holding a hurley in the right hand jumps and catches a high ball: both arms go up above the head together, the open left hand catches the ball and the right hand holds the stick up beside it to protect the catch, then lands on both feet and brings the ball to the chest.",
+ "duration": 2.5,
+ "mode": "swift"
+}

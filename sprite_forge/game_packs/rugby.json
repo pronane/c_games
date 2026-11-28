@@ -100,6 +100,9 @@
    "desc": "",
    "own": [
     "sprint"
+   ],
+   "prefer": [
+    "mz_rugby_sprint"
    ]
   },
   {
@@ -124,6 +127,9 @@
    "desc": "ball in two hands",
    "own": [
     "carry"
+   ],
+   "prefer": [
+    "mz_rugby_carry"
    ]
   },
   {
@@ -145,6 +151,9 @@
    "desc": "spin pass across the body",
    "own": [
     "rugby_pass"
+   ],
+   "prefer": [
+    "mz_rugby_pass"
    ]
   },
   {
@@ -166,6 +175,9 @@
    "desc": "",
    "own": [
     "hand_pass"
+   ],
+   "prefer": [
+    "mz_rugby_offload"
    ]
   },
   {
@@ -187,6 +199,9 @@
    "desc": "kick from hand",
    "own": [
     "high_kick_pass"
+   ],
+   "prefer": [
+    "mz_rugby_kick"
    ]
   },
   {
@@ -208,6 +223,9 @@
    "desc": "",
    "own": [
     "shoot_point"
+   ],
+   "prefer": [
+    "mz_rugby_drop_goal"
    ]
   },
   {
@@ -229,6 +247,9 @@
    "desc": "",
    "own": [
     "shoot_goal"
+   ],
+   "prefer": [
+    "mz_rugby_place_kick"
    ]
   },
   {
@@ -250,6 +271,9 @@
    "desc": "high ball",
    "own": [
     "catch_aerial"
+   ],
+   "prefer": [
+    "mz_rugby_catch"
    ]
   },
   {
@@ -271,6 +295,9 @@
    "desc": "the jumper at the top of the lineout",
    "own": [
     "lineout_lift"
+   ],
+   "prefer": [
+    "mz_rugby_lineout"
    ]
   },
   {
@@ -292,6 +319,9 @@
    "desc": "",
    "own": [
     "tackle"
+   ],
+   "prefer": [
+    "mz_rugby_tackle"
    ]
   },
   {
@@ -313,6 +343,9 @@
    "desc": "",
    "own": [
     "rugby_hand_off"
+   ],
+   "prefer": [
+    "mz_rugby_hand_off"
    ]
   },
   {
@@ -355,6 +388,9 @@
    "desc": "",
    "own": [
     "rugby_ruck"
+   ],
+   "prefer": [
+    "mz_rugby_ruck"
    ]
   },
   {
@@ -376,6 +412,9 @@
    "desc": "diving to ground the ball",
    "own": [
     "rugby_try"
+   ],
+   "prefer": [
+    "mz_rugby_try"
    ]
   },
   {
@@ -397,6 +436,9 @@
    "desc": "",
    "own": [
     "pick_up_ground"
+   ],
+   "prefer": [
+    "mz_rugby_pick_up"
    ]
   },
   {
@@ -421,6 +463,9 @@
    "desc": "",
    "own": [
     "sidestep"
+   ],
+   "prefer": [
+    "mz_rugby_sidestep"
    ]
   },
   {
@@ -439,7 +484,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_rugby_fall"
+   ]
   },
   {
    "name": "get_up",
@@ -460,6 +508,9 @@
    "desc": "",
    "own": [
     "get_up"
+   ],
+   "prefer": [
+    "mz_rugby_get_up"
    ]
   },
   {
@@ -478,7 +529,10 @@
     "reload": -1,
     "footsteps": []
    },
-   "desc": ""
+   "desc": "",
+   "prefer": [
+    "mz_rugby_hit"
+   ]
   },
   {
    "name": "celebrate",

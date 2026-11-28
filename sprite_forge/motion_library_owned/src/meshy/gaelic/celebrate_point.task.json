@@ -1,0 +1,10 @@
+{
+ "id": "01a22125-0a97-70ec-bf25-a57d3f9e4275",
+ "status": "SUCCEEDED",
+ "consumed_credits": 3,
+ "created_at": 1795852406132,
+ "finished_at": 1795852412973,
+ "prompt": "A Gaelic football player celebrates a point: turns, clenches the right fist and pumps it once up beside the head, then jogs back.",
+ "duration": 2.5,
+ "mode": "swift"
+}
