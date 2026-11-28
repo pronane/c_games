@@ -47,6 +47,8 @@ public sealed partial class SoccerClipRig : Node3D
     private readonly List<string> _materialOrder = new();
     private float _height = 1.77f;
     private string _current = "";
+    /// <summary>The clip this rig is playing (QA reports).</summary>
+    public string CurrentClip => _current;
     private bool _oneShotDone = true;
     private MotionState? _motionState;
 
@@ -123,6 +125,9 @@ public sealed partial class SoccerClipRig : Node3D
         public float ReleaseT;
     }
     private FootLock _lockL, _lockR;
+    // Skeleton3D.GetBoneGlobalPose updates only the bones whose pose changed, so the IK
+    // reads fresh global poses without ForceUpdateAllBoneTransforms (a full recompute of every
+    // bone, which PR 271 called 6+ times per rig per frame).
     /// <summary>Let a locked foot go once the clip's foot is this far (m, ground plane) from the
     /// anchor: past it the leg straightens and the pinned foot lifts.</summary>
     public const float MaxLockStretch = .22f;
@@ -277,7 +282,21 @@ public sealed partial class SoccerClipRig : Node3D
 
     /// <summary>Resolve common GLTF bone-name variants, including side-prefix names
     /// (LThigh) and side-suffix names (thigh_L), plus Godot duplicate suffixes.</summary>
+    // Bone lookups by loose name are cached per skeleton: the inertialization code asks for
+    // nine bones every frame on every rig, and an uncached miss scans every bone name twice
+    // through Godot interop with string allocations (~8 ms a frame for 22 players).
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Skeleton3D, Dictionary<string, int>> LooseBoneCache = new();
+
     public static int FindBoneLoose(Skeleton3D skel, string name)
+    {
+        var cache = LooseBoneCache.GetValue(skel, _ => new Dictionary<string, int>(StringComparer.Ordinal));
+        if (cache.TryGetValue(name, out int cached)) return cached;
+        int found = FindBoneLooseUncached(skel, name);
+        cache[name] = found;
+        return found;
+    }
+
+    private static int FindBoneLooseUncached(Skeleton3D skel, string name)
     {
         static string Normalize(string value)
             => new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
@@ -843,15 +862,8 @@ public sealed partial class SoccerClipRig : Node3D
             Player.SpeedScale = 0f;
             return;
         }
-        // Foot overrides are persistent in Godot. Remove last frame's output
-        // before reading the new authored pose so swing feet do not stay pinned.
-        if (Skel != null)
-        {
-            foreach (var pair in _bones)
-                if (pair.Value.Foot >= 0)
-                    Skel.SetBoneGlobalPoseOverride(pair.Value.Foot, Transform3D.Identity, 0f, false);
-            Skel.ForceUpdateAllBoneTransforms();
-        }
+        // (The foot IK now writes pose rotations, not global-pose overrides, so there is no
+        // override to clear before the new authored pose is read.)
         Player.SpeedScale = _speedScale;
         float speed = Mx.Flat(p.Vel).Length();
         bool hasBall = p.Dribbling || p.Shielding;
@@ -1174,7 +1186,6 @@ public sealed partial class SoccerClipRig : Node3D
                 if (parent < 0)
                     Skel.SetBonePosePosition(ib.bone,
                         Skel.GetBonePosePosition(ib.bone) + parentBasis.Inverse() * ib.posOff);
-                Skel.ForceUpdateAllBoneTransforms();
             }
         }
         float energy = 0f;
@@ -1340,10 +1351,6 @@ public sealed partial class SoccerClipRig : Node3D
             if (!_bones.TryGetValue(side, out var b)) continue;
             bool isLeft = side == "L";
             ref FootLock fl = ref (isLeft ? ref _lockL : ref _lockR);
-            // The previous frame's persistent override must not pin a swing foot
-            // or feed an old global pose back into the new IK solve.
-            Skel.SetBoneGlobalPoseOverride(b.Foot, Transform3D.Identity, 0f, false);
-            Skel.ForceUpdateAllBoneTransforms();
             var footPose = Skel.GetBoneGlobalPose(b.Foot);
             var footWorld = skelGlobal * (footPose * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero));
             float height = footWorld.Y - worldPos.Y;
@@ -1417,7 +1424,6 @@ public sealed partial class SoccerClipRig : Node3D
                 Vector3 ankleTarget = (skelInv * tw) - footBasis * (b.HasSoleGeometry ? b.SoleLocal : Vector3.Zero);
                 SolveTwoBone(b.Thigh, b.Shin, b.Foot, ankleTarget, yaw);
                 SetFootGlobalBasis(b.Foot, footBasis);
-                Skel.ForceUpdateAllBoneTransforms();
                 float ankleResidual = Skel.GetBoneGlobalPose(b.Foot).Origin.DistanceTo(ankleTarget);
                 _ankleResidualAccum += ankleResidual;
                 _ankleResidualSamples++;
@@ -1678,10 +1684,8 @@ public sealed partial class SoccerClipRig : Node3D
         // The delta is computed in the parent's coordinates and composed with
         // the authored local rotation, preserving its twist and bone rest axes.
         RotateSegmentToward(thigh, shin, knee - hip);
-        Skel.ForceUpdateAllBoneTransforms();
         Vector3 solvedKnee = Skel.GetBoneGlobalPose(shin).Origin;
         RotateSegmentToward(shin, foot, end - solvedKnee);
-        Skel.ForceUpdateAllBoneTransforms();
     }
 
     private void RotateSegmentToward(int bone, int child, Vector3 targetDirection)

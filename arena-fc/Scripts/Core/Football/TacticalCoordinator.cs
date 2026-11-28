@@ -32,14 +32,15 @@ public sealed class TacticalCoordinator
 
     public List<Assignment> BuildAssignments(MatchState s, int team, BallTrajectory? ballPred = null)
     {
-        var list = new List<Assignment>();
+        var list = new List<Assignment>(12);
         int opp = 1 - team;
-        var oppPos = new List<Vector3>();
-        var oppVel = new List<Vector3>();
+        // scratch buffers are reused between calls (this runs twice every tick)
+        var oppPos = _oppPos; var oppVel = _oppVel;
+        oppPos.Clear(); oppVel.Clear();
         foreach (var p in s.Players) if (p.Team == opp && !p.SentOff) { oppPos.Add(p.Pos); oppVel.Add(p.Vel); }
         Vector3 ballNow = s.Ball.Pos;
         Vector3 ballRef = ballNow;
-        if (ballPred != null && ballPred.Samples.Count > 0) ballRef = ballPred.At(0.35f).Position;
+        if (ballPred != null && ballPred.Count > 0) ballRef = ballPred.At(0.35f).Position;
         else ballRef = ballNow + Mx.Flat(s.Ball.Vel) * 0.35f;
 
         bool teamInPoss = s.Ball.Owner >= 0 && s.Ball.Owner < s.Players.Length && s.Players[s.Ball.Owner].Team == team;
@@ -48,7 +49,8 @@ public sealed class TacticalCoordinator
         Vector3 oppGoal = team == 0 ? new Vector3(Mx.HalfLength, 0, 0) : new Vector3(-Mx.HalfLength, 0, 0);
 
         // Rank by time to predicted ball using actual player capabilities.
-        var byReach = new List<(int idx, float t, float dist)>();
+        var byReach = _byReach;
+        byReach.Clear();
         foreach (var p in s.Players)
         {
             if (p.Team != team || p.SentOff || p.IsKeeper) continue;
@@ -58,11 +60,7 @@ public sealed class TacticalCoordinator
             float d = Mx.FlatDist(p.Pos, ballRef);
             byReach.Add((p.Index, t, d));
         }
-        byReach.Sort((a, b) =>
-        {
-            int c = a.t.CompareTo(b.t);
-            return c != 0 ? c : a.dist.CompareTo(b.dist);
-        });
+        byReach.Sort(CompareReach);
 
         int presser = -1, cover = -1, support = -1;
         if (!teamInPoss)
@@ -101,8 +99,11 @@ public sealed class TacticalCoordinator
             }
         }
 
-        Vector3[] oppPosArr = oppPos.ToArray();
-        Vector3[] oppVelArr = oppVel.ToArray();
+        if (_oppPosArr.Length != oppPos.Count) _oppPosArr = new Vector3[oppPos.Count];
+        oppPos.CopyTo(_oppPosArr);
+        Vector3[] oppPosArr = _oppPosArr;
+        if (teamInPoss) BuildSupportSpots(attackSign, ballRef, oppPosArr);
+
         Vector3 ballVel = Mx.Flat(s.Ball.Vel);
         bool transitionThreat = !teamInPoss && ballVel.LengthSquared() > 25f && (ballVel.X * -attackSign) > 2.5f;
 
@@ -118,7 +119,6 @@ public sealed class TacticalCoordinator
                 list.Add(a); continue;
             }
 
-            float space = PlayerPerception.SpaceScore(p.Pos, oppPosArr);
             if (teamInPoss)
             {
                 if (s.Ball.Owner == p.Index)
@@ -128,7 +128,7 @@ public sealed class TacticalCoordinator
                 else if (p.Index == support)
                 {
                     a.Role = "support"; a.Intent = "support";
-                    a.MovementTarget = SupportTarget(p, s, team, attackSign, ballRef, oppPosArr);
+                    a.MovementTarget = SupportTarget(p);
                     a.FacingTarget = ballNow;
                     a.SpeedLimit = 7.2f;
                 }
@@ -141,9 +141,9 @@ public sealed class TacticalCoordinator
                 }
                 else
                 {
-                    a.Role = space > 0.40f ? "support" : "recycle";
+                    a.Role = PlayerPerception.SpaceScore(p.Pos, oppPosArr) > 0.40f ? "support" : "recycle";
                     a.Intent = a.Role;
-                    a.MovementTarget = SupportTarget(p, s, team, attackSign, ballRef, oppPosArr);
+                    a.MovementTarget = SupportTarget(p);
                     a.SpeedLimit = 6.8f;
                 }
             }
@@ -225,22 +225,49 @@ public sealed class TacticalCoordinator
         return ClampPitch(t);
     }
 
-    private static Vector3 SupportTarget(PlayerState p, MatchState s, int team, int attackSign, Vector3 ballRef, Vector3[] oppPos)
+    private readonly List<Vector3> _oppPos = new(11), _oppVel = new(11);
+    private Vector3[] _oppPosArr = Array.Empty<Vector3>();
+    private readonly List<(int idx, float t, float dist)> _byReach = new(11);
+    private static readonly Comparison<(int idx, float t, float dist)> CompareReach = (a, b) =>
+    {
+        int c = a.t.CompareTo(b.t);
+        return c != 0 ? c : a.dist.CompareTo(b.dist);
+    };
+
+    private static readonly float[] SupportZ = { -18f, -12f, -6f, 0f, 6f, 12f, 18f };
+    private static readonly float[] SupportX = { 0f, 6f, 12f, -4f };
+    private readonly Vector3[] _supportSpot = new Vector3[28];
+    private readonly float[] _supportSpace = new float[28];
+    private readonly float[] _supportForward = new float[28];
+
+    /// <summary>The 28 candidate support spots ahead of / beside the ball and how much space
+    /// each has: the same for every player of the team, so built once per team, per call.</summary>
+    private void BuildSupportSpots(int attackSign, Vector3 ballRef, Vector3[] oppPos)
+    {
+        float baseX = ballRef.X + attackSign * 8f;
+        int k = 0;
+        foreach (float xo in SupportX)
+        foreach (float zo in SupportZ)
+        {
+            Vector3 c = ClampPitch(new Vector3(baseX + xo * attackSign, 0, Math.Clamp(ballRef.Z + zo, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f)));
+            _supportSpot[k] = c;
+            _supportSpace[k] = PlayerPerception.SpaceScore(c, oppPos, 9f);
+            _supportForward[k] = (c.X - ballRef.X) * attackSign;
+            k++;
+        }
+    }
+
+    private Vector3 SupportTarget(PlayerState p)
     {
         // Find a support spot: ahead/side of ball, in space, onside-safe.
         float best = float.MinValue;
         Vector3 bestPos = p.Pos;
-        float baseX = ballRef.X + attackSign * 8f;
-        float[] zOffs = { -18f, -12f, -6f, 0f, 6f, 12f, 18f };
-        float[] xOffs = { 0f, 6f, 12f, -4f };
-        foreach (float xo in xOffs)
-        foreach (float zo in zOffs)
+        for (int k = 0; k < _supportSpot.Length; k++)
         {
-            Vector3 c = ClampPitch(new Vector3(baseX + xo * attackSign, 0, Math.Clamp(ballRef.Z + zo, -Mx.HalfWidth + 2f, Mx.HalfWidth - 2f)));
-            float space = PlayerPerception.SpaceScore(c, oppPos, 9f);
-            float forward = (c.X - ballRef.X) * attackSign;
+            Vector3 c = _supportSpot[k];
+            float forward = _supportForward[k];
             float dist = Mx.FlatDist(p.Pos, c);
-            float score = space * 3f + Math.Clamp(forward / 20f, -1f, 1f) * 1.5f - dist * 0.04f;
+            float score = _supportSpace[k] * 3f + Math.Clamp(forward / 20f, -1f, 1f) * 1.5f - dist * 0.04f;
             if (p.Role == Role.Defender) score -= Math.Max(0f, forward - 5f) * 0.08f;
             if (p.Role == Role.Forward) score += Math.Max(0f, forward) * 0.03f;
             if (score > best) { best = score; bestPos = c; }
