@@ -18,6 +18,31 @@ public enum SkillMove
     FakeShot,      // fake the shot, keep ball
     HeelToHeel,    // heel drag
     BallRoll,      // sole roll
+    // v11.42: Meshy-animated moves.  Appended so the wire values of the first eight stay the same.
+    ReverseStepOver,
+    DoubleStepOver,
+    BodyFeint,
+    ReverseElastico,
+    DragBack,
+    CruyffTurn,
+    LaCroqueta,
+    HeelChop,
+    FakePass,
+    BallHop,
+    HeelFlick,
+    ScoopTurn,
+    SombreroFlick,
+    BerbaSpin,
+    SoleRollTurn,
+    OutsideHook,
+    InsideHook,
+    HesitationBurst,
+    KnockOnAndRun,
+    LaneChange,
+    TornadoSpin,
+    BehindLegTurn,
+    RabonaFake,
+    FlairPass,
 }
 
 /// <summary>
@@ -74,6 +99,30 @@ public static class SkillMoves
             SkillMove.FakeShot => 0.70f,
             SkillMove.HeelToHeel => 0.75f,
             SkillMove.BallRoll => 0.80f,
+            SkillMove.ReverseStepOver => 0.62f,
+            SkillMove.DoubleStepOver => 0.58f,
+            SkillMove.BodyFeint => 0.72f,
+            SkillMove.ReverseElastico => 0.55f,
+            SkillMove.DragBack => 0.75f,
+            SkillMove.CruyffTurn => 0.68f,
+            SkillMove.LaCroqueta => 0.62f,
+            SkillMove.HeelChop => 0.65f,
+            SkillMove.FakePass => 0.70f,
+            SkillMove.BallHop => 0.60f,
+            SkillMove.HeelFlick => 0.50f,
+            SkillMove.ScoopTurn => 0.62f,
+            SkillMove.SombreroFlick => 0.42f,
+            SkillMove.BerbaSpin => 0.55f,
+            SkillMove.SoleRollTurn => 0.66f,
+            SkillMove.OutsideHook => 0.72f,
+            SkillMove.InsideHook => 0.72f,
+            SkillMove.HesitationBurst => 0.66f,
+            SkillMove.KnockOnAndRun => 0.60f,
+            SkillMove.LaneChange => 0.70f,
+            SkillMove.TornadoSpin => 0.45f,
+            SkillMove.BehindLegTurn => 0.58f,
+            SkillMove.RabonaFake => 0.50f,
+            SkillMove.FlairPass => 0.60f,
             _ => 0f,
         };
 
@@ -96,6 +145,30 @@ public static class SkillMoves
         SkillMove.FakeShot => "fake shot",
         SkillMove.HeelToHeel => "drag-back",
         SkillMove.BallRoll => "ball roll",
+        SkillMove.ReverseStepOver => "reverse step-over",
+        SkillMove.DoubleStepOver => "double step-over",
+        SkillMove.BodyFeint => "body feint",
+        SkillMove.ReverseElastico => "reverse elastico",
+        SkillMove.DragBack => "drag-back",
+        SkillMove.CruyffTurn => "Cruyff turn",
+        SkillMove.LaCroqueta => "la croqueta",
+        SkillMove.HeelChop => "heel chop",
+        SkillMove.FakePass => "fake pass",
+        SkillMove.BallHop => "ball hop",
+        SkillMove.HeelFlick => "heel flick",
+        SkillMove.ScoopTurn => "scoop turn",
+        SkillMove.SombreroFlick => "sombrero flick",
+        SkillMove.BerbaSpin => "Berba spin",
+        SkillMove.SoleRollTurn => "sole roll turn",
+        SkillMove.OutsideHook => "outside hook",
+        SkillMove.InsideHook => "inside hook",
+        SkillMove.HesitationBurst => "stop and go",
+        SkillMove.KnockOnAndRun => "knock-on and run",
+        SkillMove.LaneChange => "lane change",
+        SkillMove.TornadoSpin => "tornado spin",
+        SkillMove.BehindLegTurn => "behind-the-leg turn",
+        SkillMove.RabonaFake => "rabona fake",
+        SkillMove.FlairPass => "flair pass",
         _ => "skill",
     };
 
@@ -151,6 +224,30 @@ public static class SkillMoves
         SkillMove.FakeShot => "skill_fake_shot",
         SkillMove.HeelToHeel => "skill_heel_to_heel",
         SkillMove.BallRoll => "skill_ball_roll",
+        SkillMove.ReverseStepOver => "skill_reverse_stepover",
+        SkillMove.DoubleStepOver => "skill_double_stepover",
+        SkillMove.BodyFeint => "skill_body_feint",
+        SkillMove.ReverseElastico => "skill_reverse_elastico",
+        SkillMove.DragBack => "skill_drag_back",
+        SkillMove.CruyffTurn => "skill_cruyff_turn",
+        SkillMove.LaCroqueta => "skill_la_croqueta",
+        SkillMove.HeelChop => "skill_heel_chop",
+        SkillMove.FakePass => "skill_fake_pass",
+        SkillMove.BallHop => "skill_ball_hop",
+        SkillMove.HeelFlick => "skill_heel_flick",
+        SkillMove.ScoopTurn => "skill_scoop_turn",
+        SkillMove.SombreroFlick => "skill_sombrero_flick",
+        SkillMove.BerbaSpin => "skill_berba_spin",
+        SkillMove.SoleRollTurn => "skill_sole_roll_turn",
+        SkillMove.OutsideHook => "skill_outside_hook",
+        SkillMove.InsideHook => "skill_inside_hook",
+        SkillMove.HesitationBurst => "skill_hesitation_burst",
+        SkillMove.KnockOnAndRun => "skill_knock_on_and_run",
+        SkillMove.LaneChange => "skill_lane_change",
+        SkillMove.TornadoSpin => "skill_tornado_spin",
+        SkillMove.BehindLegTurn => "skill_behind_leg_turn",
+        SkillMove.RabonaFake => "skill_rabona_fake",
+        SkillMove.FlairPass => "skill_flair_pass",
         _ => "dribble",
     };
 
@@ -164,6 +261,56 @@ public static class SkillMoves
         SkillMove.FakeShot => 0.4f,
         SkillMove.HeelToHeel => 0.5f,
         SkillMove.BallRoll => 0.4f,
+        SkillMove.ReverseStepOver => 0.55f,
+        SkillMove.DoubleStepOver => 0.75f,
+        SkillMove.BodyFeint => 0.45f,
+        SkillMove.ReverseElastico => 0.60f,
+        SkillMove.DragBack => 0.50f,
+        SkillMove.CruyffTurn => 0.60f,
+        SkillMove.LaCroqueta => 0.45f,
+        SkillMove.HeelChop => 0.50f,
+        SkillMove.FakePass => 0.45f,
+        SkillMove.BallHop => 0.50f,
+        SkillMove.HeelFlick => 0.50f,
+        SkillMove.ScoopTurn => 0.60f,
+        SkillMove.SombreroFlick => 0.75f,
+        SkillMove.BerbaSpin => 0.80f,
+        SkillMove.SoleRollTurn => 0.60f,
+        SkillMove.OutsideHook => 0.45f,
+        SkillMove.InsideHook => 0.45f,
+        SkillMove.HesitationBurst => 0.70f,
+        SkillMove.KnockOnAndRun => 0.75f,
+        SkillMove.LaneChange => 0.45f,
+        SkillMove.TornadoSpin => 0.80f,
+        SkillMove.BehindLegTurn => 0.55f,
+        SkillMove.RabonaFake => 0.60f,
+        SkillMove.FlairPass => 0.45f,
         _ => 0f,
     };
+
+    /// <summary>v11.42: each taught input has a family of related moves, as in modern football games.  The
+    /// match picks one with its seeded RNG (so online peers agree); roll is in [0, 1).  The taught move itself
+    /// comes up most often, and the training ground always plays it.</summary>
+    public static readonly System.Collections.Generic.IReadOnlyDictionary<SkillMove, SkillMove[]> Families =
+        new System.Collections.Generic.Dictionary<SkillMove, SkillMove[]>
+        {
+            // Members kept after reviewing every Meshy skill clip on the Arena player (v11.42); the others
+            // (reverse/double step-over, body feint, reverse elastico, heel chop, fake pass, Berba spin, sole roll,
+            // inside hook, knock-on, behind-the-leg, rabona fake, flair pass, sombrero) stay callable by name only.
+            [SkillMove.StepOver] = new[] { SkillMove.StepOver, SkillMove.StepOver, SkillMove.LaneChange },
+            [SkillMove.HeelToHeel] = new[] { SkillMove.HeelToHeel, SkillMove.HeelToHeel, SkillMove.DragBack, SkillMove.CruyffTurn, SkillMove.ScoopTurn },
+            [SkillMove.BallRoll] = new[] { SkillMove.BallRoll, SkillMove.BallRoll, SkillMove.LaCroqueta, SkillMove.OutsideHook, SkillMove.HesitationBurst },
+            [SkillMove.Elastico] = new[] { SkillMove.Elastico },
+            [SkillMove.Roulette] = new[] { SkillMove.Roulette, SkillMove.Roulette, SkillMove.TornadoSpin },
+            [SkillMove.Rainbow] = new[] { SkillMove.Rainbow, SkillMove.Rainbow, SkillMove.HeelFlick, SkillMove.BallHop },
+            [SkillMove.FakeShot] = new[] { SkillMove.FakeShot },
+        };
+
+    /// <summary>The move actually played for an input: a member of its family (itself when it has none).</summary>
+    public static SkillMove Variant(SkillMove taught, float roll)
+    {
+        if (!Families.TryGetValue(taught, out var fam) || fam.Length == 0) return taught;
+        int i = (int)(Math.Clamp(roll, 0f, 0.9999f) * fam.Length);
+        return fam[i];
+    }
 }

@@ -38,17 +38,19 @@ static int load_model_animation(const char *path)
     anims = LoadModelAnimations(path, &animCount);
     if (!anims || animCount <= 0 || !anims[0].bones || anims[0].boneCount <= 0 || anims[0].boneCount > MAX_BONES) return 0;
     model.bones = anims[0].bones; model.boneCount = anims[0].boneCount;
+    initClipNames();
     for (int k = 0; k < C_COUNT; ++k) clipIdx[k] = -1;
     for (int i = 0; i < animCount; ++i) {
         if (anims[i].boneCount != model.boneCount || !anims[i].bones || !anims[i].framePoses || anims[i].frameCount < 2) return 0;
         for (int b = 0; b < model.boneCount; ++b)
             if (strcmp(anims[i].bones[b].name, model.bones[b].name) || anims[i].bones[b].parent != model.bones[b].parent) return 0;
-        for (int k = 0; k < C_COUNT; ++k) if (!strcmp(anims[i].name, CLIP_NAMES[k])) {
+        for (int k = 0; k < C_COUNT; ++k) if (CLIP_NAMES[k][0] && !strcmp(anims[i].name, CLIP_NAMES[k])) {
             if (clipIdx[k] >= 0) return 0;
             clipIdx[k] = i;
         }
     }
-    for (int k = 0; k < C_COUNT; ++k) if (clipIdx[k] < 0) return 0;
+    for (int k = 0; k < C_REQUIRED; ++k) if (clipIdx[k] < 0) return 0;
+    applyMeshyActions();
     boneFootL = findBone("foot_l"); boneFootR = findBone("foot_r");
     boneHandL = findBone("hand_l"); boneHandR = findBone("hand_r"); boneHead = findBone("head");
     bonePelvis = findBone("pelvis");

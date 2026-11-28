@@ -6808,6 +6808,2618 @@
     "hit_start": -1,
     "hit_end": -1
    }
+  },
+  {
+   "name": "soccer_mz_aeroplane",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_aeroplane",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_appeal",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_appeal",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_applaud",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_applaud",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_argue_referee",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_argue_referee",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_arms_wide",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_arms_wide",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_backflip",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_backflip",
+   "frames": 72,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_backheel_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_backheel_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 15,
+    "ball_contact_frac": 0.254,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_backpedal",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_backpedal",
+   "frames": 19,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     4,
+     14
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_backward_header",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_backward_header",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 21,
+    "ball_contact_frac": 0.356,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_ball_hop",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_ball_hop",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 36,
+    "ball_contact_frac": 0.61,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_ball_roll",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_ball_roll",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.475,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_behind_leg_turn",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_behind_leg_turn",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.288,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_berba_spin",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_berba_spin",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 55,
+    "ball_contact_frac": 0.743,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_bicycle_kick",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_bicycle_kick",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.378,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_block_shot",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_block_shot",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 15,
+    "ball_contact_frac": 0.254,
+    "footsteps": [],
+    "hit_start": 8,
+    "hit_end": 22
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_body_feint",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_body_feint",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 44,
+    "ball_contact_frac": 0.746,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_call_for_ball",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_call_for_ball",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_cartwheel",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_cartwheel",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_celebrate",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_celebrate",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_chest_control",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_chest_control",
+   "frames": 50,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 2,
+    "ball_contact_frac": 0.041,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_chest_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_chest_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 1,
+    "ball_contact_frac": 0.017,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_chip_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_chip_shot",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 19,
+    "ball_contact_frac": 0.322,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_clearance_header",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_clearance_header",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.407,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_clearance_kick",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_clearance_kick",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 42,
+    "ball_contact_frac": 0.712,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_corner_kick",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_corner_kick",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 29,
+    "ball_contact_frac": 0.326,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_cross_low",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_cross_low",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.271,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_cross_whipped",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_cross_whipped",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.216,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_cruyff_turn",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_cruyff_turn",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.407,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_cup_ear",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_cup_ear",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_cushion_volley",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_cushion_volley",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 13,
+    "ball_contact_frac": 0.22,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_dance",
+   "loop": true,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_dance",
+   "frames": 39,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_decelerate",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_decelerate",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     15,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_dive_simulation",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_dive_simulation",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 22,
+    "ball_contact_frac": 0.373,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_diving_header",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_diving_header",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 8,
+    "ball_contact_frac": 0.077,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_double_stepover",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_double_stepover",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 67,
+    "ball_contact_frac": 0.905,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_drag_back",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_drag_back",
+   "frames": 42,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 38,
+    "ball_contact_frac": 0.927,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_dribble",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_dribble",
+   "frames": 26,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     19
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_driven_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_driven_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.475,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_elastico",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_elastico",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 19,
+    "ball_contact_frac": 0.322,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_fake_pass",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_fake_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 21,
+    "ball_contact_frac": 0.356,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_fake_shot",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_fake_shot",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 36,
+    "ball_contact_frac": 0.61,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_fall_pushed",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_fall_pushed",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_fall_tripped",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_fall_tripped",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_finesse_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_finesse_shot",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 38,
+    "ball_contact_frac": 0.514,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_first_time_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_first_time_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.441,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_first_touch_turn",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_first_touch_turn",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 57,
+    "ball_contact_frac": 0.966,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_fist_pump",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_fist_pump",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_flair_pass",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_flair_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 20,
+    "ball_contact_frac": 0.339,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_flick_on_header",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_flick_on_header",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.525,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_flick_up",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_flick_up",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 40,
+    "ball_contact_frac": 0.678,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_free_kick_curl",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_free_kick_curl",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 45,
+    "ball_contact_frac": 0.433,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_free_kick_power",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_free_kick_power",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 40,
+    "ball_contact_frac": 0.385,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_free_kick_stance",
+   "loop": true,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_free_kick_stance",
+   "frames": 41,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_frustrated_kick_air",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_frustrated_kick_air",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_get_up",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_get_up",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_catch_chest",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_catch_chest",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 9,
+    "ball_contact_frac": 0.153,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_catch_high",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_catch_high",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.271,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_collect_low",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_collect_low",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 5,
+    "ball_contact_frac": 0.085,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_dive_high_left",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_dive_high_left",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 31,
+    "ball_contact_frac": 0.525,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_dive_high_right",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_dive_high_right",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 25,
+    "ball_contact_frac": 0.424,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_dive_low_left",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_dive_low_left",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 38,
+    "ball_contact_frac": 0.644,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_dive_low_right",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_dive_low_right",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 7,
+    "ball_contact_frac": 0.119,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_drop_kick",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_drop_kick",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 30,
+    "ball_contact_frac": 0.405,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_get_up",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_get_up",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 72,
+    "ball_contact_frac": 0.692,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_goal_kick",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_goal_kick",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.324,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_parry",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_parry",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 7,
+    "ball_contact_frac": 0.119,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_penalty_ready",
+   "loop": true,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_penalty_ready",
+   "frames": 49,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_punch",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_punch",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 19,
+    "ball_contact_frac": 0.322,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_ready",
+   "loop": true,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_ready",
+   "frames": 35,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_roll_out",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_roll_out",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 47,
+    "ball_contact_frac": 0.797,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_shuffle",
+   "loop": true,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_shuffle",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_smother",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_smother",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 21,
+    "ball_contact_frac": 0.356,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_spread",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_spread",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.203,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_throw_overarm",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_throw_overarm",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.407,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_gk_tip_over",
+   "loop": false,
+   "category": "Goalkeeper",
+   "source": "meshy:mz_soccer_gk_tip_over",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 22,
+    "ball_contact_frac": 0.373,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_half_volley",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_half_volley",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.271,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_hands_on_head",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_hands_on_head",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_handshake",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_handshake",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_header_jump",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_header_jump",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.475,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_header_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_header_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 14,
+    "ball_contact_frac": 0.237,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_header_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_header_shot",
+   "frames": 52,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 5,
+    "ball_contact_frac": 0.098,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_header_standing",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_header_standing",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 54,
+    "ball_contact_frac": 0.915,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_heart_hands",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_heart_hands",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_heel_chop",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_heel_chop",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.441,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_heel_flick",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_heel_flick",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 12,
+    "ball_contact_frac": 0.203,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_heel_to_heel",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_heel_to_heel",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 22,
+    "ball_contact_frac": 0.373,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_hesitation_burst",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_hesitation_burst",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 43,
+    "ball_contact_frac": 0.729,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_high_five",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_high_five",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_idle_foot_on_ball",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_idle_foot_on_ball",
+   "frames": 34,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     8,
+     25
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_idle_tired",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_idle_tired",
+   "frames": 37,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     9,
+     27
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_injured_lying",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_injured_lying",
+   "frames": 120,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_inside_hook",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_inside_hook",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 34,
+    "ball_contact_frac": 0.576,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_interception",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_interception",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.559,
+    "footsteps": [],
+    "hit_start": 26,
+    "hit_end": 40
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_jog",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_jog",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_jump_spin",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_jump_spin",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_keepy_uppy",
+   "loop": true,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_keepy_uppy",
+   "frames": 30,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_kick_off",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_kick_off",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 42,
+    "ball_contact_frac": 0.712,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_knee_slide",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_knee_slide",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_knock_on_and_run",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_knock_on_and_run",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 10,
+    "ball_contact_frac": 0.135,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_knuckle_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_knuckle_shot",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 38,
+    "ball_contact_frac": 0.514,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_la_croqueta",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_la_croqueta",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 1,
+    "ball_contact_frac": 0.017,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_lane_change",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_lane_change",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 10,
+    "ball_contact_frac": 0.169,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_leap_chest_control",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_leap_chest_control",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_limp",
+   "loop": true,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_limp",
+   "frames": 25,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_lobbed_through",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_lobbed_through",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 14,
+    "ball_contact_frac": 0.237,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_lofted_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_lofted_pass",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 25,
+    "ball_contact_frac": 0.338,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_long_throw",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_long_throw",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 41,
+    "ball_contact_frac": 0.461,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_low_driven_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_low_driven_shot",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.351,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_lunge_challenge",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_lunge_challenge",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 54,
+    "ball_contact_frac": 0.915,
+    "footsteps": [],
+    "hit_start": 47,
+    "hit_end": 59
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_no_look_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_no_look_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 58,
+    "ball_contact_frac": 0.983,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_organise_defence",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_organise_defence",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_outside_foot_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_outside_foot_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 18,
+    "ball_contact_frac": 0.305,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_outside_hook",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_outside_hook",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.271,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_pass",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_pass",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 32,
+    "ball_contact_frac": 0.542,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_penalty_kick",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_penalty_kick",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 13,
+    "ball_contact_frac": 0.125,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_penalty_stutter",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_penalty_stutter",
+   "frames": 105,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.317,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_point_to_sky",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_point_to_sky",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_point_to_teammate",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_point_to_teammate",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_poke_tackle",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_poke_tackle",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 15,
+    "ball_contact_frac": 0.254,
+    "footsteps": [],
+    "hit_start": 8,
+    "hit_end": 22
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_power_shot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_power_shot",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 41,
+    "ball_contact_frac": 0.461,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_push_fight",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_push_fight",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 7,
+    "ball_contact_frac": 0.119,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_rabona",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_rabona",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 26,
+    "ball_contact_frac": 0.351,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_rabona_fake",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_rabona_fake",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 11,
+    "ball_contact_frac": 0.186,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_rainbow_flick",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_rainbow_flick",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 40,
+    "ball_contact_frac": 0.541,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_reverse_elastico",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_reverse_elastico",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 17,
+    "ball_contact_frac": 0.288,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_reverse_stepover",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_reverse_stepover",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.407,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_roulette",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_roulette",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 39,
+    "ball_contact_frac": 0.527,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_salute",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_salute",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_scoop_turn",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_scoop_turn",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.559,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_scorpion_kick",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_scorpion_kick",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.446,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_shield_ball",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_shield_ball",
+   "frames": 43,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     10,
+     32
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_shirt_kiss",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_shirt_kiss",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_shoot",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_shoot",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.216,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_shoulder_challenge",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_shoulder_challenge",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 24,
+    "ball_contact_frac": 0.407,
+    "footsteps": [],
+    "hit_start": 17,
+    "hit_end": 31
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_shush",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_shush",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_side_volley",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_side_volley",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.446,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_slide_tackle",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_slide_tackle",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 21,
+    "ball_contact_frac": 0.284,
+    "footsteps": [],
+    "hit_start": 12,
+    "hit_end": 30
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_sole_roll_turn",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_sole_roll_turn",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 45,
+    "ball_contact_frac": 0.763,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_sombrero_flick",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_sombrero_flick",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 53,
+    "ball_contact_frac": 0.716,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_sprint",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_sprint",
+   "frames": 23,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     6,
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_sprint_dribble",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_sprint_dribble",
+   "frames": 22,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     16
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_standing_block",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_standing_block",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 33,
+    "ball_contact_frac": 0.559,
+    "footsteps": [],
+    "hit_start": 26,
+    "hit_end": 40
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_stepover",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_stepover",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 48,
+    "ball_contact_frac": 0.814,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_strafe_left",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_strafe_left",
+   "frames": 21,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     5,
+     15
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_strafe_right",
+   "loop": true,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_strafe_right",
+   "frames": 17,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     4,
+     12
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_stumble",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_stumble",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_tackle",
+   "loop": false,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_tackle",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 16,
+    "ball_contact_frac": 0.271,
+    "footsteps": [],
+    "hit_start": 9,
+    "hit_end": 23
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_tap_in",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_tap_in",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 49,
+    "ball_contact_frac": 0.831,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_team_huddle",
+   "loop": false,
+   "category": "Extra",
+   "source": "meshy:mz_soccer_team_huddle",
+   "frames": 90,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_thigh_control",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_thigh_control",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 4,
+    "ball_contact_frac": 0.068,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_through_ball",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_through_ball",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 35,
+    "ball_contact_frac": 0.593,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_throw_in",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_throw_in",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 32,
+    "ball_contact_frac": 0.432,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_toe_poke",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_toe_poke",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 10,
+    "ball_contact_frac": 0.169,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_tornado_spin",
+   "loop": false,
+   "category": "Skill",
+   "source": "meshy:mz_soccer_tornado_spin",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 38,
+    "ball_contact_frac": 0.514,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_track_back",
+   "loop": true,
+   "category": "Defence",
+   "source": "meshy:mz_soccer_track_back",
+   "frames": 22,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_trap_inside",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_trap_inside",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 28,
+    "ball_contact_frac": 0.475,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_trap_sole",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_trap_sole",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 38,
+    "ball_contact_frac": 0.644,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_trivela",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_trivela",
+   "frames": 75,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 47,
+    "ball_contact_frac": 0.635,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_turn_180",
+   "loop": false,
+   "category": "Locomotion",
+   "source": "meshy:mz_soccer_turn_180",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": -1,
+    "ball_contact_frac": -1.0,
+    "footsteps": [
+     15,
+     44
+    ],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_volley",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_volley",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 18,
+    "ball_contact_frac": 0.305,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
+  },
+  {
+   "name": "soccer_mz_wall_jump",
+   "loop": false,
+   "category": "Ball",
+   "source": "meshy:mz_soccer_wall_jump",
+   "frames": 60,
+   "fps": 30.0,
+   "events": {
+    "ball_contact": 41,
+    "ball_contact_frac": 0.695,
+    "footsteps": [],
+    "hit_start": -1,
+    "hit_end": -1
+   },
+   "licence": "LicenseRef-Owned-Meshy"
   }
  ],
  "action_aliases": {
@@ -6818,7 +9430,7 @@
   "run": "soccer_run",
   "sprint": "soccer_sprint",
   "dribble": "soccer_dribble",
-  "shield": "soccer_shield",
+  "shield": "soccer_mz_shield_ball",
   "run_ball": "soccer_run_ball",
   "kick": "soccer_kick_place",
   "pass": "soccer_short_pass",
@@ -6828,65 +9440,65 @@
   "through": "soccer_through_ball",
   "through_ball": "soccer_through_ball",
   "cross": "soccer_cross",
-  "shoot": "soccer_shoot",
+  "shoot": "soccer_mz_shoot",
   "volley": "soccer_volley",
   "header": "soccer_header",
-  "chest_control": "soccer_chest_control",
-  "trap": "soccer_trap",
+  "chest_control": "soccer_mz_chest_control",
+  "trap": "soccer_mz_trap_sole",
   "toe_lift": "soccer_toe_lift",
   "pickup": "soccer_pickup",
-  "catch": "soccer_keeper_catch",
+  "catch": "soccer_mz_gk_catch_chest",
   "tackle": "soccer_tackle",
   "slide": "soccer_slide_tackle",
   "slide_tackle": "soccer_slide_tackle",
   "shoulder_charge": "soccer_shoulder_charge",
   "dispossess": "soccer_dispossess",
   "block": "soccer_block",
-  "foul": "soccer_trip",
-  "stumble": "soccer_stumble",
-  "trip": "soccer_trip",
-  "fall": "soccer_fall",
-  "get_up": "soccer_get_up",
+  "foul": "soccer_mz_fall_tripped",
+  "stumble": "soccer_mz_stumble",
+  "trip": "soccer_mz_fall_tripped",
+  "fall": "soccer_mz_fall_pushed",
+  "get_up": "soccer_mz_get_up",
   "knocked_down": "soccer_knocked_down",
   "pushed": "soccer_pushed",
   "hit_react": "soccer_hit_react",
   "dive": "soccer_keeper_dive_left",
-  "save": "soccer_keeper_save",
-  "parry": "soccer_keeper_save",
+  "save": "soccer_mz_gk_parry",
+  "parry": "soccer_mz_gk_parry",
   "keeper_idle": "soccer_keeper_idle",
-  "keeper_ready": "soccer_keeper_ready",
-  "keeper_catch": "soccer_keeper_catch",
+  "keeper_ready": "soccer_mz_gk_ready",
+  "keeper_catch": "soccer_mz_gk_catch_chest",
   "keeper_ground_catch": "soccer_keeper_ground_catch",
-  "keeper_save": "soccer_keeper_save",
+  "keeper_save": "soccer_mz_gk_parry",
   "keeper_dive_left": "soccer_keeper_dive_left",
-  "keeper_dive_right": "soccer_keeper_dive_right",
-  "keeper_dive_high": "soccer_keeper_dive_high",
-  "keeper_punch": "soccer_keeper_punch",
-  "keeper_throw": "soccer_keeper_throw",
-  "keeper_kick": "soccer_keeper_kick",
+  "keeper_dive_right": "soccer_mz_gk_dive_low_right",
+  "keeper_dive_high": "soccer_mz_gk_dive_high_left",
+  "keeper_punch": "soccer_mz_gk_punch",
+  "keeper_throw": "soccer_mz_gk_throw_overarm",
+  "keeper_kick": "soccer_mz_gk_drop_kick",
   "kick_place": "soccer_kick_place",
   "kick_run": "soccer_kick_run",
   "kick_out": "soccer_kick_out",
-  "drop_kick": "soccer_drop_kick",
-  "throw_in": "soccer_throw_in",
+  "drop_kick": "soccer_mz_gk_drop_kick",
+  "throw_in": "soccer_mz_throw_in",
   "corner_kick": "soccer_corner_kick",
   "free_kick": "soccer_free_kick",
   "penalty_kick": "soccer_penalty_kick",
   "goal_kick": "soccer_goal_kick",
   "sidestep": "soccer_sidestep",
-  "strafe_l": "soccer_strafe_l",
-  "strafe_r": "soccer_strafe_r",
+  "strafe_l": "soccer_mz_strafe_left",
+  "strafe_r": "soccer_mz_strafe_right",
   "strafe": "soccer_sidestep",
-  "backpedal": "soccer_backpedal",
+  "backpedal": "soccer_mz_backpedal",
   "jockey": "soccer_jockey",
   "juke_feint": "soccer_juke_feint",
-  "stop": "soccer_stop",
+  "stop": "soccer_mz_decelerate",
   "turn": "soccer_turn",
   "cut": "soccer_change_direction",
   "change_direction": "soccer_change_direction",
   "spin": "soccer_spin",
-  "celebrate": "soccer_celebrate",
-  "celebrate_jump": "soccer_celebrate_jump",
+  "celebrate": "soccer_mz_celebrate",
+  "celebrate_jump": "soccer_mz_jump_spin",
   "taunt": "soccer_taunt",
   "victory": "soccer_victory",
   "hand_pass": "soccer_hand_pass",
@@ -6894,19 +9506,19 @@
   "fist_pass": "soccer_fist_pass",
   "fist_shoot": "soccer_fist_shoot",
   "skill_step_over": "soccer_skill_step_over",
-  "skill_roulette": "soccer_skill_roulette",
-  "skill_drag_back": "soccer_skill_drag_back",
-  "skill_elastico": "soccer_skill_elastico",
+  "skill_roulette": "soccer_mz_roulette",
+  "skill_drag_back": "soccer_mz_drag_back",
+  "skill_elastico": "soccer_mz_elastico",
   "skill_ball_roll": "soccer_skill_ball_roll",
-  "skill_rainbow": "soccer_skill_rainbow",
-  "skill_fake_shot": "soccer_skill_fake_shot",
+  "skill_rainbow": "soccer_mz_rainbow_flick",
+  "skill_fake_shot": "soccer_mz_fake_shot",
   "skill_heel_to_heel": "soccer_skill_heel_to_heel",
-  "thigh_control": "soccer_thigh_control",
-  "chip_shot": "soccer_chip_shot",
-  "trivela": "soccer_trivela",
-  "bicycle": "soccer_bicycle_kick",
-  "bicycle_kick": "soccer_bicycle_kick",
-  "keeper_penalty_set": "soccer_keeper_penalty_set",
+  "thigh_control": "soccer_mz_thigh_control",
+  "chip_shot": "soccer_mz_chip_shot",
+  "trivela": "soccer_mz_trivela",
+  "bicycle": "soccer_mz_bicycle_kick",
+  "bicycle_kick": "soccer_mz_bicycle_kick",
+  "keeper_penalty_set": "soccer_mz_gk_penalty_ready",
   "punch": "soccer_punch",
   "headbutt": "soccer_headbutt",
   "off_ref_whistle": "ref_whistle",
@@ -6920,7 +9532,162 @@
   "off_ar_offside": "ar_offside",
   "off_ar_flag_corner": "ar_flag_corner",
   "off_ar_flag_throw": "ar_flag_throw",
-  "off_fourth_board": "fourth_board"
+  "off_fourth_board": "fourth_board",
+  "mz_jog": "soccer_mz_jog",
+  "mz_sprint": "soccer_mz_sprint",
+  "mz_dribble": "soccer_mz_dribble",
+  "mz_sprint_dribble": "soccer_mz_sprint_dribble",
+  "mz_backpedal": "soccer_mz_backpedal",
+  "mz_strafe_left": "soccer_mz_strafe_left",
+  "mz_strafe_right": "soccer_mz_strafe_right",
+  "mz_turn_180": "soccer_mz_turn_180",
+  "mz_decelerate": "soccer_mz_decelerate",
+  "mz_idle_foot_on_ball": "soccer_mz_idle_foot_on_ball",
+  "mz_idle_tired": "soccer_mz_idle_tired",
+  "mz_shield_ball": "soccer_mz_shield_ball",
+  "mz_trap_sole": "soccer_mz_trap_sole",
+  "mz_trap_inside": "soccer_mz_trap_inside",
+  "mz_chest_control": "soccer_mz_chest_control",
+  "mz_thigh_control": "soccer_mz_thigh_control",
+  "mz_first_touch_turn": "soccer_mz_first_touch_turn",
+  "mz_flick_up": "soccer_mz_flick_up",
+  "mz_keepy_uppy": "soccer_mz_keepy_uppy",
+  "mz_cushion_volley": "soccer_mz_cushion_volley",
+  "mz_pass": "soccer_mz_pass",
+  "mz_driven_pass": "soccer_mz_driven_pass",
+  "mz_lofted_pass": "soccer_mz_lofted_pass",
+  "mz_through_ball": "soccer_mz_through_ball",
+  "mz_lobbed_through": "soccer_mz_lobbed_through",
+  "mz_cross_whipped": "soccer_mz_cross_whipped",
+  "mz_cross_low": "soccer_mz_cross_low",
+  "mz_backheel_pass": "soccer_mz_backheel_pass",
+  "mz_outside_foot_pass": "soccer_mz_outside_foot_pass",
+  "mz_no_look_pass": "soccer_mz_no_look_pass",
+  "mz_header_pass": "soccer_mz_header_pass",
+  "mz_flick_on_header": "soccer_mz_flick_on_header",
+  "mz_chest_pass": "soccer_mz_chest_pass",
+  "mz_first_time_pass": "soccer_mz_first_time_pass",
+  "mz_shoot": "soccer_mz_shoot",
+  "mz_power_shot": "soccer_mz_power_shot",
+  "mz_finesse_shot": "soccer_mz_finesse_shot",
+  "mz_chip_shot": "soccer_mz_chip_shot",
+  "mz_low_driven_shot": "soccer_mz_low_driven_shot",
+  "mz_volley": "soccer_mz_volley",
+  "mz_half_volley": "soccer_mz_half_volley",
+  "mz_side_volley": "soccer_mz_side_volley",
+  "mz_bicycle_kick": "soccer_mz_bicycle_kick",
+  "mz_scorpion_kick": "soccer_mz_scorpion_kick",
+  "mz_rabona": "soccer_mz_rabona",
+  "mz_trivela": "soccer_mz_trivela",
+  "mz_toe_poke": "soccer_mz_toe_poke",
+  "mz_tap_in": "soccer_mz_tap_in",
+  "mz_diving_header": "soccer_mz_diving_header",
+  "mz_header_shot": "soccer_mz_header_shot",
+  "mz_knuckle_shot": "soccer_mz_knuckle_shot",
+  "skill_stepover": "soccer_mz_stepover",
+  "skill_reverse_stepover": "soccer_mz_reverse_stepover",
+  "skill_double_stepover": "soccer_mz_double_stepover",
+  "skill_body_feint": "soccer_mz_body_feint",
+  "skill_reverse_elastico": "soccer_mz_reverse_elastico",
+  "skill_rainbow_flick": "soccer_mz_rainbow_flick",
+  "skill_cruyff_turn": "soccer_mz_cruyff_turn",
+  "skill_la_croqueta": "soccer_mz_la_croqueta",
+  "skill_heel_chop": "soccer_mz_heel_chop",
+  "skill_fake_pass": "soccer_mz_fake_pass",
+  "skill_ball_hop": "soccer_mz_ball_hop",
+  "skill_heel_flick": "soccer_mz_heel_flick",
+  "skill_scoop_turn": "soccer_mz_scoop_turn",
+  "skill_sombrero_flick": "soccer_mz_sombrero_flick",
+  "skill_berba_spin": "soccer_mz_berba_spin",
+  "skill_sole_roll_turn": "soccer_mz_sole_roll_turn",
+  "skill_outside_hook": "soccer_mz_outside_hook",
+  "skill_inside_hook": "soccer_mz_inside_hook",
+  "skill_hesitation_burst": "soccer_mz_hesitation_burst",
+  "skill_knock_on_and_run": "soccer_mz_knock_on_and_run",
+  "skill_lane_change": "soccer_mz_lane_change",
+  "skill_tornado_spin": "soccer_mz_tornado_spin",
+  "skill_behind_leg_turn": "soccer_mz_behind_leg_turn",
+  "skill_rabona_fake": "soccer_mz_rabona_fake",
+  "skill_flair_pass": "soccer_mz_flair_pass",
+  "mz_tackle": "soccer_mz_tackle",
+  "mz_slide_tackle": "soccer_mz_slide_tackle",
+  "mz_poke_tackle": "soccer_mz_poke_tackle",
+  "mz_block_shot": "soccer_mz_block_shot",
+  "mz_shoulder_challenge": "soccer_mz_shoulder_challenge",
+  "mz_interception": "soccer_mz_interception",
+  "mz_clearance_kick": "soccer_mz_clearance_kick",
+  "mz_clearance_header": "soccer_mz_clearance_header",
+  "mz_standing_block": "soccer_mz_standing_block",
+  "mz_push_fight": "soccer_mz_push_fight",
+  "mz_lunge_challenge": "soccer_mz_lunge_challenge",
+  "mz_track_back": "soccer_mz_track_back",
+  "mz_header_jump": "soccer_mz_header_jump",
+  "mz_header_standing": "soccer_mz_header_standing",
+  "mz_leap_chest_control": "soccer_mz_leap_chest_control",
+  "mz_backward_header": "soccer_mz_backward_header",
+  "mz_gk_ready": "soccer_mz_gk_ready",
+  "mz_gk_shuffle": "soccer_mz_gk_shuffle",
+  "mz_gk_dive_low_left": "soccer_mz_gk_dive_low_left",
+  "mz_gk_dive_low_right": "soccer_mz_gk_dive_low_right",
+  "mz_gk_dive_high_left": "soccer_mz_gk_dive_high_left",
+  "mz_gk_dive_high_right": "soccer_mz_gk_dive_high_right",
+  "mz_gk_tip_over": "soccer_mz_gk_tip_over",
+  "mz_gk_parry": "soccer_mz_gk_parry",
+  "mz_gk_catch_chest": "soccer_mz_gk_catch_chest",
+  "mz_gk_catch_high": "soccer_mz_gk_catch_high",
+  "mz_gk_punch": "soccer_mz_gk_punch",
+  "mz_gk_collect_low": "soccer_mz_gk_collect_low",
+  "mz_gk_smother": "soccer_mz_gk_smother",
+  "mz_gk_spread": "soccer_mz_gk_spread",
+  "mz_gk_goal_kick": "soccer_mz_gk_goal_kick",
+  "mz_gk_drop_kick": "soccer_mz_gk_drop_kick",
+  "mz_gk_throw_overarm": "soccer_mz_gk_throw_overarm",
+  "mz_gk_roll_out": "soccer_mz_gk_roll_out",
+  "mz_gk_get_up": "soccer_mz_gk_get_up",
+  "mz_gk_penalty_ready": "soccer_mz_gk_penalty_ready",
+  "mz_throw_in": "soccer_mz_throw_in",
+  "mz_long_throw": "soccer_mz_long_throw",
+  "mz_corner_kick": "soccer_mz_corner_kick",
+  "mz_free_kick_curl": "soccer_mz_free_kick_curl",
+  "mz_free_kick_power": "soccer_mz_free_kick_power",
+  "mz_penalty_kick": "soccer_mz_penalty_kick",
+  "mz_penalty_stutter": "soccer_mz_penalty_stutter",
+  "mz_wall_jump": "soccer_mz_wall_jump",
+  "mz_kick_off": "soccer_mz_kick_off",
+  "mz_free_kick_stance": "soccer_mz_free_kick_stance",
+  "mz_fall_tripped": "soccer_mz_fall_tripped",
+  "mz_fall_pushed": "soccer_mz_fall_pushed",
+  "mz_dive_simulation": "soccer_mz_dive_simulation",
+  "mz_get_up": "soccer_mz_get_up",
+  "mz_stumble": "soccer_mz_stumble",
+  "mz_injured_lying": "soccer_mz_injured_lying",
+  "mz_limp": "soccer_mz_limp",
+  "mz_hands_on_head": "soccer_mz_hands_on_head",
+  "mz_appeal": "soccer_mz_appeal",
+  "mz_argue_referee": "soccer_mz_argue_referee",
+  "mz_applaud": "soccer_mz_applaud",
+  "mz_high_five": "soccer_mz_high_five",
+  "mz_handshake": "soccer_mz_handshake",
+  "mz_frustrated_kick_air": "soccer_mz_frustrated_kick_air",
+  "mz_point_to_teammate": "soccer_mz_point_to_teammate",
+  "mz_call_for_ball": "soccer_mz_call_for_ball",
+  "mz_organise_defence": "soccer_mz_organise_defence",
+  "mz_celebrate": "soccer_mz_celebrate",
+  "mz_knee_slide": "soccer_mz_knee_slide",
+  "mz_aeroplane": "soccer_mz_aeroplane",
+  "mz_fist_pump": "soccer_mz_fist_pump",
+  "mz_point_to_sky": "soccer_mz_point_to_sky",
+  "mz_cup_ear": "soccer_mz_cup_ear",
+  "mz_shush": "soccer_mz_shush",
+  "mz_jump_spin": "soccer_mz_jump_spin",
+  "mz_backflip": "soccer_mz_backflip",
+  "mz_cartwheel": "soccer_mz_cartwheel",
+  "mz_heart_hands": "soccer_mz_heart_hands",
+  "mz_salute": "soccer_mz_salute",
+  "mz_dance": "soccer_mz_dance",
+  "mz_team_huddle": "soccer_mz_team_huddle",
+  "mz_shirt_kiss": "soccer_mz_shirt_kiss",
+  "mz_arms_wide": "soccer_mz_arms_wide"
  },
  "stats": {
   "tris": 16000,
@@ -7162,5 +9929,10 @@
     "prop": "camera"
    }
   }
+ },
+ "meshy": {
+  "pack": "sprite_forge v11.42 meshy (Text to Motion, owner-held)",
+  "clips": 161,
+  "catalogue": "sprite_forge/game_packs/meshy/soccer_full.json"
  }
 }

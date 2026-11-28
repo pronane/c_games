@@ -919,6 +919,23 @@ for (int i = 0; i < 60 * 6; i++)
     if (sk.Events.Count(ev => ev.Text.Contains("pulls off")) > before) skills++;
 }
 Check("skills: a player can do more than one skill move (timer counts down)", skills >= 3, $"skills={skills}");
+// v11.42: every skill move has a clip, a duration and a name, and every one can come up from some input.
+{
+    var all = Enum.GetValues<SkillMove>().Where(m => m != SkillMove.None).ToArray();
+    var reachable = new HashSet<SkillMove>();
+    foreach (var taught in SkillMoves.Families.Keys)
+        for (int r = 0; r < 1000; r++) reachable.Add(SkillMoves.Variant(taught, r / 1000f));
+    Check("skills: all " + all.Length + " moves have a skill_ clip, a duration and a name",
+          all.All(m => SkillMoves.ClipName(m).StartsWith("skill_") && SkillMoves.Duration(m) > 0f
+                       && SkillMoves.DisplayName(m) != "skill" && SkillMoves.SuccessChance(m, .5f, 5f) > .1f)
+          && all.Select(SkillMoves.ClipName).Distinct().Count() == all.Length,
+          string.Join(",", all.Where(m => !SkillMoves.ClipName(m).StartsWith("skill_"))));
+    Check("skills: each input plays itself most often and its family only (reviewed moves)",
+          SkillMoves.Families.All(kv => kv.Value.Contains(kv.Key)
+                                        && kv.Value.Count(m => m == kv.Key) * 2 >= kv.Value.Length - 1)
+          && reachable.Count >= 15 && reachable.All(all.Contains),
+          $"reachable={reachable.Count}");
+}
 
 
 Section("Goals, keeper and AI shooting");

@@ -125,6 +125,18 @@ class FakeMeshy:
 fake = FakeMeshy()
 cl = MZ.Client(key="msy_test", transport=fake, sleep=lambda s: None)
 
+SMPL = ("Pelvis L_Hip R_Hip Spine1 L_Knee R_Knee Spine2 L_Ankle R_Ankle Spine3 L_Foot R_Foot Neck L_Collar R_Collar "
+        "Head L_Shoulder R_Shoulder L_Elbow R_Elbow L_Wrist R_Wrist").split()
+sc_, sm_, _ = BM.detect_convention(SMPL)
+check("Meshy prime's SMPL-H skeleton: L_Hip is the thigh, L_Knee the shin, L_Collar the shoulder",
+      sc_ == "smpl" and sm_.get("thigh_L") == "L_Hip" and sm_.get("shin_L") == "L_Knee" and sm_.get("foot_L") == "L_Ankle"
+      and sm_.get("upperarm_L") == "L_Shoulder" and sm_.get("shoulder_L") == "L_Collar", (sc_, sm_))
+rec = json.load(open(os.path.join(motionlib.OWNED, "mz_soccer_long_throw.json"))) if os.path.isfile(
+    os.path.join(motionlib.OWNED, "mz_soccer_long_throw.json")) else None
+if rec:
+    ev = MC.clip_events(rec, "Set piece", "long_throw")
+    check("clip_events: an overhead throw releases with the hands above the head, not on the lift", 0.35 < ev["ball_contact"] < 0.65, ev)
+
 # -- 4-5: client ---------------------------------------------------------------------------------------------------
 check("balance is read with the bearer key", cl.balance()["balance"] == 500 and fake.calls[-1][3] == "Bearer msy_test")
 errs = []

@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -351,3 +352,54 @@ def main(argv=None, client=None):
     except MZ.MeshyError as e:
         print("error: %s" % e, file=sys.stderr)
         return 1
+
+
+def clip_events(rec, category, move):
+    """Event fractions (0..1, -1 = none) for a game: ball_contact at the fastest foot (kicks, passes, skills), the
+    fastest hand (throws, keeper saves) or the head's highest point (headers); a tackle's hit window around its foot
+    peak. Same keys as Arena FC's CLIP_EVENTS. Worked out from the clip, so it follows what Meshy actually made."""
+    import numpy as np
+    from . import rig
+    keys = rec.get("keys") or []
+    ev = {"ball_contact": -1.0, "footsteps": [], "hit_start": -1.0, "hit_end": -1.0}
+    if len(keys) < 3:
+        return ev
+    t = np.array([float(k[0]) for k in keys])
+    t = (t - t[0]) / max(1e-6, t[-1] - t[0])
+    W = [rig.evaluate(k[1]).world for k in keys]
+    pos = lambda j: np.array([w[j][:3, 3] for w in W])
+    speed = lambda j: np.r_[0.0, np.linalg.norm(np.diff(pos(j), axis=0), axis=1) / np.maximum(1e-6, np.diff(t))]
+    mv = move.lower()
+    if category == "Locomotion" or rec.get("loop"):
+        if category == "Locomotion":
+            ev["footsteps"] = [0.25, 0.75]
+        return ev
+    if re.search(r"head", mv) and category in ("Shooting", "Passing", "Aerial", "Defending"):
+        ev["ball_contact"] = float(t[int(np.argmax(pos("head")[:, 1]))])
+    elif re.search(r"throw|roll_out|catch|parry|punch|tip|collect|smother|spread|save|dive", mv):
+        sp = np.maximum(speed("hand_L"), speed("hand_R"))
+        if re.search(r"throw", mv) and not re.search(r"roll", mv):       # release: hands driving forward
+            hz = pos("hips")[:, 2]                                       # relative to the body (a run-up)
+            fwd = lambda j: np.r_[0.0, np.diff(pos(j)[:, 2] - hz) / np.maximum(1e-6, np.diff(t))]
+            sp = np.maximum(fwd("hand_L"), fwd("hand_R"))
+            over = np.maximum(pos("hand_L")[:, 1], pos("hand_R")[:, 1]) > pos("head")[:, 1]
+            if re.search(r"throw_in|long_throw|overarm", mv) and (over & (sp > 0)).any():
+                sp = np.where(over, sp, 0.0)                             # overhead throws release above the head
+        ev["ball_contact"] = float(t[int(np.argmax(sp))])
+    elif category in ("Passing", "Shooting", "Set piece", "Control", "Skill", "Ball", "Defending", "Goalkeeper", "Kicking"):
+        fl, fr = speed("foot_L"), speed("foot_R")
+        hl, hr = pos("foot_L")[:, 1], pos("foot_R")[:, 1]
+        floor = min(hl.min(), hr.min())
+        reach = 0.35 if not re.search(r"volley|bicycle|scorpion|thigh|chest", mv) else 1.2
+        sp = np.maximum(np.where(hl - floor < reach, fl, 0.0), np.where(hr - floor < reach, fr, 0.0))
+        if not sp[1:-1].any():
+            sp = np.maximum(fl, fr)
+        i = int(np.argmax(sp[1:-1])) + 1 if len(sp) > 2 else 0
+        ev["ball_contact"] = float(t[i])
+        if category == "Defending" and re.search(r"tackle|challenge|lunge|poke|block|intercept", mv):
+            ev["hit_start"] = max(0.0, float(t[i]) - 0.12)
+            ev["hit_end"] = min(1.0, float(t[i]) + 0.12)
+    ev["ball_contact"] = round(ev["ball_contact"], 3)
+    ev["hit_start"] = round(ev["hit_start"], 3)
+    ev["hit_end"] = round(ev["hit_end"], 3)
+    return ev
