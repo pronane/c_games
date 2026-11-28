@@ -78,6 +78,22 @@ Locomotion...). Each move also gets structured tags (`sforge/motiontags.py`):
   tags a folder of moves and reports the training-eligible set per category and source.
 * The built-in `motion_library` is tagged, with `ml_training = yes` (all CC0 procedural moves).
 * Tests: `python3 tools/test_motiontags.py` (in CI).
+## New in v11.39: the touchline - benches, managers, ball kids, photographers, real goal nets, corner flags (fed back from Arena FC)
+
+- **`sforge.pitchside`:** clips for everyone round the pitch, authored in the pose channels and QA'd.
+  - The clips: subs sitting or leaning on the bench and jumping up for a goal; managers watching or shouting; staff standing; ball kids at the ready; photographers kneeling or standing with the camera to the eye.
+  - `LOOKS` says what each role wears, as rules on the team's colours.
+  - `props_glb` builds the camera with its long lens.
+  - `placements(stadium_json, half_length, half_width)` puts everyone round any `sforge.stadium` ground.
+- **`sforge.goalnet`:** goals with depth (posts, crossbar, stanchions and ground bars) and a dense net, for soccer, futsal, Gaelic, hockey and handball sizes.
+  - The net is a flat roof that slopes to the ground, plus side panels, and already sags a little.
+  - `TEXCOORD_1` carries how free each net vertex is to move, so a shader can bulge it where the ball hits.
+  - `corner_flag()` builds a pole and a cloth that flaps.
+- **`tailor.staff_garments()`:** long trousers cut from the body's legs.
+- **`stadium`:** dugout seats are now at chair height, and the json lists each seat (`bench`, `seat_top`).
+
+    PS.placements(json.load(open("stadium_bowl.json")), 52.5, 34.0)
+    G.export("goal_soccer.glb", "soccer")
 
 ## New in v11.38: LODs for skinned characters (fed back from Arena FC)
 

@@ -33,3 +33,8 @@ arena-fc/Data/models/soccer_player_*.png
 arena-fc/Data/models/soccer_player_*.jpg
 arena-fc/Data/models/soccer_player_*.import
 arena-fc/Data/models/soccer_player.src.glb
+
+# local Sprite Forge python env used by aussies_rules_3d/tools (not committed)
+/sfvenv/
+# Gaelic player-derived motion caches (rebuild locally)
+Gaelic_Football_3d/**/*.gfmotion

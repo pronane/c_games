@@ -1,0 +1,48 @@
+{
+ "version": "11.36",
+ "presets": {
+  "skin": {
+   "roughness": 0.52,
+   "specular": 0.35,
+   "subsurface": 0.28,
+   "subsurface_tint": [
+    0.95,
+    0.55,
+    0.45
+   ],
+   "rim": 0.18,
+   "rim_tint": 0.5,
+   "detail_repeat": 38.0,
+   "detail_strength": 0.55,
+   "note": "subsurface needs a deferred / clustered renderer (Godot Forward+); skin_mode on"
+  },
+  "hair": {
+   "roughness": 0.38,
+   "specular": 0.55,
+   "anisotropy": 0.6,
+   "alpha_scissor": 0.45,
+   "alpha_antialias": true,
+   "note": "alpha-scissor with alpha-to-coverage; anisotropic highlight along the strands"
+  },
+  "eyes": {
+   "roughness": 0.05,
+   "specular": 0.8,
+   "clearcoat": 1.0,
+   "clearcoat_roughness": 0.02,
+   "note": "wet cornea highlight - the catch-light that makes a face read alive"
+  },
+  "lashes": {
+   "roughness": 0.6,
+   "alpha_scissor": 0.4
+  },
+  "beard": {
+   "roughness": 0.55,
+   "alpha_scissor": 0.35,
+   "anisotropy": 0.3
+  }
+ },
+ "maps": {
+  "skin_detail_normal": "tangent-space, tileable, OpenGL (+Y) convention",
+  "skin_detail_rough": "tileable roughness modulation"
+ }
+}

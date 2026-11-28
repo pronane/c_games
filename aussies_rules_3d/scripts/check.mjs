@@ -62,19 +62,52 @@ check('production build', () => {
   return 'dist/ written';
 });
 
+function readGlbJson(file) {
+  const fd = openSync(file, 'r');
+  const head = Buffer.alloc(20);
+  readSync(fd, head, 0, 20, 0);
+  if (head.toString('latin1', 0, 4) !== 'glTF') { closeSync(fd); throw new Error(file + ' is not a glTF binary'); }
+  const jsonLen = head.readUInt32LE(12);
+  const json = Buffer.alloc(jsonLen);
+  readSync(fd, json, 0, jsonLen, 20);
+  closeSync(fd);
+  return JSON.parse(json.toString('utf8'));
+}
+
 check('3D assets are valid glTF binaries', () => {
   const details = [];
   for (const f of ['player.glb', 'gaelic_player.glb', 'ball.glb', 'stadium.glb']) {
     const p = path.join(ROOT, 'public', 'assets', f);
     if (!existsSync(p)) throw new Error(`${f} missing`);
-    const fd = openSync(p, 'r');
-    const buf = Buffer.alloc(12);
-    readSync(fd, buf, 0, 12, 0);
-    closeSync(fd);
-    if (buf.toString('latin1', 0, 4) !== 'glTF') throw new Error(`${f} is not a glTF binary`);
+    readGlbJson(p);
     details.push(`${f} ${(statSync(p).size / 1024).toFixed(0)}KB`);
   }
   return details.join(', ');
+});
+
+check('squad GLB carries the full 52-joint / 32-clip / nine-look contract', () => {
+  // The runtime tints kit pieces and prunes appearance variants by vN_* node
+  // names — a GLB that loses those (e.g. a bad repack) would silently render
+  // white kits with every look visible, so gate on it here.
+  const p = path.join(ROOT, 'public', 'assets', 'gaelic_player.glb');
+  const j = readGlbJson(p);
+  const skins = j.skins ?? [];
+  if (skins.length !== 1) throw new Error(`expected exactly 1 skin, got ${skins.length}`);
+  const joints = skins[0].joints?.length ?? 0;
+  if (joints !== 52) throw new Error(`expected 52 joints, got ${joints}`);
+  const anims = (j.animations ?? []).map((a) => a.name);
+  for (const need of ['idle', 'run', 'run_ball', 'kick_run', 'hand_pass', 'tackle_reach', 'knocked_down']) {
+    if (!anims.includes(need)) throw new Error(`missing clip ${need}`);
+  }
+  const meshNames = (j.nodes ?? []).map((n) => n.name ?? '');
+  for (let v = 0; v <= 8; v++) {
+    if (!meshNames.some((n) => n.startsWith(`v${v}_`))) throw new Error(`no meshes for look v${v}`);
+  }
+  const forKit = ['jersey', 'shorts', 'socks', 'boots'];
+  for (const suffix of forKit) {
+    if (!meshNames.some((n) => n.endsWith(`_${suffix}`))) throw new Error(`no *_${suffix} mesh`);
+  }
+  return `52 joints, ${anims.length} clips, v0..v8 looks`;
 });
 
 const failed = results.filter((r) => !r.ok);

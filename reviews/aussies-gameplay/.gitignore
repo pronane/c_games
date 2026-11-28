@@ -1,0 +1,4 @@
+# User recording and extracted review frames stay local; do not commit media.
+*.mp4
+*.jpg
+*.png

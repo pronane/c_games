@@ -79,19 +79,7 @@ public sealed partial class OfficialsView : Node3D
         scene.QueueFree();
     }
 
-    /// <summary>Bone by name, tolerating the "_2" suffixes Godot adds each time one GltfState generates
-    /// another scene (every squad player and official shares the parsed GLB).</summary>
-    public static int FindBoneLoose(Skeleton3D skel, string name)
-    {
-        int b = skel.FindBone(name);
-        if (b >= 0) return b;
-        for (int i = 0; i < skel.GetBoneCount(); i++)
-        {
-            string n = skel.GetBoneName(i);
-            if (n.StartsWith(name + "_") && n.Substring(name.Length).Replace("_2", "") == "") return i;
-        }
-        return -1;
-    }
+    public static int FindBoneLoose(Skeleton3D skel, string name) => SoccerClipRig.FindBoneLoose(skel, name);
 
     private static StandardMaterial3D? _propMat;
     private static StandardMaterial3D PropMaterial() => _propMat ??= new StandardMaterial3D

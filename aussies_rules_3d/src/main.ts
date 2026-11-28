@@ -1,3 +1,6 @@
+import { MotionProbe } from './render/motionProbe';
+import { BallReadability } from './render/ballReadability';
+import { captureIntent } from './sim/captureScenario';
 /**
  * Aussie Rules 3D — entry point and game loop.
  *
@@ -7,12 +10,13 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadMotionAssets, type MotionAssets } from './render/motionBinding';
 import { MatchSim, HumanIntent, emptyHumanIntent } from './sim/match';
 import type { PlayerState } from './rules/types';
 import { RulesEngine } from './rules/engine';
-import { AFL_SETTINGS, MatchEvent, MatchSettings, scoreString } from './rules/types';
+import { AFL_SETTINGS, FIELD, MatchEvent, MatchSettings, scoreString } from './rules/types';
 import { BroadcastCamera } from './render/camera';
-import { createWorld, drawScoreboard, World } from './render/scene';
+import { createWorld, drawScoreboard, updateLedScorebug, World } from './render/scene';
 import {
   createPlayerViews,
   syncPlayerViews,
@@ -24,6 +28,19 @@ import {
 import { InputManager } from './input/input';
 import { InputFrame } from './input/mappings';
 import { MatchAudio } from './audio/audio';
+import { LOD_DISTANCES, pickLodQuality, type LodQuality } from './render/lod';
+
+/**
+ * A/B capture mode for the CI visual workflow (?ab=1, optional ?lod=ultra|high|performance):
+ * fixed attract seed so two runs are frame-comparable, hides menu overlays so frames
+ * show unobstructed attract play, and logs AB_STATS renderer counters to the console
+ * every couple of seconds (captured by the CI console log). No effect otherwise.
+ */
+const AB_PARAMS = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+const AB_MODE = !!AB_PARAMS?.has('ab');
+const AB_LOD = AB_PARAMS?.get('lod');
+const AB_MATCH = AB_MODE && AB_PARAMS?.get('scenario') === 'match';
+const AB_MANUAL = AB_MATCH && AB_PARAMS?.get('drive') === 'manual';
 import { Hud, Menus, CLUBS, $, createTouchButtons } from './ui/ui';
 
 type GamePhase = 'menu' | 'playing' | 'paused' | 'ended';
@@ -57,9 +74,15 @@ class Game {
   sim: MatchSim | null = null;
   views = new Map<number, PlayerView>();
   ballMesh!: THREE.Group;
+  private ballReadability!: BallReadability;
+  private captureTick = 0;
+  private motionProbe = new MotionProbe();
+  ballShadow!: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   broadcast!: BroadcastCamera;
   input = new InputManager($('game'));
   audio = new MatchAudio();
+  /** Graphics quality tier — drives the squad LOD switch distances. */
+  lodQuality: LodQuality = pickLodQuality(AB_LOD ?? 'high');
   hud = new Hud();
   menus = new Menus();
   teams: Teams = {
@@ -78,6 +101,7 @@ class Game {
   private scoreboardTimer = 0;
   private touchButtons = new Map<string, HTMLElement>();
   private playerGltf: Awaited<ReturnType<GLTFLoader['loadAsync']>> | null = null;
+  private motionAssets: MotionAssets | null = null;
   private menuFocusIndex = 0;
   private menuFocusedScreen = '';
   private menuNavDir = 0;
@@ -85,6 +109,17 @@ class Game {
   private menuBackDown = false;
   private showMarkers = true;
   private hintTimer = 0;
+  private fpsEma = 1 / 60;
+  private abLastLog = 0;
+  private abFrameTimes: number[] = [];
+  // camera subject visibility accounting (AB mode — framing regression tripwire)
+  private abCamFrames = 0;
+  private abCamBallIn = 0;
+  private abCamPlayerIn = 0;
+  private abCamPlayerFrames = 0;
+  private abCamBallMax = 0;
+  private abCamPlayerMax = 0;
+  private abCamLastLog = 0;
   // attract mode — AI vs AI behind the title menu
   private demoSim: MatchSim | null = null;
   private demoViews = new Map<number, PlayerView>();
@@ -97,25 +132,63 @@ class Game {
   private switchFlashT = 0;
 
   async boot(): Promise<void> {
+    if (AB_MODE) console.log('AB_BOOT world');
     this.menus.setLoading(0.1, 'Building the Melbourne arena…');
     this.world = await createWorld($('game') as HTMLCanvasElement);
     this.broadcast = new BroadcastCamera(this.world.camera);
 
     this.menus.setLoading(0.45, 'Rigging the players…');
     const loader = new GLTFLoader();
-    this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
+    try {
+      // Built by tools/build_afl_player.py on a networked machine — preferred when present
+      this.playerGltf = await loader.loadAsync('./assets/afl_player.glb');
+      console.info('AFL player asset loaded (afl_player.glb)');
+    } catch {
+      this.playerGltf = await loader.loadAsync('./assets/gaelic_player.glb');
+      console.info('afl_player.glb not built yet — using gaelic_player.glb');
+    }
+    if (AB_MODE) console.log('AB_BOOT player loaded');
+    this.motionAssets = await loadMotionAssets();
+    if (AB_MODE) console.log(`AB_BOOT motion=${!!this.motionAssets}`);
     this.menus.setLoading(0.75, 'Inflating the Sherrin…');
     const ballGltf = await loader.loadAsync('./assets/ball.glb');
     this.ballMesh = ballGltf.scene;
     // AFL Sherrin is ~27 cm long — the raw GLB is modelled ~1.45 m, scale it down.
     this.ballMesh.scale.setScalar(0.19);
     this.world.scene.add(this.ballMesh);
+    this.ballReadability = new BallReadability(this.world.scene, this.ballMesh);
+    // soft blob under the ball — reads at broadcast distance, survives flight
+    const cnv = document.createElement('canvas');
+    cnv.width = 64;
+    cnv.height = 64;
+    const g2d = cnv.getContext('2d')!;
+    const grad = g2d.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(0,0,0,0.6)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.25)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g2d.fillStyle = grad;
+    g2d.fillRect(0, 0, 64, 64);
+    const ballShadowTex = new THREE.CanvasTexture(cnv);
+    this.ballShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.42, 16),
+      new THREE.MeshBasicMaterial({ map: ballShadowTex, transparent: true, depthWrite: false })
+    );
+    this.ballShadow.rotation.x = -Math.PI / 2;
+    this.ballShadow.position.y = 0.022;
+    this.ballShadow.renderOrder = 1;
+    this.world.scene.add(this.ballShadow);
 
+    if (AB_MODE) console.log('AB_BOOT assets loaded');
     this.menus.setLoading(0.95, 'Ready.');
     this.setupMenus();
     this.setupTouch();
     this.startAttract();
     this.menus.show('title');
+    if (AB_MATCH) this.startMatch();
+    if (AB_MODE) {
+      // capture the unobstructed attract demo (deterministic — see AB_PARAMS)
+      document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    }
 
     // mouse-wheel zoom on the broadcast cam (auto-recentres after 3 s)
     ($('game') as HTMLCanvasElement).addEventListener(
@@ -144,6 +217,35 @@ class Game {
     window.setInterval(refreshPadStatus, 1500);
     refreshPadStatus();
 
+    if (AB_MANUAL) {
+      // CI owns simulation progress, not SwiftShader's wall-clock frame rate.
+      Object.assign(window, { __advanceCapture: (ticks: number) => {
+        for (let i = 0; i < Math.min(600, Math.max(0, ticks)); i++) this.stepMatch(1 / 60);
+        this.ballReadability.update(this.ballMesh, this.world.camera, this.world.renderer.domElement.clientHeight, true);
+        this.world.renderer.render(this.world.scene, this.world.camera);
+        const cp = this.sim?.controlled();
+        const b = this.sim!.state.ball;
+        const crowd5 = this.sim!.state.players.filter(p => !p.onBench && Math.hypot(p.x - b.x, p.z - b.z) < 5).length;
+        const ballNdc = new THREE.Vector3(b.x, b.y, b.z).project(this.world.camera);
+        const groundNdc = new THREE.Vector3(b.x, 0.15, b.z).project(this.world.camera);
+        const state = { view: this.broadcast.view,
+          cameraOutsideBroadcastSide: this.broadcast.mode !== 'broadcast' || this.broadcast.view !== 'broadcast' || this.world.camera.position.z >= FIELD.boundaryB + 8,
+          groundNdc: [groundNdc.x, groundNdc.y, groundNdc.z],
+          worldBall: [b.x, b.y, b.z], ballNdc: [ballNdc.x, ballNdc.y, ballNdc.z],
+          cameraPosition: this.world.camera.position.toArray(),
+          motion: this.motionProbe.snapshot(), team: this.sim!.teamDiagnostics,
+          motionLoaded: cp ? !!this.views.get(cp.id)?.motion : false,
+          clip: cp ? this.views.get(cp.id)?.motion?.state.currentClipId ?? null : null,
+          modelYaw: cp ? this.views.get(cp.id)?.root.rotation.y : null,
+          mode: this.broadcast.mode, tick: this.captureTick, seed: this.settings.seed, phase: this.sim!.state.phase,
+          ballMinorPixels: this.ballReadability.minorPixels,
+          heading: cp?.facing, velocity: cp ? [cp.vx, cp.vz] : null, crowd5,
+          camera: { ...this.broadcast.diagnostics }, sim: this.sim!.diagnostics };
+        console.log(`CAPTURE_STATE ${JSON.stringify(state)}`);
+        return state;
+      } });
+    }
+
     this.lastTime = performance.now();
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -166,6 +268,10 @@ class Game {
 
     $('btn-play').addEventListener('click', () => this.startMatch());
     $('btn-settings').addEventListener('click', () => this.menus.show('settings'));
+    // graphics quality applies live — next sync picks up the new distances
+    ($('sel-graphics') as HTMLSelectElement).addEventListener('change', (e) => {
+      this.lodQuality = pickLodQuality((e.target as HTMLSelectElement).value);
+    });
     $('btn-controls').addEventListener('click', () => this.menus.show('controls'));
     $('btn-settings-back').addEventListener('click', () => this.menus.show('title'));
     $('btn-controls-back').addEventListener('click', () => {
@@ -196,7 +302,8 @@ class Game {
     this.teams.away = { ...CLUBS[ai] };
     this.settings.difficulty = (($('sel-difficulty') as HTMLSelectElement).value as MatchSettings['difficulty']) ?? 'afl';
     this.settings.quarterSeconds = Number(( $('sel-quarters') as HTMLSelectElement).value) || 300;
-    this.settings.seed = (Math.random() * 1e9) | 0;
+    this.settings.seed = AB_MODE ? 0x5eed5eed : (Math.random() * 1e9) | 0;
+    this.lodQuality = pickLodQuality(($('sel-graphics') as HTMLSelectElement | null)?.value);
     this.audio.setEnabled(($('chk-sound') as HTMLInputElement).checked);
     this.audio.init();
     this.audio.resume();
@@ -208,7 +315,7 @@ class Game {
     for (const v of this.views.values()) {
       this.world.scene.remove(v.root);
     }
-    this.views = createPlayerViews(this.playerGltf!, this.sim.state, this.teams);
+    this.views = createPlayerViews(this.playerGltf!, this.sim.state, this.teams, this.motionAssets);
     for (const v of this.views.values()) this.world.scene.add(v.root);
 
     this.hud.show();
@@ -220,6 +327,8 @@ class Game {
     this.menus.hideAll();
     this.phase = 'playing';
     this.accum = 0;
+    this.captureTick = 0;
+    this.motionProbe = new MotionProbe();
     this.celebrationTimer = 0;
     this.redrawScoreboards();
   }
@@ -229,7 +338,7 @@ class Game {
   private startAttract(): void {
     for (const v of this.demoViews.values()) this.world.scene.remove(v.root);
     this.demoViews.clear();
-    const seed = (Math.random() * 1e9) | 0;
+    const seed = AB_MODE ? 0x5eed5eed : (Math.random() * 1e9) | 0;
     const sim = new MatchSim(
       { ...AFL_SETTINGS, quarterSeconds: 300, difficulty: 'afl', seed },
       'afl',
@@ -241,10 +350,11 @@ class Game {
     this.demoAccum = 0;
     this.demoTime = 0;
     this.menuCamT = 0;
-    this.demoViews = createPlayerViews(this.playerGltf!, sim.state, {
-      home: { ...CLUBS[0] },
-      away: { ...CLUBS[1] },
-    });
+    this.demoViews = createPlayerViews(
+      this.playerGltf!, sim.state,
+      { home: { ...CLUBS[0] }, away: { ...CLUBS[1] } },
+      this.motionAssets
+    );
     for (const v of this.demoViews.values()) this.world.scene.add(v.root);
   }
 
@@ -269,9 +379,13 @@ class Game {
     const CYCLE: Array<'broadcast' | 'aerial' | 'wing'> = ['broadcast', 'aerial', 'wing'];
     this.broadcast.view = CYCLE[Math.floor(this.menuCamT / 9) % CYCLE.length];
     const b = sim.state.ball;
-    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true);
+    syncPlayerViews(this.demoViews, sim.state, dt, false, -1, true, undefined, undefined, this.world.camera, LOD_DISTANCES[this.lodQuality]);
     this.ballMesh.position.set(b.x, b.y, b.z);
-    this.broadcast.update(dt, sim.state, b.x, b.z);
+    this.ballShadow.position.set(b.x, 0.022, b.z);
+    const air = Math.max(0, b.y - 0.11);
+    this.ballShadow.material.opacity = Math.max(0.06, 0.5 - air * 0.045);
+    this.ballShadow.scale.setScalar(1 + air * 0.08);
+    this.broadcast.update(dt, sim.state, null);
     this.world.update(dt, b);
     this.scoreboardTimer -= dt;
     if (this.scoreboardTimer <= 0) {
@@ -298,6 +412,15 @@ class Game {
         `${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
       );
     }
+    updateLedScorebug(
+      this.world.led,
+      teams.home.name,
+      teams.away.name,
+      scoreString(s.scores[0]),
+      scoreString(s.scores[1]),
+      s.clock.quarter,
+      `Q${s.clock.quarter} ${Math.floor(s.clock.secondsRemaining / 60)}:${String(Math.floor(s.clock.secondsRemaining % 60)).padStart(2, '0')}`
+    );
   }
 
   /** White ring that shrinks around whichever player control just moved to. */
@@ -460,11 +583,12 @@ class Game {
 
   private frame(now: number): void {
     requestAnimationFrame((t) => this.frame(t));
-    const dt = Math.min(0.1, (now - this.lastTime) / 1000);
+    const wallDt = Math.max(1e-4, (now - this.lastTime) / 1000);
+    const dt = AB_MATCH ? 1 / 30 : Math.min(0.1, wallDt);
     this.lastTime = now;
 
     if (this.phase === 'playing' && this.sim) {
-      this.stepMatch(dt);
+      if (!AB_MANUAL) this.stepMatch(dt);
     } else {
       // menu-like phase: controller/keyboard navigation for the visible screen
       this.updateMenuInput(this.input.poll(0));
@@ -473,7 +597,69 @@ class Game {
       this.stepAttract(dt);
     }
 
+    this.ballReadability.update(this.ballMesh, this.world.camera,
+      this.world.renderer.domElement.clientHeight, this.phase === 'playing' || this.phase === 'menu');
     this.world.renderer.render(this.world.scene, this.world.camera);
+    if (AB_MODE) Object.assign(window, { __captureReady: true });
+    if (AB_MODE) {
+      this.fpsEma += ((1 / wallDt) - this.fpsEma) * 0.05;
+      this.abFrameTimes.push(wallDt);
+      if (this.abFrameTimes.length > 240) this.abFrameTimes.shift();
+      // camera visibility: is the ball / your man inside the safe NDC box?
+      {
+        const camSim = this.sim ?? this.demoSim;
+        const camBall = camSim?.state.ball ?? null;
+        if (camBall && this.broadcast.mode !== 'celebration') {
+          const cam = this.world.camera;
+          const ndcOf = (x: number, y: number, z: number) => {
+            const v = new THREE.Vector3(x, y, z).project(cam);
+            return Number.isFinite(v.x) && Number.isFinite(v.y) && v.z >= -1 && v.z <= 1 ? v : null;
+          };
+          this.abCamFrames++;
+          const bn = ndcOf(camBall.x, Math.max(camBall.y, 0.15), camBall.z);
+          if (bn && Math.abs(bn.x) <= 0.78 && Math.abs(bn.y) <= 0.78) this.abCamBallIn++;
+          if (bn) this.abCamBallMax = Math.max(this.abCamBallMax, Math.abs(bn.x), Math.abs(bn.y));
+          if (this.phase === 'playing' && this.sim) {
+            const cp = this.sim.controlled();
+            if (cp) {
+              const pn = ndcOf(cp.x, 1.0 + (cp.y ?? 0), cp.z);
+              this.abCamPlayerFrames++;
+              if (pn && Math.abs(pn.x) <= 0.78 && Math.abs(pn.y) <= 0.78) this.abCamPlayerIn++;
+              if (pn) this.abCamPlayerMax = Math.max(this.abCamPlayerMax, Math.abs(pn.x), Math.abs(pn.y));
+            }
+          }
+        }
+        if (now - this.abCamLastLog > 2000 && this.abCamFrames > 0) {
+          const pct = (n: number, d: number) => ((100 * n) / Math.max(1, d)).toFixed(1);
+          console.log(
+            `AB_CAMSTAT frames=${this.abCamFrames} ball_in=${pct(this.abCamBallIn, this.abCamFrames)} ` +
+              `player_in=${this.abCamPlayerFrames > 0 ? pct(this.abCamPlayerIn, this.abCamPlayerFrames) : 'na'} ` +
+              `ball_max_ndc=${this.abCamBallMax.toFixed(2)} ` +
+              `player_max_ndc=${this.abCamPlayerFrames > 0 ? this.abCamPlayerMax.toFixed(2) : 'na'}`
+          );
+          this.abCamFrames = 0;
+          this.abCamBallIn = 0;
+          this.abCamPlayerIn = 0;
+          this.abCamPlayerFrames = 0;
+          this.abCamBallMax = 0;
+          this.abCamPlayerMax = 0;
+          this.abCamLastLog = now;
+          console.log(`AB_PLAY ${JSON.stringify({ tick: this.captureTick,
+            ballMinorPixels: +this.ballReadability.minorPixels.toFixed(2),
+            camera: this.broadcast.diagnostics, sim: this.sim?.diagnostics ?? null })}`);
+        }
+      }
+      if (now - this.abLastLog > 2000 && this.abFrameTimes.length >= 20) {
+        const info = this.world.renderer.info;
+        const sorted = [...this.abFrameTimes].sort((a, b) => a - b);
+        const pct = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] * 1000;
+        console.log(
+          `AB_STATS fps=${this.fpsEma.toFixed(1)} p50_ms=${pct(0.5).toFixed(1)} p95_ms=${pct(0.95).toFixed(1)} tris=${info.render.triangles} calls=${info.render.calls} textures=${info.memory.textures} geometries=${info.memory.geometries} lod=${this.lodQuality}`
+        );
+        this.abFrameTimes.length = 0;
+        this.abLastLog = now;
+      }
+    }
     this.audio.settle(dt);
   }
 
@@ -504,7 +690,7 @@ class Game {
         handball: first ? intent.handball : false,
         switchPlayer: first ? intent.switchPlayer : false,
       };
-      const events = sim.update(simDt, sub);
+      const events = sim.update(simDt, AB_MATCH ? captureIntent(this.captureTick++) : sub);
       this.handleEvents(events);
       this.accum -= simDt;
       first = false;
@@ -534,13 +720,35 @@ class Game {
     syncPlayerViews(
       this.views, sim.state, dt, this.celebrationTimer > 0, sim.controlledId, this.showMarkers,
       { mode: targetMode, handId: sim.handTargetId, kickId: sim.kickTargetId },
-      { id: this.switchFlashT > 0 ? this.switchFlashId : -1, remaining: this.switchFlashT }
+      { id: this.switchFlashT > 0 ? this.switchFlashId : -1, remaining: this.switchFlashT },
+      this.world.camera,
+      LOD_DISTANCES[this.lodQuality]
     );
+    if (AB_MATCH && controlled) {
+      const view = this.views.get(controlled.id);
+      if (view) {
+        view.root.updateMatrixWorld(true);
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(view.root.getWorldQuaternion(new THREE.Quaternion()));
+        const feet = ['foot_l', 'foot_r'].map((name, i) => {
+          const bone = view.root.getObjectByName(name);
+          if (!bone) return null;
+          const p = bone.getWorldPosition(new THREE.Vector3());
+          const contact = i === 0 ? view.motion?.footPlantedLeft : view.motion?.footPlantedRight;
+          return { x: p.x, y: p.y, z: p.z, contact: !!contact };
+        });
+        this.motionProbe.observe(controlled.id, { x: controlled.vx, z: controlled.vz }, forward,
+          feet.filter((f): f is NonNullable<typeof f> => f !== null), dt);
+      }
+    }
     this.updateOffscreenArrow(controlled);
 
     // ball mesh
     const b = sim.state.ball;
     this.ballMesh.position.set(b.x, b.y, b.z);
+    this.ballShadow.position.set(b.x, 0.022, b.z);
+    const air = Math.max(0, b.y - 0.11);
+    this.ballShadow.material.opacity = Math.max(0.06, 0.5 - air * 0.045);
+    this.ballShadow.scale.setScalar(1 + air * 0.08);
     if (b.mode === 'loose') {
       this.ballMesh.rotation.x += b.vy * dt * 1.2;
       this.ballMesh.rotation.z += b.vx * dt * 0.8;
@@ -549,8 +757,7 @@ class Game {
     this.broadcast.update(
       dt,
       sim.state,
-      controlled?.x ?? 0,
-      controlled?.z ?? 0
+      controlled ? { x: controlled.x, y: 1.0 + (controlled.y ?? 0), z: controlled.z } : null
     );
     this.world.update(dt, b);
 
@@ -587,6 +794,11 @@ class Game {
     }
   }
 
+  private playWhistle(long: boolean): void {
+    if (this.sim) this.sim.diagnostics.whistles++;
+    this.audio.whistle(long);
+  }
+
   private handleEvents(events: MatchEvent[]): void {
     const sim = this.sim!;
     for (const e of events) {
@@ -604,7 +816,7 @@ class Game {
         }
         case 'behind': {
           this.hud.callout('BEHIND', '', '#cfe3ff');
-          this.audio.whistle(false);
+          this.playWhistle(false);
           this.audio.cheer(0.25);
           this.redrawScoreboards();
           break;
@@ -619,12 +831,12 @@ class Game {
         case 'freeKick': {
           const text = FREE_KICK_TEXT[e.text ?? ''] ?? 'FREE KICK';
           this.hud.callout(text, e.team === 0 ? this.teams.home.name : this.teams.away.name);
-          this.audio.whistle(false);
+          this.playWhistle(false);
           break;
         }
         case 'fiftyMetres': {
           this.hud.callout('50m PENALTY!', '', '#ff9d2e');
-          this.audio.whistle(true);
+          this.playWhistle(true);
           break;
         }
         case 'tackle': {
@@ -651,7 +863,7 @@ class Game {
         case 'ballUp':
         case 'throwIn':
         case 'centreBallUp':
-          this.audio.whistle(false);
+          this.playWhistle(false);
           break;
         case 'kickIn':
           this.hud.callout('KICK-IN', '', '#cfe3ff');
@@ -662,7 +874,7 @@ class Game {
             e.type === 'outOnTheFull' ? 'OUT ON THE FULL' : 'LAST DISPOSAL',
             e.team === 0 ? this.teams.home.name : this.teams.away.name
           );
-          this.audio.whistle(false);
+          this.playWhistle(false);
           break;
         case 'quarterEnd': {
           const q = sim.state.clock.quarter;

@@ -26,7 +26,7 @@ if not exist "%RAYLIB_DIR%\include\raylib.h" (
 
 echo Using "%GCC%"  with raylib in "%RAYLIB_DIR%"
 "%GCC%" -std=c99 -O2 -DNDEBUG -Wall -Wextra ^
-    -I"%RAYLIB_DIR%\include" src\main.c src\game.c ^
+    -I"%RAYLIB_DIR%\include" src\main.c src\game.c src\motion_match.c src\motion_cache.c src\action_motion.c src\release_visual.c ..\shared\arena_motion\arena_motion.c ^
     -L"%RAYLIB_DIR%\lib" -lraylib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lm ^
     -static-libgcc -o gaelic_football.exe
 if errorlevel 1 (

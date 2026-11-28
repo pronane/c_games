@@ -1,3 +1,4 @@
+import { playerModelYaw } from '../sim/locomotion';
 /**
  * Players — the rigged, skinned, animated footballers from Gaelic_Football_3d
  * (`assets/gaelic_player.glb`, Sprite Forge squad, all nine appearance
@@ -9,6 +10,10 @@ import * as THREE from 'three';
 import { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 import { MatchState, PlayerState, TeamId } from '../rules/types';
+import { MotionBinding, type MotionAssets } from './motionBinding';
+import { basePartName, collectLodKits, pickLodLevel, setLodLevel, LOD_DISTANCES, type LodKit, type LodLevel } from './lod';
+import { ensureJerseyUvs } from './jerseyUvs';
+import { guernseyTexture } from './guernsey';
 
 export interface PlayerView {
   root: THREE.Group;
@@ -27,11 +32,19 @@ export interface PlayerView {
   flashRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   /** Always-on overhead marker for the controlled player — visible in a scrum. */
   chevron: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
+  /** Ground-hugging blob shadow (fades with jump height; counter-set in sync). */
+  shadow: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  /** Arena Motion Engine binding — null when baked assets failed to load (legacy path). */
+  motion: MotionBinding | null;
+  /** LOD kits for this clone — empty with the shipped asset (no _lodN nodes). */
+  lodKits: LodKit[];
+  /** Cached level so visibility is only flipped on change (-1 = force apply). */
+  lodLevel: LodLevel | -1;
 }
 
 export interface Teams {
-  home: { primary: string; secondary: string; name: string };
-  away: { primary: string; secondary: string; name: string };
+  home: { primary: string; secondary: string; name: string; pattern?: import('./guernsey').GuernseyPattern };
+  away: { primary: string; secondary: string; name: string; pattern?: import('./guernsey').GuernseyPattern };
 }
 
 export type PlayerAnim =
@@ -62,28 +75,23 @@ const ANIM_TIMESCALE: Record<string, number> = {
   walk: 0.9,
 };
 
-function luminance(hex: string): number {
-  const n = parseInt(hex.replace('#', ''), 16);
-  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-}
+let shadowTex: THREE.CanvasTexture | null = null;
 
-function numberTexture(number: number, primary: string): THREE.CanvasTexture {
+/** Soft radial blob used for contact shadows (one texture, shared by everyone). */
+function getShadowTexture(): THREE.CanvasTexture {
+  if (shadowTex) return shadowTex;
   const c = document.createElement('canvas');
   c.width = 128;
   c.height = 128;
   const g = c.getContext('2d')!;
-  g.fillStyle = primary;
+  const grad = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(0.62, 'rgba(0,0,0,0.28)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
   g.fillRect(0, 0, 128, 128);
-  const ink = luminance(primary) > 0.6 ? '#101010' : '#f5f5f5';
-  g.fillStyle = ink;
-  g.font = 'bold 92px system-ui, sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(String(number), 64, 68);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  shadowTex = new THREE.CanvasTexture(c);
+  return shadowTex;
 }
 
 function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: number): void {
@@ -92,13 +100,17 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
     if (!(obj instanceof THREE.Mesh)) return;
     const wasSingle = !Array.isArray(obj.material);
     const mats = (Array.isArray(obj.material) ? obj.material : [obj.material]) as THREE.MeshStandardMaterial[];
-    const meshName = (obj.name ?? '').toLowerCase();
+    const meshName = basePartName((obj.name ?? '').toLowerCase());
     const cloned = mats.map((m) => {
       const mat = m.clone();
       // The Gaelic GLB ships one shared 'kit' material; AFL club colours are
       // flat tints per kit piece, identified by the vN_* mesh names.
       if (meshName.endsWith('jersey')) {
-        mat.map = numberTexture(number, kit.primary);
+        // Kit garments ship without UVs — synthesise the chest/back number
+        // projection so the number texture can actually sample.
+        ensureJerseyUvs((obj as THREE.Mesh).geometry as THREE.BufferGeometry);
+        mat.map = guernseyTexture({ primary: kit.primary, secondary: kit.secondary,
+          pattern: kit.pattern ?? 'solid', number });
         mat.color = new THREE.Color(0xffffff);
       } else if (meshName.endsWith('shorts') || meshName.endsWith('socks')) {
         mat.color = new THREE.Color(kit.secondary);
@@ -124,7 +136,8 @@ function tintKits(root: THREE.Object3D, team: TeamId, teams: Teams, number: numb
 export function createPlayerViews(
   gltf: GLTF,
   state: MatchState,
-  teams: Teams
+  teams: Teams,
+  motionAssets: MotionAssets | null = null
 ): Map<number, PlayerView> {
   const views = new Map<number, PlayerView>();
   const clips = new Map<string, THREE.AnimationClip>();
@@ -146,10 +159,12 @@ export function createPlayerViews(
   for (const p of state.players) {
     const template = templates[p.id % templates.length];
     const root = skeletonClone(template) as THREE.Group;
+    const lodKits = collectLodKits(root);
+    if (lodKits.length) setLodLevel(lodKits, 0);
     tintKits(root, p.team, teams, p.number);
     root.scale.setScalar(1.0);
     root.position.set(p.x, 0, p.z);
-    root.rotation.y = -p.facing + Math.PI / 2;
+    root.rotation.y = playerModelYaw(p.facing);
 
     const mixer = new THREE.AnimationMixer(root);
     const actions = new Map<string, THREE.AnimationAction>();
@@ -165,6 +180,9 @@ export function createPlayerViews(
     }
     const idle = actions.get('idle');
     idle?.play();
+    const motion = motionAssets
+      ? new MotionBinding(mixer, gltf, motionAssets, p.id, p.facing)
+      : null;
 
     // ground ring: light-blue (home) / pink (away), yellow + pulse when controlled
     const ring = new THREE.Mesh(
@@ -229,6 +247,21 @@ export function createPlayerViews(
     chevron.visible = false;
     root.add(chevron);
 
+    // blob contact shadow — cheap, grounds the player at broadcast distance
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1.32, 20),
+      new THREE.MeshBasicMaterial({
+        map: getShadowTexture(),
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+      })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.02;
+    shadow.renderOrder = 1;
+    root.add(shadow);
+
     views.set(p.id, {
       root,
       mixer,
@@ -242,6 +275,10 @@ export function createPlayerViews(
       targetRing,
       flashRing,
       chevron,
+      shadow,
+      motion,
+      lodKits,
+      lodLevel: 0,
     });
   }
   return views;
@@ -260,6 +297,20 @@ export function playAnim(view: PlayerView, anim: PlayerAnim, fade = 0.18): void 
   next.play();
   if (prev && prev !== next) prev.crossFadeTo(next, fade, false);
   view.current = anim;
+}
+
+/** Gait intent for the motion engine (one-shot actions force their clip instead). */
+function pickIntent(p: PlayerState, celebrating: boolean, controlled: boolean): import('../motion').PlayerIntent {
+  void controlled;
+  if (celebrating) return 'celebrate';
+  const speed = Math.hypot(p.vx, p.vz);
+  return speed > 6.2 ? 'sprint' : 'move';
+}
+
+/** Ball context for clip matching. Loose balls read as 'None': the Approach rows are
+ * one-shot pickup wind-ups, not a gait, and must only fire from explicit events. */
+function pickBallState(p: PlayerState, ball: { holderId: number | null }): import('../motion/clipMeta').BallState {
+  return ball.holderId === p.id ? 'Possessed' : 'None';
 }
 
 /** Decide which clip a player should be showing right now. */
@@ -308,7 +359,9 @@ export function syncPlayerViews(
   controlledId: number | null = null,
   markersOn = true,
   targets: TargetRings = { mode: 'none', handId: -1, kickId: -1 },
-  flash: SwitchFlash = { id: -1, remaining: 0 }
+  flash: SwitchFlash = { id: -1, remaining: 0 },
+  camera?: THREE.Camera,
+  lodDistances: [number, number] = LOD_DISTANCES.high
 ): void {
   const now = performance.now() / 1000;
   for (const p of state.players) {
@@ -331,7 +384,7 @@ export function syncPlayerViews(
         view.ring.scale.setScalar(1 + 0.16 * Math.sin(now * 5));
       } else {
         view.ring.material.color.setHex(view.team === 0 ? 0x7fd0ff : 0xff8f8f);
-        view.ring.material.opacity = 0.6;
+        view.ring.material.opacity = 0.22;
         view.ring.scale.setScalar(1);
       }
     }
@@ -369,26 +422,52 @@ export function syncPlayerViews(
     }
 
     const b = state.ball;
-    // ball carrier animates with the ball; others react to movement
-    const anim = chooseAnim(p, view, b, false, celebrating);
-    if (
-      view.current !== 'kick' &&
-      view.current !== 'handball' &&
-      view.current !== 'tackle' &&
-      view.current !== 'mark_jump' &&
-      view.current !== 'hit_deck' ||
-      view.actions.get(view.current)?.isRunning() === false
-    ) {
-      playAnim(view, anim);
+    if (view.motion) {
+      // Arena Motion Engine path: engine selects clip + phase every frame.
+      const celebratingThis = celebrating && b.holderId === p.id;
+      const intent = pickIntent(p, celebratingThis, false);
+      view.motion.update(dt, p, pickBallState(p, b), intent, -1);
+    } else {
+      // Legacy path: hand-written anim names + crossfade.
+      const anim = chooseAnim(p, view, b, false, celebrating);
+      if (
+        view.current !== 'kick' &&
+        view.current !== 'handball' &&
+        view.current !== 'tackle' &&
+        view.current !== 'mark_jump' &&
+        view.current !== 'hit_deck' ||
+        view.actions.get(view.current)?.isRunning() === false
+      ) {
+        playAnim(view, anim);
+      }
     }
 
     view.root.position.set(p.x, p.y, p.z);
+    if (camera && view.lodKits.length) {
+      const dist = camera.position.distanceTo(view.root.position);
+      const level = pickLodLevel(dist, lodDistances);
+      if (level !== view.lodLevel) {
+        setLodLevel(view.lodKits, level);
+        view.lodLevel = level;
+      }
+    }
+    // shadow stays on the turf and fades as the player leaves it
+    const jump = Math.max(0, p.y);
+    view.shadow.position.y = 0.02 - p.y;
+    view.shadow.material.opacity = Math.max(0.09, 0.42 - jump * 0.24);
+    view.shadow.scale.setScalar(1 + jump * 0.35);
     // the model faces -Z in glTF; sim facing is radians where 0 = +x
-    view.root.rotation.y = -p.facing - Math.PI / 2;
+    view.root.rotation.y = playerModelYaw(p.facing);
     view.mixer.update(dt);
+    // Planted-foot IK (experimental, ?plantik=1) — re-solve legs post-pose.
+    view.motion?.plantIk(dt, view.root, Math.cos(p.facing), Math.sin(p.facing));
   }
 }
 
 export function triggerOneShot(view: PlayerView, anim: PlayerAnim): void {
+  if (view.motion) {
+    view.motion.forceOneShot(anim);
+    return;
+  }
   playAnim(view, anim, 0.08);
 }

@@ -16,6 +16,7 @@
 //   1.6 phase sync: on clip switch, start the new clip at the matching phase
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using ArenaFC.Core;
 using ArenaFC.Core.Animation;
@@ -179,8 +180,48 @@ public sealed partial class SoccerClipRig : Node3D
         SetArchetype(spec.Archetype);
         float s = _height > 0.01f ? spec.Height / _height : 1f;
         Scale = new Vector3(s, s, s);
+        ApplyBuild(spec);
         CacheBones();
         return true;
+    }
+
+    /// <summary>Body build (gap A7): the identities share one body, so the squad's builds came from height
+    /// alone.  Bulk (0.7..1.4) widens the chest and shoulders and thickens the upper arms - a uniform scale
+    /// on the bone with its inverse on the children, so heads and hands keep their size and nothing skews.
+    /// Clips animate rotations (and the hips' position) only, so the scale persists.</summary>
+    public void ApplyBuild(CharacterSpec spec)
+    {
+        if (Skel == null) return;
+        float bulk = Math.Clamp(spec.Bulk, .7f, 1.4f);
+        float chest = 1f + (bulk - 1f) * .22f;                       // .93 .. 1.09
+        float arm = 1f + (bulk - 1f) * .3f;
+        float shoulders = 1f + (spec.ShoulderWidth - 1f) * .25f;
+        void Set(string bone, float k)
+        {
+            int b = FindBoneLoose(Skel, bone);
+            if (b >= 0) Skel.SetBonePoseScale(b, new Vector3(k, k, k));
+        }
+        Set("Chest", chest * shoulders);
+        Set("Neck", 1f / (chest * shoulders));
+        foreach (var side in new[] { "L", "R" })
+        {
+            Set(side + "UpperArm", arm / (chest * shoulders));
+            Set(side + "Forearm", 1f / arm);
+        }
+    }
+
+    /// <summary>Bone by name, tolerating the "_2" suffixes Godot adds each time one GltfState generates
+    /// another scene (every player shares the parsed GLB).</summary>
+    public static int FindBoneLoose(Skeleton3D skel, string name)
+    {
+        int b = skel.FindBone(name);
+        if (b >= 0) return b;
+        for (int i = 0; i < skel.GetBoneCount(); i++)
+        {
+            string n = skel.GetBoneName(i);
+            if (n.StartsWith(name + "_") && n.Substring(name.Length).Replace("_2", "") == "") return i;
+        }
+        return -1;
     }
 
     private void LoadManifest()
@@ -214,6 +255,27 @@ public sealed partial class SoccerClipRig : Node3D
             }
             if (root.TryGetProperty("stats", out var stats) && stats.TryGetProperty("height_m", out var h))
                 _height = h.GetSingle();
+            if (_lodParts == null && root.TryGetProperty("lod", out var lod))
+            {
+                var parts = new Dictionary<string, int[]>();
+                if (lod.TryGetProperty("parts", out var lp))
+                    foreach (var q in lp.EnumerateObject())
+                    {
+                        var row = new List<int>();
+                        foreach (var x in q.Value.EnumerateArray()) row.Add(x.GetInt32());
+                        parts[q.Name] = row.ToArray();
+                    }
+                var dist = new Dictionary<string, float[]>();
+                if (lod.TryGetProperty("distances_m", out var dm))
+                    foreach (var q in dm.EnumerateObject())
+                    {
+                        var d = new List<float>();
+                        foreach (var x in q.Value.EnumerateArray()) d.Add(x.GetSingle());
+                        dist[q.Name] = d.ToArray();
+                    }
+                _lodDistances = dist;
+                _lodParts = parts;
+            }
         }
         catch (Exception) { /* fallback aliases above still cover the core actions */ }
     }
@@ -221,11 +283,54 @@ public sealed partial class SoccerClipRig : Node3D
     /// <summary>Which identity prefix ("v0_") a player shows: stable per character Id,
     /// so the same player always has the same face.</summary>
     public static string VariantFor(CharacterSpec spec, IReadOnlyList<string> prefixes)
+        => VariantFor(spec, prefixes, null);
+
+    /// <summary>The identity a player wears: deterministic from his name and number (the same face every
+    /// launch - the GUID Id changed each run), and, when the identities' skin tones are known, among the
+    /// three whose skin is closest to his SkinTone.</summary>
+    public static string VariantFor(CharacterSpec spec, IReadOnlyList<string> prefixes, IReadOnlyDictionary<string, float>? skinLum)
     {
         if (prefixes.Count == 0) return "";
         int h = 7;
-        foreach (char c in spec.Id ?? spec.Name ?? "") h = unchecked(h * 31 + c);
-        return prefixes[(int)((uint)h % (uint)prefixes.Count)];
+        foreach (char c in (spec.Name ?? "") + "#" + spec.Number) h = unchecked(h * 31 + c);
+        var pool = prefixes.ToList();
+        if (skinLum != null && skinLum.Count == prefixes.Count && prefixes.Count > 3)
+        {
+            var c = CharacterRig.C(spec.SkinHex);
+            float want = .2126f * c.R + .7152f * c.G + .0722f * c.B;
+            pool = prefixes.OrderBy(p => Math.Abs(skinLum[p] - want)).Take(3).OrderBy(p => p, StringComparer.Ordinal).ToList();
+        }
+        return pool[(int)((uint)h % (uint)pool.Count)];
+    }
+
+    // identity -> mean skin luminance (from its skin atlas), measured once
+    private static Dictionary<string, float>? _skinLum;
+
+    private Dictionary<string, float>? SkinLuminance(List<string> prefixes)
+    {
+        if (_skinLum != null && _skinLum.Count == prefixes.Count) return _skinLum;
+        var lum = new Dictionary<string, float>();
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (!n.EndsWith("_body") || n.Length < 4) continue;
+            var mat = mi.Mesh?.SurfaceGetMaterial(0) as BaseMaterial3D;
+            var img = mat?.AlbedoTexture?.GetImage();
+            if (img == null || img.IsEmpty()) continue;
+            if (img.IsCompressed()) img.Decompress();
+            img.Resize(32, 32, Image.Interpolation.Bilinear);
+            float sum = 0; int cnt = 0;
+            for (int y = 8; y < 24; y++)
+                for (int x = 8; x < 24; x++)
+                {
+                    var c = img.GetPixel(x, y);
+                    if (c.A < .5f) continue;
+                    sum += .2126f * c.R + .7152f * c.G + .0722f * c.B; cnt++;
+                }
+            if (cnt > 0) lum[n[..3]] = sum / cnt;
+        }
+        _skinLum = lum.Count == prefixes.Count ? lum : null;
+        return _skinLum;
     }
 
     /// <summary>Realistic GLB: show one identity per player (all ship in the file; hidden ones cost nothing).</summary>
@@ -238,14 +343,118 @@ public sealed partial class SoccerClipRig : Node3D
             if (n.Length > 3 && n[0] == 'v' && char.IsDigit(n[1]) && n[2] == '_' && !prefixes.Contains(n[..3])) prefixes.Add(n[..3]);
         }
         prefixes.Sort(StringComparer.Ordinal);
-        string pick = VariantFor(spec, prefixes);
+        string pick = VariantFor(spec, prefixes, SkinLuminance(prefixes));
         if (pick == "") return;
         foreach (var mi in _meshes)
         {
             string n = mi.Name.ToString();
-            if (n.Length > 3 && n[0] == 'v' && n[2] == '_') mi.Visible = n.StartsWith(pick);
+            if (n.Length > 3 && n[0] == 'v' && n[2] == '_')
+                mi.Visible = n.StartsWith(pick) && OptionalLayerShown(n, spec.IsKeeper, spec.IsKeeper || spec.LongSleeves, false);
         }
+        _pick = pick;
         foreach (var mi in _meshes) if (mi.Visible) { Mesh = mi; break; }
+        ApplyLods(pick);
+    }
+
+    // ---- Levels of detail (Sprite Forge skinlod v11.38, Tools/add_lods.py) ----
+    private static Dictionary<string, int[]>? _lodParts;
+    private static Dictionary<string, float[]>? _lodDistances;
+
+    /// <summary>Switch distances (m) for the current quality tier: full detail up close and in replays,
+    /// then about 45% and 20% of the triangles.</summary>
+    public static float[] LodDistances()
+    {
+        string tier = RenderProfile.Tier switch { RenderTier.Ultra => "ultra", RenderTier.High => "high", _ => "performance" };
+        if (_lodDistances != null && _lodDistances.TryGetValue(tier, out var d) && d.Length >= 2) return d;
+        return new[] { 16f, 36f };
+    }
+
+    /// <summary>Visibility ranges on the identity's meshes: each part's base mesh, its _lod1 and _lod2 nodes
+    /// hand over at the tier's distances (a part dropped from a level just ends there).</summary>
+    private void ApplyLods(string pick)
+    {
+        if (_lodParts == null || pick == "") return;
+        var dist = LodDistances();
+        float At(int level) => level <= 0 ? 0f : level - 1 < dist.Length ? dist[level - 1] : float.MaxValue;
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (!n.StartsWith(pick)) continue;
+            string rest = n[pick.Length..];
+            int level = 0;
+            int at = rest.LastIndexOf("_lod", StringComparison.Ordinal);
+            if (at > 0 && int.TryParse(rest[(at + 4)..], out int k)) { level = k; rest = rest[..at]; }
+            if (!_lodParts.TryGetValue(rest, out var row)) continue;
+            int next = -1;
+            for (int m = level + 1; m <= row.Length; m++) if (row[m - 1] != 0) { next = m; break; }
+            mi.VisibilityRangeBegin = At(level);
+            mi.VisibilityRangeBeginMargin = level > 0 ? 1.5f : 0f;
+            mi.VisibilityRangeEnd = next > 0 ? At(next) : 0f;          // 0 = no end
+            mi.VisibilityRangeEndMargin = next > 0 ? 1.5f : 0f;
+        }
+        if (!_lodLogged) { _lodLogged = true; GD.Print($"ARENA_FC_LOD tier={RenderProfile.Tier} switch={dist[0]}m/{dist[1]}m parts={_lodParts.Count}"); }
+    }
+    private static bool _lodLogged;
+
+    /// <summary>Optional garments (Sprite Forge tailor.keeper_garments / staff_garments): the long-sleeved base
+    /// layer, gloves and trousers ride along in every identity, hidden unless the role wears them.</summary>
+    private static bool OptionalLayerShown(string node, bool gloves, bool sleeves, bool trousers)
+        => node.Contains("_gloves") ? gloves : node.Contains("_sleeves") ? sleeves : !node.Contains("_trousers") || trousers;
+    private string _pick = "";
+
+    // ---- Touchline figures (Sprite Forge pitchside v11.39): a role's clothes and a looping clip ----
+    /// <summary>Show the identity's optional layers for a pitch-side role (base layer, trousers, gloves).</summary>
+    public void Wear(bool sleeves, bool trousers, bool gloves = false)
+    {
+        foreach (var mi in _meshes)
+        {
+            string n = mi.Name.ToString();
+            if (_pick == "" || !n.StartsWith(_pick)) continue;
+            if (n.Contains("_sleeves") || n.Contains("_trousers") || n.Contains("_gloves"))
+                mi.Visible = OptionalLayerShown(n, gloves, sleeves, trousers);
+        }
+    }
+
+    /// <summary>Recolour one non-kit layer of this player (e.g. a sub's sleeves in the team colour under his bib).</summary>
+    public void SetLayerColor(string layer, Color c)
+    {
+        foreach (var mi in _meshes)
+        {
+            if (mi.Mesh == null) continue;
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+                if (mi.GetSurfaceOverrideMaterial(i) is StandardMaterial3D m && m.ResourceName == layer) m.AlbedoColor = c;
+        }
+    }
+
+    /// <summary>Play a looping clip from `phase` (0..1) at `speed`; no locomotion, no match state.</summary>
+    public void PlayLoop(string clip, float phase, float speed = 1f)
+    {
+        if (Player == null || !Player.HasAnimation(clip)) return;
+        var anim = Player.GetAnimation(clip);
+        anim.LoopMode = Animation.LoopModeEnum.Linear;
+        Player.Play(clip, .3f);
+        Player.Seek(phase * anim.Length, true);
+        Player.SpeedScale = speed;
+        _current = clip;
+    }
+
+    /// <summary>Play a one-shot clip once; -> its length in seconds (0 when missing).</summary>
+    public float PlayOnce(string clip)
+    {
+        if (Player == null || !Player.HasAnimation(clip)) return 0f;
+        Player.Play(clip, .15f);
+        Player.Seek(0, true);
+        Player.SpeedScale = 1f;
+        _current = clip;
+        return (float)Player.GetAnimation(clip).Length;
+    }
+
+    /// <summary>World position of the hips (for sitting a figure on a seat).</summary>
+    public Vector3 HipsWorld()
+    {
+        if (Skel == null) return Vector3.Zero;
+        int b = FindBoneLoose(Skel, "Hips");
+        return b < 0 ? Vector3.Zero : (Skel.GlobalTransform * Skel.GetBoneGlobalPose(b)).Origin;
     }
 
     /// <summary>Club / character colour for a material name, or null to keep it as authored:
@@ -261,6 +470,9 @@ public sealed partial class SoccerClipRig : Node3D
             case "boots": return spec.BootsColor;
             case "hair": case "beard_shell": case "facial_hair": return spec.HairColor;
             case "skin": return spec.SkinHex;
+            case "sleeves": return spec.KitPrimary;      // keeper base layer in the shirt colour
+            case "trousers": return spec.ShortsColor;    // staff trousers (pitch-side roles)
+            case "gloves": return spec.GlovesColor;
         }
         if (layer.StartsWith("hair_") || layer.StartsWith("eyebrows_") || layer.StartsWith("eyelashes_")) return spec.HairColor;
         return null;
@@ -341,6 +553,9 @@ public sealed partial class SoccerClipRig : Node3D
         m.SetShaderParameter("name_chars", glyphs);
         m.SetShaderParameter("name_len", len);
         m.SetShaderParameter("wet", wet);
+        uint seed = (uint)spec.Number * 31u;
+        foreach (char ch in spec.DisplayName ?? "") seed = seed * 131u + ch;
+        m.SetShaderParameter("flutter_seed", seed % 1000u / 1000f);
         return m;
     }
 
@@ -369,6 +584,17 @@ public sealed partial class SoccerClipRig : Node3D
     private static float Lum(Color c) => .2126f * c.R + .7152f * c.G + .0722f * c.B;
 
     private ShaderMaterial? _kit;
+    private float _flutter, _flutterSent = -1f;
+
+    /// <summary>Sleeve and shorts hems ripple with the player's speed (kit.gdshader, tailor flutter weights).</summary>
+    private void UpdateFlutter(float speed, float dt)
+    {
+        if (_kit == null) return;
+        _flutter += (Math.Clamp(speed / 8f, 0f, 1f) - _flutter) * Math.Min(1f, dt * 3f);
+        if (Math.Abs(_flutter - _flutterSent) < .03f) return;
+        _flutterSent = _flutter;
+        _kit.SetShaderParameter("flutter_speed", _flutter);
+    }
     /// <summary>The live kit material (weather / dirt are set on it during a match).</summary>
     public ShaderMaterial? KitShader => _kit;
 
@@ -392,6 +618,7 @@ public sealed partial class SoccerClipRig : Node3D
                 }
                 if (src is not StandardMaterial3D std) continue;
                 if (layer == "" && _materialOrder.Count > i) layer = _materialOrder[i];   // older sculpt GLBs
+                if (CloseUpShading(mi, i, std, layer, TintHexFor(layer, spec))) continue;
                 string? hex = TintHexFor(layer, spec);
                 if (hex == null) continue;
                 var mat = (StandardMaterial3D)std.Duplicate();
@@ -407,6 +634,86 @@ public sealed partial class SoccerClipRig : Node3D
             }
         }
     }
+
+    // ---- Close-up shading (Sprite Forge sforge.skinshade v11.36) ----------------------------------------
+    private static Texture2D? _skinDetailN, _skinDetailR;
+    private static readonly Dictionary<string, StandardMaterial3D> _shaded = new();
+
+    /// <summary>Skin, hair, eyes, lashes and beards of the realistic identities: pore detail and subsurface
+    /// scattering on skin, anisotropic alpha-to-coverage hair, a wet catch-light in the eyes.  Shared per
+    /// source material (identities are reused across the squad).  Subsurface / anisotropy / clearcoat
+    /// need Forward+; on the GL renderer the same materials just stay simpler.</summary>
+    private static bool CloseUpShading(MeshInstance3D mi, int surface, StandardMaterial3D std, string layer, string? tint)
+    {
+        string kind = layer.StartsWith("skin_") ? "skin" : layer.StartsWith("hair_") ? "hair"
+            : layer.StartsWith("eyes_") ? "eyes" : layer.StartsWith("eyelashes") ? "lashes"
+            : layer is "beard_shell" or "facial_hair" || layer.StartsWith("eyebrows") ? "beard" : "";
+        if (kind == "") return false;
+        // shared per source material and tint (hair cards are grey, coloured with each player's hair colour)
+        string key = std.GetInstanceId() + "|" + (tint ?? "");
+        if (!_shaded.TryGetValue(key, out var mat))
+        {
+            mat = (StandardMaterial3D)std.Duplicate();
+            if (tint != null) mat.AlbedoColor = CharacterRig.C(tint);
+            bool fp = RenderProfile.ForwardPlus;
+            switch (kind)
+            {
+                case "skin":
+                    mat.Roughness = .52f;
+                    mat.MetallicSpecular = .35f;
+                    mat.RimEnabled = true; mat.Rim = .18f; mat.RimTint = .5f;
+                    _skinDetailN ??= LoadTex("res://Data/textures/skin/skin_detail_normal.png");
+                    if (_skinDetailN != null)
+                    {
+                        // pores: a 4 cm tile projected triplanar in the body's own space (UV2), independent
+                        // of the 1-2k colour atlas on UV1
+                        mat.DetailEnabled = true;
+                        mat.DetailNormal = _skinDetailN;
+                        mat.DetailUVLayer = BaseMaterial3D.DetailUV.UV2;
+                        mat.UV2Triplanar = true;
+                        mat.UV2Scale = new Vector3(25f, 25f, 25f);
+                        // the detail layer is a normal map only: multiply leaves the colour atlas untouched
+                        mat.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mul;
+                    }
+                    if (fp && RenderProfile.Tier >= RenderTier.High)
+                    {
+                        mat.SubsurfScatterEnabled = true;
+                        mat.SubsurfScatterStrength = .28f;
+                        mat.SubsurfScatterSkinMode = true;
+                    }
+                    break;
+                case "hair":
+                case "beard":
+                    mat.Roughness = kind == "hair" ? .38f : .55f;
+                    mat.MetallicSpecular = .5f;
+                    mat.Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor;
+                    mat.AlphaScissorThreshold = kind == "hair" ? .45f : .35f;
+                    mat.AlphaAntialiasingMode = BaseMaterial3D.AlphaAntiAliasing.AlphaToCoverage;
+                    mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                    if (fp) { mat.AnisotropyEnabled = true; mat.Anisotropy = kind == "hair" ? .6f : .3f; }
+                    break;
+                case "eyes":
+                    // MakeHuman's brown irises are red-brown; the broadcast grade pushed them to red
+                    mat.AlbedoColor = new Color(.84f, .9f, 1f);
+                    mat.Roughness = .05f;
+                    mat.MetallicSpecular = .8f;
+                    if (fp) { mat.ClearcoatEnabled = true; mat.Clearcoat = 1f; mat.ClearcoatRoughness = .02f; }
+                    break;
+                case "lashes":
+                    mat.Roughness = .6f;
+                    mat.Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor;
+                    mat.AlphaScissorThreshold = .4f;
+                    mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                    break;
+            }
+            _shaded[key] = mat;
+        }
+        mi.SetSurfaceOverrideMaterial(surface, mat);
+        return true;
+    }
+
+    private static Texture2D? LoadTex(string path)
+        => ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
 
     /// <summary>Set the player's movement archetype (Phase 1.3).</summary>
     public void SetArchetype(Archetype archetype)
@@ -537,6 +844,7 @@ public sealed partial class SoccerClipRig : Node3D
         else _phase = (_phase + dt * Player.SpeedScale / clipLen) % 1f;
 
         UpdateLean(p, dt, speed);
+        UpdateFlutter(speed, dt);
         UpdateLookAt(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateReach(worldPos, yaw, hasBall ? worldPos + Vector3.Forward * .4f : Vector3.Zero);
         UpdateFootIk(worldPos, yaw);

@@ -32,6 +32,7 @@ public partial class MatchView : Node3D
     public CharacterRig[] Rigs = Array.Empty<CharacterRig>();
     /// <summary>Referee, assistants and fourth official (presentation only; not in State.Players).</summary>
     public OfficialsView? Officials;
+    public PitchsideView? Pitchside;
     public MeshInstance3D Ball = null!, BallShadow = null!, Cursor = null!, BallRing = null!, OwnerRing = null!,
                           ControlArrow = null!, OwnerArrow = null!, PressureRing = null!;
     /// <summary>Billboarded, always-visible nameplates for the controlled player,
@@ -205,6 +206,13 @@ public partial class MatchView : Node3D
             Officials = new OfficialsView();
             AddChild(Officials);
             Officials.Init(Engine);
+            // the touchline: benches, managers, ball kids, photographers (Sprite Forge sforge.pitchside, v11.38)
+            if (stadium.GroundPreset != "")
+            {
+                Pitchside = new PitchsideView();
+                AddChild(Pitchside);
+                Pitchside.Init(Engine, _opts, stadium.GroundPreset);
+            }
         }
 
         Ball = BallFactory.Create();
@@ -507,6 +515,9 @@ public partial class MatchView : Node3D
             {
                 var stadium = GetNodeOrNull<Stadium>("Stadium");
                 stadium?.CelebrateCrowd(5f);
+                var bp = Engine.State.Ball.Pos;
+                stadium?.NetImpact(new Vector3(bp.X, bp.Y, bp.Z), new Vector3(Engine.State.Ball.Vel.X, Engine.State.Ball.Vel.Y, Engine.State.Ball.Vel.Z));
+                Pitchside?.OnGoal(evt.Side);
                 // Update commentary context with score.
                 _commentaryCtx.HomeScore = Engine.State.Score[0];
                 _commentaryCtx.AwayScore = Engine.State.Score[1];
@@ -571,6 +582,7 @@ public partial class MatchView : Node3D
             float dirt = Math.Clamp(played * .35f + _grime[i] * .55f + wet * .2f, 0f, .9f);
             kit.SetShaderParameter("wet", wet);
             kit.SetShaderParameter("dirt", dirt);
+            kit.SetShaderParameter("wind", Math.Clamp(_opts.WindSpeed / 14f, 0f, 1f));
         }
     }
     private float[] _grime = new float[64];
