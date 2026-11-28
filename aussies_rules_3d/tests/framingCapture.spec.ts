@@ -37,3 +37,34 @@ describe('capture visibility gate', () => {
     expect(check(sample().replace('0.70', '0.90').repeat(2)).status).toBe(1);
   });
 });
+
+it('allows distant selection only with explicit ball-first camera policy', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'camera-policy-'));
+  try {
+    const file = join(dir, 'console.log');
+    writeFileSync(file, sample('100.0', '50.0').repeat(2));
+    const run = (flags: string[]) => spawnSync(process.execPath,
+      ['tools/check_framing.mjs', '--require-player', ...flags, file], { encoding: 'utf8' });
+    expect(run([]).status).toBe(1);
+    expect(run(['--allow-distant-player']).status).toBe(0);
+    writeFileSync(file, sample('100.0', 'na').repeat(2));
+    expect(run(['--allow-distant-player']).status).toBe(1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+it('publishes scripted capture measurements as API-readable annotations and rejects missing ticks', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capture-review-'));
+  try {
+    for (let i = 0; i < 12; i++) writeFileSync(join(dir, `state-${String(i).padStart(3, '0')}.json`), JSON.stringify({
+      tick: (i + 1) * 30, mode: 'broadcast', ballNdc: [0, 0, 0.9], groundNdc: [0, 0, 0.9], ballMinorPixels: 6,
+      crowd5: 3, camera: { emergencyCorrections: 0 }, sim: { frees: 1 },
+      motionLoaded: true, motion: { samples: (i + 1) * 30, maxBackwardsSeconds: 0 },
+    }));
+    const run = () => spawnSync(process.execPath, ['tools/capture_review.mjs', dir], { encoding: 'utf8' });
+    const result = run();
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('::notice title=Scripted gameplay measurements::');
+    writeFileSync(join(dir, 'state-011.json'), JSON.stringify({ tick: 999, mode: 'broadcast', ballNdc: [0, 0, 0.9], ballMinorPixels: 6, crowd5: 3 }));
+    expect(run().status).toBe(1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

@@ -40,7 +40,7 @@ MANIFEST = os.path.join(ARENA, "Data", "clips", "clip_manifest.json")
 PREFIX = "ss_"
 LICENCE = dict(spdx="CC-BY-4.0", custom_text="Creative Commons Attribution 4.0 International",
                author="Ian Mason, Sebastian Starke, Taku Komura (100STYLE)",
-               source_url="https://www.ianxmason.com/100style/", redistribution="yes",
+               source_url="https://www.ianxmason.com/100style/", redistribution="yes", ml_training="yes",  # v11.40: CC BY 4.0
                attribution="The 100STYLE Dataset - Ian Mason",
                notes="Retargeted onto the Arena FC skeleton; loops cut from the dataset's Frame_Cuts spans.")
 

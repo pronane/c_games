@@ -15,12 +15,14 @@ def _lic_args(p):
     g.add_argument("--author"); g.add_argument("--source-url", dest="source_url")
     g.add_argument("--redistribution", choices=list(L.REDIST), help="may this asset be shared in a pack? yes / no / unknown")
     g.add_argument("--attribution", help="credit line required by the licence")
+    g.add_argument("--ml-training", dest="ml_training", choices=list(L.ML_TRAINING),
+                   help="may machine-learning models be trained on it? yes / no / unknown (v11.40; Mixamo: no)")
     g.add_argument("--notes")
 
 
 def _lic_from(a, base=None):
     lic = dict(base or L.blank_licence())
-    for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes"):
+    for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes", "ml_training"):
         v = getattr(a, k, None)
         if v is not None:
             lic[k] = v
@@ -28,6 +30,16 @@ def _lic_from(a, base=None):
 
 
 def _print_entry(e):
+    if e["kind"] == "models":
+        print("  %-22s model     %-15s v%-3s %-7s ml_training=%s  [%s, redistribute=%s]%s" % (
+            e["name"], e.get("task"), e.get("version"), "stored" if e.get("stored") else "url", e["licence"].get("ml_training"),
+            e["licence"]["spdx"] or "?", e["licence"]["redistribution"], ("  PROBLEMS: " + "; ".join(e["problems"])) if e["problems"] else ""))
+        return
+    if e["kind"] == "environments":
+        print("  %-22s env       %-12s %s  [%s, redistribute=%s]%s" % (
+            e["name"], e.get("sport"), "+".join(e.get("parts", [])), e["licence"]["spdx"] or "?", e["licence"]["redistribution"],
+            ("  PROBLEMS: " + "; ".join(e["problems"])) if e["problems"] else ""))
+        return
     if e["kind"] == "kits":
         print("  %-22s kit  %s  [%s, redistribute=%s]" % (e["name"], ", ".join(e["materials"])[:40], e["licence"]["spdx"] or "?", e["licence"]["redistribution"]))
         return
@@ -80,6 +92,22 @@ def main(argv):
     ve = sub.add_parser("verify", help="check a .sfpack: checksums, safe paths, licence records"); ve.add_argument("pack")
     cd = sub.add_parser("clips-drop", help="delete clips from an asset (also clears their licence 'includes' entries)")
     cd.add_argument("name"); cd.add_argument("clips", help="comma list, or 'from:SOURCE' = every clip saved from SOURCE")
+    mo = sub.add_parser("models", help="v11.41: ML models as library assets (detector, pose, lifter, motion matching)")
+    mo.add_argument("action", choices=["list", "import-registry", "add", "latest"])
+    mo.add_argument("--name"); mo.add_argument("--file", action="append", default=[], help="weights / config files to store")
+    mo.add_argument("--task", choices=["detector", "pose2d", "pose3d", "lifter", "motion_matching", "motion_generator",
+                                       "classifier", "other"])
+    mo.add_argument("--version", type=int); mo.add_argument("--url", default=""); mo.add_argument("--role", default="")
+    mo.add_argument("--trained-on", dest="trained_on", action="append", default=[], metavar="FOLDER_OR_DATASET=ml_training",
+                    help="dataset it was trained on and that data's ml_training (repeat); marks the model trained here")
+    mo.add_argument("--overwrite", action="store_true")
+    _lic_args(mo)
+    en = sub.add_parser("environments", aliases=["envs"], help="v11.41: grounds (stadium, turf, crowd, boards, goals, touchline)")
+    en.add_argument("action", choices=["list", "seed", "build", "add"])
+    en.add_argument("--name"); en.add_argument("--out", help="build: output folder (default build/env_<name>)")
+    en.add_argument("--from", dest="base", help="add: start from this preset or library environment")
+    en.add_argument("--set", action="append", default=[], metavar="PART.KEY=VALUE", help="add: e.g. crowd.fill=0.4 pitch.mow=rings")
+    en.add_argument("--overwrite", action="store_true")
     th = sub.add_parser("thumb", help="re-render an asset's thumbnail"); th.add_argument("name"); th.add_argument("--clip"); th.add_argument("--kit")
     a = p.parse_args(argv)
     lib = L.Library(a.library)
@@ -101,6 +129,10 @@ def _run(a, lib, p):
         if not man["assets"]:
             print("  (empty) - forge.py library add FILE.fbx | install packs/sfs_starter_cc0.sfpack")
         return 0
+    if a.act == "models":
+        return _models(a, lib)
+    if a.act in ("environments", "envs"):
+        return _envs(a, lib)
     if a.act == "scan":
         man, imp = lib.scan()
         print("library.json: %d assets%s" % (len(man["assets"]), (" (imported from inbox: %s)" % ", ".join(n for _, n in imp)) if imp else ""))
@@ -134,7 +166,7 @@ def _run(a, lib, p):
         k, n = lib.remove(a.name); print("removed %s/%s (your original source file is untouched)" % (k, n)); return 0
     if a.act in ("licence", "license"):
         lic = lib.licence(a.name)
-        if any(getattr(a, k) is not None for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes")):
+        if any(getattr(a, k) is not None for k in ("spdx", "custom_text", "author", "source_url", "redistribution", "attribution", "notes", "ml_training")):
             lic = _lic_from(a, lic); lib.set_licence(a.name, lic); lib.scan(import_inbox=False)
         print(L.licence_text(lic, a.name))
         probs = L.validate_licence(lic)
@@ -313,4 +345,71 @@ def retarget_main(argv):
                 print("note: %s/%s now contains clips from a source that may not be redistributed -> it stays local (%s)" % (k, n, why))
         lib.scan(import_inbox=False)
         print("saved %d clips into %s/%s" % (len(names), k, n))
+    return 0
+
+
+def _models(a, lib):
+    from . import modellib as MDL
+    if a.action == "import-registry":
+        for n, probs in MDL.import_registry(lib, overwrite=a.overwrite):
+            print("  %-22s %s" % (n, "; ".join(probs) or "added"))
+        lib.scan(import_inbox=False); return 0
+    if a.action == "latest":
+        n, m = MDL.latest(lib, a.task or "lifter")
+        print(n or "no %s model in the library" % (a.task or "lifter")); return 0 if n else 1
+    if a.action == "add":
+        if not (a.name and a.task):
+            print("error: models add needs --name and --task"); return 2
+        meta = MDL.blank_model(a.name, a.task, a.version or MDL.version_of(a.name))
+        meta.update(url=a.url, role=a.role, title=a.name)
+        if a.trained_on:
+            meta["trained_here"] = True
+            for t in a.trained_on:
+                ds, _, v = t.partition("=")
+                meta["trained_on"].append(dict(dataset=ds, ml_training=v or "unknown"))
+        d, probs = lib.add_model(a.name, meta, _lic_from(a), a.file)
+        print("added models/%s%s" % (os.path.basename(d), ("  PROBLEMS: " + "; ".join(probs)) if probs else ""))
+        return 1 if probs else 0
+    for e in lib.manifest()["assets"]:
+        if e["kind"] == "models":
+            _print_entry(e)
+    return 0
+
+
+def _envs(a, lib):
+    import copy
+    from . import environments as E
+    if a.action == "seed":
+        added = E.seed_presets(lib, overwrite=a.overwrite); lib.scan(import_inbox=False)
+        print("added: %s" % (", ".join(added) or "nothing (already there; --overwrite to replace)")); return 0
+    if a.action == "add":
+        if not a.name:
+            print("error: environments add needs --name"); return 2
+        base = a.base or "soccer_bowl"
+        r = copy.deepcopy(E.PRESETS[base] if base in E.PRESETS else E.load(lib, base))
+        for kv in a.set:
+            key, _, v = kv.partition("=")
+            part, _, field = key.partition(".")
+            try:
+                v = json.loads(v)
+            except ValueError:
+                pass
+            if not field:
+                r[part] = v
+            else:
+                r[part] = dict(r.get(part) or {}); r[part][field] = v
+        d, probs = lib.add_environment(a.name, r)
+        print("added environments/%s%s" % (os.path.basename(d), ("  PROBLEMS: " + "; ".join(probs)) if probs else ""))
+        return 1 if probs else 0
+    if a.action == "build":
+        if not a.name:
+            print("error: environments build needs --name"); return 2
+        r = E.load(lib, a.name) if a.name in lib.names("environments") else E.PRESETS[a.name]
+        files = E.build(r, a.out or os.path.join("build", "env_" + a.name))
+        for k, v in files.items():
+            print("  %-16s %s" % (k, v))
+        return 0
+    for e in lib.manifest()["assets"]:
+        if e["kind"] == "environments":
+            _print_entry(e)
     return 0

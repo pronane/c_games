@@ -30,9 +30,13 @@ import sys
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KINDS = ("rigs", "animations", "kits", "outfits", "props")
+KINDS = ("rigs", "animations", "kits", "outfits", "props", "models", "environments")
+# v11.41: kinds whose folder holds a description file instead of rig.json (sforge.modellib, sforge.environments)
+META_FILES = {"models": "model.json", "environments": "environment.json"}
+RIG_KINDS = ("rigs", "animations", "outfits", "props")
 KIND_ALIASES = {"rig": "rigs", "animation": "animations", "anim": "animations", "kit": "kits", "outfit": "outfits",
-                "prop": "props", "armour": "outfits", "armor": "outfits", "clothing": "outfits"}
+                "prop": "props", "model": "models", "environment": "environments", "env": "environments",
+                "armour": "outfits", "armor": "outfits", "clothing": "outfits"}
 SOCKETS = ("hand_r", "hand_l", "head", "back", "hip", "foot_r", "foot_l")
 # v7 licence presets (library add --preset ...): pre-filled records the user can still edit
 MESHY_ANIM_WHY = ("Meshy animation-library clips are Meshy 'Service Assets', licensed only as incorporated into your "
@@ -40,21 +44,25 @@ MESHY_ANIM_WHY = ("Meshy animation-library clips are Meshy 'Service Assets', lic
 LICENCE_PRESETS = {
     "meshy-free": dict(spdx="CC-BY-4.0", custom_text="", author="Meshy (free plan output, licensed CC BY 4.0)",
                        source_url="https://www.meshy.ai", redistribution="yes",
-                       attribution="Model created with Meshy \u2013 CC BY 4.0 License",
+                       attribution="Model created with Meshy \u2013 CC BY 4.0 License", ml_training="yes",
                        notes="Meshy free plan: Meshy owns the output and licenses it under CC BY 4.0 (commercial use OK with "
                              "credit). Terms: https://www.meshy.ai/terms-of-use 3.2; help.meshy.ai ownership article."),
     "meshy-paid": dict(spdx="LicenseRef-Proprietary", custom_text="Meshy paid-plan output: privately owned by the user who generated it "
                        "(Meshy Terms of Use 3.2), provided the inputs did not infringe anyone's copyright.", author="",
-                       source_url="https://www.meshy.ai", redistribution="no", attribution="",
+                       source_url="https://www.meshy.ai", redistribution="no", attribution="", ml_training="yes",
                        notes="Default redistribution NO: it is your private asset - flip to yes if you want to share it "
                              "(library licence NAME --redistribution yes). Meshy asks paid users who want to keep ownership not to "
                              "publish the model to the Meshy Community."),
     "makehuman": dict(spdx="CC0-1.0", custom_text="", author="MakeHuman base assets (CC0) + your parameters",
-                      source_url="http://www.makehumancommunity.org", redistribution="yes", attribution="",
+                      source_url="http://www.makehumancommunity.org", redistribution="yes", attribution="", ml_training="yes",
                       notes="MakeHuman assets (base mesh, targets, default skeleton + weights) are CC0 1.0; exports are the "
                             "user's own data. MakeHuman program code is AGPL-3.0 and is NOT included or used here."),
 }
 REDIST = ("yes", "no", "unknown")
+# v11.40: may machine-learning models (learned motion matching, motion generators) be trained on the asset?
+# Separate from redistribution: Mixamo may ship inside a game but Adobe forbids training on it; a free pack
+# whose terms are silent is "unknown", and training leaves unknown out (see sforge.motiontags.training_allowed).
+ML_TRAINING = ("yes", "no", "unknown")
 SPDX_COMMON = ["CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "MIT", "Apache-2.0", "LicenseRef-Proprietary",
                "LicenseRef-Mixamo-Terms", "LicenseRef-Store-EULA", "custom"]
 OVERRIDE_STATEMENT = "I own the rights to this asset (or have permission) and may redistribute it in a pack."
@@ -83,8 +91,9 @@ def slug(s):
 
 
 # ----------------------------------------------------------------- licences
-def blank_licence(redistribution="unknown"):
-    return dict(spdx="", custom_text="", author="", source_url="", redistribution=redistribution, attribution="", notes="")
+def blank_licence(redistribution="unknown", ml_training="unknown"):
+    return dict(spdx="", custom_text="", author="", source_url="", redistribution=redistribution, attribution="", notes="",
+                ml_training=ml_training)
 
 
 def validate_licence(lic):
@@ -101,6 +110,8 @@ def validate_licence(lic):
         p.append("spdx 'custom' needs custom_text")
     if lic.get("redistribution") not in REDIST:
         p.append("redistribution must be yes / no / unknown")
+    if "ml_training" in lic and lic["ml_training"] not in ML_TRAINING:  # v11.40 (older records may omit it)
+        p.append("ml_training must be yes / no / unknown")
     if not lic.get("author"):
         p.append("author is empty")
     return p
@@ -129,6 +140,8 @@ def licence_text(lic, name=""):
     if lic.get("source_url"):
         out.append("  source       : %s" % lic["source_url"])
     out.append("  redistribute : %s" % lic.get("redistribution", "unknown"))
+    from .motiontags import training_allowed
+    out.append("  ML training  : %s%s" % (training_allowed(lic), "" if "ml_training" in lic else " (read from the licence)"))
     if lic.get("attribution"):
         out.append("  attribution  : %s" % lic["attribution"])
     ov = lic.get("rights_override")
@@ -196,7 +209,8 @@ class Library:
             return []
         if kind == "kits":
             return sorted(os.path.splitext(f)[0] for f in os.listdir(d) if f.endswith(".json"))
-        return sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f, "rig.json")))
+        mf = META_FILES.get(kind, "rig.json")
+        return sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f, mf)))
 
     def find(self, name):
         """-> (kind, name) for 'name' or 'rigs/name' / 'animations/name' / 'kits/name'."""
@@ -217,8 +231,8 @@ class Library:
     def load_rig(self, name):
         from .rigrec import Rig
         k, n = self.find(name)
-        if k == "kits":
-            raise KeyError("'%s' is a kit, not a rig" % name)
+        if k not in RIG_KINDS:
+            raise KeyError("'%s' is a %s, not a rig" % (name, k[:-1]))
         return Rig.load(self.path(k, n))
 
     def bonemap(self, name, rig=None):
@@ -358,6 +372,8 @@ class Library:
                         materials=list(kit.get("materials", {})), licence=dict(spdx=lic.get("spdx"), redistribution=lic.get("redistribution")),
                         licence_ok=not validate_licence(lic))
         d = self.path(k, n)
+        if k in META_FILES:
+            return self._meta_entry(k, n, d)
         meta = json.load(open(os.path.join(d, "rig.json"), encoding="utf-8"))
         lic = self.licence("%s/%s" % (k, n))
         bm = {}
@@ -370,6 +386,41 @@ class Library:
                                  owner_confirmed=bool(lic.get("rights_override")), redistributable=redistributable(lic)[0]),
                     licence_ok=not validate_licence(lic), description=meta.get("meta", {}).get("description", ""),
                     thumb="%s/%s/thumb.png" % (k, n))
+
+    def _meta_entry(self, k, n, d):
+        meta = json.load(open(os.path.join(d, META_FILES[k]), encoding="utf-8"))
+        lic = self.licence("%s/%s" % (k, n))
+        probs = []
+        if k == "models":
+            from .modellib import validate_model
+            probs = validate_model(meta, d)
+            extra = dict(task=meta.get("task"), version=meta.get("version"), stored=bool(meta.get("stored")),
+                         trained_here=bool(meta.get("trained_here")), description=meta.get("title") or meta.get("role", ""))
+        else:
+            from .environments import validate
+            probs = validate(meta)
+            extra = dict(sport=meta.get("sport"), parts=[p for p in ("stadium", "pitch", "crowd", "adboards", "goals", "touchline")
+                                                         if meta.get(p) is not None], description=meta.get("description", ""))
+        from .motiontags import training_allowed
+        return dict(kind=k, name=n, path="%s/%s" % (k, n), problems=probs,
+                    licence=dict(spdx=lic.get("spdx") or ("custom" if lic.get("custom_text") else ""), redistribution=lic.get("redistribution"),
+                                 ml_training=training_allowed(lic), owner_confirmed=bool(lic.get("rights_override")),
+                                 redistributable=redistributable(lic)[0]),
+                    licence_ok=not validate_licence(lic), **extra)
+
+    def add_model(self, name, meta, licence, files=()):
+        """v11.41: a model asset (sforge.modellib).  -> (folder, problems)"""
+        from . import modellib
+        d, p = modellib.add_model(self, name, meta, licence, files)
+        self.scan(import_inbox=False)
+        return d, p
+
+    def add_environment(self, name, recipe, licence=None):
+        """v11.41: an environment recipe (sforge.environments).  -> (folder, problems)"""
+        from . import environments
+        d, p = environments.add_environment(self, name, recipe, licence)
+        self.scan(import_inbox=False)
+        return d, p
 
     def manifest(self):
         p = os.path.join(self.dir, "library.json")
@@ -431,6 +482,10 @@ class Library:
                 hint = (" (remove those clips: forge.py library clips-drop, or fix the source's licence)" if why.startswith("contains clips")
                         else " (set the licence, or confirm you own the rights)")
                 refused.append((k, n, why + hint)); continue
+            if k in META_FILES:
+                e = self.entry(k, n)
+                if e["problems"]:
+                    refused.append((k, n, "; ".join(e["problems"]))); continue
             rows.append((k, n, lic))
         if refused:
             msg = "\n".join("  %s/%s: %s" % r for r in refused)
@@ -453,14 +508,15 @@ class Library:
                     else:
                         data = open(p, "rb").read()
                     z.writestr(arc, data); files[arc] = hashlib.sha256(data).hexdigest()
-                if k != "kits":
+                if k in RIG_KINDS:
                     th = os.path.join(self.path(k, n), "thumb.png")
                     if os.path.exists(th):
                         arc = "thumbnails/%s_%s.png" % (k, n); data = open(th, "rb").read()
                         z.writestr(arc, data); files[arc] = hashlib.sha256(data).hexdigest()
                 e = self.entry(k, n)
                 man["assets"].append(dict(kind=k, name=n, files=files, licence=lic,
-                                          info={x: e.get(x) for x in ("bones", "tris", "height_m", "clips", "convention", "description") if x in e}))
+                                          info={x: e.get(x) for x in ("bones", "tris", "height_m", "clips", "convention", "description",
+                                                                      "task", "version", "sport", "parts") if x in e}))
                 lic_txt += [licence_text(lic, "%s/%s" % (k, n)), ""]
             z.writestr("LICENSES.txt", "\n".join(lic_txt))
             z.writestr("pack.json", json.dumps(man, indent=1))
@@ -523,7 +579,7 @@ class Library:
                 else:
                     json.dump(lic, open(os.path.join(self.path(k, target), "licence.json"), "w", encoding="utf-8"), indent=1)
                     if target != n:
-                        rj = os.path.join(self.path(k, target), "rig.json")
+                        rj = os.path.join(self.path(k, target), META_FILES.get(k, "rig.json"))
                         meta = json.load(open(rj, encoding="utf-8")); meta["name"] = target
                         json.dump(meta, open(rj, "w", encoding="utf-8"), indent=1)
                 installed.append((k, target, "installed"))
@@ -588,8 +644,9 @@ def verify(pack):
                     probs.append("%s: missing file %s" % (tag, arc)); continue
                 if hashlib.sha256(z.read(arc)).hexdigest() != h:
                     probs.append("%s: checksum mismatch %s" % (tag, arc))
-            if k != "kits" and not any(x.endswith("/rig.json") for x in a.get("files", {})):
-                probs.append("%s: rig.json missing" % tag)
+            mf = META_FILES.get(k, "rig.json")
+            if k != "kits" and not any(x.endswith("/" + mf) for x in a.get("files", {})):
+                probs.append("%s: %s missing" % (tag, mf))
         extra = sorted(n for n in names if n not in listed and not n.endswith("/"))
         if extra:
             warn.append("unlisted files ignored: %s" % ", ".join(extra[:10]))

@@ -35,7 +35,7 @@ PREFIX = "rr_"
 LICENCE = dict(spdx="LicenseRef-AndersonRohr-MocapPack05",
                author="Anderson Rohr (Mocap Pack 05 - Soccer)",
                source_url="https://andersonrohr.gumroad.com/l/mocap_pack5",
-               redistribution="no - not as a standalone pack; use inside a game is allowed",
+               redistribution="no - not as a standalone pack; use inside a game is allowed", ml_training="unknown",  # v11.40: the pack's terms say nothing about training models
                text="Free for personal and commercial projects. Do not redistribute, resell or repackage the "
                     "pack as a standalone product.",
                attribution="Soccer motion capture by Anderson Rohr.")

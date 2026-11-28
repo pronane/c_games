@@ -93,8 +93,16 @@ def node_local(nd, T=None, R=None, S=None):
     return M
 
 
-def load(path, report=None):
+def load(path, report=None, loop_overrides=None):
+    """Load a glTF/GLB into a Rig.
+
+    loop_overrides: optional mapping of clip name -> bool. The default loop flag
+    is a keyword heuristic on the clip name (idle/walk/run/jog/sprint/loop/cycle/drive),
+    which misclassifies cycle-like clips with unrelated names (e.g. 'solo',
+    'keeper_ready'). Pass {'solo': True} to force those clips to loop; callers that
+    know the ground truth should always pass it. Keys match case-insensitively."""
     report = report if report is not None else {}
+    overrides = {str(k).lower(): bool(v) for k, v in (loop_overrides or {}).items()}
     gl, bufs = read(path)
     nodes = gl.get("nodes", [])
     parent = {}
@@ -323,7 +331,10 @@ def load(path, report=None):
         while nm in seen:
             nm = "%s_%d" % (base, k); k += 1
         seen.add(nm)
-        rig.clips[nm] = rig.clip_from_worlds(nm, Wf, FPS, None, "glTF animation '%s'" % an.get("name", ai))
+        clip = rig.clip_from_worlds(nm, Wf, FPS, None, "glTF animation '%s'" % an.get("name", ai))
+        if overrides and nm.lower() in overrides:
+            clip.loop = overrides[nm.lower()]
+        rig.clips[nm] = clip
     report["takes"] = [(k, round(c.duration, 3), c.frames) for k, c in rig.clips.items()]
     report["bones"] = rig.nb
     report["mesh"] = dict(tris=int(len(rig.F)), verts=int(len(rig.V)))

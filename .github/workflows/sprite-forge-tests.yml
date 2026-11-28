@@ -34,6 +34,8 @@ jobs:
       # v11.21: field-sport clips (skills, aerial control, chip/trivela/bicycle, conduct), their QA, bind conform
       - run: python tools/test_fieldsport.py
       - run: python tools/test_jointtrack.py
+      - run: python tools/test_motiontags.py
+      - run: python tools/test_models_envs.py
       # v11.23: rosters, portraits and the engine projects (Godot / Unity / Unreal / raylib / web / pygame)
       - run: python tools/test_engines.py
       # v11.24: distinct roster looks, every move inside its cell on every pack, numbered kits

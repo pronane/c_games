@@ -685,6 +685,8 @@ def record_keys(keys_path, name=None, path=None, loop=None, licence=None, catego
         "loop": lp, "source": "mocap:" + os.path.basename(keys_path), "origin": "record",
         "licence": lic, "keys": keys, "duration": 1.0 if lp else 0.8,
     }
+    from . import motiontags as MT
+    MT.retag(rec)  # v11.40: tags + a real category instead of "Recorded" when the move can be told
     lib = open_library(path)
     out = lib.save(rec)
     return rec, out, validate_licence(lic)
@@ -1129,6 +1131,8 @@ def import_file(path, name=None, clip=None, library=None, licence=None, loop=Non
             "note": "Projected onto the mannequin's semantic joints. Fingers, twist bones and facial tracks are not kept.",
         },
     }
+    from . import motiontags as MT
+    MT.retag(rec)  # v11.40: tags + a real category instead of "Imported" when the move can be told
     out = open_library(library).save(rec)
     return rec, out, validate_licence(lic)
 

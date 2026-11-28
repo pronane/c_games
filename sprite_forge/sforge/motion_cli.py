@@ -21,13 +21,15 @@ def _lic_args(p):
     g.add_argument("--author")
     g.add_argument("--source-url", dest="source_url")
     g.add_argument("--redistribution", choices=["yes", "no", "unknown"])
+    g.add_argument("--ml-training", dest="ml_training", choices=["yes", "no", "unknown"],
+                   help="may models be trained on this move? (v11.40)")
     g.add_argument("--attribution")
     g.add_argument("--notes")
 
 
 def _lic_from(a):
     lic = ML._licence()
-    for k in ("spdx", "author", "source_url", "redistribution", "attribution", "notes"):
+    for k in ("spdx", "author", "source_url", "redistribution", "attribution", "notes", "ml_training"):
         v = getattr(a, k, None)
         if v is not None:
             lic[k] = v

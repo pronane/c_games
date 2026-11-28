@@ -12,7 +12,8 @@
 "source_url": "https://huggingface.co/datasets/SkillCorner/opendata-bodypose",
 "redistribution": "yes",
 "attribution": "Body pose and event data: SkillCorner Open Data (MIT licence).",
-"notes": "3D joints estimated from broadcast video (7-15 cm per joint). Events from github.com/SkillCorner/opendata. Fitted onto the shared skeleton with sforge.jointtrack."
+"notes": "3D joints estimated from broadcast video (7-15 cm per joint). Events from github.com/SkillCorner/opendata. Fitted onto the shared skeleton with sforge.jointtrack.",
+"ml_training": "yes"
 },
 "duration": 0.8,
 "keys": [
@@ -1249,5 +1250,12 @@
 2.073
 ],
 "joint_p90_mae_cm": 11.1
+},
+"tags": {
+"action": "dribble",
+"gait": "jog",
+"direction": "forward",
+"source": "skillcorner",
+"capture": "match_video"
 }
 }

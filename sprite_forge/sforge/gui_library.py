@@ -234,6 +234,21 @@ class LibraryTab:
             txt += ["", L.licence_text(self.lib.licence(iid), iid)]
             self.info.insert(tk.END, "\n".join(txt))
             self._show(self._kit_swatch(n, 220)); return
+        if k in L.META_FILES:   # v11.41 models / environments: a description, no rig to preview
+            import json
+            meta = json.load(open(os.path.join(self.lib.path(k, n), L.META_FILES[k]), encoding="utf-8"))
+            e = self.lib.entry(k, n)
+            self.cur_rig = None; self.clip_cb["values"] = []; self.clip.set("")
+            txt = ["%s %s  -  %s" % (k[:-1], n, e.get("description") or "")]
+            txt += ["  %-12s %s" % (x, meta[x]) for x in ("task", "version", "format", "role", "sport", "metrics", "used_by", "check")
+                    if meta.get(x) not in (None, "", [], {})]
+            if k == "environments":
+                txt += ["  %-12s %s" % (p, meta.get(p)) for p in ("stadium", "pitch", "crowd", "goals", "touchline")]
+            if meta.get("trained_on"):
+                txt += ["  trained on:"] + ["    %s (%s, ml_training %s)" % (d.get("dataset"), d.get("spdx"), d.get("ml_training"))
+                                            for d in meta["trained_on"]]
+            txt += ["  problems: %s" % ("; ".join(e["problems"]) or "none"), "", L.licence_text(self.lib.licence(iid), iid)]
+            self.info.insert(tk.END, "\n".join(txt)); return
         try:
             self.cur_rig = self.lib.load_rig(iid); rec = self.lib.bonemap(iid, self.cur_rig)
         except Exception as e:
@@ -376,12 +391,13 @@ class LibraryTab:
         f = ttk.Frame(w, padding=10); f.pack(fill=tk.BOTH, expand=True)
         ttk.Label(f, text="Every asset needs a licence record before it can go into a pack.\nYou only know the licence of files you made "
                           "or whose terms you have read (Help > Licensing).", foreground="#555", justify=tk.LEFT).grid(row=0, column=0, columnspan=2, sticky="w")
-        fv = {k: tk.StringVar(value=str(lic.get(k) or "")) for k in ("spdx", "author", "source_url", "redistribution", "attribution", "notes")}
+        fv = {k: tk.StringVar(value=str(lic.get(k) or "")) for k in ("spdx", "author", "source_url", "redistribution", "attribution", "notes", "ml_training")}
         rows = [("SPDX id", ttk.Combobox(f, textvariable=fv["spdx"], values=[""] + list(L.SPDX_COMMON), width=34)),
                 ("Author", ttk.Entry(f, textvariable=fv["author"], width=44)),
                 ("Source URL", ttk.Entry(f, textvariable=fv["source_url"], width=44)),
                 ("Redistribution", ttk.Combobox(f, textvariable=fv["redistribution"], values=REDIST_CHOICES, state="readonly", width=10)),
                 ("Attribution", ttk.Entry(f, textvariable=fv["attribution"], width=44)),
+                ("ML training", ttk.Combobox(f, textvariable=fv["ml_training"], values=list(L.ML_TRAINING), state="readonly", width=10)),
                 ("Notes", ttk.Entry(f, textvariable=fv["notes"], width=44))]
         for i, (lab, wd) in enumerate(rows, 1):
             ttk.Label(f, text=lab).grid(row=i, column=0, sticky="w", pady=2); wd.grid(row=i, column=1, sticky="w", pady=2)
@@ -396,6 +412,7 @@ class LibraryTab:
 
         def save():
             new = dict(lic); new.update({k: x.get().strip() for k, x in fv.items()}); new["custom_text"] = ct.get("1.0", tk.END).strip()
+            new["ml_training"] = new.get("ml_training") or "unknown"
             probs = L.validate_licence(new)
             self.lib.set_licence(iid, new); self.refresh(iid)
             ok, why = L.redistributable(new)
