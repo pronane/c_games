@@ -1,0 +1,31 @@
+{
+  "_doc": "Targets the CI gameplay recording is checked against (Tools/check_recording.py). min_* must be reached, max_* must not be exceeded. Timing budgets are for a GitHub runner with software rendering, so they are deliberately generous; the football and animation targets are the real checks. The planted-foot slide gate matches the runtime-evidence gate.",
+  "video": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "min_duration_s": 19.5,
+    "max_blank_frames": 0,
+    "max_frozen_run_s": 2.0,
+    "min_moving_fraction": 0.6,
+    "min_pitch_fraction": 0.2
+  },
+  "gameplay": {
+    "min_passes": 4,
+    "min_possession_changes": 1,
+    "min_ball_distance_m": 60,
+    "min_player_distance_m": 600,
+    "min_distinct_clips": 8,
+    "min_footsteps": 200
+  },
+  "animation": {
+    "max_planted_foot_slide_mps": 0.8,
+    "min_planted_foot_slide_samples": 200,
+    "min_plant_window_lock_coverage": 0.3,
+    "max_avg_contact_frame_error": 4.0
+  },
+  "performance": {
+    "max_sim_step_ms_p95": 4.0,
+    "max_rig_sync_ms_p95": 40.0
+  }
+}

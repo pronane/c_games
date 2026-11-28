@@ -397,9 +397,14 @@ public sealed partial class MatchEngine
             RequiresFootPlant = requiresFootPlant,
             ShouldSprint = p.Sprinting,
             Pressing = p.Pressing,
-            Role = p.Role.ToString().ToLowerInvariant(),
+            Role = RoleName(p.Role),
         };
     }
+
+    // Role names for contracts: enum ToString + ToLowerInvariant allocated two strings per
+    // player twice a tick.
+    private static readonly string[] RoleNames = Enum.GetNames<Role>().Select(n => n.ToLowerInvariant()).ToArray();
+    private static string RoleName(Role r) => (uint)r < (uint)RoleNames.Length ? RoleNames[(int)r] : r.ToString().ToLowerInvariant();
 
     private void PopulateBaselineContracts()
     {
@@ -436,7 +441,7 @@ public sealed partial class MatchEngine
                     SpeedLimit = p.MaxSpeed,
                     ShouldSprint = p.Sprinting,
                     Pressing = p.Pressing,
-                    Role = p.Role.ToString().ToLowerInvariant(),
+                    Role = RoleName(p.Role),
                 };
             }
             else if (b.Owner < 0 && b.PassReceiver == i)
@@ -460,7 +465,7 @@ public sealed partial class MatchEngine
                     RequiresBallContact = true,
                     ShouldSprint = p.Sprinting,
                     Pressing = p.Pressing,
-                    Role = p.Role.ToString().ToLowerInvariant(),
+                    Role = RoleName(p.Role),
                 };
             }
             else
@@ -478,7 +483,7 @@ public sealed partial class MatchEngine
                     SpeedLimit = p.MaxSpeed,
                     ShouldSprint = p.Sprinting,
                     Pressing = p.Pressing,
-                    Role = p.Role.ToString().ToLowerInvariant(),
+                    Role = RoleName(p.Role),
                 };
             }
         }
@@ -529,7 +534,7 @@ public sealed partial class MatchEngine
                     DesiredTurnRate = 3.0f,
                     ShouldSprint = recv.Sprinting,
                     Pressing = recv.Pressing,
-                    Role = recv.Role.ToString().ToLowerInvariant(),
+                    Role = RoleName(recv.Role),
                 };
             }
         }
@@ -1869,8 +1874,9 @@ public sealed partial class MatchEngine
         // M3: coordinator is authoritative for primary defensive engagement when available.
         // Rank 0 prefers coordinator press, rank 1 prefers cover, rank 2 prefers next defensive role.
         // Fallback to distance/intercept ranking, excluding higher-ranked picks.
+        // (Allocation-free: the exclusion set is a bit mask, the candidate list is reused.)
         if (rank < 0) rank = 0;
-        var exclude = new HashSet<int>();
+        ulong exclude = 0;
         for (int r = 0; r <= rank; r++)
         {
             int pick = -1;
@@ -1881,25 +1887,30 @@ public sealed partial class MatchEngine
                 {
                     foreach (var p in State.Players)
                     {
-                        if (p.Team != team || p.IsKeeper || p.SentOff || exclude.Contains(p.Index)) continue;
+                        if (p.Team != team || p.IsKeeper || p.SentOff || (exclude & (1UL << p.Index)) != 0) continue;
                         var tac = GetTacticalAssignment(p.Index);
                         if (tac != null && tac.Role == want) { pick = p.Index; break; }
                     }
                 }
                 else
                 {
-                    var candidates = new List<(int idx, float score)>();
+                    var candidates = _chaserCandidates;
+                    candidates.Clear();
+                    Vector3 focus = default; bool haveFocus = false;
                     foreach (var p in State.Players)
                     {
-                        if (p.Team != team || p.IsKeeper || p.SentOff || exclude.Contains(p.Index)) continue;
+                        if (p.Team != team || p.IsKeeper || p.SentOff || (exclude & (1UL << p.Index)) != 0) continue;
                         var tac = GetTacticalAssignment(p.Index);
                         if (tac == null) continue;
                         if (tac.Role == "recover" || tac.Role == "support" || tac.Role == "cover")
-                            candidates.Add((p.Index, Mx.FlatDist2(p.Pos, BallFocus())));
+                        {
+                            if (!haveFocus) { focus = BallFocus(); haveFocus = true; }
+                            candidates.Add((p.Index, Mx.FlatDist2(p.Pos, focus)));
+                        }
                     }
                     if (candidates.Count > 0)
                     {
-                        candidates.Sort((a, b) => a.score.CompareTo(b.score));
+                        candidates.Sort(CompareChaserScore);
                         pick = candidates[0].idx;
                     }
                 }
@@ -1907,33 +1918,61 @@ public sealed partial class MatchEngine
             if (pick < 0) pick = ClosestToBall(team, 0, exclude);
             if (pick < 0) return -1;
             if (r == rank) return pick;
-            exclude.Add(pick);
+            exclude |= 1UL << pick;
         }
         return -1;
     }
+    private readonly List<(int idx, float score)> _chaserCandidates = new();
+    private static readonly Comparison<(int idx, float score)> CompareChaserScore = (a, b) => a.score.CompareTo(b.score);
 
-    private int ClosestToBall(int team, int rank) => ClosestToBall(team, rank, null);
+    private int ClosestToBall(int team, int rank) => ClosestToBall(team, rank, 0UL);
 
-    private int ClosestToBall(int team, int rank, HashSet<int>? exclude)
+    private int ClosestToBall(int team, int rank, ulong exclude)
     {
         var b = State.Ball;
         var focus = BallFocus();
         bool looseMoving = b.Owner < 0 && !b.HasPending && !IsSkill && Mx.Flat(b.Vel).LengthSquared() > 4f;
         var pred = looseMoving ? BallPred(1.5f) : null;
-        var list = State.Players.Where(p => p.Team == team && !p.IsKeeper && !p.SentOff && (exclude == null || !exclude.Contains(p.Index)))
-            .Select(p => {
+        // A player's chase score depends only on his position and speed, the focus point
+        // and the (per-tick cached) ball prediction, and every defender's decision asks
+        // for it several times a tick: keep it per player and recompute only when one of
+        // those inputs changed.  The order is a stable sort on score, as OrderBy was.
+        var players = State.Players;
+        if (_chaseScore.Length != players.Length)
+        {
+            _chaseScore = new float[players.Length];
+            _chaseKey = new (Vector3 pos, float maxSpeed, Vector3 focus, object? pred)[players.Length];
+            _chaseValid = new bool[players.Length];
+            _chaseOrder = new int[players.Length];
+        }
+        int n = 0;
+        foreach (var p in players)
+        {
+            if (p.Team != team || p.IsKeeper || p.SentOff || (exclude & (1UL << p.Index)) != 0) continue;
+            int i = p.Index;
+            var key = (p.Pos, p.MaxSpeed, focus, (object?)pred);
+            if (!_chaseValid[i] || !_chaseKey[i].Equals(key))
+            {
                 float score = Mx.FlatDist2(p.Pos, focus);
                 if (pred != null)
                 {
                     float accel = Math.Clamp(9f + p.Spec.Pace * 6f + p.Spec.Defending * 3f, 8f, 18f);
-                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var s, 0f))
-                        score = s.Time * s.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(s.Position.X,0,s.Position.Z)) * 0.01f;
+                    if (pred.TryInterceptXZ(p.Pos, p.MaxSpeed, accel, out var smp, 0f))
+                        score = smp.Time * smp.Time * 100f + Mx.FlatDist2(p.Pos, new Vector3(smp.Position.X, 0, smp.Position.Z)) * 0.01f;
                 }
-                return (p.Index, score);
-            })
-            .OrderBy(x => x.score).ToArray();
-        return rank < list.Length ? list[rank].Index : (list.Length > 0 ? list[0].Index : -1);
+                _chaseScore[i] = score; _chaseKey[i] = key; _chaseValid[i] = true;
+            }
+            // stable insertion by score (ties keep player order, like OrderBy)
+            int j = n++;
+            while (j > 0 && _chaseScore[_chaseOrder[j - 1]] > _chaseScore[i]) { _chaseOrder[j] = _chaseOrder[j - 1]; j--; }
+            _chaseOrder[j] = i;
+        }
+        return rank < n ? _chaseOrder[rank] : (n > 0 ? _chaseOrder[0] : -1);
     }
+    private float[] _chaseScore = Array.Empty<float>();
+    private (Vector3 pos, float maxSpeed, Vector3 focus, object? pred)[] _chaseKey = Array.Empty<(Vector3, float, Vector3, object?)>();
+    private bool[] _chaseValid = Array.Empty<bool>();
+    private int[] _chaseOrder = Array.Empty<int>();
 
     private int FindBestPassTarget(PlayerState from, bool through, bool longPass = false, Vector2 aimDir = default)
     {
@@ -2040,9 +2079,9 @@ public sealed partial class MatchEngine
         if (Mx.Flat(b.Vel).Length() < 4f) return false;
         var pred = BallPred(2.2f);
         float t = -1f; Vector3 p = default;
-        for (int i = 1; i < pred.Samples.Count; i++)
+        for (int i = 1; i < pred.Count; i++)
         {
-            var s = pred.Samples[i];
+            var s = pred[i];
             if (s.Position.Y <= 2.3f && s.Velocity.Y <= 0f)
             { t = s.Time; p = new Vector3(s.Position.X, 0f, s.Position.Z); break; }
         }
@@ -3648,7 +3687,12 @@ public sealed partial class MatchEngine
     // PR C: tactical coordinator cache + hysteresis
     private readonly ArenaFC.Core.Football.TacticalCoordinator _tactical = new();
     private int _tacticalTick = -1;
-    private readonly Dictionary<int, ArenaFC.Core.Football.TacticalCoordinator.Assignment> _tacticalByPlayer = new();
+    private ArenaFC.Core.Football.TacticalCoordinator.Assignment?[] _tacByIndex = Array.Empty<ArenaFC.Core.Football.TacticalCoordinator.Assignment?>();
+    private string?[] _tacPrevRole = Array.Empty<string?>();
+
+    private ArenaFC.Core.Football.BallTrajectory PredictBall(float horizonSeconds)
+        => ArenaFC.Core.Football.BallTrajectory.Predict(State.Ball.Pos, State.Ball.Vel, State.Ball.Spin, horizonSeconds,
+            Weather.Raining, Weather.WindX, Weather.WindZ);
     public int TacticalRoleChanges;
     public int TacticalPressAssignments;
     public int TacticalCoverAssignments;
@@ -3666,8 +3710,7 @@ public sealed partial class MatchEngine
         if (_ballPredLongTick == _tick && _ballPredLong != null && _ballPredLongHorizon >= h - 0.001f)
             return _ballPredLong;
         _ballPredLongHorizon = MathF.Max(h, 2.5f);
-        _ballPredLong = ArenaFC.Core.Football.BallTrajectory.Predict(
-            State.Ball.Pos, State.Ball.Vel, State.Ball.Spin, _ballPredLongHorizon, Weather.Raining, Weather.WindX, Weather.WindZ);
+        _ballPredLong = PredictBall(_ballPredLongHorizon);
         _ballPredLongTick = _tick;
         return _ballPredLong;
     }
@@ -3676,32 +3719,32 @@ public sealed partial class MatchEngine
     {
         if (_tacticalTick != _tick)
         {
-            var prev = new Dictionary<int, string>(_tacticalByPlayer.Count);
-            foreach (var kv in _tacticalByPlayer) prev[kv.Key] = kv.Value.Role;
+            int np = State.Players.Length;
+            if (_tacByIndex.Length != np) { _tacByIndex = new ArenaFC.Core.Football.TacticalCoordinator.Assignment?[np]; _tacPrevRole = new string?[np]; }
+            for (int k = 0; k < np; k++) { _tacPrevRole[k] = _tacByIndex[k]?.Role; _tacByIndex[k] = null; }
             _tacticalTick = _tick;
-            _tacticalByPlayer.Clear();
             // M3: coordinator sees predicted ball trajectory (same physics rules).
-            _tacticalBallPred = ArenaFC.Core.Football.BallTrajectory.Predict(
-                State.Ball.Pos, State.Ball.Vel, State.Ball.Spin, 0.8f, Weather.Raining, Weather.WindX, Weather.WindZ);
+            _tacticalBallPred = PredictBall(0.8f);
             var t0 = _tactical.BuildAssignments(State, 0, _tacticalBallPred);
             var t1 = _tactical.BuildAssignments(State, 1, _tacticalBallPred);
             void Add(ArenaFC.Core.Football.TacticalCoordinator.Assignment a)
             {
-                if (prev.TryGetValue(a.PlayerIndex, out var oldRole) && oldRole != a.Role) TacticalRoleChanges++;
+                var oldRole = (uint)a.PlayerIndex < (uint)np ? _tacPrevRole[a.PlayerIndex] : null;
+                if (oldRole != null && oldRole != a.Role) TacticalRoleChanges++;
                 if (a.Role == "press") TacticalPressAssignments++;
                 else if (a.Role == "cover") TacticalCoverAssignments++;
-                _tacticalByPlayer[a.PlayerIndex] = a;
+                if ((uint)a.PlayerIndex < (uint)np) _tacByIndex[a.PlayerIndex] = a;
             }
             foreach (var a in t0) Add(a);
             foreach (var a in t1) Add(a);
         }
-        return _tacticalByPlayer.TryGetValue(playerIndex, out var asn) ? asn : null;
+        return (uint)playerIndex < (uint)_tacByIndex.Length ? _tacByIndex[playerIndex] : null;
     }
 
     internal void ResetTacticalCache()
     {
         _tacticalTick = -1;
-        _tacticalByPlayer.Clear();
+        Array.Clear(_tacByIndex);
         _tacticalBallPred = null;
         _ballPredLong = null;
         _ballPredLongTick = -1;

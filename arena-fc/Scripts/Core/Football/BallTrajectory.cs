@@ -26,7 +26,33 @@ public readonly struct BallSample
 public sealed class BallTrajectory
 {
     public const float Dt = 1f / 60f;
-    public readonly List<BallSample> Samples = new();
+
+    // Samples are integrated on demand: most callers read the first few tenths of a
+    // second (At(0.35), the earliest intercept), so a 2.5 s prediction used to integrate
+    // 150 steps to answer a question about the first 20.  Every sample is computed by the
+    // same Step sequence, in order, so values are identical to integrating them all up front.
+    private readonly List<BallSample> _samples = new();
+    private int _steps;
+    private Vector3 _p, _v, _s;
+    private bool _raining;
+    private float _windX, _windZ;
+
+    /// <summary>All samples (forces the whole horizon to be integrated).</summary>
+    public List<BallSample> Samples { get { Fill(_steps); return _samples; } }
+    /// <summary>Number of samples over the horizon (start sample included).</summary>
+    public int Count => _steps + 1;
+    /// <summary>Sample i (0 = start, i * Dt seconds ahead), integrated if not yet.</summary>
+    public BallSample this[int i] { get { Fill(i); return _samples[i]; } }
+
+    private void Fill(int index)
+    {
+        if (index > _steps) index = _steps;
+        while (_samples.Count <= index)
+        {
+            Step(ref _p, ref _v, ref _s, Dt, _raining, _windX, _windZ);
+            _samples.Add(new BallSample(_samples.Count * Dt, _p, _v));
+        }
+    }
 
     /// <summary>
     /// Base-flight prediction using Step() physics only. Excludes post-Step match events:
@@ -38,42 +64,37 @@ public sealed class BallTrajectory
     {
         var t = new BallTrajectory();
         float h = Math.Clamp(horizonSeconds, 0f, 5f);
-        int steps = Math.Max(1, (int)MathF.Ceiling(h / Dt));
-        Vector3 p = pos;
-        Vector3 v = vel;
-        Vector3 s = spin;
-        t.Samples.Add(new BallSample(0f, p, v));
-        for (int i = 1; i <= steps; i++)
-        {
-            Step(ref p, ref v, ref s, Dt, raining, windX, windZ);
-            t.Samples.Add(new BallSample(i * Dt, p, v));
-        }
+        t._steps = Math.Max(1, (int)MathF.Ceiling(h / Dt));
+        t._p = pos; t._v = vel; t._s = spin;
+        t._raining = raining; t._windX = windX; t._windZ = windZ;
+        t._samples.Add(new BallSample(0f, pos, vel));
         return t;
     }
 
     public BallSample At(float seconds)
     {
-        if (Samples.Count == 0) return default;
-        if (seconds <= Samples[0].Time) return Samples[0];
-        for (int i = 1; i < Samples.Count; i++)
+        var first = this[0];
+        if (seconds <= first.Time) return first;
+        for (int i = 1; i <= _steps; i++)
         {
-            if (Samples[i].Time < seconds) continue;
-            var a = Samples[i - 1];
-            var b = Samples[i];
+            var b = this[i];
+            if (b.Time < seconds) continue;
+            var a = _samples[i - 1];
             float span = MathF.Max(0.0001f, b.Time - a.Time);
             float u = Math.Clamp((seconds - a.Time) / span, 0f, 1f);
             return new BallSample(seconds, Vector3.Lerp(a.Position, b.Position, u), Vector3.Lerp(a.Velocity, b.Velocity, u));
         }
-        return Samples[^1];
+        return this[_steps];
     }
 
     public bool TryFirstGroundedBelow(float maxHeight, out BallSample sample)
     {
-        for (int i = 0; i < Samples.Count; i++)
+        for (int i = 0; i <= _steps; i++)
         {
-            if (Samples[i].Position.Y <= maxHeight)
+            var s = this[i];
+            if (s.Position.Y <= maxHeight)
             {
-                sample = Samples[i];
+                sample = s;
                 return true;
             }
         }
@@ -86,9 +107,9 @@ public sealed class BallTrajectory
         sample = default;
         bool found = false;
         float bestT = float.MaxValue;
-        for (int i = 0; i < Samples.Count; i++)
+        for (int i = 0; i <= _steps; i++)
         {
-            var s = Samples[i];
+            var s = this[i];
             if (s.Time < minT) continue;
             float tReach = PlayerPerception.TimeToReach(origin, currentVelocity, s.Position, maxSpeed, acceleration);
             if (tReach <= s.Time + 0.03f && s.Time < bestT)
@@ -96,6 +117,9 @@ public sealed class BallTrajectory
                 bestT = s.Time;
                 sample = s;
                 found = true;
+                // Samples are in time order, so the first reachable one is the earliest:
+                // nothing later can beat it (this loop used to scan the whole horizon).
+                break;
             }
         }
         return found;

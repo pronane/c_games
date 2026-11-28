@@ -21,6 +21,8 @@ public partial class MatchView : Node3D
     // BlendLearner: which movement clip each player is actually using.
     private readonly BlendLearner _blend = new();
     private readonly MotionDriver _motion = new();
+    // QA: --gameplay-report PATH (see GameplayReport)
+    private readonly GameplayReport? _gameplay = GameplayReport.PathFromArgs() is string gp ? new GameplayReport(gp) : null;
     private int _blendFrame;
     private AmbientAction[] _ambientTag = Array.Empty<AmbientAction>();
     private Emotion[] _faceTag = Array.Empty<Emotion>();
@@ -294,6 +296,12 @@ public partial class MatchView : Node3D
         Sync(0f);
     }
 
+    public override void _ExitTree()
+    {
+        if (_gameplay != null && Engine != null) _gameplay.Write(Engine, Rigs, _motion.Metrics);
+        base._ExitTree();
+    }
+
     public override void _PhysicsProcess(double delta)
     {
         if (!_built) return;
@@ -356,7 +364,9 @@ public partial class MatchView : Node3D
             if (_aiVsAi) { Engine.State.Controlled = -1; _pending = PlayerCommand.None; }
             int before = Engine.CurrentTick;
             var stepped = _pending;
+            long gpStep = GameplayReport.Now();
             Engine.Step(dt, _pending);
+            _gameplay?.AddStep(GameplayReport.Ms(gpStep));
             bool ticked = Engine.CurrentTick != before;
             if (ticked) _pending = PlayerCommand.None;
             if (_coach != null)
@@ -367,7 +377,9 @@ public partial class MatchView : Node3D
             }
         }
         PlayEventSounds();
+        long gpSync = GameplayReport.Now();
         Sync(dt);
+        if (_gameplay != null) { _gameplay.AddSync(GameplayReport.Ms(gpSync)); _gameplay.Frame(Engine, Rigs, delta); }
         // Crowd reacts to goals and settles back down between them.
         int goals = Engine.State.Score[0] + Engine.State.Score[1];
         if (_lastGoals >= 0 && goals > _lastGoals)

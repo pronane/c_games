@@ -110,6 +110,86 @@ jobs:
             arena-fc/coverage-match-core.cobertura.xml
           if-no-files-found: warn
 
+  gameplay-recording:
+    name: Gameplay recording (video + targets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      RECORD_FRAMES: "600"     # 20 s at 30 fps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Install software rendering, virtual display and ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils ffmpeg
+      - name: Download Godot 4.7.2 Mono
+        run: |
+          curl -fsSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x "$RUNNER_TEMP"/godot/*/Godot_v4.7.2-stable_mono_linux.x86_64
+      - name: Build Godot C# assemblies
+        working-directory: arena-fc
+        run: dotnet build ArenaFC.sln -c Release -v:q
+      - name: Import Godot resources (textures, materials and scene assets)
+        working-directory: arena-fc
+        run: '"$GODOT" --headless --editor --path . --import --quit'
+      - name: Record an 11v11 AI-vs-AI match (Godot movie maker, fixed 30 fps)
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          out="$RUNNER_TEMP/gameplay-recording"
+          mkdir -p "$out"
+          # --write-movie renders every frame at a fixed 30 fps, so the video plays at real
+          # speed whatever the runner's speed; --gameplay-report writes what happened in it.
+          set -o pipefail
+          xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . \
+            --rendering-driver opengl3 --audio-driver Dummy \
+            --write-movie "$out/match.avi" --fixed-fps 30 --quit-after "$RECORD_FRAMES" \
+            -- --match --size 11 --seed 2026 --ai-vs-ai --gameplay-report "$out/gameplay.json" \
+            2>&1 | tee "$out/godot.log"
+          test -s "$out/match.avi"
+          test -s "$out/gameplay.json"
+      - name: Encode the recording (H.264)
+        run: |
+          out="$RUNNER_TEMP/gameplay-recording"
+          ffmpeg -v error -y -i "$out/match.avi" -an -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p \
+            -movflags +faststart "$out/match.mp4"
+          rm "$out/match.avi"
+          ls -la "$out"
+      - name: Upload the recording
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-gameplay-recording
+          path: ${{ runner.temp }}/gameplay-recording/
+          if-no-files-found: warn
+      - name: Check the recording against the targets
+        working-directory: arena-fc
+        run: |
+          out="$RUNNER_TEMP/gameplay-recording"
+          python3 Tools/check_recording.py --video "$out/match.mp4" --report "$out/gameplay.json" \
+            --log "$out/godot.log" --targets Tools/recording_targets.json --out "$out" \
+            --summary "$GITHUB_STEP_SUMMARY" --artifact-url "${{ steps.upload.outputs.artifact-url }}"
+      - name: Upload the check results and previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fc-gameplay-recording-check
+          path: |
+            ${{ runner.temp }}/gameplay-recording/recording-check.*
+            ${{ runner.temp }}/gameplay-recording/contact-sheet.png
+            ${{ runner.temp }}/gameplay-recording/preview.gif
+          if-no-files-found: warn
+
   godot-render-captures:
     name: Godot rendered rig and gameplay captures
     runs-on: ubuntu-latest
