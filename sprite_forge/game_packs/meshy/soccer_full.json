@@ -466,10 +466,10 @@
   },
   "ball_roll": {
    "category": "Skill",
-   "duration": 2.0,
+   "duration": 2.5,
    "loop": false,
    "library": "run",
-   "prompt": "A professional football (soccer) player rolls the ball sideways across the body with the sole of the right foot, stepping sideways with it.",
+   "prompt": "A professional football (soccer) player rolls the ball: standing over the ball, puts the sole of the right foot on top of it and drags it sideways across in front of the body to the left, taking two side steps to the left with it, the right foot sliding across the ground, then pushes it forward.",
    "mode": "prime"
   },
   "heel_chop": {
@@ -613,10 +613,10 @@
   },
   "tackle": {
    "category": "Defending",
-   "duration": 2.0,
+   "duration": 2.5,
    "loop": false,
    "library": "kick",
-   "prompt": "A professional football (soccer) player makes a standing tackle: steps in and blocks the ball with the inside of the right foot, leaning in.",
+   "prompt": "A professional football (soccer) player makes a block tackle: sprints two steps towards an opponent, plants the left foot and lunges forward low, the right leg stretched far out in front with the inside of the foot blocking the ball, the body leaning hard into the challenge, then recovers to standing.",
    "mode": "prime"
   },
   "slide_tackle": {
@@ -629,10 +629,10 @@
   },
   "poke_tackle": {
    "category": "Defending",
-   "duration": 2.0,
+   "duration": 2.5,
    "loop": false,
    "library": "kick",
-   "prompt": "A professional football (soccer) player stretches the right leg out to poke the ball away from an attacker with the toe.",
+   "prompt": "A professional football (soccer) player pokes the ball away: from a crouched defensive stance, lunges forward and to the side with a big step, stretching the right leg out fully along the ground to toe the ball away, both arms out for balance, then pulls back to standing.",
    "mode": "prime"
   },
   "block_shot": {
@@ -645,10 +645,10 @@
   },
   "shoulder_challenge": {
    "category": "Defending",
-   "duration": 2.0,
+   "duration": 2.5,
    "loop": false,
    "library": "walk",
-   "prompt": "A professional football (soccer) player runs alongside an attacker and leans in with the shoulder to barge them off the ball.",
+   "prompt": "A professional football (soccer) player barges an opponent: runs, then leans the whole upper body sideways hard into the opponent on the left, the left shoulder driving into them, elbow tucked in, feet wide, pushing with the legs, then straightens up and keeps running.",
    "mode": "prime"
   },
   "interception": {
@@ -702,10 +702,10 @@
   },
   "header_jump": {
    "category": "Aerial",
-   "duration": 2.0,
+   "duration": 2.5,
    "loop": false,
    "library": "jump",
-   "prompt": "A professional football (soccer) player jumps up to win a header, arms raised for leverage, heads the ball forward.",
+   "prompt": "A professional football (soccer) player jumps for a header: bends both knees, swings both arms up and springs high off both feet, at the top of the jump arches the back and snaps the head and neck forward hard to head the ball, then lands on both feet with bent knees.",
    "mode": "prime"
   },
   "header_standing": {
@@ -896,10 +896,10 @@
   },
   "free_kick_curl": {
    "category": "Set piece",
-   "duration": 3.5,
+   "duration": 4.0,
    "loop": false,
    "library": "kick",
-   "prompt": "A professional football (soccer) player takes a curling free kick: stands still, takes a short angled run-up, and curls the ball with the inside of the right foot.",
+   "prompt": "A professional football (soccer) player takes a free kick: stands still behind the ball, then three steps of run-up at an angle, plants the left foot beside the ball and swings the right leg hard across the body, striking with the inside of the foot; the kicking leg follows through high across the body to hip height, arms out wide, then lands on the right foot.",
    "mode": "prime"
   },
   "free_kick_power": {
@@ -911,10 +911,10 @@
   },
   "penalty_kick": {
    "category": "Set piece",
-   "duration": 3.5,
+   "duration": 4.0,
    "loop": false,
    "library": "kick",
-   "prompt": "A professional football (soccer) player takes a penalty: stands, takes a short run-up and strikes the ball low and hard to the side.",
+   "prompt": "A professional football (soccer) player takes a penalty: stands still, takes four quick run-up steps, plants the left foot hard beside the ball and swings the right leg through powerfully, the knee over the ball; the kicking leg follows through forward to waist height and the player lands on the right foot, body leaning forward.",
    "mode": "prime"
   },
   "penalty_stutter": {

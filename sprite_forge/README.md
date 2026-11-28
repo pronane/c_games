@@ -72,6 +72,10 @@ fewer frames. The starter has no Mixamo or Meshy clips (v11.41's owned Meshy cli
   (kickout, penalty, pick-up and tackle added).
 * Tests: `test_meshy` 26 checks; Arena FC 112/112, 1263/1263 and `build.py --check` 6/6; Gaelic 3D `make test` and
   `make test-motion-model` pass.
+* **v11.44:** the 7 Arena actions still on their old clips got a third take: prime again, with the body mechanics
+  spelled out in the prompt (run-up steps, plant foot, follow-through height, where the arms go). The free kick,
+  penalty and header now play Meshy (**64 actions**); the tackle, poke tackle, shoulder charge and ball roll keep
+  their clips after three takes each, and the reasons are in `MESHY_REJECTED`.
 
 ## New in v11.42: full move catalogues (soccer, Gaelic, hurling), in Arena FC and Gaelic Football 3D
 

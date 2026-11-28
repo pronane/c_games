@@ -575,12 +575,13 @@ MESHY_ACTIONS = {           # kept after a side-by-side review of old vs Meshy o
     "turn": "turn_180", "slide": "slide_tackle", "slide_tackle": "slide_tackle", "block": "block_shot",
     "juke_feint": "body_feint", "dive": "gk_dive_low_left", "keeper_dive_left": "gk_dive_low_left",
     "keeper_ground_catch": "gk_collect_low", "skill_heel_to_heel": "heel_to_heel", "skill_step_over": "stepover",
+    # v11.44: prime takes with sharper prompts (body mechanics spelled out), reviewed and kept
+    "free_kick": "free_kick_curl", "penalty_kick": "penalty_kick", "header": "header_jump",
 }
 # Reviewed and left on their old clips: the swift Meshy take was weaker (see sprite_forge/README v11.42).
-MESHY_REJECTED = {          # still on their old clips after the swift and the prime takes were both reviewed
-    "free_kick": "no clear strike in swift or prime", "penalty_kick": "no visible kick in swift or prime",
-    "header": "small jump in both", "tackle": "standing reach in both", "dispossess": "crouch, no lunge",
-    "shoulder_charge": "no lean in either", "skill_ball_roll": "swift falls over, prime barely moves",
+MESHY_REJECTED = {          # still on their old clips after three Meshy takes each (swift, prime, sharper prime)
+    "tackle": "a crouch and stand, no lunge, in all three", "dispossess": "a milder lunge than the old clip",
+    "shoulder_charge": "the sharper take drops almost to the ground", "skill_ball_roll": "no clearer than the old clip",
 }
 BASE_ACTIONS = set(ACTION_ALIASES)
 for _a, _m in MESHY_ACTIONS.items():

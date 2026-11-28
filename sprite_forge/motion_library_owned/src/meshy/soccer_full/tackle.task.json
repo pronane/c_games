@@ -1,10 +1,10 @@
 {
- "id": "01a2229c-5d84-762d-ada3-00a5ba36852c",
+ "id": "01a2231b-1ff1-70e2-8135-8fb2abf3c340",
  "status": "SUCCEEDED",
  "consumed_credits": 10,
- "created_at": 1795877003380,
- "finished_at": 1795877025207,
- "prompt": "A professional football (soccer) player makes a standing tackle: steps in and blocks the ball with the inside of the right foot, leaning in.",
- "duration": 2.0,
+ "created_at": 1795885310782,
+ "finished_at": 1795885331500,
+ "prompt": "A professional football (soccer) player makes a block tackle: sprints two steps towards an opponent, plants the left foot and lunges forward low, the right leg stretched far out in front with the inside of the foot blocking the ball, the body leaning hard into the challenge, then recovers to standing.",
+ "duration": 2.5,
  "mode": "prime"
 }

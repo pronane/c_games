@@ -1,10 +1,10 @@
 {
- "id": "01a2229e-2b2e-7782-9755-1abb474ba0d8",
+ "id": "01a2231c-2a24-77ac-b26b-8eaeb5f84f1d",
  "status": "SUCCEEDED",
  "consumed_credits": 10,
- "created_at": 1795877121404,
- "finished_at": 1795877139850,
- "prompt": "A professional football (soccer) player runs alongside an attacker and leans in with the shoulder to barge them off the ball.",
- "duration": 2.0,
+ "created_at": 1795885378892,
+ "finished_at": 1795885397991,
+ "prompt": "A professional football (soccer) player barges an opponent: runs, then leans the whole upper body sideways hard into the opponent on the left, the left shoulder driving into them, elbow tucked in, feet wide, pushing with the legs, then straightens up and keeps running.",
+ "duration": 2.5,
  "mode": "prime"
 }

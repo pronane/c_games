@@ -1,10 +1,10 @@
 {
- "id": "01a2229d-1875-774b-81fb-4e7be41f096e",
+ "id": "01a2231b-a5c0-77a4-832e-c4fc51f611a0",
  "status": "SUCCEEDED",
  "consumed_credits": 10,
- "created_at": 1795877051307,
- "finished_at": 1795877103895,
- "prompt": "A professional football (soccer) player stretches the right leg out to poke the ball away from an attacker with the toe.",
- "duration": 2.0,
+ "created_at": 1795885344909,
+ "finished_at": 1795885362998,
+ "prompt": "A professional football (soccer) player pokes the ball away: from a crouched defensive stance, lunges forward and to the side with a big step, stretching the right leg out fully along the ground to toe the ball away, both arms out for balance, then pulls back to standing.",
+ "duration": 2.5,
  "mode": "prime"
 }

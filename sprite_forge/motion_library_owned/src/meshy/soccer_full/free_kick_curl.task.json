@@ -1,10 +1,10 @@
 {
- "id": "01a2229e-8461-723b-90a0-b3be0a40cafd",
+ "id": "01a22319-80da-703c-bded-748f75ba7f25",
  "status": "SUCCEEDED",
  "consumed_credits": 10,
- "created_at": 1795877144338,
- "finished_at": 1795877164750,
- "prompt": "A professional football (soccer) player takes a curling free kick: stands still, takes a short angled run-up, and curls the ball with the inside of the right foot.",
- "duration": 3.5,
+ "created_at": 1795885204361,
+ "finished_at": 1795885222175,
+ "prompt": "A professional football (soccer) player takes a free kick: stands still behind the ball, then three steps of run-up at an angle, plants the left foot beside the ball and swings the right leg hard across the body, striking with the inside of the foot; the kicking leg follows through high across the body to hip height, arms out wide, then lands on the right foot.",
+ "duration": 4.0,
  "mode": "prime"
 }

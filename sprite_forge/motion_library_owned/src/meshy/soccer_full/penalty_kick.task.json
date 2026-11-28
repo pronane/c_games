@@ -1,10 +1,10 @@
 {
- "id": "01a2229f-0c26-7520-a298-409fc1da41eb",
+ "id": "01a2231a-0ee5-7104-8cd4-7ef543895249",
  "status": "SUCCEEDED",
  "consumed_credits": 10,
- "created_at": 1795877179411,
- "finished_at": 1795877197078,
- "prompt": "A professional football (soccer) player takes a penalty: stands, takes a short run-up and strikes the ball low and hard to the side.",
- "duration": 3.5,
+ "created_at": 1795885240692,
+ "finished_at": 1795885258552,
+ "prompt": "A professional football (soccer) player takes a penalty: stands still, takes four quick run-up steps, plants the left foot hard beside the ball and swings the right leg through powerfully, the knee over the ball; the kicking leg follows through forward to waist height and the player lands on the right foot, body leaning forward.",
+ "duration": 4.0,
  "mode": "prime"
 }

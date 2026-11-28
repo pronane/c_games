@@ -6977,11 +6977,11 @@
    "loop": false,
    "category": "Skill",
    "source": "meshy:mz_soccer_ball_roll",
-   "frames": 60,
+   "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 26,
-    "ball_contact_frac": 0.441,
+    "ball_contact": 44,
+    "ball_contact_frac": 0.595,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7623,11 +7623,11 @@
    "loop": false,
    "category": "Ball",
    "source": "meshy:mz_soccer_free_kick_curl",
-   "frames": 105,
+   "frames": 120,
    "fps": 30.0,
    "events": {
-    "ball_contact": 56,
-    "ball_contact_frac": 0.538,
+    "ball_contact": 92,
+    "ball_contact_frac": 0.773,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8071,11 +8071,11 @@
    "loop": false,
    "category": "Ball",
    "source": "meshy:mz_soccer_header_jump",
-   "frames": 60,
+   "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 49,
-    "ball_contact_frac": 0.831,
+    "ball_contact": 34,
+    "ball_contact_frac": 0.459,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8656,11 +8656,11 @@
    "loop": false,
    "category": "Ball",
    "source": "meshy:mz_soccer_penalty_kick",
-   "frames": 105,
+   "frames": 120,
    "fps": 30.0,
    "events": {
-    "ball_contact": 62,
-    "ball_contact_frac": 0.596,
+    "ball_contact": 94,
+    "ball_contact_frac": 0.79,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8720,14 +8720,14 @@
    "loop": false,
    "category": "Defence",
    "source": "meshy:mz_soccer_poke_tackle",
-   "frames": 60,
+   "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 2,
-    "ball_contact_frac": 0.034,
+    "ball_contact": 26,
+    "ball_contact_frac": 0.351,
     "footsteps": [],
-    "hit_start": 0,
-    "hit_end": 9
+    "hit_start": 17,
+    "hit_end": 35
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -8963,14 +8963,14 @@
    "loop": false,
    "category": "Defence",
    "source": "meshy:mz_soccer_shoulder_challenge",
-   "frames": 60,
+   "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 53,
-    "ball_contact_frac": 0.898,
+    "ball_contact": 16,
+    "ball_contact_frac": 0.216,
     "footsteps": [],
-    "hit_start": 46,
-    "hit_end": 59
+    "hit_start": 7,
+    "hit_end": 25
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -9183,13 +9183,13 @@
    "loop": false,
    "category": "Defence",
    "source": "meshy:mz_soccer_tackle",
-   "frames": 60,
+   "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 12,
-    "ball_contact_frac": 0.203,
+    "ball_contact": 10,
+    "ball_contact_frac": 0.135,
     "footsteps": [],
-    "hit_start": 5,
+    "hit_start": 1,
     "hit_end": 19
    },
    "licence": "LicenseRef-Owned-Meshy"
@@ -9442,7 +9442,7 @@
   "cross": "soccer_mz_cross_whipped",
   "shoot": "soccer_mz_shoot",
   "volley": "soccer_mz_volley",
-  "header": "soccer_header",
+  "header": "soccer_mz_header_jump",
   "chest_control": "soccer_mz_chest_control",
   "trap": "soccer_mz_trap_sole",
   "toe_lift": "soccer_mz_flick_up",
@@ -9482,8 +9482,8 @@
   "drop_kick": "soccer_mz_gk_drop_kick",
   "throw_in": "soccer_mz_throw_in",
   "corner_kick": "soccer_mz_corner_kick",
-  "free_kick": "soccer_free_kick",
-  "penalty_kick": "soccer_penalty_kick",
+  "free_kick": "soccer_mz_free_kick_curl",
+  "penalty_kick": "soccer_mz_penalty_kick",
   "goal_kick": "soccer_mz_gk_goal_kick",
   "sidestep": "soccer_sidestep",
   "strafe_l": "soccer_mz_strafe_left",

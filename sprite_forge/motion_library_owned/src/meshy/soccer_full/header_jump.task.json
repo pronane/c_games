@@ -1,10 +1,10 @@
 {
- "id": "01a222a0-a1bb-702e-9f8c-1d595dd76fd2",
+ "id": "01a2231a-99de-7311-a233-2a1cda40f82c",
  "status": "SUCCEEDED",
  "consumed_credits": 10,
- "created_at": 1795877282826,
- "finished_at": 1795877300464,
- "prompt": "A professional football (soccer) player jumps up to win a header, arms raised for leverage, heads the ball forward.",
- "duration": 2.0,
+ "created_at": 1795885276289,
+ "finished_at": 1795885294245,
+ "prompt": "A professional football (soccer) player jumps for a header: bends both knees, swings both arms up and springs high off both feet, at the top of the jump arches the back and snaps the head and neck forward hard to head the ball, then lands on both feet with bent knees.",
+ "duration": 2.5,
  "mode": "prime"
 }
