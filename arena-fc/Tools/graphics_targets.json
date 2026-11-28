@@ -1,0 +1,37 @@
+{
+  "_doc": "Graphics benchmark rules (Tools/graphics_benchmark.py compare). 'fc' is an estimate of what an FC 25-class console football game ships (EA does not publish exact figures): it shows how far off we are, it does not fail the job. A change fails if a metric gets worse than its base by more than 'tolerance' (absolute) or 'tolerance_pct' (relative). higher_is_better defaults to true.",
+  "metrics": {
+    "Player model (from the GLB)": {
+      "model.player_tris_lod0_median": { "label": "triangles per player (LOD0)", "fc": 40000, "tolerance_pct": 2 },
+      "model.skeleton_joints": { "label": "skeleton joints (fingers, face, twist bones)", "fc": 80 },
+      "model.facial_blend_shapes": { "label": "facial blend shapes (expressions, speech)", "fc": 50 },
+      "model.normal_mapped_materials_pct": { "label": "materials with normal maps (%)", "fc": 100 },
+      "model.roughness_mapped_materials_pct": { "label": "materials with roughness maps (%)", "fc": 100 },
+      "model.kit_textured_materials_pct": { "label": "kit materials with textures (%)", "fc": 100 },
+      "model.skin_texture_px_median": { "label": "skin texture size (px)", "fc": 2048 },
+      "model.distinct_faces": { "label": "distinct faces", "fc": 100 }
+    },
+    "Broadcast camera (the main gameplay view)": {
+      "shots.broadcast.render.player_height_frac_median": { "label": "player height on screen (fraction of frame)", "fc": 0.08, "tolerance": 0.003 },
+      "shots.broadcast.render.shadow_casting_suns": { "label": "sun casts shadows", "fc": 1 },
+      "shots.broadcast.image.aa_edge_smoothness": { "label": "edge anti-aliasing (smooth edge share)", "tolerance_pct": 10 },
+      "shots.broadcast.image.detail": { "label": "fine detail (Laplacian variance)", "tolerance_pct": 15 },
+      "shots.broadcast.image.dynamic_range": { "label": "dynamic range (luminance p1-p99)", "tolerance_pct": 10 },
+      "shots.broadcast.image.clipped_pct": { "label": "clipped pixels (%)", "higher_is_better": false, "tolerance": 0.5 },
+      "shots.broadcast.image.colourfulness": { "label": "colourfulness", "tolerance_pct": 15 },
+      "shots.broadcast.render.draw_calls_in_frame": { "label": "draw calls (cost)", "higher_is_better": false, "tolerance_pct": 15 }
+    },
+    "Shoulder camera (close gameplay view)": {
+      "shots.close.render.player_height_frac_median": { "label": "player height on screen (fraction of frame)", "tolerance": 0.005 },
+      "shots.close.image.aa_edge_smoothness": { "label": "edge anti-aliasing", "tolerance_pct": 10 },
+      "shots.close.image.detail": { "label": "fine detail", "tolerance_pct": 15 },
+      "shots.close.image.dynamic_range": { "label": "dynamic range", "tolerance_pct": 10 }
+    },
+    "Player and face close-ups": {
+      "shots.player.image.aa_edge_smoothness": { "label": "player: edge anti-aliasing", "tolerance_pct": 10 },
+      "shots.player.image.detail": { "label": "player: fine detail", "tolerance_pct": 15 },
+      "shots.face.image.detail": { "label": "face: fine detail (skin, hair, eyes)", "tolerance_pct": 15 },
+      "shots.face.image.dynamic_range": { "label": "face: dynamic range", "tolerance_pct": 10 }
+    }
+  }
+}

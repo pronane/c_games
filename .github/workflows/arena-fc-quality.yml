@@ -177,6 +177,120 @@ jobs:
           path: ${{ runner.temp }}/bench/
           if-no-files-found: warn
 
+  graphics-shots:
+    name: Graphics shots (${{ matrix.side }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # The base side can't take shots until this benchmark has merged (no --shot-out flag yet).
+    continue-on-error: ${{ matrix.side == 'base' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [head, base]
+    steps:
+      - name: Work out what to check out
+        id: ref
+        run: |
+          if [ "${{ matrix.side }}" = head ]; then ref="${{ github.sha }}"; else
+            ref="${{ github.event.pull_request.base.sha }}"; [ -z "$ref" ] && ref="${{ github.event.before }}"
+            case "$ref" in ""|0000000000000000000000000000000000000000) ref="";; esac
+          fi
+          echo "sha=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.ref.outputs.sha != ''
+        with:
+          ref: ${{ steps.ref.outputs.sha }}
+      - name: Use this change's benchmark tools on both sides
+        if: steps.ref.outputs.sha != '' && matrix.side == 'base'
+        run: |
+          git fetch -q --depth=1 origin ${{ github.sha }}
+          git checkout ${{ github.sha }} -- arena-fc/Tools/graphics_shots.sh arena-fc/Tools/graphics_benchmark.py arena-fc/Tools/graphics_targets.json
+      - uses: actions/setup-dotnet@v4
+        if: steps.ref.outputs.sha != ''
+        with:
+          dotnet-version: "9.0.x"
+      - name: Install software rendering, virtual display and image tools
+        if: steps.ref.outputs.sha != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+          python3 -m pip install --user -q numpy pillow
+      - name: Download Godot 4.7.2 Mono
+        if: steps.ref.outputs.sha != ''
+        run: |
+          curl -fsSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x "$RUNNER_TEMP"/godot/*/Godot_v4.7.2-stable_mono_linux.x86_64
+      - name: Build and import
+        if: steps.ref.outputs.sha != ''
+        working-directory: arena-fc
+        run: |
+          dotnet build ArenaFC.sln -c Release -v:q
+          "$GODOT" --headless --editor --path . --import --quit
+      - name: Render the shots and measure them
+        if: steps.ref.outputs.sha != ''
+        working-directory: arena-fc
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          out="$RUNNER_TEMP/graphics-${{ matrix.side }}"
+          bash Tools/graphics_shots.sh "$out" opengl3
+          python3 Tools/graphics_benchmark.py measure --shots "$out" --glb Data/models/soccer_player.glb \
+            --out "$out/graphics.json" > /dev/null
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.ref.outputs.sha != ''
+        with:
+          name: arena-fc-graphics-${{ matrix.side }}
+          retention-days: 7
+          path: ${{ runner.temp }}/graphics-${{ matrix.side }}/
+          if-no-files-found: warn
+
+  graphics-benchmark:
+    name: Graphics benchmark (vs base)
+    needs: graphics-shots
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arena-fc-graphics-*
+          path: ${{ runner.temp }}/g
+      - name: Compare with the base
+        working-directory: arena-fc
+        run: |
+          g="$RUNNER_TEMP/g"
+          test -s "$g/arena-fc-graphics-head/graphics.json" || { echo "::error::head shots missing"; exit 1; }
+          base=""; [ -s "$g/arena-fc-graphics-base/graphics.json" ] && base="--base $g/arena-fc-graphics-base/graphics.json"
+          python3 Tools/graphics_benchmark.py compare --head "$g/arena-fc-graphics-head/graphics.json" $base \
+            --targets Tools/graphics_targets.json --summary "$GITHUB_STEP_SUMMARY" --out "$g/graphics-comparison.json"
+      - name: Contact sheet of this change's shots
+        if: always()
+        run: |
+          python3 -m pip install --user -q pillow
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          d = os.path.join(os.environ["RUNNER_TEMP"], "g", "arena-fc-graphics-head")
+          ims = [Image.open(p).convert("RGB").resize((960, 540)) for p in sorted(glob.glob(d + "/*.png"))]
+          if ims:
+              sheet = Image.new("RGB", (1920, 540 * ((len(ims) + 1) // 2)))
+              for k, im in enumerate(ims):
+                  sheet.paste(im, ((k % 2) * 960, (k // 2) * 540))
+              sheet.save(os.path.join(os.environ["RUNNER_TEMP"], "graphics-shots.png"))
+          PY
+      - name: Upload the contact sheet (opens in the browser)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/graphics-shots.png
+          archive: false
+          retention-days: 7
+          if-no-files-found: warn
+
   gameplay-recording:
     name: Gameplay recording (video + targets)
     runs-on: ubuntu-latest
