@@ -56,6 +56,32 @@ def load_prompts(pack, folder=PROMPTS):
     return d
 
 
+MAX_TRAVEL_MS = 8.0       # a footballer's sprint is ~9-10 m/s; Meshy prime takes run off at up to 30 m/s
+
+
+def cap_travel(rec, peak=MAX_TRAVEL_MS):
+    """Meshy's prime model sometimes sends the body across the ground far too fast (a slide tackle 30 m in 2.5 s)
+    while the pose itself is right. Scale the root's ground travel so its peak speed is `peak` m/s; the original
+    peak is kept in rec["meshy"]["travel"]. Games play these moves in place, so only the pose is visible there."""
+    import numpy as np
+    keys = rec.get("keys") or []
+    if len(keys) < 2:
+        return 1.0
+    dur = float(rec.get("duration") or keys[-1][0] or 1.0)
+    t = np.array([float(k[0]) for k in keys]) * dur / max(1e-6, float(keys[-1][0]) or 1.0)
+    P = np.array([(list(k[1].get("pos", (0, 0))) + [0, 0])[:2] for k in keys], float)
+    v = np.linalg.norm(np.diff(P, axis=0), axis=1) / np.maximum(1e-6, np.diff(t))
+    top = float(v.max()) if len(v) else 0.0
+    if top <= peak:
+        return 1.0
+    f = peak / top
+    for k, p in zip(keys, P):
+        if "pos" in k[1]:
+            k[1]["pos"] = [float((p[0] - P[0, 0]) * f + P[0, 0]), float((p[1] - P[0, 1]) * f + P[0, 1])]
+    rec.setdefault("meshy", {})["travel"] = {"peak_ms": round(top, 2), "scaled_to_ms": peak, "factor": round(f, 3)}
+    return f
+
+
 def plan(spec, moves=None, mode=None):
     mode = mode or spec.get("mode", "swift")
     names = [m for m in (moves or list(spec["moves"]))]
@@ -77,6 +103,7 @@ def import_clip(src, clip, loop, out_dir=OWNED, pack=None, move=None, prompt="")
     if r.returncode or not os.path.isfile(rec_p):
         return None, ["import failed: %s" % ((r.stderr or r.stdout).strip().splitlines() or ["?"])[-1]]
     rec = json.load(open(rec_p, encoding="utf-8"))
+    cap_travel(rec)
     rec["desc"] = "Meshy Text to Motion%s: %s" % (" (%s %s)" % (pack, move) if pack else "", prompt[:160])
     rec.setdefault("meshy", {}).update(pack=pack, move=move, prompt=prompt, source=os.path.relpath(src, out_dir))
     with open(rec_p, "w", encoding="utf-8") as f:
@@ -87,6 +114,32 @@ def import_clip(src, clip, loop, out_dir=OWNED, pack=None, move=None, prompt="")
     if bad:                                   # never ship a clip that fails its check; the source file stays for a re-import
         os.remove(rec_p)
     return rec_p, ["%s: %s" % (x[0], x[2]) for x in bad]
+
+
+def import_prime_safely(src, clip, m, out, pack, move):
+    """Import a prime take under a temporary name; it replaces the move's clip only when it passes its checks,
+    so a weaker prime take never removes a swift clip that works."""
+    tmp = clip + "_primetake"
+    rec_p, bad = import_clip(src, tmp, m.get("loop", False), out, pack, move, m.get("prompt", ""))
+    if not rec_p or bad:
+        return None, bad or ["import failed"]
+    rec = json.load(open(rec_p, encoding="utf-8"))
+    rec["name"] = clip
+    rec.setdefault("meshy", {})["mode"] = "prime"
+    final = os.path.join(out, clip + ".json")
+    with open(final, "w", encoding="utf-8") as f:
+        json.dump(rec, f)
+    os.remove(rec_p)
+    return final, []
+
+
+def set_mode(pack, move, mode, folder=PROMPTS):
+    p = os.path.join(folder, pack + ".json")
+    d = json.load(open(p, encoding="utf-8"))
+    d["moves"][move]["mode"] = mode
+    d["moves"][move].pop("no_clip", None)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(d, f, indent=1)
 
 
 def wire_targets(spec, pack, packs_dir=None):
@@ -238,10 +291,13 @@ def run_motion(a, client=None, log=print):
                           | {"prompt": m["prompt"], "duration": m["duration"], "mode": mode}, f, indent=1)
         except MZ.MeshyError as e:
             rows.append((n, "-", "meshy: %s" % e)); continue
-        rec_p, bad = import_clip(src, clip, m.get("loop", False), out, a.pack, n, m["prompt"])
+        rec_p, bad = import_prime_safely(src, clip, m, out, a.pack, n) if mode == "prime" else \
+            import_clip(src, clip, m.get("loop", False), out, a.pack, n, m["prompt"])
         rows.append((n, clip if rec_p else "-", "ok" if not bad else "; ".join(bad)))
         if rec_p and not bad:
             made[n] = clip
+            if mode == "prime" and not a.no_wire:      # parallel --no-wire runs record it afterwards
+                set_mode(a.pack, n, "prime", a.prompts or PROMPTS)
     _report(rows, log)
     made.update(reused(spec, out))
     if made and not a.no_wire:
@@ -260,7 +316,8 @@ def run_import(a, log=print):
     for n, m in spec["moves"].items():
         if m.get("reuse"):
             continue
-        src = next((os.path.join(src_dir, n + e) for e in (".bvh", ".fbx") if os.path.isfile(os.path.join(src_dir, n + e))), None)
+        order = (".fbx", ".bvh") if m.get("mode") == "prime" else (".bvh", ".fbx")
+        src = next((os.path.join(src_dir, n + e) for e in order if os.path.isfile(os.path.join(src_dir, n + e))), None)
         if not src:
             continue
         rec_p, bad = import_clip(src, pre + n, m.get("loop", False), out, a.pack, n, m["prompt"])

@@ -6980,8 +6980,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 28,
-    "ball_contact_frac": 0.475,
+    "ball_contact": 26,
+    "ball_contact_frac": 0.441,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7012,8 +7012,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 55,
-    "ball_contact_frac": 0.743,
+    "ball_contact": 71,
+    "ball_contact_frac": 0.959,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7044,11 +7044,11 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 15,
-    "ball_contact_frac": 0.254,
+    "ball_contact": 14,
+    "ball_contact_frac": 0.237,
     "footsteps": [],
-    "hit_start": 8,
-    "hit_end": 22
+    "hit_start": 7,
+    "hit_end": 21
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -7060,8 +7060,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 44,
-    "ball_contact_frac": 0.746,
+    "ball_contact": 2,
+    "ball_contact_frac": 0.034,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7204,8 +7204,8 @@
    "frames": 90,
    "fps": 30.0,
    "events": {
-    "ball_contact": 29,
-    "ball_contact_frac": 0.326,
+    "ball_contact": 43,
+    "ball_contact_frac": 0.483,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7236,8 +7236,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 16,
-    "ball_contact_frac": 0.216,
+    "ball_contact": 10,
+    "ball_contact_frac": 0.135,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7367,8 +7367,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 67,
-    "ball_contact_frac": 0.905,
+    "ball_contact": 61,
+    "ball_contact_frac": 0.824,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7450,8 +7450,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 21,
-    "ball_contact_frac": 0.356,
+    "ball_contact": 8,
+    "ball_contact_frac": 0.136,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7610,8 +7610,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 40,
-    "ball_contact_frac": 0.678,
+    "ball_contact": 20,
+    "ball_contact_frac": 0.339,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7626,8 +7626,8 @@
    "frames": 105,
    "fps": 30.0,
    "events": {
-    "ball_contact": 45,
-    "ball_contact_frac": 0.433,
+    "ball_contact": 56,
+    "ball_contact_frac": 0.538,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7738,8 +7738,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 5,
-    "ball_contact_frac": 0.085,
+    "ball_contact": 16,
+    "ball_contact_frac": 0.271,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7786,8 +7786,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 38,
-    "ball_contact_frac": 0.644,
+    "ball_contact": 18,
+    "ball_contact_frac": 0.305,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -7850,8 +7850,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 24,
-    "ball_contact_frac": 0.324,
+    "ball_contact": 36,
+    "ball_contact_frac": 0.486,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8074,8 +8074,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 28,
-    "ball_contact_frac": 0.475,
+    "ball_contact": 49,
+    "ball_contact_frac": 0.831,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8154,8 +8154,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 26,
-    "ball_contact_frac": 0.441,
+    "ball_contact": 40,
+    "ball_contact_frac": 0.678,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8186,8 +8186,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 22,
-    "ball_contact_frac": 0.373,
+    "ball_contact": 25,
+    "ball_contact_frac": 0.424,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8403,8 +8403,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 10,
-    "ball_contact_frac": 0.135,
+    "ball_contact": 15,
+    "ball_contact_frac": 0.203,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8515,8 +8515,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 25,
-    "ball_contact_frac": 0.338,
+    "ball_contact": 15,
+    "ball_contact_frac": 0.203,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8643,8 +8643,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 32,
-    "ball_contact_frac": 0.542,
+    "ball_contact": 24,
+    "ball_contact_frac": 0.407,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8659,8 +8659,8 @@
    "frames": 105,
    "fps": 30.0,
    "events": {
-    "ball_contact": 13,
-    "ball_contact_frac": 0.125,
+    "ball_contact": 62,
+    "ball_contact_frac": 0.596,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8723,11 +8723,11 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 15,
-    "ball_contact_frac": 0.254,
+    "ball_contact": 2,
+    "ball_contact_frac": 0.034,
     "footsteps": [],
-    "hit_start": 8,
-    "hit_end": 22
+    "hit_start": 0,
+    "hit_end": 9
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -8819,8 +8819,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 17,
-    "ball_contact_frac": 0.288,
+    "ball_contact": 12,
+    "ball_contact_frac": 0.203,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8835,8 +8835,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 24,
-    "ball_contact_frac": 0.407,
+    "ball_contact": 23,
+    "ball_contact_frac": 0.39,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -8966,11 +8966,11 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 24,
-    "ball_contact_frac": 0.407,
+    "ball_contact": 53,
+    "ball_contact_frac": 0.898,
     "footsteps": [],
-    "hit_start": 17,
-    "hit_end": 31
+    "hit_start": 46,
+    "hit_end": 59
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -9014,11 +9014,11 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 21,
-    "ball_contact_frac": 0.284,
+    "ball_contact": 10,
+    "ball_contact_frac": 0.135,
     "footsteps": [],
-    "hit_start": 12,
-    "hit_end": 30
+    "hit_start": 1,
+    "hit_end": 19
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -9046,8 +9046,8 @@
    "frames": 75,
    "fps": 30.0,
    "events": {
-    "ball_contact": 53,
-    "ball_contact_frac": 0.716,
+    "ball_contact": 21,
+    "ball_contact_frac": 0.284,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -9116,8 +9116,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 48,
-    "ball_contact_frac": 0.814,
+    "ball_contact": 54,
+    "ball_contact_frac": 0.915,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -9186,11 +9186,11 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 16,
-    "ball_contact_frac": 0.271,
+    "ball_contact": 12,
+    "ball_contact_frac": 0.203,
     "footsteps": [],
-    "hit_start": 9,
-    "hit_end": 23
+    "hit_start": 5,
+    "hit_end": 19
    },
    "licence": "LicenseRef-Owned-Meshy"
   },
@@ -9250,8 +9250,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 35,
-    "ball_contact_frac": 0.593,
+    "ball_contact": 9,
+    "ball_contact_frac": 0.153,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -9397,8 +9397,8 @@
    "frames": 60,
    "fps": 30.0,
    "events": {
-    "ball_contact": 18,
-    "ball_contact_frac": 0.305,
+    "ball_contact": 22,
+    "ball_contact_frac": 0.373,
     "footsteps": [],
     "hit_start": -1,
     "hit_end": -1
@@ -9433,27 +9433,27 @@
   "shield": "soccer_mz_shield_ball",
   "run_ball": "soccer_run_ball",
   "kick": "soccer_kick_place",
-  "pass": "soccer_short_pass",
-  "short_pass": "soccer_short_pass",
-  "long_pass": "soccer_long_pass",
-  "long_ball": "soccer_long_pass",
-  "through": "soccer_through_ball",
-  "through_ball": "soccer_through_ball",
-  "cross": "soccer_cross",
+  "pass": "soccer_mz_pass",
+  "short_pass": "soccer_mz_pass",
+  "long_pass": "soccer_mz_lofted_pass",
+  "long_ball": "soccer_mz_lofted_pass",
+  "through": "soccer_mz_through_ball",
+  "through_ball": "soccer_mz_through_ball",
+  "cross": "soccer_mz_cross_whipped",
   "shoot": "soccer_mz_shoot",
-  "volley": "soccer_volley",
+  "volley": "soccer_mz_volley",
   "header": "soccer_header",
   "chest_control": "soccer_mz_chest_control",
   "trap": "soccer_mz_trap_sole",
-  "toe_lift": "soccer_toe_lift",
+  "toe_lift": "soccer_mz_flick_up",
   "pickup": "soccer_pickup",
   "catch": "soccer_mz_gk_catch_chest",
   "tackle": "soccer_tackle",
-  "slide": "soccer_slide_tackle",
-  "slide_tackle": "soccer_slide_tackle",
+  "slide": "soccer_mz_slide_tackle",
+  "slide_tackle": "soccer_mz_slide_tackle",
   "shoulder_charge": "soccer_shoulder_charge",
   "dispossess": "soccer_dispossess",
-  "block": "soccer_block",
+  "block": "soccer_mz_block_shot",
   "foul": "soccer_mz_fall_tripped",
   "stumble": "soccer_mz_stumble",
   "trip": "soccer_mz_fall_tripped",
@@ -9462,15 +9462,15 @@
   "knocked_down": "soccer_knocked_down",
   "pushed": "soccer_pushed",
   "hit_react": "soccer_hit_react",
-  "dive": "soccer_keeper_dive_left",
+  "dive": "soccer_mz_gk_dive_low_left",
   "save": "soccer_mz_gk_parry",
   "parry": "soccer_mz_gk_parry",
   "keeper_idle": "soccer_keeper_idle",
   "keeper_ready": "soccer_mz_gk_ready",
   "keeper_catch": "soccer_mz_gk_catch_chest",
-  "keeper_ground_catch": "soccer_keeper_ground_catch",
+  "keeper_ground_catch": "soccer_mz_gk_collect_low",
   "keeper_save": "soccer_mz_gk_parry",
-  "keeper_dive_left": "soccer_keeper_dive_left",
+  "keeper_dive_left": "soccer_mz_gk_dive_low_left",
   "keeper_dive_right": "soccer_mz_gk_dive_low_right",
   "keeper_dive_high": "soccer_mz_gk_dive_high_left",
   "keeper_punch": "soccer_mz_gk_punch",
@@ -9478,22 +9478,22 @@
   "keeper_kick": "soccer_mz_gk_drop_kick",
   "kick_place": "soccer_kick_place",
   "kick_run": "soccer_kick_run",
-  "kick_out": "soccer_kick_out",
+  "kick_out": "soccer_mz_gk_goal_kick",
   "drop_kick": "soccer_mz_gk_drop_kick",
   "throw_in": "soccer_mz_throw_in",
-  "corner_kick": "soccer_corner_kick",
+  "corner_kick": "soccer_mz_corner_kick",
   "free_kick": "soccer_free_kick",
   "penalty_kick": "soccer_penalty_kick",
-  "goal_kick": "soccer_goal_kick",
+  "goal_kick": "soccer_mz_gk_goal_kick",
   "sidestep": "soccer_sidestep",
   "strafe_l": "soccer_mz_strafe_left",
   "strafe_r": "soccer_mz_strafe_right",
   "strafe": "soccer_sidestep",
   "backpedal": "soccer_mz_backpedal",
   "jockey": "soccer_jockey",
-  "juke_feint": "soccer_juke_feint",
+  "juke_feint": "soccer_mz_body_feint",
   "stop": "soccer_mz_decelerate",
-  "turn": "soccer_turn",
+  "turn": "soccer_mz_turn_180",
   "cut": "soccer_change_direction",
   "change_direction": "soccer_change_direction",
   "spin": "soccer_spin",
@@ -9505,14 +9505,14 @@
   "solo": "soccer_solo",
   "fist_pass": "soccer_fist_pass",
   "fist_shoot": "soccer_fist_shoot",
-  "skill_step_over": "soccer_skill_step_over",
+  "skill_step_over": "soccer_mz_stepover",
   "skill_roulette": "soccer_mz_roulette",
   "skill_drag_back": "soccer_mz_drag_back",
   "skill_elastico": "soccer_mz_elastico",
   "skill_ball_roll": "soccer_skill_ball_roll",
   "skill_rainbow": "soccer_mz_rainbow_flick",
   "skill_fake_shot": "soccer_mz_fake_shot",
-  "skill_heel_to_heel": "soccer_skill_heel_to_heel",
+  "skill_heel_to_heel": "soccer_mz_heel_to_heel",
   "thigh_control": "soccer_mz_thigh_control",
   "chip_shot": "soccer_mz_chip_shot",
   "trivela": "soccer_mz_trivela",

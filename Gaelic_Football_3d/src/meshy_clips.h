@@ -7,6 +7,10 @@ typedef struct { int action; const char *clip; float start, end, rate; int conta
 static const MeshyAction MESHY_ACTIONS[] = {
     { GAME_ACT_KICK, "mz_high_kick_pass", 0.498f, 1.530f, 1.100f, 1 },
     { GAME_ACT_FREE_KICK, "mz_free_from_hand", 0.623f, 2.096f, 1.100f, 1 },
+    { GAME_ACT_KICKOUT, "mz_kickout_long", 0.077f, 2.181f, 1.100f, 1 },
+    { GAME_ACT_GROUND_KICK, "mz_penalty_kick", 0.743f, 2.178f, 1.100f, 1 },
+    { GAME_ACT_PICKUP, "mz_pick_up_ground", 0.684f, 1.316f, 1.100f, 0 },
+    { GAME_ACT_TACKLE, "mz_tackle", 0.313f, 0.954f, 1.100f, 0 },
     { GAME_ACT_BOUNCE, "mz_bounce", 0.000f, 0.483f, 1.000f, 0 },
     { GAME_ACT_CATCH, "mz_catch_aerial", 0.000f, 0.896f, 1.100f, 0 },
     { GAME_ACT_FALL, "mz_fall", 0.483f, 1.917f, 1.100f, 0 },

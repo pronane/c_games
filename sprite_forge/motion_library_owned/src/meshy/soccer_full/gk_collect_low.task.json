@@ -1,10 +1,10 @@
 {
- "id": "01a22246-9a7e-7612-a4cc-65c0b5becca3",
+ "id": "01a2229f-d1a4-710d-a87a-260169784b7c",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795871382875,
- "finished_at": 1795871391492,
+ "consumed_credits": 10,
+ "created_at": 1795877230957,
+ "finished_at": 1795877251009,
  "prompt": "A professional football (soccer) player is a goalkeeper standing upright who bends down, scoops a low ball into the chest with both hands, then stands upright again holding it.",
  "duration": 2.0,
- "mode": "swift"
+ "mode": "prime"
 }

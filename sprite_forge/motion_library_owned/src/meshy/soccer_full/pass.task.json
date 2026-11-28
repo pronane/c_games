@@ -1,10 +1,10 @@
 {
- "id": "01a2223a-30a8-718b-aa0b-7ac718e5f2cc",
+ "id": "01a2229b-2205-7712-8c83-11e29f4c96eb",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795870569375,
- "finished_at": 1795870590243,
+ "consumed_credits": 10,
+ "created_at": 1795876922670,
+ "finished_at": 1795876946968,
  "prompt": "A professional football (soccer) player plays a short ground pass with the inside of the right foot, side-foot, the standing foot beside the ball, short follow-through.",
  "duration": 2.0,
- "mode": "swift"
+ "mode": "prime"
 }

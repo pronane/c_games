@@ -1,10 +1,10 @@
 {
- "id": "01a22241-b03a-7190-b145-a21b4e7ecf51",
+ "id": "01a2229e-8461-723b-90a0-b3be0a40cafd",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795871061044,
- "finished_at": 1795871071526,
+ "consumed_credits": 10,
+ "created_at": 1795877144338,
+ "finished_at": 1795877164750,
  "prompt": "A professional football (soccer) player takes a curling free kick: stands still, takes a short angled run-up, and curls the ball with the inside of the right foot.",
  "duration": 3.5,
- "mode": "swift"
+ "mode": "prime"
 }

@@ -1,10 +1,10 @@
 {
- "id": "01a2223f-7ac9-7234-a962-d02ed6e925b3",
+ "id": "01a2229d-1875-774b-81fb-4e7be41f096e",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795870916105,
- "finished_at": 1795870922204,
+ "consumed_credits": 10,
+ "created_at": 1795877051307,
+ "finished_at": 1795877103895,
  "prompt": "A professional football (soccer) player stretches the right leg out to poke the ball away from an attacker with the toe.",
  "duration": 2.0,
- "mode": "swift"
+ "mode": "prime"
 }

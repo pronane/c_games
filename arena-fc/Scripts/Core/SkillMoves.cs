@@ -294,16 +294,15 @@ public static class SkillMoves
     public static readonly System.Collections.Generic.IReadOnlyDictionary<SkillMove, SkillMove[]> Families =
         new System.Collections.Generic.Dictionary<SkillMove, SkillMove[]>
         {
-            // Members kept after reviewing every Meshy skill clip on the Arena player (v11.42); the others
-            // (reverse/double step-over, body feint, reverse elastico, heel chop, fake pass, Berba spin, sole roll,
-            // inside hook, knock-on, behind-the-leg, rabona fake, flair pass, sombrero) stay callable by name only.
-            [SkillMove.StepOver] = new[] { SkillMove.StepOver, SkillMove.StepOver, SkillMove.LaneChange },
-            [SkillMove.HeelToHeel] = new[] { SkillMove.HeelToHeel, SkillMove.HeelToHeel, SkillMove.DragBack, SkillMove.CruyffTurn, SkillMove.ScoopTurn },
+            // Members kept after reviewing every Meshy skill clip on the Arena player (v11.42 swift, v11.43 prime);
+            // heel flick, sole roll, inside hook, behind-the-leg, rabona fake and flair pass stay callable by name only.
+            [SkillMove.StepOver] = new[] { SkillMove.StepOver, SkillMove.StepOver, SkillMove.ReverseStepOver, SkillMove.DoubleStepOver, SkillMove.BodyFeint, SkillMove.LaneChange },
+            [SkillMove.HeelToHeel] = new[] { SkillMove.HeelToHeel, SkillMove.HeelToHeel, SkillMove.DragBack, SkillMove.CruyffTurn, SkillMove.ScoopTurn, SkillMove.HeelChop },
             [SkillMove.BallRoll] = new[] { SkillMove.BallRoll, SkillMove.BallRoll, SkillMove.LaCroqueta, SkillMove.OutsideHook, SkillMove.HesitationBurst },
-            [SkillMove.Elastico] = new[] { SkillMove.Elastico },
-            [SkillMove.Roulette] = new[] { SkillMove.Roulette, SkillMove.Roulette, SkillMove.TornadoSpin },
-            [SkillMove.Rainbow] = new[] { SkillMove.Rainbow, SkillMove.Rainbow, SkillMove.HeelFlick, SkillMove.BallHop },
-            [SkillMove.FakeShot] = new[] { SkillMove.FakeShot },
+            [SkillMove.Elastico] = new[] { SkillMove.Elastico, SkillMove.Elastico, SkillMove.ReverseElastico, SkillMove.KnockOnAndRun },
+            [SkillMove.Roulette] = new[] { SkillMove.Roulette, SkillMove.Roulette, SkillMove.TornadoSpin, SkillMove.BerbaSpin },
+            [SkillMove.Rainbow] = new[] { SkillMove.Rainbow, SkillMove.Rainbow, SkillMove.HeelFlick, SkillMove.BallHop, SkillMove.SombreroFlick },
+            [SkillMove.FakeShot] = new[] { SkillMove.FakeShot, SkillMove.FakeShot, SkillMove.FakePass },
         };
 
     /// <summary>The move actually played for an input: a member of its family (itself when it has none).</summary>

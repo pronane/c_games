@@ -54,6 +54,25 @@ Limits: the starter is procedural keys, not motion capture. A video import needs
 Hitboxes are a silhouette estimate. Quick preview scales event frames down because it builds
 fewer frames. The starter has no Mixamo or Meshy clips (v11.41's owned Meshy clips are in motion_library_owned/). Do not commit a recording of a real person.
 
+## New in v11.43: Meshy prime takes for the moves swift got wrong
+
+* 36 moves redone in Meshy's prime mode (10 credits each, FBX, SMPL-H skeleton): the 23 Arena FC actions and 4
+  Gaelic Football 3D actions that lost the v11.42 review, 8 weak skill variants and the knee slide. The catalogue
+  records `"mode": "prime"` per move, and `forge.py meshy import` then reads the move's FBX instead of its BVH.
+* **Not an import bug after all:** prime's pose is right but its ground travel can be absurd (a slide tackle 30 m
+  in 2.5 s, a knee slide 16 m). `meshy_cli.cap_travel` scales the root's ground travel to a peak of 8 m/s and keeps
+  the original in the record; both games play these moves in place, so only the pose shows.
+* A prime take is checked under a temporary name and replaces the swift clip only when it passes
+  (`import_prime_safely`). All 36 passed `check_motion`.
+* Reviewed the same way (Godot render on the Arena player next to the old and the swift clip; stick figures over
+  the played window for Gaelic). **Arena FC: 61 actions now play Meshy** (passes, long and through balls, cross,
+  corner and goal kicks, volley, toe lift, turn, the slide tackle on the ground, block, juke, the low left dive
+  flat out, ground catch, step-over, heel-to-heel), 7 keep their clips (free kick, penalty, header, tackle,
+  dispossess, shoulder charge, ball roll). The skill families now hold 26 moves. **Gaelic Football 3D: 9 actions**
+  (kickout, penalty, pick-up and tackle added).
+* Tests: `test_meshy` 26 checks; Arena FC 112/112, 1263/1263 and `build.py --check` 6/6; Gaelic 3D `make test` and
+  `make test-motion-model` pass.
+
 ## New in v11.42: full move catalogues (soccer, Gaelic, hurling), in Arena FC and Gaelic Football 3D
 
 * **Catalogues** (`game_packs/meshy/<sport>_full.json`, the move database): every move with its category, timing,

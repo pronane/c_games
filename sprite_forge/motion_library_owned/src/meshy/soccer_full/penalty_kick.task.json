@@ -1,10 +1,10 @@
 {
- "id": "01a22242-435f-7742-8849-ac4e8ff24615",
+ "id": "01a2229f-0c26-7520-a298-409fc1da41eb",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795871098370,
- "finished_at": 1795871110026,
+ "consumed_credits": 10,
+ "created_at": 1795877179411,
+ "finished_at": 1795877197078,
  "prompt": "A professional football (soccer) player takes a penalty: stands, takes a short run-up and strikes the ball low and hard to the side.",
  "duration": 3.5,
- "mode": "swift"
+ "mode": "prime"
 }

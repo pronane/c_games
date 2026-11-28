@@ -140,14 +140,16 @@
    "duration": 3.5,
    "loop": false,
    "library": "kick",
-   "prompt": "A Gaelic football player takes a penalty: places the ball, runs up and strikes it hard and low."
+   "prompt": "A Gaelic football player takes a penalty: places the ball, runs up and strikes it hard and low.",
+   "mode": "prime"
   },
   "kickout_long": {
    "category": "Goalkeeper",
    "duration": 3.5,
    "loop": false,
    "library": "kick",
-   "prompt": "A Gaelic football player is a goalkeeper taking a long kickout off the tee: long run-up and big kick high up the field."
+   "prompt": "A Gaelic football player is a goalkeeper taking a long kickout off the tee: long run-up and big kick high up the field.",
+   "mode": "prime"
   },
   "kickout_short": {
    "category": "Goalkeeper",

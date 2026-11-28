@@ -1,10 +1,10 @@
 {
- "id": "01a2223a-5077-73f4-842d-c79b4b09f902",
+ "id": "01a2229c-3d79-72c6-82c0-f978591e64ed",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795870577607,
- "finished_at": 1795870599895,
+ "consumed_credits": 10,
+ "created_at": 1795876995572,
+ "finished_at": 1795877019262,
  "prompt": "A professional football (soccer) player plays a long lofted pass: two-step approach, leans back slightly and gets under the ball with the right foot, high follow-through.",
  "duration": 2.5,
- "mode": "swift"
+ "mode": "prime"
 }

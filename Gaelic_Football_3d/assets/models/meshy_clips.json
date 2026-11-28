@@ -50,12 +50,15 @@
   "mz_pick_up_ground": {
    "move": "pick_up_ground",
    "source": "sprite_forge/motion_library_owned/mz_gaelic_pick_up_ground.json",
-   "sha256": "b92da300eccb642db9b205686c207572d039271827f391249108f03b5b2e52f0",
+   "sha256": "8686069a9fdb5475338fd482d971fd4d408a67819c75c172a21320f33318d126",
    "seconds": 2.467,
    "loop": false,
    "category": "Imported",
    "contact_frac": -1.0,
-   "prompt": "A Gaelic football player does a toe-lift pick-up: jogging forward, slips the toe of the right foot under a ball on the ground and flicks it up into both hands, catching it at waist height, then stands tall."
+   "prompt": "A Gaelic football player does a toe-lift pick-up: jogging forward, slips the toe of the right foot under a ball on the ground and flicks it up into both hands, catching it at waist height, then stands tall.",
+   "actions": [
+    "GAME_ACT_PICKUP"
+   ]
   },
   "mz_pick_up_aerial": {
    "move": "pick_up_aerial",
@@ -146,12 +149,15 @@
   "mz_tackle": {
    "move": "tackle",
    "source": "sprite_forge/motion_library_owned/mz_gaelic_tackle.json",
-   "sha256": "360f1b5e45058edca014f72896445e06341fe543d53f6ba80d6abf1518a3cad9",
+   "sha256": "4f0494dcbced90ab9f40734d1420d6e09b8d7e8fa79f4f08bf63b931132c14ba",
    "seconds": 1.967,
    "loop": false,
    "category": "Defence",
    "contact_frac": -1.0,
-   "prompt": "A Gaelic football player makes a legal front tackle: crouched in a defensive stance, steps in and swipes the open right hand down across in front of the body to knock the ball out of an opponent's hands, no grabbing, then recovers."
+   "prompt": "A Gaelic football player makes a legal front tackle: crouched in a defensive stance, steps in and swipes the open right hand down across in front of the body to knock the ball out of an opponent's hands, no grabbing, then recovers.",
+   "actions": [
+    "GAME_ACT_TACKLE"
+   ]
   },
   "mz_juke_feint": {
    "move": "juke_feint",
@@ -465,22 +471,28 @@
   "mz_penalty_kick": {
    "move": "penalty_kick",
    "source": "sprite_forge/motion_library_owned/mz_gaelic_penalty_kick.json",
-   "sha256": "3c632e3dde407835fd8ca87b4e5daab1e4e693910bcf4dfbc4b1c7eca51249bc",
+   "sha256": "4c85e1e2b5740a73839d62a43f6254a78a8e6489ac855e9278aed741acb21143",
    "seconds": 3.467,
    "loop": false,
    "category": "Set piece",
-   "contact_frac": 0.615,
-   "prompt": "A Gaelic football player takes a penalty: places the ball, runs up and strikes it hard and low."
+   "contact_frac": 0.442,
+   "prompt": "A Gaelic football player takes a penalty: places the ball, runs up and strikes it hard and low.",
+   "actions": [
+    "GAME_ACT_GROUND_KICK"
+   ]
   },
   "mz_kickout_long": {
    "move": "kickout_long",
    "source": "sprite_forge/motion_library_owned/mz_gaelic_kickout_long.json",
-   "sha256": "904b1db6d54d4e7be751a585d60673b638f1ddc98af5c4cbc446140308f88a66",
+   "sha256": "7676a780b593f1f5bbae839933ea46d79244f0d306e6f88ab86922023fe50ef4",
    "seconds": 3.467,
    "loop": false,
    "category": "Goalkeeper",
-   "contact_frac": 0.558,
-   "prompt": "A Gaelic football player is a goalkeeper taking a long kickout off the tee: long run-up and big kick high up the field."
+   "contact_frac": 0.356,
+   "prompt": "A Gaelic football player is a goalkeeper taking a long kickout off the tee: long run-up and big kick high up the field.",
+   "actions": [
+    "GAME_ACT_KICKOUT"
+   ]
   },
   "mz_kickout_short": {
    "move": "kickout_short",

@@ -46,11 +46,15 @@ HEADER = os.path.join(GAME, "src", "meshy_clips.h")
 
 # game action -> (Meshy move, contactBy (0 none, 1 foot, 2 hand ...), old played seconds to match).
 # Hand pass and solo stay on their clips: the motion-matching path is built around them (MOTION_MATCHING.md).
-# Kickout, ground kick (penalty), pickup and tackle were reviewed and stay on their clips too: in the swift Meshy
-# takes the strike or the bend is not visible in the played window.
+# Kickout, ground kick (penalty), pickup and tackle lost the review in swift (no visible strike / bend) and were
+# redone in prime (v11.43); the prime takes were reviewed over these windows and kept.
 ACTIONS = {
     "GAME_ACT_KICK": ("high_kick_pass", 1, (1.15 - 0.10) / 1.12),
     "GAME_ACT_FREE_KICK": ("free_from_hand", 1, (1.55 - 0.05) / 1.12),
+    "GAME_ACT_KICKOUT": ("kickout_long", 1, (7.20 - 5.00) / 1.15),          # v11.43: prime takes
+    "GAME_ACT_GROUND_KICK": ("penalty_kick", 1, (1.55 - 0.05) / 1.15),
+    "GAME_ACT_PICKUP": ("pick_up_ground", 0, 0.62 / 1.08),
+    "GAME_ACT_TACKLE": ("tackle", 0, (1.15 - 0.45) / 1.20),
     "GAME_ACT_BOUNCE": ("bounce", 0, 0.79 / 1.25),
     "GAME_ACT_CATCH": ("catch_aerial", 0, (1.70 - 0.82) / 1.08),
     "GAME_ACT_FALL": ("fall", 0, 1.50 / 1.15),

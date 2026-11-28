@@ -568,19 +568,19 @@ MESHY_ACTIONS = {           # kept after a side-by-side review of old vs Meshy o
     "thigh_control": "thigh_control", "throw_in": "throw_in", "trap": "trap_sole", "trivela": "trivela",
     "skill_drag_back": "drag_back", "skill_elastico": "elastico", "skill_fake_shot": "fake_shot",
     "skill_rainbow": "rainbow_flick", "skill_roulette": "roulette",
+    # v11.43: Meshy prime takes, reviewed the same way, replace the swift clips that lost the first review
+    "pass": "pass", "short_pass": "pass", "long_pass": "lofted_pass", "long_ball": "lofted_pass",
+    "through": "through_ball", "through_ball": "through_ball", "cross": "cross_whipped", "corner_kick": "corner_kick",
+    "goal_kick": "gk_goal_kick", "kick_out": "gk_goal_kick", "toe_lift": "flick_up", "volley": "volley",
+    "turn": "turn_180", "slide": "slide_tackle", "slide_tackle": "slide_tackle", "block": "block_shot",
+    "juke_feint": "body_feint", "dive": "gk_dive_low_left", "keeper_dive_left": "gk_dive_low_left",
+    "keeper_ground_catch": "gk_collect_low", "skill_heel_to_heel": "heel_to_heel", "skill_step_over": "stepover",
 }
 # Reviewed and left on their old clips: the swift Meshy take was weaker (see sprite_forge/README v11.42).
-MESHY_REJECTED = {
-    "pass": "leg barely swings", "short_pass": "leg barely swings", "long_pass": "lunge, no kick",
-    "long_ball": "lunge, no kick", "through": "leg barely swings", "through_ball": "leg barely swings",
-    "cross": "barely moves", "corner_kick": "small swing", "free_kick": "barely moves", "penalty_kick": "no visible kick",
-    "goal_kick": "small swing", "kick_out": "small swing", "toe_lift": "a big kick, not a toe lift",
-    "header": "small jump", "volley": "not reviewed", "turn": "not reviewed", "tackle": "knee lift, no lunge",
-    "slide": "a standing kick, not a slide", "slide_tackle": "a standing kick, not a slide",
-    "dispossess": "knee lift", "shoulder_charge": "arm swing, no lean", "block": "knee lift",
-    "juke_feint": "barely moves", "dive": "ends kneeling", "keeper_dive_left": "ends kneeling",
-    "keeper_ground_catch": "no crouch", "skill_ball_roll": "falls over", "skill_heel_to_heel": "a big kick",
-    "skill_step_over": "stands still",
+MESHY_REJECTED = {          # still on their old clips after the swift and the prime takes were both reviewed
+    "free_kick": "no clear strike in swift or prime", "penalty_kick": "no visible kick in swift or prime",
+    "header": "small jump in both", "tackle": "standing reach in both", "dispossess": "crouch, no lunge",
+    "shoulder_charge": "no lean in either", "skill_ball_roll": "swift falls over, prime barely moves",
 }
 BASE_ACTIONS = set(ACTION_ALIASES)
 for _a, _m in MESHY_ACTIONS.items():

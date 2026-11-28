@@ -1,10 +1,10 @@
 {
- "id": "01a22239-dea8-7638-94f5-5a864d240e07",
+ "id": "01a222a0-1cd5-730a-9f0d-5ba1a0a75b66",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795870548255,
- "finished_at": 1795870568369,
+ "consumed_credits": 10,
+ "created_at": 1795877249101,
+ "finished_at": 1795877269431,
  "prompt": "A professional football (soccer) player flicks an imaginary ball up off the ground with the toe of the right foot and catches it on the instep, balancing.",
  "duration": 2.0,
- "mode": "swift"
+ "mode": "prime"
 }

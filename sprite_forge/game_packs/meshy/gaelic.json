@@ -27,7 +27,8 @@
   "pick_up_ground": {
    "duration": 2.5,
    "loop": false,
-   "prompt": "A Gaelic football player does a toe-lift pick-up: jogging forward, slips the toe of the right foot under a ball on the ground and flicks it up into both hands, catching it at waist height, then stands tall."
+   "prompt": "A Gaelic football player does a toe-lift pick-up: jogging forward, slips the toe of the right foot under a ball on the ground and flicks it up into both hands, catching it at waist height, then stands tall.",
+   "mode": "prime"
   },
   "pick_up_aerial": {
    "duration": 2.0,
@@ -72,7 +73,8 @@
   "tackle": {
    "duration": 2.0,
    "loop": false,
-   "prompt": "A Gaelic football player makes a legal front tackle: crouched in a defensive stance, steps in and swipes the open right hand down across in front of the body to knock the ball out of an opponent's hands, no grabbing, then recovers."
+   "prompt": "A Gaelic football player makes a legal front tackle: crouched in a defensive stance, steps in and swipes the open right hand down across in front of the body to knock the ball out of an opponent's hands, no grabbing, then recovers.",
+   "mode": "prime"
   },
   "juke_feint": {
    "duration": 2.0,

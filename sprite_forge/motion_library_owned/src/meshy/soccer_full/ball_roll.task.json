@@ -1,10 +1,10 @@
 {
- "id": "01a2223e-3a79-708d-8cbf-b78463e08323",
+ "id": "01a222a0-5e4f-7025-a644-5a8f4fed5c2e",
  "status": "SUCCEEDED",
- "consumed_credits": 3,
- "created_at": 1795870833907,
- "finished_at": 1795870842857,
+ "consumed_credits": 10,
+ "created_at": 1795877265690,
+ "finished_at": 1795877275257,
  "prompt": "A professional football (soccer) player rolls the ball sideways across the body with the sole of the right foot, stepping sideways with it.",
  "duration": 2.0,
- "mode": "swift"
+ "mode": "prime"
 }

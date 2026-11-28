@@ -932,7 +932,7 @@ Check("skills: a player can do more than one skill move (timer counts down)", sk
           string.Join(",", all.Where(m => !SkillMoves.ClipName(m).StartsWith("skill_"))));
     Check("skills: each input plays itself most often and its family only (reviewed moves)",
           SkillMoves.Families.All(kv => kv.Value.Contains(kv.Key)
-                                        && kv.Value.Count(m => m == kv.Key) * 2 >= kv.Value.Length - 1)
+                                        && kv.Value.Where(m => m != kv.Key).All(o => kv.Value.Count(m => m == kv.Key) > kv.Value.Count(m => m == o)))
           && reachable.Count >= 15 && reachable.All(all.Contains),
           $"reachable={reachable.Count}");
 }
